@@ -167,6 +167,52 @@ const mockAlertsData = [
     resolution: 'View audit logs or configure schedules.'
   }
 ];
+// Custom Tooltip component to color text according to line/wave color
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    // Sort alphabetically by name to match the dashboard's display order
+    const sortedPayload = [...payload].sort((a, b) => a.name.localeCompare(b.name));
+    
+    return (
+      <div
+        className="custom-tooltip"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color-dark)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--spacing-3) var(--spacing-4)',
+          boxShadow: 'var(--shadow-lg)',
+        }}
+      >
+        <p
+          className="label"
+          style={{
+            margin: '0 0 var(--spacing-2) 0',
+            fontWeight: 600,
+            color: 'var(--text-secondary)',
+            fontSize: '0.875rem',
+          }}
+        >
+          {label}
+        </p>
+        {sortedPayload.map((entry, index) => (
+          <p
+            key={index}
+            style={{
+              color: entry.stroke || entry.color,
+              margin: '4px 0',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+            }}
+          >
+            {entry.name} : {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 const Dashboard = () => {
   const isLoading = usePageLoading(600);
@@ -391,14 +437,7 @@ const Dashboard = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
                 <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--bg-card)',
-                    border: '1px solid var(--border-color-dark)',
-                    borderRadius: 'var(--radius-md)'
-                  }}
-                  itemStyle={{ color: 'var(--text-primary)' }}
-                />
+                <Tooltip content={<CustomTooltip />} />
                 <Area type="monotone" dataKey="present" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorPresent)" name="Present" />
                 <Area type="monotone" dataKey="absent" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorAbsent)" name="Absent" />
                 <Area type="monotone" dataKey="late" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorLate)" name="Late" />
