@@ -1,0 +1,184 @@
+:root {
+  --sparkline-color-primary: var(--color-blue-500);
+  --sparkline-color-success: var(--color-green-600);
+  --sparkline-color-warning: var(--color-amber-600);
+  --sparkline-color-danger: var(--color-red-600);
+  --sparkline-color-purple: var(--color-purple-600);
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 140px;
+}
+
+.stat-card-clickable {
+  cursor: pointer;
+}
+
+.stat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-4);
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.stat-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+}
+
+/* Icon Variant Colors */
+.card-var-primary {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.card-var-success {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.card-var-warning {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.card-var-danger {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.card-var-purple {
+  background-color: var(--color-purple-light);
+  color: var(--color-purple);
+}
+
+.stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.stat-value-group {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.stat-trend-chip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.trend-up {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.trend-down {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.trend-warning {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.stat-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: var(--spacing-1);
+}
+
+.trend-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.stat-sparkline {
+  margin-bottom: -4px;
+}
+
+.stat-sparkline svg {
+  display: block;
+  overflow: visible;
+}
+
+.stat-sub-metrics {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-3);
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--border-color-dark);
+}
+
+.sub-metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.sub-metric-val {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  transition: color 0.15s ease;
+}
+
+.sub-metric-val.sub-primary {
+  color: var(--color-primary);
+}
+
+.sub-metric-val.sub-success {
+  color: var(--color-success);
+}
+
+.sub-metric-val.sub-warning {
+  color: var(--color-warning);
+}
+
+.sub-metric-val.sub-danger {
+  color: var(--color-danger);
+}
+
+.sub-metric-val.sub-purple {
+  color: var(--color-purple);
+}
+
+.sub-metric-lbl {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}

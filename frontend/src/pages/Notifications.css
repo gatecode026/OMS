@@ -1,0 +1,233 @@
+.notifications-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Header */
+.notif-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5);
+}
+
+.notif-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.notif-header-icon {
+  width: 52px;
+  height: 52px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border-radius: var(--radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notif-page-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px 0;
+}
+
+.notif-page-sub {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.notif-header-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* Filter Bar */
+.notif-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  flex-wrap: wrap;
+}
+
+.notif-filter-btn {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition: all 0.2s;
+}
+
+.notif-filter-btn:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.notif-filter-btn.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+.notif-type-filters {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.notif-type-btn {
+  width: 32px;
+  height: 32px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.notif-type-btn:hover {
+  background: var(--bg-card);
+  border-color: currentColor;
+  transform: scale(1.1);
+}
+
+/* Notification List */
+.notif-list-container {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Notification Item */
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-color-dark);
+  cursor: pointer;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.notif-item:last-child {
+  border-bottom: none;
+}
+
+.notif-item:hover {
+  background: var(--bg-elevated);
+}
+
+.notif-item.notif-unread {
+  background: rgba(59, 130, 246, 0.03);
+}
+
+.notif-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notif-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-message {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+}
+
+.notif-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notif-time {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.notif-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.notif-unread-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary);
+  border-radius: 50%;
+}
+
+.notif-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+}
+
+.notif-item:hover .notif-delete-btn {
+  opacity: 1;
+}
+
+.notif-delete-btn:hover {
+  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Empty State */
+.notif-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+  gap: var(--space-3);
+}
+
+.notif-empty-icon {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.notif-empty h3 {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.notif-empty p {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin: 0;
+}

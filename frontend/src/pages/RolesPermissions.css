@@ -1,0 +1,162 @@
+.permissions-split-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.8fr;
+  gap: var(--spacing-6);
+  align-items: flex-start;
+}
+
+@media (max-width: 1024px) {
+  .permissions-split-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.roles-list-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.section-column-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.roles-scroll-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.role-select-card {
+  cursor: pointer;
+  padding: var(--spacing-4) var(--spacing-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.active-role-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border-color: var(--color-slate-500);
+}
+
+.role-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.role-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.role-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.role-user-count {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Matrix Table Custom Checkboxes styling */
+.matrix-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-5);
+}
+
+.matrix-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-4);
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+}
+
+.matrix-table-wrapper {
+  margin: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.text-center {
+  text-align: center;
+}
+
+/* Custom styled switch/checkboxes */
+.checkbox-switch-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+}
+
+.matrix-checkbox {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkbox-visual {
+  height: 20px;
+  width: 20px;
+  background-color: var(--bg-input);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  display: block;
+  transition: var(--transition-all);
+  position: relative;
+}
+
+.matrix-checkbox:checked ~ .checkbox-visual {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.checkbox-visual::after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 6px;
+  top: 2px;
+  width: 4px;
+  height: 9px;
+  border: solid var(--text-white);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.matrix-checkbox:checked ~ .checkbox-visual::after {
+  display: block;
+}
+
+.matrix-checkbox:disabled ~ .checkbox-visual {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.matrix-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-color);
+  padding-top: var(--spacing-4);
+  margin-top: var(--spacing-2);
+}

@@ -1,0 +1,41 @@
+.confirm-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-4);
+  padding: var(--spacing-2) 0;
+}
+
+.confirm-icon-holder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.confirm-type-danger {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.confirm-type-warning {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.confirm-type-primary {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.confirm-message-container {
+  flex: 1;
+}
+
+.confirm-message {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}

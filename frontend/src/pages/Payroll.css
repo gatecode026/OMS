@@ -1,0 +1,29 @@
+.payroll-selector {
+  width: auto;
+  min-width: 110px;
+}
+
+.payroll-stats-row {
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-6);
+}
+
+@media (max-width: 1024px) {
+  .payroll-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .payroll-stats-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.payroll-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  min-height: 110px;
+  justify-content: space-between;
+}
