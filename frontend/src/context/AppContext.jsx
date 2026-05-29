@@ -133,7 +133,34 @@ export const AppProvider = ({ children }) => {
   // Employee CRUD Handlers
   const addEmployee = (newEmp) => {
     const id = `EMP-2026-${String(employees.length + 1).padStart(3, '0')}`;
-    const entry = { ...newEmp, id, status: 'Active' };
+    const [firstName, ...restParts] = newEmp.name.split(' ');
+    const lastName = restParts.join('') || 'user';
+    const entry = {
+      ...newEmp,
+      id,
+      status: 'Active',
+      workEmail: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@saas.io`,
+      designation: newEmp.designation || newEmp.role,
+      attendanceStatus: 'Present',
+      workStatus: 'Active',
+      accountStatus: 'Active',
+      teamLeader: newEmp.teamLeader || 'Unassigned',
+      projectManager: newEmp.projectManager || 'Unassigned',
+      nationality: newEmp.nationality || 'Not specified',
+      personalEmail: `${firstName.toLowerCase()}${lastName.toLowerCase()}${employees.length}@gmail.com`,
+      emergencyContactName: newEmp.emergencyContactName || '',
+      emergencyContactPhone: newEmp.emergencyContactPhone || '',
+      currentAddress: newEmp.currentAddress || '',
+      permanentAddress: newEmp.permanentAddress || '',
+      employmentType: newEmp.employmentType || 'Full-Time',
+      workLocation: newEmp.workLocation || newEmp.branch || '',
+      attendanceHistory: [],
+      leaveHistory: [],
+      taskHistory: [],
+      performanceScore: { overall: 0, attendance: 0, taskCompletion: 0, reportSubmission: 0, leaveDiscipline: 0, monthly: [0, 0, 0, 0, 0, 0] },
+      documents: [],
+      activityLog: []
+    };
     setEmployees(prev => [...prev, entry]);
     addActivityLog(`Added new employee: ${entry.name}`, 'Employees', 'success');
     addToast('success', `Employee ${entry.name} created successfully!`);

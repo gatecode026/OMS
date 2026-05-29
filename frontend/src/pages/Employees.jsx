@@ -167,8 +167,14 @@ const Employees = () => {
   const [wizardStep, setWizardStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', dob: '', gender: 'Male',
-    department: 'Engineering', branch: 'New York', team: '', role: 'Employee', roleId: 'employee',
-    joinDate: new Date().toISOString().split('T')[0], id: '', password: '', avatar: ''
+    nationality: '', currentAddress: '', permanentAddress: '',
+    emergencyContactName: '', emergencyContactPhone: '',
+    department: 'Engineering', branch: 'New York', team: '',
+    designation: '', role: 'Employee', roleId: 'employee',
+    joinDate: new Date().toISOString().split('T')[0],
+    id: '', password: '', avatar: '',
+    employmentType: 'Full-Time', workLocation: '',
+    teamLeader: '', projectManager: ''
   });
 
   // ── Profile Preview Card ──
@@ -314,7 +320,17 @@ const Employees = () => {
 
   // ── Form Handlers ──
   const handleOpenAdd = () => {
-    setFormData({ name: '', email: '', phone: '', dob: '', gender: 'Male', department: 'Engineering', branch: 'New York', team: '', role: 'Employee', roleId: 'employee', joinDate: new Date().toISOString().split('T')[0], id: '', password: '', avatar: '' });
+    setFormData({
+      name: '', email: '', phone: '', dob: '', gender: 'Male',
+      nationality: '', currentAddress: '', permanentAddress: '',
+      emergencyContactName: '', emergencyContactPhone: '',
+      department: 'Engineering', branch: 'New York', team: '',
+      designation: '', role: 'Employee', roleId: 'employee',
+      joinDate: new Date().toISOString().split('T')[0],
+      id: '', password: '', avatar: '',
+      employmentType: 'Full-Time', workLocation: '',
+      teamLeader: '', projectManager: ''
+    });
     setWizardStep(1); setSlideOverMode('add'); setSlideOverOpen(true);
   };
   const handleOpenEdit = (emp) => {
@@ -326,8 +342,9 @@ const Employees = () => {
   };
   const isStepValid = () => {
     if (wizardStep === 1) return formData.name && formData.email && formData.phone;
-    if (wizardStep === 2) return formData.department && formData.branch && formData.role && formData.id;
-    if (wizardStep === 3) return formData.roleId && formData.password;
+    if (wizardStep === 2) return formData.department && formData.branch && formData.id && formData.designation;
+    if (wizardStep === 3) return true;
+    if (wizardStep === 4) return formData.roleId && formData.password;
     return true;
   };
   const handleNextStep = () => { if (isStepValid()) setWizardStep(p => p + 1); };
@@ -815,7 +832,7 @@ const Employees = () => {
         footer={slideOverMode === 'view' ? null : (
           <div className="wizard-footer-buttons">
             {wizardStep > 1 && <Button variant="secondary" onClick={handlePrevStep} icon={ArrowLeft}>Back</Button>}
-            {wizardStep < 3
+            {wizardStep < 4
               ? <Button variant="primary" onClick={handleNextStep} disabled={!isStepValid()}>Next Step</Button>
               : <Button variant="primary" onClick={handleFormSubmit} disabled={!isStepValid()}>{slideOverMode === 'add' ? 'Confirm & Create' : 'Save Changes'}</Button>
             }
@@ -857,7 +874,9 @@ const Employees = () => {
               <ChevronRight size={14} className="indicator-sep" />
               <div className={`indicator-step ${wizardStep >= 2 ? 'active' : ''}`}><span className="step-num">2</span><span className="step-name">Work</span></div>
               <ChevronRight size={14} className="indicator-sep" />
-              <div className={`indicator-step ${wizardStep >= 3 ? 'active' : ''}`}><span className="step-num">3</span><span className="step-name">Access</span></div>
+              <div className={`indicator-step ${wizardStep >= 3 ? 'active' : ''}`}><span className="step-num">3</span><span className="step-name">Emergency</span></div>
+              <ChevronRight size={14} className="indicator-sep" />
+              <div className={`indicator-step ${wizardStep >= 4 ? 'active' : ''}`}><span className="step-num">4</span><span className="step-name">Access</span></div>
             </div>
             <form className="wizard-form-body animate-fade-in" onSubmit={e => e.preventDefault()}>
               {wizardStep === 1 && (
@@ -867,19 +886,43 @@ const Employees = () => {
                   <div className="form-field"><label>Phone Number *</label><input type="text" placeholder="e.g. +91 98765 43210" value={formData.phone} onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))} required /></div>
                   <div className="form-field"><label>Date of Birth</label><input type="date" value={formData.dob} onChange={e => setFormData(p => ({ ...p, dob: e.target.value }))} /></div>
                   <div className="form-field"><label>Gender</label><select value={formData.gender} onChange={e => setFormData(p => ({ ...p, gender: e.target.value }))}><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
+                  <div className="form-field"><label>Nationality</label><input type="text" placeholder="e.g. Indian, American" value={formData.nationality} onChange={e => setFormData(p => ({ ...p, nationality: e.target.value }))} /></div>
+                  <div className="form-field"><label>Current Address</label><textarea rows="2" placeholder="e.g. 12 MG Road, Jaipur, Rajasthan - 302015" value={formData.currentAddress} onChange={e => setFormData(p => ({ ...p, currentAddress: e.target.value }))} /></div>
+                  <div className="form-field"><label>Permanent Address</label><textarea rows="2" placeholder="e.g. 45 Village Road, Delhi - 110001" value={formData.permanentAddress} onChange={e => setFormData(p => ({ ...p, permanentAddress: e.target.value }))} /></div>
                 </div>
               )}
               {wizardStep === 2 && (
                 <div className="wizard-step-form">
                   <div className="form-field"><label>Employee ID *</label><input type="text" placeholder="e.g. EMP-2026-100" value={formData.id} onChange={e => setFormData(p => ({ ...p, id: e.target.value }))} disabled={slideOverMode === 'edit'} required /></div>
+                  <div className="form-field"><label>Designation / Job Title *</label><input type="text" placeholder="e.g. Senior Frontend Engineer" value={formData.designation} onChange={e => setFormData(p => ({ ...p, designation: e.target.value }))} required /></div>
                   <div className="form-field"><label>Department *</label><select value={formData.department} onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}>{depts.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
                   <div className="form-field"><label>Branch *</label><select value={formData.branch} onChange={e => setFormData(p => ({ ...p, branch: e.target.value }))}>{branches.map(b => <option key={b} value={b}>{b}</option>)}</select></div>
                   <div className="form-field"><label>Team Name</label><input type="text" placeholder="e.g. Frontend Core" value={formData.team} onChange={e => setFormData(p => ({ ...p, team: e.target.value }))} /></div>
-                  <div className="form-field"><label>Role Designation *</label><select value={formData.role} onChange={e => setFormData(p => ({ ...p, role: e.target.value }))}><option>Super Admin</option><option>Branch Admin</option><option>Team Leader</option><option>Employee</option></select></div>
+                  <div className="form-field"><label>Role Level *</label><select value={formData.role} onChange={e => setFormData(p => ({ ...p, role: e.target.value }))}><option>Super Admin</option><option>Branch Admin</option><option>Team Leader</option><option>Employee</option></select></div>
+                  <div className="form-field"><label>Employment Type</label><select value={formData.employmentType} onChange={e => setFormData(p => ({ ...p, employmentType: e.target.value }))}><option>Full-Time</option><option>Part-Time</option><option>Contract</option><option>Intern</option><option>Probation</option></select></div>
+                  <div className="form-field"><label>Work Location</label><input type="text" placeholder="e.g. Jaipur HQ, Remote, London Office" value={formData.workLocation} onChange={e => setFormData(p => ({ ...p, workLocation: e.target.value }))} /></div>
+                  <div className="form-field"><label>Team Leader / Manager</label>
+                    <select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}>
+                      <option value="">Select Team Leader</option>
+                      {leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-field"><label>Project Manager</label>
+                    <select value={formData.projectManager} onChange={e => setFormData(p => ({ ...p, projectManager: e.target.value }))}>
+                      <option value="">Select Project Manager</option>
+                      {leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                    </select>
+                  </div>
                   <div className="form-field"><label>Join Date *</label><input type="date" value={formData.joinDate} onChange={e => setFormData(p => ({ ...p, joinDate: e.target.value }))} required /></div>
                 </div>
               )}
               {wizardStep === 3 && (
+                <div className="wizard-step-form">
+                  <div className="form-field"><label>Emergency Contact Name</label><input type="text" placeholder="e.g. Priya Sharma" value={formData.emergencyContactName} onChange={e => setFormData(p => ({ ...p, emergencyContactName: e.target.value }))} /></div>
+                  <div className="form-field"><label>Emergency Contact Phone</label><input type="text" placeholder="e.g. +91 98001 00001" value={formData.emergencyContactPhone} onChange={e => setFormData(p => ({ ...p, emergencyContactPhone: e.target.value }))} /></div>
+                </div>
+              )}
+              {wizardStep === 4 && (
                 <div className="wizard-step-form">
                   <div className="form-field"><label>System Access Permission Role *</label>
                     <select value={formData.roleId} onChange={e => setFormData(p => ({ ...p, roleId: e.target.value }))}>
@@ -890,11 +933,16 @@ const Employees = () => {
                   <div className="wizard-summary-card">
                     <h5>Summary of Employee Registration</h5>
                     <div className="summary-fields-grid">
-                      <div><strong>Name:</strong> {formData.name}</div>
-                      <div><strong>ID:</strong> {formData.id}</div>
-                      <div><strong>Dept/Branch:</strong> {formData.department} ({formData.branch})</div>
-                      <div><strong>Designation:</strong> {formData.role}</div>
-                      <div><strong>Email:</strong> {formData.email}</div>
+                      <div><strong>Name:</strong> {formData.name || '—'}</div>
+                      <div><strong>ID:</strong> {formData.id || '—'}</div>
+                      <div><strong>Designation:</strong> {formData.designation || '—'}</div>
+                      <div><strong>Dept/Branch:</strong> {formData.department || '—'} ({formData.branch || '—'})</div>
+                      <div><strong>Email:</strong> {formData.email || '—'}</div>
+                      <div><strong>Phone:</strong> {formData.phone || '—'}</div>
+                      <div><strong>Employment:</strong> {formData.employmentType || '—'}</div>
+                      <div><strong>Work Location:</strong> {formData.workLocation || formData.branch || '—'}</div>
+                      <div><strong>Team Leader:</strong> {formData.teamLeader || '—'}</div>
+                      <div><strong>Nationality:</strong> {formData.nationality || '—'}</div>
                     </div>
                   </div>
                 </div>

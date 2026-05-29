@@ -140,7 +140,8 @@ function enrichEmployee(emp, seed) {
     personalEmail: `${firstName.toLowerCase()}${lastName.toLowerCase()}${seed}@gmail.com`,
     emergencyContactName: emp.emergencyContactName || 'Rajesh Sharma',
     emergencyContactPhone: emp.emergencyContactPhone || '+91 98000 11000',
-    homeAddress: emp.homeAddress || `${10 + seed} MG Road, City, India - 40000${seed}`,
+    currentAddress: emp.currentAddress || `${10 + seed} MG Road, City, India - 40000${seed}`,
+    permanentAddress: emp.permanentAddress || `${10 + seed} MG Road, City, India - 40000${seed}`,
     employmentType: emp.employmentType || 'Full-Time',
     workLocation: emp.workLocation || emp.branch,
     attendanceHistory: genAttendanceHistory(seed),
@@ -234,7 +235,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Chief Operations Officer',
     teamLeader: 'Aarav Sharma', projectManager: 'Aarav Sharma',
     nationality: 'Indian', emergencyContactName: 'Priya Sharma', emergencyContactPhone: '+91 98001 00001',
-    homeAddress: '12 Lal Kothi, Jaipur, Rajasthan - 302015', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
+    currentAddress:
+    permanentAddress: '12 Lal Kothi, Jaipur, Rajasthan - 302015', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
   },
   {
     id: 'EMP-2026-002', name: 'John Miller', email: 'john.miller@enterprise.com',
@@ -244,7 +246,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Engineering Manager',
     teamLeader: 'Elena Rostova', projectManager: 'John Miller',
     nationality: 'American', emergencyContactName: 'Sarah Miller', emergencyContactPhone: '+1 555 014 0002',
-    homeAddress: '45 Baker Street, London, UK - W1U 7BH', employmentType: 'Full-Time', workLocation: 'London Office'
+    currentAddress:
+    permanentAddress: '45 Baker Street, London, UK - W1U 7BH', employmentType: 'Full-Time', workLocation: 'London Office'
   },
   {
     id: 'EMP-2026-003', name: 'Elena Rostova', email: 'elena.rostova@enterprise.com',
@@ -254,7 +257,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Senior Frontend Engineer',
     teamLeader: 'Elena Rostova', projectManager: 'John Miller',
     nationality: 'Russian', emergencyContactName: 'Ivan Rostov', emergencyContactPhone: '+44 20 7946 0003',
-    homeAddress: '22 Oxford Street, London, UK - W1C 1AB', employmentType: 'Full-Time', workLocation: 'London Office'
+    currentAddress:
+    permanentAddress: '22 Oxford Street, London, UK - W1C 1AB', employmentType: 'Full-Time', workLocation: 'London Office'
   },
   {
     id: 'EMP-2026-004', name: 'Marcus Vance', email: 'marcus.vance@enterprise.com',
@@ -264,7 +268,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Regional Sales Manager',
     teamLeader: 'Marcus Vance', projectManager: 'Aarav Sharma',
     nationality: 'American', emergencyContactName: 'Lisa Vance', emergencyContactPhone: '+1 555 017 0004',
-    homeAddress: '89 5th Ave, New York, NY - 10003', employmentType: 'Full-Time', workLocation: 'New York Office'
+    currentAddress:
+    permanentAddress: '89 5th Ave, New York, NY - 10003', employmentType: 'Full-Time', workLocation: 'New York Office'
   },
   {
     id: 'EMP-2026-005', name: 'Aiko Tanaka', email: 'aiko.tanaka@enterprise.com',
@@ -274,7 +279,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Marketing Director APAC',
     teamLeader: 'Aiko Tanaka', projectManager: 'Aarav Sharma',
     nationality: 'Japanese', emergencyContactName: 'Hiroshi Tanaka', emergencyContactPhone: '+81 3 5555 0005',
-    homeAddress: '3-14 Shinjuku, Tokyo - 160-0022', employmentType: 'Full-Time', workLocation: 'Tokyo Office'
+    currentAddress:
+    permanentAddress: '3-14 Shinjuku, Tokyo - 160-0022', employmentType: 'Full-Time', workLocation: 'Tokyo Office'
   },
   {
     id: 'EMP-2026-006', name: 'David Kim', email: 'david.kim@enterprise.com',
@@ -284,7 +290,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Data Engineer',
     teamLeader: 'Elena Rostova', projectManager: 'John Miller',
     nationality: 'Korean', emergencyContactName: 'Min Kim', emergencyContactPhone: '+65 6789 0006',
-    homeAddress: '88 Marina Bay, Singapore - 018981', employmentType: 'Full-Time', workLocation: 'Singapore Office'
+    currentAddress:
+    permanentAddress: '88 Marina Bay, Singapore - 018981', employmentType: 'Full-Time', workLocation: 'Singapore Office'
   },
   {
     id: 'EMP-2026-007', name: 'Sophia Laurent', email: 'sophia.laurent@enterprise.com',
@@ -294,7 +301,8 @@ const baseEmployees = [
     status: 'On Leave', avatar: '', designation: 'HR Business Partner',
     teamLeader: 'John Miller', projectManager: 'Aarav Sharma',
     nationality: 'French', emergencyContactName: 'Pierre Laurent', emergencyContactPhone: '+33 1 42 27 0007',
-    homeAddress: '16 Rue de la Paix, London, UK - EC1A 1BB', employmentType: 'Full-Time', workLocation: 'London Office'
+    currentAddress:
+    permanentAddress: '16 Rue de la Paix, London, UK - EC1A 1BB', employmentType: 'Full-Time', workLocation: 'London Office'
   },
   {
     id: 'EMP-2026-008', name: 'Carlos Mendez', email: 'carlos.mendez@enterprise.com',
@@ -304,7 +312,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Account Executive',
     teamLeader: 'Marcus Vance', projectManager: 'Marcus Vance',
     nationality: 'Mexican', emergencyContactName: 'Rosa Mendez', emergencyContactPhone: '+1 555 012 0008',
-    homeAddress: '201 Brooklyn Ave, New York, NY - 11213', employmentType: 'Full-Time', workLocation: 'New York Office'
+    currentAddress:
+    permanentAddress: '201 Brooklyn Ave, New York, NY - 11213', employmentType: 'Full-Time', workLocation: 'New York Office'
   },
   {
     id: 'EMP-2026-009', name: "Liam O'Connor", email: 'liam.oconnor@enterprise.com',
@@ -314,7 +323,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Frontend Developer',
     teamLeader: 'Elena Rostova', projectManager: 'John Miller',
     nationality: 'Irish', emergencyContactName: "Siobhan O'Connor", emergencyContactPhone: '+44 20 7946 0009',
-    homeAddress: '7 Camden High St, London, UK - NW1 7JE', employmentType: 'Full-Time', workLocation: 'London Office'
+    currentAddress:
+    permanentAddress: '7 Camden High St, London, UK - NW1 7JE', employmentType: 'Full-Time', workLocation: 'London Office'
   },
   {
     id: 'EMP-2026-010', name: 'Priya Sharma', email: 'priya.sharma@enterprise.com',
@@ -324,7 +334,8 @@ const baseEmployees = [
     status: 'Inactive', avatar: '', designation: 'Marketing Analyst',
     teamLeader: 'Marcus Vance', projectManager: 'Aiko Tanaka',
     nationality: 'Indian', emergencyContactName: 'Vikram Sharma', emergencyContactPhone: '+1 555 015 0010',
-    homeAddress: '55 Park Ave, New York, NY - 10016', employmentType: 'Part-Time', workLocation: 'Remote'
+    currentAddress:
+    permanentAddress: '55 Park Ave, New York, NY - 10016', employmentType: 'Part-Time', workLocation: 'Remote'
   },
   {
     id: 'EMP-2026-011', name: 'Riya Patel', email: 'riya.patel@enterprise.com',
@@ -334,7 +345,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Backend Developer',
     teamLeader: 'Aarav Sharma', projectManager: 'John Miller',
     nationality: 'Indian', emergencyContactName: 'Suresh Patel', emergencyContactPhone: '+91 98200 00011',
-    homeAddress: '7 Civil Lines, Jaipur, Rajasthan - 302006', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
+    currentAddress:
+    permanentAddress: '7 Civil Lines, Jaipur, Rajasthan - 302006', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
   },
   {
     id: 'EMP-2026-012', name: 'Tom Harrison', email: 'tom.harrison@enterprise.com',
@@ -344,7 +356,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Operations Analyst',
     teamLeader: 'John Miller', projectManager: 'Aarav Sharma',
     nationality: 'British', emergencyContactName: 'Jane Harrison', emergencyContactPhone: '+44 20 7946 0012',
-    homeAddress: '33 Canary Wharf, London, UK - E14 5AB', employmentType: 'Full-Time', workLocation: 'London Office'
+    currentAddress:
+    permanentAddress: '33 Canary Wharf, London, UK - E14 5AB', employmentType: 'Full-Time', workLocation: 'London Office'
   },
   {
     id: 'EMP-2026-013', name: 'Kenji Nakamura', email: 'kenji.nakamura@enterprise.com',
@@ -354,7 +367,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Mobile Engineer',
     teamLeader: 'Aiko Tanaka', projectManager: 'John Miller',
     nationality: 'Japanese', emergencyContactName: 'Yuki Nakamura', emergencyContactPhone: '+81 3 5555 0013',
-    homeAddress: '5-9 Akihabara, Tokyo - 101-0021', employmentType: 'Full-Time', workLocation: 'Tokyo Office'
+    currentAddress:
+    permanentAddress: '5-9 Akihabara, Tokyo - 101-0021', employmentType: 'Full-Time', workLocation: 'Tokyo Office'
   },
   {
     id: 'EMP-2026-014', name: 'Amira Hassan', email: 'amira.hassan@enterprise.com',
@@ -364,7 +378,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Digital Marketing Specialist',
     teamLeader: 'Aiko Tanaka', projectManager: 'Aiko Tanaka',
     nationality: 'Egyptian', emergencyContactName: 'Omar Hassan', emergencyContactPhone: '+65 6789 0014',
-    homeAddress: '12 Orchard Road, Singapore - 238895', employmentType: 'Full-Time', workLocation: 'Singapore Office'
+    currentAddress:
+    permanentAddress: '12 Orchard Road, Singapore - 238895', employmentType: 'Full-Time', workLocation: 'Singapore Office'
   },
   {
     id: 'EMP-2026-015', name: 'Raj Mehta', email: 'raj.mehta@enterprise.com',
@@ -374,7 +389,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Talent Acquisition Lead',
     teamLeader: 'Aarav Sharma', projectManager: 'Aarav Sharma',
     nationality: 'Indian', emergencyContactName: 'Anita Mehta', emergencyContactPhone: '+91 98300 00015',
-    homeAddress: '5 Vaishali Nagar, Jaipur, Rajasthan - 302021', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
+    currentAddress:
+    permanentAddress: '5 Vaishali Nagar, Jaipur, Rajasthan - 302021', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
   },
   {
     id: 'EMP-2026-016', name: 'Nadia Volkova', email: 'nadia.volkova@enterprise.com',
@@ -384,7 +400,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'QA Engineer',
     teamLeader: 'Elena Rostova', projectManager: 'John Miller',
     nationality: 'Russian', emergencyContactName: 'Alexei Volkov', emergencyContactPhone: '+44 20 7946 0016',
-    homeAddress: '9 Tower Bridge Rd, London, UK - SE1 4TR', employmentType: 'Full-Time', workLocation: 'London Office'
+    currentAddress:
+    permanentAddress: '9 Tower Bridge Rd, London, UK - SE1 4TR', employmentType: 'Full-Time', workLocation: 'London Office'
   },
   {
     id: 'EMP-2026-017', name: 'Wei Zhang', email: 'wei.zhang@enterprise.com',
@@ -394,7 +411,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Cloud Infrastructure Engineer',
     teamLeader: 'David Kim', projectManager: 'John Miller',
     nationality: 'Chinese', emergencyContactName: 'Li Zhang', emergencyContactPhone: '+65 6789 0017',
-    homeAddress: '22 Jurong East, Singapore - 609731', employmentType: 'Full-Time', workLocation: 'Singapore Office'
+    currentAddress:
+    permanentAddress: '22 Jurong East, Singapore - 609731', employmentType: 'Full-Time', workLocation: 'Singapore Office'
   },
   {
     id: 'EMP-2026-018', name: 'Isabella Rossi', email: 'isabella.rossi@enterprise.com',
@@ -404,7 +422,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Enterprise Account Manager',
     teamLeader: 'Marcus Vance', projectManager: 'Marcus Vance',
     nationality: 'Italian', emergencyContactName: 'Marco Rossi', emergencyContactPhone: '+1 555 018 0018',
-    homeAddress: '123 Madison Ave, New York, NY - 10016', employmentType: 'Full-Time', workLocation: 'New York Office'
+    currentAddress:
+    permanentAddress: '123 Madison Ave, New York, NY - 10016', employmentType: 'Full-Time', workLocation: 'New York Office'
   },
   {
     id: 'EMP-2026-019', name: 'Ahmed Al-Farsi', email: 'ahmed.alfarsi@enterprise.com',
@@ -414,7 +433,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Operations Manager',
     teamLeader: 'David Kim', projectManager: 'Aarav Sharma',
     nationality: 'Emirati', emergencyContactName: 'Fatima Al-Farsi', emergencyContactPhone: '+65 6789 0019',
-    homeAddress: '5 Raffles Place, Singapore - 048618', employmentType: 'Full-Time', workLocation: 'Singapore Office'
+    currentAddress:
+    permanentAddress: '5 Raffles Place, Singapore - 048618', employmentType: 'Full-Time', workLocation: 'Singapore Office'
   },
   {
     id: 'EMP-2026-020', name: 'Fatima Khan', email: 'fatima.khan@enterprise.com',
@@ -424,7 +444,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'HR Generalist',
     teamLeader: 'Raj Mehta', projectManager: 'Aarav Sharma',
     nationality: 'Pakistani', emergencyContactName: 'Ali Khan', emergencyContactPhone: '+91 98400 00020',
-    homeAddress: '14 Pink City, Jaipur, Rajasthan - 302003', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
+    currentAddress:
+    permanentAddress: '14 Pink City, Jaipur, Rajasthan - 302003', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
   },
   {
     id: 'EMP-2026-021', name: 'Lucas Bernard', email: 'lucas.bernard@enterprise.com',
@@ -434,7 +455,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Content Strategist',
     teamLeader: 'Sophia Laurent', projectManager: 'Aiko Tanaka',
     nationality: 'French', emergencyContactName: 'Marie Bernard', emergencyContactPhone: '+33 1 42 27 0021',
-    homeAddress: '8 Kensington, London, UK - W8 4PT', employmentType: 'Full-Time', workLocation: 'London Office'
+    currentAddress:
+    permanentAddress: '8 Kensington, London, UK - W8 4PT', employmentType: 'Full-Time', workLocation: 'London Office'
   },
   {
     id: 'EMP-2026-022', name: 'Sunita Rao', email: 'sunita.rao@enterprise.com',
@@ -444,7 +466,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Senior Backend Engineer',
     teamLeader: 'Aarav Sharma', projectManager: 'John Miller',
     nationality: 'Indian', emergencyContactName: 'Ramesh Rao', emergencyContactPhone: '+91 98500 00022',
-    homeAddress: '22 Malviya Nagar, Jaipur, Rajasthan - 302017', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
+    currentAddress:
+    permanentAddress: '22 Malviya Nagar, Jaipur, Rajasthan - 302017', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
   },
   {
     id: 'EMP-2026-023', name: 'Oliver Hughes', email: 'oliver.hughes@enterprise.com',
@@ -454,7 +477,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Sales Development Rep',
     teamLeader: 'Marcus Vance', projectManager: 'Marcus Vance',
     nationality: 'British', emergencyContactName: 'Emily Hughes', emergencyContactPhone: '+44 20 7946 0023',
-    homeAddress: '67 Soho Square, London, UK - W1D 3QX', employmentType: 'Full-Time', workLocation: 'London Office'
+    currentAddress:
+    permanentAddress: '67 Soho Square, London, UK - W1D 3QX', employmentType: 'Full-Time', workLocation: 'London Office'
   },
   {
     id: 'EMP-2026-024', name: 'Mei Lin', email: 'mei.lin@enterprise.com',
@@ -464,7 +488,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'iOS Developer',
     teamLeader: 'Kenji Nakamura', projectManager: 'John Miller',
     nationality: 'Chinese', emergencyContactName: 'Chen Lin', emergencyContactPhone: '+81 3 5555 0024',
-    homeAddress: '2-8 Harajuku, Tokyo - 150-0001', employmentType: 'Full-Time', workLocation: 'Tokyo Office'
+    currentAddress:
+    permanentAddress: '2-8 Harajuku, Tokyo - 150-0001', employmentType: 'Full-Time', workLocation: 'Tokyo Office'
   },
   {
     id: 'EMP-2026-025', name: 'Daniel Osei', email: 'daniel.osei@enterprise.com',
@@ -474,7 +499,8 @@ const baseEmployees = [
     status: 'Active', avatar: '', designation: 'Operations Coordinator',
     teamLeader: 'Marcus Vance', projectManager: 'Aarav Sharma',
     nationality: 'Ghanaian', emergencyContactName: 'Grace Osei', emergencyContactPhone: '+1 555 025 0025',
-    homeAddress: '300 W 57th St, New York, NY - 10019', employmentType: 'Full-Time', workLocation: 'New York Office'
+    currentAddress:
+    permanentAddress: '300 W 57th St, New York, NY - 10019', employmentType: 'Full-Time', workLocation: 'New York Office'
   }
 ];
 

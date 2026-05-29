@@ -262,8 +262,12 @@ const EmployeeDetail = () => {
                 </div>
               ))}
               <div className="ed-field-card ed-field-full">
-                <span className="ed-field-label">Home Address</span>
-                <span className="ed-field-value">{emp.homeAddress || '—'}</span>
+                <span className="ed-field-label">Current Address</span>
+                <span className="ed-field-value">{emp.currentAddress || emp.homeAddress || '—'}</span>
+              </div>
+              <div className="ed-field-card ed-field-full">
+                <span className="ed-field-label">Permanent Address</span>
+                <span className="ed-field-value">{emp.permanentAddress || emp.homeAddress || '—'}</span>
               </div>
             </div>
           </div>
