@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import './EmployeeDetail.css';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -20,6 +20,39 @@ const fmtDate = (str) => {
 };
 const fmtTime = (t) => t || '—';
 
+const fmtDob = (dateStr) => {
+  if (!dateStr) return '15/08/1996';
+  const d = new Date(dateStr);
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+};
+
+const calculateExpiry = (dateStr) => {
+  if (!dateStr) return '31 Dec 2031';
+  const d = new Date(dateStr);
+  d.setFullYear(d.getFullYear() + 5);
+  return fmtDate(d.toISOString());
+};
+
+const renderName = (fullname) => {
+  if (!fullname) return '';
+  const parts = fullname.trim().split(' ');
+  if (parts.length === 1) return <span className="id-name-dark">{parts[0]}</span>;
+  return (
+    <>
+      <span className="id-name-dark">{parts[0]} </span>
+      <span className="id-name-accent">{parts.slice(1).join(' ')}</span>
+    </>
+  );
+};
+
+const getBranchAddress = (branchName) => {
+  const name = (branchName || '').toLowerCase().trim();
+  if (name.includes('delhi')) return 'Connaught Place, New Delhi - 110001';
+  if (name.includes('mumbai')) return 'Bandra Kurla Complex, Mumbai - 400051';
+  if (name.includes('bangalore') || name.includes('bengaluru')) return 'MG Road, Bangalore - 560001';
+  return 'Malviya Nagar, Jaipur, Rajasthan 302017';
+};
+
 const TABS = [
   { id: 'personal', label: 'Personal Info', icon: User },
   { id: 'professional', label: 'Professional', icon: Briefcase },
@@ -30,6 +63,10 @@ const TABS = [
   { id: 'performance', label: 'Performance', icon: BarChart2 },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'logs', label: 'Activity Logs', icon: Activity },
+  { id: 'history', label: 'Employment History', icon: Activity },
+  { id: 'skills', label: 'Skills & Certs', icon: Trophy },
+  { id: 'security', label: 'Security Info', icon: Shield },
+  { id: 'payroll', label: 'Payroll Summary', icon: TrendingUp },
 ];
 
 // ── Status Badge helpers ─────────────────────────────────────────────────────
@@ -140,7 +177,7 @@ const AttendanceCalendar = ({ history }) => {
 const EmployeeDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { employees, showConfirm, deactivateEmployee, addToast, updateEmployee } = useApp();
+  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee } = useApp();
 
   const emp = useMemo(() => employees.find(e => e.id === id), [employees, id]);
 
@@ -148,6 +185,8 @@ const EmployeeDetail = () => {
   const [expandedReport, setExpandedReport] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState({});
+  const [showIdCard, setShowIdCard] = useState(false);
+  const idCardRef = useRef(null);
 
   if (!emp) return (
     <div className="ed-not-found">
@@ -173,6 +212,28 @@ const EmployeeDetail = () => {
       deactivateEmployee(emp.id);
       navigate('/employees');
     }, 'danger');
+  };
+
+  const handleActivate = () => {
+    showConfirm('Activate Employee', `Are you sure you want to activate ${emp.name}?`, () => {
+      activateEmployee(emp.id);
+    }, 'primary');
+  };
+
+  const downloadIdCard = async () => {
+    if (!idCardRef.current) return;
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(idCardRef.current, {
+        scale: 3, backgroundColor: null, allowTaint: false, useCORS: true
+      });
+      const link = document.createElement('a');
+      link.download = `${emp.id}_ID_Card.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      addToast('error', 'Failed to download ID card.');
+    }
   };
 
   const SegmentBar = ({ att, task, report, leave }) => {
@@ -219,10 +280,15 @@ const EmployeeDetail = () => {
           </div>
         </div>
         <div className="ed-profile-actions">
-          <Button variant="primary" icon={Edit2} onClick={() => navigate('/employees')}>Edit Profile</Button>
+          <Button variant="primary" icon={Edit2} onClick={() => navigate(`/employees?edit=${emp.id}`)}>Edit Profile</Button>
           <Button variant="secondary" icon={CheckSquare} onClick={() => navigate('/tasks')}>Assign Task</Button>
+          <Button variant="secondary" icon={Download} onClick={() => setShowIdCard(true)}>ID Card</Button>
           <Button variant="secondary" icon={FileText} onClick={() => navigate('/work-reports')}>View Reports</Button>
-          <Button variant="ghost" icon={Trash2} onClick={handleDelete}>Delete</Button>
+          {emp.status === 'Inactive' ? (
+            <Button variant="success" icon={CheckCircle} onClick={handleActivate}>Activate</Button>
+          ) : (
+            <Button variant="ghost" icon={Trash2} onClick={handleDelete}>Delete</Button>
+          )}
         </div>
       </div>
 
@@ -569,7 +635,368 @@ const EmployeeDetail = () => {
           </div>
         )}
 
+        {/* ── Employment History ── */}
+        {activeTab === 'history' && (
+          <div className="ed-tab-body animate-fade-in">
+            <div className="ed-section-title-row"><h3>Employment History</h3></div>
+            <table className="ed-table">
+              <thead>
+                <tr>
+                  <th>Event Date</th>
+                  <th>Event Type</th>
+                  <th>Details / Changes</th>
+                  <th>Previous Value</th>
+                  <th>New Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(emp.employmentHistory || [
+                  { date: '2026-01-15', eventType: 'Promotion', details: 'Promoted to Senior Role', prevVal: 'Developer', newVal: 'Senior Developer' },
+                  { date: '2025-06-01', eventType: 'Transfer', details: 'Transferred Department', prevVal: 'Marketing', newVal: 'Sales' }
+                ]).map((h, i) => (
+                  <tr key={i}>
+                    <td className="td-mono td-sm">{fmtDate(h.date)}</td>
+                    <td><Badge variant={h.eventType === 'Promotion' ? 'success' : 'primary'}>{h.eventType}</Badge></td>
+                    <td>{h.details}</td>
+                    <td className="td-old-val">{h.prevVal || '—'}</td>
+                    <td className="td-new-val">{h.newVal || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ── Skills & Certifications ── */}
+        {activeTab === 'skills' && (
+          <div className="ed-tab-body animate-fade-in">
+            <div className="ed-section-title-row"><h3>Skills & Certifications</h3></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--spacing-6)' }}>
+              <div>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>Technical Skills Matrix</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(emp.skills || [
+                    { name: 'React.js', level: 'Expert' },
+                    { name: 'Node.js', level: 'Expert' },
+                    { name: 'TypeScript', level: 'Intermediate' }
+                  ]).map((skill, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '0.8125rem' }}>{skill.name}</strong>
+                      <Badge variant={skill.level === 'Expert' ? 'success' : skill.level === 'Intermediate' ? 'primary' : 'neutral'}>
+                        {skill.level}
+                      </Badge>
+                    </div>
+                  ))}
+                  {(emp.skills || []).length === 0 && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No skills added.</span>}
+                </div>
+              </div>
+              <div>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>Certification Records</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(emp.certifications || [
+                    { name: 'AWS Certified Solutions Architect', expiryDate: '2027-12-31' },
+                    { name: 'Google Cloud Professional Cloud Architect', expiryDate: '2026-08-15' }
+                  ]).map((cert, idx) => {
+                    const isExpired = cert.expiryDate ? new Date(cert.expiryDate) < new Date() : false;
+                    return (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <strong style={{ color: 'var(--text-primary)', fontSize: '0.8125rem' }}>{cert.name}</strong>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Expiry: {cert.expiryDate ? fmtDate(cert.expiryDate) : 'Never'}</span>
+                        </div>
+                        {cert.expiryDate && (
+                          <Badge variant={isExpired ? 'danger' : 'success'}>
+                            {isExpired ? 'Expired' : 'Active'}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(emp.certifications || []).length === 0 && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No certifications added.</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Security Information ── */}
+        {activeTab === 'security' && (
+          <div className="ed-tab-body animate-fade-in">
+            <div className="ed-section-title-row"><h3>Security Information</h3></div>
+            <div className="ed-fields-grid">
+              <div className="ed-field-card">
+                <span className="ed-field-label">Last Login Timestamp</span>
+                <span className="ed-field-value">{emp.securityInfo?.lastLogin || '2026-05-29 08:06:17'}</span>
+              </div>
+              <div className="ed-field-card">
+                <span className="ed-field-label">Last Login Device</span>
+                <span className="ed-field-value">{emp.securityInfo?.loginDevice || 'MacBook Pro (Chrome/OSX)'}</span>
+              </div>
+              <div className="ed-field-card">
+                <span className="ed-field-label">Last Login Location</span>
+                <span className="ed-field-value">{emp.securityInfo?.loginLocation || 'Jaipur HQ (192.168.1.120)'}</span>
+              </div>
+              <div className="ed-field-card">
+                <span className="ed-field-label">Failed Login Attempts</span>
+                <span className="ed-field-value" style={{ color: (emp.securityInfo?.failedAttempts || 0) > 0 ? 'var(--color-danger)' : 'var(--text-primary)' }}>
+                  {emp.securityInfo?.failedAttempts || 0} attempts
+                </span>
+              </div>
+              <div className="ed-field-card">
+                <span className="ed-field-label">Multi-Factor Authentication (MFA)</span>
+                <span className="ed-field-value">
+                  <Badge variant={(emp.securityInfo?.mfaStatus || 'Enabled') === 'Enabled' ? 'success' : 'danger'}>
+                    {emp.securityInfo?.mfaStatus || 'Enabled'}
+                  </Badge>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Payroll Summary ── */}
+        {activeTab === 'payroll' && (
+          <div className="ed-tab-body animate-fade-in">
+            <div className="ed-section-title-row"><h3>Payroll Summary</h3></div>
+            <div className="ed-fields-grid" style={{ marginBottom: 'var(--spacing-6)' }}>
+              <div className="ed-field-card">
+                <span className="ed-field-label">Salary Dispatch Status</span>
+                <span className="ed-field-value">
+                  <Badge variant={(emp.payrollSummary?.salaryStatus || 'Dispatched') === 'Dispatched' ? 'success' : 'warning'}>
+                    {emp.payrollSummary?.salaryStatus || 'Dispatched'}
+                  </Badge>
+                </span>
+              </div>
+              <div className="ed-field-card">
+                <span className="ed-field-label">Last Payout Date</span>
+                <span className="ed-field-value">{fmtDate(emp.payrollSummary?.lastSalaryDate || '2026-05-01')}</span>
+              </div>
+              <div className="ed-field-card">
+                <span className="ed-field-label">Upcoming Payout Run</span>
+                <span className="ed-field-value">{fmtDate(emp.payrollSummary?.upcomingPayrollDate || '2026-06-01')}</span>
+              </div>
+              <div className="ed-field-card">
+                <span className="ed-field-label">Basic Net Monthly Pay</span>
+                <span className="ed-field-value">₹{(emp.salaryAmount || 35000).toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+
+            <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>Bonus & Incentive History</h4>
+            <table className="ed-table">
+              <thead>
+                <tr>
+                  <th>Cycle Date</th>
+                  <th>Incentive Type</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(emp.payrollSummary?.bonusHistory || [
+                  { date: '2026-03-31', type: 'Q1 Performance Bonus', amount: '₹15,000', status: 'Disbursed' },
+                  { date: '2025-10-25', type: 'Diwali Festive Allowance', amount: '₹5,000', status: 'Disbursed' }
+                ]).map((b, i) => (
+                  <tr key={i}>
+                    <td className="td-mono td-sm">{fmtDate(b.date)}</td>
+                    <td>{b.type}</td>
+                    <td><strong>{b.amount}</strong></td>
+                    <td><Badge variant="success">{b.status}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
       </div>
+
+      {/* ── ID Card Modal ── */}
+      {showIdCard && (
+        <div className="id-card-overlay" onClick={() => setShowIdCard(false)}>
+          <div className="id-card-modal" onClick={e => e.stopPropagation()}>
+            <button className="id-card-close" onClick={() => setShowIdCard(false)}>✕</button>
+            
+            {/* The wrapper that will be captured for download */}
+            <div className="id-card-render-wrapper" ref={idCardRef}>
+              
+              {/* FRONT SIDE */}
+              <div className="id-card-front">
+                <div className="id-card-front-header-bg">
+                  <div className="id-card-watermark"></div>
+                </div>
+                <div className="id-card-front-pink-bg"></div>
+                
+                <div className="id-card-logo-area">
+                  <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg">
+                    <polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" />
+                    <polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" />
+                  </svg>
+                  <div className="id-card-company-title">{emp.companyName || 'OM ENTERPRISE'}</div>
+                  <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Office Management'}</div>
+                </div>
+
+                <div className="id-card-photo-wrap">
+                  <Avatar name={emp.name} size="xl" className="id-card-photo-img" />
+                </div>
+
+                <div className="id-card-name-area">
+                  <h2 className="id-card-emp-name">
+                    {renderName(emp.name)}
+                  </h2>
+                  <p className="id-card-emp-role">{emp.designation || emp.role}</p>
+                </div>
+
+                <div className="id-card-details-grid">
+                  <div className="id-detail-label">ID NO</div>
+                  <div className="id-detail-colon">:</div>
+                  <div className="id-detail-value">{emp.id}</div>
+
+                  <div className="id-detail-label">Dept.</div>
+                  <div className="id-detail-colon">:</div>
+                  <div className="id-detail-value">{emp.department}</div>
+
+                  <div className="id-detail-label">Deg.</div>
+                  <div className="id-detail-colon">:</div>
+                  <div className="id-detail-value">{emp.designation || emp.role}</div>
+
+                  <div className="id-detail-label">DOB</div>
+                  <div className="id-detail-colon">:</div>
+                  <div className="id-detail-value">{fmtDob(emp.dob)}</div>
+
+                  <div className="id-detail-label">Email</div>
+                  <div className="id-detail-colon">:</div>
+                  <div className="id-detail-value" title={emp.workEmail || emp.email}>
+                    {emp.workEmail || emp.email}
+                  </div>
+                </div>
+              </div>
+
+              {/* BACK SIDE */}
+              <div className="id-card-back">
+                <div className="id-card-back-bullets">
+                  <div className="id-card-bullet-row">
+                    <span className="id-bullet-dot"></span>
+                    <p>This card is the official property of {emp.companyName || 'OM Enterprise'} and must be returned on demand.</p>
+                  </div>
+                  <div className="id-card-bullet-row">
+                    <span className="id-bullet-dot"></span>
+                    <p>If found, please return to the HR Department or dynamic branch address below immediately.</p>
+                  </div>
+                  <div className="id-card-bullet-row">
+                    <span className="id-bullet-dot"></span>
+                    <p style={{ fontWeight: 600 }}>Branch Address: {emp.branchAddress || getBranchAddress(emp.branch)}</p>
+                  </div>
+                </div>
+
+                <div className="id-card-back-middle">
+                  <div className="id-card-back-dates">
+                    <div className="id-date-row">
+                      <span className="id-date-label">Join Date:</span>
+                      <span className="id-date-val">{fmtDate(emp.joinDate)}</span>
+                    </div>
+                    <div className="id-date-row">
+                      <span className="id-date-label">Expire Date:</span>
+                      <span className="id-date-val">{emp.contractEndDate ? fmtDate(emp.contractEndDate) : calculateExpiry(emp.joinDate)}</span>
+                    </div>
+                    <div className="id-card-barcode-area">
+                      <svg viewBox="0 0 100 20" className="id-card-barcode-svg">
+                        <rect x="0" y="0" width="3" height="20" fill="#0f172a" />
+                        <rect x="5" y="0" width="1" height="20" fill="#0f172a" />
+                        <rect x="8" y="0" width="2" height="20" fill="#0f172a" />
+                        <rect x="12" y="0" width="4" height="20" fill="#0f172a" />
+                        <rect x="18" y="0" width="1" height="20" fill="#0f172a" />
+                        <rect x="21" y="0" width="2" height="20" fill="#0f172a" />
+                        <rect x="25" y="0" width="3" height="20" fill="#0f172a" />
+                        <rect x="30" y="0" width="1" height="20" fill="#0f172a" />
+                        <rect x="33" y="0" width="2" height="20" fill="#0f172a" />
+                        <rect x="37" y="0" width="5" height="20" fill="#0f172a" />
+                        <rect x="44" y="0" width="1" height="20" fill="#0f172a" />
+                        <rect x="47" y="0" width="3" height="20" fill="#0f172a" />
+                        <rect x="52" y="0" width="2" height="20" fill="#0f172a" />
+                        <rect x="56" y="0" width="4" height="20" fill="#0f172a" />
+                        <rect x="62" y="0" width="1" height="20" fill="#0f172a" />
+                        <rect x="65" y="0" width="2" height="20" fill="#0f172a" />
+                        <rect x="69" y="0" width="3" height="20" fill="#0f172a" />
+                        <rect x="74" y="0" width="1" height="20" fill="#0f172a" />
+                        <rect x="77" y="0" width="2" height="20" fill="#0f172a" />
+                        <rect x="81" y="0" width="5" height="20" fill="#0f172a" />
+                        <rect x="88" y="0" width="1" height="20" fill="#0f172a" />
+                        <rect x="91" y="0" width="3" height="20" fill="#0f172a" />
+                        <rect x="96" y="0" width="2" height="20" fill="#0f172a" />
+                      </svg>
+                      <div className="id-card-barcode-text">*{emp.id}*</div>
+                    </div>
+                  </div>
+
+                  <div className="id-card-back-qr">
+                    <svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg">
+                      <rect x="0" y="0" width="28" height="28" fill="#0f172a" />
+                      <rect x="4" y="4" width="20" height="20" fill="#ffffff" />
+                      <rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" />
+
+                      <rect x="72" y="0" width="28" height="28" fill="#0f172a" />
+                      <rect x="76" y="4" width="20" height="20" fill="#ffffff" />
+                      <rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" />
+
+                      <rect x="0" y="72" width="28" height="28" fill="#0f172a" />
+                      <rect x="4" y="76" width="20" height="20" fill="#ffffff" />
+                      <rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" />
+
+                      <rect x="36" y="4" width="8" height="8" fill="#0f172a" />
+                      <rect x="52" y="4" width="8" height="8" fill="#0f172a" />
+                      <rect x="44" y="12" width="16" height="8" fill="#0f172a" />
+                      <rect x="36" y="24" width="8" height="8" fill="#0f172a" />
+                      
+                      <rect x="4" y="36" width="8" height="8" fill="#0f172a" />
+                      <rect x="16" y="44" width="8" height="8" fill="#0f172a" />
+                      <rect x="24" y="36" width="8" height="8" fill="#0f172a" />
+                      
+                      <rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" />
+                      <rect x="40" y="40" width="8" height="8" fill="#ffffff" />
+                      
+                      <rect x="60" y="36" width="8" height="8" fill="#0f172a" />
+                      <rect x="56" y="48" width="8" height="8" fill="#0f172a" />
+                      
+                      <rect x="36" y="56" width="8" height="8" fill="#0f172a" />
+                      <rect x="48" y="60" width="8" height="8" fill="#0f172a" />
+                      
+                      <rect x="76" y="36" width="8" height="8" fill="#0f172a" />
+                      <rect x="84" y="44" width="12" height="8" fill="#0f172a" />
+                      <rect x="72" y="56" width="8" height="16" fill="#0f172a" />
+                      <rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" />
+                      
+                      <rect x="36" y="76" width="12" height="8" fill="#0f172a" />
+                      <rect x="52" y="72" width="8" height="16" fill="#0f172a" />
+                      <rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" />
+                      
+                      <rect x="76" y="76" width="12" height="8" fill="#0f172a" />
+                      <rect x="84" y="84" width="12" height="8" fill="#0f172a" />
+                    </svg>
+                    <span className="id-qr-label">SCAN ME</span>
+                  </div>
+                </div>
+
+                <div className="id-card-back-signature-area">
+                  <div className="id-signature-font">{emp.teamLeader || 'Vikram Singh'}</div>
+                  <div className="id-signature-line"></div>
+                  <div className="id-signature-label">Authorized Signatory</div>
+                </div>
+
+                <div className="id-card-back-bottom-bg">
+                  <div className="id-card-watermark"></div>
+                </div>
+                <div className="id-card-back-pink-bg"></div>
+              </div>
+
+            </div>
+
+            <button className="id-card-download-btn" onClick={downloadIdCard}>
+              <Download size={16} /> Download ID Cards
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

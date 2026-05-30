@@ -35,7 +35,7 @@ import {
 const navigationItems = [
   { name: 'Dashboard', path: '/', section: 'Core', icon: LayoutDashboard },
   { name: 'Company Overview', path: '/overview', section: 'Core', icon: Building2 },
-  { name: 'Add Employee', path: '/employees?action=add', section: 'People', icon: UserPlus },
+  { name: 'Add Employee', path: '/employees/add', section: 'People', icon: UserPlus },
   { name: 'All Employees', path: '/employees', section: 'People', icon: Users },
   { name: 'Punch In Out Reports', path: '/attendance', section: 'People', icon: Clock },
   { name: 'Leave Management', path: '/leaves', section: 'People', icon: CalendarDays },

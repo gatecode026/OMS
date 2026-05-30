@@ -19,7 +19,7 @@ import {
 const mockAuditLogs = [
   {
     id: 'AUD-901',
-    user: 'Sarah Connor',
+    user: 'Divya Singh',
     role: 'Super Admin',
     action: 'Modified system permissions for Role: Branch Admin',
     module: 'Permissions',
@@ -29,7 +29,7 @@ const mockAuditLogs = [
   },
   {
     id: 'AUD-902',
-    user: 'Sarah Connor',
+    user: 'Divya Singh',
     role: 'Super Admin',
     action: 'Added new IP Whitelist range: 10.0.0.0/8',
     module: 'Security',
@@ -39,7 +39,7 @@ const mockAuditLogs = [
   },
   {
     id: 'AUD-903',
-    user: 'Kenji Sato',
+    user: 'Sanjay Gupta',
     role: 'Branch Admin',
     action: 'Disbursed Monthly Payroll Batch (May 2026)',
     module: 'Payroll',
@@ -49,7 +49,7 @@ const mockAuditLogs = [
   },
   {
     id: 'AUD-904',
-    user: 'John Doe',
+    user: 'Rajesh Kumar',
     role: 'Branch Admin',
     action: 'Failed authentication attempt (invalid password)',
     module: 'Auth',
@@ -59,9 +59,9 @@ const mockAuditLogs = [
   },
   {
     id: 'AUD-905',
-    user: 'Sarah Connor',
+    user: 'Divya Singh',
     role: 'Super Admin',
-    action: 'Deactivated Employee profile: Jane Smith',
+    action: 'Deactivated Employee profile: Meena Sharma',
     module: 'Employees',
     ip: '192.168.1.120',
     severity: 'Warning',
@@ -69,9 +69,9 @@ const mockAuditLogs = [
   },
   {
     id: 'AUD-906',
-    user: 'Emma Watson',
+    user: 'Shweta Joshi',
     role: 'Team Leader',
-    action: 'Approved Annual Leave request for Tom Brown',
+    action: 'Approved Annual Leave request for Ravi Yadav',
     module: 'Leaves',
     ip: '151.20.9.3',
     severity: 'Success',

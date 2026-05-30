@@ -22,65 +22,65 @@ const mockBranches = [
   },
   {
     id: 'BR-02',
-    name: 'London Agency',
-    country: 'United Kingdom',
-    manager: 'John Doe',
+    name: 'Delhi Office',
+    country: 'India',
+    manager: 'Rajesh Kumar',
     employeesCount: 28,
     activeProjects: 8,
-    timezone: 'GMT (UTC+0)',
+    timezone: 'IST (UTC+5:30)',
     status: 'High Load',
-    lat: '51.5074° N',
-    lng: '0.1278° W',
-    address: '30 St Mary Axe (The Gherkin)',
+    lat: '28.6139° N',
+    lng: '77.2090° E',
+    address: 'Connaught Place, New Delhi - 110001',
   },
   {
     id: 'BR-03',
-    name: 'Tokyo DevHub',
-    country: 'Japan',
-    manager: 'Kenji Sato',
+    name: 'Mumbai Office',
+    country: 'India',
+    manager: 'Sanjay Gupta',
     employeesCount: 34,
     activeProjects: 14,
-    timezone: 'JST (UTC+9)',
+    timezone: 'IST (UTC+5:30)',
     status: 'Optimal',
-    lat: '35.6762° N',
-    lng: '139.6503° E',
-    address: 'Shibuya Scramble Square, Floor 28',
+    lat: '19.0760° N',
+    lng: '72.8777° E',
+    address: 'Bandra Kurla Complex, Mumbai - 400051',
   },
   {
     id: 'BR-04',
-    name: 'Sydney Office',
-    country: 'Australia',
-    manager: 'Emma Watson',
+    name: 'Kolkata Office',
+    country: 'India',
+    manager: 'Shweta Joshi',
     employeesCount: 18,
     activeProjects: 5,
-    timezone: 'AEST (UTC+10)',
+    timezone: 'IST (UTC+5:30)',
     status: 'Optimal',
-    lat: '33.8688° S',
-    lng: '151.2093° E',
-    address: 'Circular Quay Tower, Level 15',
+    lat: '22.5726° N',
+    lng: '88.3639° E',
+    address: 'Salt Lake City, Kolkata - 700091',
   },
   {
     id: 'BR-05',
-    name: 'Munich Sales',
-    country: 'Germany',
-    manager: 'Hans Meier',
+    name: 'Chennai Office',
+    country: 'India',
+    manager: 'Harish Verma',
     employeesCount: 12,
     activeProjects: 4,
-    timezone: 'CET (UTC+1)',
+    timezone: 'IST (UTC+5:30)',
     status: 'Optimal',
-    lat: '48.1351° N',
-    lng: '11.5820° E',
-    address: 'Balanstraße 73, Haus 10',
+    lat: '13.0827° N',
+    lng: '80.2707° E',
+    address: 'OMR Road, Chennai - 600096',
   }
 ];
 
 const mockDepts = [
-  { name: 'Engineering', count: 52, budget: '$1.4M', color: 'var(--color-primary)' },
-  { name: 'Product Management', count: 18, budget: '$650K', color: '#10b981' },
-  { name: 'Design', count: 15, budget: '$400K', color: '#ec4899' },
-  { name: 'Marketing & Sales', count: 25, budget: '$850K', color: '#f59e0b' },
-  { name: 'Operations', count: 12, budget: '$300K', color: '#8b5cf6' },
-  { name: 'Finance & HR', count: 8, budget: '$200K', color: '#6b7280' },
+  { name: 'Engineering', count: 52, budget: '₹11.9Cr', color: 'var(--color-primary)' },
+  { name: 'Product Management', count: 18, budget: '₹5.5Cr', color: '#10b981' },
+  { name: 'Design', count: 15, budget: '₹3.4Cr', color: '#ec4899' },
+  { name: 'Marketing & Sales', count: 25, budget: '₹7.2Cr', color: '#f59e0b' },
+  { name: 'Operations', count: 12, budget: '₹2.5Cr', color: '#8b5cf6' },
+  { name: 'Finance & HR', count: 8, budget: '₹1.7Cr', color: '#6b7280' },
 ];
 
 const Overview = () => {
@@ -138,7 +138,7 @@ const Overview = () => {
         />
         <StatCard
           title="Annual Run Rate (ARR)"
-          value="$3.8M"
+          value="₹32.3Cr"
           icon={DollarSign}
           description="Estimated gross run rate"
           trend="+12% growth"

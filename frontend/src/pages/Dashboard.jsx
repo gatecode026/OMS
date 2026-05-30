@@ -31,7 +31,12 @@ import {
   Info,
   Activity,
   FileCheck,
-  Bell
+  Bell,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Mail,
+  Send
 } from 'lucide-react';
 import {
   AreaChart,
@@ -44,10 +49,10 @@ import {
 } from 'recharts';
 
 const mockBranchesData = [
-  { name: 'Jaipur HQ', country: 'India', flag: '🇮🇳', headcount: 3, projects: 2, status: 'Optimal', score: 97, revenue: '$2.4M' },
-  { name: 'London Agency', country: 'United Kingdom', flag: '🇬🇧', headcount: 4, projects: 2, status: 'Active', score: 89, revenue: '$1.8M' },
-  { name: 'Tokyo DevHub', country: 'Japan', flag: '🇯🇵', headcount: 1, projects: 1, status: 'Optimal', score: 82, revenue: '$920K' },
-  { name: 'Singapore Office', country: 'Singapore', flag: '🇸🇬', headcount: 1, projects: 1, status: 'Active', score: 75, revenue: '$680K' }
+  { name: 'Jaipur HQ', country: 'India', flag: '🇮🇳', headcount: 3, projects: 2, status: 'Optimal', score: 97, revenue: '₹20.4Cr' },
+  { name: 'Delhi Office', country: 'India', flag: '🇮🇳', headcount: 4, projects: 2, status: 'Active', score: 89, revenue: '₹15.3Cr' },
+  { name: 'Mumbai Office', country: 'India', flag: '🇮🇳', headcount: 1, projects: 1, status: 'Optimal', score: 82, revenue: '₹7.8Cr' },
+  { name: 'Bangalore Office', country: 'India', flag: '🇮🇳', headcount: 1, projects: 1, status: 'Active', score: 75, revenue: '₹5.7Cr' }
 ];
 
 const mockDeptsData = [
@@ -59,9 +64,9 @@ const mockDeptsData = [
 
 const mockReportsData = [
   { id: 'R-1', employee: 'Aarav Sharma', avatar: 'AS', project: 'SaaS Platform v2', hours: 8, status: 'Approved', summary: 'Refactored lazy routes, authorization guards, and theme settings.', blockers: 'None. Clean build outputs verified.', tomorrowGoals: 'Develop active theme toggling and setup inbox messaging.' },
-  { id: 'R-2', employee: 'John Doe', avatar: 'JD', project: 'Marketing Website', hours: 7.5, status: 'Submitted', summary: 'Designed fresh layouts, vector assets, and brand color systems.', blockers: 'None. Client review pending.', tomorrowGoals: 'Finalize SVG icons export and coordinate assets deployment.' },
-  { id: 'R-3', employee: 'Jane Smith', avatar: 'JS', project: 'Q2 Promo Campaign', hours: 6, status: 'Flagged', summary: 'Attended client reviews. Did not log detailed task logs.', blockers: 'Awaiting copy approval from operations.', tomorrowGoals: 'Submit corrected hours sheet.' },
-  { id: 'R-4', employee: 'Bob Johnson', avatar: 'BJ', project: 'Branch Deployments', hours: 8.5, status: 'Approved', summary: 'Configured workstations, user controls, and IP whitelist profiles.', blockers: 'Network latency issues resolved.', tomorrowGoals: 'Verify backup cron schedules and session timeouts.' }
+  { id: 'R-2', employee: 'Rajesh Kumar', avatar: 'RK', project: 'Marketing Website', hours: 7.5, status: 'Submitted', summary: 'Designed fresh layouts, vector assets, and brand color systems.', blockers: 'None. Client review pending.', tomorrowGoals: 'Finalize SVG icons export and coordinate assets deployment.' },
+  { id: 'R-3', employee: 'Meena Sharma', avatar: 'MS', project: 'Q2 Promo Campaign', hours: 6, status: 'Flagged', summary: 'Attended client reviews. Did not log detailed task logs.', blockers: 'Awaiting copy approval from operations.', tomorrowGoals: 'Submit corrected hours sheet.' },
+  { id: 'R-4', employee: 'Prakash Patel', avatar: 'PP', project: 'Branch Deployments', hours: 8.5, status: 'Approved', summary: 'Configured workstations, user controls, and IP whitelist profiles.', blockers: 'Network latency issues resolved.', tomorrowGoals: 'Verify backup cron schedules and session timeouts.' }
 ];
 
 const mockActivitiesData = [
@@ -78,7 +83,7 @@ const mockActivitiesData = [
     type: 'warning',
     time: '1 hour ago',
     icon: CalendarDays,
-    title: <span><strong>John Miller</strong> submitted a medical leave request</span>,
+    title: <span><strong>Vikram Singh</strong> submitted a medical leave request</span>,
     details: 'Medical leave request submitted for 3 days starting June 1st. Attachment uploaded.'
   },
   {
@@ -86,7 +91,7 @@ const mockActivitiesData = [
     type: 'primary',
     time: '3 hours ago',
     icon: CheckCircle,
-    title: <span><strong>Elena Rostova</strong> updated task <strong>Deploy production v2.1</strong> to Done</span>,
+    title: <span><strong>Ananya Gupta</strong> updated task <strong>Deploy production v2.1</strong> to Done</span>,
     details: 'Task moved to Done status. Commit hash: 9a2f1c8d. All unit tests passed.'
   },
   {
@@ -102,7 +107,7 @@ const mockActivitiesData = [
     type: 'success',
     time: '1 day ago',
     icon: FileText,
-    title: <span><strong>Marcus Vance</strong> submitted Q2 Marketing Work Report</span>,
+    title: <span><strong>Rohit Sharma</strong> submitted Q2 Marketing Work Report</span>,
     details: 'Logged 8.5 hours. Core focus: campaign assets creation and ad copywriting draft.'
   },
   {
@@ -110,7 +115,7 @@ const mockActivitiesData = [
     type: 'primary',
     time: '1 day ago',
     icon: FileCheck,
-    title: <span><strong>Sophia Laurent</strong> approved DevOps CI/CD pipeline automation workflow</span>,
+    title: <span><strong>Neha Verma</strong> approved DevOps CI/CD pipeline automation workflow</span>,
     details: 'Workflow recipe triggered. Production deployments now run on staging success.'
   }
 ];
@@ -123,17 +128,17 @@ const mockAlertsData = [
     desc: '3 employees clocked in late at Jaipur HQ today.',
     time: 'Just now',
     icon: AlertTriangle,
-    details: 'Neha Patel, John Miller, and Aarav Sharma checked in after the grace period (09:15 AM). Late flags applied.',
+    details: 'Neha Patel, Vikram Singh, and Aarav Sharma checked in after the grace period (09:15 AM). Late flags applied.',
     resolution: 'Notify employees or waive compliance flag.'
   },
   {
     id: 'al-2',
     type: 'danger',
     title: 'Missing Punch-Outs',
-    desc: 'Missing punch-out detected for John Doe yesterday.',
+    desc: 'Missing punch-out detected for Rajesh Kumar yesterday.',
     time: '2 hours ago',
     icon: AlertCircle,
-    details: 'John Doe failed to log checkout session. Current active status is still open.',
+    details: 'Rajesh Kumar failed to log checkout session. Current active status is still open.',
     resolution: 'Force logout session or manually input check-out timesheet.'
   },
   {
@@ -214,6 +219,51 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
+// Collapsible Org Node Component
+const OrgNode = ({ name, role, subItems }) => {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = subItems && subItems.length > 0;
+  return (
+    <div className="org-tree-branch" style={{ marginLeft: '24px', borderLeft: '1px dashed rgba(255,255,255,0.08)', paddingLeft: '16px', marginTop: '10px', position: 'relative' }}>
+      <div 
+        onClick={() => hasChildren && setExpanded(!expanded)} 
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px', 
+          cursor: hasChildren ? 'pointer' : 'default',
+          padding: '8px 12px',
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-md)',
+          width: 'max-content',
+          minWidth: '220px',
+          transition: 'all 0.2s ease',
+          userSelect: 'none'
+        }}
+      >
+        <Avatar name={name} size="sm" />
+        <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+          <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>{name}</span>
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{role}</span>
+        </div>
+        {hasChildren && (
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </span>
+        )}
+      </div>
+      {hasChildren && expanded && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {subItems.map((item, idx) => (
+            <OrgNode key={idx} {...item} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Dashboard = () => {
   const isLoading = usePageLoading(600);
   const {
@@ -231,6 +281,93 @@ const Dashboard = () => {
 
   const [leaderboardTab, setLeaderboardTab] = useState('employee'); // 'employee' or 'branch'
   const [reports, setReports] = useState(mockReportsData);
+  const [showExtendedStats, setShowExtendedStats] = useState(false);
+
+  // Communication Center State
+  const [commTab, setCommTab] = useState('company');
+  const [commModal, setCommModal] = useState(null); // 'announcement', 'notification', 'email'
+  const [commForm, setCommForm] = useState({ title: '', body: '', target: 'All' });
+  const [announcements, setAnnouncements] = useState({
+    company: [
+      { title: 'CEO Townhall Meeting', body: 'Q2 All-Hands meeting scheduled for June 5th at 3 PM IST.', time: '1d ago' },
+      { title: 'New Office Policy', body: 'Updated remote work policy document uploaded in Document Vault.', time: '3d ago' }
+    ],
+    department: [
+      { title: 'Engineering Sprint Sync', body: 'All devs please update task statuses before end of sprint.', time: '2h ago' },
+      { title: 'HR Compliance Audit', body: 'Please verify and update document list under employee profile.', time: '1d ago' }
+    ],
+    team: [
+      { title: 'Frontend UI Polish', body: 'Meeting today at 4:30 PM to discuss dashboard custom gradient colors.', time: '30m ago' }
+    ]
+  });
+
+  const handleQuickAction = (type) => {
+    setCommForm({ title: '', body: '', target: type === 'email' ? 'All Employees' : 'All Departments' });
+    setCommModal(type);
+  };
+
+  const handleCommSubmit = () => {
+    if (!commForm.title || !commForm.body) {
+      addToast('warning', 'Please fill in all fields.');
+      return;
+    }
+    if (commModal === 'announcement') {
+      const newAnn = { title: commForm.title, body: commForm.body, time: 'Just now' };
+      setAnnouncements(prev => ({
+        ...prev,
+        company: [newAnn, ...prev.company]
+      }));
+      addToast('success', 'Announcement published successfully!');
+    } else if (commModal === 'notification') {
+      addToast('success', `Alert sent to target group: ${commForm.target}`);
+    } else {
+      addToast('success', `Email dispatched successfully!`);
+    }
+    setCommModal(null);
+  };
+
+  // Org Chart Hierarchy Data
+  const orgChartData = {
+    name: 'Aarav Sharma',
+    role: 'Chief Executive Officer / COO',
+    subItems: [
+      {
+        name: 'Vikram Singh',
+        role: 'Engineering Director / Branch Admin',
+        subItems: [
+          {
+            name: 'Ananya Gupta',
+            role: 'Engineering Manager / Team Leader',
+            subItems: [
+              { name: 'Suresh Kumar', role: 'Frontend Developer', subItems: [] },
+              { name: 'Kavita Singh', role: 'QA Engineer', subItems: [] }
+            ]
+          },
+          {
+            name: 'Arjun Mehta',
+            role: 'Data Manager / Team Leader',
+            subItems: [
+              { name: 'Amit Bose', role: 'Cloud Engineer', subItems: [] }
+            ]
+          }
+        ]
+      },
+      {
+        name: 'Priya Patel',
+        role: 'Marketing Director / Branch Admin',
+        subItems: [
+          {
+            name: 'Rohit Sharma',
+            role: 'Sales Manager / Team Leader',
+            subItems: [
+              { name: 'Deepak Joshi', role: 'Account Executive', subItems: [] },
+              { name: 'Naveen Saxena', role: 'Sales Specialist', subItems: [] }
+            ]
+          }
+        ]
+      }
+    ]
+  };
 
   // Stats Calculations
   const totalEmployeesCount = employees.length || 8;
@@ -241,6 +378,16 @@ const Dashboard = () => {
   const todoTasks = tasks.filter(t => t.status === 'To Do').length;
   const progressTasks = tasks.filter(t => t.status === 'In Progress').length;
   const doneTasks = tasks.filter(t => t.status === 'Done').length;
+
+  const totalDepts = [...new Set(employees.map(e => e.department))].length || 4;
+  const totalTeams = [...new Set(employees.map(e => e.team).filter(Boolean))].length || 6;
+  const probationCount = employees.filter(e => e.employmentStatus === 'Probation').length || 3;
+  const contractExpiringCount = employees.filter(e => e.employeeType === 'Contract').length || 2;
+  const missingDocsCount = employees.filter(e => !e.documents || e.documents.length < 3).length || 5;
+  const notMarkedAttendanceCount = Math.max(0, employees.length - presentToday);
+  const avgTenure = "2.4 Years";
+  const turnoverRate = "4.8%";
+  const satisfactionScore = "88%";
 
   // Chart Data
   const attendanceChartData = [
@@ -256,10 +403,10 @@ const Dashboard = () => {
 
   // Leaderboard data
   const employeeLeaderboard = [
-    { name: 'Elena Rostova', dept: 'Engineering', score: 98, color: '#10b981' },
+    { name: 'Ananya Gupta', dept: 'Engineering', score: 98, color: '#10b981' },
     { name: 'Aarav Sharma', dept: 'Operations', score: 95, color: '#3b82f6' },
-    { name: 'Marcus Vance', dept: 'Sales', score: 88, color: '#8b5cf6' },
-    { name: 'John Miller', dept: 'Engineering', score: 76, color: '#f59e0b' }
+    { name: 'Rohit Sharma', dept: 'Sales', score: 88, color: '#8b5cf6' },
+    { name: 'Vikram Singh', dept: 'Engineering', score: 76, color: '#f59e0b' }
   ];
 
   const branchLeaderboard = mockBranchesData.map(b => ({
@@ -404,6 +551,91 @@ const Dashboard = () => {
           ]}
         />
       </div>
+      
+      {/* Toggle button for Extended Metrics */}
+      <div style={{ display: 'flex', justifyContent: 'center', margin: '0' }}>
+        <Button 
+          variant="secondary" 
+          size="sm" 
+          onClick={() => setShowExtendedStats(!showExtendedStats)}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', justifyContent: 'center', background: 'var(--bg-elevated)', border: '1px dashed var(--border-color)' }}
+        >
+          {showExtendedStats ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {showExtendedStats ? 'Collapse Extended Analytics Grid' : 'Expand Extended Analytics Grid (10 Additional KPIs)'}
+        </Button>
+      </div>
+
+      {showExtendedStats && (
+        <div className="stats-row animate-slide-up" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-4)' }}>
+          <StatCard
+            label="Total Departments"
+            value={totalDepts}
+            icon={Building2}
+            colorVariant="primary"
+            onClick={() => navigate('/employees')}
+          />
+          <StatCard
+            label="Total Teams"
+            value={totalTeams}
+            icon={Users}
+            colorVariant="primary"
+            onClick={() => navigate('/employees')}
+          />
+          <StatCard
+            label="Employees in Probation"
+            value={probationCount}
+            icon={Clock}
+            colorVariant="warning"
+            onClick={() => navigate('/employees')}
+          />
+          <StatCard
+            label="Contract Expiring Soon"
+            value={contractExpiringCount}
+            icon={CalendarDays}
+            colorVariant="danger"
+            onClick={() => navigate('/employees')}
+          />
+          <StatCard
+            label="Missing Documents"
+            value={missingDocsCount}
+            icon={FileText}
+            colorVariant="danger"
+            onClick={() => navigate('/employees')}
+          />
+          <StatCard
+            label="Unmarked Attendance Today"
+            value={notMarkedAttendanceCount}
+            icon={AlertCircle}
+            colorVariant="danger"
+            onClick={() => navigate('/attendance')}
+          />
+          <StatCard
+            label="Average Employee Tenure"
+            value={avgTenure}
+            icon={TrendingUp}
+            colorVariant="success"
+          />
+          <StatCard
+            label="Employee Turnover Rate"
+            value={turnoverRate}
+            icon={Activity}
+            colorVariant="warning"
+          />
+          <StatCard
+            label="Employee Satisfaction"
+            value={satisfactionScore}
+            icon={Award}
+            colorVariant="purple"
+          />
+          <StatCard
+            label="Total Projects"
+            value={activeProjectsCount}
+            icon={Briefcase}
+            colorVariant="purple"
+            onClick={() => navigate('/projects')}
+          />
+        </div>
+      )}
 
       {/* 2. Middle Row: Attendance History Area & Branch Overview */}
       <div className="charts-row">
@@ -587,6 +819,90 @@ const Dashboard = () => {
 
       </div>
 
+      {/* Org Hierarchy Chart & Communication Center Splits Row */}
+      <div className="dashboard-splits animate-slide-up" style={{ marginTop: '0' }}>
+        
+        {/* Organization Hierarchy Chart Card */}
+        <div className="card split-panel flex-1" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
+          <div className="panel-header-simple">
+            <div>
+              <h3 className="card-title">Organization Hierarchy Chart</h3>
+              <span className="chart-subtitle">Collapsible visual team reporting tree</span>
+            </div>
+            <Badge variant="primary">Hierarchy</Badge>
+          </div>
+          <div className="panel-scroll-list" style={{ padding: 'var(--spacing-4) var(--spacing-6)', overflowY: 'auto', flex: 1 }}>
+            <div style={{ display: 'inline-block', minWidth: '100%' }}>
+              <OrgNode {...orgChartData} isRoot={true} />
+            </div>
+          </div>
+        </div>
+
+        {/* Communication Center Card */}
+        <div className="card split-panel flex-1" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
+          <div className="panel-header-simple" style={{ paddingBottom: 'var(--spacing-3)' }}>
+            <div>
+              <h3 className="card-title">Communication Center</h3>
+              <span className="chart-subtitle">Direct broadcasting & quick updates</span>
+            </div>
+            
+            {/* Communication Tab selector */}
+            <div className="tab-btn-group">
+              <button
+                className={`tab-btn ${commTab === 'company' ? 'active' : ''}`}
+                onClick={() => setCommTab('company')}
+              >
+                Company
+              </button>
+              <button
+                className={`tab-btn ${commTab === 'department' ? 'active' : ''}`}
+                onClick={() => setCommTab('department')}
+              >
+                Dept
+              </button>
+              <button
+                className={`tab-btn ${commTab === 'team' ? 'active' : ''}`}
+                onClick={() => setCommTab('team')}
+              >
+                Team
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', padding: 'var(--spacing-3) var(--spacing-6)', gap: 'var(--spacing-2)', borderBottom: '1px solid var(--border-color)' }}>
+            <Button size="sm" onClick={() => handleQuickAction('announcement')} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Bell size={12} /> Broadcast
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleQuickAction('notification')} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <AlertCircle size={12} /> Alert
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => handleQuickAction('email')} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Mail size={12} /> Email
+            </Button>
+          </div>
+
+          <div className="panel-scroll-list" style={{ padding: 'var(--spacing-4) var(--spacing-6)', flex: 1, overflowY: 'auto' }}>
+            {announcements[commTab]?.length === 0 ? (
+              <div className="empty-panel-view">
+                <h4>No announcements</h4>
+                <p>No recent broadcasts for this segment.</p>
+              </div>
+            ) : (
+              announcements[commTab]?.map((ann, idx) => (
+                <div key={idx} className="split-list-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{ann.title}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{ann.time}</span>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>{ann.body}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+      </div>
+
       {/* 4. Daily Work Reports table grid */}
       <div className="card table-card animate-slide-up">
         <div className="table-card-header">
@@ -738,16 +1054,113 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 5. Dashboard Footer (Last login details) */}
-      <footer className="dashboard-footer card">
-        <div className="dashboard-footer-info">
-          <ShieldCheck size={14} className="text-success" />
-          <span>Active Operator: <strong>{currentUser?.name || 'Aarav Sharma'}</strong> (Super Admin)</span>
+      {/* 5. Dashboard Footer (Last login details & expanded analytics) */}
+      <footer className="dashboard-footer card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-4)', padding: 'var(--spacing-5) var(--spacing-6) !important', marginTop: 'var(--spacing-6)' }}>
+        <div className="dashboard-footer-info" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+          <ShieldCheck size={16} className="text-success" />
+          <span>Operator: <strong>{currentUser?.name || 'Aarav Sharma'}</strong> (Super Admin)</span>
         </div>
         <div>
-          <span>Last Login: <strong>2026-05-29 08:06:17</strong> from IP <strong>192.168.1.120</strong> (JaipurHQ)</span>
+          <span>Active Sessions: <strong style={{ color: 'var(--color-primary)' }}>12 Operator nodes</strong></span>
+        </div>
+        <div>
+          <span>Pending Approvals: <strong style={{ color: 'var(--color-warning)' }}>5 requests</strong></span>
+        </div>
+        <div>
+          <span>Open Tasks: <strong style={{ color: 'var(--color-purple)' }}>{todoTasks + progressTasks} tasks</strong></span>
+        </div>
+        <div>
+          <span>System Health: <strong style={{ color: 'var(--color-success)' }}>99.8% Operational</strong></span>
+        </div>
+        <div>
+          <span>Data Sync: <strong style={{ color: 'var(--text-primary)' }}>Synchronized (Just now)</strong></span>
         </div>
       </footer>
+
+      {/* Communication Modal */}
+      <Modal
+        isOpen={!!commModal}
+        onClose={() => setCommModal(null)}
+        title={
+          commModal === 'announcement' ? 'Broadcast General Announcement' :
+          commModal === 'notification' ? 'Dispatch Dashboard Notification' :
+          'Send Direct Mail Integration'
+        }
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper" style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--spacing-2)', width: '100%' }}>
+            <Button variant="secondary" onClick={() => setCommModal(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleCommSubmit} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Send size={14} /> Send
+            </Button>
+          </div>
+        }
+      >
+        {commModal && (
+          <div className="comm-form-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Subject / Title
+              </label>
+              <input
+                type="text"
+                className="form-control"
+                value={commForm.title}
+                onChange={(e) => setCommForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter subject title..."
+                style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Target Audience
+              </label>
+              <select
+                className="form-control"
+                value={commForm.target}
+                onChange={(e) => setCommForm(prev => ({ ...prev, target: e.target.value }))}
+                style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)' }}
+              >
+                {commModal === 'announcement' ? (
+                  <>
+                    <option value="All">All Employees (Company-wide)</option>
+                    <option value="IT">IT Department Only</option>
+                    <option value="HR">HR Department Only</option>
+                    <option value="Sales">Sales Department Only</option>
+                  </>
+                ) : commModal === 'notification' ? (
+                  <>
+                    <option value="All Departments">All Departments</option>
+                    <option value="Management">Management Tier Only</option>
+                    <option value="Developers">Software Engineering Team</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="All Employees">All Enrolled Emails</option>
+                    <option value="Contractors">Contract Workers Only</option>
+                    <option value="Probationary">Probationary Employees Only</option>
+                  </>
+                )}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                Message Content
+              </label>
+              <textarea
+                className="form-control"
+                rows={4}
+                value={commForm.body}
+                onChange={(e) => setCommForm(prev => ({ ...prev, body: e.target.value }))}
+                placeholder="Type your message body details here..."
+                style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', resize: 'none' }}
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Daily Work Report Details Modal */}
       <Modal

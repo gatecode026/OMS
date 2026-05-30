@@ -170,10 +170,10 @@ const Attendance = () => {
 
           <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
             <option value="">All Branches</option>
-            <option value="New York">New York</option>
-            <option value="London">London</option>
-            <option value="Tokyo">Tokyo</option>
-            <option value="Singapore">Singapore</option>
+            <option value="Jaipur">Jaipur</option>
+            <option value="Delhi">Delhi</option>
+            <option value="Mumbai">Mumbai</option>
+            <option value="Bangalore">Bangalore</option>
           </select>
         </div>
       </div>
@@ -202,16 +202,95 @@ const Attendance = () => {
         </div>
       </div>
 
-      {/* Table grid */}
-      <div className="card table-wrapper-card">
-        <DataTable
-          columns={columns}
-          data={filteredAttendance}
-          loading={isLoading}
-          rowsPerPage={10}
-          emptyTitle="No Attendance Records Found"
-          emptyDescription="Try selecting another date or adjusting filters."
-        />
+      {/* Attendance Analytics Card Group */}
+      <div className="stats-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: '0', gap: 'var(--spacing-4)' }}>
+        <div className="card attendance-stat-item" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', padding: 'var(--spacing-4)' }}>
+          <span className="stat-label" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Avg Login Time</span>
+          <h3 className="stat-num" style={{ fontSize: '1.25rem', margin: '4px 0', color: 'var(--text-primary)', fontWeight: 700 }}>09:12 AM</h3>
+          <span className="stat-desc-sub" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Within grace limit</span>
+        </div>
+        <div className="card attendance-stat-item" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', padding: 'var(--spacing-4)' }}>
+          <span className="stat-label" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Avg Logout Time</span>
+          <h3 className="stat-num" style={{ fontSize: '1.25rem', margin: '4px 0', color: 'var(--text-primary)', fontWeight: 700 }}>06:05 PM</h3>
+          <span className="stat-desc-sub" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Standard shift check</span>
+        </div>
+        <div className="card attendance-stat-item" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', padding: 'var(--spacing-4)' }}>
+          <span className="stat-label" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Total Working Hours</span>
+          <h3 className="stat-num" style={{ fontSize: '1.25rem', margin: '4px 0', color: 'var(--color-success)', fontWeight: 700 }}>184.5 hrs</h3>
+          <span className="stat-desc-sub" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Cumulated this month</span>
+        </div>
+        <div className="card attendance-stat-item" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', padding: 'var(--spacing-4)' }}>
+          <span className="stat-label" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Overtime Hours</span>
+          <h3 className="stat-num" style={{ fontSize: '1.25rem', margin: '4px 0', color: 'var(--color-primary)', fontWeight: 700 }}>12.4 hrs</h3>
+          <span className="stat-desc-sub" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Approved calculations</span>
+        </div>
+        <div className="card attendance-stat-item" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', padding: 'var(--spacing-4)' }}>
+          <span className="stat-label" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Break Hours</span>
+          <h3 className="stat-num" style={{ fontSize: '1.25rem', margin: '4px 0', color: 'var(--text-secondary)', fontWeight: 700 }}>22.0 hrs</h3>
+          <span className="stat-desc-sub" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>1 hr daily policy limit</span>
+        </div>
+        <div className="card attendance-stat-item" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', padding: 'var(--spacing-4)' }}>
+          <span className="stat-label" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Monthly Trend</span>
+          <h3 className="stat-num" style={{ fontSize: '1.25rem', margin: '4px 0', color: 'var(--color-success)', fontWeight: 700 }}>+2.4%</h3>
+          <span className="stat-desc-sub" style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Higher compliance rate</span>
+        </div>
+      </div>
+
+      {/* Table grid split layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--spacing-6)', alignItems: 'start' }}>
+        
+        {/* Table card */}
+        <div className="card table-wrapper-card" style={{ flex: 2, height: 'max-content' }}>
+          <DataTable
+            columns={columns}
+            data={filteredAttendance}
+            loading={isLoading}
+            rowsPerPage={10}
+            emptyTitle="No Attendance Records Found"
+            emptyDescription="Try selecting another date or adjusting filters."
+          />
+        </div>
+
+        {/* Attendance Alerts Side Panel */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', padding: 'var(--spacing-5)', height: '100%', flex: 1 }}>
+          <div className="widget-header" style={{ marginBottom: '16px' }}>
+            <span className="widget-title" style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)' }}>Attendance Alerts & Flags</span>
+            <Badge variant="danger">Critical</Badge>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.04)', border: '1px solid rgba(239, 68, 68, 0.1)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <strong style={{ fontSize: '0.8125rem', color: 'var(--color-danger)' }}>Frequent Late Arrivals</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>3 Flagged</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                Vikram Singh and Rajesh Kumar checked in late more than 3 times this week.
+              </p>
+            </div>
+
+            <div style={{ padding: '12px', background: 'rgba(245, 158, 11, 0.04)', border: '1px solid rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <strong style={{ fontSize: '0.8125rem', color: 'var(--color-warning)' }}>Missing Punch Records</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>1 Flagged</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                Rajesh Kumar has a missing clock-out record for yesterday.
+              </p>
+            </div>
+
+            <div style={{ padding: '12px', background: 'rgba(168, 85, 247, 0.04)', border: '1px solid rgba(168, 85, 247, 0.1)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <strong style={{ fontSize: '0.8125rem', color: 'var(--color-purple)' }}>Consecutive Absence Alert</strong>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>1 Flagged</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                Meena Sharma has been absent for 3 consecutive working days.
+              </p>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Edit Attendance Record Modal */}

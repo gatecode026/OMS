@@ -51,10 +51,10 @@ const Profile = () => {
   };
 
   const activityHistory = [
-    { action: 'Approved leave request for Sophia Laurent', time: '5 min ago', icon: CheckCircle, color: '#10b981' },
+    { action: 'Approved leave request for Neha Verma', time: '5 min ago', icon: CheckCircle, color: '#10b981' },
     { action: 'Ran payroll for Engineering department', time: '2 hours ago', icon: Briefcase, color: '#3b82f6' },
     { action: 'Updated permissions for Branch Admin role', time: '1 day ago', icon: Shield, color: '#8b5cf6' },
-    { action: 'Added new employee: Carlos Mendez', time: '3 days ago', icon: User, color: '#10b981' },
+    { action: 'Added new employee: Deepak Joshi', time: '3 days ago', icon: User, color: '#10b981' },
     { action: 'Modified system timezone settings', time: '1 week ago', icon: Globe, color: '#f59e0b' }
   ];
 

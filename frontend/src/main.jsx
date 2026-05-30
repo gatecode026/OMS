@@ -58,6 +58,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
               {/* ── People ── */}
               <Route path="/employees"  element={<Employees />} />
+              <Route path="/employees/add" element={<Employees />} />
               <Route path="/employees/:id" element={<EmployeeDetail />} />
               <Route path="/attendance" element={<Attendance />} />
               <Route path="/leaves"     element={<LeaveManagement />} />

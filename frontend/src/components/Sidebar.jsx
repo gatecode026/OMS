@@ -47,7 +47,7 @@ const menuStructure = [
         name: 'Employee Management',
         icon: Users,
         subItems: [
-          { name: 'Add Employee', path: '/employees?action=add' },
+          { name: 'Add Employee', path: '/employees/add' },
           { name: 'All Employees', path: '/employees' }
         ]
       },

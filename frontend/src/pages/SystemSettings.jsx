@@ -57,11 +57,11 @@ const SystemSettings = () => {
   const [saved, setSaved] = useState(false);
 
   // General Settings state
-  const [companyName, setCompanyName] = useState('Enterprise Corp.');
-  const [timezone, setTimezone] = useState('UTC-5 (Eastern Time)');
-  const [language, setLanguage] = useState('English (US)');
-  const [dateFormat, setDateFormat] = useState('YYYY-MM-DD');
-  const [currency, setCurrency] = useState('USD ($)');
+  const [companyName, setCompanyName] = useState('Office Management Pvt. Ltd.');
+  const [timezone, setTimezone] = useState('IST (UTC+5:30)');
+  const [language, setLanguage] = useState('English (IN)');
+  const [dateFormat, setDateFormat] = useState('DD-MM-YYYY');
+  const [currency, setCurrency] = useState('INR (₹)');
   const [fiscalYear, setFiscalYear] = useState('January');
 
   // Appearance state
@@ -101,9 +101,9 @@ const SystemSettings = () => {
             <div className="settings-group">
               <h4 className="settings-group-title">Organisation Info</h4>
               <div className="settings-fields-grid">
-                <SettingsInput label="Company Name" value={companyName} onChange={setCompanyName} placeholder="Enterprise Corp." />
-                <SettingsInput label="Fiscal Year Start" value={fiscalYear} onChange={setFiscalYear} placeholder="January" />
-                <SettingsInput label="Default Currency" value={currency} onChange={setCurrency} placeholder="USD ($)" />
+                <SettingsInput label="Company Name" value={companyName} onChange={setCompanyName} placeholder="Office Management Pvt. Ltd." />
+                <SettingsInput label="Fiscal Year Start" value={fiscalYear} onChange={setFiscalYear} placeholder="April" />
+                <SettingsInput label="Default Currency" value={currency} onChange={setCurrency} placeholder="INR (₹)" />
                 <SettingsInput label="Date Format" value={dateFormat} onChange={setDateFormat} placeholder="YYYY-MM-DD" />
               </div>
             </div>

@@ -61,9 +61,9 @@ export const AppProvider = ({ children }) => {
 
   // Messages states
   const [messages, setMessages] = useState([
-    { id: 'msg-1', sender: 'Elena Rostova', text: 'Hey Aarav, the frontend lazy route changes are live in production. Please check.', time: '10m ago', unread: true },
-    { id: 'msg-2', sender: 'John Miller', text: 'Can you review the leave request I submitted yesterday? Need to travel next week.', time: '1h ago', unread: true },
-    { id: 'msg-3', sender: 'Sophia Laurent', text: 'Draft payroll calculations for May are ready in the dashboard.', time: '5h ago', unread: false }
+    { id: 'msg-1', sender: 'Ananya Gupta', text: 'Hey Aarav, the frontend lazy route changes are live in production. Please check.', time: '10m ago', unread: true },
+    { id: 'msg-2', sender: 'Vikram Singh', text: 'Can you review the leave request I submitted yesterday? Need to travel next week.', time: '1h ago', unread: true },
+    { id: 'msg-3', sender: 'Neha Verma', text: 'Draft payroll calculations for May are ready in the dashboard.', time: '5h ago', unread: false }
   ]);
 
   const markMessageRead = (id) => {
@@ -150,6 +150,7 @@ export const AppProvider = ({ children }) => {
       personalEmail: `${firstName.toLowerCase()}${lastName.toLowerCase()}${employees.length}@gmail.com`,
       emergencyContactName: newEmp.emergencyContactName || '',
       emergencyContactPhone: newEmp.emergencyContactPhone || '',
+      emergencyContactPhoneAlt: newEmp.emergencyContactPhoneAlt || '',
       currentAddress: newEmp.currentAddress || '',
       permanentAddress: newEmp.permanentAddress || '',
       employmentType: newEmp.employmentType || 'Full-Time',
@@ -159,7 +160,28 @@ export const AppProvider = ({ children }) => {
       taskHistory: [],
       performanceScore: { overall: 0, attendance: 0, taskCompletion: 0, reportSubmission: 0, leaveDiscipline: 0, monthly: [0, 0, 0, 0, 0, 0] },
       documents: [],
-      activityLog: []
+      activityLog: [],
+      
+      // New default properties
+      employeeType: newEmp.employeeType || 'Full-Time',
+      probationEndDate: newEmp.probationEndDate || '',
+      contractEndDate: newEmp.contractEndDate || '',
+      employmentStatus: newEmp.employmentStatus || 'Confirmed',
+      bankName: newEmp.bankName || '',
+      bankAccountNumber: newEmp.bankAccountNumber || '',
+      bankIfscCode: newEmp.bankIfscCode || '',
+      bankUpiId: newEmp.bankUpiId || '',
+      skills: newEmp.skills || [],
+      certifications: newEmp.certifications || [],
+      employmentHistory: newEmp.employmentHistory || [],
+      securityInfo: newEmp.securityInfo || { lastLogin: '—', loginDevice: '—', loginLocation: '—', failedAttempts: 0, mfaStatus: 'Disabled' },
+      payrollSummary: newEmp.payrollSummary || { salaryStatus: 'Pending', lastSalaryDate: '—', upcomingPayrollDate: '—', bonusHistory: [] },
+      productivityScore: newEmp.productivityScore || 75,
+      performanceRating: newEmp.performanceRating || 'Good',
+      leaveBalance: newEmp.leaveBalance || 15,
+      currentProjectsCount: newEmp.currentProjectsCount || 0,
+      experience: newEmp.experience || 0,
+      shift: newEmp.shift || 'Morning (09:00 AM - 06:00 PM)'
     };
     setEmployees(prev => [...prev, entry]);
     addActivityLog(`Added new employee: ${entry.name}`, 'Employees', 'success');
@@ -188,6 +210,66 @@ export const AppProvider = ({ children }) => {
     );
     addActivityLog(`Deactivated employee: ${emp.name}`, 'Employees', 'danger');
     addToast('warning', `Employee ${emp.name} has been deactivated.`);
+  };
+
+  const activateEmployee = (id) => {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    
+    setEmployees(prev =>
+      prev.map(e => (e.id === id ? { ...e, status: 'Active' } : e))
+    );
+    addActivityLog(`Activated employee: ${emp.name}`, 'Employees', 'success');
+    addToast('success', `Employee ${emp.name} has been activated.`);
+  };
+
+
+  const bulkAssignRole = (ids, roleId) => {
+    const roleObj = roles.find(r => r.id === roleId);
+    setEmployees(prev =>
+      prev.map(e => (ids.has(e.id) ? { ...e, roleId, role: roleObj ? roleObj.name : e.role } : e))
+    );
+    addActivityLog(`Bulk assigned role "${roleObj?.name}" to ${ids.size} employees`, 'Employees', 'success');
+    addToast('success', `Assigned role "${roleObj?.name}" to ${ids.size} employees.`);
+  };
+
+  const bulkTransferDept = (ids, deptName) => {
+    setEmployees(prev =>
+      prev.map(e => (ids.has(e.id) ? { ...e, department: deptName } : e))
+    );
+    addActivityLog(`Bulk transferred ${ids.size} employees to department: ${deptName}`, 'Employees', 'success');
+    addToast('success', `Transferred ${ids.size} employees to ${deptName}.`);
+  };
+
+  const bulkUpdateStatus = (ids, status) => {
+    setEmployees(prev =>
+      prev.map(e => (ids.has(e.id) ? { ...e, status } : e))
+    );
+    addActivityLog(`Bulk updated status of ${ids.size} employees to "${status}"`, 'Employees', 'success');
+    addToast('success', `Updated status of ${ids.size} employees to "${status}".`);
+  };
+
+  const bulkAllocateLeave = (ids, leaveData) => {
+    setEmployees(prev =>
+      prev.map(e => (ids.has(e.id) ? { ...e, leaveBalance: (e.leaveBalance || 0) + (parseInt(leaveData) || 0) } : e))
+    );
+    addActivityLog(`Bulk allocated ${leaveData} leaves to ${ids.size} employees`, 'Employees', 'success');
+    addToast('success', `Allocated ${leaveData} leaves to ${ids.size} employees.`);
+  };
+
+  const bulkSendNotification = (ids, message) => {
+    setNotifications(prev => [
+      {
+        id: `NTF-BULK-${Math.random().toString(36).substring(2, 9)}`,
+        type: 'info',
+        message: `Notification sent to ${ids.size} employees: "${message}"`,
+        timestamp: 'Just now',
+        read: false
+      },
+      ...prev
+    ]);
+    addActivityLog(`Sent bulk notification to ${ids.size} employees: "${message}"`, 'Employees', 'success');
+    addToast('success', `Notification sent to ${ids.size} employees.`);
   };
 
   // Leave Requests Handlers
@@ -364,6 +446,12 @@ export const AppProvider = ({ children }) => {
         addEmployee,
         updateEmployee,
         deactivateEmployee,
+        activateEmployee,
+        bulkAssignRole,
+        bulkTransferDept,
+        bulkUpdateStatus,
+        bulkAllocateLeave,
+        bulkSendNotification,
         approveLeaveRequest,
         rejectLeaveRequest,
         updateTaskStatus,

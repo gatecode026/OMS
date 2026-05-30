@@ -96,7 +96,7 @@ const Reports = () => {
       {/* KPI Summary Row */}
       <div className="reports-kpi-row">
         {[
-          { label: 'Total Payroll This Month', value: '$56,800', change: '+4.2%', up: true, color: '#10b981' },
+          { label: 'Total Payroll This Month', value: '₹48,20,000', change: '+4.2%', up: true, color: '#10b981' },
           { label: 'Avg Attendance Rate', value: '91%', change: '+2.1%', up: true, color: '#3b82f6' },
           { label: 'Open Leave Requests', value: '3', change: 'Pending Review', up: null, color: '#f59e0b' },
           { label: 'Task Completion Rate', value: '72%', change: '-8%', up: false, color: '#ef4444' }
