@@ -79,11 +79,14 @@ const downloadCSV = (employees) => {
 // ─── Attendance Status Badge ─────────────────────────────────────────────────
 const AttBadge = ({ status }) => {
   const map = {
-    'Present': { cls: 'att-present', label: 'Present' },
-    'Absent': { cls: 'att-absent', label: 'Absent' },
-    'On Leave': { cls: 'att-leave', label: 'On Leave' },
-    'Late': { cls: 'att-late', label: 'Late' },
-    'Work From Home': { cls: 'att-wfh', label: 'WFH' },
+    'Present': { cls: 'att-present', label: '✅ Present' },
+    'Absent': { cls: 'att-absent', label: '❌ Absent' },
+    'On Leave': { cls: 'att-leave', label: '🌴 On Leave' },
+    'Leave': { cls: 'att-leave', label: '🌴 On Leave' },
+    'Late': { cls: 'att-late', label: '🕐 Late' },
+    'Work From Home': { cls: 'att-wfh', label: '🏠 WFH' },
+    'WFH': { cls: 'att-wfh', label: '🏠 WFH' },
+    'Overtime': { cls: 'att-ot', label: '⏰ Overtime' },
   };
   const cfg = map[status] || { cls: 'att-absent', label: status || '—' };
   return (
@@ -145,8 +148,9 @@ const COLUMN_GROUPS = [
   { label: 'Identity', keys: ['checkbox', 'name', 'id'] },
   { label: 'Role', keys: ['designation', 'department', 'branch', 'teamLeader', 'projectManager'] },
   { label: 'Contact', keys: ['phone', 'workEmail'] },
-  { label: 'Timeline', keys: ['joinDate'] },
+  { label: 'Timeline', keys: ['joinDate', 'lastSeen'] },
   { label: 'Status', keys: ['attendanceStatus', 'workStatus', 'accountStatus'] },
+  { label: 'Punch Info', keys: ['todayPunchIn', 'todayPunchOut', 'todayWorkingHours'] },
   { label: 'Advanced', keys: ['employeeType', 'shift', 'experience', 'lastLogin', 'currentProjects', 'leaveBalance', 'productivityScore', 'performanceRating'] },
 ];
 
@@ -155,15 +159,17 @@ const COLUMN_LABELS = {
   department: 'Department', branch: 'Branch', teamLeader: 'Team Leader', projectManager: 'Project Manager',
   phone: 'Contact Number', workEmail: 'Email Address', joinDate: 'Joining Date',
   attendanceStatus: 'Attendance Status', workStatus: 'Work Status', accountStatus: 'Account Status',
-  employeeType: 'Employee Type', shift: 'Shift Time', experience: 'Experience', lastLogin: 'Last Login',
+  todayPunchIn: "Today's Punch In", todayPunchOut: "Today's Punch Out", todayWorkingHours: "Working Hours",
+  lastSeen: 'Last Seen', employeeType: 'Employee Type', shift: 'Shift Time', experience: 'Experience', lastLogin: 'Last Login',
   currentProjects: 'Projects Count', leaveBalance: 'Leave Balance', productivityScore: 'Productivity',
   performanceRating: 'Performance Rating', actions: 'Actions'
 };
 
 const DEFAULT_VISIBILITY = {
   checkbox: true, name: true, id: true, designation: true, department: true,
-  branch: true, teamLeader: true, projectManager: true, phone: true,
-  workEmail: true, joinDate: true, attendanceStatus: true, workStatus: true,
+  branch: true, teamLeader: false, projectManager: false, phone: false,
+  workEmail: true, joinDate: false, attendanceStatus: true, todayPunchIn: true,
+  todayPunchOut: true, todayWorkingHours: true, lastSeen: true, workStatus: true,
   accountStatus: true, employeeType: false, shift: false, experience: false,
   lastLogin: false, currentProjects: false, leaveBalance: false, productivityScore: false,
   performanceRating: false, actions: true
@@ -184,6 +190,8 @@ const Employees = () => {
   const [branchFilter, setBranchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [attFilter, setAttFilter] = useState('');
+  const [shiftFilter, setShiftFilter] = useState('');
+  const [punchFilter, setPunchFilter] = useState('');
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
 
@@ -229,6 +237,10 @@ const Employees = () => {
   const [previewPos, setPreviewPos] = useState({ top: 0, left: 0 });
   const previewRef = useRef(null);
 
+  // ── Hover Quick View Card ──
+  const [hoveredEmp, setHoveredEmp] = useState(null);
+  const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
+
   // ── ID Card ──
   const [showIdCard, setShowIdCard] = useState(false);
   const [idCardEmployee, setIdCardEmployee] = useState(null);
@@ -245,6 +257,8 @@ const Employees = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('Active');
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showShiftModal, setShowShiftModal] = useState(false);
+  const [bulkShift, setBulkShift] = useState('Morning (09:00 AM - 06:00 PM)');
   const [bulkLeaveDays, setBulkLeaveDays] = useState(5);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [bulkNotifyMsg, setBulkNotifyMsg] = useState('');
@@ -309,8 +323,14 @@ const Employees = () => {
     const md = deptFilter ? e.department === deptFilter : true;
     const mb = branchFilter ? e.branch === branchFilter : true;
     const mst = statusFilter ? e.status === statusFilter : true;
-    const ma = attFilter ? e.attendanceStatus === attFilter : true;
-    return ms && md && mb && mst && ma;
+    const ma = attFilter ? (
+      attFilter === 'WFH' || attFilter === 'Work From Home' ? (e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH') :
+      attFilter === 'On Leave' || attFilter === 'Leave' ? (e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave') :
+      e.attendanceStatus === attFilter
+    ) : true;
+    const msh = shiftFilter ? (e.shift && e.shift.toLowerCase().includes(shiftFilter.toLowerCase())) : true;
+    const mp = punchFilter ? e.todayPunchStatus === punchFilter : true;
+    return ms && md && mb && mst && ma && msh && mp;
   }).sort((a, b) => {
     let av = a[sortKey] || '', bv = b[sortKey] || '';
     if (sortKey === 'joinDate') { av = new Date(av); bv = new Date(bv); }
@@ -338,6 +358,19 @@ const Employees = () => {
     const top = Math.max(10, (window.innerHeight - cardH) / 2 + window.scrollY);
     setPreviewPos({ top, left });
     setPreviewEmp(emp);
+  };
+
+  const handleNameMouseEnter = (e, emp) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoverPos({
+      top: rect.top + window.scrollY - 150, // slightly offset above the name
+      left: rect.left + window.scrollX + 50
+    });
+    setHoveredEmp(emp);
+  };
+
+  const handleNameMouseLeave = () => {
+    setHoveredEmp(null);
   };
 
   // ── Bulk Actions ──
@@ -429,6 +462,63 @@ const Employees = () => {
     setSelectedIds(new Set());
   };
 
+  const handleBulkMarkPresent = () => {
+    selectedIds.forEach(id => {
+      updateEmployee(id, {
+        attendanceStatus: 'Present',
+        todayPunchIn: '09:02 AM',
+        todayPunchOut: '06:15 PM',
+        todayWorkingHours: 8.2,
+        todayPunchStatus: 'Punched In',
+        lastSeen: 'Just now'
+      });
+    });
+    setSelectedIds(new Set());
+    addToast('success', `Marked ${selectedIds.size} employee(s) Present.`);
+  };
+
+  const handleBulkMarkAbsent = () => {
+    selectedIds.forEach(id => {
+      updateEmployee(id, {
+        attendanceStatus: 'Absent',
+        todayPunchIn: null,
+        todayPunchOut: null,
+        todayWorkingHours: 0,
+        todayPunchStatus: 'Not Punched',
+        lastSeen: 'Yesterday 06:15 PM'
+      });
+    });
+    setSelectedIds(new Set());
+    addToast('warning', `Marked ${selectedIds.size} employee(s) Absent.`);
+  };
+
+  const handleBulkAssignShift = () => {
+    selectedIds.forEach(id => {
+      updateEmployee(id, {
+        shift: bulkShift
+      });
+    });
+    setShowShiftModal(false);
+    setSelectedIds(new Set());
+    addToast('success', `Assigned shift "${bulkShift}" to ${selectedIds.size} employee(s).`);
+  };
+
+  const handleBulkExportAttendance = () => {
+    addToast('info', 'Exporting attendance logs...');
+    setTimeout(() => {
+      const headers = ['ID','Name','Today Status','Today Punch In','Today Punch Out','Working Hours','Last Seen'];
+      const rows = selectedEmployees.map(e => [
+        e.id, e.name, e.attendanceStatus, e.todayPunchIn || '—', e.todayPunchOut || '—', e.todayWorkingHours ? `${e.todayWorkingHours} hrs` : '0 hrs', e.lastSeen || '—'
+      ]);
+      const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'attendance_export.csv'; a.click();
+      URL.revokeObjectURL(url);
+      addToast('success', 'Attendance export download ready!');
+    }, 800);
+  };
+
   // ── Form Handlers ──
   const handleOpenAdd = () => {
     setFormData({
@@ -499,7 +589,7 @@ const Employees = () => {
       addToast('error', 'Failed to download ID card.');
     }
   };
-  const handleClearFilters = () => { setSearchTerm(''); setDeptFilter(''); setBranchFilter(''); setStatusFilter(''); setAttFilter(''); };
+  const handleClearFilters = () => { setSearchTerm(''); setDeptFilter(''); setBranchFilter(''); setStatusFilter(''); setAttFilter(''); setShiftFilter(''); setPunchFilter(''); };
 
   // ── Widgets Data ──
   const totalEmp = employees.length;
@@ -583,6 +673,19 @@ const Employees = () => {
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
               <option value="On Leave">On Leave</option>
+            </select>
+            <select value={shiftFilter} onChange={e => setShiftFilter(e.target.value)}>
+              <option value="">All Shifts</option>
+              <option value="Morning">Morning</option>
+              <option value="Evening">Evening</option>
+              <option value="Night">Night</option>
+              <option value="Flexible">Flexible</option>
+            </select>
+            <select value={punchFilter} onChange={e => setPunchFilter(e.target.value)}>
+              <option value="">Punch Status</option>
+              <option value="Punched In">Punched In</option>
+              <option value="Not Punched">Not Punched</option>
+              <option value="Missing Punch Out">Missing Punch Out</option>
             </select>
             <Button variant="ghost" onClick={handleClearFilters}>Clear</Button>
           </div>
@@ -793,6 +896,23 @@ const Employees = () => {
         </div>
       </div>
 
+      {/* ── Attendance Snapshot Strip ── */}
+      <div className="card attendance-snapshot-strip glass">
+        <div className="snapshot-left">
+          <span className="snapshot-title">Today's Attendance Snapshot:</span>
+          <div className="snapshot-metrics">
+            <span className="snapshot-metric"><span className="emoji">✅</span> Punched In: <strong>{(1000 + employees.filter(e => ['Present', 'Late', 'Work From Home', 'Overtime'].includes(e.attendanceStatus)).length).toLocaleString()}</strong></span>
+            <span className="snapshot-metric"><span className="emoji">⚠️</span> Not Yet: <strong>{150 + employees.filter(e => e.attendanceStatus === 'Absent').length}</strong></span>
+            <span className="snapshot-metric"><span className="emoji">🕐</span> Late: <strong>{40 + employees.filter(e => e.attendanceStatus === 'Late').length}</strong></span>
+            <span className="snapshot-metric"><span className="emoji">🏠</span> WFH: <strong>{30 + employees.filter(e => e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH').length}</strong></span>
+            <span className="snapshot-metric"><span className="emoji">🌴</span> On Leave: <strong>{65 + employees.filter(e => e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave').length}</strong></span>
+          </div>
+        </div>
+        <button className="snapshot-link-btn" onClick={() => navigate('/attendance')}>
+          View Full Punch Records →
+        </button>
+      </div>
+
       {/* ── Bulk Actions Bar ── */}
       <div className={`bulk-actions-bar${selectedIds.size > 0 ? ' bulk-bar-visible' : ''}`}>
         <div className="bulk-bar-left">
@@ -801,6 +921,18 @@ const Employees = () => {
           <button className="bulk-deselect-link" onClick={() => setSelectedIds(new Set())}>Deselect All</button>
         </div>
         <div className="bulk-bar-right" style={{ flexWrap: 'wrap', gap: '8px' }}>
+          <button className="bulk-btn bulk-btn-success" onClick={handleBulkMarkPresent} title="Mark Present">
+            <CheckCircle size={14} /> Mark Present
+          </button>
+          <button className="bulk-btn bulk-btn-danger" onClick={handleBulkMarkAbsent} title="Mark Absent">
+            <XCircle size={14} /> Mark Absent
+          </button>
+          <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowShiftModal(true)} title="Assign Shift">
+            <Clock size={14} /> Assign Shift
+          </button>
+          <button className="bulk-btn bulk-btn-success" onClick={handleBulkExportAttendance} title="Export Attendance">
+            <Download size={14} /> Export Attendance
+          </button>
           <button className="bulk-btn bulk-btn-danger" onClick={handleBulkDelete} title="Delete Selected">
             <Trash2 size={14} /> Delete
           </button>
@@ -898,7 +1030,11 @@ const Employees = () => {
                 {colVis.productivityScore && <TH col="productivityScore" label="Productivity" sortable />}
                 {colVis.performanceRating && <TH col="performanceRating" label="Rating" sortable />}
 
-                {colVis.attendanceStatus && <th>Attendance</th>}
+                {colVis.todayPunchIn && <TH col="todayPunchIn" label="Punch In" sortable />}
+                {colVis.todayPunchOut && <TH col="todayPunchOut" label="Punch Out" sortable />}
+                {colVis.todayWorkingHours && <TH col="todayWorkingHours" label="Hours" sortable />}
+                {colVis.attendanceStatus && <th>Attendance Status</th>}
+                {colVis.lastSeen && <TH col="lastSeen" label="Last Seen" sortable />}
                 {colVis.workStatus && <th>Work Status</th>}
                 {colVis.accountStatus && <th>Account</th>}
                 <th className="col-actions">Actions</th>
@@ -936,7 +1072,14 @@ const Employees = () => {
                           <Avatar name={row.name} size="sm" />
                         </span>
                         <div className="employee-info-cell">
-                          <span className="emp-name-bold emp-name-clickable" onClick={e => openPreview(e, row)}>{row.name}</span>
+                          <span 
+                            className="emp-name-bold emp-name-clickable" 
+                            onClick={e => openPreview(e, row)}
+                            onMouseEnter={e => handleNameMouseEnter(e, row)}
+                            onMouseLeave={handleNameMouseLeave}
+                          >
+                            {row.name}
+                          </span>
                           <span className="emp-email-sub">{row.workEmail || row.email}</span>
                         </div>
                       </div>
@@ -984,8 +1127,25 @@ const Employees = () => {
                       </Badge>
                     </td>
                   )}
+                  {colVis.todayPunchIn && <td><span className="punch-time-mono">{row.todayPunchIn || '--:--'}</span></td>}
+                  {colVis.todayPunchOut && <td><span className="punch-time-mono">{row.todayPunchOut || '--:--'}</span></td>}
+                  {colVis.todayWorkingHours && (
+                    <td>
+                      <span className="bold-text font-mono text-secondary">
+                        {row.todayWorkingHours ? `${row.todayWorkingHours} hrs` : '0 hrs'}
+                      </span>
+                    </td>
+                  )}
                   {colVis.attendanceStatus && (
                     <td><AttBadge status={row.attendanceStatus} /></td>
+                  )}
+                  {colVis.lastSeen && (
+                    <td>
+                      <span className="text-secondary-sm last-seen-cell">
+                        <Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+                        {row.lastSeen || '—'}
+                      </span>
+                    </td>
                   )}
                   {colVis.workStatus && (
                     <td><WorkStatusDot status={row.workStatus} /></td>
@@ -1036,6 +1196,39 @@ const Employees = () => {
       </div>
 
       </>)}
+      {/* ── Employee Hover Quick View Card ── */}
+      {hoveredEmp && (
+        <div className="emp-hover-quick-card glass animate-fade-in" style={{ position: 'absolute', top: hoverPos.top, left: hoverPos.left, zIndex: 1100 }}>
+          <div className="hover-card-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <Avatar name={hoveredEmp.name} size="sm" />
+            <div className="hover-card-meta" style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2' }}>
+              <h5 className="hover-card-name" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{hoveredEmp.name}</h5>
+              <span className="hover-card-dept" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{hoveredEmp.department}</span>
+            </div>
+          </div>
+          <div className="hover-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem' }}>
+            <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+              <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Today:</span>
+              <span className="hover-card-value" style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+                {hoveredEmp.todayPunchIn ? `Punched In ✅ at ${hoveredEmp.todayPunchIn}` : 'Not Punched ⚠️'}
+              </span>
+            </div>
+            <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+              <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Status:</span>
+              <span className="hover-card-value" style={{ color: hoveredEmp.attendanceStatus === 'Present' || hoveredEmp.attendanceStatus === 'Overtime' ? 'var(--color-success)' : hoveredEmp.attendanceStatus === 'Late' ? 'var(--color-warning)' : 'var(--color-danger)', fontWeight: 600 }}>
+                {hoveredEmp.attendanceStatus || 'Offline'}
+              </span>
+            </div>
+            <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+              <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Working Hours:</span>
+              <span className="hover-card-value font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                {hoveredEmp.todayWorkingHours ? `${hoveredEmp.todayWorkingHours} hrs so far` : '0 hrs'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Profile Preview Card ── */}
       {previewEmp && (
         <div className="emp-preview-card animate-preview" ref={previewRef}
@@ -1234,6 +1427,25 @@ const Employees = () => {
             <div className="modal-footer">
               <Button variant="secondary" onClick={() => setShowNotifyModal(false)}>Cancel</Button>
               <Button variant="primary" onClick={handleBulkNotification}>Send Alert</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Assign Shift Modal ── */}
+      {showShiftModal && (
+        <div className="modal-overlay" onClick={() => setShowShiftModal(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <h3>Assign Shift to {selectedIds.size} employee(s)</h3>
+            <select value={bulkShift} onChange={e => setBulkShift(e.target.value)} style={{ marginTop: 16, marginBottom: 16, width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)' }}>
+              <option value="Morning (09:00 AM - 06:00 PM)">Morning (09:00 AM - 06:00 PM)</option>
+              <option value="Evening (02:00 PM - 11:00 PM)">Evening (02:00 PM - 11:00 PM)</option>
+              <option value="Night (10:00 PM - 07:00 AM)">Night (10:00 PM - 07:00 AM)</option>
+              <option value="Flexible (09:00 AM - 06:00 PM)">Flexible (09:00 AM - 06:00 PM)</option>
+            </select>
+            <div className="modal-footer">
+              <Button variant="secondary" onClick={() => setShowShiftModal(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleBulkAssignShift}>Assign Shift</Button>
             </div>
           </div>
         </div>

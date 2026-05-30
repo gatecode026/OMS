@@ -82,7 +82,7 @@ const StatCard = ({
   const safeId = displayLabel.replace(/[^a-zA-Z0-9]/g, '') || Math.random().toString(36).substring(2, 9);
 
   return (
-    <div className={`stat-card card ${onClick ? 'stat-card-clickable' : ''}`} onClick={onClick}>
+    <div className={`stat-card card ${colorMap[colorVariant] || 'card-var-primary'} ${onClick ? 'stat-card-clickable' : ''}`} onClick={onClick}>
       <div className="stat-header">
         <span className="stat-label">{displayLabel}</span>
         <div className={`stat-icon-wrapper ${colorMap[colorVariant] || 'card-var-primary'}`}>

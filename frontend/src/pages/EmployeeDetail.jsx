@@ -9,7 +9,11 @@ import {
   ArrowLeft, Edit2, Trash2, User, Briefcase, Calendar, Phone, Mail,
   MapPin, Shield, FileText, Activity, CheckSquare, BarChart2, Download,
   Upload, Copy, ChevronDown, ChevronUp, Clock, Star, Trophy, AlertTriangle,
-  TrendingUp, CheckCircle, XCircle, File, Image, FileMinus
+  TrendingUp, CheckCircle, XCircle, File, Image, FileMinus,
+  UserCheck, UserMinus, Fingerprint, Home, Globe, Zap, Bell,
+  Search, RefreshCw, ChevronRight, Target, Layers, Share2,
+  AlertCircle, Coffee, Smartphone, Cpu, Filter, MoreHorizontal,
+  TrendingDown, BookOpen, AlarmClock, ArrowUpRight, Timer
 } from 'lucide-react';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -19,6 +23,18 @@ const fmtDate = (str) => {
   return `${String(d.getDate()).padStart(2,'0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 };
 const fmtTime = (t) => t || '—';
+
+const getRowClass = (status) => {
+  switch (status) {
+    case 'Present': return 'row-green';
+    case 'Late': return 'row-amber';
+    case 'Work From Home': return 'row-cyan';
+    case 'Overtime': return 'row-pink';
+    case 'On Leave': return 'row-purple';
+    case 'Absent': return 'row-red';
+    default: return '';
+  }
+};
 
 const fmtDob = (dateStr) => {
   if (!dateStr) return '15/08/1996';
@@ -56,6 +72,7 @@ const getBranchAddress = (branchName) => {
 const TABS = [
   { id: 'personal', label: 'Personal Info', icon: User },
   { id: 'professional', label: 'Professional', icon: Briefcase },
+  { id: 'attendance_punch', label: 'Attendance & Punch', icon: Clock },
   { id: 'attendance', label: 'Attendance', icon: Calendar },
   { id: 'leaves', label: 'Leave History', icon: Clock },
   { id: 'reports', label: 'Work Reports', icon: FileText },
@@ -173,7 +190,80 @@ const AttendanceCalendar = ({ history }) => {
   );
 };
 
-// ── EmployeeDetail Page ──────────────────────────────────────────────────────
+// ─── Punch Attendance Calendar ──────────────────────────────────────────────
+const PunchAttendanceCalendar = ({ history }) => {
+  const [month, setMonth] = useState(4); // May (0-indexed)
+  const year = 2026;
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  
+  const dayMap = {};
+  history.forEach(r => {
+    const d = new Date(r.date);
+    if (d.getMonth() === month && d.getFullYear() === year) {
+      dayMap[d.getDate()] = {
+        status: r.status,
+        punchIn: r.punchIn,
+        punchOut: r.punchOut
+      };
+    }
+  });
+
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let i = 1; i <= daysInMonth; i++) cells.push(i);
+
+  const today = new Date();
+  
+  const getCellClass = (day, status) => {
+    if (!day) return '';
+    const dateObj = new Date(year, month, day);
+    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+    
+    if (status) {
+      return attDayClass(status);
+    }
+    return isWeekend ? 'day-weekend' : '';
+  };
+
+  return (
+    <div className="att-calendar">
+      <div className="cal-nav">
+        <button onClick={() => setMonth(m => Math.max(0, m - 1))}>‹</button>
+        <span>{MONTHS[month]} {year}</span>
+        <button onClick={() => setMonth(m => Math.min(11, m + 1))}>›</button>
+      </div>
+      <div className="cal-weekdays">
+        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d} className="cal-wday">{d}</div>)}
+      </div>
+      <div className="cal-grid">
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e-${i}`} />;
+          const data = dayMap[day];
+          const status = data?.status;
+          const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+          const cellClass = getCellClass(day, status);
+          
+          return (
+            <div key={day} className={`cal-day-cell ${cellClass} ${isToday ? 'cal-today' : ''}`}>
+              <span className="cal-day-num">{day}</span>
+              <div className="cal-day-tooltip">
+                <strong className="tooltip-status">{status || (cellClass === 'day-weekend' ? 'Weekend' : 'No Data')}</strong>
+                {data?.punchIn && data.punchIn !== '--:--' && <div className="tooltip-time">In: {data.punchIn}</div>}
+                {data?.punchOut && data.punchOut !== '--:--' && <div className="tooltip-time">Out: {data.punchOut}</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="cal-legend" style={{ flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+        {[['Present','day-present'],['Absent','day-absent'],['Late','day-late'],['Leave','day-leave'],['WFH','day-wfh'],['Weekend','day-weekend']].map(([l, c]) => (
+          <span key={l} className="legend-item"><span className={`legend-dot ${c}`}></span>{l}</span>
+        ))}
+      </div>
+    </div>
+  );
+};
 const EmployeeDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -181,43 +271,78 @@ const EmployeeDetail = () => {
 
   const emp = useMemo(() => employees.find(e => e.id === id), [employees, id]);
 
-  const [activeTab, setActiveTab] = useState('personal');
+  const queryTab = new URLSearchParams(window.location.search).get('tab');
+  const [activeTab, setActiveTab] = useState(queryTab || 'personal');
+
+  React.useEffect(() => {
+    const qTab = new URLSearchParams(window.location.search).get('tab');
+    if (qTab && qTab !== activeTab) {
+      setActiveTab(qTab);
+    }
+  }, [window.location.search, activeTab]);
   const [expandedReport, setExpandedReport] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState({});
   const [showIdCard, setShowIdCard] = useState(false);
   const idCardRef = useRef(null);
-
   if (!emp) return (
     <div className="ed-not-found">
       <p>Employee not found.</p>
       <Button variant="secondary" onClick={() => navigate('/employees')} icon={ArrowLeft}>Back to Directory</Button>
     </div>
   );
-
   const perf = emp.performanceScore || { overall: 78, attendance: 82, taskCompletion: 75, reportSubmission: 80, leaveDiscipline: 73, monthly: [70,73,76,78,80,78] };
   const attHistory = emp.attendanceHistory || [];
   const leaveHistory = emp.leaveHistory || [];
   const taskHistory = emp.taskHistory || [];
   const documents = emp.documents || [];
   const activityLog = emp.activityLog || [];
-
   const presentDays = attHistory.filter(r => r.status === 'Present').length;
   const absentDays = attHistory.filter(r => r.status === 'Absent').length;
   const lateDays = attHistory.filter(r => r.status === 'Late').length;
   const leaveDays = attHistory.filter(r => r.status === 'On Leave').length;
-
   const handleDelete = () => {
     showConfirm('Deactivate Employee', `Are you sure you want to deactivate ${emp.name}?`, () => {
       deactivateEmployee(emp.id);
       navigate('/employees');
     }, 'danger');
   };
-
   const handleActivate = () => {
     showConfirm('Activate Employee', `Are you sure you want to activate ${emp.name}?`, () => {
       activateEmployee(emp.id);
     }, 'primary');
+  };
+
+  const handleApproveLeave = (leaveId) => {
+    const updatedHistory = leaveHistory.map(l => {
+      if (l.id === leaveId) {
+        return {
+          ...l,
+          status: 'Approved',
+          approvedBy: 'Aarav Sharma (Manager)',
+          approvedDate: new Date().toISOString().split('T')[0]
+        };
+      }
+      return l;
+    });
+    updateEmployee(emp.id, { leaveHistory: updatedHistory });
+    addToast('success', 'Leave request approved successfully.');
+  };
+
+  const handleRejectLeave = (leaveId) => {
+    const updatedHistory = leaveHistory.map(l => {
+      if (l.id === leaveId) {
+        return {
+          ...l,
+          status: 'Rejected',
+          approvedBy: 'Aarav Sharma (Manager)',
+          approvedDate: new Date().toISOString().split('T')[0]
+        };
+      }
+      return l;
+    });
+    updateEmployee(emp.id, { leaveHistory: updatedHistory });
+    addToast('warning', 'Leave request rejected.');
   };
 
   const downloadIdCard = async () => {
@@ -369,6 +494,600 @@ const EmployeeDetail = () => {
                 <span className="org-name">{emp.name}</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── Punch In/Out Reports Tab ── */}
+        {activeTab === 'attendance_punch' && (
+          <div className="ed-tab-body animate-fade-in">
+
+            {/* Page Title */}
+            <div className="pior-page-header">
+              <div className="pior-header-left">
+                <div className="pior-header-icon"><Timer size={18} /></div>
+                <div>
+                  <h3>Punch In/Out Reports</h3>
+                  <p className="pior-header-sub">Track and analyse all employee punch details including timing, breaks, device tracking and early/late entry statistics.</p>
+                </div>
+              </div>
+              <div className="pior-header-actions">
+                <button className="pior-action-btn" onClick={() => addToast('info', 'Refreshing punch data...')}>
+                  <RefreshCw size={13} /> Refresh
+                </button>
+                <button className="pior-action-btn pior-btn-primary" onClick={() => addToast('success', 'Punch report exported!')}>
+                  <Download size={13} /> Export
+                </button>
+              </div>
+            </div>
+
+            {/* ── Top Summary Cards ── */}
+            <div className="pior-kpi-row">
+              {[
+                { label: 'Total Punch Days', value: attHistory.length || 22, sub: `Total: ${attHistory.length || 22}`, color: '#60a5fa', icon: Calendar },
+                { label: 'Present Daily Avg', value: '7.8 hrs', sub: 'Avg working per day', color: '#4ade80', icon: Clock },
+                { label: 'Missing Punch Data', value: attHistory.filter(r => !r.punchIn || !r.punchOut).length || 2, sub: `Missing punch for EMP-${emp.id?.slice(-5) || '2026'}`, color: '#f87171', icon: AlertCircle },
+                { label: 'Employees to Leave', value: leaveHistory.filter(l => l.status === 'Approved').length || 3, sub: 'Approved leaves pending', color: '#fbbf24', icon: BookOpen },
+                { label: 'Late Employees', value: attHistory.filter(r => r.status === 'Late').length || 4, sub: 'Late Today: 0', color: '#fb923c', icon: AlarmClock },
+                { label: 'Work From Home', value: attHistory.filter(r => r.status === 'Work From Home').length || 5, sub: 'WFH Employees: 5', color: '#a78bfa', icon: Home },
+              ].map((kpi, i) => {
+                const Icon = kpi.icon;
+                return (
+                  <div key={i} className="pior-kpi-card" style={{ borderTopColor: kpi.color }}>
+                    <div className="pior-kpi-top">
+                      <span className="pior-kpi-label">{kpi.label}</span>
+                      <div className="pior-kpi-icon" style={{ background: `${kpi.color}18`, border: `1px solid ${kpi.color}30` }}>
+                        <Icon size={14} style={{ color: kpi.color }} />
+                      </div>
+                    </div>
+                    <div className="pior-kpi-value" style={{ color: kpi.color }}>{kpi.value}</div>
+                    <div className="pior-kpi-sub">{kpi.sub}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── Main 3-column Grid ── */}
+            <div className="pior-main-grid">
+
+              {/* LEFT: Punch Activity Analytics */}
+              <div className="pior-panel pior-analytics-panel">
+                <div className="pior-panel-header">
+                  <div className="pior-panel-title"><BarChart2 size={14} style={{ color: '#60a5fa' }} /><span>Punch Activity Analytics</span></div>
+                </div>
+
+                {/* Stats list */}
+                <div className="pior-analytics-stats">
+                  <div className="pior-a-stat-row">
+                    <span className="pior-a-label">Total Punch-Ins</span>
+                    <strong>{attHistory.filter(r => r.punchIn).length || 20}</strong>
+                  </div>
+                  <div className="pior-a-stat-row">
+                    <span className="pior-a-label">Total Punch-Outs</span>
+                    <strong>{attHistory.filter(r => r.punchOut).length || 19}</strong>
+                  </div>
+                  <div className="pior-a-stat-row">
+                    <span className="pior-a-label">Average Punch-In Time</span>
+                    <strong>09:07 AM</strong>
+                  </div>
+                  <div className="pior-a-stat-row">
+                    <span className="pior-a-label">Avg Working Hours</span>
+                    <strong>7.92 hrs</strong>
+                  </div>
+                  <div className="pior-a-stat-row">
+                    <span className="pior-a-label">Total Working Hours</span>
+                    <strong>{attHistory.reduce((sum, r) => sum + (r.totalHours || 0), 0).toFixed(1) || '158.4'} hrs</strong>
+                  </div>
+                  <div className="pior-a-stat-row">
+                    <span className="pior-a-label">Avg Punch-Out Time</span>
+                    <strong>06:04 PM</strong>
+                  </div>
+                  <div className="pior-a-stat-row">
+                    <span className="pior-a-label">Grade / Status</span>
+                    <span className="pior-grade-tag">A+</span>
+                  </div>
+                  <div className="pior-a-stat-row">
+                    <span className="pior-a-label">Employee's Status</span>
+                    <span className={`pior-emp-status-dot ${emp.status === 'Active' ? 'pior-dot-on' : 'pior-dot-off'}`}>{emp.status || 'Active'}</span>
+                  </div>
+                </div>
+
+                {/* Live status types */}
+                <div className="pior-live-section">
+                  <div className="pior-live-title">Live Status Types</div>
+                  <div className="pior-live-types">
+                    {[
+                      { label: 'Present', dot: '#4ade80' },
+                      { label: 'Absent', dot: '#f87171' },
+                      { label: 'Late', dot: '#fbbf24' },
+                      { label: 'Half Day', dot: '#a78bfa' },
+                      { label: 'On Leave', dot: '#60a5fa' },
+                      { label: 'WFH', dot: '#34d399' },
+                      { label: 'On Break', dot: '#fb923c' },
+                      { label: 'Work From Home', dot: '#c084fc' },
+                    ].map((t, i) => (
+                      <div key={i} className="pior-status-type-row">
+                        <span className="pior-type-dot" style={{ background: t.dot }} />
+                        <span>{t.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Weekly Attendance */}
+                <div className="pior-weekly-section">
+                  <div className="pior-weekly-title">Weekly Attendance Reports</div>
+                  <div className="pior-weekly-bars">
+                    {[['Mon', 95], ['Tue', 92], ['Wed', 88], ['Thu', 100], ['Fri', 90], ['Sat', 50]].map(([day, pct]) => (
+                      <div key={day} className="pior-wbar-col">
+                        <div className="pior-wbar-wrap">
+                          <div className="pior-wbar-fill" style={{ height: `${pct}%` }} />
+                        </div>
+                        <span className="pior-wbar-label">{day}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pior-weekly-links">
+                    {['Late Arrivals', 'Early Departures', 'Absent Count', 'Late Attendance', 'Attendance Status'].map((lnk, i) => (
+                      <button key={i} className="pior-weekly-link">
+                        <ChevronRight size={11} />{lnk}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Automation Status */}
+                <div className="pior-auto-section">
+                  <div className="pior-auto-title">Automation Status</div>
+                  {[
+                    { label: 'Present', active: true },
+                    { label: 'Absent', active: false },
+                    { label: 'WFH (Work From Home)', active: true },
+                    { label: 'On Leave', active: false },
+                    { label: 'Other', active: true },
+                  ].map((s, i) => (
+                    <div key={i} className="pior-auto-row">
+                      <span className={`pior-auto-dot ${s.active ? 'pior-auto-on' : 'pior-auto-off'}`} />
+                      <span>{s.label}</span>
+                      <span className={`pior-auto-badge ${s.active ? 'pior-badge-on' : 'pior-badge-off'}`}>{s.active ? 'Active' : 'Inactive'}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Live Attendance Monitoring */}
+                <div className="pior-live-monitor-section">
+                  <div className="pior-live-monitor-title">Live Attendance Monitoring Feed</div>
+                  {[
+                    { text: `Employee punched in at 09:02 AM`, type: 'in' },
+                    { text: `${emp.name} punch at 09:00 AM on 2026-05-29`, type: 'in' },
+                    { text: `Leave requested, needs approval at 11:15 PM`, type: 'warn' },
+                    { text: `Early left, last punch noted at 04:15 PM`, type: 'late' },
+                  ].map((ev, i) => (
+                    <div key={i} className={`pior-feed-row pior-feed-${ev.type}`}>
+                      <span className="pior-feed-dot" />{ev.text}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* CENTER: Punch Records Table + Employee Punch Detail */}
+              <div className="pior-panel pior-records-panel">
+                <div className="pior-panel-header">
+                  <div className="pior-panel-title"><FileText size={14} style={{ color: '#4ade80' }} /><span>Punch Records Table</span></div>
+                  <div className="pior-table-header-right">
+                    <span className="pior-count-tag">{attHistory.length} records</span>
+                  </div>
+                </div>
+
+                {/* Time display */}
+                <div className="pior-time-display">
+                  <div className="pior-time-block">
+                    <span className="pior-time-label">Time (Shown as format 02:43 AM)</span>
+                    <strong className="pior-time-value">** possible format 09:00-18:00 **</strong>
+                  </div>
+                </div>
+
+                {/* Table columns section */}
+                <div className="pior-table-columns-info">
+                  <div className="pior-col-info">
+                    <div className="pior-col-item">Employee ID</div>
+                    <div className="pior-col-item">Employee Name</div>
+                    <div className="pior-col-item">Department</div>
+                    <div className="pior-col-item">Punch In Time</div>
+                    <div className="pior-col-item">Punch Out Time</div>
+                    <div className="pior-col-item">Total Hours</div>
+                    <div className="pior-col-item">Team Leader</div>
+                    <div className="pior-col-item">Project Manager</div>
+                    <div className="pior-col-item">Approver Name</div>
+                  </div>
+                </div>
+
+                {/* Actual punch table */}
+                <div className="pior-table-scroll">
+                  <table className="ed-table pior-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>In</th>
+                        <th>Out</th>
+                        <th>Hours</th>
+                        <th>Break</th>
+                        <th>OT</th>
+                        <th>Source</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attHistory.slice(0, 15).map((r, i) => (
+                        <tr key={i} className={getRowClass(r.status)}>
+                          <td className="td-bold">{fmtDate(r.date)}</td>
+                          <td className="pior-time-td">{fmtTime(r.punchIn)}</td>
+                          <td className="pior-time-td">{fmtTime(r.punchOut)}</td>
+                          <td>{r.totalHours ? `${r.totalHours}h` : '—'}</td>
+                          <td>{r.breakTime || '45m'}</td>
+                          <td>{r.overtime || '0h'}</td>
+                          <td><span className="att-source-tag">{r.source === 'Biometric' ? '⚙️' : r.source === 'GPS' ? '📍' : '💻'} {r.source || 'Bio'}</span></td>
+                          <td><span className={`att-badge ${attDayClass(r.status)}`}>{r.status}</span></td>
+                        </tr>
+                      ))}
+                      {attHistory.length === 0 && (
+                        <tr><td colSpan={8} className="td-empty">No punch records found.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Employee Punch Detail View */}
+                <div className="pior-detail-section">
+                  <div className="pior-panel-header" style={{ marginTop: '16px' }}>
+                    <div className="pior-panel-title"><User size={14} style={{ color: '#a78bfa' }} /><span>Employee Punch Detail View</span></div>
+                  </div>
+                  <div className="pior-employee-detail-card">
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Employee Name</span>
+                      <strong>{emp.name}</strong>
+                    </div>
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Employee ID</span>
+                      <span style={{ fontFamily: 'monospace' }}>{emp.id}</span>
+                    </div>
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Department</span>
+                      <span>{emp.department}</span>
+                    </div>
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Shift Timing</span>
+                      <span>{emp.shift || 'Morning (09:00 AM – 06:00 PM)'}</span>
+                    </div>
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Today's Punch In</span>
+                      <span className="pior-punch-in-val">{emp.todayPunchIn || '09:02 AM'}</span>
+                    </div>
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Today's Punch Out</span>
+                      <span className="pior-punch-out-val">{emp.todayPunchOut || '--:--'}</span>
+                    </div>
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Total Hours</span>
+                      <span>{emp.todayWorkingHours ? `${emp.todayWorkingHours} hrs` : '7.5 hrs (ongoing)'}</span>
+                    </div>
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Daily OT Counter</span>
+                      <span style={{ color: '#fbbf24' }}>0 hrs</span>
+                    </div>
+                    <div className="pior-emp-detail-row">
+                      <span className="pior-emp-field">Approver Status</span>
+                      <span className="pior-badge-green">✅ Auto-Approved</span>
+                    </div>
+                  </div>
+
+                  {/* Today's Attendance Stats */}
+                  <div className="pior-today-stats">
+                    <div className="pior-panel-title" style={{ marginBottom: '10px' }}><Activity size={13} style={{ color: '#fbbf24' }} /><span>Today's Attendance Status</span></div>
+                    <div className="pior-today-stats-grid">
+                      <div className="pior-today-stat">
+                        <span>Total Team Members</span>
+                        <strong>42</strong>
+                      </div>
+                      <div className="pior-today-stat">
+                        <span>Present Count</span>
+                        <strong style={{ color: '#4ade80' }}>{attHistory.filter(r => r.status === 'Present').length || 38}</strong>
+                      </div>
+                      <div className="pior-today-stat">
+                        <span>Absent Count</span>
+                        <strong style={{ color: '#f87171' }}>{attHistory.filter(r => r.status === 'Absent').length || 2}</strong>
+                      </div>
+                      <div className="pior-today-stat">
+                        <span>In Meeting</span>
+                        <strong style={{ color: '#60a5fa' }}>5</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Late attendance monitoring */}
+                <div className="pior-late-section">
+                  <div className="pior-panel-header" style={{ marginTop: '16px' }}>
+                    <div className="pior-panel-title"><AlarmClock size={14} style={{ color: '#f87171' }} /><span>Late/Early Monitoring</span></div>
+                  </div>
+                  <div className="pior-late-items">
+                    {[
+                      { label: 'Missing Arrival Report', count: attHistory.filter(r => !r.punchIn).length || 1, type: 'error' },
+                      { label: 'Many Hours Overtime', count: attHistory.filter(r => r.overtime && r.overtime !== '0 hrs').length || 2, type: 'warn' },
+                      { label: 'Average Punch-Out Time', count: '06:04 PM', type: 'info' },
+                      { label: 'Total Days Duration', count: attHistory.length || 22, type: 'info' },
+                      { label: 'Doubled Days - ABS', count: 0, type: 'neutral' },
+                    ].map((item, i) => (
+                      <div key={i} className={`pior-late-item pior-late-${item.type}`}>
+                        <span>{item.label}</span>
+                        <strong>{item.count}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* RIGHT: Country Reports + Search + Quick Actions + Punch Preview */}
+              <div className="pior-panel pior-right-panel">
+
+                {/* Country Reports */}
+                <div className="pior-sub-panel">
+                  <div className="pior-panel-header">
+                    <div className="pior-panel-title"><Globe size={13} style={{ color: '#60a5fa' }} /><span>Country Reports</span></div>
+                  </div>
+                  <div className="pior-country-report">
+                    <div className="pior-cr-row">
+                      <strong>Cut-off Time Reports</strong>
+                    </div>
+                    {[
+                      ['Total cut-off hours', '9.0 hrs'],
+                      ['Employees for cut-off', '3'],
+                      ['Shift cut-off hours', '0.5 hrs'],
+                      ['Add total employees', `${emp.id}`],
+                    ].map(([k, v], i) => (
+                      <div key={i} className="pior-cr-item">
+                        <span>{k}</span>
+                        <strong>{v}</strong>
+                      </div>
+                    ))}
+
+                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Employee Name Inline Views</strong></div>
+                    <div className="pior-cr-note">When clicking on employee: Attendance Details + Punch time Records + Attendance Summary + Leave Details + Direct Employee</div>
+
+                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Attendance Details</strong></div>
+                    {[
+                      ['Attendance Type', emp.status || 'Present'],
+                      ['Employee ID', emp.id],
+                      ['Dept.', emp.department],
+                      ['Working hrs', '7.9 hrs avg'],
+                      ['Dept. office', emp.branch],
+                    ].map(([k, v], i) => (
+                      <div key={i} className="pior-cr-item">
+                        <span>{k}</span>
+                        <strong>{v}</strong>
+                      </div>
+                    ))}
+
+                    {/* Cut-off Filters */}
+                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Filters</strong></div>
+                    <div className="pior-filter-tags">
+                      {['Present', 'Late', 'Absent', 'Half Day', 'WFH', 'Off Day'].map(t => (
+                        <span key={t} className="pior-filter-chip">{t}</span>
+                      ))}
+                    </div>
+
+                    {/* Shift filter */}
+                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Shift Type</strong></div>
+                    <div className="pior-filter-tags">
+                      {['Morning', 'Evening', 'Night', 'Mid Day'].map(t => (
+                        <span key={t} className="pior-filter-chip">{t}</span>
+                      ))}
+                    </div>
+
+                    {/* Hours type */}
+                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Hours Type</strong></div>
+                    <div className="pior-filter-tags">
+                      {['Working', 'Overtime', 'Break', 'Night'].map(t => (
+                        <span key={t} className="pior-filter-chip">{t}</span>
+                      ))}
+                    </div>
+
+                    {/* Dept breakdown */}
+                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Dept/Office/Branch Filter</strong></div>
+                    {[
+                      ['Engineering', '42', 4, '90%'],
+                      ['Marketing', '22', 2, '91%'],
+                      ['Sales', '35', 5, '86%'],
+                      ['Operations', '20', 1, '95%'],
+                    ].map(([dept, total, absent, rate], i) => (
+                      <div key={i} className="pior-dept-row">
+                        <span className="pior-dept-name">{dept}</span>
+                        <span className="pior-dept-total">{total}</span>
+                        <span className="pior-dept-absent" style={{ color: '#f87171' }}>-{absent}</span>
+                        <span className="pior-dept-rate" style={{ color: '#4ade80' }}>{rate}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Search & Filters */}
+                <div className="pior-sub-panel">
+                  <div className="pior-panel-header">
+                    <div className="pior-panel-title"><Search size={13} style={{ color: '#a78bfa' }} /><span>Search & Filters</span></div>
+                  </div>
+                  <div className="pior-search-body">
+                    <input type="text" className="pior-search-input" placeholder="Search employee name..." />
+                    <input type="text" className="pior-search-input" placeholder="Employee ID..." />
+                    <input type="text" className="pior-search-input" placeholder="Department..." />
+                    <select className="pior-search-select">
+                      <option>All Statuses</option>
+                      <option>Present</option>
+                      <option>Late</option>
+                      <option>Absent</option>
+                      <option>WFH</option>
+                    </select>
+                    <div className="pior-filter-tag-row">
+                      {['Present', 'Late', 'WFH', 'Absent'].map(tag => (
+                        <button key={tag} className="pior-filter-chip">{tag}</button>
+                      ))}
+                    </div>
+                    <div className="pior-date-row">
+                      <label>Date Filter</label>
+                      <div className="pior-date-range">
+                        <input type="date" className="pior-date-input" />
+                        <span>to</span>
+                        <input type="date" className="pior-date-input" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Action Buttons */}
+                <div className="pior-sub-panel">
+                  <div className="pior-panel-header">
+                    <div className="pior-panel-title"><Zap size={13} style={{ color: '#fbbf24' }} /><span>Quick Action Buttons</span></div>
+                  </div>
+                  <div className="pior-quick-actions">
+                    {[
+                      { label: 'Export Attendance Report', icon: Download, color: '#60a5fa' },
+                      { label: 'Flag Late', icon: AlarmClock, color: '#fb923c' },
+                      { label: 'Approve All Requests', icon: CheckCircle, color: '#4ade80' },
+                      { label: 'Approve Attendance Requests', icon: UserCheck, color: '#a78bfa' },
+                      { label: 'Generate Attendance Report', icon: FileText, color: '#fbbf24' },
+                      { label: 'Schedule Notification to Report', icon: Bell, color: '#f472b6' },
+                    ].map((btn, i) => {
+                      const Icon = btn.icon;
+                      return (
+                        <button key={i} className="pior-quick-action-btn" onClick={() => addToast('success', `${btn.label} triggered.`)}>
+                          <Icon size={12} style={{ color: btn.color }} />
+                          <span>{btn.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Punch Preview */}
+                <div className="pior-sub-panel">
+                  <div className="pior-panel-header">
+                    <div className="pior-panel-title"><Timer size={13} style={{ color: '#4ade80' }} /><span>Punch Preview</span></div>
+                  </div>
+                  <div className="pior-punch-preview">
+                    <div className="pior-pp-card pior-pp-in">
+                      <div className="pior-pp-label">Today Punch-In</div>
+                      <div className="pior-pp-time">{emp.todayPunchIn || '09:02 AM'}</div>
+                      <div className="pior-pp-source">⚙️ Biometric</div>
+                    </div>
+                    <div className="pior-pp-card pior-pp-out">
+                      <div className="pior-pp-label">Today Punch-Out</div>
+                      <div className="pior-pp-time">{emp.todayPunchOut || '--:--'}</div>
+                      <div className="pior-pp-source">Still Working</div>
+                    </div>
+
+                    {/* Monthly ring */}
+                    <div className="pior-monthly-ring">
+                      <svg viewBox="0 0 90 90" width="80" height="80">
+                        <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="8" />
+                        <circle cx="45" cy="45" r="38" fill="none"
+                          stroke="var(--color-primary)"
+                          strokeWidth="8"
+                          strokeDasharray={`${0.94 * 2 * Math.PI * 38} ${2 * Math.PI * 38}`}
+                          strokeLinecap="round"
+                          transform="rotate(-90 45 45)"
+                        />
+                        <text x="45" y="42" textAnchor="middle" fill="white" fontSize="14" fontWeight="800">94%</text>
+                        <text x="45" y="54" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="7">This Month</text>
+                      </svg>
+                      <div className="pior-ring-label">
+                        <strong>Monthly Rate</strong>
+                        <span>Present: 20d / 22d</span>
+                      </div>
+                    </div>
+
+                    {/* Attendance Calendar (mini) */}
+                    <div className="pior-mini-cal-wrapper">
+                      <div className="pior-mini-cal-title">Attendance Calendar</div>
+                      <PunchAttendanceCalendar history={attHistory} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Late Punch Alarms */}
+                <div className="pior-sub-panel">
+                  <div className="pior-panel-header">
+                    <div className="pior-panel-title"><AlertCircle size={13} style={{ color: '#f87171' }} /><span>Verify Alarms & Alerts</span></div>
+                  </div>
+                  <div className="pior-alarms">
+                    {[
+                      { title: 'Mark Attendance Punch Records', count: 2, type: 'warn' },
+                      { title: 'Missing Punch Records', count: 1, type: 'error' },
+                      { title: 'Pending Approval', count: 3, type: 'warn' },
+                      { title: 'Attendance Date Conflict', count: 0, type: 'info' },
+                    ].map((al, i) => (
+                      <div key={i} className={`pior-alarm-row pior-alarm-${al.type}`}>
+                        <span>{al.title}</span>
+                        <span className="pior-alarm-count">{al.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Punch Sources */}
+                <div className="pior-sub-panel">
+                  <div className="pior-panel-header">
+                    <div className="pior-panel-title"><Fingerprint size={13} style={{ color: '#60a5fa' }} /><span>Punch Sources</span></div>
+                  </div>
+                  <div className="pior-sources">
+                    {[
+                      { src: 'Biometric', pct: 75, color: '#4ade80', icon: '⚙️' },
+                      { src: 'GPS', pct: 15, color: '#60a5fa', icon: '📍' },
+                      { src: 'Web Portal', pct: 10, color: '#a78bfa', icon: '💻' },
+                    ].map((s, i) => (
+                      <div key={i} className="pior-src-row">
+                        <span>{s.icon}</span>
+                        <span className="pior-src-name">{s.src}</span>
+                        <div className="pior-src-bar"><div className="pior-src-bar-fill" style={{ width: `${s.pct}%`, background: s.color }} /></div>
+                        <span className="pior-src-pct">{s.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Report Generation */}
+                <div className="pior-sub-panel">
+                  <div className="pior-panel-header">
+                    <div className="pior-panel-title"><Share2 size={13} style={{ color: '#fbbf24' }} /><span>Generate & Export</span></div>
+                  </div>
+                  <div className="pior-report-gen">
+                    <div className="pior-gen-range">
+                      {['Today', 'Weekly', 'Monthly', 'Quarterly'].map(r => (
+                        <button key={r} className="pior-range-btn">{r}</button>
+                      ))}
+                    </div>
+                    <div className="pior-gen-fmts">
+                      {['PDF', 'Excel', 'CSV'].map(fmt => (
+                        <button key={fmt} className="pior-fmt-btn" onClick={() => addToast('success', `${emp.name} punch report exported as ${fmt}.`)}>
+                          <Download size={11} /> {fmt}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="pior-checkbox-list">
+                      {[
+                        'Individual Attendance History',
+                        'Early/Late Punch Report',
+                        'Monthly Report',
+                      ].map((opt, i) => (
+                        <label key={i} className="pior-checkbox-row">
+                          <input type="checkbox" defaultChecked={i < 2} />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </div>
         )}
 
