@@ -156,6 +156,7 @@ export const AppProvider = ({ children }) => {
       employmentType: newEmp.employmentType || 'Full-Time',
       workLocation: newEmp.workLocation || newEmp.branch || '',
       attendanceHistory: [],
+      overtimeHistory: [],
       leaveHistory: [],
       taskHistory: [],
       performanceScore: { overall: 0, attendance: 0, taskCompletion: 0, reportSubmission: 0, leaveDiscipline: 0, monthly: [0, 0, 0, 0, 0, 0] },
@@ -181,7 +182,12 @@ export const AppProvider = ({ children }) => {
       leaveBalance: newEmp.leaveBalance || 15,
       currentProjectsCount: newEmp.currentProjectsCount || 0,
       experience: newEmp.experience || 0,
-      shift: newEmp.shift || 'Morning (09:00 AM - 06:00 PM)'
+      shift: newEmp.shift || 'Morning (09:00 AM - 06:00 PM)',
+      todayPunchIn: '09:02 AM',
+      todayPunchOut: '06:15 PM',
+      todayWorkingHours: 8.2,
+      todayPunchStatus: 'Punched In',
+      lastSeen: 'Just now'
     };
     setEmployees(prev => [...prev, entry]);
     addActivityLog(`Added new employee: ${entry.name}`, 'Employees', 'success');
@@ -337,6 +343,12 @@ export const AppProvider = ({ children }) => {
     addToast('error', `Leave request for ${leave.employeeName} rejected.`);
   };
 
+  const addAttendanceRecord = (newRecord) => {
+    setAttendance(prev => [newRecord, ...prev]);
+    addActivityLog(`Logged attendance record for ${newRecord.employeeName}`, 'Attendance', 'success');
+    addToast('success', 'Attendance record logged successfully.');
+  };
+
   const updateAttendanceRecord = (id, updatedData) => {
     setAttendance(prev =>
       prev.map(a => (a.id === id ? { ...a, ...updatedData } : a))
@@ -458,6 +470,7 @@ export const AppProvider = ({ children }) => {
         addTask,
         deleteTask,
         updateAttendanceRecord,
+        addAttendanceRecord,
         runPayroll,
         generatePayslip,
         updatePermissions,
