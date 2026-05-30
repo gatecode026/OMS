@@ -43,9 +43,9 @@
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: var(--color-slate-100);
+  background-color: var(--bg-elevated);
   color: var(--text-primary);
-  border-color: var(--color-slate-300);
+  border-color: var(--border-color-dark);
 }
 
 .btn-secondary:focus {
@@ -58,7 +58,7 @@
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background-color: var(--color-slate-100);
+  background-color: var(--bg-elevated);
   color: var(--text-primary);
 }
 
