@@ -233,9 +233,9 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: var(--spacing-4) 0;
+  padding: var(--spacing-2) 0;
   border-bottom: 1px solid var(--border-color);
-  gap: var(--spacing-4);
+  gap: var(--spacing-3);
 }
 
 .split-list-item:last-child {

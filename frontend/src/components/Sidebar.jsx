@@ -61,13 +61,7 @@ const menuStructure = [
       { name: 'Leave Management', icon: CalendarDays, path: '/leaves' },
       { name: 'Department Management', icon: GitMerge, path: '/departments' },
       { name: 'Agency Branch Management', icon: Network, path: '/branches' },
-      {
-        name: 'Team Management',
-        icon: Award,
-        subItems: [
-          { name: 'Team Leaders', path: '/teams' }
-        ]
-      }
+      { name: 'Team Management', icon: Award, path: '/teams' }
     ]
   },
   {

@@ -309,6 +309,7 @@
 @media (max-width: 1024px) {
   .app-sidebar {
     transform: translateX(-100%);
+    z-index: 1250; /* Above modals/backdrops (1200) and quick actions bar (1100) */
   }
 
   .app-sidebar.mobile-show {
@@ -323,6 +324,6 @@
     bottom: 0;
     background-color: rgba(9, 13, 22, 0.6);
     backdrop-filter: blur(4px);
-    z-index: 850;
+    z-index: 1240; /* Just below mobile sidebar menu but above page quick actions bar */
   }
 }

@@ -533,16 +533,23 @@ const Attendance = () => {
               <div className="att-donut-section">
                 <div className="att-donut-ring">
                   <svg viewBox="0 0 120 120" width="120" height="120">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="14" />
+                    <defs>
+                      <linearGradient id="presentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#4ade80" />
+                        <stop offset="100%" stopColor="#06b6d4" />
+                      </linearGradient>
+                    </defs>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="10" />
                     <circle cx="60" cy="60" r="50" fill="none"
-                      stroke="#4ade80"
-                      strokeWidth="14"
+                      stroke="url(#presentGrad)"
+                      strokeWidth="10"
                       strokeDasharray={`${(totalPresent / Math.max(filteredAttendance.length, 1)) * 314} 314`}
                       strokeLinecap="round"
                       transform="rotate(-90 60 60)"
+                      style={{ filter: 'drop-shadow(0 0 5px rgba(34, 211, 238, 0.4))' }}
                     />
-                    <text x="60" y="56" textAnchor="middle" fill="white" fontSize="18" fontWeight="800">{attendanceRate}%</text>
-                    <text x="60" y="70" textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="7.5">Present Rate</text>
+                    <text x="60" y="58" textAnchor="middle" fill="white" fontSize="20" fontWeight="900" style={{ fontFamily: 'var(--font-mono)' }}>{attendanceRate}%</text>
+                    <text x="60" y="74" textAnchor="middle" fill="var(--text-muted)" fontSize="7.5" fontWeight="700" letterSpacing="0.04em" textTransform="uppercase">Present Rate</text>
                   </svg>
                 </div>
                 <div className="att-donut-legend">
@@ -595,7 +602,7 @@ const Attendance = () => {
               {deptBreakdown.map((dept, i) => (
                 <div key={i} className="att-dept-row">
                   <span className="att-dept-name">{dept.name}</span>
-                  <div className="att-dept-bar-wrap">
+<div className="att-dept-bar-wrap">
                     <div
                       className="att-dept-bar-fill"
                       style={{
@@ -653,38 +660,6 @@ const Attendance = () => {
                   <strong style={{ color: '#fbbf24' }}>535</strong>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Quick Actions + Automation Preview */}
-          <div className="card att-quick-actions-card">
-            <div className="att-card-header">
-              <div className="att-card-title">
-                <Zap size={16} style={{ color: '#fbbf24' }} />
-                <span>Quick Actions</span>
-              </div>
-            </div>
-            <div className="att-quick-grid">
-              {[
-                { label: 'Mark Attendance', icon: CheckSquare, color: '#4ade80', action: () => setMarkModalOpen(true) },
-                { label: 'Assign Shift', icon: Clock, color: '#60a5fa', action: () => setShiftModalOpen(true) },
-                { label: 'Request Check-In', icon: UserCheck, color: '#fbbf24', action: handleRequestAttendance },
-                { label: 'Approve All', icon: ShieldCheck, color: '#a78bfa', action: handleApproveAll },
-                { label: 'Schedule Report', icon: Calendar, color: '#f472b6', action: handleScheduleReport },
-                { label: 'Download Report', icon: Download, color: '#38bdf8', action: () => handleExport('CSV') },
-                { label: 'Attendance Alerts', icon: Bell, color: '#fb923c', action: () => addToast('info', 'Showing attendance alert configuration...') },
-                { label: 'System Status', icon: Activity, color: '#4ade80', action: () => addToast('success', 'All attendance systems are operational.') },
-              ].map((action, i) => {
-                const Icon = action.icon;
-                return (
-                  <button key={i} className="att-quick-btn" onClick={action.action}>
-                    <div className="att-quick-icon" style={{ background: `${action.color}18`, border: `1px solid ${action.color}30` }}>
-                      <Icon size={16} style={{ color: action.color }} />
-                    </div>
-                    <span>{action.label}</span>
-                  </button>
-                );
-              })}
             </div>
 
             {/* Real-time system status */}
@@ -1546,6 +1521,34 @@ const Attendance = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Floating Bottom Quick Actions Bar */}
+      <div className="att-floating-actions-bar">
+        <div className="att-fab-title">
+          <Zap size={14} style={{ color: '#fbbf24', marginRight: '4px' }} />
+          <span>Quick Actions</span>
+        </div>
+        <div className="att-fab-buttons">
+          {[
+            { label: 'Mark Attendance', icon: CheckSquare, color: '#4ade80', action: () => setMarkModalOpen(true) },
+            { label: 'Assign Shift', icon: Clock, color: '#60a5fa', action: () => setShiftModalOpen(true) },
+            { label: 'Request Check-In', icon: UserCheck, color: '#fbbf24', action: handleRequestAttendance },
+            { label: 'Approve All', icon: ShieldCheck, color: '#a78bfa', action: handleApproveAll },
+            { label: 'Schedule Report', icon: Calendar, color: '#f472b6', action: handleScheduleReport },
+            { label: 'Download Report', icon: Download, color: '#38bdf8', action: () => handleExport('CSV') },
+            { label: 'Alerts', icon: Bell, color: '#fb923c', action: () => addToast('info', 'Showing attendance alerts...') },
+            { label: 'System Status', icon: Activity, color: '#2ec4b6', action: () => addToast('success', 'All systems online.') },
+          ].map((action, i) => {
+            const Icon = action.icon;
+            return (
+              <button key={i} className="att-fab-btn" onClick={action.action} title={action.label}>
+                <Icon size={14} style={{ color: action.color }} />
+                <span>{action.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
     </div>
   );
