@@ -34,7 +34,12 @@ export const AppProvider = ({ children }) => {
     onCancel: () => {}
   });
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [currentUserRole, setCurrentUserRole] = useState('super_admin');
+  const [currentUserRole, setCurrentUserRole] = useState(() => {
+    return localStorage.getItem('saas_role') || 'super_admin';
+  });
+  const [currentUserId, setCurrentUserId] = useState(() => {
+    return localStorage.getItem('saas_user_id') || '';
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Theme states
@@ -78,6 +83,13 @@ export const AppProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
+    if (currentUserId) {
+      const match = employees.find(e => e.id === currentUserId);
+      if (match && match.roleId === currentUserRole) {
+        setCurrentUser(match);
+        return;
+      }
+    }
     // Sync current user when role changes to demonstrate RBAC
     const userMap = {
       super_admin: employees.find(e => e.roleId === 'super_admin') || employees[0],
@@ -85,8 +97,91 @@ export const AppProvider = ({ children }) => {
       team_leader: employees.find(e => e.roleId === 'team_leader'),
       employee: employees.find(e => e.roleId === 'employee')
     };
-    setCurrentUser(userMap[currentUserRole] || employees[0]);
-  }, [currentUserRole, employees]);
+    const defaultUser = userMap[currentUserRole] || employees[0];
+    setCurrentUser(defaultUser);
+    if (defaultUser && defaultUser.id !== currentUserId) {
+      setCurrentUserId(defaultUser.id);
+    }
+  }, [currentUserRole, currentUserId, employees]);
+
+  useEffect(() => {
+    localStorage.setItem('saas_role', currentUserRole);
+  }, [currentUserRole]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      localStorage.setItem('saas_user_id', currentUserId);
+    } else {
+      localStorage.removeItem('saas_user_id');
+    }
+  }, [currentUserId]);
+
+  // Auth Actions
+  const login = async (email, password) => {
+    if (!email || email.trim().length === 0) {
+      throw new Error('Email address cannot be empty.');
+    }
+    if (!password || password.trim().length === 0) {
+      throw new Error('Password cannot be empty.');
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const result = await response.json();
+
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Authentication failed');
+      }
+
+      const { user, token } = result.data;
+
+      // Save real credentials and token
+      localStorage.setItem('saas_token', token);
+      sessionStorage.setItem('saas_token', token);
+      localStorage.setItem('saas_role', user.roleId);
+      localStorage.setItem('saas_user_id', user.id);
+
+      // Merge backend loaded user metadata with existing local employee mock arrays
+      setEmployees(prev => {
+        const index = prev.findIndex(e => e.id === user.id);
+        if (index > -1) {
+          const updated = [...prev];
+          updated[index] = { ...updated[index], ...user };
+          return updated;
+        } else {
+          return [...prev, user];
+        }
+      });
+
+      setCurrentUserRole(user.roleId);
+      setCurrentUserId(user.id);
+      setCurrentUser(user);
+
+      addActivityLog(`User logged in via database: ${user.name}`, 'Authentication', 'success');
+      return user;
+    } catch (err) {
+      addToast('error', err.message);
+      throw err;
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('saas_token');
+    localStorage.removeItem('saas_role');
+    localStorage.removeItem('saas_user_id');
+    sessionStorage.removeItem('saas_token');
+
+    setCurrentUserRole('super_admin');
+    setCurrentUserId('');
+    setCurrentUser(null);
+  };
 
   // Toast Handler
   const addToast = (type, message) => {
@@ -481,7 +576,9 @@ export const AppProvider = ({ children }) => {
         toggleTheme,
         messages,
         markMessageRead,
-        markAllMessagesRead
+        markAllMessagesRead,
+        login,
+        logout
       }}
     >
       {children}
