@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import './Sidebar.css';
 import { useApp } from '../context/AppContext';
@@ -61,7 +61,14 @@ const menuStructure = [
       { name: 'Leave Management', icon: CalendarDays, path: '/leaves' },
       { name: 'Department Management', icon: GitMerge, path: '/departments' },
       { name: 'Agency Branch Management', icon: Network, path: '/branches' },
-      { name: 'Team Management', icon: Award, path: '/teams' }
+      {
+        name: 'Team Management',
+        icon: Award,
+        path: '/teams',
+        subItems: [
+          { name: 'Team Leaders', path: '/teams/leaders' }
+        ]
+      }
     ]
   },
   {
@@ -136,8 +143,43 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
     if (path === '/') {
       return location.pathname === '/';
     }
-    return location.pathname.startsWith(path);
+    if (location.pathname === path) {
+      return true;
+    }
+    if (location.pathname.startsWith(path + '/')) {
+      const hasCloserMatch = menuStructure.some(section =>
+        section.items.some(item => {
+          if (item.path && item.path !== path && (location.pathname === item.path || location.pathname.startsWith(item.path + '/'))) {
+            return true;
+          }
+          if (item.subItems) {
+            return item.subItems.some(sub => sub.path !== path && (location.pathname === sub.path || location.pathname.startsWith(sub.path + '/')));
+          }
+          return false;
+        })
+      );
+      return !hasCloserMatch;
+    }
+    return false;
   };
+
+  useEffect(() => {
+    // Automatically expand the active sub-menu group if any subitem or the main path is active
+    menuStructure.forEach(section => {
+      section.items.forEach(item => {
+        if (item.subItems) {
+          const isSubitemActive = item.subItems.some(sub => isActive(sub.path));
+          const isParentActive = item.path && isActive(item.path);
+          if (isSubitemActive || isParentActive) {
+            setExpandedMenus(prev => ({
+              ...prev,
+              [item.name]: true
+            }));
+          }
+        }
+      });
+    });
+  }, [location.pathname]);
 
   const handleLogout = (e) => {
     e.preventDefault();
@@ -152,31 +194,59 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
     const Icon = item.icon;
     const isSub = !!item.subItems;
     const isExpanded = expandedMenus[item.name];
-    const isCurrentActive = !isSub && isActive(item.path);
+    const isCurrentActive = isActive(item.path);
 
     // If subitem active, mark parent as active-like
     const isParentActive = isSub && item.subItems.some(sub => isActive(sub.path));
+    const isMainActive = isCurrentActive || isParentActive;
 
     if (isSub) {
+      const triggerContent = (
+        <>
+          <div className="menu-item-content">
+            <Icon size={18} className="menu-icon" />
+            {!sidebarCollapsed && <span className="menu-label-text">{item.name}</span>}
+          </div>
+          {!sidebarCollapsed && (
+            <ChevronDown
+              size={16}
+              className={`submenu-chevron ${isExpanded ? 'rotated' : ''}`}
+              onClick={(e) => {
+                if (item.path) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }
+                toggleSubmenu(item.name);
+              }}
+            />
+          )}
+          {sidebarCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
+        </>
+      );
+
       return (
-        <div key={item.name} className={`menu-group ${isParentActive ? 'parent-active' : ''}`}>
-          <button
-            onClick={() => toggleSubmenu(item.name)}
-            className={`menu-link menu-link-toggle ${sidebarCollapsed ? 'justify-center' : ''}`}
-            title={sidebarCollapsed ? item.name : ''}
-          >
-            <div className="flex-center gap-3">
-              <Icon size={18} className="menu-icon" />
-              {!sidebarCollapsed && <span className="menu-label-text">{item.name}</span>}
-            </div>
-            {!sidebarCollapsed && (
-              <ChevronDown
-                size={16}
-                className={`submenu-chevron ${isExpanded ? 'rotated' : ''}`}
-              />
-            )}
-            {sidebarCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
-          </button>
+        <div key={item.name} className={`menu-group ${isMainActive ? 'parent-active' : ''}`}>
+          {item.path ? (
+            <Link
+              to={item.path}
+              onClick={() => {
+                toggleSubmenu(item.name);
+                setMobileOpen(false);
+              }}
+              className={`menu-link menu-link-toggle ${isCurrentActive ? 'active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
+              title={sidebarCollapsed ? item.name : ''}
+            >
+              {triggerContent}
+            </Link>
+          ) : (
+            <button
+              onClick={() => toggleSubmenu(item.name)}
+              className={`menu-link menu-link-toggle ${sidebarCollapsed ? 'justify-center' : ''}`}
+              title={sidebarCollapsed ? item.name : ''}
+            >
+              {triggerContent}
+            </button>
+          )}
           
           {/* Submenu entries */}
           <div className={`submenu-wrapper ${isExpanded && !sidebarCollapsed ? 'expanded' : 'collapsed'}`}>
@@ -223,7 +293,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
         className={`menu-link ${isCurrentActive ? 'active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
         title={sidebarCollapsed ? item.name : ''}
       >
-        <div className="flex-center gap-3">
+        <div className="menu-item-content">
           <Icon size={18} className="menu-icon" />
           {!sidebarCollapsed && <span className="menu-label-text">{item.name}</span>}
         </div>
@@ -257,7 +327,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
             <div className="logo-icon-holder">
               <Sparkles size={18} className="logo-spark" />
             </div>
-            {!sidebarCollapsed && <span className="sidebar-brand-name">Sass Admin</span>}
+            {!sidebarCollapsed && <span className="sidebar-brand-name">SaaS Admin</span>}
           </Link>
         </div>
 

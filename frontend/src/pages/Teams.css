@@ -1,13 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@600;700;800&display=swap');
-
 /* Apply custom fonts to Teams page context and constrain scroll */
 .teams-page {
-  font-family: 'DM Sans', var(--font-sans), sans-serif;
+  font-family: var(--font-sans);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  height: calc(100vh - 140px);
-  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -110,8 +106,6 @@
 }
 
 .teams-tab-scrollable-content {
-  flex: 1;
-  overflow-y: auto;
   padding-right: 6px;
   display: flex;
   flex-direction: column;
@@ -139,7 +133,7 @@
 }
 
 .teams-page h1, .teams-page h2, .teams-page h3, .teams-page h4, .teams-page .syne-heading {
-  font-family: 'Syne', var(--font-sans), sans-serif;
+  font-family: var(--font-sans);
   font-weight: 700;
 }
 
@@ -221,7 +215,7 @@
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1.1;
-  font-family: 'Syne', sans-serif;
+  font-family: var(--font-sans);
 }
 
 .teams-top-details {
@@ -335,7 +329,7 @@
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--color-primary);
-  font-family: 'Syne', sans-serif;
+  font-family: var(--font-sans);
 }
 
 .teams-mini-score-label {
@@ -615,6 +609,10 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-card);
   margin-top: 12px;
+  position: sticky;
+  bottom: var(--space-4);
+  z-index: 10;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .teams-footer-pills {

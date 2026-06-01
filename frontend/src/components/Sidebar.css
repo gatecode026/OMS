@@ -135,6 +135,14 @@
   color: var(--text-primary);
 }
 
+.menu-item-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  min-width: 0;
+  flex: 1;
+}
+
 .menu-label-text {
   white-space: nowrap;
   overflow: hidden;
