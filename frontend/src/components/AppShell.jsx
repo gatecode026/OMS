@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import './AppShell.css';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import CommandPalette from './CommandPalette';
 import GlobalSearch from './GlobalSearch';
 import { ToastContainer } from './Toast';
 import ConfirmDialog from './common/ConfirmDialog';
@@ -24,7 +25,7 @@ const AppShell = () => {
       {/* Main page content area */}
       <div className={`app-shell-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <Topbar onMenuToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)} />
-        
+
         {/* Scrollable page viewport */}
         <main className="app-shell-content">
           <div className="page-entry-container animate-fade-in">
@@ -48,9 +49,10 @@ const AppShell = () => {
       </div>
 
       {/* Global Utilities */}
+      <CommandPalette />
       <GlobalSearch isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
       <ToastContainer />
-      
+
       {/* Global Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}

@@ -6,21 +6,19 @@ import Button from '../components/common/Button';
 import { Sparkles, Key, Mail, Eye, EyeOff, ShieldCheck, Phone, Smartphone, CheckCircle, ArrowLeft } from 'lucide-react';
 
 const Login = () => {
-  const { addToast, setCurrentUserRole } = useApp();
+  const { addToast, login } = useApp();
   const navigate = useNavigate();
-  
-  // Sign In states
-  const [email, setEmail] = useState('admin@saas.com');
-  const [password, setPassword] = useState('admin123'); // Preset default for useful toggle testing
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Authentication mode: 'signin' | 'forgot'
   const [authMode, setAuthMode] = useState('signin');
-  
+
   // Forgot Password step states: 1 (Email/Phone) | 2 (OTP) | 3 (Change Password) | 4 (Success)
   const [forgotStep, setForgotStep] = useState(1);
-  
+
   // Forgot Password fields
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -34,67 +32,21 @@ const Login = () => {
     setLoading(true);
 
     // Simulate server network authentication delay
-    setTimeout(() => {
-      setLoading(false);
-      
-      // Store mock authentication token to persist login state across reloads
-      sessionStorage.setItem('saas_token', 'mock-admin-token');
-      setCurrentUserRole('super_admin');
-      
-      addToast('success', 'Authenticated successfully. Welcome back, Aarav Sharma!');
-      navigate('/');
-    }, 1200);
-  };
-
-  // Forgot password form navigation
-  const handleForgotSubmit = (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    setTimeout(() => {
-      setLoading(false);
-      if (forgotStep === 1) {
-        if (!emailOrPhone) {
-          addToast('warning', 'Please enter your registered email address or phone number.');
-          return;
-        }
-        addToast('success', `Verification code (OTP) sent to ${emailOrPhone}.`);
-        setForgotStep(2);
-      } else if (forgotStep === 2) {
-        if (otpCode !== '123456' && otpCode.length < 4) {
-          addToast('error', 'Invalid verification code. Enter 123456 to verify.');
-          return;
-        }
-        addToast('success', 'Verification code confirmed successfully.');
-        setForgotStep(3);
-      } else if (forgotStep === 3) {
-        if (newPassword.length < 6) {
-          addToast('warning', 'Password must contain at least 6 characters.');
-          return;
-        }
-        if (newPassword !== confirmPassword) {
-          addToast('error', 'Passwords do not match. Please verify passwords.');
-          return;
-        }
-        addToast('success', 'Password reset successfully.');
-        setForgotStep(4);
+    setTimeout(async () => {
+      try {
+        await login(email, password);
+        setLoading(false);
+        navigate('/');
+      } catch (err) {
+        setLoading(false);
       }
-    }, 1000);
-  };
-
-  const handleBackToSignIn = () => {
-    setAuthMode('signin');
-    setForgotStep(1);
-    setEmailOrPhone('');
-    setOtpCode('');
-    setNewPassword('');
-    setConfirmPassword('');
+    }, 800);
   };
 
   return (
     <div className="login-wrapper flex-center">
       <div className="login-card card animate-slide-up">
-        
+
         {/* Branding header block */}
         <div className="login-brand">
           <div className="brand-logo-icon">
@@ -151,8 +103,8 @@ const Login = () => {
                 <input type="checkbox" defaultChecked />
                 <span>Keep session active</span>
               </label>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="forgot-password-link-btn"
                 onClick={() => setAuthMode('forgot')}
               >
@@ -169,21 +121,21 @@ const Login = () => {
         {/* FORGOT PASSWORD STATEFUL FLOW */}
         {authMode === 'forgot' && (
           <div className="forgot-password-flow flex-column gap-4">
-            
+
             <div className="forgot-header-sec flex-column items-center gap-1 text-center">
               {forgotStep < 4 && (
                 <>
                   <h4>Reset Credentials</h4>
                   <p className="text-xs text-muted">Step {forgotStep} of 3: {
                     forgotStep === 1 ? 'Verify Email/Phone' :
-                    forgotStep === 2 ? 'Enter OTP Verification' : 'Set New Password'
+                      forgotStep === 2 ? 'Enter OTP Verification' : 'Set New Password'
                   }</p>
                 </>
               )}
             </div>
 
             <form onSubmit={handleForgotSubmit} className="login-form">
-              
+
               {/* STEP 1: Enter email or phone */}
               {forgotStep === 1 && (
                 <div className="form-group flex-column gap-3">
@@ -201,7 +153,7 @@ const Login = () => {
                     />
                   </div>
                   <p className="forgot-help-hint text-xs text-muted">We will send a 6-digit verification code to this address.</p>
-                  
+
                   <Button variant="primary" type="submit" loading={loading} className="forgot-submit-btn">
                     Send Verification Code (OTP)
                   </Button>
@@ -228,7 +180,7 @@ const Login = () => {
                   <p className="forgot-help-hint text-xs text-muted">
                     Enter code <strong className="text-primary font-mono">123456</strong> to verify mock simulation.
                   </p>
-                  
+
                   <Button variant="primary" type="submit" loading={loading} className="forgot-submit-btn">
                     Verify Code & Continue
                   </Button>
@@ -238,7 +190,7 @@ const Login = () => {
               {/* STEP 3: Change Password */}
               {forgotStep === 3 && (
                 <div className="form-group flex-column gap-3">
-                  
+
                   <div className="flex-column gap-1">
                     <label htmlFor="newPassword">New Password</label>
                     <div className="login-input-wrapper">
@@ -284,7 +236,7 @@ const Login = () => {
                       </button>
                     </div>
                   </div>
-                  
+
                   <Button variant="primary" type="submit" loading={loading} className="forgot-submit-btn">
                     Reset & Change Password
                   </Button>
@@ -301,7 +253,7 @@ const Login = () => {
                   <p className="text-sm text-secondary">
                     Your password has been changed successfully. You can now sign in using your new credentials.
                   </p>
-                  
+
                   <Button variant="primary" type="button" onClick={handleBackToSignIn} className="forgot-submit-btn">
                     Return to Sign In
                   </Button>
@@ -312,8 +264,8 @@ const Login = () => {
 
             {/* Back links layout */}
             {forgotStep < 4 && (
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="forgot-back-nav"
                 onClick={() => {
                   if (forgotStep === 1) handleBackToSignIn();
