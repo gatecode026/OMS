@@ -41,7 +41,7 @@ const navigationItems = [
   { name: 'Leave Management', path: '/leaves', section: 'People', icon: CalendarDays },
   { name: 'Department Management', path: '/departments', section: 'People', icon: GitMerge },
   { name: 'Agency Branch Management', path: '/branches', section: 'People', icon: Network },
-  { name: 'Team Leaders', path: '/teams', section: 'People', icon: Award },
+  { name: 'Team Management', path: '/teams', section: 'People', icon: Award },
   { name: 'Project Management', path: '/projects', section: 'Operations', icon: Briefcase },
   { name: 'Workflow Management', path: '/workflows', section: 'Operations', icon: GitFork },
   { name: 'Task Monitoring', path: '/tasks', section: 'Operations', icon: KanbanSquare },

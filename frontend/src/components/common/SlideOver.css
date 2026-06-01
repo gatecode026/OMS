@@ -6,7 +6,7 @@
   bottom: 0;
   background-color: rgba(9, 13, 22, 0.8);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: 1200;
   display: flex;
   justify-content: flex-end;
 }

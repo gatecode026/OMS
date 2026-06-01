@@ -4,13 +4,14 @@ import './AppShell.css';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import CommandPalette from './CommandPalette';
+import GlobalSearch from './GlobalSearch';
 import { ToastContainer } from './Toast';
 import ConfirmDialog from './common/ConfirmDialog';
 import Skeleton from './common/Skeleton';
 import { useApp } from '../context/AppContext';
 
 const AppShell = () => {
-  const { sidebarCollapsed, confirmDialog } = useApp();
+  const { sidebarCollapsed, confirmDialog, commandPaletteOpen, setCommandPaletteOpen } = useApp();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   return (
@@ -24,7 +25,7 @@ const AppShell = () => {
       {/* Main page content area */}
       <div className={`app-shell-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <Topbar onMenuToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)} />
-        
+
         {/* Scrollable page viewport */}
         <main className="app-shell-content">
           <div className="page-entry-container animate-fade-in">
@@ -49,8 +50,9 @@ const AppShell = () => {
 
       {/* Global Utilities */}
       <CommandPalette />
+      <GlobalSearch isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
       <ToastContainer />
-      
+
       {/* Global Confirmation Dialog */}
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}

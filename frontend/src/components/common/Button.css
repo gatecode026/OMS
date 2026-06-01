@@ -43,9 +43,9 @@
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: var(--bg-elevated);
+  background-color: rgba(99, 102, 241, 0.1);
   color: var(--text-primary);
-  border-color: var(--border-color-dark);
+  border-color: var(--color-primary);
 }
 
 .btn-secondary:focus {
@@ -58,7 +58,7 @@
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background-color: var(--bg-elevated);
+  background-color: rgba(99, 102, 241, 0.1);
   color: var(--text-primary);
 }
 

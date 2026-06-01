@@ -147,3 +147,79 @@
   text-align: center;
   line-height: 1.4;
 }
+
+/* Forgot Password Elements */
+.forgot-password-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-primary-light);
+  font-weight: 500;
+  cursor: pointer;
+  font-size: inherit;
+  transition: var(--transition-all);
+}
+
+.forgot-password-link-btn:hover {
+  text-decoration: underline;
+  color: var(--color-primary);
+}
+
+.forgot-back-nav {
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  transition: var(--transition-all);
+  width: 100%;
+}
+
+.forgot-back-nav:hover {
+  color: var(--text-primary);
+}
+
+.forgot-help-hint {
+  line-height: 1.4;
+}
+
+.success-circle-check-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scalePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.success-icon-glowing {
+  filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.4));
+  animation: iconGlowPulse 2s infinite ease-in-out;
+}
+
+@keyframes scalePop {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes iconGlowPulse {
+  0% { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.3)); }
+  50% { filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.6)); }
+  100% { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.3)); }
+}
+
+.forgot-submit-btn {
+  height: 40px !important;
+  width: 100% !important;
+  font-size: 0.88rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-top: var(--space-4) !important;
+  border-radius: var(--radius-md) !important;
+}

@@ -1,15 +1,18 @@
 /**
  * @file src/middlewares/auth.middleware.js
- * @description Standard Authentication & Authorization (RBAC) middleware triggers.
+ * @description Authentication & Authorization (RBAC) middleware verifying real JWT tokens.
  */
 
+import jwt from 'jsonwebtoken';
+import env from '../config/env.js';
+import Admin from '../modules/admin/admin.model.js';
 import logger from '../config/logger.js';
 
 /**
  * Validates JWT access token stored in Authorization header.
- * Simulates check for 'saas_token' matching the UI sessionStorage key.
+ * Attaches validated database user session context to request payload.
  */
-export const authenticate = (req, res, next) => {
+export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -22,24 +25,44 @@ export const authenticate = (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     
-    // Placeholder JWT decoding:
-    /*
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    */
+    // Decode token
+    const decoded = jwt.verify(token, env.jwtSecret);
     
-    // Simulated decoded user session context
+    // Retrieve associated active account from matching collection
+    let user;
+    if (decoded.role === 'super_admin') {
+      user = await Admin.findOne({ id: decoded.id });
+    } else {
+      // Other roles will reside in their own dedicated collections in future updates
+      user = null;
+    }
+
+    if (!user) {
+      return res.status(401).json({
+        status: 'fail',
+        message: 'Authentication failed. The session user was not found.',
+      });
+    }
+
+    if (user.status !== 'Active' && user.status !== 'On Leave') {
+      return res.status(403).json({
+        status: 'fail',
+        message: 'Authentication failed. This account is inactive.',
+      });
+    }
+
+    // Attach user profile context
     req.user = {
-      id: 'EMP-2026-001',
-      name: 'Aarav Sharma',
-      email: 'admin@saas.com',
-      role: 'super_admin', // matches highest level role
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.roleId,
     };
 
     logger.debug(`User authenticated successfully: ${req.user.name} (${req.user.role})`);
     next();
   } catch (error) {
-    logger.error('Authentication Error:', error);
+    logger.error('Authentication Middleware Error:', error);
     return res.status(401).json({
       status: 'fail',
       message: 'Authentication failed. Expired or malformed session token.',
@@ -53,7 +76,6 @@ export const authenticate = (req, res, next) => {
  */
 export const restrictTo = (...allowedRoles) => {
   return (req, res, next) => {
-    // Standard role access guard check
     if (!req.user || !allowedRoles.includes(req.user.role)) {
       logger.warn(`Access forbidden for user: ${req.user?.name}. Role: ${req.user?.role}. Required: ${allowedRoles.join(', ')}`);
       return res.status(403).json({
