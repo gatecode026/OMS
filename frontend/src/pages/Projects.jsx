@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import './Projects.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -79,6 +80,23 @@ const mockProjects = [
     tasksDone: 18,
     color: '#f59e0b',
     tags: ['Compliance', 'GDPR', 'Audit']
+  },
+  {
+    id: 'PRJ-005',
+    name: 'Legacy Migration Core',
+    description: 'Migration of database and legacy core APIs to the cloud platform. Delayed due to data mapping complexity.',
+    department: 'Engineering',
+    lead: 'David Kim',
+    members: ['David Kim', 'Liam O\'Connor'],
+    status: 'Delayed',
+    priority: 'High',
+    startDate: '2025-10-01',
+    deadline: '2025-12-01',
+    progress: 45,
+    tasksTotal: 30,
+    tasksDone: 12,
+    color: '#ef4444',
+    tags: ['Database', 'Cloud', 'Migration']
   }
 ];
 
@@ -86,7 +104,8 @@ const statusVariant = {
   'In Progress': 'primary',
   Planning: 'warning',
   Completed: 'success',
-  'On Hold': 'neutral'
+  'On Hold': 'neutral',
+  Delayed: 'danger'
 };
 
 const priorityVariant = {
@@ -99,15 +118,40 @@ const priorityVariant = {
 const Projects = () => {
   const isLoading = usePageLoading(500);
   const { addToast } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const urlStatus = searchParams.get('status');
+  const urlDept = searchParams.get('department');
+
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(urlStatus || 'All');
+  const [deptFilter, setDeptFilter] = useState(urlDept || 'All');
+
+  const handleStatusChange = (status) => {
+    setStatusFilter(status);
+    const newParams = new URLSearchParams(searchParams);
+    if (status === 'All') {
+      newParams.delete('status');
+    } else {
+      newParams.set('status', status);
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleClearDeptFilter = () => {
+    setDeptFilter('All');
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('department');
+    setSearchParams(newParams);
+  };
 
   const filtered = mockProjects.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.department.toLowerCase().includes(search.toLowerCase()) ||
       p.lead.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'All' || p.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchDept = deptFilter === 'All' || p.department.toLowerCase() === deptFilter.toLowerCase();
+    return matchSearch && matchStatus && matchDept;
   });
 
   const totalTasks = mockProjects.reduce((a, p) => a + p.tasksTotal, 0);
@@ -151,11 +195,11 @@ const Projects = () => {
           />
         </div>
         <div className="prj-status-filters">
-          {['All', 'Planning', 'In Progress', 'Completed'].map(s => (
+          {['All', 'Planning', 'In Progress', 'Completed', 'Delayed'].map(s => (
             <button
               key={s}
               className={`notif-filter-btn ${statusFilter === s ? 'active' : ''}`}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => handleStatusChange(s)}
             >
               {s}
             </button>
@@ -165,6 +209,22 @@ const Projects = () => {
           New Project
         </Button>
       </div>
+
+      {/* Active filters display */}
+      {deptFilter !== 'All' && (
+        <div className="card flex-center justify-start gap-2 py-2 px-4 mb-4 text-sm animate-fade-in" style={{ width: 'fit-content', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+          <span className="text-muted">Filtering by department:</span>
+          <Badge variant="purple">{deptFilter}</Badge>
+          <button 
+            className="icon-action-btn icon-action-danger" 
+            style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '0 4px', fontSize: '1.2rem', display: 'flex', alignItems: 'center', marginLeft: '6px', color: 'var(--text-muted)' }}
+            onClick={handleClearDeptFilter}
+            title="Clear department filter"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Project Cards */}
       <div className="prj-list">

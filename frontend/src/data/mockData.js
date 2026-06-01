@@ -6,21 +6,75 @@ const fmtDate = (d) => {
 };
 
 function genAttendanceHistory(seed) {
-  const statuses = ['Present','Present','Present','Present','Late','Absent','On Leave','Work From Home'];
+  const statuses = ['Present','Present','Present','Present','Late','Absent','On Leave','Work From Home','Overtime'];
   const res = [];
+  const sources = ['Biometric', 'Web Portal', 'Mobile App'];
   for (let i = 29; i >= 0; i--) {
     const d = new Date('2026-05-29');
     d.setDate(d.getDate() - i);
     if (d.getDay() === 0 || d.getDay() === 6) continue;
     const s = statuses[(seed + i) % statuses.length];
-    const hr = 8 + (seed % 2);
-    const min = String((seed * 3 + i * 7) % 45).padStart(2,'0');
-    const pIn = s === 'Present' ? `${hr}:${min}` : s === 'Late' ? `10:${String((seed * 5 + i) % 30 + 15).padStart(2,'0')}` : s === 'Work From Home' ? '09:00' : null;
-    const pOut = pIn ? '18:00' : null;
-    res.push({ date: d.toISOString().split('T')[0], punchIn: pIn, punchOut: pOut, totalHours: pIn ? 9 : 0, status: s });
+    
+    let pIn = null;
+    let pOut = null;
+    let totalHours = 0;
+    let breakTime = '0 mins';
+    let overtime = '0 hrs';
+    
+    if (s === 'Present') {
+      const minVal = String((seed * 3 + i * 7) % 15).padStart(2, '0');
+      pIn = `08:${minVal} AM`;
+      pOut = `05:${String((seed * 2 + i * 5) % 15 + 15).padStart(2, '0')} PM`;
+      totalHours = 8.2;
+      breakTime = '45 mins';
+      overtime = '0 hrs';
+    } else if (s === 'Late') {
+      pIn = `10:${String((seed * 5 + i) % 15 + 15).padStart(2, '0')} AM`;
+      pOut = `06:00 PM`;
+      totalHours = 7.25;
+      breakTime = '40 mins';
+      overtime = '0 hrs';
+    } else if (s === 'Work From Home') {
+      pIn = '09:00 AM';
+      pOut = '06:00 PM';
+      totalHours = 8.0;
+      breakTime = '60 mins';
+      overtime = '0 hrs';
+    } else if (s === 'Overtime') {
+      pIn = '09:00 AM';
+      pOut = '08:30 PM';
+      totalHours = 10.5;
+      breakTime = '45 mins';
+      overtime = '2.5 hrs';
+    }
+    
+    res.push({
+      date: d.toISOString().split('T')[0],
+      punchIn: pIn || '--:--',
+      punchOut: pOut || '--:--',
+      totalHours: totalHours,
+      breakTime: breakTime,
+      overtime: overtime,
+      status: s,
+      source: pIn ? sources[(seed + i) % sources.length] : '—'
+    });
   }
   return res;
 }
+
+function genOvertimeHistory(seed) {
+  const reasons = ['Critical server bug resolution', 'Deploying Nexus Platform update', 'Preparing quarterly board decks', 'System security audit follow-up'];
+  const statuses = ['Approved', 'Pending', 'Rejected'];
+  const dates = ['2026-05-28', '2026-05-25', '2026-05-20', '2026-05-15'];
+  const count = 2 + (seed % 2);
+  return Array.from({ length: count }, (_, i) => ({
+    date: dates[i % dates.length],
+    extraHours: 1.5 + (i * 0.5) + (seed % 2),
+    reason: reasons[(seed + i) % reasons.length],
+    status: statuses[(seed + i) % statuses.length]
+  }));
+}
+
 
 function genLeaveHistory(seed, empId, empName) {
   const types = ['Casual Leave','Sick Leave','Annual Leave','Emergency Leave','Maternity Leave'];
@@ -161,11 +215,45 @@ function enrichEmployee(emp, seed) {
     ]
   ][seed % 3];
 
+  const attStatus = ['Present','Present','Present','Late','Absent','On Leave','Work From Home','Overtime'][seed % 8];
+  
+  let todayPunchIn = null;
+  let todayPunchOut = null;
+  let todayWorkingHours = 0;
+  let todayPunchStatus = 'Not Punched';
+  let lastSeen = 'Yesterday 06:15 PM';
+
+  if (attStatus === 'Present') {
+    todayPunchIn = '09:02 AM';
+    todayPunchOut = (seed % 9 === 0) ? null : '06:15 PM';
+    todayWorkingHours = (seed % 9 === 0) ? 5.4 : 8.2;
+    todayPunchStatus = (seed % 9 === 0) ? 'Missing Punch Out' : 'Punched In';
+    lastSeen = 'Just now';
+  } else if (attStatus === 'Late') {
+    todayPunchIn = '10:15 AM';
+    todayPunchOut = '06:30 PM';
+    todayWorkingHours = 7.25;
+    todayPunchStatus = 'Punched In';
+    lastSeen = 'Just now';
+  } else if (attStatus === 'Work From Home') {
+    todayPunchIn = '09:00 AM';
+    todayPunchOut = '06:00 PM';
+    todayWorkingHours = 8.0;
+    todayPunchStatus = 'Punched In';
+    lastSeen = 'Just now';
+  } else if (attStatus === 'Overtime') {
+    todayPunchIn = '09:00 AM';
+    todayPunchOut = '08:30 PM';
+    todayWorkingHours = 10.5;
+    todayPunchStatus = 'Punched In';
+    lastSeen = 'Just now';
+  }
+
   return {
     ...emp,
     workEmail: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@saas.io`,
     designation: emp.designation || emp.role,
-    attendanceStatus: ['Present','Present','Present','Late','Absent','On Leave','Work From Home'][seed % 7],
+    attendanceStatus: attStatus,
     workStatus: ['Active','Active','In Meeting','Idle','Working','Offline'][(seed * 2) % 6],
     accountStatus: seed % 10 < 8 ? 'Active' : seed % 10 < 9 ? 'Disabled' : 'Suspended',
     teamLeader: emp.teamLeader || 'Ananya Gupta',
@@ -180,6 +268,7 @@ function enrichEmployee(emp, seed) {
     employmentType: emp.employmentType || empType,
     workLocation: emp.workLocation || emp.branch,
     attendanceHistory: genAttendanceHistory(seed),
+    overtimeHistory: genOvertimeHistory(seed),
     leaveHistory: genLeaveHistory(seed, emp.id, emp.name),
     taskHistory: genTaskHistory(seed, emp.id, emp.name),
     performanceScore: genPerformanceScore(seed),
@@ -226,7 +315,12 @@ function enrichEmployee(emp, seed) {
     leaveBalance: 12 + (seed % 10),
     currentProjectsCount: 1 + (seed % 3),
     experience: 1 + (seed % 10),
-    shift: ['Morning (09:00 AM - 06:00 PM)', 'Night (10:00 PM - 07:00 AM)', 'Evening (02:00 PM - 11:00 PM)'][seed % 3]
+    shift: ['Morning (09:00 AM - 06:00 PM)', 'Night (10:00 PM - 07:00 AM)', 'Evening (02:00 PM - 11:00 PM)', 'Flexible (09:00 AM - 06:00 PM)'][seed % 4],
+    todayPunchIn,
+    todayPunchOut,
+    todayWorkingHours,
+    todayPunchStatus,
+    lastSeen
   };
 }
 

@@ -32,6 +32,7 @@ th {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   user-select: none;
+  white-space: nowrap;
 }
 
 .sortable-header {
@@ -66,6 +67,7 @@ td {
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-color);
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 tr:last-child td {

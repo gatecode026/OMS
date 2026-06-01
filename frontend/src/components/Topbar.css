@@ -85,36 +85,45 @@
 .topbar-search-trigger {
   display: flex;
   align-items: center;
-  gap: var(--spacing-2);
+  gap: 10px;
   background-color: var(--bg-input);
   border: 1px solid var(--border-color);
-  padding: 8px var(--spacing-3) 8px var(--spacing-4);
-  border-radius: var(--radius-md);
-  width: 220px;
+  padding: 7px 12px 7px 14px;
+  border-radius: 10px;
+  width: 230px;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: var(--transition-all);
+  transition: all 0.18s ease;
 }
 
 .topbar-search-trigger:hover {
   background-color: rgba(255, 255, 255, 0.05);
-  border-color: var(--border-color-dark);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.topbar-search-trigger .search-icon {
+  color: var(--text-muted);
+  opacity: 0.55;
 }
 
 .search-placeholder {
   font-size: 0.8125rem;
   flex: 1;
   text-align: left;
+  font-weight: 450;
+  opacity: 0.7;
 }
 
 .shortcut-badge {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border-color);
-  padding: 1px 5px;
-  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  border-radius: 5px;
   color: var(--text-muted);
+  opacity: 0.8;
+  letter-spacing: 0.02em;
 }
 
 /* Bell unread dot */
