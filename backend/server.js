@@ -22,12 +22,10 @@ const bootstrap = async () => {
   try {
     // Connect to database (simulated/future integration)
     await database.connect();
-    
+
     const server = app.listen(PORT, () => {
-      logger.info(`==================================================`);
       logger.info(`  Server running in [${NODE_ENV}] mode on port ${PORT}`);
       logger.info(`  Client URL allowed: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
-      logger.info(`==================================================`);
     });
 
     // Handle graceful shutdown

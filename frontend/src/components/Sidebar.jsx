@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import './Sidebar.css';
 import { useApp } from '../context/AppContext';
+import { filterMenuByRole } from '../permissions/permissions';
 import {
   ChevronDown,
   LayoutDashboard,
@@ -123,7 +124,7 @@ const menuStructure = [
 
 const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   const navigate = useNavigate();
-  const { sidebarCollapsed, setSidebarCollapsed, notifications, addToast, setCurrentUserRole } = useApp();
+  const { sidebarCollapsed, setSidebarCollapsed, notifications, currentUserRole, logout } = useApp();
   const location = useLocation();
   const [expandedMenus, setExpandedMenus] = useState({});
 
@@ -183,9 +184,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
   const handleLogout = (e) => {
     e.preventDefault();
-    sessionStorage.removeItem('saas_token');
-    addToast('warning', 'Logged out successfully. Session cleared.');
-    setCurrentUserRole('employee'); // reset role
+    logout();
     setMobileOpen(false);
     navigate('/login');
   };
@@ -333,7 +332,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
         {/* Scrollable menu items */}
         <div className="sidebar-menu-container sidebar-scroll">
-          {menuStructure.map((section) => (
+          {filterMenuByRole(menuStructure, currentUserRole).map((section) => (
             <div key={section.title} className="sidebar-section">
               {!sidebarCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
               <div className="sidebar-section-items">

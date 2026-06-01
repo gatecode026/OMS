@@ -38,7 +38,8 @@ const Topbar = ({ onMenuToggle }) => {
     toggleTheme,
     messages,
     markMessageRead,
-    markAllMessagesRead
+    markAllMessagesRead,
+    logout
   } = useApp();
 
   const [notifOpen, setNotifOpen] = useState(false);
@@ -52,9 +53,7 @@ const Topbar = ({ onMenuToggle }) => {
 
   const handleLogout = (e) => {
     e.preventDefault();
-    sessionStorage.removeItem('saas_token');
-    addToast('warning', 'Logged out successfully. Session cleared.');
-    setCurrentUserRole('employee'); // reset role
+    logout();
     setProfileOpen(false);
     navigate('/login');
   };
