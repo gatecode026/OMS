@@ -22,6 +22,7 @@ const RolesPermissions = lazy(() => import('./pages/RolesPermissions'));
 const Departments     = lazy(() => import('./pages/Departments'));
 const Branches        = lazy(() => import('./pages/Branches'));
 const Teams           = lazy(() => import('./pages/Teams'));
+const TeamLeaders     = lazy(() => import('./pages/TeamLeaders'));
 const Projects        = lazy(() => import('./pages/Projects'));
 const Performance     = lazy(() => import('./pages/Performance'));
 const Notifications   = lazy(() => import('./pages/Notifications'));
@@ -65,6 +66,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="/departments" element={<Departments />} />
               <Route path="/branches"   element={<Branches />} />
               <Route path="/teams"      element={<Teams />} />
+              <Route path="/teams/leaders" element={<TeamLeaders />} />
 
               {/* ── Operations ── */}
               <Route path="/projects"     element={<Projects />} />

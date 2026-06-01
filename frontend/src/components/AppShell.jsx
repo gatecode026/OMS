@@ -3,14 +3,14 @@ import { Outlet } from 'react-router-dom';
 import './AppShell.css';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import CommandPalette from './CommandPalette';
+import GlobalSearch from './GlobalSearch';
 import { ToastContainer } from './Toast';
 import ConfirmDialog from './common/ConfirmDialog';
 import Skeleton from './common/Skeleton';
 import { useApp } from '../context/AppContext';
 
 const AppShell = () => {
-  const { sidebarCollapsed, confirmDialog } = useApp();
+  const { sidebarCollapsed, confirmDialog, commandPaletteOpen, setCommandPaletteOpen } = useApp();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   return (
@@ -48,7 +48,7 @@ const AppShell = () => {
       </div>
 
       {/* Global Utilities */}
-      <CommandPalette />
+      <GlobalSearch isOpen={commandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
       <ToastContainer />
       
       {/* Global Confirmation Dialog */}
