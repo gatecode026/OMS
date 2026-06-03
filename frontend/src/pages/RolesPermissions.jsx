@@ -33,8 +33,8 @@ const RolesPermissions = () => {
     setLocalPermissions(prev => ({
       ...prev,
       [module]: {
-        ...prev[module],
-        [operation]: !prev[module][operation]
+        ...(prev?.[module] || {}),
+        [operation]: !prev?.[module]?.[operation]
       }
     }));
   };
@@ -44,21 +44,21 @@ const RolesPermissions = () => {
   };
 
   const modules = [
-    { key: 'dashboard', label: 'Dashboard Overview' },
-    { key: 'employees', label: 'Employee Profiles' },
-    { key: 'attendance', label: 'Attendance Records' },
-    { key: 'leaves', label: 'Leave Approvals' },
-    { key: 'tasks', label: 'Kanban Tasks' },
-    { key: 'payroll', label: 'Payroll & Disbursal' },
-    { key: 'permissions', label: 'Role Management' },
-    { key: 'settings', label: 'System Settings' }
+    { key: 'dashboard', label: 'Dashboard' },
+    { key: 'employees', label: 'Employees' },
+    { key: 'attendance', label: 'Attendance' },
+    { key: 'leaves', label: 'Leaves' },
+    { key: 'tasks', label: 'Projects' },
+    { key: 'payroll', label: 'Payroll' }
   ];
 
   const operations = [
-    { key: 'create', label: 'Create' },
-    { key: 'read', label: 'Read' },
-    { key: 'update', label: 'Update' },
-    { key: 'delete', label: 'Delete' }
+    { key: 'read', label: 'VIEW' },
+    { key: 'create', label: 'CREATE' },
+    { key: 'update', label: 'EDIT' },
+    { key: 'delete', label: 'DELETE' },
+    { key: 'approve', label: 'APPROVE' },
+    { key: 'export', label: 'EXPORT' }
   ];
 
   if (isLoading || !localPermissions) {
@@ -143,7 +143,7 @@ const RolesPermissions = () => {
             <table>
               <thead>
                 <tr>
-                  <th>Application Module</th>
+                  <th>MODULE</th>
                   {operations.map(op => (
                     <th key={op.key} className="text-center">{op.label}</th>
                   ))}
@@ -154,19 +154,19 @@ const RolesPermissions = () => {
                   <tr key={mod.key}>
                     <td className="bold-text">{mod.label}</td>
                     {operations.map(op => {
-                      const isChecked = localPermissions[mod.key]?.[op.key];
+                      const isChecked = selectedRoleId === 'super_admin' ? true : !!localPermissions[mod.key]?.[op.key];
                       return (
-                        <td key={op.key} className="text-center">
-                          <label className="checkbox-switch-container">
-                            <input
-                              type="checkbox"
-                              checked={!!isChecked}
-                              onChange={() => handleCheckboxToggle(mod.key, op.key)}
-                              disabled={isSuperAdmin}
-                              className="matrix-checkbox"
-                            />
-                            <span className="checkbox-visual"></span>
-                          </label>
+                        <td 
+                          key={op.key} 
+                          className="text-center permission-cell"
+                          onClick={() => !isSuperAdmin && handleCheckboxToggle(mod.key, op.key)}
+                          style={{ cursor: isSuperAdmin ? 'default' : 'pointer' }}
+                        >
+                          {isChecked ? (
+                            <span className="permission-check">✓</span>
+                          ) : (
+                            <span className="permission-cross">X</span>
+                          )}
                         </td>
                       );
                     })}

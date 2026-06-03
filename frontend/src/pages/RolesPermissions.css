@@ -160,3 +160,54 @@
   padding-top: var(--spacing-4);
   margin-top: var(--spacing-2);
 }
+
+.permission-cell {
+  position: relative;
+  padding: var(--spacing-4) var(--spacing-4) !important;
+  font-size: 1.15rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.permission-cell:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.permission-check {
+  color: var(--color-success, #10b981);
+  font-weight: 700;
+  display: inline-block;
+}
+
+.permission-cross {
+  color: var(--text-muted, #64748b);
+  font-style: italic;
+  font-weight: 400;
+  display: inline-block;
+}
+
+/* Clean borders and spacing matching the matrix screenshot */
+.matrix-table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.matrix-table-wrapper th, 
+.matrix-table-wrapper td {
+  border-bottom: 1px solid var(--border-color);
+  padding: var(--spacing-4);
+}
+
+.matrix-table-wrapper tr:last-child td {
+  border-bottom: none;
+}
+
+.matrix-table-wrapper th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  background-color: rgba(255, 255, 255, 0.01);
+}

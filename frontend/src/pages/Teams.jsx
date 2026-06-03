@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Teams.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
@@ -14,7 +15,7 @@ import {
 import {
   Award, Plus, Users, TrendingUp, Search, Edit2, Trash2, MapPin, CheckCircle2, UserMinus, BookOpen,
   Briefcase, BarChart2, Calendar, FileText, Settings, ArrowUpRight, TrendingDown,
-  AlertTriangle, CheckSquare, Eye, Shield, User, FileCode, Check, Send, Trash, Play, HelpCircle
+  AlertTriangle, CheckSquare, Eye, Shield, User, FileCode, Check, Send, Trash, Play, HelpCircle, X
 } from 'lucide-react';
 
 // SECTION 2 - 8 initial sample rows
@@ -268,8 +269,21 @@ const initialActivities = [
 ];
 
 const Teams = () => {
+  const navigate = useNavigate();
   const isLoading = usePageLoading(600);
-  const { addToast, showConfirm } = useApp();
+  const { addToast, showConfirm, employees, updateEmployee } = useApp();
+
+  // New Modal States
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showPostAlertModal, setShowPostAlertModal] = useState(false);
+  const [showSchedulerModal, setShowSchedulerModal] = useState(false);
+
+  // New Form States
+  const [exportFormState, setExportFormState] = useState({ format: 'PDF', type: 'Teams Directory', includeInactive: false });
+  const [reportFormState, setReportFormState] = useState({ type: 'Performance Summary', dateRange: 'Last 7 Days', targetDepartment: 'All' });
+  const [postAlertFormState, setPostAlertFormState] = useState({ type: 'info', text: '' });
+  const [schedulerFormState, setSchedulerFormState] = useState({ title: '', date: '', time: '', teamId: '', description: '' });
 
   // Core Team List State
   const [teams, setTeams] = useState(initialTeams);
@@ -289,6 +303,22 @@ const Teams = () => {
   const [activeDrawerTab, setActiveDrawerTab] = useState('info');
   const [activePageTab, setActivePageTab] = useState('directory');
   const [showSummary, setShowSummary] = useState(true);
+
+  // Additional Modal States
+  const [showAssignLeaderModal, setShowAssignLeaderModal] = useState(false);
+  const [showAddMembersModal, setShowAddMembersModal] = useState(false);
+  const [showRemoveMembersModal, setShowRemoveMembersModal] = useState(false);
+  const [showTransferEmployeesModal, setShowTransferEmployeesModal] = useState(false);
+  const [showAllocateProjectModal, setShowAllocateProjectModal] = useState(false);
+  const [showChangeManagerModal, setShowChangeManagerModal] = useState(false);
+
+  // Form States
+  const [assignLeaderForm, setAssignLeaderForm] = useState({ teamId: '', employeeId: '' });
+  const [addMembersForm, setAddMembersForm] = useState({ teamId: '', employeeId: '' });
+  const [removeMembersForm, setRemoveMembersForm] = useState({ teamId: '', employeeId: '' });
+  const [transferForm, setTransferForm] = useState({ employeeId: '', fromTeamId: '', toTeamId: '' });
+  const [allocateProjectForm, setAllocateProjectForm] = useState({ teamId: '', projectName: '', description: '', priority: 'Medium', dueDate: '' });
+  const [changeManagerForm, setChangeManagerForm] = useState({ employeeId: '', managerName: '' });
 
   // Dismissible Alert States
   const [alerts, setAlerts] = useState(initialAlerts);
@@ -418,6 +448,269 @@ const Teams = () => {
 
   const handleExport = (format) => {
     addToast('info', `Exporting data as ${format}...`);
+  };
+
+  const handleGenerateAnalyticsReport = () => {
+    addToast('info', 'Compiling team performance analytics report...');
+    setTimeout(() => {
+      const reportContent = `TEAM PERFORMANCE AUDIT REPORT\nDate: ${new Date().toLocaleDateString()}\nActive Teams: ${teams.length}\n`;
+      const blob = new Blob([reportContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `teams_analytics_report_${Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast('success', 'Report Downloaded Successfully!');
+    }, 1000);
+  };
+
+  const handleExportFormSubmit = (e) => {
+    e.preventDefault();
+    addToast('success', `Exported ${exportFormState.type} successfully as ${exportFormState.format}!`);
+    setShowExportModal(false);
+  };
+
+  const handleReportFormSubmit = (e) => {
+    e.preventDefault();
+    addToast('info', `Compiling ${reportFormState.type} report...`);
+    setTimeout(() => {
+      const reportContent = `TEAM ANALYTICS REPORT: ${reportFormState.type.toUpperCase()}
+Date Generated: ${new Date().toLocaleString()}
+Date Range: ${reportFormState.dateRange}
+Target Department: ${reportFormState.targetDepartment}
+Active Teams Mapped: ${teams.length}
+`;
+      const blob = new Blob([reportContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${reportFormState.type.toLowerCase().replace(/\s+/g, '_')}_report.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast('success', 'Report Generated & Downloaded Successfully!');
+      setShowReportModal(false);
+    }, 800);
+  };
+
+  const handlePostAlertSubmit = (e) => {
+    e.preventDefault();
+    if (!postAlertFormState.text.trim()) {
+      addToast('warning', 'Please enter alert message text.');
+      return;
+    }
+    const newAlert = {
+      id: Date.now().toString(),
+      type: postAlertFormState.type,
+      text: postAlertFormState.text
+    };
+    setAlerts(prev => [newAlert, ...prev]);
+    setActivities(prev => [
+      { id: Date.now().toString(), type: postAlertFormState.type === 'warning' ? 'yellow' : 'blue', text: `System alert posted: "${postAlertFormState.text}"`, time: 'Just now' },
+      ...prev
+    ]);
+    addToast('success', 'New system alert posted successfully.');
+    setPostAlertFormState({ type: 'info', text: '' });
+    setShowPostAlertModal(false);
+  };
+
+  const handleSchedulerSubmit = (e) => {
+    e.preventDefault();
+    if (!schedulerFormState.title || !schedulerFormState.date || !schedulerFormState.time || !schedulerFormState.teamId) {
+      addToast('warning', 'Please fill in all required scheduler fields.');
+      return;
+    }
+    const team = teams.find(t => t.id === schedulerFormState.teamId);
+    setActivities(prev => [
+      { id: Date.now().toString(), type: 'green', text: `Meeting "${schedulerFormState.title}" scheduled with ${team?.name || 'team'} for ${schedulerFormState.date} at ${schedulerFormState.time}`, time: 'Just now' },
+      ...prev
+    ]);
+    addToast('success', `Meeting "${schedulerFormState.title}" scheduled successfully.`);
+    setSchedulerFormState({ title: '', date: '', time: '', teamId: '', description: '' });
+    setShowSchedulerModal(false);
+  };
+
+  const handleAssignLeaderSubmit = (e) => {
+    e.preventDefault();
+    const { teamId, employeeId } = assignLeaderForm;
+    if (!teamId || !employeeId) {
+      addToast('warning', 'Please select both team and employee.');
+      return;
+    }
+    const emp = employees.find(x => x.id === employeeId);
+    if (!emp) return;
+
+    setTeams(prev => prev.map(t => {
+      if (t.id === teamId) {
+        // Also add the leader as a member if not already there
+        const isMember = t.membersList?.some(m => m.id === employeeId);
+        const updatedList = isMember ? t.membersList : [
+          ...(t.membersList || []),
+          { name: emp.name, id: emp.id, designation: emp.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 95, productivity: 90 }
+        ];
+        return { ...t, leader: emp.name, membersList: updatedList };
+      }
+      return t;
+    }));
+
+    setActivities(prev => [
+      { id: Date.now().toString(), type: 'blue', text: `${emp.name} assigned as leader of ${teams.find(t => t.id === teamId)?.name}`, time: 'Just now' },
+      ...prev
+    ]);
+    addToast('success', `${emp.name} is now the leader of selected team.`);
+    setShowAssignLeaderModal(false);
+  };
+
+  const handleAddMemberSubmit = (e) => {
+    e.preventDefault();
+    const { teamId, employeeId } = addMembersForm;
+    if (!teamId || !employeeId) {
+      addToast('warning', 'Please select both team and employee.');
+      return;
+    }
+    const emp = employees.find(x => x.id === employeeId);
+    if (!emp) return;
+
+    const team = teams.find(t => t.id === teamId);
+    if (team?.membersList?.some(m => m.id === employeeId)) {
+      addToast('warning', 'Employee is already a member of this team.');
+      return;
+    }
+
+    setTeams(prev => prev.map(t => {
+      if (t.id === teamId) {
+        return {
+          ...t,
+          membersList: [
+            ...(t.membersList || []),
+            { name: emp.name, id: emp.id, designation: emp.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 100, productivity: 90 }
+          ]
+        };
+      }
+      return t;
+    }));
+
+    setActivities(prev => [
+      { id: Date.now().toString(), type: 'green', text: `${emp.name} added to ${team?.name}`, time: 'Just now' },
+      ...prev
+    ]);
+    addToast('success', `${emp.name} added to team.`);
+    setShowAddMembersModal(false);
+  };
+
+  const handleRemoveMemberSubmit = (e) => {
+    e.preventDefault();
+    const { teamId, employeeId } = removeMembersForm;
+    if (!teamId || !employeeId) {
+      addToast('warning', 'Please select both team and employee.');
+      return;
+    }
+    const emp = employees.find(x => x.id === employeeId);
+    const team = teams.find(t => t.id === teamId);
+
+    setTeams(prev => prev.map(t => {
+      if (t.id === teamId) {
+        return {
+          ...t,
+          membersList: (t.membersList || []).filter(m => m.id !== employeeId)
+        };
+      }
+      return t;
+    }));
+
+    setActivities(prev => [
+      { id: Date.now().toString(), type: 'red', text: `${emp?.name || 'Employee'} removed from ${team?.name}`, time: 'Just now' },
+      ...prev
+    ]);
+    addToast('warning', `Removed employee from team.`);
+    setShowRemoveMembersModal(false);
+  };
+
+  const handleTransferSubmitLocal = (e) => {
+    e.preventDefault();
+    const { employeeId, fromTeamId, toTeamId } = transferForm;
+    if (!employeeId || !fromTeamId || !toTeamId) {
+      addToast('warning', 'Please complete all transfer fields.');
+      return;
+    }
+    if (fromTeamId === toTeamId) {
+      addToast('warning', 'Source and target teams must be different.');
+      return;
+    }
+    const emp = employees.find(x => x.id === employeeId);
+    const fromTeam = teams.find(t => t.id === fromTeamId);
+    const toTeam = teams.find(t => t.id === toTeamId);
+
+    setTeams(prev => prev.map(t => {
+      if (t.id === fromTeamId) {
+        return { ...t, membersList: (t.membersList || []).filter(m => m.id !== employeeId) };
+      }
+      if (t.id === toTeamId) {
+        return {
+          ...t,
+          membersList: [
+            ...(t.membersList || []),
+            { name: emp?.name || 'Transfer Staff', id: employeeId, designation: emp?.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 95, productivity: 90 }
+          ]
+        };
+      }
+      return t;
+    }));
+
+    setActivities(prev => [
+      { id: Date.now().toString(), type: 'blue', text: `${emp?.name || 'Employee'} transferred from ${fromTeam?.name} to ${toTeam?.name}`, time: 'Just now' },
+      ...prev
+    ]);
+    addToast('success', `Employee transferred successfully.`);
+    setShowTransferEmployeesModal(false);
+  };
+
+  const handleAllocateProjectSubmit = (e) => {
+    e.preventDefault();
+    const { teamId, projectName } = allocateProjectForm;
+    if (!teamId || !projectName) {
+      addToast('warning', 'Please select team and enter project name.');
+      return;
+    }
+    const team = teams.find(t => t.id === teamId);
+
+    setTeams(prev => prev.map(t => {
+      if (t.id === teamId) {
+        return { ...t, activeProjects: t.activeProjects + 1 };
+      }
+      return t;
+    }));
+
+    setActivities(prev => [
+      { id: Date.now().toString(), type: 'green', text: `Project "${projectName}" allocated to ${team?.name}`, time: 'Just now' },
+      ...prev
+    ]);
+    addToast('success', `Project "${projectName}" allocated to ${team?.name}.`);
+    setShowAllocateProjectModal(false);
+  };
+
+  const handleChangeManagerSubmit = (e) => {
+    e.preventDefault();
+    const { employeeId, managerName } = changeManagerForm;
+    if (!employeeId || !managerName) {
+      addToast('warning', 'Please select employee and manager.');
+      return;
+    }
+    const emp = employees.find(x => x.id === employeeId);
+    if (!emp) return;
+
+    updateEmployee(employeeId, { teamLeader: managerName });
+
+    setActivities(prev => [
+      { id: Date.now().toString(), type: 'blue', text: `Reporting manager for ${emp.name} updated to ${managerName}`, time: 'Just now' },
+      ...prev
+    ]);
+    addToast('success', `Reporting manager for ${emp.name} updated.`);
+    setShowChangeManagerModal(false);
   };
 
   const handleDismissAlert = (id) => {
@@ -948,12 +1241,12 @@ const Teams = () => {
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   <Button variant="primary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => setCreateModalOpen(true)}>Create Team</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => addToast('info', 'Choose a team row to assign leader')}>Assign Leader</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => addToast('info', 'Choose a team details drawer to add members')}>Add Members</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => addToast('info', 'Select member in details to transfer')}>Transfer Staff</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => addToast('info', 'Choose project to allocate')}>Allocate Project</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => handleExport(exportFormat)}>Export Registry</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem', gridColumn: 'span 2' }} onClick={() => addToast('info', 'Generating core performance report...')}>Generate Analytics Reports</Button>
+                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAssignLeaderForm({ teamId: '', employeeId: '' }); setShowAssignLeaderModal(true); }}>Assign Leader</Button>
+                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAddMembersForm({ teamId: '', employeeId: '' }); setShowAddMembersModal(true); }}>Add Members</Button>
+                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setTransferForm({ employeeId: '', fromTeamId: '', toTeamId: '' }); setShowTransferEmployeesModal(true); }}>Transfer Staff</Button>
+                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAllocateProjectForm({ teamId: '', projectName: '', description: '', priority: 'Medium', dueDate: '' }); setShowAllocateProjectModal(true); }}>Allocate Project</Button>
+                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setExportFormState({ format: exportFormat, type: 'Teams Directory', includeInactive: false }); setShowExportModal(true); }}>Export Registry</Button>
+                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem', gridColumn: 'span 2' }} onClick={() => { setReportFormState({ type: 'Performance Summary', dateRange: 'Last 7 Days', targetDepartment: 'All' }); setShowReportModal(true); }}>Generate Analytics Reports</Button>
                 </div>
               </div>
 
@@ -964,12 +1257,12 @@ const Teams = () => {
                   <span>Super Admin Actions</span>
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => addToast('success', 'Permission verified. Open add members panel...')}>➕ Add Team Members</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => addToast('warning', 'Permission verified. Choose member to remove...')}>➖ Remove Team Members</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => addToast('info', 'Initiating employee transfer log...')}>🔄 Transfer Employees</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => addToast('info', 'Assign new team leader role...')}>👤 Assign Team Leader</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => addToast('info', 'Update direct reporting managers...')}>🔁 Change Reporting Manager</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => addToast('success', 'Opening project allocation console...')}>📁 Allocate Projects</button>
+                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAddMembersForm({ teamId: '', employeeId: '' }); setShowAddMembersModal(true); }}>➕ Add Team Members</button>
+                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setRemoveMembersForm({ teamId: '', employeeId: '' }); setShowRemoveMembersModal(true); }}>➖ Remove Team Members</button>
+                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setTransferForm({ employeeId: '', fromTeamId: '', toTeamId: '' }); setShowTransferEmployeesModal(true); }}>🔄 Transfer Employees</button>
+                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAssignLeaderForm({ teamId: '', employeeId: '' }); setShowAssignLeaderModal(true); }}>👤 Assign Team Leader</button>
+                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setChangeManagerForm({ employeeId: '', managerName: '' }); setShowChangeManagerModal(true); }}>🔁 Change Reporting Manager</button>
+                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAllocateProjectForm({ teamId: '', projectName: '', description: '', priority: 'Medium', dueDate: '' }); setShowAllocateProjectModal(true); }}>📁 Allocate Projects</button>
                 </div>
               </div>
 
@@ -993,9 +1286,9 @@ const Teams = () => {
                     <div><strong>Experience:</strong> 8 years senior track</div>
                     <div><strong>Performance Score:</strong> <span className="text-success bold-text">98%</span></div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    <Button variant="secondary" size="sm" onClick={() => addToast('info', 'Opening transfer dialog...')}>Change Lead</Button>
-                    <Button variant="secondary" size="sm" onClick={() => addToast('info', 'Modifying system permissions...')}>Permissions</Button>
+                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    <Button variant="secondary" size="sm" onClick={() => { setAssignLeaderForm({ teamId: 'TM-001', employeeId: '' }); setShowAssignLeaderModal(true); }}>Change Lead</Button>
+                    <Button variant="secondary" size="sm" onClick={() => navigate('/permissions')}>Permissions</Button>
                   </div>
                 </div>
               </div>
@@ -1017,8 +1310,8 @@ const Teams = () => {
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  <Button variant="secondary" size="sm" onClick={() => addToast('success', 'Announcement sent successfully.')}>Post Alert</Button>
-                  <Button variant="secondary" size="sm" onClick={() => addToast('info', 'Opening scheduler dialog...')}>Meet Calendar</Button>
+                  <Button variant="secondary" size="sm" onClick={() => { setPostAlertFormState({ type: 'info', text: '' }); setShowPostAlertModal(true); }}>Post Alert</Button>
+                  <Button variant="secondary" size="sm" onClick={() => { setSchedulerFormState({ title: '', date: '', time: '', teamId: '', description: '' }); setShowSchedulerModal(true); }}>Meet Calendar</Button>
                 </div>
               </div>
             </div>
@@ -1225,32 +1518,45 @@ const Teams = () => {
                 <div className="teams-form-grid">
                   <div className="teams-form-group">
                     <label>Team Leader*</label>
-                    <input
-                      type="text"
-                      placeholder="Leader name (e.g. Rahul Sharma)"
+                    <select
+                      className="teams-filter-select"
                       value={newTeam.leader}
                       onChange={e => setNewTeam(prev => ({ ...prev, leader: e.target.value }))}
                       style={{ borderColor: formErrors.leader ? '#ef4444' : '' }}
-                    />
+                      required
+                    >
+                      <option value="">Select Team Leader</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
+                      ))}
+                    </select>
                     {formErrors.leader && <span className="text-danger text-xs">{formErrors.leader}</span>}
                   </div>
                   <div className="teams-form-group">
                     <label>Assistant Team Leader</label>
-                    <input
-                      type="text"
-                      placeholder="Assistant Leader (optional)"
+                    <select
+                      className="teams-filter-select"
                       value={newTeam.assistantLeader}
                       onChange={e => setNewTeam(prev => ({ ...prev, assistantLeader: e.target.value }))}
-                    />
+                    >
+                      <option value="">Select Assistant Leader (optional)</option>
+                      {employees.filter(emp => emp.name !== newTeam.leader).map(emp => (
+                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="teams-form-full">
                     <label>Reporting Project Manager</label>
-                    <input
-                      type="text"
-                      placeholder="Project Manager (optional)"
+                    <select
+                      className="teams-filter-select"
                       value={newTeam.projectManager}
                       onChange={e => setNewTeam(prev => ({ ...prev, projectManager: e.target.value }))}
-                    />
+                    >
+                      <option value="">Select Project Manager (optional)</option>
+                      {employees.filter(emp => emp.name !== newTeam.leader && emp.name !== newTeam.assistantLeader).map(emp => (
+                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1386,8 +1692,8 @@ const Teams = () => {
                   <div className="teams-search-actions">
                     <div className="teams-filter-label">Assigned Members List</div>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <Button variant="secondary" size="sm" onClick={() => addToast('info', 'Initiating Add Member workflow...')}>Add Member</Button>
-                      <Button variant="secondary" size="sm" onClick={() => addToast('info', 'Select member to remove...')}>Remove Member</Button>
+                      <Button variant="secondary" size="sm" onClick={() => { setAddMembersForm({ teamId: selectedTeam.id, employeeId: '' }); setShowAddMembersModal(true); }}>Add Member</Button>
+                      <Button variant="secondary" size="sm" onClick={() => { setRemoveMembersForm({ teamId: selectedTeam.id, employeeId: '' }); setShowRemoveMembersModal(true); }}>Remove Member</Button>
                     </div>
                   </div>
                   <div className="table-responsive">
@@ -1493,6 +1799,623 @@ const Teams = () => {
             <div className="teams-slideover-footer">
               <Button variant="secondary" onClick={() => setDetailDrawerOpen(false)}>Close Drawer</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Team Leader Modal */}
+      {showAssignLeaderModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowAssignLeaderModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Assign Team Leader</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowAssignLeaderModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAssignLeaderSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Select Team*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={assignLeaderForm.teamId}
+                      onChange={e => setAssignLeaderForm(prev => ({ ...prev, teamId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select Team</option>
+                      {teams.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Select Employee as Leader*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={assignLeaderForm.employeeId}
+                      onChange={e => setAssignLeaderForm(prev => ({ ...prev, employeeId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select Employee</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowAssignLeaderModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Assign Leader</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Team Members Modal */}
+      {showAddMembersModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowAddMembersModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Add Team Members</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowAddMembersModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddMemberSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Select Target Team*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={addMembersForm.teamId}
+                      onChange={e => setAddMembersForm(prev => ({ ...prev, teamId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select Team</option>
+                      {teams.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Select Employee to Add*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={addMembersForm.employeeId}
+                      onChange={e => setAddMembersForm(prev => ({ ...prev, employeeId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select Employee</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowAddMembersModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Add Member</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Team Members Modal */}
+      {showRemoveMembersModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowRemoveMembersModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Remove Team Members</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowRemoveMembersModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleRemoveMemberSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Select Team*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={removeMembersForm.teamId}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setRemoveMembersForm({ teamId: val, employeeId: '' });
+                      }}
+                      required
+                    >
+                      <option value="">Select Team</option>
+                      {teams.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Select Member to Remove*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={removeMembersForm.employeeId}
+                      onChange={e => setRemoveMembersForm(prev => ({ ...prev, employeeId: e.target.value }))}
+                      disabled={!removeMembersForm.teamId}
+                      required
+                    >
+                      <option value="">Select Member</option>
+                      {teams.find(t => t.id === removeMembersForm.teamId)?.membersList?.map(m => (
+                        <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowRemoveMembersModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Remove Member</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Employees Modal */}
+      {showTransferEmployeesModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowTransferEmployeesModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Transfer Employees</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowTransferEmployeesModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleTransferSubmitLocal}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Select Source Team*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={transferForm.fromTeamId}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setTransferForm({ fromTeamId: val, employeeId: '', toTeamId: '' });
+                      }}
+                      required
+                    >
+                      <option value="">Select Team</option>
+                      {teams.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Select Employee to Transfer*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={transferForm.employeeId}
+                      onChange={e => setTransferForm(prev => ({ ...prev, employeeId: e.target.value }))}
+                      disabled={!transferForm.fromTeamId}
+                      required
+                    >
+                      <option value="">Select Employee</option>
+                      {teams.find(t => t.id === transferForm.fromTeamId)?.membersList?.map(m => (
+                        <option key={m.id} value={m.id}>{m.name} ({m.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Select Target Team*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={transferForm.toTeamId}
+                      onChange={e => setTransferForm(prev => ({ ...prev, toTeamId: e.target.value }))}
+                      disabled={!transferForm.employeeId}
+                      required
+                    >
+                      <option value="">Select Team</option>
+                      {teams.filter(t => t.id !== transferForm.fromTeamId).map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowTransferEmployeesModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Transfer Employee</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Allocate Project Modal */}
+      {showAllocateProjectModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowAllocateProjectModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Allocate Project to Team</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowAllocateProjectModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAllocateProjectSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Select Target Team*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={allocateProjectForm.teamId}
+                      onChange={e => setAllocateProjectForm(prev => ({ ...prev, teamId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select Team</option>
+                      {teams.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Project Name*</label>
+                    <input
+                      type="text"
+                      placeholder="Enter project name (e.g. Nexus Phase 2)"
+                      value={allocateProjectForm.projectName}
+                      onChange={e => setAllocateProjectForm(prev => ({ ...prev, projectName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Description</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Project deliverables overview..."
+                      value={allocateProjectForm.description}
+                      onChange={e => setAllocateProjectForm(prev => ({ ...prev, description: e.target.value }))}
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: 10, color: 'var(--text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div className="teams-form-group" style={{ marginTop: '12px' }}>
+                    <label>Priority</label>
+                    <select
+                      className="teams-filter-select"
+                      value={allocateProjectForm.priority}
+                      onChange={e => setAllocateProjectForm(prev => ({ ...prev, priority: e.target.value }))}
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="Critical">Critical</option>
+                    </select>
+                  </div>
+                  <div className="teams-form-group" style={{ marginTop: '12px' }}>
+                    <label>Due Date</label>
+                    <input
+                      type="date"
+                      value={allocateProjectForm.dueDate}
+                      onChange={e => setAllocateProjectForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowAllocateProjectModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Allocate Project</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Reporting Manager Modal */}
+      {showChangeManagerModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowChangeManagerModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Change Reporting Manager</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowChangeManagerModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleChangeManagerSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Select Employee*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={changeManagerForm.employeeId}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const emp = employees.find(x => x.id === val);
+                        setChangeManagerForm({ employeeId: val, managerName: emp?.teamLeader || '' });
+                      }}
+                      required
+                    >
+                      <option value="">Select Employee</option>
+                      {employees.map(emp => (
+                        <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>New Reporting Manager Name*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={changeManagerForm.managerName}
+                      onChange={e => setChangeManagerForm(prev => ({ ...prev, managerName: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select Manager</option>
+                      {employees.filter(emp => emp.id !== changeManagerForm.employeeId).map(emp => (
+                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowChangeManagerModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Change Manager</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Export Registry Modal */}
+      {showExportModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowExportModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Export Teams Registry</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowExportModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleExportFormSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Export Format*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={exportFormState.format}
+                      onChange={e => setExportFormState(prev => ({ ...prev, format: e.target.value }))}
+                      required
+                    >
+                      <option value="PDF">PDF (Portable Document Format)</option>
+                      <option value="Excel">Excel Spreadsheet (XLSX)</option>
+                      <option value="CSV">Comma Separated Values (CSV)</option>
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Registry Target Scope*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={exportFormState.type}
+                      onChange={e => setExportFormState(prev => ({ ...prev, type: e.target.value }))}
+                      required
+                    >
+                      <option value="Teams Directory">Teams Directory (Detailed Metadata)</option>
+                      <option value="Roster Allocation">Roster & Member Allocations</option>
+                      <option value="Full Hierarchy">Full Departmental Hierarchy</option>
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      id="includeInactive"
+                      checked={exportFormState.includeInactive}
+                      onChange={e => setExportFormState(prev => ({ ...prev, includeInactive: e.target.checked }))}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    <label htmlFor="includeInactive" style={{ margin: 0, fontSize: '0.78rem', cursor: 'pointer' }}>Include inactive and archived teams</label>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowExportModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Export Registry</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Analytics Reports Modal */}
+      {showReportModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowReportModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Configure Analytics Report</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowReportModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleReportFormSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Report Type*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={reportFormState.type}
+                      onChange={e => setReportFormState(prev => ({ ...prev, type: e.target.value }))}
+                      required
+                    >
+                      <option value="Performance Summary">Team Performance Summary</option>
+                      <option value="Employee Workload Audit">Employee Workload & Capacity Audit</option>
+                      <option value="Roster Attendance Analytics">Roster Attendance Analytics</option>
+                    </select>
+                  </div>
+                  <div className="teams-form-group" style={{ marginTop: '12px' }}>
+                    <label>Date Range*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={reportFormState.dateRange}
+                      onChange={e => setReportFormState(prev => ({ ...prev, dateRange: e.target.value }))}
+                      required
+                    >
+                      <option value="Last 7 Days">Last 7 Days</option>
+                      <option value="Last 30 Days">Last 30 Days</option>
+                      <option value="Current Month">Current Month</option>
+                      <option value="Last Quarter">Last Quarter</option>
+                    </select>
+                  </div>
+                  <div className="teams-form-group" style={{ marginTop: '12px' }}>
+                    <label>Target Department*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={reportFormState.targetDepartment}
+                      onChange={e => setReportFormState(prev => ({ ...prev, targetDepartment: e.target.value }))}
+                      required
+                    >
+                      <option value="All">All Departments</option>
+                      <option value="IT">IT (Tech)</option>
+                      <option value="HR">HR</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Sales">Sales</option>
+                      <option value="Finance">Finance</option>
+                      <option value="Operations">Operations</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowReportModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Generate & Download</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Post Alert Modal */}
+      {showPostAlertModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowPostAlertModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Post System Alert</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowPostAlertModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handlePostAlertSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Alert Type*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={postAlertFormState.type}
+                      onChange={e => setPostAlertFormState(prev => ({ ...prev, type: e.target.value }))}
+                      required
+                    >
+                      <option value="info">Information (Blue Announcement)</option>
+                      <option value="warning">Warning (Yellow/Amber Alert)</option>
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Alert Message Content*</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Enter announcement text or system alert description..."
+                      value={postAlertFormState.text}
+                      onChange={e => setPostAlertFormState(prev => ({ ...prev, text: e.target.value }))}
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: 10, color: 'var(--text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowPostAlertModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Post Alert</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Meeting Modal */}
+      {showSchedulerModal && (
+        <div className="modal-backdrop animate-fade-in" onClick={() => setShowSchedulerModal(false)}>
+          <div className="modal-container modal-md animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Schedule Team Meeting</h3>
+              <button className="modal-close-btn" type="button" onClick={() => setShowSchedulerModal(false)} aria-label="Close modal">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleSchedulerSubmit}>
+              <div className="modal-body">
+                <div className="teams-form-grid">
+                  <div className="teams-form-full">
+                    <label>Meeting Title*</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Q2 Architecture Planning"
+                      value={schedulerFormState.title}
+                      onChange={e => setSchedulerFormState(prev => ({ ...prev, title: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="teams-form-group" style={{ marginTop: '12px' }}>
+                    <label>Date*</label>
+                    <input
+                      type="date"
+                      value={schedulerFormState.date}
+                      onChange={e => setSchedulerFormState(prev => ({ ...prev, date: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="teams-form-group" style={{ marginTop: '12px' }}>
+                    <label>Time*</label>
+                    <input
+                      type="time"
+                      value={schedulerFormState.time}
+                      onChange={e => setSchedulerFormState(prev => ({ ...prev, time: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Invite Team*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={schedulerFormState.teamId}
+                      onChange={e => setSchedulerFormState(prev => ({ ...prev, teamId: e.target.value }))}
+                      required
+                    >
+                      <option value="">Select Target Team</option>
+                      {teams.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.id})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-full" style={{ marginTop: '12px' }}>
+                    <label>Description / Agenda</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Brief description of the call agenda..."
+                      value={schedulerFormState.description}
+                      onChange={e => setSchedulerFormState(prev => ({ ...prev, description: e.target.value }))}
+                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: 10, color: 'var(--text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="secondary" type="button" onClick={() => setShowSchedulerModal(false)}>Cancel</Button>
+                <Button variant="primary" type="submit">Schedule Meeting</Button>
+              </div>
+            </form>
           </div>
         </div>
       )}
