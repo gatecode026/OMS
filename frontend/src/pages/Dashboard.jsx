@@ -271,7 +271,8 @@ const Dashboard = () => {
     attendance,
     tasks,
     currentUser,
-    addToast
+    addToast,
+    showConfirm
   } = useApp();
 
   const navigate = useNavigate();
@@ -416,13 +417,30 @@ const Dashboard = () => {
     color: b.status === 'Optimal' ? '#10b981' : '#3b82f6'
   }));
 
-  const handleReportAction = (id, nextStatus) => {
-    setReports(prev =>
-      prev.map(r => (r.id === id ? { ...r, status: nextStatus } : r))
-    );
-    addToast(
-      nextStatus === 'Approved' ? 'success' : 'warning',
-      `Work report status updated to ${nextStatus}.`
+  const handleReportAction = (id, nextStatus, isModal = false) => {
+    const report = reports.find(r => r.id === id);
+    const empName = report ? report.employee : 'Employee';
+    const actionName = nextStatus === 'Approved' ? 'Approve' : 'Flag';
+    const title = `${actionName} Work Report`;
+    const message = `Are you sure you want to ${nextStatus === 'Approved' ? 'approve' : 'flag'} the work report for ${empName}?`;
+    const confirmType = nextStatus === 'Approved' ? 'primary' : 'danger';
+
+    showConfirm(
+      title,
+      message,
+      () => {
+        setReports(prev =>
+          prev.map(r => (r.id === id ? { ...r, status: nextStatus } : r))
+        );
+        addToast(
+          nextStatus === 'Approved' ? 'success' : 'warning',
+          `Work report status updated to ${nextStatus}.`
+        );
+        if (isModal) {
+          setSelectedReport(null);
+        }
+      },
+      confirmType
     );
   };
 
@@ -1178,8 +1196,7 @@ const Dashboard = () => {
                 <Button
                   variant="danger"
                   onClick={() => {
-                    handleReportAction(selectedReport.id, 'Flagged');
-                    setSelectedReport(null);
+                    handleReportAction(selectedReport.id, 'Flagged', true);
                   }}
                 >
                   Flag Report
@@ -1187,8 +1204,7 @@ const Dashboard = () => {
                 <Button
                   variant="primary"
                   onClick={() => {
-                    handleReportAction(selectedReport.id, 'Approved');
-                    setSelectedReport(null);
+                    handleReportAction(selectedReport.id, 'Approved', true);
                   }}
                 >
                   Approve Report

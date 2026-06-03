@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import './Departments.css';
 import { useApp } from '../context/AppContext';
+import { FIELD_LABELS } from '../utils/fieldLabels';
 import usePageLoading from '../hooks/usePageLoading';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
@@ -253,7 +254,7 @@ const Departments = () => {
     name: '', code: '', head: '', branch: 'Delhi Head Office', budget: 100000, description: '', color: '#3b82f6'
   });
   const [newTeamForm, setNewTeamForm] = useState({
-    name: '', leader: '', department: 'Engineering', count: 4, status: 'Active'
+    name: '', leader: '', department: 'Engineering', count: 0, status: 'Active', members: []
   });
   const [transferForm, setTransferForm] = useState({
     employee: '', source: 'Sales', target: 'Engineering', reason: '', date: '2026-06-01'
@@ -305,6 +306,8 @@ const Departments = () => {
   };
 
   const filteredDepts = departments.filter(handleApplyFilter);
+
+  const deptEmployees = employees.filter(emp => emp.department === newTeamForm.department);
 
   // Handle Action - Add Department
   const handleAddDeptSubmit = (e) => {
@@ -395,7 +398,7 @@ const Departments = () => {
     }));
     setCreateTeamOpen(false);
     addToast('success', `Team "${newTeamForm.name}" registered successfully.`);
-    setNewTeamForm({ name: '', leader: '', department: 'Engineering', count: 4, status: 'Active' });
+    setNewTeamForm({ name: '', leader: '', department: 'Engineering', count: 0, status: 'Active', members: [] });
   };
 
   // Handle Action - Transfer Employee
@@ -664,15 +667,15 @@ const Departments = () => {
               <thead>
                 <tr>
                   <th>Department ID</th>
-                  <th>Name</th>
-                  <th>Code</th>
-                  <th>Head / Leader</th>
-                  <th>Location</th>
-                  <th>Workforce</th>
+                  <th>Department Name</th>
+                  <th>Department Code</th>
+                  <th>Department Head</th>
+                  <th>{FIELD_LABELS.branch}</th>
+                  <th>Workforce Count</th>
                   <th>Budget Spent</th>
-                  <th>Attendance</th>
-                  <th>Productivity</th>
-                  <th>Status</th>
+                  <th>Attendance Rate</th>
+                  <th>Productivity Rate</th>
+                  <th>Department Status</th>
                   <th>Created Date</th>
                   <th>Actions</th>
                 </tr>
@@ -897,7 +900,7 @@ const Departments = () => {
                 <tr>
                   <th>Team ID</th>
                   <th>Team Name</th>
-                  <th>Team Leader</th>
+                  <th>{FIELD_LABELS.teamLeader}</th>
                   <th>Department</th>
                   <th>Employee Count</th>
                   <th>Active Projects</th>
@@ -1339,7 +1342,7 @@ const Departments = () => {
               id="teamDept"
               className="form-control"
               value={newTeamForm.department}
-              onChange={e => setNewTeamForm({ ...newTeamForm, department: e.target.value })}
+              onChange={e => setNewTeamForm({ ...newTeamForm, department: e.target.value, members: [], count: 0 })}
             >
               {departments.map(d => (
                 <option key={d.id} value={d.name}>{d.name}</option>
@@ -1348,13 +1351,115 @@ const Departments = () => {
           </div>
 
           <div className="form-group flex-column gap-1">
-            <label htmlFor="teamCount">Initial Workforce Size</label>
+            <label>Select Team Members</label>
+            <div style={{
+              maxHeight: '220px',
+              overflowY: 'auto',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--bg-card)'
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textTransform: 'none' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color-dark)', position: 'sticky', top: 0, backgroundColor: 'var(--bg-elevated)', zIndex: 10 }}>
+                    <th style={{ padding: '8px 10px', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600', border: 'none' }}>Name & Designation</th>
+                    <th style={{ padding: '8px 10px', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600', width: '95px', border: 'none' }}>Performance</th>
+                    <th style={{ padding: '8px 10px', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600', width: '95px', border: 'none' }}>Productivity</th>
+                    <th style={{ padding: '8px 10px', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600', width: '95px', border: 'none' }}>Attendance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deptEmployees.map(emp => {
+                    const isSelected = newTeamForm.members?.includes(emp.name);
+                    const perfVal = emp.performanceScore?.overall || 75;
+                    const prodVal = emp.productivityScore || 80;
+                    const attVal = emp.performanceScore?.attendance || 90;
+
+                    return (
+                      <tr key={emp.id} style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: isSelected ? 'var(--color-primary-light)' : 'transparent' }}>
+                        {/* Column 1: Checkbox & Name */}
+                        <td style={{ padding: '8px 10px', verticalAlign: 'middle', border: 'none' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, textTransform: 'none', width: '100%', justifyContent: 'flex-start' }}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              style={{ 
+                                cursor: 'pointer',
+                                width: '15px',
+                                height: '15px',
+                                margin: '0',
+                                flexShrink: 0
+                              }}
+                              onChange={() => {
+                                const updatedMembers = isSelected
+                                  ? newTeamForm.members.filter(m => m !== emp.name)
+                                  : [...(newTeamForm.members || []), emp.name];
+                                setNewTeamForm({
+                                  ...newTeamForm,
+                                  members: updatedMembers,
+                                  count: updatedMembers.length
+                                });
+                              }}
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column', textTransform: 'none' }}>
+                              <span style={{ fontWeight: '600', color: 'var(--text-primary)', textTransform: 'none', lineHeight: '1.2' }}>{emp.name}</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', textTransform: 'none', marginTop: '2px' }}>{emp.designation}</span>
+                            </div>
+                          </label>
+                        </td>
+
+                        {/* Column 2: Performance Progress bar */}
+                        <td style={{ padding: '8px 10px', verticalAlign: 'middle', border: 'none' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: '600', minWidth: '24px', color: 'var(--text-primary)' }}>{perfVal}%</span>
+                            <div style={{ width: '40px', height: '5px', backgroundColor: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden', flexShrink: 0 }}>
+                              <div style={{ width: `${perfVal}%`, height: '100%', backgroundColor: 'var(--color-primary)', borderRadius: 'var(--radius-full)' }} />
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Column 3: Productivity Progress bar */}
+                        <td style={{ padding: '8px 10px', verticalAlign: 'middle', border: 'none' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: '600', minWidth: '24px', color: 'var(--text-primary)' }}>{prodVal}%</span>
+                            <div style={{ width: '40px', height: '5px', backgroundColor: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden', flexShrink: 0 }}>
+                              <div style={{ width: `${prodVal}%`, height: '100%', backgroundColor: 'var(--accent-blue-solid)', borderRadius: 'var(--radius-full)' }} />
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Column 4: Attendance Progress bar */}
+                        <td style={{ padding: '8px 10px', verticalAlign: 'middle', border: 'none' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: '600', minWidth: '24px', color: 'var(--text-primary)' }}>{attVal}%</span>
+                            <div style={{ width: '40px', height: '5px', backgroundColor: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden', flexShrink: 0 }}>
+                              <div style={{ width: `${attVal}%`, height: '100%', backgroundColor: 'var(--color-success)', borderRadius: 'var(--radius-full)' }} />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {deptEmployees.length === 0 && (
+                    <tr>
+                      <td colSpan="4" style={{ padding: '20px 10px', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', textTransform: 'none', border: 'none' }}>
+                        No employees available in this department.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="form-group flex-column gap-1">
+            <label htmlFor="teamCount">Initial Workforce Size (Calculated)</label>
             <input
               id="teamCount"
               type="number"
               className="form-control"
+              disabled
               value={newTeamForm.count}
-              onChange={e => setNewTeamForm({ ...newTeamForm, count: Number(e.target.value) })}
             />
           </div>
 

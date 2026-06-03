@@ -274,6 +274,7 @@ function enrichEmployee(emp, seed) {
     performanceScore: genPerformanceScore(seed),
     documents: genDocuments(seed, emp.name),
     activityLog: genActivityLog(seed, emp.name),
+    maritalStatus: emp.maritalStatus || ['Married', 'Single', 'Single', 'Married'][seed % 4],
     
     // New fields
     companyName: emp.companyName || (emp.email && emp.email.includes('enterprise.com') ? 'Enterprise Corp' : emp.email && emp.email.includes('saas.com') ? 'SaaS Global' : 'OM Enterprise'),
@@ -650,10 +651,67 @@ const baseEmployees = [
   }
 ];
 
-export const mockEmployees = baseEmployees.map((emp, i) => enrichEmployee(emp, i + 1));
+// Generate 50 dummy employees programmatically
+const names = [
+  'Amit Sharma', 'Priya Verma', 'Rohan Gupta', 'Sneha Iyer', 'Rahul Nair', 
+  'Neha Sen', 'Deepak Rao', 'Kirti Das', 'Manish Jha', 'Anjali Joshi',
+  'Siddharth Roy', 'Shalini Mishra', 'Arvind Pandey', 'Tanvi Hegde', 'Abhishek Patil',
+  'Pooja Kulkarni', 'Sandeep Deshmukh', 'Aditi Kulkarni', 'Rajesh Gaikwad', 'Divya Shekhawat',
+  'Harsh Vardhan', 'Rashmi Ranjan', 'Saurabh Dwivedi', 'Komal Preet', 'Jatin Chawla',
+  'Ritu Phogat', 'Ashish Nehra', 'Preeti Zinta', 'Kunal Kapoor', 'Simran Kaur',
+  'Gaurav Solanki', 'Meghna Pant', 'Pranav Anand', 'Nisha Rawat', 'Varun Dhawan',
+  'Shreya Ghoshal', 'Alok Nath', 'Kiran Bedi', 'Yuvraj Singh', 'Mithali Raj',
+  'Sachin Tendulkar', 'Sania Mirza', 'Sunil Chhetri', 'Mary Kom', 'Abhinav Bindra',
+  'Pankaj Advani', 'Viswanathan Anand', 'Geeta Phogat', 'Milind Soman', 'Sushmita Sen'
+];
+
+const depts = ['Engineering', 'Sales', 'Marketing', 'Human Resources', 'Operations', 'Finance'];
+const branches = ['Jaipur', 'Delhi', 'Mumbai', 'Bangalore'];
+const roles = ['Employee', 'Employee', 'Employee', 'Team Leader'];
+const roleIds = ['employee', 'employee', 'employee', 'team_leader'];
+const designations = ['Software Engineer', 'Sales Executive', 'Marketing Associate', 'HR Associate', 'Operations Executive', 'Financial Analyst'];
+
+const extraEmployees = [];
+for (let i = 0; i < 50; i++) {
+  const name = names[i % names.length] + ' ' + (i + 26); // unique names
+  const emailName = name.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z.]/g, '');
+  const idNum = String(i + 26).padStart(3, '0');
+  const dept = depts[i % depts.length];
+  const branch = branches[i % branches.length];
+  const rIndex = i % roles.length;
+  
+  extraEmployees.push({
+    id: `EMP-2026-${idNum}`,
+    name: name,
+    email: `${emailName}@saas.com`,
+    phone: `+91 9${String(i * 12345).padStart(9, '0').slice(-9)}`,
+    dob: `199${(i % 9)}-0${(i % 9) + 1}-1${i % 9}`,
+    gender: i % 2 === 0 ? 'Female' : 'Male',
+    department: dept,
+    branch: branch,
+    team: dept === 'Engineering' ? 'Backend Core' : dept === 'Sales' ? 'Domestic Sales' : 'Operations Core',
+    role: roles[rIndex],
+    roleId: roleIds[rIndex],
+    joinDate: `2024-0${(i % 9) + 1}-15`,
+    status: i % 10 === 0 ? 'On Leave' : 'Active',
+    avatar: '',
+    designation: designations[i % designations.length],
+    teamLeader: 'Ananya Gupta',
+    projectManager: 'Vikram Singh',
+    nationality: 'Indian',
+    emergencyContactName: 'Rajesh Kumar',
+    emergencyContactPhone: '+91 98000 11000',
+    currentAddress: `${100 + i} Malviya Nagar, Jaipur, India`,
+    permanentAddress: `${100 + i} Malviya Nagar, Jaipur, India`,
+    employmentType: 'Full-Time',
+    workLocation: branch
+  });
+}
+
+export const mockEmployees = [...baseEmployees, ...extraEmployees].map((emp, i) => enrichEmployee(emp, i + 1));
 
 // ─── Attendance Records ────────────────────────────────────────────────────────
-export const mockAttendance = [
+const baseAttendance = [
   { id: 'ATT-001', employeeId: 'EMP-2026-001', employeeName: 'Aarav Sharma', department: 'Operations', branch: 'Jaipur', date: '2026-05-29', punchIn: '08:45', punchOut: '17:15', totalHours: 8.5, status: 'Present' },
   { id: 'ATT-002', employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', department: 'Engineering', branch: 'Delhi', date: '2026-05-29', punchIn: '09:05', punchOut: '18:00', totalHours: 8.92, status: 'Present' },
   { id: 'ATT-003', employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', department: 'Engineering', branch: 'Delhi', date: '2026-05-29', punchIn: '09:35', punchOut: '17:45', totalHours: 8.16, status: 'Late' },
@@ -669,6 +727,41 @@ export const mockAttendance = [
   { id: 'ATT-104', employeeId: 'EMP-2026-004', employeeName: 'Rohit Sharma', department: 'Sales', branch: 'Delhi', date: '2026-05-28', punchIn: '08:45', punchOut: '17:00', totalHours: 8.25, status: 'Present' },
   { id: 'ATT-107', employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', department: 'Human Resources', branch: 'Delhi', date: '2026-05-28', punchIn: '--:--', punchOut: '--:--', totalHours: 0, status: 'Absent' }
 ];
+
+// Generate 30 dummy attendance records programmatically
+const extraAttendance = [];
+const allMockEmployees = [...baseEmployees, ...extraEmployees];
+for (let i = 0; i < 30; i++) {
+  const emp = allMockEmployees[i % allMockEmployees.length];
+  const status = ['Present', 'Present', 'Late', 'Present', 'Work From Home', 'Present'][i % 6];
+  let punchIn = '09:00';
+  let punchOut = '18:00';
+  let totalHours = 9.0;
+  if (status === 'Late') {
+    punchIn = '09:45';
+    punchOut = '18:15';
+    totalHours = 8.5;
+  } else if (status === 'Work From Home') {
+    punchIn = '09:00';
+    punchOut = '17:30';
+    totalHours = 8.5;
+  }
+  
+  extraAttendance.push({
+    id: `ATT-EXTRA-${String(i + 1).padStart(3, '0')}`,
+    employeeId: emp.id,
+    employeeName: emp.name,
+    department: emp.department,
+    branch: emp.branch,
+    date: '2026-06-02', // Today's date
+    punchIn: punchIn,
+    punchOut: punchOut,
+    totalHours: totalHours,
+    status: status
+  });
+}
+
+export const mockAttendance = [...baseAttendance, ...extraAttendance];
 
 // ─── Leave Requests ────────────────────────────────────────────────────────────
 export const mockLeaveRequests = [
@@ -692,7 +785,7 @@ export const mockLeaveRequests = [
     id: 'LR-003', employeeId: 'EMP-2026-009', employeeName: "Suresh Kumar", department: 'Engineering',
     type: 'Casual Leave', fromDate: '2026-06-02', toDate: '2026-06-03', days: 2,
     reason: 'Personal errands and attending a family wedding.',
-    status: 'Pending', appliedDate: '2026-05-28',
+    status: 'Approved', appliedDate: '2026-05-28',
     history: [{ date: '2026-05-28', status: 'Pending', comment: "Applied by Suresh Kumar" }],
     approverNotes: ''
   },

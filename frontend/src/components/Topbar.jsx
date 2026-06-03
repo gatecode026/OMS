@@ -6,7 +6,6 @@ import Avatar from './common/Avatar';
 import Badge from './common/Badge';
 import {
   Menu,
-  Search,
   Bell,
   Sun,
   Moon,
@@ -17,7 +16,8 @@ import {
   AlertCircle,
   Info,
   Check,
-  CheckCheck
+  CheckCheck,
+  Search
 } from 'lucide-react';
 
 const Topbar = ({ onMenuToggle }) => {
@@ -139,10 +139,14 @@ const Topbar = ({ onMenuToggle }) => {
 
       {/* Topbar Right: Actions, Notifications, Profile Swapper */}
       <div className="topbar-right">
-        {/* Search trigger box */}
-        <button className="topbar-search-trigger" onClick={() => setCommandPaletteOpen(true)}>
-          <Search size={16} className="search-icon" />
-          <span className="search-placeholder">Search...</span>
+        {/* Global Search Trigger */}
+        <button
+          className="topbar-search-trigger"
+          onClick={() => setCommandPaletteOpen(true)}
+          title="Search (⌘K)"
+        >
+          <Search size={15} className="search-icon" />
+          <span className="search-placeholder">Search anything...</span>
           <span className="shortcut-badge">⌘K</span>
         </button>
 
