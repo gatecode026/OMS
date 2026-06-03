@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import './Teams.css';
 import { useApp } from '../context/AppContext';
+import { FIELD_LABELS } from '../utils/fieldLabels';
 import usePageLoading from '../hooks/usePageLoading';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
@@ -640,13 +641,13 @@ const Teams = () => {
                     <tr>
                       <th>Team ID</th>
                       <th>Team Name</th>
-                      <th>Team Leader</th>
+                      <th>{FIELD_LABELS.teamLeader}</th>
                       <th>Department</th>
-                      <th>Branch/Agency</th>
-                      <th className="text-center">Projects</th>
+                      <th>{FIELD_LABELS.branch}</th>
+                      <th className="text-center">Active Projects</th>
                       <th className="text-center">Completed Tasks</th>
-                      <th className="text-center">Productivity</th>
-                      <th className="text-center">Attendance</th>
+                      <th className="text-center">Productivity Rate</th>
+                      <th className="text-center">Attendance Rate</th>
                       <th>Status</th>
                       <th className="text-right">Actions</th>
                     </tr>

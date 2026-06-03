@@ -73,6 +73,7 @@
   border: 1px solid var(--border-color);
   background-color: var(--bg-card);
   transition: var(--transition-all);
+  cursor: pointer;
 }
 
 .kpi-card-custom:hover {
@@ -358,6 +359,7 @@
 .bg-var-success { background-color: var(--color-success-light); color: var(--color-success); }
 .bg-var-warning { background-color: var(--color-warning-light); color: var(--color-warning); }
 .bg-var-danger { background-color: var(--color-danger-light); color: var(--color-danger); }
+.bg-var-purple { background-color: var(--color-purple-light); color: var(--color-purple); }
 .bg-var-neutral { background-color: rgba(255, 255, 255, 0.08); color: var(--text-secondary); }
 
 /* Table customized cell styles */
@@ -832,8 +834,8 @@
 
 .policy-form-field label {
   font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-muted);
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 .policy-form-field input, .policy-form-field select {
@@ -1358,4 +1360,184 @@
   padding: var(--spacing-3) var(--spacing-4);
   border-radius: var(--radius-md);
   border: 1px dashed var(--border-color);
+}
+/* ==================== ADDITIONAL CSS FOR ADMIN POLICY TABLE ==================== */
+
+/* Policy Admin Table Styles */
+.policy-admin-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.policy-admin-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.policy-admin-table th,
+.policy-admin-table td {
+  padding: var(--spacing-3) var(--spacing-2);
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.policy-admin-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  background-color: rgba(255, 255, 255, 0.02);
+  letter-spacing: 0.05em;
+}
+
+.inactive-row {
+  opacity: 0.6;
+  background-color: rgba(255, 255, 255, 0.01);
+}
+
+.policy-days-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.carry-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.policy-desc-preview {
+  max-width: 200px;
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.policy-actions {
+  display: flex;
+  gap: var(--spacing-1);
+}
+
+.status-toggle-btn {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-all);
+  border: none;
+}
+
+.status-toggle-btn.active {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.status-toggle-btn.active:hover {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.status-toggle-btn.inactive {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.status-toggle-btn.inactive:hover {
+  background-color: var(--color-danger);
+  color: white;
+}
+
+/* Empty table state */
+.empty-table-state {
+  padding: var(--spacing-8) var(--spacing-4);
+}
+
+.empty-table-state svg {
+  opacity: 0.3;
+}
+
+/* Info box */
+.bg-primary-light {
+  background-color: var(--color-primary-light);
+}
+
+.border-primary {
+  border-color: var(--color-primary);
+}
+
+.rounded-md {
+  border-radius: var(--radius-md);
+}
+
+/* Modal additional styles */
+.policy-edit-form,
+.policy-add-form {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: var(--spacing-2);
+}
+
+.info-box {
+  background-color: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .policy-admin-table th,
+  .policy-admin-table td {
+    padding: var(--spacing-2) var(--spacing-1);
+    font-size: 0.75rem;
+  }
+  
+  .policy-days-badge,
+  .carry-badge {
+    padding: 2px 6px;
+    font-size: 0.65rem;
+  }
+  
+  .status-toggle-btn {
+    padding: 2px 8px;
+    font-size: 0.65rem;
+  }
+  
+  .policy-desc-preview {
+    max-width: 120px;
+  }
+}
+
+/* Scrollbar for policy forms */
+.policy-edit-form::-webkit-scrollbar,
+.policy-add-form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.policy-edit-form::-webkit-scrollbar-track,
+.policy-add-form::-webkit-scrollbar-track {
+  background: var(--border-color);
+  border-radius: var(--radius-full);
+}
+
+.policy-edit-form::-webkit-scrollbar-thumb,
+.policy-add-form::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: var(--radius-full);
+}
+
+.policy-edit-form::-webkit-scrollbar-thumb:hover,
+.policy-add-form::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
 }

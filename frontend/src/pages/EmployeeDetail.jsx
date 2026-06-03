@@ -1,19 +1,14 @@
-import React, { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import './EmployeeDetail.css';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Avatar from '../components/common/Avatar';
-import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import {
-  ArrowLeft, Edit2, Trash2, User, Briefcase, Calendar, Phone, Mail,
-  MapPin, Shield, FileText, Activity, CheckSquare, BarChart2, Download,
-  Upload, Copy, ChevronDown, ChevronUp, Clock, Star, Trophy, AlertTriangle,
-  TrendingUp, CheckCircle, XCircle, File, Image, FileMinus,
-  UserCheck, UserMinus, Fingerprint, Home, Globe, Zap, Bell,
-  Search, RefreshCw, ChevronRight, Target, Layers, Share2,
-  AlertCircle, Coffee, Smartphone, Cpu, Filter, MoreHorizontal,
-  TrendingDown, BookOpen, AlarmClock, ArrowUpRight, Timer
+  ArrowLeft, Edit2, Trash2, User, Briefcase, Calendar, Shield,
+  FileText, Activity, CheckSquare, BarChart2, Download, Upload,
+  ChevronDown, ChevronUp, Clock, TrendingUp, CheckCircle,
+  Building2, Lock
 } from 'lucide-react';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -23,18 +18,6 @@ const fmtDate = (str) => {
   return `${String(d.getDate()).padStart(2,'0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 };
 const fmtTime = (t) => t || '—';
-
-const getRowClass = (status) => {
-  switch (status) {
-    case 'Present': return 'row-green';
-    case 'Late': return 'row-amber';
-    case 'Work From Home': return 'row-cyan';
-    case 'Overtime': return 'row-pink';
-    case 'On Leave': return 'row-purple';
-    case 'Absent': return 'row-red';
-    default: return '';
-  }
-};
 
 const fmtDob = (dateStr) => {
   if (!dateStr) return '15/08/1996';
@@ -72,18 +55,17 @@ const getBranchAddress = (branchName) => {
 const TABS = [
   { id: 'personal', label: 'Personal Info', icon: User },
   { id: 'professional', label: 'Professional', icon: Briefcase },
-  { id: 'attendance_punch', label: 'Attendance & Punch', icon: Clock },
+  { id: 'workplace', label: 'Workplace', icon: Building2 },
   { id: 'attendance', label: 'Attendance', icon: Calendar },
   { id: 'leaves', label: 'Leave History', icon: Clock },
   { id: 'reports', label: 'Work Reports', icon: FileText },
   { id: 'tasks', label: 'Task History', icon: CheckSquare },
   { id: 'performance', label: 'Performance', icon: BarChart2 },
   { id: 'documents', label: 'Documents', icon: FileText },
-  { id: 'logs', label: 'Activity Logs', icon: Activity },
-  { id: 'history', label: 'Employment History', icon: Activity },
-  { id: 'skills', label: 'Skills & Certs', icon: Trophy },
-  { id: 'security', label: 'Security Info', icon: Shield },
+  { id: 'permissions', label: 'Permissions', icon: Shield },
+  { id: 'security', label: 'Security Info', icon: Lock },
   { id: 'payroll', label: 'Payroll Summary', icon: TrendingUp },
+  { id: 'logs', label: 'Activity Logs', icon: Activity },
 ];
 
 // ── Status Badge helpers ─────────────────────────────────────────────────────
@@ -92,10 +74,18 @@ const taskStatusClass = (s) => {
   return m[s] || 'ts-todo';
 };
 const leaveStatusClass = (s) => ({ 'Approved': 'ls-approved', 'Rejected': 'ls-rejected', 'Pending': 'ls-pending' }[s] || 'ls-pending');
-const attDayClass = (s) => ({ 'Present': 'day-present', 'Absent': 'day-absent', 'Late': 'day-late', 'On Leave': 'day-leave', 'Work From Home': 'day-wfh' }[s] || '');
+const attDayClass = (s) => {
+  if (!s) return '';
+  if (s === 'Present') return 'day-present';
+  if (s === 'Absent') return 'day-absent';
+  if (s === 'Late') return 'day-late';
+  if (s === 'Work From Home') return 'day-wfh';
+  if (s === 'On Leave' || s === 'Leave' || s.includes('Leave')) return 'day-leave';
+  return '';
+};
 
 // ── Mini SVG Line Chart ──────────────────────────────────────────────────────
-const LineChart = ({ data, label }) => {
+const LineChart = ({ data }) => {
   const min = Math.min(...data) - 5;
   const max = Math.max(...data) + 5;
   const range = max - min || 1;
@@ -114,17 +104,13 @@ const LineChart = ({ data, label }) => {
           <stop offset="100%" stopColor="#d946ef" stopOpacity="0" />
         </linearGradient>
       </defs>
-      {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => (
         <line key={i} x1="16" x2={w - 16} y1={h - (pct * (h - 24)) - 8} y2={h - (pct * (h - 24)) - 8}
           stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
       ))}
-      {/* Fill area */}
       <path d={`${pathD} L ${pts[pts.length - 1].x} ${h - 8} L ${pts[0].x} ${h - 8} Z`}
         fill="url(#lineGrad)" />
-      {/* Line */}
       <path d={pathD} fill="none" stroke="#d946ef" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      {/* Dots */}
       {pts.map((p, i) => (
         <g key={i}>
           <circle cx={p.x} cy={p.y} r="4" fill="#d946ef" />
@@ -132,7 +118,6 @@ const LineChart = ({ data, label }) => {
           <text x={p.x} y={p.y - 10} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.5)">{data[i]}</text>
         </g>
       ))}
-      {/* Month labels */}
       {months.map((m, i) => (
         <text key={m} x={(i / (months.length - 1)) * (w - 32) + 16} y={h + 16}
           textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.35)">{m}</text>
@@ -141,9 +126,9 @@ const LineChart = ({ data, label }) => {
   );
 };
 
-// ── Attendance Calendar ──────────────────────────────────────────────────────
-const AttendanceCalendar = ({ history }) => {
-  const [month, setMonth] = useState(4); // May (0-indexed)
+// ─── Attendance Calendar ──────────────────────────────────────────────────────
+const AttendanceCalendar = ({ history, leaveHistory = [] }) => {
+  const [month, setMonth] = useState(4);
   const year = 2026;
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -151,7 +136,17 @@ const AttendanceCalendar = ({ history }) => {
   history.forEach(r => {
     const d = new Date(r.date);
     if (d.getMonth() === month && d.getFullYear() === year) {
-      dayMap[d.getDate()] = r.status;
+      let status = r.status;
+      if (status === 'On Leave' || status === 'Leave') {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const foundLeave = leaveHistory.find(l => 
+          l.status === 'Approved' && 
+          dateStr >= l.fromDate && 
+          dateStr <= l.toDate
+        );
+        status = foundLeave ? foundLeave.type : 'On Leave';
+      }
+      dayMap[d.getDate()] = status;
     }
   });
   const cells = [];
@@ -190,107 +185,45 @@ const AttendanceCalendar = ({ history }) => {
   );
 };
 
-// ─── Punch Attendance Calendar ──────────────────────────────────────────────
-const PunchAttendanceCalendar = ({ history }) => {
-  const [month, setMonth] = useState(4); // May (0-indexed)
-  const year = 2026;
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  
-  const dayMap = {};
-  history.forEach(r => {
-    const d = new Date(r.date);
-    if (d.getMonth() === month && d.getFullYear() === year) {
-      dayMap[d.getDate()] = {
-        status: r.status,
-        punchIn: r.punchIn,
-        punchOut: r.punchOut
-      };
-    }
-  });
-
-  const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let i = 1; i <= daysInMonth; i++) cells.push(i);
-
-  const today = new Date();
-  
-  const getCellClass = (day, status) => {
-    if (!day) return '';
-    const dateObj = new Date(year, month, day);
-    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-    
-    if (status) {
-      return attDayClass(status);
-    }
-    return isWeekend ? 'day-weekend' : '';
-  };
-
-  return (
-    <div className="att-calendar">
-      <div className="cal-nav">
-        <button onClick={() => setMonth(m => Math.max(0, m - 1))}>‹</button>
-        <span>{MONTHS[month]} {year}</span>
-        <button onClick={() => setMonth(m => Math.min(11, m + 1))}>›</button>
-      </div>
-      <div className="cal-weekdays">
-        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d} className="cal-wday">{d}</div>)}
-      </div>
-      <div className="cal-grid">
-        {cells.map((day, i) => {
-          if (!day) return <div key={`e-${i}`} />;
-          const data = dayMap[day];
-          const status = data?.status;
-          const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
-          const cellClass = getCellClass(day, status);
-          
-          return (
-            <div key={day} className={`cal-day-cell ${cellClass} ${isToday ? 'cal-today' : ''}`}>
-              <span className="cal-day-num">{day}</span>
-              <div className="cal-day-tooltip">
-                <strong className="tooltip-status">{status || (cellClass === 'day-weekend' ? 'Weekend' : 'No Data')}</strong>
-                {data?.punchIn && data.punchIn !== '--:--' && <div className="tooltip-time">In: {data.punchIn}</div>}
-                {data?.punchOut && data.punchOut !== '--:--' && <div className="tooltip-time">Out: {data.punchOut}</div>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="cal-legend" style={{ flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
-        {[['Present','day-present'],['Absent','day-absent'],['Late','day-late'],['Leave','day-leave'],['WFH','day-wfh'],['Weekend','day-weekend']].map(([l, c]) => (
-          <span key={l} className="legend-item"><span className={`legend-dot ${c}`}></span>{l}</span>
-        ))}
-      </div>
+// ─── Segment Bar Chart for Performance ───────────────────────────────────────
+const SegmentBar = ({ att, task, report, leave }) => (
+  <div className="segment-bar-wrapper">
+    <div className="segment-bar">
+      <div className="seg att-seg" style={{ width: `${att * 0.3}%` }} title={`Attendance: ${att}% (30%)`} />
+      <div className="seg task-seg" style={{ width: `${task * 0.35}%` }} title={`Tasks: ${task}% (35%)`} />
+      <div className="seg report-seg" style={{ width: `${report * 0.2}%` }} title={`Reports: ${report}% (20%)`} />
+      <div className="seg leave-seg" style={{ width: `${leave * 0.15}%` }} title={`Leave: ${leave}% (15%)`} />
     </div>
-  );
-};
+    <div className="seg-labels">
+      <span className="seg-label att-lbl">Attendance 30%</span>
+      <span className="seg-label task-lbl">Tasks 35%</span>
+      <span className="seg-label report-lbl">Reports 20%</span>
+      <span className="seg-label leave-lbl">Leave Discipline 15%</span>
+    </div>
+  </div>
+);
+
 const EmployeeDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee } = useApp();
 
   const emp = useMemo(() => employees.find(e => e.id === id), [employees, id]);
 
-  const queryTab = new URLSearchParams(window.location.search).get('tab');
-  const [activeTab, setActiveTab] = useState(queryTab || 'personal');
+  const activeTab = new URLSearchParams(location.search).get('tab') || 'personal';
 
-  React.useEffect(() => {
-    const qTab = new URLSearchParams(window.location.search).get('tab');
-    if (qTab && qTab !== activeTab) {
-      setActiveTab(qTab);
-    }
-  }, [window.location.search, activeTab]);
   const [expandedReport, setExpandedReport] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [editData, setEditData] = useState({});
   const [showIdCard, setShowIdCard] = useState(false);
   const idCardRef = useRef(null);
+  
   if (!emp) return (
     <div className="ed-not-found">
       <p>Employee not found.</p>
       <Button variant="secondary" onClick={() => navigate('/employees')} icon={ArrowLeft}>Back to Directory</Button>
     </div>
   );
+  
   const perf = emp.performanceScore || { overall: 78, attendance: 82, taskCompletion: 75, reportSubmission: 80, leaveDiscipline: 73, monthly: [70,73,76,78,80,78] };
   const attHistory = emp.attendanceHistory || [];
   const leaveHistory = emp.leaveHistory || [];
@@ -301,12 +234,14 @@ const EmployeeDetail = () => {
   const absentDays = attHistory.filter(r => r.status === 'Absent').length;
   const lateDays = attHistory.filter(r => r.status === 'Late').length;
   const leaveDays = attHistory.filter(r => r.status === 'On Leave').length;
+  
   const handleDelete = () => {
     showConfirm('Deactivate Employee', `Are you sure you want to deactivate ${emp.name}?`, () => {
       deactivateEmployee(emp.id);
       navigate('/employees');
     }, 'danger');
   };
+  
   const handleActivate = () => {
     showConfirm('Activate Employee', `Are you sure you want to activate ${emp.name}?`, () => {
       activateEmployee(emp.id);
@@ -316,12 +251,7 @@ const EmployeeDetail = () => {
   const handleApproveLeave = (leaveId) => {
     const updatedHistory = leaveHistory.map(l => {
       if (l.id === leaveId) {
-        return {
-          ...l,
-          status: 'Approved',
-          approvedBy: 'Aarav Sharma (Manager)',
-          approvedDate: new Date().toISOString().split('T')[0]
-        };
+        return { ...l, status: 'Approved', approvedBy: 'Aarav Sharma (Manager)', approvedDate: new Date().toISOString().split('T')[0] };
       }
       return l;
     });
@@ -332,12 +262,7 @@ const EmployeeDetail = () => {
   const handleRejectLeave = (leaveId) => {
     const updatedHistory = leaveHistory.map(l => {
       if (l.id === leaveId) {
-        return {
-          ...l,
-          status: 'Rejected',
-          approvedBy: 'Aarav Sharma (Manager)',
-          approvedDate: new Date().toISOString().split('T')[0]
-        };
+        return { ...l, status: 'Rejected', approvedBy: 'Aarav Sharma (Manager)', approvedDate: new Date().toISOString().split('T')[0] };
       }
       return l;
     });
@@ -349,35 +274,15 @@ const EmployeeDetail = () => {
     if (!idCardRef.current) return;
     try {
       const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(idCardRef.current, {
-        scale: 3, backgroundColor: null, allowTaint: false, useCORS: true
-      });
+      const canvas = await html2canvas(idCardRef.current, { scale: 3, backgroundColor: null, allowTaint: false, useCORS: true });
       const link = document.createElement('a');
       link.download = `${emp.id}_ID_Card.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (err) {
+      console.error('Failed to download ID card:', err);
       addToast('error', 'Failed to download ID card.');
     }
-  };
-
-  const SegmentBar = ({ att, task, report, leave }) => {
-    return (
-      <div className="segment-bar-wrapper">
-        <div className="segment-bar">
-          <div className="seg att-seg" style={{ width: `${att * 0.3}%` }} title={`Attendance: ${att}% (30%)`} />
-          <div className="seg task-seg" style={{ width: `${task * 0.35}%` }} title={`Tasks: ${task}% (35%)`} />
-          <div className="seg report-seg" style={{ width: `${report * 0.2}%` }} title={`Reports: ${report}% (20%)`} />
-          <div className="seg leave-seg" style={{ width: `${leave * 0.15}%` }} title={`Leave: ${leave}% (15%)`} />
-        </div>
-        <div className="seg-labels">
-          <span className="seg-label att-lbl">Attendance 30%</span>
-          <span className="seg-label task-lbl">Tasks 35%</span>
-          <span className="seg-label report-lbl">Reports 20%</span>
-          <span className="seg-label leave-lbl">Leave Discipline 15%</span>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -423,7 +328,7 @@ const EmployeeDetail = () => {
           const Icon = tab.icon;
           return (
             <button key={tab.id} className={`ed-tab-btn${activeTab === tab.id ? ' active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}>
+              onClick={() => navigate(`?tab=${tab.id}`, { replace: true })}>
               <Icon size={14} />
               {tab.label}
             </button>
@@ -434,22 +339,43 @@ const EmployeeDetail = () => {
       {/* ── Tab Content ── */}
       <div className="card ed-tab-content">
 
-        {/* ── Personal Info ── */}
+        {/* ── Personal Info with ALL missing fields ── */}
         {activeTab === 'personal' && (
           <div className="ed-tab-body">
-            <div className="ed-section-title-row">
-              <h3>Personal Information</h3>
-            </div>
+            <div className="ed-section-title-row"><h3>Personal Information</h3></div>
             <div className="ed-fields-grid">
               {[
-                ['Full Name', emp.name], ['Date of Birth', fmtDate(emp.dob)],
-                ['Gender', emp.gender], ['Nationality', emp.nationality || '—'],
-                ['Personal Email', emp.personalEmail || '—'], ['Phone Number', emp.phone],
-                ['Emergency Contact', emp.emergencyContactName || '—'], ['Emergency Phone', emp.emergencyContactPhone || '—'],
+                ['Full Name', `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || emp.name],
+                ['First Name', emp.firstName || emp.name?.split(' ')[0] || '—'],
+                ['Last Name', emp.lastName || emp.name?.split(' ').slice(1).join(' ') || '—'],
+                ['Date of Birth', fmtDate(emp.dob)],
+                ['Gender', emp.gender || '—'],
+                ['Blood Group', emp.bloodGroup || '—'],
+                ['Marital Status', emp.maritalStatus || '—'],
+                ['Personal Email', emp.personalEmail || '—'],
+                ['Official Email', emp.workEmail || emp.email || '—'],
+                ['Phone Number', emp.phone || '—'],
+                ['Alternate Phone', emp.alternatePhone || '—'],
               ].map(([label, val]) => (
                 <div key={label} className="ed-field-card">
                   <span className="ed-field-label">{label}</span>
-                  <span className="ed-field-value">{val}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Address Section */}
+            <div className="ed-section-title-row" style={{ marginTop: 'var(--spacing-4)' }}><h3>Address Details</h3></div>
+            <div className="ed-fields-grid">
+              {[
+                ['City', emp.city || '—'],
+                ['State', emp.state || '—'],
+                ['Country', emp.country || 'India'],
+                ['ZIP / Postal Code', emp.zipCode || '—'],
+              ].map(([label, val]) => (
+                <div key={label} className="ed-field-card">
+                  <span className="ed-field-label">{label}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
                 </div>
               ))}
               <div className="ed-field-card ed-field-full">
@@ -461,633 +387,116 @@ const EmployeeDetail = () => {
                 <span className="ed-field-value">{emp.permanentAddress || emp.homeAddress || '—'}</span>
               </div>
             </div>
+
+            {/* Emergency Contact Section */}
+            <div className="ed-section-title-row" style={{ marginTop: 'var(--spacing-4)' }}><h3>Emergency Contact</h3></div>
+            <div className="ed-fields-grid">
+              {[
+                ['Contact Name', emp.emergencyContactName || '—'],
+                ['Phone Number', emp.emergencyContactPhone || '—'],
+                ['Alternate Phone', emp.emergencyContactPhoneAlt || '—'],
+                ['Relation', emp.emergencyContactRelation || '—'],
+                ['Address', emp.emergencyContactAddress || '—'],
+              ].map(([label, val]) => (
+                <div key={label} className="ed-field-card">
+                  <span className="ed-field-label">{label}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* ── Professional Info ── */}
+        {/* ── Professional Info with ALL missing fields ── */}
         {activeTab === 'professional' && (
           <div className="ed-tab-body">
             <div className="ed-section-title-row"><h3>Professional Information</h3></div>
             <div className="ed-fields-grid">
               {[
-                ['Employee ID', emp.id], ['Designation', emp.designation || emp.role],
-                ['Department', emp.department], ['Branch', emp.branch],
-                ['Team', emp.team || '—'], ['Team Leader', emp.teamLeader || '—'],
-                ['Project Manager', emp.projectManager || '—'], ['Joining Date', fmtDate(emp.joinDate)],
-                ['Employment Type', emp.employmentType || 'Full-Time'], ['Work Location', emp.workLocation || emp.branch],
+                ['Employee ID', emp.id],
+                ['Employee Type', emp.employeeType || 'Full Time'],
+                ['Employment Status', emp.employmentStatus || 'Active'],
+                ['Designation', emp.designation || emp.role],
+                ['Department', emp.department],
+                ['Branch / Agency', emp.branch],
+                ['Branch Address', emp.branchAddress || getBranchAddress(emp.branch)],
+                ['Team', emp.team || emp.teamName || '—'],
+                ['Team Leader', emp.teamLeader || '—'],
+                ['Project Manager', emp.projectManager || '—'],
+                ['Joining Date', fmtDate(emp.joinDate)],
+                ['Probation End Date', emp.probationEndDate ? fmtDate(emp.probationEndDate) : '—'],
+                ['Contract End Date', emp.contractEndDate ? fmtDate(emp.contractEndDate) : '—'],
+                ['Work Location', emp.workLocation || emp.branch || '—'],
+                ['Reporting Manager', emp.reportingManager || emp.teamLeader || '—'],
+                ['Company Name', emp.companyName || 'OM Enterprise'],
               ].map(([label, val]) => (
                 <div key={label} className="ed-field-card">
                   <span className="ed-field-label">{label}</span>
-                  <span className="ed-field-value">{val}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
                 </div>
               ))}
             </div>
-            {/* Org Node */}
-            <div className="org-node-wrapper">
-              <div className="org-node-box manager-node">
-                <span className="org-role">Reports To</span>
-                <span className="org-name">{emp.teamLeader || 'Aarav Sharma'}</span>
-              </div>
-              <div className="org-connector"></div>
-              <div className="org-node-box self-node">
-                <span className="org-role">{emp.designation || emp.role}</span>
-                <span className="org-name">{emp.name}</span>
-              </div>
+            
+            {/* Bank Details Section */}
+            <div className="ed-section-title-row" style={{ marginTop: 'var(--spacing-5)' }}><h3>Bank Details</h3></div>
+            <div className="ed-fields-grid">
+              {[
+                ['Bank Name', emp.bankName || '—'],
+                ['Account Number', emp.bankAccountNumber || '—'],
+                ['IFSC Code', emp.bankIfscCode || '—'],
+                ['UPI ID', emp.bankUpiId || '—'],
+              ].map(([label, val]) => (
+                <div key={label} className="ed-field-card">
+                  <span className="ed-field-label">{label}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* ── Punch In/Out Reports Tab ── */}
-        {activeTab === 'attendance_punch' && (
-          <div className="ed-tab-body animate-fade-in">
-
-            {/* Page Title */}
-            <div className="pior-page-header">
-              <div className="pior-header-left">
-                <div className="pior-header-icon"><Timer size={18} /></div>
-                <div>
-                  <h3>Punch In/Out Reports</h3>
-                  <p className="pior-header-sub">Track and analyse all employee punch details including timing, breaks, device tracking and early/late entry statistics.</p>
-                </div>
-              </div>
-              <div className="pior-header-actions">
-                <button className="pior-action-btn" onClick={() => addToast('info', 'Refreshing punch data...')}>
-                  <RefreshCw size={13} /> Refresh
-                </button>
-                <button className="pior-action-btn pior-btn-primary" onClick={() => addToast('success', 'Punch report exported!')}>
-                  <Download size={13} /> Export
-                </button>
-              </div>
-            </div>
-
-            {/* ── Top Summary Cards ── */}
-            <div className="pior-kpi-row">
-              {[
-                { label: 'Total Punch Days', value: attHistory.length || 22, sub: `Total: ${attHistory.length || 22}`, color: '#60a5fa', icon: Calendar },
-                { label: 'Present Daily Avg', value: '7.8 hrs', sub: 'Avg working per day', color: '#4ade80', icon: Clock },
-                { label: 'Missing Punch Data', value: attHistory.filter(r => !r.punchIn || !r.punchOut).length || 2, sub: `Missing punch for EMP-${emp.id?.slice(-5) || '2026'}`, color: '#f87171', icon: AlertCircle },
-                { label: 'Employees to Leave', value: leaveHistory.filter(l => l.status === 'Approved').length || 3, sub: 'Approved leaves pending', color: '#fbbf24', icon: BookOpen },
-                { label: 'Late Employees', value: attHistory.filter(r => r.status === 'Late').length || 4, sub: 'Late Today: 0', color: '#fb923c', icon: AlarmClock },
-                { label: 'Work From Home', value: attHistory.filter(r => r.status === 'Work From Home').length || 5, sub: 'WFH Employees: 5', color: '#a78bfa', icon: Home },
-              ].map((kpi, i) => {
-                const Icon = kpi.icon;
-                return (
-                  <div key={i} className="pior-kpi-card" style={{ borderTopColor: kpi.color }}>
-                    <div className="pior-kpi-top">
-                      <span className="pior-kpi-label">{kpi.label}</span>
-                      <div className="pior-kpi-icon" style={{ background: `${kpi.color}18`, border: `1px solid ${kpi.color}30` }}>
-                        <Icon size={14} style={{ color: kpi.color }} />
-                      </div>
-                    </div>
-                    <div className="pior-kpi-value" style={{ color: kpi.color }}>{kpi.value}</div>
-                    <div className="pior-kpi-sub">{kpi.sub}</div>
+        {/* ── Workplace Tab (NEW) ── */}
+        {activeTab === 'workplace' && (
+          <div className="ed-tab-body">
+            <div className="ed-section-title-row"><h3>Workplace Configuration</h3></div>
+            
+            {/* Work Mode */}
+            <div className="workplace-section">
+              <h4>Work Mode</h4>
+              <div className="ed-fields-grid">
+                {[
+                  ['Work Mode', emp.workMode || 'Work From Office'],
+                  ['Work Location', emp.workLocation || emp.branch || '—'],
+                  ['Reporting Manager', emp.reportingManager || emp.teamLeader || '—'],
+                ].map(([label, val]) => (
+                  <div key={label} className="ed-field-card">
+                    <span className="ed-field-label">{label}</span>
+                    <span className="ed-field-value">{val || '—'}</span>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* ── Main 3-column Grid ── */}
-            <div className="pior-main-grid">
-
-              {/* LEFT: Punch Activity Analytics */}
-              <div className="pior-panel pior-analytics-panel">
-                <div className="pior-panel-header">
-                  <div className="pior-panel-title"><BarChart2 size={14} style={{ color: '#60a5fa' }} /><span>Punch Activity Analytics</span></div>
-                </div>
-
-                {/* Stats list */}
-                <div className="pior-analytics-stats">
-                  <div className="pior-a-stat-row">
-                    <span className="pior-a-label">Total Punch-Ins</span>
-                    <strong>{attHistory.filter(r => r.punchIn).length || 20}</strong>
-                  </div>
-                  <div className="pior-a-stat-row">
-                    <span className="pior-a-label">Total Punch-Outs</span>
-                    <strong>{attHistory.filter(r => r.punchOut).length || 19}</strong>
-                  </div>
-                  <div className="pior-a-stat-row">
-                    <span className="pior-a-label">Average Punch-In Time</span>
-                    <strong>09:07 AM</strong>
-                  </div>
-                  <div className="pior-a-stat-row">
-                    <span className="pior-a-label">Avg Working Hours</span>
-                    <strong>7.92 hrs</strong>
-                  </div>
-                  <div className="pior-a-stat-row">
-                    <span className="pior-a-label">Total Working Hours</span>
-                    <strong>{attHistory.reduce((sum, r) => sum + (r.totalHours || 0), 0).toFixed(1) || '158.4'} hrs</strong>
-                  </div>
-                  <div className="pior-a-stat-row">
-                    <span className="pior-a-label">Avg Punch-Out Time</span>
-                    <strong>06:04 PM</strong>
-                  </div>
-                  <div className="pior-a-stat-row">
-                    <span className="pior-a-label">Grade / Status</span>
-                    <span className="pior-grade-tag">A+</span>
-                  </div>
-                  <div className="pior-a-stat-row">
-                    <span className="pior-a-label">Employee's Status</span>
-                    <span className={`pior-emp-status-dot ${emp.status === 'Active' ? 'pior-dot-on' : 'pior-dot-off'}`}>{emp.status || 'Active'}</span>
-                  </div>
-                </div>
-
-                {/* Live status types */}
-                <div className="pior-live-section">
-                  <div className="pior-live-title">Live Status Types</div>
-                  <div className="pior-live-types">
-                    {[
-                      { label: 'Present', dot: '#4ade80' },
-                      { label: 'Absent', dot: '#f87171' },
-                      { label: 'Late', dot: '#fbbf24' },
-                      { label: 'Half Day', dot: '#a78bfa' },
-                      { label: 'On Leave', dot: '#60a5fa' },
-                      { label: 'WFH', dot: '#34d399' },
-                      { label: 'On Break', dot: '#fb923c' },
-                      { label: 'Work From Home', dot: '#c084fc' },
-                    ].map((t, i) => (
-                      <div key={i} className="pior-status-type-row">
-                        <span className="pior-type-dot" style={{ background: t.dot }} />
-                        <span>{t.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Weekly Attendance */}
-                <div className="pior-weekly-section">
-                  <div className="pior-weekly-title">Weekly Attendance Reports</div>
-                  <div className="pior-weekly-bars">
-                    {[['Mon', 95], ['Tue', 92], ['Wed', 88], ['Thu', 100], ['Fri', 90], ['Sat', 50]].map(([day, pct]) => (
-                      <div key={day} className="pior-wbar-col">
-                        <div className="pior-wbar-wrap">
-                          <div className="pior-wbar-fill" style={{ height: `${pct}%` }} />
-                        </div>
-                        <span className="pior-wbar-label">{day}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="pior-weekly-links">
-                    {['Late Arrivals', 'Early Departures', 'Absent Count', 'Late Attendance', 'Attendance Status'].map((lnk, i) => (
-                      <button key={i} className="pior-weekly-link">
-                        <ChevronRight size={11} />{lnk}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Automation Status */}
-                <div className="pior-auto-section">
-                  <div className="pior-auto-title">Automation Status</div>
-                  {[
-                    { label: 'Present', active: true },
-                    { label: 'Absent', active: false },
-                    { label: 'WFH (Work From Home)', active: true },
-                    { label: 'On Leave', active: false },
-                    { label: 'Other', active: true },
-                  ].map((s, i) => (
-                    <div key={i} className="pior-auto-row">
-                      <span className={`pior-auto-dot ${s.active ? 'pior-auto-on' : 'pior-auto-off'}`} />
-                      <span>{s.label}</span>
-                      <span className={`pior-auto-badge ${s.active ? 'pior-badge-on' : 'pior-badge-off'}`}>{s.active ? 'Active' : 'Inactive'}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Live Attendance Monitoring */}
-                <div className="pior-live-monitor-section">
-                  <div className="pior-live-monitor-title">Live Attendance Monitoring Feed</div>
-                  {[
-                    { text: `Employee punched in at 09:02 AM`, type: 'in' },
-                    { text: `${emp.name} punch at 09:00 AM on 2026-05-29`, type: 'in' },
-                    { text: `Leave requested, needs approval at 11:15 PM`, type: 'warn' },
-                    { text: `Early left, last punch noted at 04:15 PM`, type: 'late' },
-                  ].map((ev, i) => (
-                    <div key={i} className={`pior-feed-row pior-feed-${ev.type}`}>
-                      <span className="pior-feed-dot" />{ev.text}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* CENTER: Punch Records Table + Employee Punch Detail */}
-              <div className="pior-panel pior-records-panel">
-                <div className="pior-panel-header">
-                  <div className="pior-panel-title"><FileText size={14} style={{ color: '#4ade80' }} /><span>Punch Records Table</span></div>
-                  <div className="pior-table-header-right">
-                    <span className="pior-count-tag">{attHistory.length} records</span>
-                  </div>
-                </div>
-
-                {/* Time display */}
-                <div className="pior-time-display">
-                  <div className="pior-time-block">
-                    <span className="pior-time-label">Time (Shown as format 02:43 AM)</span>
-                    <strong className="pior-time-value">** possible format 09:00-18:00 **</strong>
-                  </div>
-                </div>
-
-                {/* Table columns section */}
-                <div className="pior-table-columns-info">
-                  <div className="pior-col-info">
-                    <div className="pior-col-item">Employee ID</div>
-                    <div className="pior-col-item">Employee Name</div>
-                    <div className="pior-col-item">Department</div>
-                    <div className="pior-col-item">Punch In Time</div>
-                    <div className="pior-col-item">Punch Out Time</div>
-                    <div className="pior-col-item">Total Hours</div>
-                    <div className="pior-col-item">Team Leader</div>
-                    <div className="pior-col-item">Project Manager</div>
-                    <div className="pior-col-item">Approver Name</div>
-                  </div>
-                </div>
-
-                {/* Actual punch table */}
-                <div className="pior-table-scroll">
-                  <table className="ed-table pior-table">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>In</th>
-                        <th>Out</th>
-                        <th>Hours</th>
-                        <th>Break</th>
-                        <th>OT</th>
-                        <th>Source</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attHistory.slice(0, 15).map((r, i) => (
-                        <tr key={i} className={getRowClass(r.status)}>
-                          <td className="td-bold">{fmtDate(r.date)}</td>
-                          <td className="pior-time-td">{fmtTime(r.punchIn)}</td>
-                          <td className="pior-time-td">{fmtTime(r.punchOut)}</td>
-                          <td>{r.totalHours ? `${r.totalHours}h` : '—'}</td>
-                          <td>{r.breakTime || '45m'}</td>
-                          <td>{r.overtime || '0h'}</td>
-                          <td><span className="att-source-tag">{r.source === 'Biometric' ? '⚙️' : r.source === 'GPS' ? '📍' : '💻'} {r.source || 'Bio'}</span></td>
-                          <td><span className={`att-badge ${attDayClass(r.status)}`}>{r.status}</span></td>
-                        </tr>
-                      ))}
-                      {attHistory.length === 0 && (
-                        <tr><td colSpan={8} className="td-empty">No punch records found.</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Employee Punch Detail View */}
-                <div className="pior-detail-section">
-                  <div className="pior-panel-header" style={{ marginTop: '16px' }}>
-                    <div className="pior-panel-title"><User size={14} style={{ color: '#a78bfa' }} /><span>Employee Punch Detail View</span></div>
-                  </div>
-                  <div className="pior-employee-detail-card">
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Employee Name</span>
-                      <strong>{emp.name}</strong>
-                    </div>
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Employee ID</span>
-                      <span style={{ fontFamily: 'monospace' }}>{emp.id}</span>
-                    </div>
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Department</span>
-                      <span>{emp.department}</span>
-                    </div>
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Shift Timing</span>
-                      <span>{emp.shift || 'Morning (09:00 AM – 06:00 PM)'}</span>
-                    </div>
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Today's Punch In</span>
-                      <span className="pior-punch-in-val">{emp.todayPunchIn || '09:02 AM'}</span>
-                    </div>
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Today's Punch Out</span>
-                      <span className="pior-punch-out-val">{emp.todayPunchOut || '--:--'}</span>
-                    </div>
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Total Hours</span>
-                      <span>{emp.todayWorkingHours ? `${emp.todayWorkingHours} hrs` : '7.5 hrs (ongoing)'}</span>
-                    </div>
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Daily OT Counter</span>
-                      <span style={{ color: '#fbbf24' }}>0 hrs</span>
-                    </div>
-                    <div className="pior-emp-detail-row">
-                      <span className="pior-emp-field">Approver Status</span>
-                      <span className="pior-badge-green">✅ Auto-Approved</span>
-                    </div>
-                  </div>
-
-                  {/* Today's Attendance Stats */}
-                  <div className="pior-today-stats">
-                    <div className="pior-panel-title" style={{ marginBottom: '10px' }}><Activity size={13} style={{ color: '#fbbf24' }} /><span>Today's Attendance Status</span></div>
-                    <div className="pior-today-stats-grid">
-                      <div className="pior-today-stat">
-                        <span>Total Team Members</span>
-                        <strong>42</strong>
-                      </div>
-                      <div className="pior-today-stat">
-                        <span>Present Count</span>
-                        <strong style={{ color: '#4ade80' }}>{attHistory.filter(r => r.status === 'Present').length || 38}</strong>
-                      </div>
-                      <div className="pior-today-stat">
-                        <span>Absent Count</span>
-                        <strong style={{ color: '#f87171' }}>{attHistory.filter(r => r.status === 'Absent').length || 2}</strong>
-                      </div>
-                      <div className="pior-today-stat">
-                        <span>In Meeting</span>
-                        <strong style={{ color: '#60a5fa' }}>5</strong>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Late attendance monitoring */}
-                <div className="pior-late-section">
-                  <div className="pior-panel-header" style={{ marginTop: '16px' }}>
-                    <div className="pior-panel-title"><AlarmClock size={14} style={{ color: '#f87171' }} /><span>Late/Early Monitoring</span></div>
-                  </div>
-                  <div className="pior-late-items">
-                    {[
-                      { label: 'Missing Arrival Report', count: attHistory.filter(r => !r.punchIn).length || 1, type: 'error' },
-                      { label: 'Many Hours Overtime', count: attHistory.filter(r => r.overtime && r.overtime !== '0 hrs').length || 2, type: 'warn' },
-                      { label: 'Average Punch-Out Time', count: '06:04 PM', type: 'info' },
-                      { label: 'Total Days Duration', count: attHistory.length || 22, type: 'info' },
-                      { label: 'Doubled Days - ABS', count: 0, type: 'neutral' },
-                    ].map((item, i) => (
-                      <div key={i} className={`pior-late-item pior-late-${item.type}`}>
-                        <span>{item.label}</span>
-                        <strong>{item.count}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT: Country Reports + Search + Quick Actions + Punch Preview */}
-              <div className="pior-panel pior-right-panel">
-
-                {/* Country Reports */}
-                <div className="pior-sub-panel">
-                  <div className="pior-panel-header">
-                    <div className="pior-panel-title"><Globe size={13} style={{ color: '#60a5fa' }} /><span>Country Reports</span></div>
-                  </div>
-                  <div className="pior-country-report">
-                    <div className="pior-cr-row">
-                      <strong>Cut-off Time Reports</strong>
-                    </div>
-                    {[
-                      ['Total cut-off hours', '9.0 hrs'],
-                      ['Employees for cut-off', '3'],
-                      ['Shift cut-off hours', '0.5 hrs'],
-                      ['Add total employees', `${emp.id}`],
-                    ].map(([k, v], i) => (
-                      <div key={i} className="pior-cr-item">
-                        <span>{k}</span>
-                        <strong>{v}</strong>
-                      </div>
-                    ))}
-
-                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Employee Name Inline Views</strong></div>
-                    <div className="pior-cr-note">When clicking on employee: Attendance Details + Punch time Records + Attendance Summary + Leave Details + Direct Employee</div>
-
-                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Attendance Details</strong></div>
-                    {[
-                      ['Attendance Type', emp.status || 'Present'],
-                      ['Employee ID', emp.id],
-                      ['Dept.', emp.department],
-                      ['Working hrs', '7.9 hrs avg'],
-                      ['Dept. office', emp.branch],
-                    ].map(([k, v], i) => (
-                      <div key={i} className="pior-cr-item">
-                        <span>{k}</span>
-                        <strong>{v}</strong>
-                      </div>
-                    ))}
-
-                    {/* Cut-off Filters */}
-                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Filters</strong></div>
-                    <div className="pior-filter-tags">
-                      {['Present', 'Late', 'Absent', 'Half Day', 'WFH', 'Off Day'].map(t => (
-                        <span key={t} className="pior-filter-chip">{t}</span>
-                      ))}
-                    </div>
-
-                    {/* Shift filter */}
-                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Shift Type</strong></div>
-                    <div className="pior-filter-tags">
-                      {['Morning', 'Evening', 'Night', 'Mid Day'].map(t => (
-                        <span key={t} className="pior-filter-chip">{t}</span>
-                      ))}
-                    </div>
-
-                    {/* Hours type */}
-                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Hours Type</strong></div>
-                    <div className="pior-filter-tags">
-                      {['Working', 'Overtime', 'Break', 'Night'].map(t => (
-                        <span key={t} className="pior-filter-chip">{t}</span>
-                      ))}
-                    </div>
-
-                    {/* Dept breakdown */}
-                    <div className="pior-cr-row" style={{ marginTop: '8px' }}><strong>Dept/Office/Branch Filter</strong></div>
-                    {[
-                      ['Engineering', '42', 4, '90%'],
-                      ['Marketing', '22', 2, '91%'],
-                      ['Sales', '35', 5, '86%'],
-                      ['Operations', '20', 1, '95%'],
-                    ].map(([dept, total, absent, rate], i) => (
-                      <div key={i} className="pior-dept-row">
-                        <span className="pior-dept-name">{dept}</span>
-                        <span className="pior-dept-total">{total}</span>
-                        <span className="pior-dept-absent" style={{ color: '#f87171' }}>-{absent}</span>
-                        <span className="pior-dept-rate" style={{ color: '#4ade80' }}>{rate}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Search & Filters */}
-                <div className="pior-sub-panel">
-                  <div className="pior-panel-header">
-                    <div className="pior-panel-title"><Search size={13} style={{ color: '#a78bfa' }} /><span>Search & Filters</span></div>
-                  </div>
-                  <div className="pior-search-body">
-                    <input type="text" className="pior-search-input" placeholder="Search employee name..." />
-                    <input type="text" className="pior-search-input" placeholder="Employee ID..." />
-                    <input type="text" className="pior-search-input" placeholder="Department..." />
-                    <select className="pior-search-select">
-                      <option>All Statuses</option>
-                      <option>Present</option>
-                      <option>Late</option>
-                      <option>Absent</option>
-                      <option>WFH</option>
-                    </select>
-                    <div className="pior-filter-tag-row">
-                      {['Present', 'Late', 'WFH', 'Absent'].map(tag => (
-                        <button key={tag} className="pior-filter-chip">{tag}</button>
-                      ))}
-                    </div>
-                    <div className="pior-date-row">
-                      <label>Date Filter</label>
-                      <div className="pior-date-range">
-                        <input type="date" className="pior-date-input" />
-                        <span>to</span>
-                        <input type="date" className="pior-date-input" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Action Buttons */}
-                <div className="pior-sub-panel">
-                  <div className="pior-panel-header">
-                    <div className="pior-panel-title"><Zap size={13} style={{ color: '#fbbf24' }} /><span>Quick Action Buttons</span></div>
-                  </div>
-                  <div className="pior-quick-actions">
-                    {[
-                      { label: 'Export Attendance Report', icon: Download, color: '#60a5fa' },
-                      { label: 'Flag Late', icon: AlarmClock, color: '#fb923c' },
-                      { label: 'Approve All Requests', icon: CheckCircle, color: '#4ade80' },
-                      { label: 'Approve Attendance Requests', icon: UserCheck, color: '#a78bfa' },
-                      { label: 'Generate Attendance Report', icon: FileText, color: '#fbbf24' },
-                      { label: 'Schedule Notification to Report', icon: Bell, color: '#f472b6' },
-                    ].map((btn, i) => {
-                      const Icon = btn.icon;
-                      return (
-                        <button key={i} className="pior-quick-action-btn" onClick={() => addToast('success', `${btn.label} triggered.`)}>
-                          <Icon size={12} style={{ color: btn.color }} />
-                          <span>{btn.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Punch Preview */}
-                <div className="pior-sub-panel">
-                  <div className="pior-panel-header">
-                    <div className="pior-panel-title"><Timer size={13} style={{ color: '#4ade80' }} /><span>Punch Preview</span></div>
-                  </div>
-                  <div className="pior-punch-preview">
-                    <div className="pior-pp-card pior-pp-in">
-                      <div className="pior-pp-label">Today Punch-In</div>
-                      <div className="pior-pp-time">{emp.todayPunchIn || '09:02 AM'}</div>
-                      <div className="pior-pp-source">⚙️ Biometric</div>
-                    </div>
-                    <div className="pior-pp-card pior-pp-out">
-                      <div className="pior-pp-label">Today Punch-Out</div>
-                      <div className="pior-pp-time">{emp.todayPunchOut || '--:--'}</div>
-                      <div className="pior-pp-source">Still Working</div>
-                    </div>
-
-                    {/* Monthly ring */}
-                    <div className="pior-monthly-ring">
-                      <svg viewBox="0 0 90 90" width="80" height="80">
-                        <circle cx="45" cy="45" r="38" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="8" />
-                        <circle cx="45" cy="45" r="38" fill="none"
-                          stroke="var(--color-primary)"
-                          strokeWidth="8"
-                          strokeDasharray={`${0.94 * 2 * Math.PI * 38} ${2 * Math.PI * 38}`}
-                          strokeLinecap="round"
-                          transform="rotate(-90 45 45)"
-                        />
-                        <text x="45" y="42" textAnchor="middle" fill="white" fontSize="14" fontWeight="800">94%</text>
-                        <text x="45" y="54" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="7">This Month</text>
-                      </svg>
-                      <div className="pior-ring-label">
-                        <strong>Monthly Rate</strong>
-                        <span>Present: 20d / 22d</span>
-                      </div>
-                    </div>
-
-                    {/* Attendance Calendar (mini) */}
-                    <div className="pior-mini-cal-wrapper">
-                      <div className="pior-mini-cal-title">Attendance Calendar</div>
-                      <PunchAttendanceCalendar history={attHistory} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Late Punch Alarms */}
-                <div className="pior-sub-panel">
-                  <div className="pior-panel-header">
-                    <div className="pior-panel-title"><AlertCircle size={13} style={{ color: '#f87171' }} /><span>Verify Alarms & Alerts</span></div>
-                  </div>
-                  <div className="pior-alarms">
-                    {[
-                      { title: 'Mark Attendance Punch Records', count: 2, type: 'warn' },
-                      { title: 'Missing Punch Records', count: 1, type: 'error' },
-                      { title: 'Pending Approval', count: 3, type: 'warn' },
-                      { title: 'Attendance Date Conflict', count: 0, type: 'info' },
-                    ].map((al, i) => (
-                      <div key={i} className={`pior-alarm-row pior-alarm-${al.type}`}>
-                        <span>{al.title}</span>
-                        <span className="pior-alarm-count">{al.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Punch Sources */}
-                <div className="pior-sub-panel">
-                  <div className="pior-panel-header">
-                    <div className="pior-panel-title"><Fingerprint size={13} style={{ color: '#60a5fa' }} /><span>Punch Sources</span></div>
-                  </div>
-                  <div className="pior-sources">
-                    {[
-                      { src: 'Biometric', pct: 75, color: '#4ade80', icon: '⚙️' },
-                      { src: 'GPS', pct: 15, color: '#60a5fa', icon: '📍' },
-                      { src: 'Web Portal', pct: 10, color: '#a78bfa', icon: '💻' },
-                    ].map((s, i) => (
-                      <div key={i} className="pior-src-row">
-                        <span>{s.icon}</span>
-                        <span className="pior-src-name">{s.src}</span>
-                        <div className="pior-src-bar"><div className="pior-src-bar-fill" style={{ width: `${s.pct}%`, background: s.color }} /></div>
-                        <span className="pior-src-pct">{s.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Report Generation */}
-                <div className="pior-sub-panel">
-                  <div className="pior-panel-header">
-                    <div className="pior-panel-title"><Share2 size={13} style={{ color: '#fbbf24' }} /><span>Generate & Export</span></div>
-                  </div>
-                  <div className="pior-report-gen">
-                    <div className="pior-gen-range">
-                      {['Today', 'Weekly', 'Monthly', 'Quarterly'].map(r => (
-                        <button key={r} className="pior-range-btn">{r}</button>
-                      ))}
-                    </div>
-                    <div className="pior-gen-fmts">
-                      {['PDF', 'Excel', 'CSV'].map(fmt => (
-                        <button key={fmt} className="pior-fmt-btn" onClick={() => addToast('success', `${emp.name} punch report exported as ${fmt}.`)}>
-                          <Download size={11} /> {fmt}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="pior-checkbox-list">
-                      {[
-                        'Individual Attendance History',
-                        'Early/Late Punch Report',
-                        'Monthly Report',
-                      ].map((opt, i) => (
-                        <label key={i} className="pior-checkbox-row">
-                          <input type="checkbox" defaultChecked={i < 2} />
-                          <span>{opt}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
+                ))}
               </div>
             </div>
 
+            {/* Shift Configuration */}
+            <div className="workplace-section">
+              <h4>Shift Configuration</h4>
+              <div className="ed-fields-grid">
+                {[
+                  ['Shift Type', emp.shiftType || emp.shift || 'Morning Shift'],
+                  ['Shift Timing', emp.shiftTiming || '09:00 AM - 06:00 PM'],
+                  ['Punch In Time', emp.punchInTime || '09:00 AM'],
+                  ['Punch Out Time', emp.punchOutTime || '06:00 PM'],
+                  ['Attendance Rule', emp.attendanceRule || 'Standard 9-6'],
+                  ['Weekly Off Days', emp.weeklyOffDays?.length ? emp.weeklyOffDays.join(', ') : 'Sunday'],
+                  ['Overtime Eligibility', emp.overtimeEligibility ? '✅ Enabled' : '❌ Disabled'],
+                ].map(([label, val]) => (
+                  <div key={label} className="ed-field-card">
+                    <span className="ed-field-label">{label}</span>
+                    <span className="ed-field-value">{val || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1095,7 +504,7 @@ const EmployeeDetail = () => {
         {activeTab === 'attendance' && (
           <div className="ed-tab-body">
             <div className="ed-section-title-row"><h3>Attendance History</h3></div>
-            <AttendanceCalendar history={attHistory} />
+            <AttendanceCalendar history={attHistory} leaveHistory={leaveHistory} />
             <div className="att-summary-cards">
               {[
                 { label: 'Present Days', val: presentDays, cls: 'att-sum-green' },
@@ -1103,10 +512,7 @@ const EmployeeDetail = () => {
                 { label: 'Late Days', val: lateDays, cls: 'att-sum-amber' },
                 { label: 'Leave Days', val: leaveDays, cls: 'att-sum-purple' },
               ].map(c => (
-                <div key={c.label} className={`att-sum-card ${c.cls}`}>
-                  <span className="att-sum-val">{c.val}</span>
-                  <span className="att-sum-label">{c.label}</span>
-                </div>
+                <div key={c.label} className={`att-sum-card ${c.cls}`}><span className="att-sum-val">{c.val}</span><span className="att-sum-label">{c.label}</span></div>
               ))}
             </div>
             <div className="punch-table-wrapper">
@@ -1119,7 +525,13 @@ const EmployeeDetail = () => {
                       <td>{fmtTime(r.punchIn)}</td>
                       <td>{fmtTime(r.punchOut)}</td>
                       <td>{r.totalHours ? `${r.totalHours}h` : '—'}</td>
-                      <td><span className={`att-badge ${attDayClass(r.status)}`}>{r.status}</span></td>
+                      <td>
+                        <span className={`att-badge ${attDayClass(r.status)}`}>
+                          {r.status === 'On Leave' || r.status === 'Leave'
+                            ? (leaveHistory.find(l => l.status === 'Approved' && r.date >= l.fromDate && r.date <= l.toDate)?.type || 'On Leave')
+                            : r.status}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1133,22 +545,31 @@ const EmployeeDetail = () => {
           <div className="ed-tab-body">
             <div className="ed-section-title-row"><h3>Leave History</h3></div>
             <div className="leave-balance-strip">
-              {[['Casual Leave', 12, leaveHistory.filter(l => l.type === 'Casual Leave').length],
-                ['Sick Leave', 10, leaveHistory.filter(l => l.type === 'Sick Leave').length],
-                ['Annual Leave', 20, leaveHistory.filter(l => l.type === 'Annual Leave').length],
-              ].map(([type, allowed, taken]) => (
-                <div key={type} className="leave-bal-card">
-                  <div className="lbc-type">{type}</div>
-                  <div className="lbc-stats">
-                    <span><strong>{allowed}</strong> allowed</span>
-                    <span className="lbc-taken"><strong>{taken}</strong> taken</span>
-                    <span className="lbc-rem"><strong>{Math.max(0, allowed - taken)}</strong> left</span>
+              {[
+                ['Casual Leave', 12],
+                ['Sick Leave', 10],
+                ['Paid Leave', 20],
+                ['Unpaid Leave', 30],
+                ...(emp.gender === 'Female' && emp.maritalStatus === 'Married' ? [['Maternity Leave', 180]] : []),
+              ].map(([type, allowed]) => {
+                const taken = leaveHistory.filter(l => 
+                  l.type === type || 
+                  (type === 'Paid Leave' && (l.type === 'Annual Leave' || l.type === 'Paid Leave (Annual)'))
+                ).length;
+                return (
+                  <div key={type} className="leave-bal-card" style={{ minWidth: '180px' }}>
+                    <div className="lbc-type">{type}</div>
+                    <div className="lbc-stats">
+                      <span><strong>{allowed}</strong> allowed</span>
+                      <span className="lbc-taken"><strong>{taken}</strong> taken</span>
+                      <span className="lbc-rem"><strong>{Math.max(0, allowed - taken)}</strong> left</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <table className="ed-table" style={{ marginTop: 16 }}>
-              <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Status</th><th>Approved By</th></tr></thead>
+            <table className="ed-table">
+              <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Status</th><th>Actions / Approved By</th></tr></thead>
               <tbody>
                 {leaveHistory.map((l, i) => (
                   <tr key={i}>
@@ -1158,7 +579,16 @@ const EmployeeDetail = () => {
                     <td>{l.days}</td>
                     <td className="td-reason" title={l.reason}>{l.reason?.slice(0, 30)}{l.reason?.length > 30 ? '…' : ''}</td>
                     <td><span className={`leave-badge ${leaveStatusClass(l.status)}`}>{l.status}</span></td>
-                    <td>{l.approvedBy || '—'}</td>
+                    <td>
+                      {l.status === 'Pending' ? (
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button className="leave-action-btn btn-approve" onClick={() => handleApproveLeave(l.id)} title="Approve">✓ Approve</button>
+                          <button className="leave-action-btn btn-reject" onClick={() => handleRejectLeave(l.id)} title="Reject">✕ Reject</button>
+                        </div>
+                      ) : (
+                        l.approvedBy || '—'
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {leaveHistory.length === 0 && <tr><td colSpan={7} className="td-empty">No leave records found.</td></tr>}
@@ -1175,20 +605,13 @@ const EmployeeDetail = () => {
               {[
                 { date: '2026-05-28', summary: 'Completed UI review and API integration tests.', status: 'Acknowledged', tasks: ['API integration testing for module A', 'UI review for dashboard changes'], hours: '8.5h', blockers: 'None', plan: 'Deploy to staging tomorrow morning.' },
                 { date: '2026-05-27', summary: 'Fixed critical bug in auth flow and reviewed PRs.', status: 'Pending Review', tasks: ['Fixed auth bug #334', 'Reviewed 3 pull requests'], hours: '9h', blockers: 'Waiting for DB migration sign-off.', plan: 'Continue with API integration.' },
-                { date: '2026-05-26', summary: 'Team standup, sprint planning, and documentation.', status: 'Flagged', tasks: ['Sprint planning session', 'Updated technical docs'], hours: '7.5h', blockers: 'Dependency on external API delayed.', plan: 'Pick up blocked tasks.' },
               ].map((r, i) => {
                 const expanded = expandedReport === i;
                 return (
                   <div key={i} className={`report-card ${expanded ? 'report-expanded' : ''}`}>
                     <div className="report-card-header" onClick={() => setExpandedReport(expanded ? null : i)}>
-                      <div className="report-card-left">
-                        <span className="report-date">{fmtDate(r.date)}</span>
-                        <span className="report-summary">{r.summary}</span>
-                      </div>
-                      <div className="report-card-right">
-                        <span className={`rpt-status ${r.status === 'Acknowledged' ? 'rpt-ack' : r.status === 'Flagged' ? 'rpt-flag' : 'rpt-pending'}`}>{r.status}</span>
-                        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </div>
+                      <div className="report-card-left"><span className="report-date">{fmtDate(r.date)}</span><span className="report-summary">{r.summary}</span></div>
+                      <div className="report-card-right"><span className={`rpt-status ${r.status === 'Acknowledged' ? 'rpt-ack' : 'rpt-pending'}`}>{r.status}</span>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</div>
                     </div>
                     {expanded && (
                       <div className="report-card-body">
@@ -1233,39 +656,17 @@ const EmployeeDetail = () => {
         {activeTab === 'performance' && (
           <div className="ed-tab-body">
             <div className="ed-section-title-row"><h3>Performance Reports</h3></div>
-            {/* Score Card */}
             <div className="perf-score-card">
-              <div className="perf-score-main">
-                <span className="perf-score-number">{perf.overall}</span>
-                <span className="perf-score-denom">/100</span>
-              </div>
+              <div className="perf-score-main"><span className="perf-score-number">{perf.overall}</span><span className="perf-score-denom">/100</span></div>
               <div className="perf-score-label">Overall Performance Score</div>
               <SegmentBar att={perf.attendance} task={perf.taskCompletion} report={perf.reportSubmission} leave={perf.leaveDiscipline} />
             </div>
-
-            {/* Comparison Row */}
             <div className="perf-compare-row">
-              <div className="perf-mini-stat">
-                <span className="pms-label">This Employee</span>
-                <span className="pms-val primary-val">{perf.overall}</span>
-              </div>
-              <div className="perf-mini-stat">
-                <span className="pms-label">Team Average</span>
-                <span className="pms-val">{Math.round(perf.overall * 0.94)}</span>
-              </div>
-              <div className="perf-mini-stat">
-                <span className="pms-label">Dept Average</span>
-                <span className="pms-val">{Math.round(perf.overall * 0.92)}</span>
-              </div>
+              <div className="perf-mini-stat"><span className="pms-label">This Employee</span><span className="pms-val primary-val">{perf.overall}</span></div>
+              <div className="perf-mini-stat"><span className="pms-label">Team Average</span><span className="pms-val">{Math.round(perf.overall * 0.94)}</span></div>
+              <div className="perf-mini-stat"><span className="pms-label">Dept Average</span><span className="pms-val">{Math.round(perf.overall * 0.92)}</span></div>
             </div>
-
-            {/* Trend Chart */}
-            <div className="perf-chart-card">
-              <div className="perf-chart-title">6-Month Performance Trend</div>
-              <LineChart data={perf.monthly} />
-            </div>
-
-            {/* Dimension Breakdown */}
+            <div className="perf-chart-card"><div className="perf-chart-title">6-Month Performance Trend</div><LineChart data={perf.monthly} /></div>
             <div className="perf-dimensions">
               {[
                 { label: 'Attendance', val: perf.attendance, color: '#22c55e' },
@@ -1275,9 +676,7 @@ const EmployeeDetail = () => {
               ].map(d => (
                 <div key={d.label} className="perf-dim-row">
                   <span className="perf-dim-label">{d.label}</span>
-                  <div className="perf-dim-bar-track">
-                    <div className="perf-dim-bar-fill" style={{ width: `${d.val}%`, background: d.color }} />
-                  </div>
+                  <div className="perf-dim-bar-track"><div className="perf-dim-bar-fill" style={{ width: `${d.val}%`, background: d.color }} /></div>
                   <span className="perf-dim-val" style={{ color: d.color }}>{d.val}%</span>
                 </div>
               ))}
@@ -1288,34 +687,133 @@ const EmployeeDetail = () => {
         {/* ── Documents ── */}
         {activeTab === 'documents' && (
           <div className="ed-tab-body">
-            <div className="ed-section-title-row">
-              <h3>Uploaded Documents</h3>
-              <button className="upload-doc-btn" onClick={() => addToast('info', 'Upload modal coming soon.')}>
-                <Upload size={14} /> Upload Document
-              </button>
-            </div>
+            <div className="ed-section-title-row"><h3>Uploaded Documents</h3><button className="upload-doc-btn" onClick={() => addToast('info', 'Upload modal coming soon.')}><Upload size={14} /> Upload Document</button></div>
             <div className="doc-cards-grid">
               {documents.map((doc, i) => (
                 <div key={i} className="doc-card">
-                  <div className={`doc-file-icon ${doc.fileType === 'pdf' ? 'doc-pdf' : 'doc-img'}`}>
-                    <FileText size={28} />
-                  </div>
-                  <div className="doc-info">
-                    <span className="doc-category">{doc.category}</span>
-                    <span className="doc-filename">{doc.fileName}</span>
-                    <span className="doc-date">{fmtDate(doc.uploadDate)}</span>
-                  </div>
-                  <div className="doc-actions">
-                    <button className="doc-action-btn" title="Download" onClick={() => addToast('success', `Downloading ${doc.fileName}`)}>
-                      <Download size={14} />
-                    </button>
-                    <button className="doc-action-btn doc-delete-btn" title="Delete" onClick={() => addToast('warning', 'Document removed.')}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                  <div className={`doc-file-icon ${doc.fileType === 'pdf' ? 'doc-pdf' : 'doc-img'}`}><FileText size={28} /></div>
+                  <div className="doc-info"><span className="doc-category">{doc.category}</span><span className="doc-filename">{doc.fileName}</span><span className="doc-date">{fmtDate(doc.uploadDate)}</span></div>
+                  <div className="doc-actions"><button className="doc-action-btn" onClick={() => addToast('success', `Downloading ${doc.fileName}`)}><Download size={14} /></button><button className="doc-action-btn doc-delete-btn" onClick={() => addToast('warning', 'Document removed.')}><Trash2 size={14} /></button></div>
                 </div>
               ))}
               {documents.length === 0 && <p className="text-muted">No documents uploaded.</p>}
+            </div>
+          </div>
+        )}
+
+        {/* ── Permissions Matrix (NEW) ── */}
+        {activeTab === 'permissions' && (
+          <div className="ed-tab-body">
+            <div className="ed-section-title-row"><h3>Permission Matrix</h3></div>
+            <div className="perm-matrix-view">
+              <table className="perm-view-table">
+                <thead>
+                  <tr>
+                    <th>Module</th>
+                    <th>View</th>
+                    <th>Create</th>
+                    <th>Edit</th>
+                    <th>Delete</th>
+                    <th>Approve</th>
+                    <th>Export</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(emp.permissions || {
+                    dashboard: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+                    employees: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+                    attendance: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+                    leaves: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+                    projects: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+                    payroll: { view: false, create: false, edit: false, delete: false, approve: false, export: false }
+                  }).map(([module, perms]) => (
+                    <tr key={module}>
+                      <td className="perm-module">{module.charAt(0).toUpperCase() + module.slice(1)}</td>
+                      {['view', 'create', 'edit', 'delete', 'approve', 'export'].map(action => (
+                        <td key={action} className="perm-cell">
+                          {perms[action] ? '✓' : '✗'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="ed-section-title-row" style={{ marginTop: 'var(--spacing-5)' }}><h3>Role Information</h3></div>
+            <div className="ed-fields-grid">
+              {[
+                ['Role', emp.role || 'Employee'],
+                ['Role ID', emp.roleId || 'employee'],
+                ['Username', emp.username || emp.email?.split('@')[0] || '—'],
+                ['Official Email', emp.officialEmail || emp.workEmail || emp.email || '—'],
+              ].map(([label, val]) => (
+                <div key={label} className="ed-field-card">
+                  <span className="ed-field-label">{label}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Security Information (with missing fields) ── */}
+        {activeTab === 'security' && (
+          <div className="ed-tab-body">
+            <div className="ed-section-title-row"><h3>Security Configuration</h3></div>
+            <div className="ed-fields-grid">
+              {[
+                ['Two-Factor Authentication (2FA)', emp.twoFactorAuth ? '✅ Enabled' : '❌ Disabled'],
+                ['Multi-Device Login', emp.multiDeviceLogin ? '✅ Allowed' : '❌ Not Allowed'],
+                ['IP Restriction', emp.ipRestriction || 'Not configured (All IPs allowed)'],
+                ['Login Activity Tracking', emp.loginActivityTracking || 'Enabled'],
+                ['Session Timeout', emp.sessionTimeout || '30 minutes'],
+              ].map(([label, val]) => (
+                <div key={label} className="ed-field-card">
+                  <span className="ed-field-label">{label}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
+                </div>
+              ))}
+            </div>
+            <div className="ed-section-title-row" style={{ marginTop: 'var(--spacing-4)' }}><h3>Recent Activity</h3></div>
+            <div className="ed-fields-grid">
+              {[
+                ['Last Login Timestamp', emp.securityInfo?.lastLogin || emp.lastLogin || '2026-05-29 08:06:17'],
+                ['Last Login Device', emp.securityInfo?.loginDevice || emp.lastLoginDevice || 'MacBook Pro (Chrome/OSX)'],
+                ['Last Login Location (IP)', emp.securityInfo?.loginLocation || emp.lastLoginIp || 'Jaipur HQ (192.168.1.120)'],
+                ['Failed Login Attempts', emp.securityInfo?.failedAttempts || 0],
+              ].map(([label, val]) => (
+                <div key={label} className="ed-field-card">
+                  <span className="ed-field-label">{label}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Payroll Summary ── */}
+        {activeTab === 'payroll' && (
+          <div className="ed-tab-body">
+            <div className="ed-section-title-row"><h3>Payroll Summary</h3></div>
+            <div className="ed-fields-grid">
+              {[
+                ['Salary Type', emp.salaryType || 'Monthly Fixed'],
+                ['Monthly Salary', `₹${(emp.monthlySalary || emp.salaryAmount || 35000).toLocaleString('en-IN')}`],
+                ['Basic Salary', `₹${(emp.salaryAmount || 25000).toLocaleString('en-IN')}`],
+                ['Allowances', `₹${(emp.salaryAllowances || 8000).toLocaleString('en-IN')}`],
+                ['Deductions', `₹${(emp.salaryDeductions || 2000).toLocaleString('en-IN')}`],
+                ['PAN Number', emp.panNumber || '—'],
+                ['Aadhaar Number', emp.aadhaarNumber || '—'],
+                ['Tax Details', emp.taxDetails || 'Standard deduction (Old Regime)'],
+                ['Salary Dispatch Status', emp.payrollSummary?.salaryStatus || 'Dispatched'],
+                ['Last Payout Date', fmtDate(emp.payrollSummary?.lastSalaryDate || '2026-05-01')],
+                ['Upcoming Payout', fmtDate(emp.payrollSummary?.upcomingPayrollDate || '2026-06-01')],
+              ].map(([label, val]) => (
+                <div key={label} className="ed-field-card">
+                  <span className="ed-field-label">{label}</span>
+                  <span className="ed-field-value">{val || '—'}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1354,179 +852,6 @@ const EmployeeDetail = () => {
           </div>
         )}
 
-        {/* ── Employment History ── */}
-        {activeTab === 'history' && (
-          <div className="ed-tab-body animate-fade-in">
-            <div className="ed-section-title-row"><h3>Employment History</h3></div>
-            <table className="ed-table">
-              <thead>
-                <tr>
-                  <th>Event Date</th>
-                  <th>Event Type</th>
-                  <th>Details / Changes</th>
-                  <th>Previous Value</th>
-                  <th>New Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(emp.employmentHistory || [
-                  { date: '2026-01-15', eventType: 'Promotion', details: 'Promoted to Senior Role', prevVal: 'Developer', newVal: 'Senior Developer' },
-                  { date: '2025-06-01', eventType: 'Transfer', details: 'Transferred Department', prevVal: 'Marketing', newVal: 'Sales' }
-                ]).map((h, i) => (
-                  <tr key={i}>
-                    <td className="td-mono td-sm">{fmtDate(h.date)}</td>
-                    <td><Badge variant={h.eventType === 'Promotion' ? 'success' : 'primary'}>{h.eventType}</Badge></td>
-                    <td>{h.details}</td>
-                    <td className="td-old-val">{h.prevVal || '—'}</td>
-                    <td className="td-new-val">{h.newVal || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ── Skills & Certifications ── */}
-        {activeTab === 'skills' && (
-          <div className="ed-tab-body animate-fade-in">
-            <div className="ed-section-title-row"><h3>Skills & Certifications</h3></div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--spacing-6)' }}>
-              <div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>Technical Skills Matrix</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {(emp.skills || [
-                    { name: 'React.js', level: 'Expert' },
-                    { name: 'Node.js', level: 'Expert' },
-                    { name: 'TypeScript', level: 'Intermediate' }
-                  ]).map((skill, idx) => (
-                    <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                      <strong style={{ color: 'var(--text-primary)', fontSize: '0.8125rem' }}>{skill.name}</strong>
-                      <Badge variant={skill.level === 'Expert' ? 'success' : skill.level === 'Intermediate' ? 'primary' : 'neutral'}>
-                        {skill.level}
-                      </Badge>
-                    </div>
-                  ))}
-                  {(emp.skills || []).length === 0 && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No skills added.</span>}
-                </div>
-              </div>
-              <div>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>Certification Records</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {(emp.certifications || [
-                    { name: 'AWS Certified Solutions Architect', expiryDate: '2027-12-31' },
-                    { name: 'Google Cloud Professional Cloud Architect', expiryDate: '2026-08-15' }
-                  ]).map((cert, idx) => {
-                    const isExpired = cert.expiryDate ? new Date(cert.expiryDate) < new Date() : false;
-                    return (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <strong style={{ color: 'var(--text-primary)', fontSize: '0.8125rem' }}>{cert.name}</strong>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Expiry: {cert.expiryDate ? fmtDate(cert.expiryDate) : 'Never'}</span>
-                        </div>
-                        {cert.expiryDate && (
-                          <Badge variant={isExpired ? 'danger' : 'success'}>
-                            {isExpired ? 'Expired' : 'Active'}
-                          </Badge>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {(emp.certifications || []).length === 0 && <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No certifications added.</span>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Security Information ── */}
-        {activeTab === 'security' && (
-          <div className="ed-tab-body animate-fade-in">
-            <div className="ed-section-title-row"><h3>Security Information</h3></div>
-            <div className="ed-fields-grid">
-              <div className="ed-field-card">
-                <span className="ed-field-label">Last Login Timestamp</span>
-                <span className="ed-field-value">{emp.securityInfo?.lastLogin || '2026-05-29 08:06:17'}</span>
-              </div>
-              <div className="ed-field-card">
-                <span className="ed-field-label">Last Login Device</span>
-                <span className="ed-field-value">{emp.securityInfo?.loginDevice || 'MacBook Pro (Chrome/OSX)'}</span>
-              </div>
-              <div className="ed-field-card">
-                <span className="ed-field-label">Last Login Location</span>
-                <span className="ed-field-value">{emp.securityInfo?.loginLocation || 'Jaipur HQ (192.168.1.120)'}</span>
-              </div>
-              <div className="ed-field-card">
-                <span className="ed-field-label">Failed Login Attempts</span>
-                <span className="ed-field-value" style={{ color: (emp.securityInfo?.failedAttempts || 0) > 0 ? 'var(--color-danger)' : 'var(--text-primary)' }}>
-                  {emp.securityInfo?.failedAttempts || 0} attempts
-                </span>
-              </div>
-              <div className="ed-field-card">
-                <span className="ed-field-label">Multi-Factor Authentication (MFA)</span>
-                <span className="ed-field-value">
-                  <Badge variant={(emp.securityInfo?.mfaStatus || 'Enabled') === 'Enabled' ? 'success' : 'danger'}>
-                    {emp.securityInfo?.mfaStatus || 'Enabled'}
-                  </Badge>
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Payroll Summary ── */}
-        {activeTab === 'payroll' && (
-          <div className="ed-tab-body animate-fade-in">
-            <div className="ed-section-title-row"><h3>Payroll Summary</h3></div>
-            <div className="ed-fields-grid" style={{ marginBottom: 'var(--spacing-6)' }}>
-              <div className="ed-field-card">
-                <span className="ed-field-label">Salary Dispatch Status</span>
-                <span className="ed-field-value">
-                  <Badge variant={(emp.payrollSummary?.salaryStatus || 'Dispatched') === 'Dispatched' ? 'success' : 'warning'}>
-                    {emp.payrollSummary?.salaryStatus || 'Dispatched'}
-                  </Badge>
-                </span>
-              </div>
-              <div className="ed-field-card">
-                <span className="ed-field-label">Last Payout Date</span>
-                <span className="ed-field-value">{fmtDate(emp.payrollSummary?.lastSalaryDate || '2026-05-01')}</span>
-              </div>
-              <div className="ed-field-card">
-                <span className="ed-field-label">Upcoming Payout Run</span>
-                <span className="ed-field-value">{fmtDate(emp.payrollSummary?.upcomingPayrollDate || '2026-06-01')}</span>
-              </div>
-              <div className="ed-field-card">
-                <span className="ed-field-label">Basic Net Monthly Pay</span>
-                <span className="ed-field-value">₹{(emp.salaryAmount || 35000).toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-
-            <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>Bonus & Incentive History</h4>
-            <table className="ed-table">
-              <thead>
-                <tr>
-                  <th>Cycle Date</th>
-                  <th>Incentive Type</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(emp.payrollSummary?.bonusHistory || [
-                  { date: '2026-03-31', type: 'Q1 Performance Bonus', amount: '₹15,000', status: 'Disbursed' },
-                  { date: '2025-10-25', type: 'Diwali Festive Allowance', amount: '₹5,000', status: 'Disbursed' }
-                ]).map((b, i) => (
-                  <tr key={i}>
-                    <td className="td-mono td-sm">{fmtDate(b.date)}</td>
-                    <td>{b.type}</td>
-                    <td><strong>{b.amount}</strong></td>
-                    <td><Badge variant="success">{b.status}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
       </div>
 
       {/* ── ID Card Modal ── */}
@@ -1534,184 +859,56 @@ const EmployeeDetail = () => {
         <div className="id-card-overlay" onClick={() => setShowIdCard(false)}>
           <div className="id-card-modal" onClick={e => e.stopPropagation()}>
             <button className="id-card-close" onClick={() => setShowIdCard(false)}>✕</button>
-            
-            {/* The wrapper that will be captured for download */}
             <div className="id-card-render-wrapper" ref={idCardRef}>
-              
-              {/* FRONT SIDE */}
               <div className="id-card-front">
-                <div className="id-card-front-header-bg">
-                  <div className="id-card-watermark"></div>
-                </div>
+                <div className="id-card-front-header-bg"><div className="id-card-watermark"></div></div>
                 <div className="id-card-front-pink-bg"></div>
-                
                 <div className="id-card-logo-area">
-                  <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg">
-                    <polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" />
-                    <polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" />
-                  </svg>
+                  <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg>
                   <div className="id-card-company-title">{emp.companyName || 'OM ENTERPRISE'}</div>
                   <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Office Management'}</div>
                 </div>
-
-                <div className="id-card-photo-wrap">
-                  <Avatar name={emp.name} size="xl" className="id-card-photo-img" />
-                </div>
-
-                <div className="id-card-name-area">
-                  <h2 className="id-card-emp-name">
-                    {renderName(emp.name)}
-                  </h2>
-                  <p className="id-card-emp-role">{emp.designation || emp.role}</p>
-                </div>
-
+                <div className="id-card-photo-wrap"><Avatar name={emp.name} size="xl" className="id-card-photo-img" /></div>
+                <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(emp.name)}</h2><p className="id-card-emp-role">{emp.designation || emp.role}</p></div>
                 <div className="id-card-details-grid">
-                  <div className="id-detail-label">ID NO</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value">{emp.id}</div>
-
-                  <div className="id-detail-label">Dept.</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value">{emp.department}</div>
-
-                  <div className="id-detail-label">Deg.</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value">{emp.designation || emp.role}</div>
-
-                  <div className="id-detail-label">DOB</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value">{fmtDob(emp.dob)}</div>
-
-                  <div className="id-detail-label">Email</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value" title={emp.workEmail || emp.email}>
-                    {emp.workEmail || emp.email}
-                  </div>
+                  <div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.id}</div>
+                  <div className="id-detail-label">Dept.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.department}</div>
+                  <div className="id-detail-label">Deg.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.designation || emp.role}</div>
+                  <div className="id-detail-label">DOB</div><div className="id-detail-colon">:</div><div className="id-detail-value">{fmtDob(emp.dob)}</div>
+                  <div className="id-detail-label">Blood</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.bloodGroup || '—'}</div>
+                  <div className="id-detail-label">Email</div><div className="id-detail-colon">:</div><div className="id-detail-value" title={emp.workEmail || emp.email}>{emp.workEmail || emp.email}</div>
                 </div>
               </div>
-
-              {/* BACK SIDE */}
               <div className="id-card-back">
                 <div className="id-card-back-bullets">
-                  <div className="id-card-bullet-row">
-                    <span className="id-bullet-dot"></span>
-                    <p>This card is the official property of {emp.companyName || 'OM Enterprise'} and must be returned on demand.</p>
-                  </div>
-                  <div className="id-card-bullet-row">
-                    <span className="id-bullet-dot"></span>
-                    <p>If found, please return to the HR Department or dynamic branch address below immediately.</p>
-                  </div>
-                  <div className="id-card-bullet-row">
-                    <span className="id-bullet-dot"></span>
-                    <p style={{ fontWeight: 600 }}>Branch Address: {emp.branchAddress || getBranchAddress(emp.branch)}</p>
-                  </div>
+                  <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {emp.companyName || 'OM Enterprise'} and must be returned on demand.</p></div>
+                  <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div>
+                  <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {emp.branchAddress || getBranchAddress(emp.branch)}</p></div>
                 </div>
-
                 <div className="id-card-back-middle">
                   <div className="id-card-back-dates">
-                    <div className="id-date-row">
-                      <span className="id-date-label">Join Date:</span>
-                      <span className="id-date-val">{fmtDate(emp.joinDate)}</span>
-                    </div>
-                    <div className="id-date-row">
-                      <span className="id-date-label">Expire Date:</span>
-                      <span className="id-date-val">{emp.contractEndDate ? fmtDate(emp.contractEndDate) : calculateExpiry(emp.joinDate)}</span>
-                    </div>
+                    <div className="id-date-row"><span className="id-date-label">Join Date:</span><span className="id-date-val">{fmtDate(emp.joinDate)}</span></div>
+                    <div className="id-date-row"><span className="id-date-label">Expire Date:</span><span className="id-date-val">{emp.contractEndDate ? fmtDate(emp.contractEndDate) : calculateExpiry(emp.joinDate)}</span></div>
                     <div className="id-card-barcode-area">
-                      <svg viewBox="0 0 100 20" className="id-card-barcode-svg">
-                        <rect x="0" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="5" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="8" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="12" y="0" width="4" height="20" fill="#0f172a" />
-                        <rect x="18" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="21" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="25" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="30" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="33" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="37" y="0" width="5" height="20" fill="#0f172a" />
-                        <rect x="44" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="47" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="52" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="56" y="0" width="4" height="20" fill="#0f172a" />
-                        <rect x="62" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="65" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="69" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="74" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="77" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="81" y="0" width="5" height="20" fill="#0f172a" />
-                        <rect x="88" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="91" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="96" y="0" width="2" height="20" fill="#0f172a" />
-                      </svg>
+                      <svg viewBox="0 0 100 20" className="id-card-barcode-svg"><rect x="0" y="0" width="3" height="20" fill="#0f172a" /><rect x="5" y="0" width="1" height="20" fill="#0f172a" /><rect x="8" y="0" width="2" height="20" fill="#0f172a" /><rect x="12" y="0" width="4" height="20" fill="#0f172a" /><rect x="18" y="0" width="1" height="20" fill="#0f172a" /><rect x="21" y="0" width="2" height="20" fill="#0f172a" /><rect x="25" y="0" width="3" height="20" fill="#0f172a" /><rect x="30" y="0" width="1" height="20" fill="#0f172a" /><rect x="33" y="0" width="2" height="20" fill="#0f172a" /><rect x="37" y="0" width="5" height="20" fill="#0f172a" /><rect x="44" y="0" width="1" height="20" fill="#0f172a" /><rect x="47" y="0" width="3" height="20" fill="#0f172a" /><rect x="52" y="0" width="2" height="20" fill="#0f172a" /><rect x="56" y="0" width="4" height="20" fill="#0f172a" /><rect x="62" y="0" width="1" height="20" fill="#0f172a" /><rect x="65" y="0" width="2" height="20" fill="#0f172a" /><rect x="69" y="0" width="3" height="20" fill="#0f172a" /><rect x="74" y="0" width="1" height="20" fill="#0f172a" /><rect x="77" y="0" width="2" height="20" fill="#0f172a" /><rect x="81" y="0" width="5" height="20" fill="#0f172a" /><rect x="88" y="0" width="1" height="20" fill="#0f172a" /><rect x="91" y="0" width="3" height="20" fill="#0f172a" /><rect x="96" y="0" width="2" height="20" fill="#0f172a" /></svg>
                       <div className="id-card-barcode-text">*{emp.id}*</div>
                     </div>
                   </div>
-
                   <div className="id-card-back-qr">
-                    <svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg">
-                      <rect x="0" y="0" width="28" height="28" fill="#0f172a" />
-                      <rect x="4" y="4" width="20" height="20" fill="#ffffff" />
-                      <rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" />
-
-                      <rect x="72" y="0" width="28" height="28" fill="#0f172a" />
-                      <rect x="76" y="4" width="20" height="20" fill="#ffffff" />
-                      <rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" />
-
-                      <rect x="0" y="72" width="28" height="28" fill="#0f172a" />
-                      <rect x="4" y="76" width="20" height="20" fill="#ffffff" />
-                      <rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" />
-
-                      <rect x="36" y="4" width="8" height="8" fill="#0f172a" />
-                      <rect x="52" y="4" width="8" height="8" fill="#0f172a" />
-                      <rect x="44" y="12" width="16" height="8" fill="#0f172a" />
-                      <rect x="36" y="24" width="8" height="8" fill="#0f172a" />
-                      
-                      <rect x="4" y="36" width="8" height="8" fill="#0f172a" />
-                      <rect x="16" y="44" width="8" height="8" fill="#0f172a" />
-                      <rect x="24" y="36" width="8" height="8" fill="#0f172a" />
-                      
-                      <rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" />
-                      <rect x="40" y="40" width="8" height="8" fill="#ffffff" />
-                      
-                      <rect x="60" y="36" width="8" height="8" fill="#0f172a" />
-                      <rect x="56" y="48" width="8" height="8" fill="#0f172a" />
-                      
-                      <rect x="36" y="56" width="8" height="8" fill="#0f172a" />
-                      <rect x="48" y="60" width="8" height="8" fill="#0f172a" />
-                      
-                      <rect x="76" y="36" width="8" height="8" fill="#0f172a" />
-                      <rect x="84" y="44" width="12" height="8" fill="#0f172a" />
-                      <rect x="72" y="56" width="8" height="16" fill="#0f172a" />
-                      <rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" />
-                      
-                      <rect x="36" y="76" width="12" height="8" fill="#0f172a" />
-                      <rect x="52" y="72" width="8" height="16" fill="#0f172a" />
-                      <rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" />
-                      
-                      <rect x="76" y="76" width="12" height="8" fill="#0f172a" />
-                      <rect x="84" y="84" width="12" height="8" fill="#0f172a" />
-                    </svg>
+                    <svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg"><rect x="0" y="0" width="28" height="28" fill="#0f172a" /><rect x="4" y="4" width="20" height="20" fill="#ffffff" /><rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="72" y="0" width="28" height="28" fill="#0f172a" /><rect x="76" y="4" width="20" height="20" fill="#ffffff" /><rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="0" y="72" width="28" height="28" fill="#0f172a" /><rect x="4" y="76" width="20" height="20" fill="#ffffff" /><rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" /><rect x="36" y="4" width="8" height="8" fill="#0f172a" /><rect x="52" y="4" width="8" height="8" fill="#0f172a" /><rect x="44" y="12" width="16" height="8" fill="#0f172a" /><rect x="36" y="24" width="8" height="8" fill="#0f172a" /><rect x="4" y="36" width="8" height="8" fill="#0f172a" /><rect x="16" y="44" width="8" height="8" fill="#0f172a" /><rect x="24" y="36" width="8" height="8" fill="#0f172a" /><rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" /><rect x="40" y="40" width="8" height="8" fill="#ffffff" /><rect x="60" y="36" width="8" height="8" fill="#0f172a" /><rect x="56" y="48" width="8" height="8" fill="#0f172a" /><rect x="36" y="56" width="8" height="8" fill="#0f172a" /><rect x="48" y="60" width="8" height="8" fill="#0f172a" /><rect x="76" y="36" width="8" height="8" fill="#0f172a" /><rect x="84" y="44" width="12" height="8" fill="#0f172a" /><rect x="72" y="56" width="8" height="16" fill="#0f172a" /><rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" /><rect x="36" y="76" width="12" height="8" fill="#0f172a" /><rect x="52" y="72" width="8" height="16" fill="#0f172a" /><rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" /><rect x="76" y="76" width="12" height="8" fill="#0f172a" /><rect x="84" y="84" width="12" height="8" fill="#0f172a" /></svg>
                     <span className="id-qr-label">SCAN ME</span>
                   </div>
                 </div>
-
                 <div className="id-card-back-signature-area">
-                  <div className="id-signature-font">{emp.teamLeader || 'Vikram Singh'}</div>
+                  <div className="id-signature-font">{emp.reportingManager || emp.teamLeader || 'Vikram Singh'}</div>
                   <div className="id-signature-line"></div>
                   <div className="id-signature-label">Authorized Signatory</div>
                 </div>
-
-                <div className="id-card-back-bottom-bg">
-                  <div className="id-card-watermark"></div>
-                </div>
+                <div className="id-card-back-bottom-bg"><div className="id-card-watermark"></div></div>
                 <div className="id-card-back-pink-bg"></div>
               </div>
-
             </div>
-
-            <button className="id-card-download-btn" onClick={downloadIdCard}>
-              <Download size={16} /> Download ID Cards
-            </button>
+            <button className="id-card-download-btn" onClick={downloadIdCard}><Download size={16} /> Download ID Cards</button>
           </div>
         </div>
       )}

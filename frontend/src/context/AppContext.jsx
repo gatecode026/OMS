@@ -12,9 +12,79 @@ import {
 
 const AppContext = createContext(undefined);
 
+export const normalizeEmployee = (emp) => {
+  if (!emp) return emp;
+  const normalized = { ...emp };
+  
+  // 1. Employee ID / id / employeeId
+  const idVal = normalized.id || normalized.employeeId;
+  normalized.id = idVal;
+  normalized.employeeId = idVal;
+
+  // 2. Full Name / name / fullName
+  const nameVal = normalized.name || normalized.fullName;
+  normalized.name = nameVal;
+  normalized.fullName = nameVal;
+
+  // 3. Contact Number / phone / contactNumber
+  const phoneVal = normalized.phone || normalized.contactNumber;
+  normalized.phone = phoneVal;
+  normalized.contactNumber = phoneVal;
+
+  // 4. Official Email / workEmail / officialEmail
+  const oEmail = normalized.officialEmail || normalized.workEmail;
+  if (oEmail) {
+    normalized.officialEmail = oEmail;
+    normalized.workEmail = oEmail;
+  }
+
+  // 5. Branch / Agency / branchAgency / branch
+  const loc = normalized.branch || normalized.branchAgency;
+  if (loc) {
+    normalized.branch = loc;
+    normalized.branchAgency = loc;
+  }
+
+  // 6. Shift Timing / shift / shiftTiming
+  const sh = normalized.shiftTiming || normalized.shift;
+  normalized.shiftTiming = sh;
+  normalized.shift = sh;
+
+  // 7. Punch In Time / todayPunchIn / punchInTime / punchIn
+  const pIn = normalized.punchInTime || normalized.todayPunchIn || normalized.punchIn;
+  normalized.punchInTime = pIn;
+  normalized.todayPunchIn = pIn;
+  normalized.punchIn = pIn;
+
+  // 8. Punch Out Time / todayPunchOut / punchOutTime / punchOut
+  const pOut = normalized.punchOutTime || normalized.todayPunchOut || normalized.punchOut;
+  normalized.punchOutTime = pOut;
+  normalized.todayPunchOut = pOut;
+  normalized.punchOut = pOut;
+
+  // 9. Working Hours / todayWorkingHours / workingHours / totalHours
+  const hrs = normalized.workingHours || normalized.todayWorkingHours || normalized.totalHours;
+  normalized.workingHours = hrs;
+  normalized.todayWorkingHours = hrs;
+  normalized.totalHours = hrs;
+
+  // 10. Attendance Status / attendanceStatus / todayPunchStatus / status
+  const att = normalized.attendanceStatus || normalized.status || normalized.todayPunchStatus;
+  normalized.attendanceStatus = att;
+  normalized.status = att;
+  normalized.todayPunchStatus = att;
+
+  // 11. Employment Status / accountStatus / employmentStatus
+  const est = normalized.employmentStatus || normalized.accountStatus;
+  normalized.employmentStatus = est;
+  normalized.accountStatus = est;
+
+  return normalized;
+};
+
 export const AppProvider = ({ children }) => {
   // App Core States
-  const [employees, setEmployees] = useState(mockEmployees);
+  const [employees, setEmployees] = useState(() => mockEmployees.map(normalizeEmployee));
   const [attendance, setAttendance] = useState(mockAttendance);
   const [leaveRequests, setLeaveRequests] = useState(mockLeaveRequests);
   const [tasks, setTasks] = useState(mockTasks);
@@ -227,22 +297,25 @@ export const AppProvider = ({ children }) => {
 
   // Employee CRUD Handlers
   const addEmployee = (newEmp) => {
-    const id = `EMP-2026-${String(employees.length + 1).padStart(3, '0')}`;
-    const [firstName, ...restParts] = newEmp.name.split(' ');
+    const generatedId = `EMP-2026-${String(employees.length + 1).padStart(3, '0')}`;
+    const [firstName, ...restParts] = (newEmp.name || '').split(' ');
     const lastName = restParts.join('') || 'user';
+    const defaultWorkEmail = firstName ? `${firstName.toLowerCase()}.${lastName.toLowerCase()}@saas.io` : `emp.${employees.length + 1}@saas.io`;
+    const defaultPersonalEmail = firstName ? `${firstName.toLowerCase()}${lastName.toLowerCase()}${employees.length}@gmail.com` : `emp.${employees.length + 1}@gmail.com`;
+
     const entry = {
       ...newEmp,
-      id,
-      status: 'Active',
-      workEmail: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@saas.io`,
-      designation: newEmp.designation || newEmp.role,
-      attendanceStatus: 'Present',
-      workStatus: 'Active',
-      accountStatus: 'Active',
+      id: newEmp.id || generatedId,
+      status: newEmp.status || 'Active',
+      workEmail: newEmp.workEmail || newEmp.officialEmail || defaultWorkEmail,
+      designation: newEmp.designation || newEmp.role || 'Employee',
+      attendanceStatus: newEmp.attendanceStatus || 'Present',
+      workStatus: newEmp.workStatus || 'Active',
+      accountStatus: newEmp.accountStatus || 'Active',
       teamLeader: newEmp.teamLeader || 'Unassigned',
       projectManager: newEmp.projectManager || 'Unassigned',
       nationality: newEmp.nationality || 'Not specified',
-      personalEmail: `${firstName.toLowerCase()}${lastName.toLowerCase()}${employees.length}@gmail.com`,
+      personalEmail: newEmp.personalEmail || defaultPersonalEmail,
       emergencyContactName: newEmp.emergencyContactName || '',
       emergencyContactPhone: newEmp.emergencyContactPhone || '',
       emergencyContactPhoneAlt: newEmp.emergencyContactPhoneAlt || '',
@@ -530,7 +603,7 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider
       value={{
-        employees,
+        employees: employees.map(normalizeEmployee),
         attendance,
         leaveRequests,
         tasks,

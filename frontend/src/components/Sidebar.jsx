@@ -56,7 +56,8 @@ const menuStructure = [
         name: 'Attendance Management',
         icon: Clock,
         subItems: [
-          { name: 'Punch In Out Reports', path: '/attendance' }
+          { name: 'Punch In Out Reports', path: '/attendance' },
+          { name: 'Web Portal Punch', path: '/attendance/webportal' }
         ]
       },
       { name: 'Leave Management', icon: CalendarDays, path: '/leaves' },
@@ -134,10 +135,12 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
     if (sidebarCollapsed) {
       setSidebarCollapsed(false);
     }
-    setExpandedMenus(prev => ({
-      ...prev,
-      [menuName]: !prev[menuName]
-    }));
+    setExpandedMenus(prev => {
+      const isCurrentlyExpanded = !!prev[menuName];
+      return {
+        [menuName]: !isCurrentlyExpanded
+      };
+    });
   };
 
   const isActive = (path) => {
@@ -165,21 +168,20 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   };
 
   useEffect(() => {
-    // Automatically expand the active sub-menu group if any subitem or the main path is active
+    // Automatically expand ONLY the active sub-menu group and collapse all others
+    const newExpanded = {};
     menuStructure.forEach(section => {
       section.items.forEach(item => {
         if (item.subItems) {
           const isSubitemActive = item.subItems.some(sub => isActive(sub.path));
           const isParentActive = item.path && isActive(item.path);
           if (isSubitemActive || isParentActive) {
-            setExpandedMenus(prev => ({
-              ...prev,
-              [item.name]: true
-            }));
+            newExpanded[item.name] = true;
           }
         }
       });
     });
+    setExpandedMenus(newExpanded);
   }, [location.pathname]);
 
   const handleLogout = (e) => {

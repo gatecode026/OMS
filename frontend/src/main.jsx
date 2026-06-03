@@ -16,6 +16,7 @@ const Overview = lazy(() => import('./pages/Overview'));
 const Employees = lazy(() => import('./pages/Employees'));
 const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'));
 const Attendance = lazy(() => import('./pages/Attendance'));
+const WebPortalAttendance = lazy(() => import('./pages/WebPortalAttendance'));
 const LeaveManagement = lazy(() => import('./pages/LeaveManagement'));
 const TaskMonitoring = lazy(() => import('./pages/TaskMonitoring'));
 const Payroll = lazy(() => import('./pages/Payroll'));
@@ -24,7 +25,7 @@ const Departments = lazy(() => import('./pages/Departments'));
 const Branches = lazy(() => import('./pages/Branches'));
 const Teams = lazy(() => import('./pages/Teams'));
 const TeamLeaders = lazy(() => import('./pages/TeamLeaders'));
-const Projects = lazy(() => import('./pages/Projects'));
+const Projects = lazy(() => import('./pages/projects/index'));
 const Performance = lazy(() => import('./pages/Performance'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
@@ -64,21 +65,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/employees/add" element={<Employees />} />
                 <Route path="/employees/:id" element={<EmployeeDetail />} />
                 <Route path="/attendance" element={<Attendance />} />
+                <Route path="/attendance/webportal" element={<WebPortalAttendance />} />
                 <Route path="/leaves" element={<LeaveManagement />} />
                 <Route path="/departments" element={<Departments />} />
                 <Route path="/branches" element={<Branches />} />
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/teams/leaders" element={<TeamLeaders />} />
-                {/* ── People ── */}
-                <Route path="/employees" element={<Employees />} />
-                <Route path="/employees/add" element={<Employees />} />
-                <Route path="/employees/:id" element={<EmployeeDetail />} />
-                <Route path="/attendance" element={<Attendance />} />
-                <Route path="/leaves" element={<LeaveManagement />} />
-                <Route path="/departments" element={<Departments />} />
-                <Route path="/branches" element={<Branches />} />
-                <Route path="/teams" element={<Teams />} />
-
                 {/* ── Operations ── */}
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/workflows" element={<Workflows />} />
