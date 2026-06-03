@@ -941,3 +941,868 @@
 .att-fab-btn:active {
   transform: translateY(0);
 }
+
+/* ==========================================================================
+   LIGHT THEME OVERRIDES FOR ATTENDANCE
+   ========================================================================== */
+.light-theme .att-overview-grid .card {
+  background: var(--bg-card, #ffffff);
+  border-color: var(--border-color, rgba(15, 23, 42, 0.08));
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.03), var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.light-theme .att-overview-grid .card:hover {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.15);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.light-theme .att-donut-section,
+.light-theme .att-weekly-bars {
+  background: var(--bg-app, #f8fafc);
+  border-color: var(--border-color);
+}
+
+.light-theme .att-donut-ring text {
+  fill: var(--text-primary) !important;
+}
+
+.light-theme .att-bar-wrap {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.light-theme .att-dept-row {
+  background: var(--bg-app, #f8fafc);
+  border-color: var(--border-color);
+}
+
+.light-theme .att-dept-bar-wrap {
+  background: rgba(15, 23, 42, 0.04);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.light-theme .att-feed-item {
+  background: var(--bg-app, #f8fafc);
+  border-color: var(--border-color);
+}
+
+.light-theme .att-feed-item:hover {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.15);
+}
+
+.light-theme .att-punch-mini-stat {
+  background: var(--bg-app, #f8fafc);
+  border-color: var(--border-color);
+}
+
+.light-theme .att-punch-mini-stat:nth-child(1):hover {
+  background: rgba(74, 222, 128, 0.04);
+  border-color: rgba(74, 222, 128, 0.4);
+  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.08);
+}
+
+.light-theme .att-punch-mini-stat:nth-child(2):hover {
+  background: rgba(96, 165, 250, 0.04);
+  border-color: rgba(96, 165, 250, 0.4);
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.08);
+}
+
+.light-theme .att-punch-mini-stat:nth-child(3):hover {
+  background: rgba(251, 191, 36, 0.04);
+  border-color: rgba(251, 191, 36, 0.4);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.08);
+}
+
+.light-theme .att-sys-row {
+  background: var(--bg-app, #f8fafc);
+  border-color: var(--border-color);
+}
+
+.light-theme .att-sys-row:hover {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.15);
+}
+
+/* ── Light Theme Overrides for Floating Bottom Actions Bar ── */
+.light-theme .att-floating-actions-bar {
+  background: rgba(248, 250, 252, 0.85); /* Slate-50 with alpha for glassmorphism */
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.light-theme .att-fab-title {
+  color: var(--text-primary);
+  border-right-color: rgba(15, 23, 42, 0.08);
+}
+
+.light-theme .att-fab-btn {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.08);
+  color: var(--text-secondary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.light-theme .att-fab-btn:hover {
+  background: #f1f5f9; /* Slate-100 */
+  border-color: rgba(15, 23, 42, 0.15);
+  color: var(--text-primary);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.05);
+}
+
+.light-theme .att-floating-actions-bar svg {
+  filter: brightness(0.85) saturate(1.2);
+}
+
+/* ============================================
+   WORK MODE CARDS (Office/WFH/Hybrid)
+   ============================================ */
+.att-workmode-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.att-workmode-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4) var(--spacing-5);
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.att-workmode-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+}
+
+.att-workmode-card:hover .att-workmode-arrow {
+  transform: translateX(4px);
+  opacity: 1;
+}
+
+.att-workmode-office {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.att-workmode-wfh {
+  background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.att-workmode-hybrid {
+  background: linear-gradient(135deg, #9a3412 0%, #f59e0b 100%);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.att-workmode-icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.att-workmode-info {
+  flex: 1;
+  margin-left: var(--spacing-3);
+}
+
+.att-workmode-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.att-workmode-count {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: white;
+  line-height: 1.2;
+}
+
+.att-workmode-sub {
+  display: block;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 4px;
+}
+
+.att-workmode-arrow {
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+/* ============================================
+   CLICKABLE KPI CARDS
+   ============================================ */
+.att-kpi-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.att-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  border-color: var(--color-primary);
+}
+
+/* ============================================
+   WEB PORTAL FORM
+   ============================================ */
+.att-webportal-container {
+  display: grid;
+  grid-template-columns: 1.5fr 0.5fr;
+  gap: var(--spacing-5);
+}
+
+.att-webportal-card {
+  padding: var(--spacing-5);
+}
+
+.att-webportal-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-5);
+}
+
+.att-webportal-employee-select label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: var(--spacing-2);
+}
+
+.att-webportal-employee-select select {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.att-webportal-employee-select select:hover {
+  border-color: var(--color-primary);
+}
+
+.att-webportal-employee-info {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  border: 1px solid var(--border-color);
+}
+
+.att-wp-info-row {
+  display: flex;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.att-wp-info-row:last-child {
+  border-bottom: none;
+}
+
+.att-wp-label {
+  width: 100px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.att-wp-value {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.att-webportal-punch-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.att-wp-punch-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-3);
+}
+
+.att-wp-punch-in-btn,
+.att-wp-punch-out-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.att-wp-punch-in-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.att-wp-punch-in-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+}
+
+.att-wp-punch-out-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+}
+
+.att-wp-punch-out-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+}
+
+.att-wp-punch-in-btn:disabled,
+.att-wp-punch-out-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.att-wp-punch-in-btn span,
+.att-wp-punch-out-btn span {
+  font-size: 1rem;
+  letter-spacing: 1px;
+}
+
+.att-wp-punch-in-btn small,
+.att-wp-punch-out-btn small {
+  font-size: 0.65rem;
+  opacity: 0.8;
+}
+
+.att-wp-or-divider {
+  text-align: center;
+  position: relative;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.att-wp-or-divider::before,
+.att-wp-or-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.att-wp-or-divider::before {
+  left: 0;
+}
+
+.att-wp-or-divider::after {
+  right: 0;
+}
+
+.att-wp-manual-entry {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-3);
+}
+
+.att-wp-manual-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.att-wp-manual-field label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.att-wp-manual-field input,
+.att-wp-manual-field select {
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.att-webportal-submit {
+  margin-top: var(--spacing-2);
+}
+
+.att-webportal-recent {
+  padding: var(--spacing-5);
+}
+
+.att-wp-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.att-wp-recent-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-md);
+  transition: all 0.15s;
+}
+
+.att-wp-recent-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.att-wp-recent-info {
+  flex: 1;
+}
+
+.att-wp-recent-info strong {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.att-wp-recent-info span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.att-wp-recent-times {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.7rem;
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+
+.att-empty-wp {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+/* ============================================
+   BRANCH MANAGEMENT
+   ============================================ */
+.att-branches-grid {
+  display: grid;
+  grid-template-columns: 1fr 0.8fr;
+  gap: var(--spacing-5);
+}
+
+.att-branches-card {
+  padding: var(--spacing-5);
+}
+
+.att-branches-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.att-branch-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.att-branch-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-primary);
+  transform: translateX(4px);
+}
+
+.att-branch-icon {
+  font-size: 2rem;
+}
+
+.att-branch-info {
+  flex: 1;
+}
+
+.att-branch-info strong {
+  display: block;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.att-branch-address {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.att-branch-stats {
+  display: flex;
+  gap: var(--spacing-3);
+}
+
+.att-branch-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 50px;
+}
+
+.att-branch-stat span:first-child {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.att-branch-stat span:last-child {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.att-branch-bar-wrap {
+  width: 80px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.att-branch-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4ade80, #06b6d4);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.att-branch-workmode {
+  display: flex;
+  gap: 8px;
+  font-size: 0.7rem;
+}
+
+.att-branch-workmode span {
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.att-branch-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.att-branch-summary-card,
+.att-branch-workmode-card {
+  padding: var(--spacing-4);
+}
+
+.att-branch-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.att-branch-summary-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.att-branch-summary-name {
+  width: 80px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.att-branch-summary-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.att-branch-summary-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.att-branch-summary-rate {
+  width: 45px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.att-branch-workmode-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.att-branch-wm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.att-branch-wm-row strong {
+  font-size: 0.85rem;
+}
+
+.att-branch-wm-stats {
+  display: flex;
+  gap: 12px;
+}
+
+.att-wm-office {
+  color: #3b82f6;
+}
+
+.att-wm-wfh {
+  color: #10b981;
+}
+
+.att-wm-hybrid {
+  color: #f59e0b;
+}
+
+/* ============================================
+   AUTOMATION RULES - WORKING TOGGLES
+   ============================================ */
+.att-rule-toggle {
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.5px;
+}
+
+.att-rule-on {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.att-rule-off {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.att-rule-on:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.att-rule-off:hover {
+  background: rgba(239, 68, 68, 0.25);
+  transform: scale(1.02);
+}
+
+/* Status chips - clickable */
+.att-status-chip {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.att-status-chip:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Legend items clickable */
+.att-legend-item {
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+}
+
+.att-legend-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Department rows clickable */
+.att-dept-row {
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+}
+
+.att-dept-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Overtime column styling */
+.att-kpi-card.att-kpi-rose .att-kpi-value {
+  color: #f472b6;
+}
+
+/* Table overtime cell */
+.att-table-scroll td span[style*="color: var(--color-success)"] {
+  font-weight: 700;
+  text-shadow: 0 0 4px rgba(74, 222, 128, 0.3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .att-workmode-strip {
+    gap: var(--spacing-3);
+  }
+  
+  .att-workmode-card {
+    padding: var(--spacing-3);
+  }
+  
+  .att-workmode-count {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 992px) {
+  .att-webportal-container,
+  .att-branches-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .att-workmode-strip {
+    grid-template-columns: 1fr;
+  }
+  
+  .att-wp-manual-entry {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .att-branch-item {
+    flex-wrap: wrap;
+  }
+  
+  .att-branch-stats {
+    order: 3;
+    width: 100%;
+    justify-content: space-around;
+    margin-top: 8px;
+  }
+  
+  .att-branch-bar-wrap {
+    order: 4;
+    width: 100%;
+    margin-top: 8px;
+  }
+  
+  .att-branch-workmode {
+    order: 5;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Animation for cards */
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.att-workmode-card,
+.att-kpi-card,
+.att-branch-item {
+  animation: cardFadeIn 0.3s ease backwards;
+}
+
+.att-workmode-card:nth-child(1) { animation-delay: 0.05s; }
+.att-workmode-card:nth-child(2) { animation-delay: 0.1s; }
+.att-workmode-card:nth-child(3) { animation-delay: 0.15s; }
+
+/* Web portal form focus states */
+.att-webportal-employee-select select:focus,
+.att-wp-manual-field input:focus,
+.att-wp-manual-field select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(217, 70, 239, 0.1);
+}
+
+/* Empty states */
+.att-empty-feed,
+.att-empty-out,
+.att-empty-wp {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+.att-empty-feed-full {
+  text-align: center;
+  padding: 60px;
+  color: var(--text-muted);
+}
+
+/* Scrollbar for recent entries */
+.att-wp-recent-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.att-wp-recent-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 99px;
+}
+
+.att-wp-recent-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 99px;
+}
+
+.att-wp-recent-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

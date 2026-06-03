@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './LeaveManagement.css';
 import { useApp } from '../context/AppContext';
+import { FIELD_LABELS } from '../utils/fieldLabels';
 import usePageLoading from '../hooks/usePageLoading';
 import DataTable from '../components/common/DataTable';
 import Badge from '../components/common/Badge';
@@ -12,7 +13,8 @@ import {
   Check, X, Eye, FileText, CalendarDays, Search, Filter, Plus, Settings,
   AlertCircle, Calendar, TrendingUp, Users, BarChart3, PieChart, ArrowRight,
   Clock, Settings2, FileSpreadsheet, FileUp, Download, Info, Bell, Briefcase,
-  HeartPulse, Umbrella, UserCheck, Smile, ShieldAlert, Trash2, Edit, CheckCircle2
+  HeartPulse, Umbrella, UserCheck, Smile, ShieldAlert, Trash2, Edit, CheckCircle2,
+  Database, Save, RefreshCw
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -30,7 +32,7 @@ const LeaveManagement = () => {
     addToast
   } = useApp();
 
-  // Primary Tab state: 'requests' | 'analytics' | 'balances' | 'holidays'
+  // Primary Tab state: 'requests' | 'analytics' | 'balances' | 'holidays' | 'policies'
   const [activeTab, setActiveTab] = useState('requests');
 
   // Requests Sub-tab status filter: 'Pending' | 'Approved' | 'Rejected' | 'All'
@@ -52,9 +54,43 @@ const LeaveManagement = () => {
     }
   }, [leaveRequests]);
 
+  // ==================== ADMIN LEAVE POLICY TABLE STATE ====================
+  const [leavePolicyConfigs, setLeavePolicyConfigs] = useState([
+    { id: 'POL-001', leaveCode: 'CL', leaveName: 'Casual Leave', defaultDays: 8, maxCarryForward: 5, isActive: true, genderRestriction: 'All', description: 'For personal urgent reasons or brief errands' },
+    { id: 'POL-002', leaveCode: 'SL', leaveName: 'Sick Leave', defaultDays: 10, maxCarryForward: 3, isActive: true, genderRestriction: 'All', description: 'For medical recovery or doctor consultations' },
+    { id: 'POL-003', leaveCode: 'PL', leaveName: 'Paid Leave', defaultDays: 15, maxCarryForward: 10, isActive: true, genderRestriction: 'All', description: 'Annual leave for vacation or relaxation' },
+    { id: 'POL-004', leaveCode: 'ML', leaveName: 'Maternity Leave', defaultDays: 180, maxCarryForward: 0, isActive: true, genderRestriction: 'Female', description: 'For expectant mothers around childbirth' },
+    { id: 'POL-010', leaveCode: 'UL', leaveName: 'Unpaid Leave', defaultDays: 30, maxCarryForward: 0, isActive: true, genderRestriction: 'All', description: 'Without pay when balances exhausted' }
+  ]);
+
+  const [editingPolicy, setEditingPolicy] = useState(null);
+  const [policyEditForm, setPolicyEditForm] = useState({
+    leaveCode: '',
+    leaveName: '',
+    defaultDays: 0,
+    maxCarryForward: 0,
+    isActive: true,
+    genderRestriction: 'All',
+    description: ''
+  });
+  const [showAddPolicyModal, setShowAddPolicyModal] = useState(false);
+  const [newPolicyForm, setNewPolicyForm] = useState({
+    leaveCode: '',
+    leaveName: '',
+    defaultDays: 0,
+    maxCarryForward: 0,
+    isActive: true,
+    genderRestriction: 'All',
+    description: ''
+  });
+  const [showDeletePolicyConfirm, setShowDeletePolicyConfirm] = useState(null);
+  const [policySearchQuery, setPolicySearchQuery] = useState('');
+  const [filterPolicyGender, setFilterPolicyGender] = useState('All');
+  const [filterPolicyStatus, setFilterPolicyStatus] = useState('All');
+
   // Balance Edit State
   const [balanceEditEmployee, setBalanceEditEmployee] = useState(null);
-  const [balanceInput, setBalanceInput] = useState({ cl: 0, sl: 0, pl: 0, maternity: 0, paternity: 0, compensatory: 0 });
+  const [balanceInput, setBalanceInput] = useState({ cl: 0, sl: 0, pl: 0, maternity: 0 });
 
   // Policy configurations state
   const [policies, setPolicies] = useState({
@@ -63,15 +99,23 @@ const LeaveManagement = () => {
     halfDayPolicy: true,
     holidayEncashment: true,
     maternityDuration: 180,
-    paternityDuration: 15,
-    restrictDoubleFilings: true
+    restrictDoubleFilings: true,
+    useGlobalPolicyTable: true // New flag to use the global policy table
   });
 
   // Modal open states
   const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [showAddHolidayModal, setShowAddHolidayModal] = useState(false);
+  const [newHolidayForm, setNewHolidayForm] = useState({
+    date: '',
+    name: '',
+    type: 'National',
+    description: ''
+  });
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [approverNotesInput, setApproverNotesInput] = useState('');
+  const [editingLeave, setEditingLeave] = useState(null);
 
   // Form states for Applying Leave
   const [applyForm, setApplyForm] = useState({
@@ -96,13 +140,13 @@ const LeaveManagement = () => {
 
   // Mock static balance records
   const [balancesList, setBalancesList] = useState([
-    { id: 'BAL-001', employeeId: 'EMP-2026-001', employeeName: 'Aarav Sharma', cl: 8, sl: 12, pl: 15, maternity: 0, paternity: 12, compensatory: 2 },
-    { id: 'BAL-002', employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', cl: 6, sl: 8, pl: 10, maternity: 0, paternity: 0, compensatory: 1 },
-    { id: 'BAL-003', employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', cl: 5, sl: 10, pl: 18, maternity: 0, paternity: 0, compensatory: 4 },
-    { id: 'BAL-004', employeeId: 'EMP-2026-004', employeeName: 'Rohit Sharma', cl: 7, sl: 6, pl: 12, maternity: 0, paternity: 0, compensatory: 0 },
-    { id: 'BAL-005', employeeId: 'EMP-2026-005', employeeName: 'Priya Patel', cl: 4, sl: 7, pl: 14, maternity: 180, paternity: 0, compensatory: 3 },
-    { id: 'BAL-006', employeeId: 'EMP-2026-006', employeeName: 'Arjun Mehta', cl: 9, sl: 11, pl: 20, maternity: 0, paternity: 0, compensatory: 0 },
-    { id: 'BAL-007', employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', cl: 3, sl: 9, pl: 8, maternity: 0, paternity: 0, compensatory: 1 }
+    { id: 'BAL-001', employeeId: 'EMP-2026-001', employeeName: 'Aarav Sharma', cl: 8, sl: 12, pl: 15, maternity: 0 },
+    { id: 'BAL-002', employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', cl: 6, sl: 8, pl: 10, maternity: 0 },
+    { id: 'BAL-003', employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', cl: 5, sl: 10, pl: 18, maternity: 0 },
+    { id: 'BAL-004', employeeId: 'EMP-2026-004', employeeName: 'Rohit Sharma', cl: 7, sl: 6, pl: 12, maternity: 0 },
+    { id: 'BAL-005', employeeId: 'EMP-2026-005', employeeName: 'Priya Patel', cl: 4, sl: 7, pl: 14, maternity: 180 },
+    { id: 'BAL-006', employeeId: 'EMP-2026-006', employeeName: 'Arjun Mehta', cl: 9, sl: 11, pl: 20, maternity: 0 },
+    { id: 'BAL-007', employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', cl: 3, sl: 9, pl: 8, maternity: 0 }
   ]);
 
   // Mock static Holiday lists
@@ -146,11 +190,10 @@ const LeaveManagement = () => {
   ];
 
   const typesDistributionData = [
-    { name: 'Casual Leave', value: 35, color: 'var(--accent-blue-solid)' },
-    { name: 'Sick Leave', value: 20, color: 'var(--accent-pink-solid)' },
+    { name: 'Casual Leave', value: 40, color: 'var(--accent-blue-solid)' },
+    { name: 'Sick Leave', value: 25, color: 'var(--accent-pink-solid)' },
     { name: 'Paid Leave', value: 25, color: 'var(--accent-green-solid)' },
-    { name: 'Maternity/Paternity', value: 12, color: 'var(--accent-purple-solid)' },
-    { name: 'WFH Filings', value: 8, color: 'var(--accent-orange-solid)' }
+    { name: 'Maternity Leave', value: 10, color: 'var(--accent-purple-solid)' }
   ];
 
   const approvalRateData = [
@@ -160,19 +203,16 @@ const LeaveManagement = () => {
     { name: 'Marketing', Approved: 90, Rejected: 10 }
   ];
 
-  // Leave Types Descriptions
-  const leaveTypesList = [
-    { code: 'PL', name: 'Paid Leave (PL)', desc: 'Annual leave entitlement for relaxation or planned vacations.', quota: '15-18 days/yr' },
-    { code: 'CL', name: 'Casual Leave (CL)', desc: 'Leaves taken for personal urgent reasons or brief errands.', quota: '8-10 days/yr' },
-    { code: 'SL', name: 'Sick Leave (SL)', desc: 'Leaves granted for recovery from medical issues or doctor consultations.', quota: '10-12 days/yr' },
-    { code: 'EM', name: 'Emergency Leave', desc: 'Granted instantly for unforeseen accidents or family emergencies.', quota: 'Uncapped' },
-    { code: 'ML', name: 'Maternity Leave', desc: 'Paid leaves for expectant mothers around childbirth and early care.', quota: '180 days max' },
-    { code: 'PT', name: 'Paternity Leave', desc: 'Paid leaves for new fathers following child birth.', quota: '15 days max' },
-    { code: 'BL', name: 'Bereavement Leave', desc: 'Paid leaves following death in the immediate family.', quota: '5 days/event' },
-    { code: 'CO', name: 'Compensatory Off', desc: 'Leaves claimed in exchange for working on weekend or holidays.', quota: 'Earned' },
-    { code: 'WFH', name: 'Work From Home', desc: 'Remote duty filing for technical tasks or safety situations.', quota: '2 days/month' },
-    { code: 'UL', name: 'Unpaid Leave', desc: 'Absences applied without pay when other balances are exhausted.', quota: 'Uncapped' }
-  ];
+  // Leave Types Descriptions (from policy configs)
+  const leaveTypesList = leavePolicyConfigs.map(config => ({
+    code: config.leaveCode,
+    name: config.leaveName,
+    desc: config.description,
+    quota: `${config.defaultDays} days/year`,
+    maxCarry: config.maxCarryForward,
+    genderRestriction: config.genderRestriction,
+    active: config.isActive
+  }));
 
   // Calendar Schedule Data for June 2026
   const calendarDays = Array.from({ length: 30 }, (_, i) => {
@@ -199,36 +239,157 @@ const LeaveManagement = () => {
   });
 
   // Calculate top KPI numbers dynamically based on leaves list
-  const totalRequestsCount = 1250;
-  const approvedRequestsCount = 1120;
-  const rejectedRequestsCount = 85;
-  const pendingRequestsCount = 45;
-  const onLeaveTodayCount = 72;
+  const totalRequestsCount = leavesList.length;
+  const approvedRequestsCount = leavesList.filter(l => l.status === 'Approved').length;
+  const rejectedRequestsCount = leavesList.filter(l => l.status === 'Rejected').length;
+  const pendingRequestsCount = leavesList.filter(l => l.status === 'Pending').length;
+  const onLeaveTodayCount = leavesList.filter(l => l.status === 'Approved' && l.fromDate <= '2026-06-02' && l.toDate >= '2026-06-02').length;
   const leaveUtilizationRate = '88%';
 
   // Filters calculation
   const getFilteredLeaves = () => {
     return leavesList.filter(req => {
-      // Search Box filter
       const matchesSearch =
         req.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         req.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (req.employeeId && req.employeeId.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (req.department && req.department.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      // Leave Type Filter
       const matchesType = filterLeaveType === 'All' || req.type === filterLeaveType;
-
-      // Status sub-tab filter
-      const matchesStatus =
-        statusTab === 'All' ||
-        req.status === statusTab;
-
-      // Department Filter
       const matchesDept = filterDept === 'All' || req.department === filterDept;
+
+      let matchesStatus = false;
+      if (statusTab === 'All') {
+        matchesStatus = true;
+      } else if (statusTab === 'OnLeaveToday') {
+        matchesStatus = req.status === 'Approved' && req.fromDate <= '2026-06-02' && req.toDate >= '2026-06-02';
+      } else {
+        matchesStatus = req.status === statusTab;
+      }
 
       return matchesSearch && matchesType && matchesStatus && matchesDept;
     });
+  };
+
+  // Get filtered policies for the admin table
+  const getFilteredPolicies = () => {
+    return leavePolicyConfigs.filter(policy => {
+      const matchesSearch = 
+        policy.leaveCode.toLowerCase().includes(policySearchQuery.toLowerCase()) ||
+        policy.leaveName.toLowerCase().includes(policySearchQuery.toLowerCase());
+      const matchesGender = filterPolicyGender === 'All' || policy.genderRestriction === filterPolicyGender;
+      const matchesStatus = filterPolicyStatus === 'All' || 
+        (filterPolicyStatus === 'Active' && policy.isActive) ||
+        (filterPolicyStatus === 'Inactive' && !policy.isActive);
+      return matchesSearch && matchesGender && matchesStatus;
+    });
+  };
+
+  // Policy CRUD Operations
+  const handleEditPolicyClick = (policy) => {
+    setEditingPolicy(policy);
+    setPolicyEditForm({
+      leaveCode: policy.leaveCode,
+      leaveName: policy.leaveName,
+      defaultDays: policy.defaultDays,
+      maxCarryForward: policy.maxCarryForward,
+      isActive: policy.isActive,
+      genderRestriction: policy.genderRestriction,
+      description: policy.description
+    });
+  };
+
+  const handleUpdatePolicy = () => {
+    setLeavePolicyConfigs(prev => 
+      prev.map(p => 
+        p.id === editingPolicy.id 
+          ? { ...p, ...policyEditForm }
+          : p
+      )
+    );
+    addToast('success', `${policyEditForm.leaveName} policy updated successfully!`);
+    setEditingPolicy(null);
+    
+    // Add alert for policy change
+    setAlertsFeed(prev => [
+      {
+        id: `AL-${Math.random().toString(36).substring(2, 9)}`,
+        type: 'success',
+        message: `Leave policy "${policyEditForm.leaveName}" updated by Admin.`,
+        timestamp: 'Just now',
+        read: false
+      },
+      ...prev
+    ]);
+  };
+
+  const handleAddPolicy = () => {
+    if (!newPolicyForm.leaveCode || !newPolicyForm.leaveName) {
+      addToast('warning', 'Please fill all required fields.');
+      return;
+    }
+    
+    const newId = `POL-${String(leavePolicyConfigs.length + 1).padStart(3, '0')}`;
+    const newPolicy = { id: newId, ...newPolicyForm };
+    setLeavePolicyConfigs(prev => [...prev, newPolicy]);
+    addToast('success', `${newPolicyForm.leaveName} policy added successfully!`);
+    setShowAddPolicyModal(false);
+    setNewPolicyForm({
+      leaveCode: '',
+      leaveName: '',
+      defaultDays: 0,
+      maxCarryForward: 0,
+      isActive: true,
+      genderRestriction: 'All',
+      description: ''
+    });
+  };
+
+  const handleDeletePolicy = (policy) => {
+    const action = () => {
+      setLeavePolicyConfigs(prev => prev.filter(p => p.id !== policy.id));
+      addToast('warning', `${policy.leaveName} policy has been deleted.`);
+      setShowDeletePolicyConfirm(null);
+    };
+    
+    showConfirm(
+      'Delete Leave Policy',
+      `Are you sure you want to delete "${policy.leaveName}" policy? This action cannot be undone.`,
+      action,
+      'danger'
+    );
+  };
+
+  const handleTogglePolicyStatus = (policyId, currentStatus) => {
+    setLeavePolicyConfigs(prev => 
+      prev.map(p => 
+        p.id === policyId 
+          ? { ...p, isActive: !currentStatus }
+          : p
+      )
+    );
+    addToast('info', `Policy ${!currentStatus ? 'activated' : 'deactivated'} successfully.`);
+  };
+
+  // Reset all policies to default
+  const handleResetAllPolicies = () => {
+    const action = () => {
+      setLeavePolicyConfigs([
+        { id: 'POL-001', leaveCode: 'CL', leaveName: 'Casual Leave', defaultDays: 8, maxCarryForward: 5, isActive: true, genderRestriction: 'All', description: 'For personal urgent reasons or brief errands' },
+        { id: 'POL-002', leaveCode: 'SL', leaveName: 'Sick Leave', defaultDays: 10, maxCarryForward: 3, isActive: true, genderRestriction: 'All', description: 'For medical recovery or doctor consultations' },
+        { id: 'POL-003', leaveCode: 'PL', leaveName: 'Paid Leave', defaultDays: 15, maxCarryForward: 10, isActive: true, genderRestriction: 'All', description: 'Annual leave for vacation or relaxation' },
+        { id: 'POL-004', leaveCode: 'ML', leaveName: 'Maternity Leave', defaultDays: 180, maxCarryForward: 0, isActive: true, genderRestriction: 'Female', description: 'For expectant mothers around childbirth' },
+        { id: 'POL-010', leaveCode: 'UL', leaveName: 'Unpaid Leave', defaultDays: 30, maxCarryForward: 0, isActive: true, genderRestriction: 'All', description: 'Without pay when balances exhausted' }
+      ]);
+      addToast('success', 'All policies have been reset to default values.');
+    };
+    
+    showConfirm(
+      'Reset All Policies',
+      'This will reset all leave policies to their default values. Are you sure?',
+      action,
+      'danger'
+    );
   };
 
   const handleRowClick = (leave) => {
@@ -273,55 +434,24 @@ const LeaveManagement = () => {
     );
   };
 
-  // Submit new leave locally
-  const handleApplySubmit = (e) => {
-    e.preventDefault();
-    if (!applyForm.employeeId || !applyForm.fromDate || !applyForm.toDate || !applyForm.reason) {
-      addToast('warning', 'Please fill all required leave application fields.');
-      return;
-    }
+  const handleEditLeaveClick = (leave) => {
+    setEditingLeave(leave);
+    setApplyForm({
+      employeeId: leave.employeeId,
+      type: leave.type,
+      fromDate: leave.fromDate,
+      toDate: leave.toDate,
+      reason: leave.reason,
+      documentType: leave.documentType || 'Emergency Documents',
+      uploadedFileName: leave.fileName || '',
+      uploadedFileFormat: leave.fileFormat || ''
+    });
+    setApplyModalOpen(true);
+  };
 
-    const employeeSelected = employees.find(emp => emp.id === applyForm.employeeId);
-    const newLeaveId = `LR-${Math.floor(100 + Math.random() * 900)}`;
-
-    const newRequest = {
-      id: newLeaveId,
-      employeeId: applyForm.employeeId,
-      employeeName: employeeSelected ? employeeSelected.name : 'Unknown Employee',
-      department: employeeSelected ? employeeSelected.department : 'Engineering',
-      type: applyForm.type,
-      fromDate: applyForm.fromDate,
-      toDate: applyForm.toDate,
-      days: Math.max(1, Math.ceil((new Date(applyForm.toDate) - new Date(applyForm.fromDate)) / (1000 * 60 * 60 * 24)) + 1),
-      reason: applyForm.reason,
-      status: 'Pending',
-      appliedDate: new Date().toISOString().split('T')[0],
-      history: [
-        { date: new Date().toISOString().split('T')[0], status: 'Pending', comment: `Applied by ${employeeSelected ? employeeSelected.name : 'Employee'}` }
-      ],
-      documentType: applyForm.documentType,
-      fileName: applyForm.uploadedFileName || null,
-      fileFormat: applyForm.uploadedFileFormat || null,
-      approverNotes: ''
-    };
-
-    setLeavesList(prev => [newRequest, ...prev]);
+  const handleCloseApplyModal = () => {
     setApplyModalOpen(false);
-    addToast('success', 'Leave request submitted successfully for approval.');
-
-    // Add alert feed item
-    setAlertsFeed(prev => [
-      {
-        id: `AL-${Math.random().toString(36).substring(2, 9)}`,
-        type: 'warning',
-        message: `New leave request from ${newRequest.employeeName} submitted.`,
-        timestamp: 'Just now',
-        read: false
-      },
-      ...prev
-    ]);
-
-    // Reset Form
+    setEditingLeave(null);
     setApplyForm({
       employeeId: '',
       type: 'Casual Leave',
@@ -332,6 +462,122 @@ const LeaveManagement = () => {
       uploadedFileName: '',
       uploadedFileFormat: ''
     });
+  };
+
+  const scrollToTable = () => {
+    setTimeout(() => {
+      const element = document.querySelector('.approval-status-tabs');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
+
+  // Submit new leave locally or update existing
+  const handleApplySubmit = (e) => {
+    if (e) e.preventDefault();
+    if (!applyForm.employeeId || !applyForm.fromDate || !applyForm.toDate || !applyForm.reason) {
+      addToast('warning', 'Please fill all required leave application fields.');
+      return;
+    }
+
+    const employeeSelected = employees.find(emp => emp.id === applyForm.employeeId);
+
+    if (employeeSelected) {
+      const selectedPolicy = leavePolicyConfigs.find(p => p.leaveName === applyForm.type);
+      if (selectedPolicy) {
+        if (selectedPolicy.leaveName === 'Maternity Leave') {
+          if (employeeSelected.gender !== 'Female' || employeeSelected.maritalStatus !== 'Married') {
+            addToast('danger', 'Maternity Leave is only allowed for married female employees.');
+            return;
+          }
+        }
+        if (selectedPolicy.genderRestriction === 'Female' && employeeSelected.gender !== 'Female') {
+          addToast('danger', `${selectedPolicy.leaveName} is only allowed for female employees.`);
+          return;
+        }
+        if (selectedPolicy.genderRestriction === 'Male' && employeeSelected.gender !== 'Male') {
+          addToast('danger', `${selectedPolicy.leaveName} is only allowed for male employees.`);
+          return;
+        }
+      }
+    }
+
+    if (editingLeave) {
+      setLeavesList(prev =>
+        prev.map(l =>
+          l.id === editingLeave.id
+            ? {
+                ...l,
+                employeeId: applyForm.employeeId,
+                employeeName: employeeSelected ? employeeSelected.name : l.employeeName,
+                department: employeeSelected ? employeeSelected.department : l.department,
+                type: applyForm.type,
+                fromDate: applyForm.fromDate,
+                toDate: applyForm.toDate,
+                days: Math.max(1, Math.ceil((new Date(applyForm.toDate) - new Date(applyForm.fromDate)) / (1000 * 60 * 60 * 24)) + 1),
+                reason: applyForm.reason,
+                documentType: applyForm.documentType,
+                fileName: applyForm.uploadedFileName || null,
+                fileFormat: applyForm.uploadedFileFormat || null
+              }
+            : l
+        )
+      );
+
+      addToast('success', `Leave request ${editingLeave.id} has been updated.`);
+
+      setAlertsFeed(prev => [
+        {
+          id: `AL-${Math.random().toString(36).substring(2, 9)}`,
+          type: 'info',
+          message: `Leave request ${editingLeave.id} updated by Admin.`,
+          timestamp: 'Just now',
+          read: false
+        },
+        ...prev
+      ]);
+
+      handleCloseApplyModal();
+    } else {
+      const newLeaveId = `LR-${Math.floor(100 + Math.random() * 900)}`;
+
+      const newRequest = {
+        id: newLeaveId,
+        employeeId: applyForm.employeeId,
+        employeeName: employeeSelected ? employeeSelected.name : 'Unknown Employee',
+        department: employeeSelected ? employeeSelected.department : 'Engineering',
+        type: applyForm.type,
+        fromDate: applyForm.fromDate,
+        toDate: applyForm.toDate,
+        days: Math.max(1, Math.ceil((new Date(applyForm.toDate) - new Date(applyForm.fromDate)) / (1000 * 60 * 60 * 24)) + 1),
+        reason: applyForm.reason,
+        status: 'Pending',
+        appliedDate: new Date().toISOString().split('T')[0],
+        history: [
+          { date: new Date().toISOString().split('T')[0], status: 'Pending', comment: `Applied by ${employeeSelected ? employeeSelected.name : 'Employee'}` }
+        ],
+        documentType: applyForm.documentType,
+        fileName: applyForm.uploadedFileName || null,
+        fileFormat: applyForm.uploadedFileFormat || null,
+        approverNotes: ''
+      };
+
+      setLeavesList(prev => [newRequest, ...prev]);
+      handleCloseApplyModal();
+      addToast('success', 'Leave request submitted successfully for approval.');
+
+      setAlertsFeed(prev => [
+        {
+          id: `AL-${Math.random().toString(36).substring(2, 9)}`,
+          type: 'warning',
+          message: `New leave request from ${newRequest.employeeName} submitted.`,
+          timestamp: 'Just now',
+          read: false
+        },
+        ...prev
+      ]);
+    }
   };
 
   // Mock file attachment handler
@@ -371,6 +617,39 @@ const LeaveManagement = () => {
     }, 150);
   };
 
+  const handleAddHoliday = (e) => {
+    if (e) e.preventDefault();
+    if (!newHolidayForm.date || !newHolidayForm.name) {
+      addToast('warning', 'Please fill in the date and name.');
+      return;
+    }
+    const newHol = {
+      id: `HOL-${Date.now()}`,
+      ...newHolidayForm
+    };
+    setHolidaysList(prev => [...prev, newHol]);
+    addToast('success', `Holiday "${newHolidayForm.name}" added successfully!`);
+    
+    setAlertsFeed(prev => [
+      {
+        id: `AL-${Math.random().toString(36).substring(2, 9)}`,
+        type: 'success',
+        message: `New holiday "${newHolidayForm.name}" scheduled.`,
+        timestamp: 'Just now',
+        read: false
+      },
+      ...prev
+    ]);
+    
+    setNewHolidayForm({
+      date: '',
+      name: '',
+      type: 'National',
+      description: ''
+    });
+    setShowAddHolidayModal(false);
+  };
+
   // Balance edit trigger
   const handleEditBalanceClick = (balance) => {
     setBalanceEditEmployee(balance);
@@ -378,9 +657,7 @@ const LeaveManagement = () => {
       cl: balance.cl,
       sl: balance.sl,
       pl: balance.pl,
-      maternity: balance.maternity,
-      paternity: balance.paternity,
-      compensatory: balance.compensatory
+      maternity: balance.maternity
     });
   };
 
@@ -399,7 +676,6 @@ const LeaveManagement = () => {
     addToast('success', `Adjusted leave balances for ${balanceEditEmployee.employeeName}.`);
     setBalanceEditEmployee(null);
 
-    // Alert log
     setAlertsFeed(prev => [
       {
         id: `AL-${Math.random().toString(36).substring(2, 9)}`,
@@ -416,7 +692,7 @@ const LeaveManagement = () => {
   const historyColumns = [
     {
       key: 'employeeName',
-      header: 'Employee',
+      header: FIELD_LABELS.name,
       sortable: true,
       render: (row) => (
         <div className="flex-center gap-3 justify-start">
@@ -439,7 +715,7 @@ const LeaveManagement = () => {
     },
     {
       key: 'status',
-      header: 'Status',
+      header: FIELD_LABELS.leaveStatus,
       sortable: true,
       render: (row) => (
         <Badge variant={row.status === 'Approved' ? 'success' : row.status === 'Pending' ? 'warning' : 'danger'}>
@@ -459,6 +735,13 @@ const LeaveManagement = () => {
             title="View Details"
           >
             <Eye size={14} />
+          </button>
+          <button
+            className="action-btn-mini edit-btn"
+            onClick={() => handleEditLeaveClick(row)}
+            title="Edit Leave Request"
+          >
+            <Edit size={14} />
           </button>
           {row.status === 'Pending' && (
             <>
@@ -502,11 +785,14 @@ const LeaveManagement = () => {
           <p className="page-desc-text">Oversee balances, request approvals, policy overrides, and company calendars</p>
         </div>
         <div className="flex-center gap-3">
-          <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('balances'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
+          <Button variant="primary" icon={Plus} onClick={() => setApplyModalOpen(true)}>
+            Add New Leave
+          </Button>
+          <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('policies'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
             Policy Controls
           </Button>
-          <Button variant="primary" icon={Plus} onClick={() => setApplyModalOpen(true)}>
-            Apply Leave
+          <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
+            Add Holiday
           </Button>
         </div>
       </div>
@@ -518,7 +804,8 @@ const LeaveManagement = () => {
             { key: 'requests', label: 'Requests & Approval Center', icon: UserCheck },
             { key: 'analytics', label: 'Analytics & Team Calendar', icon: BarChart3 },
             { key: 'balances', label: 'Balances & Policy Limits', icon: HeartPulse },
-            { key: 'holidays', label: 'Holiday & Report Exports', icon: Calendar }
+            { key: 'holidays', label: 'Holiday & Report Exports', icon: Calendar },
+            { key: 'policies', label: 'Admin Leave Table', icon: Database }
           ].map(tab => (
             <button
               key={tab.key}
@@ -531,7 +818,6 @@ const LeaveManagement = () => {
           ))}
         </div>
         
-        {/* Toggle alerts sidebar button */}
         {activeTab === 'requests' && (
           <button 
             className={`alert-feed-toggle-btn flex-center gap-1 ${alertFeedOpen ? 'active' : ''}`}
@@ -552,7 +838,10 @@ const LeaveManagement = () => {
             
             {/* Top KPI Cards Row */}
             <div className="leaves-kpi-grid">
-              <div className="kpi-card-custom gradient-blue">
+              <div 
+                className="kpi-card-custom gradient-blue"
+                onClick={() => { setStatusTab('All'); setActiveTab('requests'); scrollToTable(); }}
+              >
                 <div className="kpi-info-sec">
                   <span className="kpi-title">Total Filings</span>
                   <span className="kpi-value">{totalRequestsCount}</span>
@@ -562,7 +851,10 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div className="kpi-card-custom gradient-orange">
+              <div 
+                className="kpi-card-custom gradient-orange"
+                onClick={() => { setStatusTab('Pending'); setActiveTab('requests'); scrollToTable(); }}
+              >
                 <div className="kpi-info-sec">
                   <span className="kpi-title">Pending Action</span>
                   <span className="kpi-value">{pendingRequestsCount}</span>
@@ -572,7 +864,10 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div className="kpi-card-custom gradient-green">
+              <div 
+                className="kpi-card-custom gradient-green"
+                onClick={() => { setStatusTab('Approved'); setActiveTab('requests'); scrollToTable(); }}
+              >
                 <div className="kpi-info-sec">
                   <span className="kpi-title">Approved Leaves</span>
                   <span className="kpi-value">{approvedRequestsCount}</span>
@@ -582,7 +877,10 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div className="kpi-card-custom gradient-red">
+              <div 
+                className="kpi-card-custom gradient-red"
+                onClick={() => { setStatusTab('Rejected'); setActiveTab('requests'); scrollToTable(); }}
+              >
                 <div className="kpi-info-sec">
                   <span className="kpi-title">Rejected Filings</span>
                   <span className="kpi-value">{rejectedRequestsCount}</span>
@@ -592,7 +890,10 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div className="kpi-card-custom gradient-purple">
+              <div 
+                className="kpi-card-custom gradient-purple"
+                onClick={() => { setStatusTab('OnLeaveToday'); setActiveTab('requests'); scrollToTable(); }}
+              >
                 <div className="kpi-info-sec">
                   <span className="kpi-title">On Leave Today</span>
                   <span className="kpi-value">{onLeaveTodayCount}</span>
@@ -602,7 +903,10 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div className="kpi-card-custom gradient-pink">
+              <div 
+                className="kpi-card-custom gradient-pink"
+                onClick={() => { setActiveTab('analytics'); }}
+              >
                 <div className="kpi-info-sec">
                   <span className="kpi-title">Utilization Rate</span>
                   <span className="kpi-value">{leaveUtilizationRate}</span>
@@ -650,13 +954,11 @@ const LeaveManagement = () => {
                   <label>Leave Category</label>
                   <select value={filterLeaveType} onChange={(e) => setFilterLeaveType(e.target.value)}>
                     <option value="All">All Categories</option>
-                    <option value="Casual Leave">Casual Leave</option>
-                    <option value="Sick Leave">Sick Leave</option>
-                    <option value="Annual Leave">Annual Leave</option>
-                    <option value="Emergency Leave">Emergency Leave</option>
-                    <option value="Maternity Leave">Maternity Leave</option>
-                    <option value="Paternity Leave">Paternity Leave</option>
-                    <option value="Work From Home">Work From Home</option>
+                    {leavePolicyConfigs.filter(p => p.isActive).map(policy => (
+                      <option key={policy.leaveCode} value={policy.leaveName}>
+                        {policy.leaveName} ({policy.leaveCode})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -692,6 +994,7 @@ const LeaveManagement = () => {
                     { key: 'Pending', label: 'Pending Requests', count: leavesList.filter(l => l.status === 'Pending').length, color: 'warning' },
                     { key: 'Approved', label: 'Approved Leaves', count: leavesList.filter(l => l.status === 'Approved').length, color: 'success' },
                     { key: 'Rejected', label: 'Rejected Filings', count: leavesList.filter(l => l.status === 'Rejected').length, color: 'danger' },
+                    { key: 'OnLeaveToday', label: 'On Leave Today', count: leavesList.filter(l => l.status === 'Approved' && l.fromDate <= '2026-06-02' && l.toDate >= '2026-06-02').length, color: 'purple' },
                     { key: 'All', label: 'Full Leave Directory', count: leavesList.length, color: 'neutral' }
                   ].map(statusItem => (
                     <button
@@ -714,7 +1017,6 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              {/* Data Table */}
               <div className="table-inner-wrapper mt-4">
                 <DataTable
                   columns={historyColumns}
@@ -938,7 +1240,6 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              {/* Grid representation */}
               <div className="calendar-month-grid">
                 {calendarDays.map((day) => (
                   <div key={day.dayNum} className="calendar-day-tile">
@@ -950,8 +1251,16 @@ const LeaveManagement = () => {
                     </div>
                     <div className="day-leaves-list">
                       {day.leaves.map((leave, idx) => (
-                        <div key={idx} className={`calendar-leave-chip color-${leave.color}`} title={`${leave.name} on ${leave.type}`}>
-                          {leave.name.split(' ')[0]} ({leave.type})
+                        <div key={idx} className={`calendar-leave-chip color-${leave.color}`} title={`${leave.name} on ${{ 'CL': 'Casual Leave', 'SL': 'Sick Leave', 'PL': 'Paid Leave', 'ML': 'Maternity Leave', 'UL': 'Unpaid Leave' }[leave.type] || leave.type}`}>
+                          {leave.name.split(' ')[0]} ({
+                            {
+                              'CL': 'Casual Leave',
+                              'SL': 'Sick Leave',
+                              'PL': 'Paid Leave',
+                              'ML': 'Maternity Leave',
+                              'UL': 'Unpaid Leave'
+                            }[leave.type] || leave.type
+                          })
                         </div>
                       ))}
                     </div>
@@ -1005,8 +1314,6 @@ const LeaveManagement = () => {
                       <th>SL Balance</th>
                       <th>PL Balance</th>
                       <th>Maternity</th>
-                      <th>Paternity</th>
-                      <th>Compensatory</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -1019,8 +1326,6 @@ const LeaveManagement = () => {
                         <td><span className="balance-badge sl-badge">{bal.sl} days</span></td>
                         <td><span className="balance-badge pl-badge">{bal.pl} days</span></td>
                         <td>{bal.maternity} days</td>
-                        <td>{bal.paternity} days</td>
-                        <td>{bal.compensatory} days</td>
                         <td>
                           <button
                             className="action-btn-mini edit-btn"
@@ -1037,13 +1342,13 @@ const LeaveManagement = () => {
               </div>
             </div>
 
-            {/* Leave directory cards */}
+            {/* Leave directory cards - dynamically from policy configs */}
             <div className="leave-types-directory-header mt-2">
               <h4>Leave Types Directory</h4>
               <p className="text-xs text-muted">Definitions and annual limits for all company-permitted absence codes</p>
             </div>
             <div className="leave-types-grid">
-              {leaveTypesList.map((item, index) => (
+              {leaveTypesList.filter(p => p.active).map((item, index) => (
                 <div key={index} className="card leave-type-card">
                   <div className="leave-type-card-header flex-row justify-between items-center">
                     <span className="type-badge-code">{item.code}</span>
@@ -1051,6 +1356,12 @@ const LeaveManagement = () => {
                   </div>
                   <h5 className="type-title-text mt-2">{item.name}</h5>
                   <p className="type-desc-text mt-1">{item.desc}</p>
+                  {item.maxCarry > 0 && (
+                    <span className="text-xs text-muted mt-2">Max Carry Forward: {item.maxCarry} days</span>
+                  )}
+                  {item.genderRestriction !== 'All' && (
+                    <span className="text-xs text-primary mt-1">🎯 {item.genderRestriction} only</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -1095,15 +1406,6 @@ const LeaveManagement = () => {
                 />
               </div>
 
-              <div className="policy-form-field">
-                <label>Paternity Leave Entitlement (Days)</label>
-                <input 
-                  type="number"
-                  value={policies.paternityDuration}
-                  onChange={(e) => setPolicies({ ...policies, paternityDuration: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-
               <div className="policy-checkbox-toggles flex-column gap-3 mt-2">
                 <label className="checkbox-toggle-label">
                   <input
@@ -1140,6 +1442,18 @@ const LeaveManagement = () => {
                     <p className="text-xs text-muted">Prevent overlap filings on already approved dates</p>
                   </div>
                 </label>
+
+                <label className="checkbox-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={policies.useGlobalPolicyTable}
+                    onChange={(e) => setPolicies({ ...policies, useGlobalPolicyTable: e.target.checked })}
+                  />
+                  <div className="checkbox-text-sec">
+                    <span>Use Global Policy Table</span>
+                    <p className="text-xs text-muted">Apply admin-defined default days from policy table</p>
+                  </div>
+                </label>
               </div>
 
               <div className="mt-4 pt-4 border-top">
@@ -1164,6 +1478,17 @@ const LeaveManagement = () => {
                 </Button>
               </div>
 
+              <div className="mt-2">
+                <Button 
+                  variant="secondary" 
+                  onClick={() => setActiveTab('policies')}
+                  className="w-full flex-center gap-2"
+                  icon={Database}
+                >
+                  Manage Leave Policy Table
+                </Button>
+              </div>
+
             </div>
           </div>
 
@@ -1183,7 +1508,7 @@ const LeaveManagement = () => {
                   <p className="text-muted text-xs">Approved scheduled holidays for the current fiscal calendar year</p>
                 </div>
                 <div className="flex-center gap-2">
-                  <Button variant="secondary" icon={Plus} onClick={() => addToast('info', 'Add custom holiday form is locked in mock mode.')}>
+                  <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
                     Add Holiday
                   </Button>
                 </div>
@@ -1299,6 +1624,399 @@ const LeaveManagement = () => {
         </div>
       )}
 
+      {/* ==================== TAB 5: ADMIN POLICY TABLE ==================== */}
+      {activeTab === 'policies' && (
+        <div className="leaves-tab-layout-vertical animate-fade-in flex-column grid-gap">
+          
+          {/* Policy Management Header */}
+          <div className="card filters-card-wrapper">
+            <div className="filters-header-row">
+              <div className="flex-center gap-2">
+                <Database size={18} className="text-primary" />
+                <h4>Global Leave Policy Configuration Table</h4>
+              </div>
+              <div className="flex-center gap-2">
+                <Button variant="danger" icon={RefreshCw} onClick={handleResetAllPolicies}>
+                  Reset to Default
+                </Button>
+                <Button variant="primary" icon={Plus} onClick={() => setShowAddPolicyModal(true)}>
+                  Add New Policy
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted mt-2">
+              Configure default leave quotas for all employees. Changes here will apply as default entitlements during leave balance initialization.
+            </p>
+          </div>
+
+          {/* Policy Filters */}
+          <div className="card filters-card-wrapper">
+            <div className="filters-controls-grid">
+              <div className="filter-input-box">
+                <label>Search Policy</label>
+                <div className="search-field-inner">
+                  <Search size={16} className="search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Search by code or name..."
+                    value={policySearchQuery}
+                    onChange={(e) => setPolicySearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="filter-input-box">
+                <label>Gender Restriction</label>
+                <select value={filterPolicyGender} onChange={(e) => setFilterPolicyGender(e.target.value)}>
+                  <option value="All">All Types</option>
+                  <option value="All">Unrestricted</option>
+                  <option value="Female">Female Only</option>
+                  <option value="Male">Male Only</option>
+                </select>
+              </div>
+
+              <div className="filter-input-box">
+                <label>Policy Status</label>
+                <select value={filterPolicyStatus} onChange={(e) => setFilterPolicyStatus(e.target.value)}>
+                  <option value="All">All Policies</option>
+                  <option value="Active">Active Policies</option>
+                  <option value="Inactive">Inactive Policies</option>
+                </select>
+              </div>
+
+              <div className="filter-input-box">
+                <label>Total Policies</label>
+                <div className="flex-center gap-2 mt-2">
+                  <Badge variant="primary">Active: {leavePolicyConfigs.filter(p => p.isActive).length}</Badge>
+                  <Badge variant="neutral">Total: {leavePolicyConfigs.length}</Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Policy Table */}
+          <div className="card">
+            <div className="table-inner-wrapper">
+              <div className="policy-admin-table">
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th>Leave Code</th>
+                      <th>Leave Name</th>
+                      <th>Default Days (Annual)</th>
+                      <th>Max Carry Forward</th>
+                      <th>Gender Restriction</th>
+                      <th>Status</th>
+                      <th>Description</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getFilteredPolicies().map((policy) => (
+                      <tr key={policy.id} className={!policy.isActive ? 'inactive-row' : ''}>
+                        <td><strong className="text-primary">{policy.leaveCode}</strong></td>
+                        <td>{policy.leaveName}</td>
+                        <td>
+                          <span className="policy-days-badge">
+                            {policy.defaultDays} {policy.defaultDays === 1 ? 'day' : 'days'}
+                          </span>
+                        </td>
+                        <td>
+                          {policy.maxCarryForward > 0 ? (
+                            <span className="carry-badge">{policy.maxCarryForward} days</span>
+                          ) : (
+                            <span className="text-muted text-xs">No carry forward</span>
+                          )}
+                        </td>
+                        <td>
+                          {policy.genderRestriction === 'All' ? (
+                            <Badge variant="neutral">All</Badge>
+                          ) : policy.genderRestriction === 'Female' ? (
+                            <Badge variant="purple">👩 Female Only</Badge>
+                          ) : (
+                            <Badge variant="blue">👨 Male Only</Badge>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            className={`status-toggle-btn ${policy.isActive ? 'active' : 'inactive'}`}
+                            onClick={() => handleTogglePolicyStatus(policy.id, policy.isActive)}
+                          >
+                            {policy.isActive ? 'Active' : 'Inactive'}
+                          </button>
+                        </td>
+                        <td>
+                          <span className="text-secondary text-xs policy-desc-preview" title={policy.description}>
+                            {policy.description.length > 35 ? policy.description.substring(0, 35) + '...' : policy.description}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="policy-actions">
+                            <button
+                              className="action-btn-mini edit-btn"
+                              onClick={() => handleEditPolicyClick(policy)}
+                              title="Edit Policy"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              className="action-btn-mini danger-btn"
+                              onClick={() => setShowDeletePolicyConfirm(policy)}
+                              title="Delete Policy"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {getFilteredPolicies().length === 0 && (
+                  <div className="empty-table-state text-center py-8">
+                    <Database size={48} className="text-muted mx-auto mb-3" />
+                    <p className="text-secondary">No policies found matching your filters.</p>
+                    <Button variant="secondary" className="mt-3" onClick={() => {
+                      setPolicySearchQuery('');
+                      setFilterPolicyGender('All');
+                      setFilterPolicyStatus('All');
+                    }}>
+                      Clear Filters
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Info */}
+          <div className="card bg-primary-light border-primary">
+            <div className="flex-row justify-between items-center flex-wrap gap-3">
+              <div className="flex-center gap-3">
+                <Info size={20} className="text-primary" />
+                <div>
+                  <h5 className="text-sm font-semibold">How Policy Table Works</h5>
+                  <p className="text-xs text-muted">These default values are applied when initializing employee leave balances. HR can override individual employee balances in the "Balances" tab.</p>
+                </div>
+              </div>
+              <div className="flex-center gap-2">
+                <span className="text-xs text-primary">Total Annual Leave Quota: </span>
+                <strong>{leavePolicyConfigs.filter(p => p.isActive && p.defaultDays > 0).reduce((sum, p) => sum + p.defaultDays, 0)} days</strong>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ==================== MODAL: EDIT POLICY ==================== */}
+      <Modal
+        isOpen={editingPolicy !== null}
+        onClose={() => setEditingPolicy(null)}
+        title={`Edit Leave Policy: ${editingPolicy?.leaveName}`}
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setEditingPolicy(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleUpdatePolicy} icon={Save}>
+              Update Policy
+            </Button>
+          </div>
+        }
+      >
+        {editingPolicy && (
+          <div className="policy-edit-form animate-fade-in flex-column gap-4">
+            <div className="apply-fields-grid-2">
+              <div className="policy-form-field">
+                <label>Leave Code *</label>
+                <input
+                  type="text"
+                  value={policyEditForm.leaveCode}
+                  onChange={(e) => setPolicyEditForm({ ...policyEditForm, leaveCode: e.target.value.toUpperCase() })}
+                  maxLength={5}
+                  placeholder="e.g., CL, SL, PL"
+                />
+              </div>
+              <div className="policy-form-field">
+                <label>Leave Name *</label>
+                <input
+                  type="text"
+                  value={policyEditForm.leaveName}
+                  onChange={(e) => setPolicyEditForm({ ...policyEditForm, leaveName: e.target.value })}
+                  placeholder="e.g., Casual Leave"
+                />
+              </div>
+            </div>
+
+            <div className="apply-fields-grid-2">
+              <div className="policy-form-field">
+                <label>Default Days (Annual)</label>
+                <input
+                  type="number"
+                  value={policyEditForm.defaultDays}
+                  onChange={(e) => setPolicyEditForm({ ...policyEditForm, defaultDays: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  max="365"
+                />
+              </div>
+              <div className="policy-form-field">
+                <label>Max Carry Forward Days</label>
+                <input
+                  type="number"
+                  value={policyEditForm.maxCarryForward}
+                  onChange={(e) => setPolicyEditForm({ ...policyEditForm, maxCarryForward: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  max="365"
+                />
+              </div>
+            </div>
+
+            <div className="apply-fields-grid-2">
+              <div className="policy-form-field">
+                <label>Gender Restriction</label>
+                <select
+                  value={policyEditForm.genderRestriction}
+                  onChange={(e) => setPolicyEditForm({ ...policyEditForm, genderRestriction: e.target.value })}
+                >
+                  <option value="All">All Employees</option>
+                  <option value="Female">Female Only</option>
+                  <option value="Male">Male Only</option>
+                </select>
+              </div>
+              <div className="policy-form-field">
+                <label>Status</label>
+                <select
+                  value={policyEditForm.isActive ? 'active' : 'inactive'}
+                  onChange={(e) => setPolicyEditForm({ ...policyEditForm, isActive: e.target.value === 'active' })}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="policy-form-field">
+              <label>Description</label>
+              <textarea
+                value={policyEditForm.description}
+                onChange={(e) => setPolicyEditForm({ ...policyEditForm, description: e.target.value })}
+                rows={3}
+                placeholder="Describe when and how this leave type can be used..."
+              />
+            </div>
+
+            <div className="info-box bg-primary-light p-3 rounded-md">
+              <p className="text-xs text-secondary">
+                <strong>Note:</strong> Changes to default days will apply to new employees only. Existing employee balances need to be manually adjusted in the Balances tab.
+              </p>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ==================== MODAL: ADD NEW POLICY ==================== */}
+      <Modal
+        isOpen={showAddPolicyModal}
+        onClose={() => setShowAddPolicyModal(false)}
+        title="Add New Leave Policy"
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setShowAddPolicyModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleAddPolicy} icon={Plus}>
+              Add Policy
+            </Button>
+          </div>
+        }
+      >
+        <div className="policy-add-form animate-fade-in flex-column gap-4">
+          <div className="apply-fields-grid-2">
+            <div className="policy-form-field">
+              <label>Leave Code *</label>
+              <input
+                type="text"
+                value={newPolicyForm.leaveCode}
+                onChange={(e) => setNewPolicyForm({ ...newPolicyForm, leaveCode: e.target.value.toUpperCase() })}
+                maxLength={5}
+                placeholder="e.g., CL, SL, PL"
+                required
+              />
+            </div>
+            <div className="policy-form-field">
+              <label>Leave Name *</label>
+              <input
+                type="text"
+                value={newPolicyForm.leaveName}
+                onChange={(e) => setNewPolicyForm({ ...newPolicyForm, leaveName: e.target.value })}
+                placeholder="e.g., Casual Leave"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="apply-fields-grid-2">
+            <div className="policy-form-field">
+              <label>Default Days (Annual)</label>
+              <input
+                type="number"
+                value={newPolicyForm.defaultDays}
+                onChange={(e) => setNewPolicyForm({ ...newPolicyForm, defaultDays: parseInt(e.target.value) || 0 })}
+                min="0"
+                max="365"
+              />
+            </div>
+            <div className="policy-form-field">
+              <label>Max Carry Forward Days</label>
+              <input
+                type="number"
+                value={newPolicyForm.maxCarryForward}
+                onChange={(e) => setNewPolicyForm({ ...newPolicyForm, maxCarryForward: parseInt(e.target.value) || 0 })}
+                min="0"
+                max="365"
+              />
+            </div>
+          </div>
+
+          <div className="apply-fields-grid-2">
+            <div className="policy-form-field">
+              <label>Gender Restriction</label>
+              <select
+                value={newPolicyForm.genderRestriction}
+                onChange={(e) => setNewPolicyForm({ ...newPolicyForm, genderRestriction: e.target.value })}
+              >
+                <option value="All">All Employees</option>
+                <option value="Female">Female Only</option>
+                <option value="Male">Male Only</option>
+              </select>
+            </div>
+            <div className="policy-form-field">
+              <label>Status</label>
+              <select
+                value={newPolicyForm.isActive ? 'active' : 'inactive'}
+                onChange={(e) => setNewPolicyForm({ ...newPolicyForm, isActive: e.target.value === 'active' })}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="policy-form-field">
+            <label>Description</label>
+            <textarea
+              value={newPolicyForm.description}
+              onChange={(e) => setNewPolicyForm({ ...newPolicyForm, description: e.target.value })}
+              rows={3}
+              placeholder="Describe when and how this leave type can be used..."
+            />
+          </div>
+        </div>
+      </Modal>
+
       {/* ==================== MODAL: ADJUST BALANCES ==================== */}
       <Modal
         isOpen={balanceEditEmployee !== null}
@@ -1352,22 +2070,7 @@ const LeaveManagement = () => {
                   onChange={(e) => setBalanceInput({ ...balanceInput, maternity: parseInt(e.target.value) || 0 })}
                 />
               </div>
-              <div className="policy-form-field">
-                <label>Paternity Leave</label>
-                <input 
-                  type="number" 
-                  value={balanceInput.paternity} 
-                  onChange={(e) => setBalanceInput({ ...balanceInput, paternity: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="policy-form-field">
-                <label>Compensatory</label>
-                <input 
-                  type="number" 
-                  value={balanceInput.compensatory} 
-                  onChange={(e) => setBalanceInput({ ...balanceInput, compensatory: parseInt(e.target.value) || 0 })}
-                />
-              </div>
+
             </div>
           </div>
         )}
@@ -1376,16 +2079,16 @@ const LeaveManagement = () => {
       {/* ==================== MODAL: APPLY LEAVE ==================== */}
       <Modal
         isOpen={applyModalOpen}
-        onClose={() => setApplyModalOpen(false)}
-        title="Apply Leave Absence Request"
+        onClose={handleCloseApplyModal}
+        title={editingLeave ? `Edit Leave Request: ${editingLeave.id}` : "Apply Leave Absence Request"}
         size="md"
         footer={
           <div className="modal-actions-wrapper">
-            <Button variant="secondary" onClick={() => setApplyModalOpen(false)}>
-              Cancel Request
+            <Button variant="secondary" onClick={handleCloseApplyModal}>
+              {editingLeave ? "Cancel Edit" : "Cancel Request"}
             </Button>
-            <Button variant="primary" onClick={handleApplySubmit} icon={Plus}>
-              Submit Application
+            <Button variant="primary" onClick={handleApplySubmit} icon={editingLeave ? Check : Plus}>
+              {editingLeave ? "Save Changes" : "Submit Application"}
             </Button>
           </div>
         }
@@ -1401,7 +2104,26 @@ const LeaveManagement = () => {
               <label>Select Filing Employee *</label>
               <select
                 value={applyForm.employeeId}
-                onChange={(e) => setApplyForm({ ...applyForm, employeeId: e.target.value })}
+                onChange={(e) => {
+                  const empId = e.target.value;
+                  const emp = employees.find(x => x.id === empId);
+                  let leaveType = applyForm.type;
+                  if (emp) {
+                    const selectedPolicy = leavePolicyConfigs.find(p => p.leaveName === leaveType);
+                    if (selectedPolicy) {
+                      if (selectedPolicy.leaveName === 'Maternity Leave' && (emp.gender !== 'Female' || emp.maritalStatus !== 'Married')) {
+                        leaveType = 'Casual Leave';
+                      }
+                      if (selectedPolicy.genderRestriction === 'Female' && emp.gender !== 'Female') {
+                        leaveType = 'Casual Leave';
+                      }
+                      if (selectedPolicy.genderRestriction === 'Male' && emp.gender !== 'Male') {
+                        leaveType = 'Casual Leave';
+                      }
+                    }
+                  }
+                  setApplyForm({ ...applyForm, employeeId: empId, type: leaveType });
+                }}
                 required
               >
                 <option value="">-- Choose Employee --</option>
@@ -1417,14 +2139,27 @@ const LeaveManagement = () => {
                 value={applyForm.type}
                 onChange={(e) => setApplyForm({ ...applyForm, type: e.target.value })}
               >
-                <option value="Casual Leave">Casual Leave (CL)</option>
-                <option value="Sick Leave">Sick Leave (SL)</option>
-                <option value="Annual Leave">Paid Leave (PL)</option>
-                <option value="Emergency Leave">Emergency Leave</option>
-                <option value="Maternity Leave">Maternity Leave</option>
-                <option value="Paternity Leave">Paternity Leave</option>
-                <option value="Work From Home">Work From Home (WFH)</option>
-                <option value="Unpaid Leave">Unpaid Leave</option>
+                {leavePolicyConfigs
+                  .filter(p => p.isActive)
+                  .filter(p => {
+                    const emp = employees.find(x => x.id === applyForm.employeeId);
+                    if (!emp) return true;
+                    if (p.leaveName === 'Maternity Leave' && (emp.gender !== 'Female' || emp.maritalStatus !== 'Married')) {
+                      return false;
+                    }
+                    if (p.genderRestriction === 'Female' && emp.gender !== 'Female') {
+                      return false;
+                    }
+                    if (p.genderRestriction === 'Male' && emp.gender !== 'Male') {
+                      return false;
+                    }
+                    return true;
+                  })
+                  .map(policy => (
+                    <option key={policy.leaveCode} value={policy.leaveName}>
+                      {policy.leaveName} ({policy.leaveCode}) - {policy.defaultDays} days/year
+                    </option>
+                  ))}
               </select>
             </div>
           </div>
@@ -1727,6 +2462,71 @@ const LeaveManagement = () => {
 
           </div>
         )}
+      </Modal>
+
+      {/* ==================== MODAL: ADD HOLIDAY ==================== */}
+      <Modal
+        isOpen={showAddHolidayModal}
+        onClose={() => setShowAddHolidayModal(false)}
+        title="Add New Scheduled Holiday"
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setShowAddHolidayModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleAddHoliday} icon={Plus}>
+              Add Holiday
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleAddHoliday} className="policy-add-form animate-fade-in flex-column gap-4">
+          <div className="apply-fields-grid-2">
+            <div className="policy-form-field">
+              <label>Holiday Date *</label>
+              <input
+                type="date"
+                value={newHolidayForm.date}
+                onChange={(e) => setNewHolidayForm({ ...newHolidayForm, date: e.target.value })}
+                required
+              />
+            </div>
+            <div className="policy-form-field">
+              <label>Holiday Description (Name) *</label>
+              <input
+                type="text"
+                value={newHolidayForm.name}
+                onChange={(e) => setNewHolidayForm({ ...newHolidayForm, name: e.target.value })}
+                placeholder="e.g., Independence Day"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="policy-form-field">
+            <label>Category *</label>
+            <select
+              value={newHolidayForm.type}
+              onChange={(e) => setNewHolidayForm({ ...newHolidayForm, type: e.target.value })}
+            >
+              <option value="National">National Holiday</option>
+              <option value="Regional">Regional Holiday</option>
+              <option value="Company">Company Holiday</option>
+              <option value="Optional">Optional Holiday</option>
+            </select>
+          </div>
+
+          <div className="policy-form-field">
+            <label>Detailed Summary (Description)</label>
+            <textarea
+              value={newHolidayForm.description}
+              onChange={(e) => setNewHolidayForm({ ...newHolidayForm, description: e.target.value })}
+              rows={3}
+              placeholder="Provide a brief summary or historical context..."
+            />
+          </div>
+        </form>
       </Modal>
 
     </div>

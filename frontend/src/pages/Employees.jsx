@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './Employees.css';
 import { useApp } from '../context/AppContext';
+import { FIELD_LABELS } from '../utils/fieldLabels';
 import usePageLoading from '../hooks/usePageLoading';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
@@ -12,8 +13,8 @@ import {
   Search, UserPlus, Eye, Edit2, Trash2, ChevronRight, ArrowLeft,
   Phone, Mail, Calendar, CheckCircle, XCircle, UserCheck, Download,
   SlidersHorizontal, RefreshCw, Users, Briefcase, Activity,
-  MoreVertical, Copy, X, ChevronUp, ChevronDown, Trophy, AlertTriangle,
-  BarChart2, TrendingUp, Shield, Clock, MapPin, User, Star, CreditCard
+  X, ChevronUp, ChevronDown, Trophy, AlertTriangle,
+  Shield, Clock, User, Star, CreditCard, Save
 } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -156,11 +157,11 @@ const COLUMN_GROUPS = [
 
 const COLUMN_LABELS = {
   checkbox: 'Select', name: 'Full Name', id: 'Employee ID', designation: 'Designation',
-  department: 'Department', branch: 'Branch', teamLeader: 'Team Leader', projectManager: 'Project Manager',
-  phone: 'Contact Number', workEmail: 'Email Address', joinDate: 'Joining Date',
-  attendanceStatus: 'Attendance Status', workStatus: 'Work Status', accountStatus: 'Account Status',
-  todayPunchIn: "Today's Punch In", todayPunchOut: "Today's Punch Out", todayWorkingHours: "Working Hours",
-  lastSeen: 'Last Seen', employeeType: 'Employee Type', shift: 'Shift Time', experience: 'Experience', lastLogin: 'Last Login',
+  department: 'Department', branch: 'Branch/Agency', teamLeader: 'Team Leader', projectManager: 'Project Manager',
+  phone: 'Contact Number', workEmail: 'Official Company Email', joinDate: 'Joining Date',
+  attendanceStatus: 'Attendance Status', workStatus: 'Work Status', accountStatus: 'Employment Status',
+  todayPunchIn: "Punch In Time", todayPunchOut: "Punch Out Time", todayWorkingHours: "Working Hours",
+  lastSeen: 'Last Seen', employeeType: 'Employee Type', shift: 'Shift Timing', experience: 'Experience', lastLogin: 'Last Login',
   currentProjects: 'Projects Count', leaveBalance: 'Leave Balance', productivityScore: 'Productivity',
   performanceRating: 'Performance Rating', actions: 'Actions'
 };
@@ -212,12 +213,33 @@ const Employees = () => {
   const [formMode, setFormMode] = useState('add');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [wizardStep, setWizardStep] = useState(1);
+  const [createdEmpInfo, setCreatedEmpInfo] = useState(null);
+  
+  const canNavigateToStep = (targetStep) => {
+    if (targetStep < wizardStep) return true;
+    if (targetStep > wizardStep && !isStepValid(wizardStep)) {
+      addToast('warning', `Please complete Step ${wizardStep} first`);
+      return false;
+    }
+    return true;
+  };
+  
+  const handleStepClick = (step) => {
+    if (canNavigateToStep(step)) {
+      setWizardStep(step);
+      addToast('info', `Step ${step} selected`);
+    }
+  };
+  
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', dob: '', gender: 'Male',
+    personalEmail: '', alternatePhone: '',
     currentAddress: '', permanentAddress: '',
-    emergencyContactName: '', emergencyContactPhone: '', emergencyContactAddress: '', emergencyContactRelation: '',
-    username: '', password: '',
-    department: 'Engineering', branch: 'Jaipur', team: '',
+    city: '', state: '', country: '', zipCode: '',
+    bloodGroup: '', maritalStatus: '',
+    emergencyContactName: '', emergencyContactPhone: '', emergencyContactPhoneAlt: '', emergencyContactAddress: '', emergencyContactRelation: '',
+    username: '', password: '', confirmPassword: '', officialEmail: '',
+    department: 'Engineering', branch: 'Jaipur', team: '', teamName: '',
     designation: '', role: 'Employee', roleId: 'employee',
     joinDate: new Date().toISOString().split('T')[0],
     id: '', avatar: '',
@@ -225,33 +247,63 @@ const Employees = () => {
     salaryAmount: '', salaryAllowances: '', salaryDeductions: '',
     teamLeader: '', projectManager: '',
     companyName: '',
-    branchAddress: ''
+    branchAddress: '',
+    workLocation: '', workMode: 'Work From Office',
+    experience: '',
+    permissions: {
+      dashboard: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+      employees: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+      attendance: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+      leaves: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+      projects: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+      payroll: { view: false, create: false, edit: false, delete: false, approve: false, export: false },
+      tasks: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+      reports: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+      settings: { view: false, create: false, edit: false, delete: false, approve: false, export: false },
+      tickets: { view: true, create: true, edit: false, delete: false, approve: false, export: false },
+      announcements: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+      documents: { view: true, create: true, edit: true, delete: false, approve: false, export: true }
+    },
+    shiftType: 'Morning Shift',
+    weeklyOffDays: ['Sunday'],
+    attendanceRule: 'Standard 9-6',
+    punchInTime: '09:00 AM',
+    punchOutTime: '06:00 PM',
+    overtimeEligibility: false,
+    salaryType: 'Monthly Fixed',
+    monthlySalary: '',
+    panNumber: '',
+    aadhaarNumber: '',
+    taxDetails: '',
+    multiDeviceLogin: false,
+    ipRestriction: '',
+    twoFactorAuth: false,
+    loginActivityTracking: 'Enabled',
+    sessionTimeout: '30 minutes',
+    employeeType: 'Full Time',
+    probationEndDate: '',
+    contractEndDate: ''
   });
+  
   const [uploadedDocs, setUploadedDocs] = useState({
     aadhaar: null, pan: null, resume: null,
-    certificates: null, offerLetter: null, profilePhoto: null
+    certificates: null, offerLetter: null, profilePhoto: null,
+    experienceLetter: null, addressProof: null, passportPhoto: null, signedAgreements: null
   });
 
-  // ── Profile Preview Card ──
   const [previewEmp, setPreviewEmp] = useState(null);
   const [previewPos, setPreviewPos] = useState({ top: 0, left: 0 });
   const previewRef = useRef(null);
-
-  // ── Hover Quick View Card ──
   const [hoveredEmp, setHoveredEmp] = useState(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
-
-  // ── ID Card ──
   const [showIdCard, setShowIdCard] = useState(false);
   const [idCardEmployee, setIdCardEmployee] = useState(null);
   const idCardRef = useRef(null);
 
-  // ── Bulk modals ──
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showAssignLeaderModal, setShowAssignLeaderModal] = useState(false);
   const [transferDept, setTransferDept] = useState('Engineering');
   const [assignLeader, setAssignLeader] = useState('');
-  
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [bulkRole, setBulkRole] = useState('employee');
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -263,31 +315,117 @@ const Employees = () => {
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [bulkNotifyMsg, setBulkNotifyMsg] = useState('');
 
-  // ── Effects ──
+  const handleOpenAdd = () => {
+    setFormData({
+      name: '', email: '', phone: '', dob: '', gender: 'Male',
+      personalEmail: '', alternatePhone: '',
+      currentAddress: '', permanentAddress: '',
+      city: '', state: '', country: '', zipCode: '',
+      bloodGroup: '', maritalStatus: '',
+      emergencyContactName: '', emergencyContactPhone: '', emergencyContactPhoneAlt: '', emergencyContactAddress: '', emergencyContactRelation: '',
+      username: '', password: '', confirmPassword: '', officialEmail: '',
+      department: 'Engineering', branch: 'Jaipur', team: '', teamName: '',
+      designation: '', role: 'Employee', roleId: 'employee',
+      joinDate: new Date().toISOString().split('T')[0],
+      id: '', avatar: '',
+      shiftTiming: '09:00 AM - 06:00 PM',
+      salaryAmount: '', salaryAllowances: '', salaryDeductions: '',
+      teamLeader: '', projectManager: '',
+      companyName: '',
+      branchAddress: '',
+      workLocation: '', workMode: 'Work From Office',
+      experience: '',
+      permissions: {
+        dashboard: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+        employees: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+        attendance: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+        leaves: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+        projects: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+        payroll: { view: false, create: false, edit: false, delete: false, approve: false, export: false },
+        tasks: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+        reports: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+        settings: { view: false, create: false, edit: false, delete: false, approve: false, export: false },
+        tickets: { view: true, create: true, edit: false, delete: false, approve: false, export: false },
+        announcements: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
+        documents: { view: true, create: true, edit: true, delete: false, approve: false, export: true }
+      },
+      shiftType: 'Morning Shift',
+      weeklyOffDays: ['Sunday'],
+      attendanceRule: 'Standard 9-6',
+      punchInTime: '09:00 AM',
+      punchOutTime: '06:00 PM',
+      overtimeEligibility: false,
+      salaryType: 'Monthly Fixed',
+      monthlySalary: '',
+      panNumber: '',
+      aadhaarNumber: '',
+      taxDetails: '',
+      multiDeviceLogin: false,
+      ipRestriction: '',
+      twoFactorAuth: false,
+      loginActivityTracking: 'Enabled',
+      sessionTimeout: '30 minutes',
+      employeeType: 'Full Time',
+      probationEndDate: '',
+      contractEndDate: ''
+    });
+    setUploadedDocs({
+      aadhaar: null, pan: null, resume: null,
+      certificates: null, offerLetter: null, profilePhoto: null,
+      experienceLetter: null, addressProof: null, passportPhoto: null, signedAgreements: null
+    });
+    setWizardStep(1); setFormMode('add'); setShowFormPanel(true);
+  };
+  
+  const handleOpenEdit = (emp) => {
+    const generatedUsername = emp.username || (emp.name ? `${emp.name.split(' ')[0].toLowerCase()}.${emp.name.split(' ')[1]?.toLowerCase() || 'emp'}` : 'emp');
+    const generatedOfficialEmail = emp.officialEmail || emp.workEmail || emp.email || `${emp.name?.split(' ')[0]?.toLowerCase() || 'employee'}@saas.io`;
+
+    setFormData({ 
+      ...emp, 
+      username: generatedUsername,
+      officialEmail: generatedOfficialEmail,
+      password: '••••••••',
+      confirmPassword: '••••••••',
+      experience: emp.experience || '',
+      employeeType: emp.employeeType || 'Full Time',
+      probationEndDate: emp.probationEndDate || '',
+      contractEndDate: emp.contractEndDate || ''
+    });
+    setWizardStep(1); setFormMode('edit'); setSelectedEmployeeId(emp.id); setShowFormPanel(true);
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (location.pathname === '/employees/add' || params.get('action') === 'add') {
-      handleOpenAdd();
-    } else {
-      const editId = params.get('edit');
-      if (editId) {
+    const isAdd = location.pathname === '/employees/add' || params.get('action') === 'add';
+    const editId = params.get('edit');
+
+    if (isAdd) {
+      if (!showFormPanel || formMode !== 'add') {
+        setTimeout(() => handleOpenAdd(), 0);
+      }
+    } else if (editId) {
+      if (!showFormPanel || formMode !== 'edit' || selectedEmployeeId !== editId) {
         const emp = employees.find(e => e.id === editId);
         if (emp) {
-          handleOpenEdit(emp);
+          setTimeout(() => handleOpenEdit(emp), 0);
         } else {
-          setShowFormPanel(false);
+          if (showFormPanel) {
+            setTimeout(() => setShowFormPanel(false), 0);
+          }
         }
-      } else {
-        setShowFormPanel(false);
+      }
+    } else {
+      if (showFormPanel) {
+        setTimeout(() => setShowFormPanel(false), 0);
       }
     }
-  }, [location, employees]);
+  }, [location.pathname, location.search, employees, showFormPanel, formMode, selectedEmployeeId]);
 
   useEffect(() => {
     localStorage.setItem(LS_KEY, JSON.stringify(colVis));
   }, [colVis]);
 
-  // Close toggle panel on outside click
   useEffect(() => {
     const handler = (e) => {
       if (togglePanelRef.current && !togglePanelRef.current.contains(e.target)) {
@@ -298,7 +436,6 @@ const Employees = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Close preview card on outside click / Escape
   useEffect(() => {
     const handleKey = (e) => { if (e.key === 'Escape') setPreviewEmp(null); };
     const handleClick = (e) => {
@@ -311,13 +448,11 @@ const Employees = () => {
     return () => { document.removeEventListener('keydown', handleKey); document.removeEventListener('mousedown', handleClick); };
   }, []);
 
-  // ── Sorting ──
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('asc'); }
   };
 
-  // ── Filter + Sort ──
   const filteredEmployees = employees.filter(e => {
     const ms = e.name.toLowerCase().includes(searchTerm.toLowerCase()) || e.id.toLowerCase().includes(searchTerm.toLowerCase());
     const md = deptFilter ? e.department === deptFilter : true;
@@ -339,7 +474,6 @@ const Employees = () => {
     return 0;
   });
 
-  // ── Selection helpers ──
   const allSelected = filteredEmployees.length > 0 && filteredEmployees.every(e => selectedIds.has(e.id));
   const toggleSelectAll = () => {
     setSelectedIds(allSelected ? new Set() : new Set(filteredEmployees.map(e => e.id)));
@@ -349,7 +483,6 @@ const Employees = () => {
   };
   const selectedEmployees = employees.filter(e => selectedIds.has(e.id));
 
-  // ── Preview Card ──
   const openPreview = (e, emp) => {
     e.stopPropagation();
     const cardW = 320;
@@ -363,7 +496,7 @@ const Employees = () => {
   const handleNameMouseEnter = (e, emp) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setHoverPos({
-      top: rect.top + window.scrollY - 150, // slightly offset above the name
+      top: rect.top + window.scrollY - 150,
       left: rect.left + window.scrollX + 50
     });
     setHoveredEmp(emp);
@@ -373,7 +506,6 @@ const Employees = () => {
     setHoveredEmp(null);
   };
 
-  // ── Bulk Actions ──
   const handleBulkDelete = () => {
     showConfirm(
       'Delete Selected Employees',
@@ -494,9 +626,7 @@ const Employees = () => {
 
   const handleBulkAssignShift = () => {
     selectedIds.forEach(id => {
-      updateEmployee(id, {
-        shift: bulkShift
-      });
+      updateEmployee(id, { shift: bulkShift });
     });
     setShowShiftModal(false);
     setSelectedIds(new Set());
@@ -519,61 +649,127 @@ const Employees = () => {
     }, 800);
   };
 
-  // ── Form Handlers ──
-  const handleOpenAdd = () => {
-    setFormData({
-      name: '', email: '', phone: '', dob: '', gender: 'Male',
-      currentAddress: '', permanentAddress: '',
-      emergencyContactName: '', emergencyContactPhone: '', emergencyContactAddress: '', emergencyContactRelation: '',
-      username: '', password: '',
-      department: 'Engineering', branch: 'Jaipur', team: '',
-      designation: '', role: 'Employee', roleId: 'employee',
-      joinDate: new Date().toISOString().split('T')[0],
-      id: '', avatar: '',
-      shiftTiming: '09:00 AM - 06:00 PM',
-      salaryAmount: '', salaryAllowances: '', salaryDeductions: '',
-      teamLeader: '', projectManager: '',
-      companyName: '',
-      branchAddress: ''
-    });
-    setUploadedDocs({
-      aadhaar: null, pan: null, resume: null,
-      certificates: null, offerLetter: null, profilePhoto: null
-    });
-    setWizardStep(1); setFormMode('add'); setShowFormPanel(true);
-  };
-  const handleOpenEdit = (emp) => {
-    setFormData({ ...emp, password: '••••••••' });
-    setWizardStep(1); setFormMode('edit'); setSelectedEmployeeId(emp.id); setShowFormPanel(true);
-  };
-  const handleOpenView = (emp) => {
-    setFormData(emp); setSlideOverOpen(true);
-  };
-  const isStepValid = () => {
-    if (wizardStep === 1) return formData.name && formData.email && formData.phone;
-    if (wizardStep === 2) return formData.designation && formData.department && formData.branch;
-    if (wizardStep === 3) return formData.roleId;
-    if (wizardStep === 4) return true;
-    if (wizardStep === 5) return true;
+  const isStepValid = (step = wizardStep) => {
+    if (step === 1) return !!(formData.name && formData.email && formData.phone);
+    if (step === 2) return !!(formData.designation && formData.department && formData.branch && formData.joinDate);
+    if (step === 3) {
+      const hasUsername = !!formData.username;
+      if (formMode === 'add') {
+        return !!(hasUsername && formData.password && formData.password.length >= 8 && formData.password === formData.confirmPassword);
+      }
+      const isPasswordChanged = formData.password && formData.password !== '••••••••';
+      if (isPasswordChanged) {
+        return !!(hasUsername && formData.password.length >= 8 && formData.password === formData.confirmPassword);
+      }
+      return hasUsername;
+    }
     return true;
   };
-  const handleNextStep = () => { if (isStepValid()) setWizardStep(p => p + 1); };
+  
+  const handleNextStep = () => { 
+    if (isStepValid()) {
+      if (wizardStep < 7) setWizardStep(p => p + 1);
+    } else {
+      addToast('warning', `Please complete all required fields in Step ${wizardStep}`);
+    }
+  };
+  
   const handlePrevStep = () => setWizardStep(p => Math.max(p - 1, 1));
+  
+  const handleWorkModeChange = (mode) => {
+    setFormData(p => {
+      if (mode === 'Work From Home') {
+        return {
+          ...p,
+          workMode: mode,
+          shiftType: 'Flexible Shift',
+          shiftTiming: 'Flexible',
+          attendanceRule: 'Flexible Hours',
+          punchInTime: 'Not Applicable',
+          punchOutTime: 'Not Applicable',
+          overtimeEligibility: false
+        };
+      } else {
+        return {
+          ...p,
+          workMode: mode,
+          shiftType: p.shiftType === 'Flexible Shift' ? 'Morning Shift' : p.shiftType,
+          shiftTiming: p.shiftTiming === 'Flexible' ? '09:00 AM - 06:00 PM' : p.shiftTiming,
+          attendanceRule: p.attendanceRule === 'Flexible Hours' ? 'Standard 9-6' : p.attendanceRule,
+          punchInTime: p.punchInTime === 'Not Applicable' ? '09:00 AM' : p.punchInTime,
+          punchOutTime: p.punchOutTime === 'Not Applicable' ? '06:00 PM' : p.punchOutTime
+        };
+      }
+    });
+  };
+  
   const handleFormSubmit = () => {
     const matchingRole = roles.find(r => r.id === formData.roleId) || roles[3];
-    const finalData = { ...formData, roleId: matchingRole.id, role: matchingRole.name, avatar: uploadedDocs.profilePhoto ? URL.createObjectURL(uploadedDocs.profilePhoto) : formData.avatar };
-    if (formMode === 'add') addEmployee(finalData);
-    else updateEmployee(selectedEmployeeId, finalData);
+    const finalData = { 
+      ...formData, 
+      name: formData.name,
+      roleId: matchingRole.id, 
+      role: matchingRole.name, 
+      avatar: uploadedDocs.profilePhoto ? URL.createObjectURL(uploadedDocs.profilePhoto) : formData.avatar 
+    };
+    if (formMode === 'add') {
+      const finalId = finalData.id || `EMP-2026-${String(employees.length + 1).padStart(3, '0')}`;
+      const finalEmail = finalData.officialEmail || `${formData.name.toLowerCase().split(' ').join('.')}@saas.io`;
+      setCreatedEmpInfo({
+        ...finalData,
+        id: finalId,
+        workEmail: finalEmail,
+        password: formData.password || 'temp@123'
+      });
+      addEmployee({ ...finalData, id: finalId, workEmail: finalEmail });
+      addToast('success', `Employee ${formData.name} created successfully!`);
+    } else {
+      updateEmployee(selectedEmployeeId, finalData);
+      addToast('success', `Employee ${formData.name} updated successfully!`);
+    }
     setShowFormPanel(false);
     setSlideOverOpen(false);
-    if (location.pathname === '/employees/add') navigate('/employees');
+    navigate('/employees');
   };
+  
+  const handleSaveDraft = () => {
+    const matchingRole = roles.find(r => r.id === formData.roleId) || roles[3];
+    const finalData = { 
+      ...formData, 
+      name: formData.name,
+      status: 'Draft',
+      roleId: matchingRole.id, 
+      role: matchingRole.name, 
+      avatar: uploadedDocs.profilePhoto ? URL.createObjectURL(uploadedDocs.profilePhoto) : formData.avatar 
+    };
+    const finalId = finalData.id || `EMP-2026-${String(employees.length + 1).padStart(3, '0')}`;
+    const finalEmail = finalData.officialEmail || `${formData.name.toLowerCase().split(' ').join('.')}@saas.io`;
+    addEmployee({ ...finalData, id: finalId, workEmail: finalEmail });
+    addToast('success', `Draft employee ${formData.name} saved successfully!`);
+    setShowFormPanel(false);
+    navigate('/employees');
+  };
+  
+  const handleResetForm = () => {
+    handleOpenAdd();
+    addToast('info', 'Form has been reset.');
+  };
+  
+  const handleGenerateEmployeeId = () => {
+    const randomSeq = Math.floor(100 + Math.random() * 900);
+    const newId = `EMP-2026-${randomSeq}`;
+    setFormData(prev => ({ ...prev, id: newId }));
+    addToast('success', `Generated ID: ${newId}`);
+  };
+  
   const handleDeactivate = (id, name) => {
     showConfirm('Deactivate Employee', `Are you sure you want to deactivate ${name}?`, () => deactivateEmployee(id), 'danger');
   };
+  
   const handleActivate = (id, name) => {
     showConfirm('Activate Employee', `Are you sure you want to activate ${name}?`, () => activateEmployee(id), 'primary');
   };
+  
   const downloadIdCard = async () => {
     if (!idCardRef.current || !idCardEmployee) return;
     try {
@@ -586,12 +782,13 @@ const Employees = () => {
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch (err) {
+      console.error(err);
       addToast('error', 'Failed to download ID card.');
     }
   };
+  
   const handleClearFilters = () => { setSearchTerm(''); setDeptFilter(''); setBranchFilter(''); setStatusFilter(''); setAttFilter(''); setShiftFilter(''); setPunchFilter(''); };
 
-  // ── Widgets Data ──
   const totalEmp = employees.length;
   const presentCount = employees.filter(e => e.attendanceStatus === 'Present').length;
   const absentCount = employees.filter(e => e.attendanceStatus === 'Absent').length;
@@ -602,34 +799,62 @@ const Employees = () => {
   const avgTaskCompletion = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.taskCompletion || 70), 0) / Math.max(employees.length, 1));
   const avgRating = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.overall || 70), 0) / Math.max(employees.length, 1));
 
-  // ── Sort indicator ──
-  const SortIcon = ({ col }) => {
-    if (sortKey !== col) return <span className="sort-neutral">⇅</span>;
-    return sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
-  };
-
-  // ── Table Header Cell ──
-  const TH = ({ col, label, sortable, style }) => (
+  const renderTH = (col, label, sortable = false, style = undefined) => (
     <th style={style} onClick={sortable ? () => handleSort(col) : undefined}
-      className={sortable ? 'sortable-th' : ''}>
+      className={sortable ? 'sortable-th' : ''} key={col}>
       <span className="th-inner">
         {label}
-        {sortable && <SortIcon col={col} />}
+        {sortable && (
+          sortKey !== col ? <span className="sort-neutral">⇅</span> :
+          sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+        )}
       </span>
     </th>
   );
 
-  // ── Pagination ──
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
   const paginated = filteredEmployees.slice((page - 1) * pageSize, page * pageSize);
 
-  useEffect(() => { setPage(1); }, [searchTerm, deptFilter, branchFilter, statusFilter, attFilter]);
+  const [prevFilters, setPrevFilters] = useState({
+    searchTerm: '', deptFilter: '', branchFilter: '', statusFilter: '',
+    attFilter: '', shiftFilter: '', punchFilter: ''
+  });
+
+  if (
+    searchTerm !== prevFilters.searchTerm ||
+    deptFilter !== prevFilters.deptFilter ||
+    branchFilter !== prevFilters.branchFilter ||
+    statusFilter !== prevFilters.statusFilter ||
+    attFilter !== prevFilters.attFilter ||
+    shiftFilter !== prevFilters.shiftFilter ||
+    punchFilter !== prevFilters.punchFilter
+  ) {
+    setPrevFilters({ searchTerm, deptFilter, branchFilter, statusFilter, attFilter, shiftFilter, punchFilter });
+    setPage(1);
+  }
 
   const depts = [...new Set(employees.map(e => e.department))].sort();
   const branches = [...new Set(employees.map(e => e.branch))].sort();
   const leaders = employees.filter(e => e.roleId === 'team_leader' || e.roleId === 'super_admin');
+
+  const handleRemoveDocument = (key, label) => {
+    setUploadedDocs(prev => ({ ...prev, [key]: null }));
+    addToast('info', `${label} removed`);
+  };
+
+  const handleClearAllDocuments = () => {
+    const hasFiles = Object.values(uploadedDocs).some(f => f !== null);
+    if (hasFiles && window.confirm('Remove all uploaded documents?')) {
+      setUploadedDocs({
+        aadhaar: null, pan: null, resume: null,
+        certificates: null, offerLetter: null, profilePhoto: null,
+        experienceLetter: null, addressProof: null, passportPhoto: null, signedAgreements: null
+      });
+      addToast('info', 'All documents cleared');
+    }
+  };
 
   return (
     <div className="employees-page flex-column grid-gap">
@@ -692,510 +917,483 @@ const Employees = () => {
         </div>
 
         {/* ── Attendance, Leave, & Productivity Widgets ── */}
-      <div className="emp-widgets-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-        {/* Attendance Overview */}
-        <div className="card emp-widget-card">
-          <div className="widget-header">
-            <span className="widget-title">Attendance Overview</span>
-            <span className="live-dot-badge"><span className="live-dot pulse-dot"></span>Live</span>
+        <div className="emp-widgets-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+          {/* Attendance Overview */}
+          <div className="card emp-widget-card">
+            <div className="widget-header">
+              <span className="widget-title">Attendance Overview</span>
+              <span className="live-dot-badge"><span className="live-dot pulse-dot"></span>Live</span>
+            </div>
+            <div className="att-metric-list">
+              <div className="att-metric-row att-present-row">
+                <span className="att-metric-label">Present</span>
+                <div className="att-metric-right">
+                  <span className="att-metric-count present-count">{presentCount}</span>
+                  <div className="mini-bar-track"><div className="mini-bar-fill green-fill" style={{ width: `${Math.round(presentCount / Math.max(totalEmp,1) * 100)}%` }}></div></div>
+                </div>
+              </div>
+              <div className="att-metric-row att-absent-row">
+                <span className="att-metric-label">Absent</span>
+                <div className="att-metric-right">
+                  <span className="att-metric-count absent-count">{absentCount}</span>
+                </div>
+              </div>
+              <div className="att-metric-row att-late-row">
+                <span className="att-metric-label">Late</span>
+                <div className="att-metric-right">
+                  <span className="att-metric-count late-count">{lateCount}</span>
+                </div>
+              </div>
+              <div className="att-metric-row att-leave-row">
+                <span className="att-metric-label">On Leave</span>
+                <div className="att-metric-right">
+                  <span className="att-metric-count leave-count">{leaveCount}</span>
+                </div>
+              </div>
+            </div>
+            <div className="widget-total">Total: <strong>{totalEmp}</strong> employees</div>
           </div>
-          <div className="att-metric-list">
-            <div className="att-metric-row att-present-row">
-              <span className="att-metric-label">Present</span>
-              <div className="att-metric-right">
-                <span className="att-metric-count present-count">{presentCount}</span>
-                <div className="mini-bar-track"><div className="mini-bar-fill green-fill" style={{ width: `${Math.round(presentCount / Math.max(totalEmp,1) * 100)}%` }}></div></div>
+
+          {/* Leave Management Card */}
+          <div className="card emp-widget-card">
+            <div className="widget-header">
+              <span className="widget-title">Leave Management Summary</span>
+              <span className="live-dot-badge">Active balances</span>
+            </div>
+            <div className="att-metric-list">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Balance</span>
+                  <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>124 days</strong>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Pending Requests</span>
+                  <strong style={{ fontSize: '1.1rem', color: 'var(--color-warning)' }}>5 approvals</strong>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                  <span>Casual Leave</span><strong>42d / 60d</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                  <span>Sick Leave</span><strong>28d / 40d</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                  <span>Earned Leave</span><strong>54d / 80d</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                  <span>Maternity Leave</span><strong>15d / 180d</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                  <span>Unpaid Leave</span><strong>10d / 30d</strong>
+                </div>
               </div>
             </div>
-            <div className="att-metric-row att-absent-row">
-              <span className="att-metric-label">Absent</span>
-              <div className="att-metric-right">
-                <span className="att-metric-count absent-count">{absentCount}</span>
-              </div>
+            <div className="widget-total" style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Approved: <strong>32</strong></span>
+              <span>Rejected: <strong>8</strong></span>
             </div>
-            <div className="att-metric-row att-late-row">
-              <span className="att-metric-label">Late</span>
-              <div className="att-metric-right">
-                <span className="att-metric-count late-count">{lateCount}</span>
-              </div>
+          </div>
+
+          {/* Productivity Overview */}
+          <div className="card emp-widget-card">
+            <div className="widget-header">
+              <span className="widget-title">Productivity Overview</span>
             </div>
-            <div className="att-metric-row att-leave-row">
-              <span className="att-metric-label">On Leave</span>
-              <div className="att-metric-right">
-                <span className="att-metric-count leave-count">{leaveCount}</span>
+            <div className="prod-metric-list">
+              <div className="prod-metric-row">
+                <span className="prod-icon trophy-icon"><Trophy size={15} /></span>
+                <span className="prod-label">Top Performers</span>
+                <span className="prod-value white-val">{topPerformers}</span>
+              </div>
+              <div className="prod-metric-row">
+                <span className="prod-icon danger-icon"><AlertTriangle size={15} /></span>
+                <span className="prod-label">Needs Attention</span>
+                <span className="prod-value danger-val">{needsAttention}</span>
+              </div>
+              <div className="prod-metric-row">
+                <span className="prod-icon blue-icon"><CheckCircle size={15} /></span>
+                <span className="prod-label">Task Completion</span>
+                <span className="prod-value blue-val">{avgTaskCompletion}%</span>
+                <div className="prod-mini-bar"><div className="prod-bar-fill" style={{ width: `${avgTaskCompletion}%` }}></div></div>
+              </div>
+              <div className="prod-metric-row">
+                <span className="prod-icon gold-icon"><Star size={15} /></span>
+                <span className="prod-label">Avg Performance</span>
+                <span className="prod-value gold-val">{avgRating}/100</span>
+              </div>
+              <div style={{ marginTop: 'var(--spacing-4)', paddingTop: 'var(--spacing-3)', borderTop: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                <div>Workload: <strong style={{ color: 'var(--color-success)' }}>Optimal (85%)</strong></div>
+                <div>Completion Trend: <strong style={{ color: 'var(--color-success)' }}>+3%</strong></div>
+                <div>Overdue Tasks: <strong style={{ color: 'var(--color-danger)' }}>3 Tasks</strong></div>
+                <div>High Priority: <strong style={{ color: 'var(--color-warning)' }}>7 Tasks</strong></div>
+                <div>Efficiency: <strong style={{ color: 'var(--text-primary)' }}>91.4% Avg</strong></div>
+                <div>Top Dept: <strong style={{ color: 'var(--color-primary)' }}>IT (92%)</strong></div>
               </div>
             </div>
           </div>
-          <div className="widget-total">Total: <strong>{totalEmp}</strong> employees</div>
         </div>
 
-        {/* Leave Management Card */}
-        <div className="card emp-widget-card">
-          <div className="widget-header">
-            <span className="widget-title">Leave Management Summary</span>
-            <span className="live-dot-badge">Active balances</span>
-          </div>
-          <div className="att-metric-list">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Balance</span>
-                <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>124 days</strong>
+        {/* ── Performance Review & Recognition Spotlight Widgets ── */}
+        <div className="emp-widgets-row" style={{ marginTop: 'var(--spacing-4)' }}>
+          <div className="card emp-widget-card">
+            <div className="widget-header">
+              <span className="widget-title">Performance Review Module</span>
+              <Badge variant="primary">Q2 Period</Badge>
+            </div>
+            <div className="att-metric-list">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Monthly</span>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>88/100</strong>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Quarterly</span>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>92/100</strong>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Annual</span>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>90/100</strong>
+                </div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Pending Requests</span>
-                <strong style={{ fontSize: '1.1rem', color: 'var(--color-warning)' }}>5 approvals</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.78rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Global Rating</span>
+                  <Badge variant="success">Outstanding</Badge>
+                </div>
+                <div style={{ marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '6px' }}>
+                  <span style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>Feedback Summary</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', fontSize: '0.6875rem' }}>
+                    <div style={{ color: 'var(--text-secondary)' }}><strong>Manager:</strong> "Exceptional execution"</div>
+                    <div style={{ color: 'var(--text-secondary)' }}><strong>Peer:</strong> "Great collaborator"</div>
+                    <div style={{ color: 'var(--text-secondary)' }}><strong>Self:</strong> "Aiming to scale infra"</div>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Casual Leave</span><strong>42d / 60d</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Sick Leave</span><strong>28d / 40d</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Earned Leave</span><strong>54d / 80d</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Maternity/Paternity</span><strong>12d / 30d</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                <span>Emergency Leave</span><strong>4d / 10d</strong>
-              </div>
-            </div>
           </div>
-          <div className="widget-total" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Approved: <strong>32</strong></span>
-            <span>Rejected: <strong>8</strong></span>
-          </div>
-        </div>
 
-        {/* Productivity Overview */}
-        <div className="card emp-widget-card">
-          <div className="widget-header">
-            <span className="widget-title">Productivity Overview</span>
-          </div>
-          <div className="prod-metric-list">
-            <div className="prod-metric-row">
-              <span className="prod-icon trophy-icon"><Trophy size={15} /></span>
-              <span className="prod-label">Top Performers</span>
-              <span className="prod-value white-val">{topPerformers}</span>
+          <div className="card emp-widget-card">
+            <div className="widget-header">
+              <span className="widget-title">Recognition Spotlight</span>
+              <Trophy size={16} className="text-warning" />
             </div>
-            <div className="prod-metric-row">
-              <span className="prod-icon danger-icon"><AlertTriangle size={15} /></span>
-              <span className="prod-label">Needs Attention</span>
-              <span className="prod-value danger-val">{needsAttention}</span>
-            </div>
-            <div className="prod-metric-row">
-              <span className="prod-icon blue-icon"><CheckCircle size={15} /></span>
-              <span className="prod-label">Task Completion</span>
-              <span className="prod-value blue-val">{avgTaskCompletion}%</span>
-              <div className="prod-mini-bar"><div className="prod-bar-fill" style={{ width: `${avgTaskCompletion}%` }}></div></div>
-            </div>
-            <div className="prod-metric-row">
-              <span className="prod-icon gold-icon"><Star size={15} /></span>
-              <span className="prod-label">Avg Performance</span>
-              <span className="prod-value gold-val">{avgRating}/100</span>
-            </div>
-            {/* Extended Productivity Metrics */}
-            <div style={{ marginTop: 'var(--spacing-4)', paddingTop: 'var(--spacing-3)', borderTop: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              <div>Workload: <strong style={{ color: 'var(--color-success)' }}>Optimal (85%)</strong></div>
-              <div>Completion Trend: <strong style={{ color: 'var(--color-success)' }}>+3%</strong></div>
-              <div>Overdue Tasks: <strong style={{ color: 'var(--color-danger)' }}>3 Tasks</strong></div>
-              <div>High Priority: <strong style={{ color: 'var(--color-warning)' }}>7 Tasks</strong></div>
-              <div>Efficiency: <strong style={{ color: 'var(--text-primary)' }}>91.4% Avg</strong></div>
-              <div>Top Dept: <strong style={{ color: 'var(--color-primary)' }}>IT (92%)</strong></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Performance Review & Recognition Spotlight Widgets ── */}
-      <div className="emp-widgets-row" style={{ marginTop: 'var(--spacing-4)' }}>
-        {/* Performance Review Module Card */}
-        <div className="card emp-widget-card">
-          <div className="widget-header">
-            <span className="widget-title">Performance Review Module</span>
-            <Badge variant="primary">Q2 Period</Badge>
-          </div>
-          <div className="att-metric-list">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Monthly</span>
-                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>88/100</strong>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(245, 158, 11, 0.04)', border: '1px solid rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)' }}>
+                <Avatar name="Ananya Gupta" size="sm" />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Employee of Month</span>
+                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Ananya Gupta</strong>
+                </div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Quarterly</span>
-                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>92/100</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-md)' }}>
+                <Avatar name="Aarav Sharma" size="sm" />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Best Performer</span>
+                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Aarav Sharma</strong>
+                </div>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Annual</span>
-                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>90/100</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.1)', borderRadius: 'var(--radius-md)' }}>
+                <Avatar name="Suresh Kumar" size="sm" />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Attendance Champ</span>
+                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Suresh Kumar</strong>
+                </div>
               </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.78rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Global Rating</span>
-                <Badge variant="success">Outstanding</Badge>
-              </div>
-              <div style={{ marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '6px' }}>
-                <span style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>Feedback Summary</span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', fontSize: '0.6875rem' }}>
-                  <div style={{ color: 'var(--text-secondary)' }}><strong>Manager:</strong> "Exceptional execution"</div>
-                  <div style={{ color: 'var(--text-secondary)' }}><strong>Peer:</strong> "Great collaborator"</div>
-                  <div style={{ color: 'var(--text-secondary)' }}><strong>Self:</strong> "Aiming to scale infra"</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(168, 85, 247, 0.04)', border: '1px solid rgba(168, 85, 247, 0.1)', borderRadius: 'var(--radius-md)' }}>
+                <Avatar name="Kavita Singh" size="sm" />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Most Productive</span>
+                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Kavita Singh</strong>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Recognition spotlight card */}
-        <div className="card emp-widget-card">
-          <div className="widget-header">
-            <span className="widget-title">Recognition Spotlight</span>
-            <Trophy size={16} className="text-warning" />
+        {/* ── Attendance Snapshot Strip ── */}
+        <div className="card attendance-snapshot-strip glass">
+          <div className="snapshot-left">
+            <span className="snapshot-title">Today's Attendance Snapshot:</span>
+            <div className="snapshot-metrics">
+              <span className="snapshot-metric"><span className="emoji">✅</span> Punched In: <strong>{(1000 + employees.filter(e => ['Present', 'Late', 'Work From Home', 'Overtime'].includes(e.attendanceStatus)).length).toLocaleString()}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">⚠️</span> Not Yet: <strong>{150 + employees.filter(e => e.attendanceStatus === 'Absent').length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🕐</span> Late: <strong>{40 + employees.filter(e => e.attendanceStatus === 'Late').length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🏠</span> WFH: <strong>{30 + employees.filter(e => e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH').length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🌴</span> On Leave: <strong>{65 + employees.filter(e => e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave').length}</strong></span>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(245, 158, 11, 0.04)', border: '1px solid rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)' }}>
-              <Avatar name="Ananya Gupta" size="sm" />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Employee of Month</span>
-                <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Ananya Gupta</strong>
-              </div>
-            </div>
+          <button className="snapshot-link-btn" onClick={() => navigate('/attendance')}>
+            View Full Punch Records →
+          </button>
+        </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-md)' }}>
-              <Avatar name="Aarav Sharma" size="sm" />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Best Performer</span>
-                <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Aarav Sharma</strong>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.1)', borderRadius: 'var(--radius-md)' }}>
-              <Avatar name="Suresh Kumar" size="sm" />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Attendance Champ</span>
-                <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Suresh Kumar</strong>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(168, 85, 247, 0.04)', border: '1px solid rgba(168, 85, 247, 0.1)', borderRadius: 'var(--radius-md)' }}>
-              <Avatar name="Kavita Singh" size="sm" />
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Most Productive</span>
-                <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Kavita Singh</strong>
-              </div>
-            </div>
-
+        {/* ── Bulk Actions Bar ── */}
+        <div className={`bulk-actions-bar${selectedIds.size > 0 ? ' bulk-bar-visible' : ''}`}>
+          <div className="bulk-bar-left">
+            <span className="bulk-count-badge">{selectedIds.size}</span>
+            <span className="bulk-bar-label">employee{selectedIds.size !== 1 ? 's' : ''} selected</span>
+            <button className="bulk-deselect-link" onClick={() => setSelectedIds(new Set())}>Deselect All</button>
           </div>
-        </div>
-      </div>
-
-      {/* ── Attendance Snapshot Strip ── */}
-      <div className="card attendance-snapshot-strip glass">
-        <div className="snapshot-left">
-          <span className="snapshot-title">Today's Attendance Snapshot:</span>
-          <div className="snapshot-metrics">
-            <span className="snapshot-metric"><span className="emoji">✅</span> Punched In: <strong>{(1000 + employees.filter(e => ['Present', 'Late', 'Work From Home', 'Overtime'].includes(e.attendanceStatus)).length).toLocaleString()}</strong></span>
-            <span className="snapshot-metric"><span className="emoji">⚠️</span> Not Yet: <strong>{150 + employees.filter(e => e.attendanceStatus === 'Absent').length}</strong></span>
-            <span className="snapshot-metric"><span className="emoji">🕐</span> Late: <strong>{40 + employees.filter(e => e.attendanceStatus === 'Late').length}</strong></span>
-            <span className="snapshot-metric"><span className="emoji">🏠</span> WFH: <strong>{30 + employees.filter(e => e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH').length}</strong></span>
-            <span className="snapshot-metric"><span className="emoji">🌴</span> On Leave: <strong>{65 + employees.filter(e => e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave').length}</strong></span>
-          </div>
-        </div>
-        <button className="snapshot-link-btn" onClick={() => navigate('/attendance')}>
-          View Full Punch Records →
-        </button>
-      </div>
-
-      {/* ── Bulk Actions Bar ── */}
-      <div className={`bulk-actions-bar${selectedIds.size > 0 ? ' bulk-bar-visible' : ''}`}>
-        <div className="bulk-bar-left">
-          <span className="bulk-count-badge">{selectedIds.size}</span>
-          <span className="bulk-bar-label">employee{selectedIds.size !== 1 ? 's' : ''} selected</span>
-          <button className="bulk-deselect-link" onClick={() => setSelectedIds(new Set())}>Deselect All</button>
-        </div>
-        <div className="bulk-bar-right" style={{ flexWrap: 'wrap', gap: '8px' }}>
-          <button className="bulk-btn bulk-btn-success" onClick={handleBulkMarkPresent} title="Mark Present">
-            <CheckCircle size={14} /> Mark Present
-          </button>
-          <button className="bulk-btn bulk-btn-danger" onClick={handleBulkMarkAbsent} title="Mark Absent">
-            <XCircle size={14} /> Mark Absent
-          </button>
-          <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowShiftModal(true)} title="Assign Shift">
-            <Clock size={14} /> Assign Shift
-          </button>
-          <button className="bulk-btn bulk-btn-success" onClick={handleBulkExportAttendance} title="Export Attendance">
-            <Download size={14} /> Export Attendance
-          </button>
-          <button className="bulk-btn bulk-btn-danger" onClick={handleBulkDelete} title="Delete Selected">
-            <Trash2 size={14} /> Delete
-          </button>
-          <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowTransferModal(true)} title="Transfer Department">
-            <Briefcase size={14} /> Transfer Dept
-          </button>
-          <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowAssignLeaderModal(true)} title="Assign Team Leader">
-            <UserCheck size={14} /> Assign Leader
-          </button>
-          <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowRoleModal(true)} title="Assign Role">
-            <Shield size={14} /> Assign Role
-          </button>
-          <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowStatusModal(true)} title="Update Status">
-            <Activity size={14} /> Status
-          </button>
-          <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowLeaveModal(true)} title="Allocate Leave">
-            <Calendar size={14} /> Allocate Leave
-          </button>
-          <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowNotifyModal(true)} title="Send Alert">
-            <Mail size={14} /> Send Alert
-          </button>
-          <button className="bulk-btn bulk-btn-success" onClick={handleBulkActivate} title="Activate Accounts">
-            <CheckCircle size={14} /> Activate
-          </button>
-          <button className="bulk-btn bulk-btn-warning" onClick={handleBulkDisable} title="Disable Accounts">
-            <XCircle size={14} /> Disable
-          </button>
-          <button className="bulk-btn bulk-btn-ghost" onClick={handleBulkExport} title="Export CSV">
-            <Download size={14} /> Export
-          </button>
-        </div>
-      </div>
-
-      {/* ── Table Card ── */}
-      <div className="card table-wrapper-card">
-        {/* Table Toolbar */}
-        <div className="table-toolbar">
-          <span className="table-count-label">
-            {isLoading ? '—' : `${filteredEmployees.length} employee${filteredEmployees.length !== 1 ? 's' : ''}`}
-          </span>
-          <div className="table-toolbar-right" ref={togglePanelRef}>
-            <button className="toggle-cols-btn" onClick={() => setShowTogglePanel(p => !p)}>
-              <SlidersHorizontal size={14} /> Toggle Columns
+          <div className="bulk-bar-right" style={{ flexWrap: 'wrap', gap: '8px' }}>
+            <button className="bulk-btn bulk-btn-success" onClick={handleBulkMarkPresent} title="Mark Present">
+              <CheckCircle size={14} /> Mark Present
             </button>
-            {showTogglePanel && (
-              <div className="toggle-cols-panel">
-                <div className="toggle-panel-header">Visible Columns</div>
-                {COLUMN_GROUPS.map(group => (
-                  <div key={group.label} className="toggle-group">
-                    <div className="toggle-group-label">{group.label}</div>
-                    {group.keys.filter(k => k !== 'checkbox').map(k => (
-                      <label key={k} className="toggle-row">
-                        <span>{COLUMN_LABELS[k]}</span>
-                        <div className={`toggle-switch${colVis[k] ? ' ts-on' : ''}`}
-                          onClick={() => setColVis(p => ({ ...p, [k]: !p[k] }))}>
-                          <div className="ts-thumb"></div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                ))}
-                <button className="toggle-reset-btn" onClick={() => { setColVis(DEFAULT_VISIBILITY); localStorage.removeItem(LS_KEY); }}>
-                  <RefreshCw size={12} /> Reset to Default
-                </button>
-              </div>
-            )}
+            <button className="bulk-btn bulk-btn-danger" onClick={handleBulkMarkAbsent} title="Mark Absent">
+              <XCircle size={14} /> Mark Absent
+            </button>
+            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowShiftModal(true)} title="Assign Shift">
+              <Clock size={14} /> Assign Shift
+            </button>
+            <button className="bulk-btn bulk-btn-success" onClick={handleBulkExportAttendance} title="Export Attendance">
+              <Download size={14} /> Export Attendance
+            </button>
+            <button className="bulk-btn bulk-btn-danger" onClick={handleBulkDelete} title="Delete Selected">
+              <Trash2 size={14} /> Delete
+            </button>
+            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowTransferModal(true)} title="Transfer Department">
+              <Briefcase size={14} /> Transfer Dept
+            </button>
+            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowAssignLeaderModal(true)} title="Assign Team Leader">
+              <UserCheck size={14} /> Assign Leader
+            </button>
+            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowRoleModal(true)} title="Assign Role">
+              <Shield size={14} /> Assign Role
+            </button>
+            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowStatusModal(true)} title="Update Status">
+              <Activity size={14} /> Status
+            </button>
+            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowLeaveModal(true)} title="Allocate Leave">
+              <Calendar size={14} /> Allocate Leave
+            </button>
+            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowNotifyModal(true)} title="Send Alert">
+              <Mail size={14} /> Send Alert
+            </button>
+            <button className="bulk-btn bulk-btn-success" onClick={handleBulkActivate} title="Activate Accounts">
+              <CheckCircle size={14} /> Activate
+            </button>
+            <button className="bulk-btn bulk-btn-warning" onClick={handleBulkDisable} title="Disable Accounts">
+              <XCircle size={14} /> Disable
+            </button>
+            <button className="bulk-btn bulk-btn-ghost" onClick={handleBulkExport} title="Export CSV">
+              <Download size={14} /> Export
+            </button>
           </div>
         </div>
 
-        {/* Scrollable Table */}
-        <div className="emp-table-scroll">
-          <table className="emp-table">
-            <thead>
-              <tr>
-                <th className="col-checkbox">
-                  <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
-                </th>
-                {colVis.name && <TH col="name" label="Full Name" sortable />}
-                {colVis.id && <TH col="id" label="ID" sortable />}
-                {colVis.designation && <TH col="designation" label="Designation" sortable />}
-                {colVis.department && <TH col="department" label="Department" sortable />}
-                {colVis.branch && <TH col="branch" label="Branch" sortable />}
-                {colVis.teamLeader && <th>Team Leader</th>}
-                {colVis.projectManager && <th>Project Manager</th>}
-                {colVis.phone && <th>Contact</th>}
-                {colVis.workEmail && <th>Email</th>}
-                {colVis.joinDate && <TH col="joinDate" label="Joining Date" sortable style={{ minWidth: 140 }} />}
-                
-                {colVis.employeeType && <TH col="employeeType" label="Emp Type" sortable />}
-                {colVis.shift && <TH col="shift" label="Shift" sortable />}
-                {colVis.experience && <TH col="experience" label="Experience" sortable />}
-                {colVis.lastLogin && <th>Last Login</th>}
-                {colVis.currentProjects && <TH col="currentProjects" label="Projects" sortable />}
-                {colVis.leaveBalance && <TH col="leaveBalance" label="Leave Bal" sortable />}
-                {colVis.productivityScore && <TH col="productivityScore" label="Productivity" sortable />}
-                {colVis.performanceRating && <TH col="performanceRating" label="Rating" sortable />}
+        {/* ── Table Card ── */}
+        <div className="card table-wrapper-card">
+          <div className="table-toolbar">
+            <span className="table-count-label">
+              {isLoading ? '—' : `${filteredEmployees.length} employee${filteredEmployees.length !== 1 ? 's' : ''}`}
+            </span>
+            <div className="table-toolbar-right" ref={togglePanelRef}>
+              <button className="toggle-cols-btn" onClick={() => setShowTogglePanel(p => !p)}>
+                <SlidersHorizontal size={14} /> Toggle Columns
+              </button>
+              {showTogglePanel && (
+                <div className="toggle-cols-panel">
+                  <div className="toggle-panel-header">Visible Columns</div>
+                  {COLUMN_GROUPS.map(group => (
+                    <div key={group.label} className="toggle-group">
+                      <div className="toggle-group-label">{group.label}</div>
+                      {group.keys.filter(k => k !== 'checkbox').map(k => (
+                        <label key={k} className="toggle-row">
+                          <span>{COLUMN_LABELS[k]}</span>
+                          <div className={`toggle-switch${colVis[k] ? ' ts-on' : ''}`}
+                            onClick={() => setColVis(p => ({ ...p, [k]: !p[k] }))}>
+                            <div className="ts-thumb"></div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                  <button className="toggle-reset-btn" onClick={() => { setColVis(DEFAULT_VISIBILITY); localStorage.removeItem(LS_KEY); }}>
+                    <RefreshCw size={12} /> Reset to Default
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
-                {colVis.todayPunchIn && <TH col="todayPunchIn" label="Punch In" sortable />}
-                {colVis.todayPunchOut && <TH col="todayPunchOut" label="Punch Out" sortable />}
-                {colVis.todayWorkingHours && <TH col="todayWorkingHours" label="Hours" sortable />}
-                {colVis.attendanceStatus && <th>Attendance Status</th>}
-                {colVis.lastSeen && <TH col="lastSeen" label="Last Seen" sortable />}
-                {colVis.workStatus && <th>Work Status</th>}
-                {colVis.accountStatus && <th>Account</th>}
-                <th className="col-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i}>
-                    {Array.from({ length: 15 }).map((_, j) => (
-                      <td key={j}><Skeleton width="80%" height="14px" /></td>
-                    ))}
-                  </tr>
-                ))
-              ) : paginated.length === 0 ? (
+          <div className="emp-table-scroll">
+            <table className="emp-table">
+              <thead>
                 <tr>
-                  <td colSpan={16} className="empty-table-cell">
-                    <div className="empty-table-msg">
-                      <Users size={36} className="empty-icon" />
-                      <p>No employees found</p>
-                      <span>Try clearing filters or search for another term.</span>
-                    </div>
-                  </td>
+                  <th className="col-checkbox">
+                    <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+                  </th>
+                  {colVis.name && renderTH("name", FIELD_LABELS.name, true)}
+                  {colVis.id && renderTH("id", FIELD_LABELS.id, true)}
+                  {colVis.designation && renderTH("designation", FIELD_LABELS.designation, true)}
+                  {colVis.department && renderTH("department", FIELD_LABELS.department, true)}
+                  {colVis.branch && renderTH("branch", FIELD_LABELS.branch, true)}
+                  {colVis.teamLeader && renderTH("teamLeader", FIELD_LABELS.teamLeader, true)}
+                  {colVis.projectManager && renderTH("projectManager", FIELD_LABELS.projectManager, true)}
+                  {colVis.phone && renderTH("phone", FIELD_LABELS.phone, true)}
+                  {colVis.workEmail && renderTH("workEmail", FIELD_LABELS.officialEmail, true)}
+                  {colVis.joinDate && renderTH("joinDate", FIELD_LABELS.joinDate, true, { minWidth: 140 })}
+                  {colVis.employeeType && renderTH("employeeType", FIELD_LABELS.employeeType, true)}
+                  {colVis.shift && renderTH("shift", FIELD_LABELS.shiftTiming, true)}
+                  {colVis.experience && renderTH("experience", FIELD_LABELS.experience, true)}
+                  {colVis.lastLogin && <th>Last Login</th>}
+                  {colVis.currentProjects && renderTH("currentProjects", "Projects", true)}
+                  {colVis.leaveBalance && renderTH("leaveBalance", "Leave Bal", true)}
+                  {colVis.productivityScore && renderTH("productivityScore", "Productivity", true)}
+                  {colVis.performanceRating && renderTH("performanceRating", "Rating", true)}
+                  {colVis.todayPunchIn && renderTH("todayPunchIn", FIELD_LABELS.punchInTime, true)}
+                  {colVis.todayPunchOut && renderTH("todayPunchOut", FIELD_LABELS.punchOutTime, true)}
+                  {colVis.todayWorkingHours && renderTH("todayWorkingHours", FIELD_LABELS.workingHours, true)}
+                  {colVis.attendanceStatus && renderTH("attendanceStatus", FIELD_LABELS.attendanceStatus, true)}
+                  {colVis.lastSeen && renderTH("lastSeen", "Last Seen", true)}
+                  {colVis.workStatus && renderTH("workStatus", "Work Status", true)}
+                  {colVis.accountStatus && renderTH("accountStatus", FIELD_LABELS.employmentStatus, true)}
+                  <th className="col-actions">Actions</th>
                 </tr>
-              ) : paginated.map(row => (
-                <tr key={row.id}
-                  className={`emp-row${selectedIds.has(row.id) ? ' row-selected' : ''}${row.accountStatus === 'Suspended' ? ' row-suspended' : ''}`}>
-                  <td className="col-checkbox">
-                    <input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
-                  </td>
-                  {colVis.name && (
-                    <td>
-                      <div className="emp-name-cell">
-                        <span className="emp-avatar-trigger" onClick={e => openPreview(e, row)}>
-                          <Avatar name={row.name} size="sm" />
-                        </span>
-                        <div className="employee-info-cell">
-                          <span 
-                            className="emp-name-bold emp-name-clickable" 
-                            onClick={e => openPreview(e, row)}
-                            onMouseEnter={e => handleNameMouseEnter(e, row)}
-                            onMouseLeave={handleNameMouseLeave}
-                          >
-                            {row.name}
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 15 }).map((_, j) => (
+                        <td key={j}><Skeleton width="80%" height="14px" /></td>
+                      ))}
+                    </tr>
+                  ))
+                ) : paginated.length === 0 ? (
+                  <tr>
+                    <td colSpan={16} className="empty-table-cell">
+                      <div className="empty-table-msg">
+                        <Users size={36} className="empty-icon" />
+                        <p>No employees found</p>
+                        <span>Try clearing filters or search for another term.</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginated.map(row => (
+                  <tr key={row.id}
+                    className={`emp-row${selectedIds.has(row.id) ? ' row-selected' : ''}${row.accountStatus === 'Suspended' ? ' row-suspended' : ''}`}>
+                    <td className="col-checkbox">
+                      <input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
+                    </td>
+                    {colVis.name && (
+                      <td>
+                        <div className="emp-name-cell">
+                          <span className="emp-avatar-trigger" onClick={e => openPreview(e, row)}>
+                            <Avatar name={row.name} size="sm" />
                           </span>
-                          <span className="emp-email-sub">{row.workEmail || row.email}</span>
+                          <div className="employee-info-cell">
+                            <span 
+                              className="emp-name-bold emp-name-clickable" 
+                              onClick={e => openPreview(e, row)}
+                              onMouseEnter={e => handleNameMouseEnter(e, row)}
+                              onMouseLeave={handleNameMouseLeave}
+                            >
+                              {row.name}
+                            </span>
+                            <span className="emp-email-sub">{row.workEmail || row.email}</span>
+                          </div>
                         </div>
+                      </td>
+                    )}
+                    {colVis.id && <td><span className="emp-id-mono">{row.id}</span></td>}
+                    {colVis.designation && <td><span className="text-secondary-sm">{row.designation || row.role}</span></td>}
+                    {colVis.department && <td><span className="dept-text">{row.department}</span></td>}
+                    {colVis.branch && <td><span className="text-secondary-sm">{row.branch}</span></td>}
+                    {colVis.teamLeader && <td><span className="text-secondary-sm">{row.teamLeader || '—'}</span></td>}
+                    {colVis.projectManager && <td><span className="text-secondary-sm">{row.projectManager || '—'}</span></td>}
+                    {colVis.phone && <td><CopyCell value={row.phone} icon={Phone} /></td>}
+                    {colVis.workEmail && <td><CopyCell value={row.workEmail || row.email} icon={Mail} truncate={22} underline /></td>}
+                    {colVis.joinDate && (
+                      <td>
+                        <div className="join-date-cell">
+                          <Calendar size={12} className="copy-cell-icon" />
+                          <span className="text-secondary-sm">{fmtJoinDate(row.joinDate)}</span>
+                          {isNewJoiner(row.joinDate) && <span className="new-joiner-badge">New</span>}
+                        </div>
+                      </td>
+                    )}
+                    {colVis.employeeType && <td><span className="text-secondary-sm">{row.employeeType || 'Full Time'}</span></td>}
+                    {colVis.shift && <td><span className="text-secondary-sm">{row.shift || '09:00 AM - 06:00 PM'}</span></td>}
+                    {colVis.experience && <td><span className="text-secondary-sm">{row.experience || '2.4 Yrs'}</span></td>}
+                    {colVis.lastLogin && <td><span className="text-secondary-sm" style={{ fontSize: '0.75rem' }}>{row.securityInfo?.lastLogin || '—'}</span></td>}
+                    {colVis.currentProjects && <td><span className="bold-text font-mono text-primary" style={{ paddingLeft: '8px' }}>{row.currentProjectsCount || 0}</span></td>}
+                    {colVis.leaveBalance && <td><span className="bold-text font-mono text-warning">{row.leaveBalance || 18} days</span></td>}
+                    {colVis.productivityScore && <td><span className="bold-text font-mono text-success" style={{ fontWeight: 600 }}>{row.productivityScore || 85}%</span></td>}
+                    {colVis.performanceRating && <td><Badge variant={(row.performanceRating || 90) >= 90 ? 'success' : (row.performanceRating || 90) >= 75 ? 'primary' : 'warning'}>{row.performanceRating || 90}</Badge></td>}
+                    {colVis.todayPunchIn && <td><span className="punch-time-mono">{row.todayPunchIn || '--:--'}</span></td>}
+                    {colVis.todayPunchOut && <td><span className="punch-time-mono">{row.todayPunchOut || '--:--'}</span></td>}
+                    {colVis.todayWorkingHours && <td><span className="bold-text font-mono text-secondary">{row.todayWorkingHours ? `${row.todayWorkingHours} hrs` : '0 hrs'}</span></td>}
+                    {colVis.attendanceStatus && <td><AttBadge status={row.attendanceStatus} /></td>}
+                    {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '—'}</span></td>}
+                    {colVis.workStatus && <td><WorkStatusDot status={row.workStatus} /></td>}
+                    {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
+                    <td className="col-actions">
+                      <div className="table-actions-cell">
+                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employees/${row.id}`); }} title="View Full Profile">
+                          <Eye size={16} />
+                        </button>
+                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`?edit=${row.id}`); }} title="Edit">
+                          <Edit2 size={16} />
+                        </button>
+                        <button className="table-action-icon-btn action-idcard-btn" onClick={(e) => { e.stopPropagation(); setIdCardEmployee(row); setShowIdCard(true); }} title="ID Card">
+                          <CreditCard size={16} />
+                        </button>
+                        {row.status === 'Inactive' ? (
+                          <button className="table-action-icon-btn action-activate-btn" onClick={(e) => { e.stopPropagation(); handleActivate(row.id, row.name); }} title="Activate">
+                            <CheckCircle size={16} />
+                          </button>
+                        ) : (
+                          <button className="table-action-icon-btn action-deactivate-btn" onClick={(e) => { e.stopPropagation(); handleDeactivate(row.id, row.name); }} title="Deactivate">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
-                  )}
-                  {colVis.id && <td><span className="emp-id-mono">{row.id}</span></td>}
-                  {colVis.designation && <td><span className="text-secondary-sm">{row.designation || row.role}</span></td>}
-                  {colVis.department && <td><span className="dept-text">{row.department}</span></td>}
-                  {colVis.branch && <td><span className="text-secondary-sm">{row.branch}</span></td>}
-                  {colVis.teamLeader && <td><span className="text-secondary-sm">{row.teamLeader || '—'}</span></td>}
-                  {colVis.projectManager && <td><span className="text-secondary-sm">{row.projectManager || '—'}</span></td>}
-                  {colVis.phone && (
-                    <td><CopyCell value={row.phone} icon={Phone} /></td>
-                  )}
-                  {colVis.workEmail && (
-                    <td><CopyCell value={row.workEmail || row.email} icon={Mail} truncate={22} underline /></td>
-                  )}
-                  {colVis.joinDate && (
-                    <td>
-                      <div className="join-date-cell">
-                        <Calendar size={12} className="copy-cell-icon" />
-                        <span className="text-secondary-sm">{fmtJoinDate(row.joinDate)}</span>
-                        {isNewJoiner(row.joinDate) && <span className="new-joiner-badge">New</span>}
-                      </div>
-                    </td>
-                  )}
-                  {colVis.employeeType && <td><span className="text-secondary-sm">{row.employeeType || 'Full Time'}</span></td>}
-                  {colVis.shift && <td><span className="text-secondary-sm">{row.shift || '09:00 AM - 06:00 PM'}</span></td>}
-                  {colVis.experience && <td><span className="text-secondary-sm">{row.experience || '2.4 Yrs'}</span></td>}
-                  {colVis.lastLogin && <td><span className="text-secondary-sm" style={{ fontSize: '0.75rem' }}>{row.securityInfo?.lastLogin || '—'}</span></td>}
-                  {colVis.currentProjects && <td><span className="bold-text font-mono text-primary" style={{ paddingLeft: '8px' }}>{row.currentProjectsCount || 0}</span></td>}
-                  {colVis.leaveBalance && <td><span className="bold-text font-mono text-warning">{row.leaveBalance || 18} days</span></td>}
-                  {colVis.productivityScore && (
-                    <td>
-                      <span className="bold-text font-mono text-success" style={{ fontWeight: 600 }}>{row.productivityScore || 85}%</span>
-                    </td>
-                  )}
-                  {colVis.performanceRating && (
-                    <td>
-                      <Badge variant={
-                        (row.performanceRating || 90) >= 90 ? 'success' :
-                        (row.performanceRating || 90) >= 75 ? 'primary' : 'warning'
-                      }>
-                        {row.performanceRating || 90}
-                      </Badge>
-                    </td>
-                  )}
-                  {colVis.todayPunchIn && <td><span className="punch-time-mono">{row.todayPunchIn || '--:--'}</span></td>}
-                  {colVis.todayPunchOut && <td><span className="punch-time-mono">{row.todayPunchOut || '--:--'}</span></td>}
-                  {colVis.todayWorkingHours && (
-                    <td>
-                      <span className="bold-text font-mono text-secondary">
-                        {row.todayWorkingHours ? `${row.todayWorkingHours} hrs` : '0 hrs'}
-                      </span>
-                    </td>
-                  )}
-                  {colVis.attendanceStatus && (
-                    <td><AttBadge status={row.attendanceStatus} /></td>
-                  )}
-                  {colVis.lastSeen && (
-                    <td>
-                      <span className="text-secondary-sm last-seen-cell">
-                        <Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-                        {row.lastSeen || '—'}
-                      </span>
-                    </td>
-                  )}
-                  {colVis.workStatus && (
-                    <td><WorkStatusDot status={row.workStatus} /></td>
-                  )}
-                  {colVis.accountStatus && (
-                    <td><AccBadge status={row.accountStatus} /></td>
-                  )}
-                  <td className="col-actions">
-                    <div className="table-actions-cell">
-                      <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employees/${row.id}`); }} title="View Full Profile">
-                        <Eye size={16} />
-                      </button>
-                      <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); handleOpenEdit(row); }} title="Edit">
-                        <Edit2 size={16} />
-                      </button>
-                      <button className="table-action-icon-btn action-idcard-btn"
-                        onClick={(e) => { e.stopPropagation(); setIdCardEmployee(row); setShowIdCard(true); }}
-                        title="ID Card">
-                        <CreditCard size={16} />
-                      </button>
-                      {row.status === 'Inactive' ? (
-                        <button className="table-action-icon-btn action-activate-btn"
-                          onClick={(e) => { e.stopPropagation(); handleActivate(row.id, row.name); }} title="Activate">
-                          <CheckCircle size={16} />
-                        </button>
-                      ) : (
-                        <button className="table-action-icon-btn action-deactivate-btn"
-                          onClick={(e) => { e.stopPropagation(); handleDeactivate(row.id, row.name); }} title="Deactivate">
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {!isLoading && filteredEmployees.length > pageSize && (
+            <div className="emp-pagination">
+              <button className="page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹ Prev</button>
+              <span className="page-info">Page {page} of {totalPages}</span>
+              <button className="page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next ›</button>
+            </div>
+          )}
         </div>
 
-        {/* Pagination */}
-        {!isLoading && filteredEmployees.length > pageSize && (
-          <div className="emp-pagination">
-            <button className="page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹ Prev</button>
-            <span className="page-info">Page {page} of {totalPages}</span>
-            <button className="page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next ›</button>
+        {/* ── Page Footer Stats ── */}
+        <div className="emp-page-footer-stats">
+          <div className="footer-stat-item">
+            <span className="footer-stat-label">Last Added</span>
+            <span className="footer-stat-value">{employees.length>0?employees[employees.length-1].name:'—'}</span>
           </div>
-        )}
-      </div>
-
+          <div className="footer-stat-divider" />
+          <div className="footer-stat-item">
+            <span className="footer-stat-label">Added Today</span>
+            <span className="footer-stat-value">{employees.filter(e=>e.joinDate===new Date().toISOString().split('T')[0]).length}</span>
+          </div>
+          <div className="footer-stat-divider" />
+          <div className="footer-stat-item">
+            <span className="footer-stat-label">System Sync</span>
+            <span className="footer-stat-value footer-stat-ok">● Synced</span>
+          </div>
+          <div className="footer-stat-divider" />
+          <div className="footer-stat-item">
+            <span className="footer-stat-label">Auto Backup</span>
+            <span className="footer-stat-value footer-stat-ok">● Active</span>
+          </div>
+          <div className="footer-stat-divider" />
+          <div className="footer-stat-item">
+            <span className="footer-stat-label">Total Records</span>
+            <span className="footer-stat-value">{employees.length} employees</span>
+          </div>
+        </div>
       </>)}
+
       {/* ── Employee Hover Quick View Card ── */}
       {hoveredEmp && (
         <div className="emp-hover-quick-card glass animate-fade-in" style={{ position: 'absolute', top: hoverPos.top, left: hoverPos.left, zIndex: 1100 }}>
@@ -1209,21 +1407,15 @@ const Employees = () => {
           <div className="hover-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem' }}>
             <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
               <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Today:</span>
-              <span className="hover-card-value" style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
-                {hoveredEmp.todayPunchIn ? `Punched In ✅ at ${hoveredEmp.todayPunchIn}` : 'Not Punched ⚠️'}
-              </span>
+              <span className="hover-card-value" style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{hoveredEmp.todayPunchIn ? `Punched In ✅ at ${hoveredEmp.todayPunchIn}` : 'Not Punched ⚠️'}</span>
             </div>
             <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
               <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Status:</span>
-              <span className="hover-card-value" style={{ color: hoveredEmp.attendanceStatus === 'Present' || hoveredEmp.attendanceStatus === 'Overtime' ? 'var(--color-success)' : hoveredEmp.attendanceStatus === 'Late' ? 'var(--color-warning)' : 'var(--color-danger)', fontWeight: 600 }}>
-                {hoveredEmp.attendanceStatus || 'Offline'}
-              </span>
+              <span className="hover-card-value" style={{ color: hoveredEmp.attendanceStatus === 'Present' || hoveredEmp.attendanceStatus === 'Overtime' ? 'var(--color-success)' : hoveredEmp.attendanceStatus === 'Late' ? 'var(--color-warning)' : 'var(--color-danger)', fontWeight: 600 }}>{hoveredEmp.attendanceStatus || 'Offline'}</span>
             </div>
             <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
               <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Working Hours:</span>
-              <span className="hover-card-value font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                {hoveredEmp.todayWorkingHours ? `${hoveredEmp.todayWorkingHours} hrs so far` : '0 hrs'}
-              </span>
+              <span className="hover-card-value font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{hoveredEmp.todayWorkingHours ? `${hoveredEmp.todayWorkingHours} hrs so far` : '0 hrs'}</span>
             </div>
           </div>
         </div>
@@ -1231,10 +1423,8 @@ const Employees = () => {
 
       {/* ── Profile Preview Card ── */}
       {previewEmp && (
-        <div className="emp-preview-card animate-preview" ref={previewRef}
-          style={{ top: previewPos.top, left: previewPos.left }}>
+        <div className="emp-preview-card animate-preview" ref={previewRef} style={{ top: previewPos.top, left: previewPos.left }}>
           <button className="preview-close-btn" onClick={() => setPreviewEmp(null)}><X size={14} /></button>
-
           <div className="preview-top">
             <Avatar name={previewEmp.name} size="lg" />
             <div className="preview-name-block">
@@ -1246,9 +1436,7 @@ const Employees = () => {
               <span className="preview-branch-badge">{previewEmp.branch}</span>
             </div>
           </div>
-
           <div className="preview-divider" />
-
           <div className="preview-stats-row">
             <div className="preview-stat">
               <div className="preview-stat-ring" style={{ '--pct': `${previewEmp.performanceScore?.attendance || 78}` }}>
@@ -1265,58 +1453,25 @@ const Employees = () => {
               <span className="preview-stat-label">Joined</span>
             </div>
           </div>
-
           <div className="preview-divider" />
-
           <div className="preview-detail-list">
-            <div className="preview-detail-row">
-              <User size={13} className="preview-detail-icon" />
-              <span className="preview-detail-label">ID</span>
-              <span className="preview-detail-value">{previewEmp.id}</span>
-            </div>
-            <div className="preview-detail-row">
-              <Users size={13} className="preview-detail-icon" />
-              <span className="preview-detail-label">Manager</span>
-              <span className="preview-detail-value">{previewEmp.teamLeader || '—'}</span>
-            </div>
-            <div className="preview-detail-row">
-              <Phone size={13} className="preview-detail-icon" />
-              <span className="preview-detail-label">Phone</span>
-              <CopyCell value={previewEmp.phone} />
-            </div>
-            <div className="preview-detail-row">
-              <Mail size={13} className="preview-detail-icon" />
-              <span className="preview-detail-label">Email</span>
-              <CopyCell value={previewEmp.workEmail || previewEmp.email} truncate={20} underline />
-            </div>
+            <div className="preview-detail-row"><User size={13} className="preview-detail-icon" /><span className="preview-detail-label">ID</span><span className="preview-detail-value">{previewEmp.id}</span></div>
+            <div className="preview-detail-row"><Users size={13} className="preview-detail-icon" /><span className="preview-detail-label">Manager</span><span className="preview-detail-value">{previewEmp.teamLeader || '—'}</span></div>
+            <div className="preview-detail-row"><Phone size={13} className="preview-detail-icon" /><span className="preview-detail-label">Phone</span><CopyCell value={previewEmp.phone} /></div>
+            <div className="preview-detail-row"><Mail size={13} className="preview-detail-icon" /><span className="preview-detail-label">Email</span><CopyCell value={previewEmp.workEmail || previewEmp.email} truncate={20} underline /></div>
           </div>
-
           <div className="preview-divider" />
-
           <div className="preview-actions-grid">
-            <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employees/${previewEmp.id}`); setPreviewEmp(null); }}>
-              View Full Profile
-            </button>
-            <button className="preview-btn preview-btn-secondary" onClick={() => { handleOpenEdit(previewEmp); setPreviewEmp(null); }}>
-              Edit Profile
-            </button>
-            <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/tasks'); setPreviewEmp(null); }}>
-              Assign Task
-            </button>
-            <button className="preview-btn preview-btn-ghost" onClick={() => { navigate('/work-reports'); setPreviewEmp(null); }}>
-              View Reports
-            </button>
+            <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employees/${previewEmp.id}`); setPreviewEmp(null); }}>View Full Profile</button>
+            <button className="preview-btn preview-btn-secondary" onClick={() => { navigate(`?edit=${previewEmp.id}`); setPreviewEmp(null); }}>Edit Profile</button>
+            <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/tasks'); setPreviewEmp(null); }}>Assign Task</button>
+            <button className="preview-btn preview-btn-ghost" onClick={() => { navigate('/work-reports'); setPreviewEmp(null); }}>View Reports</button>
           </div>
-
           <div className="preview-danger-zone">
             {previewEmp.status === 'Inactive' ? (
-              <button className="preview-activate-link" onClick={() => { handleActivate(previewEmp.id, previewEmp.name); setPreviewEmp(null); }}>
-                <CheckCircle size={12} /> Activate Account
-              </button>
+              <button className="preview-activate-link" onClick={() => { handleActivate(previewEmp.id, previewEmp.name); setPreviewEmp(null); }}><CheckCircle size={12} /> Activate Account</button>
             ) : (
-              <button className="preview-delete-link" onClick={() => { handleDeactivate(previewEmp.id, previewEmp.name); setPreviewEmp(null); }}>
-                <Trash2 size={12} /> Delete Account
-              </button>
+              <button className="preview-delete-link" onClick={() => { handleDeactivate(previewEmp.id, previewEmp.name); setPreviewEmp(null); }}><Trash2 size={12} /> Delete Account</button>
             )}
           </div>
         </div>
@@ -1327,13 +1482,8 @@ const Employees = () => {
         <div className="modal-overlay" onClick={() => setShowTransferModal(false)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Transfer {selectedIds.size} employee(s) to department</h3>
-            <select value={transferDept} onChange={e => setTransferDept(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>
-              {depts.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-            <div className="modal-footer">
-              <Button variant="secondary" onClick={() => setShowTransferModal(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleTransferDept}>Confirm Transfer</Button>
-            </div>
+            <select value={transferDept} onChange={e => setTransferDept(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>{depts.map(d => <option key={d} value={d}>{d}</option>)}</select>
+            <div className="modal-footer"><Button variant="secondary" onClick={() => setShowTransferModal(false)}>Cancel</Button><Button variant="primary" onClick={handleTransferDept}>Confirm Transfer</Button></div>
           </div>
         </div>
       )}
@@ -1343,14 +1493,8 @@ const Employees = () => {
         <div className="modal-overlay" onClick={() => setShowAssignLeaderModal(false)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Assign Team Leader to {selectedIds.size} employee(s)</h3>
-            <select value={assignLeader} onChange={e => setAssignLeader(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>
-              <option value="">Select a leader...</option>
-              {leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
-            </select>
-            <div className="modal-footer">
-              <Button variant="secondary" onClick={() => setShowAssignLeaderModal(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleAssignLeader} disabled={!assignLeader}>Assign</Button>
-            </div>
+            <select value={assignLeader} onChange={e => setAssignLeader(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}><option value="">Select a leader...</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select>
+            <div className="modal-footer"><Button variant="secondary" onClick={() => setShowAssignLeaderModal(false)}>Cancel</Button><Button variant="primary" onClick={handleAssignLeader} disabled={!assignLeader}>Assign</Button></div>
           </div>
         </div>
       )}
@@ -1361,15 +1505,10 @@ const Employees = () => {
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Assign Role to {selectedIds.size} employee(s)</h3>
             <select value={bulkRole} onChange={e => setBulkRole(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>
-              <option value="super_admin">Super Admin</option>
-              <option value="project_manager">Project Manager</option>
-              <option value="team_leader">Team Leader</option>
-              <option value="employee">Employee</option>
+              <option value="super_admin">Super Admin</option><option value="project_manager">Project Manager</option>
+              <option value="team_leader">Team Leader</option><option value="employee">Employee</option>
             </select>
-            <div className="modal-footer">
-              <Button variant="secondary" onClick={() => setShowRoleModal(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkRoleAssign}>Assign Role</Button>
-            </div>
+            <div className="modal-footer"><Button variant="secondary" onClick={() => setShowRoleModal(false)}>Cancel</Button><Button variant="primary" onClick={handleBulkRoleAssign}>Assign Role</Button></div>
           </div>
         </div>
       )}
@@ -1380,14 +1519,9 @@ const Employees = () => {
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Update Status for {selectedIds.size} employee(s)</h3>
             <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-              <option value="On Leave">On Leave</option>
+              <option value="Active">Active</option><option value="Inactive">Inactive</option><option value="On Leave">On Leave</option>
             </select>
-            <div className="modal-footer">
-              <Button variant="secondary" onClick={() => setShowStatusModal(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkStatusUpdate}>Update Status</Button>
-            </div>
+            <div className="modal-footer"><Button variant="secondary" onClick={() => setShowStatusModal(false)}>Cancel</Button><Button variant="primary" onClick={handleBulkStatusUpdate}>Update Status</Button></div>
           </div>
         </div>
       )}
@@ -1397,17 +1531,8 @@ const Employees = () => {
         <div className="modal-overlay" onClick={() => setShowLeaveModal(false)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Allocate Leave Days to {selectedIds.size} employee(s)</h3>
-            <input 
-              type="number" 
-              value={bulkLeaveDays} 
-              onChange={e => setBulkLeaveDays(e.target.value)} 
-              style={{ marginTop: 16, marginBottom: 16, width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)' }}
-              min="1"
-            />
-            <div className="modal-footer">
-              <Button variant="secondary" onClick={() => setShowLeaveModal(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkLeaveAllocation}>Allocate Days</Button>
-            </div>
+            <input type="number" value={bulkLeaveDays} onChange={e => setBulkLeaveDays(e.target.value)} style={{ marginTop: 16, marginBottom: 16, width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)' }} min="1" />
+            <div className="modal-footer"><Button variant="secondary" onClick={() => setShowLeaveModal(false)}>Cancel</Button><Button variant="primary" onClick={handleBulkLeaveAllocation}>Allocate Days</Button></div>
           </div>
         </div>
       )}
@@ -1417,17 +1542,8 @@ const Employees = () => {
         <div className="modal-overlay" onClick={() => setShowNotifyModal(false)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Send Alert to {selectedIds.size} employee(s)</h3>
-            <textarea 
-              rows="3" 
-              placeholder="Type announcement message..."
-              value={bulkNotifyMsg} 
-              onChange={e => setBulkNotifyMsg(e.target.value)} 
-              style={{ marginTop: 16, marginBottom: 16, width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', resize: 'none' }}
-            />
-            <div className="modal-footer">
-              <Button variant="secondary" onClick={() => setShowNotifyModal(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkNotification}>Send Alert</Button>
-            </div>
+            <textarea rows="3" placeholder="Type announcement message..." value={bulkNotifyMsg} onChange={e => setBulkNotifyMsg(e.target.value)} style={{ marginTop: 16, marginBottom: 16, width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', resize: 'none' }} />
+            <div className="modal-footer"><Button variant="secondary" onClick={() => setShowNotifyModal(false)}>Cancel</Button><Button variant="primary" onClick={handleBulkNotification}>Send Alert</Button></div>
           </div>
         </div>
       )}
@@ -1443,10 +1559,7 @@ const Employees = () => {
               <option value="Night (10:00 PM - 07:00 AM)">Night (10:00 PM - 07:00 AM)</option>
               <option value="Flexible (09:00 AM - 06:00 PM)">Flexible (09:00 AM - 06:00 PM)</option>
             </select>
-            <div className="modal-footer">
-              <Button variant="secondary" onClick={() => setShowShiftModal(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleBulkAssignShift}>Assign Shift</Button>
-            </div>
+            <div className="modal-footer"><Button variant="secondary" onClick={() => setShowShiftModal(false)}>Cancel</Button><Button variant="primary" onClick={handleBulkAssignShift}>Assign Shift</Button></div>
           </div>
         </div>
       )}
@@ -1455,320 +1568,500 @@ const Employees = () => {
       {showFormPanel && (
         <div className="card form-panel-card animate-fade-in">
           <div className="form-panel-header">
-            <h3>{formMode === 'add' ? 'Add New Employee' : 'Edit Employee Details'}</h3>
-            <button className="slide-over-close-btn" onClick={() => { setShowFormPanel(false); if (location.pathname === '/employees/add') navigate('/employees'); }} aria-label="Close"><X size={18} /></button>
+            <div>
+              <h3>{formMode === 'add' ? 'Add New Employee' : 'Edit Employee'}</h3>
+              <span className="form-step-sub">Step {wizardStep} of 7 — {['Personal Details','Professional Details','Login & Role','Attendance & Shift','Salary & Payroll','Documents','Security'][wizardStep-1]}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {formMode === 'edit' && (
+                <Button variant="primary" size="sm" icon={Save} onClick={handleFormSubmit}>
+                  Save
+                </Button>
+              )}
+              <button className="slide-over-close-btn" onClick={() => { setShowFormPanel(false); navigate('/employees'); }} aria-label="Close"><X size={18} /></button>
+            </div>
           </div>
 
+          {/* ── Validation Alerts ── */}
+          {(() => {
+            const dupEmail = formData.email && employees.some(e => (e.email === formData.email || e.workEmail === formData.email) && e.id !== selectedEmployeeId);
+            const dupPhone = formData.phone && employees.some(e => e.phone === formData.phone && e.id !== selectedEmployeeId);
+            const weakPass = wizardStep === 3 && formData.password && formData.password !== '••••••••' && formData.password.length < 8;
+            if (!dupEmail && !dupPhone && !weakPass) return null;
+            return (
+              <div className="form-validation-alerts">
+                {dupEmail && <div className="form-alert form-alert-danger">⚠️ <strong>Duplicate Email:</strong> Already registered to another employee.</div>}
+                {dupPhone && <div className="form-alert form-alert-warning">⚠️ <strong>Duplicate Mobile:</strong> Phone number already in use.</div>}
+                {weakPass && <div className="form-alert form-alert-warning">⚠️ <strong>Weak Password:</strong> Must be at least 8 characters.</div>}
+              </div>
+            );
+          })()}
+
+          {/* ── Clickable Wizard Indicators ── */}
           <div className="wizard-indicators-bar">
-            <div className={`indicator-step ${wizardStep >= 1 ? 'active' : ''}`}><span className="step-num">1</span><span className="step-name">Personal</span></div>
-            <ChevronRight size={14} className="indicator-sep" />
-            <div className={`indicator-step ${wizardStep >= 2 ? 'active' : ''}`}><span className="step-num">2</span><span className="step-name">Professional</span></div>
-            <ChevronRight size={14} className="indicator-sep" />
-            <div className={`indicator-step ${wizardStep >= 3 ? 'active' : ''}`}><span className="step-num">3</span><span className="step-name">Login</span></div>
-            <ChevronRight size={14} className="indicator-sep" />
-            <div className={`indicator-step ${wizardStep >= 4 ? 'active' : ''}`}><span className="step-num">4</span><span className="step-name">Documents</span></div>
-            <ChevronRight size={14} className="indicator-sep" />
-            <div className={`indicator-step ${wizardStep >= 5 ? 'active' : ''}`}><span className="step-num">5</span><span className="step-name">Skills & Certs</span></div>
+            {[
+              { n: 1, l: 'Personal' },
+              { n: 2, l: 'Professional' },
+              { n: 3, l: 'Login' },
+              { n: 4, l: 'Attendance' },
+              { n: 5, l: 'Salary' },
+              { n: 6, l: 'Documents' },
+              { n: 7, l: 'Security' }
+            ].map(({ n, l }, i, arr) => {
+              const isCompleted = wizardStep > n;
+              const isActive = wizardStep === n;
+              
+              return (
+                <React.Fragment key={n}>
+                  <div 
+                    className={`indicator-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} clickable`}
+                    onClick={() => handleStepClick(n)}
+                    title={`Click to go to Step ${n}: ${l}`}
+                  >
+                    <span className="step-num">{isCompleted ? '✓' : n}</span>
+                    <span className="step-name">{l}</span>
+                  </div>
+                  {i < arr.length - 1 && <ChevronRight size={12} className="indicator-sep" />}
+                </React.Fragment>
+              );
+            })}
           </div>
 
           <form className="wizard-form-body" onSubmit={e => e.preventDefault()}>
+            {/* Step 1: Personal Details */}
             {wizardStep === 1 && (
               <div className="wizard-step-form">
+                <h4 className="form-subsection-title">Personal Details</h4>
                 <div className="form-section-grid">
-                  <div className="form-field"><label>Full Name *</label><input type="text" placeholder="e.g. Vikram Singh" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} required /></div>
-                  <div className="form-field"><label>Date of Birth</label><input type="date" value={formData.dob} onChange={e => setFormData(p => ({ ...p, dob: e.target.value }))} /></div>
-                  <div className="form-field"><label>Gender</label><select value={formData.gender} onChange={e => setFormData(p => ({ ...p, gender: e.target.value }))}><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
-                  <div className="form-field"><label>Contact Number *</label><input type="text" placeholder="e.g. +91 98765 43210" value={formData.phone} onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))} required /></div>
-                  <div className="form-field"><label>Email Address *</label><input type="email" placeholder="e.g. vikram@company.com" value={formData.email} onChange={e => setFormData(p => ({ ...p, email: e.target.value }))} required /></div>
-                  <div className="form-field form-field-full"><label>Current Address</label><textarea rows="2" placeholder="Current residential address" value={formData.currentAddress} onChange={e => setFormData(p => ({ ...p, currentAddress: e.target.value }))} /></div>
-                  <div className="form-field form-field-full"><label>Permanent Address</label><textarea rows="2" placeholder="Permanent address" value={formData.permanentAddress} onChange={e => setFormData(p => ({ ...p, permanentAddress: e.target.value }))} /></div>
+                  <div className="form-field form-field-full"><label>{FIELD_LABELS.name} *</label><input type="text" placeholder="e.g. Vikram Singh" value={formData.name} onChange={e=>setFormData(p=>({...p,name:e.target.value}))} required /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.dob}</label><input type="date" value={formData.dob} onChange={e=>setFormData(p=>({...p,dob:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.gender}</label><select value={formData.gender} onChange={e=>setFormData(p=>({...p,gender:e.target.value}))}><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
+                  <div className="form-field"><label>{FIELD_LABELS.phone} *</label><input type="text" placeholder="+91 98765 43210" value={formData.phone} onChange={e=>setFormData(p=>({...p,phone:e.target.value}))} required /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.alternatePhone}</label><input type="text" placeholder="+91 98765 43211" value={formData.alternatePhone||''} onChange={e=>setFormData(p=>({...p,alternatePhone:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.email} *</label><input type="email" placeholder="vikram@company.com" value={formData.email} onChange={e=>setFormData(p=>({...p,email:e.target.value}))} required /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.personalEmail}</label><input type="email" placeholder="vikram@gmail.com" value={formData.personalEmail||''} onChange={e=>setFormData(p=>({...p,personalEmail:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.bloodGroup}</label><select value={formData.bloodGroup||''} onChange={e=>setFormData(p=>({...p,bloodGroup:e.target.value}))}><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+                  <div className="form-field"><label>{FIELD_LABELS.maritalStatus}</label><select value={formData.maritalStatus||''} onChange={e=>setFormData(p=>({...p,maritalStatus:e.target.value}))}><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
+                  <div className="form-field"><label>{FIELD_LABELS.experience}</label><input type="text" placeholder="e.g. 5 years" value={formData.experience} onChange={e=>setFormData(p=>({...p,experience:e.target.value}))} /></div>
                 </div>
-                <h4 className="form-subsection-title">Emergency Contact</h4>
+                <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-5)'}}>Address Details</h4>
                 <div className="form-section-grid">
-                  <div className="form-field"><label>Contact Name</label><input type="text" placeholder="e.g. Priya Sharma" value={formData.emergencyContactName} onChange={e => setFormData(p => ({ ...p, emergencyContactName: e.target.value }))} /></div>
-                  <div className="form-field"><label>Phone Number</label><input type="text" placeholder="e.g. +91 98765 43211" value={formData.emergencyContactPhone} onChange={e => setFormData(p => ({ ...p, emergencyContactPhone: e.target.value }))} /></div>
-                  <div className="form-field"><label>Alt Phone Number</label><input type="text" placeholder="e.g. +91 98765 43212" value={formData.emergencyContactPhoneAlt || ''} onChange={e => setFormData(p => ({ ...p, emergencyContactPhoneAlt: e.target.value }))} /></div>
-                  <div className="form-field"><label>Address</label><input type="text" placeholder="Emergency contact address" value={formData.emergencyContactAddress} onChange={e => setFormData(p => ({ ...p, emergencyContactAddress: e.target.value }))} /></div>
-                  <div className="form-field"><label>Relation</label><select value={formData.emergencyContactRelation} onChange={e => setFormData(p => ({ ...p, emergencyContactRelation: e.target.value }))}>
-                    <option value="">Select Relation</option><option>Spouse</option><option>Parent</option><option>Sibling</option><option>Friend</option><option>Relative</option><option>Other</option>
-                  </select></div>
+                  <div className="form-field form-field-full"><label>{FIELD_LABELS.currentAddress}</label><textarea rows="2" placeholder="Current residential address" value={formData.currentAddress||''} onChange={e=>setFormData(p=>({...p,currentAddress:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.city}</label><input type="text" placeholder="e.g. Jaipur" value={formData.city||''} onChange={e=>setFormData(p=>({...p,city:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.state}</label><input type="text" placeholder="e.g. Rajasthan" value={formData.state||''} onChange={e=>setFormData(p=>({...p,state:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.country}</label><input type="text" placeholder="e.g. India" value={formData.country||''} onChange={e=>setFormData(p=>({...p,country:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.zipCode}</label><input type="text" placeholder="e.g. 302017" value={formData.zipCode||''} onChange={e=>setFormData(p=>({...p,zipCode:e.target.value}))} /></div>
+                  <div className="form-field form-field-full"><label>{FIELD_LABELS.permanentAddress}</label><textarea rows="2" placeholder="Permanent address (if different)" value={formData.permanentAddress||''} onChange={e=>setFormData(p=>({...p,permanentAddress:e.target.value}))} /></div>
                 </div>
-              </div>
-            )}
-            {wizardStep === 2 && (
-              <div className="wizard-step-form">
+                <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-5)'}}>Emergency Contact</h4>
                 <div className="form-section-grid">
-                  <div className="form-field"><label>Employee ID</label><input type="text" placeholder="e.g. EMP-2026-100" value={formData.id} onChange={e => setFormData(p => ({ ...p, id: e.target.value }))} disabled={formMode === 'edit'} /></div>
-                  <div className="form-field"><label>Company Name</label><input type="text" placeholder="e.g. OM Enterprise" value={formData.companyName || ''} onChange={e => setFormData(p => ({ ...p, companyName: e.target.value }))} /></div>
-                  <div className="form-field"><label>Designation *</label><input type="text" placeholder="e.g. Senior Software Engineer" value={formData.designation} onChange={e => setFormData(p => ({ ...p, designation: e.target.value }))} required /></div>
-                  <div className="form-field"><label>Department *</label><select value={formData.department} onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}>{depts.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                  <div className="form-field">
-                    <label>Branch/Agency *</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Jaipur" 
-                      value={formData.branch} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        setFormData(p => {
-                          const updated = { ...p, branch: val };
-                          const cleanBranch = val.toLowerCase().trim();
-                          const defaults = {
-                            delhi: 'Connaught Place, New Delhi - 110001',
-                            mumbai: 'Bandra Kurla Complex, Mumbai - 400051',
-                            bangalore: 'MG Road, Bangalore - 560001',
-                            bengaluru: 'MG Road, Bangalore - 560001',
-                            jaipur: 'Malviya Nagar, Jaipur, Rajasthan 302017'
-                          };
-                          if (!p.branchAddress || Object.values(defaults).includes(p.branchAddress)) {
-                            if (cleanBranch.includes('delhi')) updated.branchAddress = defaults.delhi;
-                            else if (cleanBranch.includes('mumbai')) updated.branchAddress = defaults.mumbai;
-                            else if (cleanBranch.includes('bangalore') || cleanBranch.includes('bengaluru')) updated.branchAddress = defaults.bangalore;
-                            else if (cleanBranch.includes('jaipur')) updated.branchAddress = defaults.jaipur;
-                          }
-                          return updated;
-                        });
-                      }} 
-                      list="branch-list"
-                      required 
-                    />
-                    <datalist id="branch-list">
-                      {branches.map(b => <option key={b} value={b} />)}
-                    </datalist>
-                  </div>
-                  <div className="form-field"><label>Branch Address</label><input type="text" placeholder="e.g. Malviya Nagar, Jaipur, Rajasthan 302017" value={formData.branchAddress || ''} onChange={e => setFormData(p => ({ ...p, branchAddress: e.target.value }))} /></div>
-                  <div className="form-field"><label>Team Leader</label><select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}><option value="">Select Team Leader</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
-                  <div className="form-field"><label>Project Manager</label><select value={formData.projectManager} onChange={e => setFormData(p => ({ ...p, projectManager: e.target.value }))}><option value="">Select Project Manager</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
-                  <div className="form-field"><label>Joining Date *</label><input type="date" value={formData.joinDate} onChange={e => setFormData(p => ({ ...p, joinDate: e.target.value }))} required /></div>
-                  <div className="form-field"><label>Shift Timing</label><input type="text" placeholder="e.g. 09:00 AM - 06:00 PM" value={formData.shiftTiming} onChange={e => setFormData(p => ({ ...p, shiftTiming: e.target.value }))} /></div>
-                  <div className="form-field"><label>Salary Amount (Basic)</label><input type="number" placeholder="e.g. 35000" value={formData.salaryAmount} onChange={e => setFormData(p => ({ ...p, salaryAmount: e.target.value }))} /></div>
-                  <div className="form-field"><label>Allowances</label><input type="number" placeholder="e.g. 12000" value={formData.salaryAllowances} onChange={e => setFormData(p => ({ ...p, salaryAllowances: e.target.value }))} /></div>
-                  <div className="form-field"><label>Deductions</label><input type="number" placeholder="e.g. 5000" value={formData.salaryDeductions} onChange={e => setFormData(p => ({ ...p, salaryDeductions: e.target.value }))} /></div>
-                </div>
-
-                <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Employment Information</h4>
-                <div className="form-section-grid">
-                  <div className="form-field">
-                    <label>Employee Type</label>
-                    <select value={formData.employeeType || 'Full Time'} onChange={e => setFormData(p => ({ ...p, employeeType: e.target.value }))}>
-                      <option value="Full Time">Full Time</option>
-                      <option value="Part Time">Part Time</option>
-                      <option value="Contract">Contract</option>
-                      <option value="Internship">Internship</option>
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label>Employment Status</label>
-                    <select value={formData.employmentStatus || 'Active'} onChange={e => setFormData(p => ({ ...p, employmentStatus: e.target.value }))}>
-                      <option value="Active">Active</option>
-                      <option value="Probation">Probation</option>
-                      <option value="Suspended">Suspended</option>
-                      <option value="Terminated">Terminated</option>
-                    </select>
-                  </div>
-                  <div className="form-field"><label>Probation End Date</label><input type="date" value={formData.probationEndDate || ''} onChange={e => setFormData(p => ({ ...p, probationEndDate: e.target.value }))} /></div>
-                  <div className="form-field"><label>Contract End Date</label><input type="date" value={formData.contractEndDate || ''} onChange={e => setFormData(p => ({ ...p, contractEndDate: e.target.value }))} /></div>
-                </div>
-
-                <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Bank Details</h4>
-                <div className="form-section-grid">
-                  <div className="form-field"><label>Bank Name</label><input type="text" placeholder="e.g. HDFC Bank" value={formData.bankName || ''} onChange={e => setFormData(p => ({ ...p, bankName: e.target.value }))} /></div>
-                  <div className="form-field"><label>Account Number</label><input type="text" placeholder="e.g. 501002348271" value={formData.bankAccountNumber || ''} onChange={e => setFormData(p => ({ ...p, bankAccountNumber: e.target.value }))} /></div>
-                  <div className="form-field"><label>IFSC Code</label><input type="text" placeholder="e.g. HDFC0000123" value={formData.bankIfscCode || ''} onChange={e => setFormData(p => ({ ...p, bankIfscCode: e.target.value }))} /></div>
-                  <div className="form-field"><label>UPI ID</label><input type="text" placeholder="e.g. employee@okhdfc" value={formData.bankUpiId || ''} onChange={e => setFormData(p => ({ ...p, bankUpiId: e.target.value }))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactName}</label><input type="text" placeholder="e.g. Priya Sharma" value={formData.emergencyContactName||''} onChange={e=>setFormData(p=>({...p,emergencyContactName:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactPhone}</label><input type="text" placeholder="+91 98765 43211" value={formData.emergencyContactPhone||''} onChange={e=>setFormData(p=>({...p,emergencyContactPhone:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactPhoneAlt}</label><input type="text" placeholder="+91 98765 43212" value={formData.emergencyContactPhoneAlt||''} onChange={e=>setFormData(p=>({...p,emergencyContactPhoneAlt:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactRelation}</label><select value={formData.emergencyContactRelation||''} onChange={e=>setFormData(p=>({...p,emergencyContactRelation:e.target.value}))}><option value="">Select</option><option>Spouse</option><option>Parent</option><option>Sibling</option><option>Friend</option><option>Relative</option><option>Other</option></select></div>
                 </div>
               </div>
             )}
+
+            {/* Step 2: Professional Details */}
+            {wizardStep === 2 && (() => {
+              const isWfh = formData.workMode === 'Work From Home';
+              const isFullTime = formData.employeeType === 'Full Time';
+              return (
+                <div className="wizard-step-form">
+                  <div className="form-section-grid">
+                    <div className="form-field"><label>{FIELD_LABELS.id}</label><input type="text" placeholder="e.g. EMP-2026-100" value={formData.id} onChange={e => setFormData(p => ({ ...p, id: e.target.value }))} disabled={formMode === 'edit'} /></div>
+                    <div className="form-field"><label>{FIELD_LABELS.companyName}</label><input type="text" placeholder="e.g. OM Enterprise" value={formData.companyName || ''} onChange={e => setFormData(p => ({ ...p, companyName: e.target.value }))} /></div>
+                    <div className="form-field"><label>{FIELD_LABELS.designation} *</label><input type="text" placeholder="e.g. Senior Software Engineer" value={formData.designation} onChange={e => setFormData(p => ({ ...p, designation: e.target.value }))} required /></div>
+                    <div className="form-field"><label>{FIELD_LABELS.department} *</label><select value={formData.department} onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}>{depts.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                    <div className="form-field"><label>{FIELD_LABELS.branch} *</label><input type="text" placeholder="e.g. Jaipur" value={formData.branch} onChange={e => {const val = e.target.value; setFormData(p => ({ ...p, branch: val }));}} list="branch-list" required /><datalist id="branch-list">{branches.map(b => <option key={b} value={b} />)}</datalist></div>
+                    <div className="form-field"><label>{FIELD_LABELS.branchAddress}</label><input type="text" placeholder="e.g. Malviya Nagar, Jaipur, Rajasthan 302017" value={formData.branchAddress || ''} onChange={e => setFormData(p => ({ ...p, branchAddress: e.target.value }))} /></div>
+                    <div className="form-field"><label>{FIELD_LABELS.teamLeader}</label><select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}><option value="">Select Team Leader</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
+                    <div className="form-field"><label>{FIELD_LABELS.projectManager}</label><select value={formData.projectManager} onChange={e => setFormData(p => ({ ...p, projectManager: e.target.value }))}><option value="">Select Project Manager</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
+                    <div className="form-field"><label>{FIELD_LABELS.joinDate} *</label><input type="date" value={formData.joinDate} onChange={e => setFormData(p => ({ ...p, joinDate: e.target.value }))} required /></div>
+                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
+                      <label>{FIELD_LABELS.shiftTiming}</label>
+                      <input 
+                        type="text" 
+                        placeholder={isWfh ? 'Flexible / Not Applicable' : 'e.g. 09:00 AM - 06:00 PM'} 
+                        value={isWfh ? '' : formData.shiftTiming} 
+                        onChange={e => setFormData(p => ({ ...p, shiftTiming: e.target.value }))} 
+                        disabled={isWfh}
+                      />
+                    </div>
+                    <div className="form-field"><label>{FIELD_LABELS.workLocation}</label><input type="text" placeholder="e.g. Tower B, 3rd Floor" value={formData.workLocation||''} onChange={e=>setFormData(p=>({...p,workLocation:e.target.value}))} /></div>
+                  </div>
+                  <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-4)'}}>Work Mode</h4>
+                  <div className="work-mode-selector">
+                    {['Work From Office','Work From Home','Hybrid'].map(mode=>(
+                      <label key={mode} className={`work-mode-option ${formData.workMode===mode?'selected':''}`}>
+                        <input type="radio" name="workMode" value={mode} checked={formData.workMode===mode} onChange={()=>handleWorkModeChange(mode)} hidden />
+                        <span className="work-mode-icon">{mode==='Work From Office'?'🏢':mode==='Work From Home'?'🏠':'🔄'}</span><span>{mode}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-4)'}}>Quick Assign</h4>
+                  <div className={`form-quick-assign-card ${isWfh ? 'disabled-field' : ''}`}>
+                    <p className="quick-assign-desc">Auto-fill related fields by selecting a team or shift preset.</p>
+                    <div className="form-section-grid">
+                      <div className="form-field"><label>Team Assignment</label><select value={formData.teamName||''} onChange={e=>setFormData(p=>({...p,teamName:e.target.value}))}><option value="">Select Team</option>{['Alpha Squad','Beta Unit','Gamma Force','Delta Team','Product Core','Dev Ops'].map(t=><option key={t}>{t}</option>)}</select></div>
+                      <div className="form-field"><label>Shift Preset</label><select value={formData.shiftTiming||''} onChange={e=>setFormData(p=>({...p,shiftTiming:e.target.value}))} disabled={isWfh}><option value="">Select Shift</option><option value="09:00 AM - 06:00 PM">Morning (09:00 AM - 06:00 PM)</option><option value="02:00 PM - 11:00 PM">Evening (02:00 PM - 11:00 PM)</option><option value="10:00 PM - 07:00 AM">Night (10:00 PM - 07:00 AM)</option><option value="Flexible">Flexible</option></select></div>
+                    </div>
+                  </div>
+                  <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Employment Information</h4>
+                  <div className="form-section-grid">
+                    <div className="form-field"><label>{FIELD_LABELS.employeeType}</label>
+                      <select value={formData.employeeType || 'Full Time'} onChange={e => {
+                        const newType = e.target.value;
+                        setFormData(p => ({ ...p, employeeType: newType, probationEndDate: newType === 'Full Time' ? '' : p.probationEndDate }));
+                      }}>
+                        <option value="Full Time">Full Time</option>
+                        <option value="Part Time">Part Time</option>
+                        <option value="Contract">Contract</option>
+                        <option value="Internship">Internship</option>
+                      </select>
+                    </div>
+                    <div className="form-field"><label>{FIELD_LABELS.employmentStatus}</label><select value={formData.employmentStatus || 'Active'} onChange={e => setFormData(p => ({ ...p, employmentStatus: e.target.value }))}><option value="Active">Active</option><option value="Probation">Probation</option><option value="Suspended">Suspended</option><option value="Terminated">Terminated</option></select></div>
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.probationEndDate}</label>
+                      <input type="date" value={formData.probationEndDate || ''} onChange={e => setFormData(p => ({ ...p, probationEndDate: e.target.value }))} disabled={isFullTime} style={{ opacity: isFullTime ? 0.5 : 1, cursor: isFullTime ? 'not-allowed' : 'pointer' }} />
+                      {isFullTime && <small style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Disabled for Full Time employees</small>}
+                    </div>
+                    <div className="form-field"><label>{FIELD_LABELS.contractEndDate}</label><input type="date" value={formData.contractEndDate || ''} onChange={e => setFormData(p => ({ ...p, contractEndDate: e.target.value }))} /></div>
+                  </div>
+                  <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Bank Details</h4>
+                  <div className="form-section-grid">
+                    <div className="form-field"><label>{FIELD_LABELS.bankName}</label><input type="text" placeholder="e.g. HDFC Bank" value={formData.bankName || ''} onChange={e => setFormData(p => ({ ...p, bankName: e.target.value }))} /></div>
+                    <div className="form-field"><label>{FIELD_LABELS.bankAccountNumber}</label><input type="text" placeholder="e.g. 501002348271" value={formData.bankAccountNumber || ''} onChange={e => setFormData(p => ({ ...p, bankAccountNumber: e.target.value }))} /></div>
+                    <div className="form-field"><label>{FIELD_LABELS.bankIfscCode}</label><input type="text" placeholder="e.g. HDFC0000123" value={formData.bankIfscCode || ''} onChange={e => setFormData(p => ({ ...p, bankIfscCode: e.target.value }))} /></div>
+                    <div className="form-field"><label>{FIELD_LABELS.bankUpiId}</label><input type="text" placeholder="e.g. employee@okhdfc" value={formData.bankUpiId || ''} onChange={e => setFormData(p => ({ ...p, bankUpiId: e.target.value }))} /></div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Step 3: Login & Role Access */}
             {wizardStep === 3 && (
               <div className="wizard-step-form">
+                <h4 className="form-subsection-title">Login Credentials</h4>
                 <div className="form-section-grid">
-                  <div className="form-field"><label>Username</label><input type="text" placeholder="e.g. vikram.singh" value={formData.username} onChange={e => setFormData(p => ({ ...p, username: e.target.value }))} /></div>
-                  <div className="form-field"><label>Password *</label><input type="password" placeholder={formMode === 'edit' ? 'Leave blank to keep current' : 'Set login password'} value={formData.password} onChange={e => setFormData(p => ({ ...p, password: e.target.value }))} required={formMode !== 'edit'} /></div>
-                  <div className="form-field"><label>Role Assignment *</label>
-                    <select value={formData.roleId} onChange={e => setFormData(p => ({ ...p, roleId: e.target.value }))}>
-                      <option value="super_admin">Super Admin</option>
-                      <option value="project_manager">Project Manager</option>
-                      <option value="team_leader">Team Leader</option>
-                      <option value="employee">Employee</option>
-                    </select>
+                  <div className="form-field"><label>{FIELD_LABELS.username}</label><input type="text" placeholder="e.g. vikram.singh" value={formData.username||''} onChange={e=>setFormData(p=>({...p,username:e.target.value}))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.officialEmail}</label><input type="email" placeholder="vikram@company.io" value={formData.officialEmail||''} onChange={e=>setFormData(p=>({...p,officialEmail:e.target.value}))} /></div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.password} *</label>
+                    <input type="password" placeholder={formMode==='edit'?'Leave blank to keep current':'Set login password'} value={formData.password||''} onChange={e=>setFormData(p=>({...p,password:e.target.value}))} />
+                    {formData.password && formData.password!=='••••••••' && (
+                      <div className="password-strength-bar">
+                        <div className={`pw-bar-fill pw-${formData.password.length<6?'weak':formData.password.length<10?'medium':'strong'}`} style={{width:`${Math.min(100,formData.password.length*10)}%`}} />
+                        <span className={`pw-label pw-label-${formData.password.length<6?'weak':formData.password.length<10?'medium':'strong'}`}>{formData.password.length<6?'🔴 Weak':formData.password.length<10?'🟡 Medium':'🟢 Strong'}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.confirmPassword} *</label>
+                    <input type="password" placeholder="Re-enter password" value={formData.confirmPassword||''} onChange={e=>setFormData(p=>({...p,confirmPassword:e.target.value}))} />
+                    {formData.confirmPassword && formData.confirmPassword!==formData.password && <span style={{fontSize:'0.75rem',color:'var(--color-danger)',marginTop:'4px',display:'block'}}>⚠ Passwords do not match</span>}
+                    {formData.confirmPassword && formData.confirmPassword===formData.password && formData.confirmPassword.length>0 && <span style={{fontSize:'0.75rem',color:'var(--color-success)',marginTop:'4px',display:'block'}}>✓ Passwords match</span>}
+                  </div>
+                  <div className="form-field"><label>{FIELD_LABELS.roleId} *</label><select value={formData.roleId||'employee'} onChange={e=>setFormData(p=>({...p,roleId:e.target.value}))}><option value="super_admin">Super Admin</option><option value="project_manager">Project Manager</option><option value="team_leader">Team Leader</option><option value="employee">Employee</option></select></div>
+                </div>
+                <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-5)'}}>Permission Management Matrix</h4>
+                <p style={{fontSize:'0.8rem',color:'var(--text-muted)',marginBottom:'var(--spacing-3)'}}>Set module-level CRUD access for this employee.</p>
+                <div className="perm-matrix-wrapper">
+                  <table className="perm-matrix-table">
+                    <thead><tr><th className="perm-module-col">Module</th>{['View','Create','Edit','Delete','Approve','Export'].map(p=><th key={p} className="perm-action-col">{p}</th>)}</tr></thead>
+                    <tbody>
+                      {Object.entries(formData.permissions||{}).map(([module,perms])=>(
+                        <tr key={module} className="perm-row">
+                          <td className="perm-module-name">{module.charAt(0).toUpperCase()+module.slice(1)}</td>
+                          {['view','create','edit','delete','approve','export'].map(action=>(
+                            <td key={action} className="perm-check-cell">
+                              {action in perms ? <input type="checkbox" className="perm-checkbox" checked={!!perms[action]} onChange={ev=>setFormData(prev=>({...prev,permissions:{...prev.permissions,[module]:{...prev.permissions[module],[action]:ev.target.checked}}}))} /> : <span className="perm-na">—</span>}
+                             </td>
+                          ))}
+                         </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Attendance & Shift Setup */}
+            {wizardStep === 4 && (() => {
+              const isWfh = formData.workMode === 'Work From Home';
+              return (
+                <div className="wizard-step-form">
+                  {isWfh && (
+                    <div className="form-alert form-alert-info" style={{ marginBottom: 'var(--spacing-4)' }}>
+                      ℹ️ <strong>Work From Home Active:</strong> Shift timings, rules, and overtime settings are managed automatically under the remote work policy.
+                    </div>
+                  )}
+                  <h4 className="form-subsection-title">Shift Configuration</h4>
+                  <div className="form-section-grid">
+                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
+                      <label>{FIELD_LABELS.shiftType}</label>
+                      <select 
+                        value={formData.shiftType || 'Morning Shift'} 
+                        onChange={e => setFormData(p => ({ ...p, shiftType: e.target.value }))}
+                        disabled={isWfh}
+                      >
+                        <option value="Morning Shift">🌅 Morning Shift</option>
+                        <option value="Evening Shift">🌆 Evening Shift</option>
+                        <option value="Night Shift">🌙 Night Shift</option>
+                        <option value="Flexible Shift">🔄 Flexible Shift</option>
+                      </select>
+                    </div>
+                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
+                      <label>{FIELD_LABELS.shiftTiming}</label>
+                      <input 
+                        type="text" 
+                        placeholder={isWfh ? 'Flexible / Not Applicable' : '09:00 AM - 06:00 PM'} 
+                        value={formData.shiftTiming || ''} 
+                        onChange={e => setFormData(p => ({ ...p, shiftTiming: e.target.value }))} 
+                        disabled={isWfh}
+                      />
+                    </div>
+                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
+                      <label>{FIELD_LABELS.attendanceRule}</label>
+                      <select 
+                        value={formData.attendanceRule || 'Standard 9-6'} 
+                        onChange={e => setFormData(p => ({ ...p, attendanceRule: e.target.value }))}
+                        disabled={isWfh}
+                      >
+                        <option value="Standard 9-6">Standard 9-6</option>
+                        <option value="Flexible Hours">Flexible Hours</option>
+                        <option value="Night Shift Rule">Night Shift Rule</option>
+                        <option value="Part Time Rule">Part Time Rule</option>
+                      </select>
+                    </div>
+                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
+                      <label>{FIELD_LABELS.punchInTime}</label>
+                      <input 
+                        type="text" 
+                        placeholder={isWfh ? 'Not Applicable' : '09:00 AM'} 
+                        value={formData.punchInTime || ''} 
+                        onChange={e => setFormData(p => ({ ...p, punchInTime: e.target.value }))} 
+                        disabled={isWfh}
+                      />
+                    </div>
+                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
+                      <label>{FIELD_LABELS.punchOutTime}</label>
+                      <input 
+                        type="text" 
+                        placeholder={isWfh ? 'Not Applicable' : '06:00 PM'} 
+                        value={formData.punchOutTime || ''} 
+                        onChange={e => setFormData(p => ({ ...p, punchOutTime: e.target.value }))} 
+                        disabled={isWfh}
+                      />
+                    </div>
+                  </div>
+                  <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-5)' }}>Weekly Off Days</h4>
+                  <div className={`weekly-off-grid ${isWfh ? 'disabled-grid' : ''}`}>
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                      const isSelected = (formData.weeklyOffDays || []).includes(day);
+                      return (
+                        <label key={day} className={`weekly-off-chip ${isSelected ? 'selected' : ''} ${isWfh ? 'disabled-chip' : ''}`}>
+                          <input 
+                            type="checkbox" 
+                            hidden 
+                            checked={isSelected} 
+                            onChange={e => {
+                              if (isWfh) return;
+                              const d = formData.weeklyOffDays || [];
+                              setFormData(p => ({ ...p, weeklyOffDays: e.target.checked ? [...d, day] : d.filter(x => x !== day) }));
+                            }} 
+                            disabled={isWfh}
+                          />
+                          {day.slice(0, 3)}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Overtime</h4>
+                  <div className={`toggle-field-row ${isWfh ? 'disabled-row' : ''}`}>
+                    <div>
+                      <span className="toggle-field-label">Overtime Eligibility</span>
+                      <span className="toggle-field-desc">Allow this employee to log overtime hours</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      className={`toggle-switch ${formData.overtimeEligibility ? 'on' : 'off'} ${isWfh ? 'disabled-switch' : ''}`} 
+                      onClick={() => {
+                        if (isWfh) return;
+                        setFormData(p => ({ ...p, overtimeEligibility: !p.overtimeEligibility }));
+                      }}
+                      disabled={isWfh}
+                    >
+                      <span className="toggle-knob" />
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
-            {wizardStep === 4 && (
-              <div className="wizard-step-form">
-                <div className="form-section-grid-docs">
-                  {['aadhaar', 'pan', 'resume', 'certificates', 'offerLetter', 'profilePhoto'].map(docKey => (
-                    <div key={docKey} className="form-doc-upload">
-                      <label className="doc-label">{docKey === 'offerLetter' ? 'Offer Letter' : docKey.charAt(0).toUpperCase() + docKey.slice(1).replace(/([A-Z])/g, ' $1')}</label>
-                      <label className="doc-upload-box">
-                        <input type="file" accept={docKey === 'profilePhoto' ? 'image/*' : '.pdf,.jpg,.png,.jpeg'} onChange={e => setUploadedDocs(p => ({ ...p, [docKey]: e.target.files[0] }))} hidden />
-                        {uploadedDocs[docKey] ? <span className="doc-file-name">{uploadedDocs[docKey].name}</span> : <span className="doc-placeholder">+ Upload</span>}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              );
+            })()}
+
+            {/* Step 5: Salary Details */}
             {wizardStep === 5 && (
               <div className="wizard-step-form">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-6)' }}>
-                  
-                  {/* Skills Section */}
-                  <div>
-                    <h4 className="form-subsection-title" style={{ marginTop: 0 }}>Skills</h4>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                      <input 
-                        type="text" 
-                        id="new-skill-name"
-                        placeholder="Skill e.g. React" 
-                        style={{ flex: 1, padding: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)' }}
-                      />
-                      <select 
-                        id="new-skill-level"
-                        style={{ padding: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)' }}
-                      >
-                        <option>Beginner</option>
-                        <option>Intermediate</option>
-                        <option>Expert</option>
-                      </select>
-                      <Button size="sm" onClick={() => {
-                        const nameEl = document.getElementById('new-skill-name');
-                        const levelEl = document.getElementById('new-skill-level');
-                        if (nameEl && nameEl.value.trim()) {
-                          const newSkill = { name: nameEl.value.trim(), level: levelEl.value };
-                          setFormData(prev => ({
-                            ...prev,
-                            skills: [...(prev.skills || []), newSkill]
-                          }));
-                          nameEl.value = '';
-                        }
-                      }}>Add</Button>
-                    </div>
+                <h4 className="form-subsection-title">Salary Details</h4>
+                <div className="form-section-grid">
+                  <div className="form-field"><label>Salary Type</label><select value={formData.salaryType||'Monthly Fixed'} onChange={e=>setFormData(p=>({...p,salaryType:e.target.value}))}><option value="Monthly Fixed">Monthly Fixed</option><option value="CTC Based">CTC Based</option><option value="Hourly Rate">Hourly Rate</option><option value="Daily Wage">Daily Wage</option></select></div>
+                  <div className="form-field"><label>Monthly Salary (₹)</label><input type="number" placeholder="55000" value={formData.monthlySalary||''} onChange={e=>setFormData(p=>({...p,monthlySalary:e.target.value}))} /></div>
+                  <div className="form-field"><label>Basic Salary (₹)</label><input type="number" placeholder="35000" value={formData.salaryAmount||''} onChange={e=>setFormData(p=>({...p,salaryAmount:e.target.value}))} /></div>
+                  <div className="form-field"><label>Allowances (₹)</label><input type="number" placeholder="12000" value={formData.salaryAllowances||''} onChange={e=>setFormData(p=>({...p,salaryAllowances:e.target.value}))} /></div>
+                  <div className="form-field"><label>Deductions (₹)</label><input type="number" placeholder="5000" value={formData.salaryDeductions||''} onChange={e=>setFormData(p=>({...p,salaryDeductions:e.target.value}))} /></div>
+                  <div className="form-field"><label>Tax Details</label><input type="text" placeholder="e.g. 30% Slab" value={formData.taxDetails||''} onChange={e=>setFormData(p=>({...p,taxDetails:e.target.value}))} /></div>
+                  <div className="form-field"><label>PAN Number</label><input type="text" placeholder="ABCDE1234F" value={formData.panNumber||''} onChange={e=>setFormData(p=>({...p,panNumber:e.target.value.toUpperCase()}))} maxLength={10} /></div>
+                  <div className="form-field"><label>Aadhaar Number</label><input type="text" placeholder="1234 5678 9012" value={formData.aadhaarNumber||''} onChange={e=>setFormData(p=>({...p,aadhaarNumber:e.target.value}))} maxLength={14} /></div>
+                </div>
+              </div>
+            )}
 
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
-                      {(formData.skills || []).map((skill, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-card-hover)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '4px 8px', fontSize: '0.78rem' }}>
-                          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{skill.name}</span>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>({skill.level})</span>
-                          <button 
-                            type="button" 
-                            style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
-                            onClick={() => setFormData(prev => ({
-                              ...prev,
-                              skills: prev.skills.filter((_, i) => i !== idx)
-                            }))}
-                          >
-                            <X size={12} />
-                          </button>
+            {/* Step 6: Document Upload */}
+            {wizardStep === 6 && (
+              <div className="wizard-step-form">
+                <h4 className="form-subsection-title">Employee Documents</h4>
+                <p style={{fontSize:'0.8rem',color:'var(--text-muted)',marginBottom:'var(--spacing-4)'}}>
+                  Accepted: <strong>.pdf .jpg .jpeg .png .docx</strong> (Max 5MB each)
+                </p>
+                <div className="form-section-grid-docs">
+                  {[
+                    {key:'aadhaar',label:'Aadhaar Card',required:true},
+                    {key:'pan',label:'PAN Card',required:true},
+                    {key:'resume',label:'Resume / CV',required:true},
+                    {key:'certificates',label:'Certificates',required:false},
+                    {key:'offerLetter',label:'Offer Letter',required:false},
+                    {key:'experienceLetter',label:'Experience Letter',required:false},
+                    {key:'addressProof',label:'Address Proof',required:false},
+                    {key:'passportPhoto',label:'Passport Photo',required:false},
+                    {key:'signedAgreements',label:'Signed Agreements',required:false},
+                    {key:'profilePhoto',label:'Profile Photo',required:false}
+                  ].map(({key,label,required})=>{
+                    const imgOnly=['profilePhoto','passportPhoto'];
+                    const validTypes=imgOnly.includes(key)?['image/jpeg','image/png','image/jpg']:['application/pdf','image/jpeg','image/png','image/jpg','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+                    const file = uploadedDocs[key];
+                    const isInvalid = file && !validTypes.includes(file.type);
+                    const isImage = file && file.type.startsWith('image/');
+                    const filePreview = isImage && file ? URL.createObjectURL(file) : null;
+                    
+                    return(
+                      <div key={key} className={`form-doc-upload ${file ? 'has-file' : ''} ${isInvalid ? 'doc-invalid' : ''}`}>
+                        <label className="doc-label">{label} {required && <span className="doc-required">*</span>}</label>
+                        <div className="doc-upload-container">
+                          {!file ? (
+                            <label className="doc-upload-box">
+                              <input type="file" accept={imgOnly.includes(key)?'image/*':'.pdf,.jpg,.jpeg,.png,.docx'} onChange={e => {const f = e.target.files[0]; if(f && f.size > 5 * 1024 * 1024) {addToast('error', `${label} exceeds 5MB limit`); return;} if(f && !validTypes.includes(f.type)) {addToast('error', `Invalid type for ${label}`); return;} setUploadedDocs(prev => ({ ...prev, [key]: f || null }));}} hidden />
+                              <div className="doc-upload-placeholder"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4v16m8-8H4" /></svg><span>Upload</span></div>
+                            </label>
+                          ) : (
+                            <div className="doc-file-preview">
+                              {isImage && filePreview ? (
+                                <div className="doc-image-preview">
+                                  <img src={filePreview} alt={label} className="doc-preview-img" />
+                                  <button type="button" className="doc-remove-btn" onClick={() => handleRemoveDocument(key, label)} title="Remove file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
+                                </div>
+                              ) : (
+                                <div className="doc-file-info">
+                                  <div className="doc-file-icon">{file.type.includes('pdf') ? (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>) : (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><polyline points="13 2 13 9 20 9" /></svg>)}</div>
+                                  <div className="doc-file-details"><span className="doc-file-name" title={file.name}>{file.name.length > 20 ? file.name.slice(0, 18) + '…' : file.name}</span><span className="doc-file-size">{(file.size / 1024).toFixed(1)} KB</span></div>
+                                  <button type="button" className="doc-remove-btn doc-remove-file-btn" onClick={() => handleRemoveDocument(key, label)} title="Remove file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
+                                </div>
+                              )}
+                              <label className="doc-replace-link"><input type="file" accept={imgOnly.includes(key)?'image/*':'.pdf,.jpg,.jpeg,.png,.docx'} onChange={e => {const f = e.target.files[0]; if(f && f.size > 5 * 1024 * 1024) {addToast('error', `${label} exceeds 5MB limit`); return;} if(f && !validTypes.includes(f.type)) {addToast('error', `Invalid type for ${label}`); return;} setUploadedDocs(prev => ({ ...prev, [key]: f || null })); addToast('success', `${label} updated`);}} hidden /><span>Replace</span></label>
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        {isInvalid && <span className="doc-error-msg">❌ Invalid format. Use {imgOnly.includes(key) ? 'JPG, PNG' : 'PDF, JPG, PNG, DOCX'}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="doc-clear-all-container">
+                  <button type="button" className="doc-clear-all-btn" onClick={handleClearAllDocuments}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>Clear All Documents</button>
+                </div>
+              </div>
+            )}
 
-                  {/* Certifications Section */}
+            {/* Step 7: System Access & Security */}
+            {wizardStep === 7 && (
+              <div className="wizard-step-form">
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'var(--spacing-6)',alignItems:'start'}}>
                   <div>
-                    <h4 className="form-subsection-title" style={{ marginTop: 0 }}>Certifications</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-                      <input 
-                        type="text" 
-                        id="new-cert-name"
-                        placeholder="Cert name e.g. AWS" 
-                        style={{ padding: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)' }}
-                      />
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input 
-                          type="date" 
-                          id="new-cert-expiry"
-                          style={{ flex: 1, padding: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)' }}
-                        />
-                        <Button size="sm" onClick={() => {
-                          const nameEl = document.getElementById('new-cert-name');
-                          const expiryEl = document.getElementById('new-cert-expiry');
-                          if (nameEl && nameEl.value.trim()) {
-                            const newCert = { name: nameEl.value.trim(), expiryDate: expiryEl.value || null };
-                            setFormData(prev => ({
-                              ...prev,
-                              certifications: [...(prev.certifications || []), newCert]
-                            }));
-                            nameEl.value = '';
-                            expiryEl.value = '';
-                          }
-                        }}>Add</Button>
+                    <h4 className="form-subsection-title" style={{marginTop:0}}>System Access & Security</h4>
+                    <div className="toggle-field-row"><div><span className="toggle-field-label">Two-Factor Authentication</span><span className="toggle-field-desc">Require 2FA on every login</span></div><button type="button" className={`toggle-switch ${formData.twoFactorAuth?'on':'off'}`} onClick={()=>setFormData(p=>({...p,twoFactorAuth:!p.twoFactorAuth}))}><span className="toggle-knob" /></button></div>
+                    <div className="toggle-field-row"><div><span className="toggle-field-label">Multi-Device Login</span><span className="toggle-field-desc">Allow simultaneous logins</span></div><button type="button" className={`toggle-switch ${formData.multiDeviceLogin?'on':'off'}`} onClick={()=>setFormData(p=>({...p,multiDeviceLogin:!p.multiDeviceLogin}))}><span className="toggle-knob" /></button></div>
+                    <div className="form-field" style={{marginTop:'var(--spacing-4)'}}><label>IP Restriction <span style={{color:'var(--text-muted)',fontWeight:400}}>(Optional)</span></label><input type="text" placeholder="192.168.1.0/24" value={formData.ipRestriction||''} onChange={e=>setFormData(p=>({...p,ipRestriction:e.target.value}))} /></div>
+                    <div className="form-field"><label>Login Activity Tracking</label><select value={formData.loginActivityTracking||'Enabled'} onChange={e=>setFormData(p=>({...p,loginActivityTracking:e.target.value}))}><option value="Enabled">Enabled</option><option value="Disabled">Disabled</option></select></div>
+                    <div className="form-field"><label>Session Timeout</label><select value={formData.sessionTimeout||'30 minutes'} onChange={e=>setFormData(p=>({...p,sessionTimeout:e.target.value}))}><option value="15 minutes">15 minutes</option><option value="30 minutes">30 minutes</option><option value="1 hour">1 hour</option><option value="4 hours">4 hours</option><option value="Never">Never</option></select></div>
+                  </div>
+                  <div>
+                    <h4 className="form-subsection-title" style={{marginTop:0}}>Employee Preview</h4>
+                    <div className="pre-save-preview-card">
+                      <div className="pre-save-avatar-row"><Avatar name={formData.name||'New Employee'} size="lg" /><div className="pre-save-name-block"><h4>{formData.name||'New Employee'}</h4><span>{formData.designation||'Designation not set'}</span></div></div>
+                      <div className="pre-save-id-badge">{formData.id||'ID not generated'}</div>
+                      <div className="pre-save-detail-list">
+                        <div className="pre-save-detail-row"><span>Department</span><strong>{formData.department||'—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Branch</span><strong>{formData.branch||'—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Role</span><strong>{roles.find(r=>r.id===formData.roleId)?.name||'—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Work Mode</span><strong>{formData.workMode||'—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Shift</span><strong>{formData.shiftType||'—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Leader</span><strong>{formData.teamLeader||'—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Joining</span><strong>{formData.joinDate?fmtJoinDate(formData.joinDate):'—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Experience</span><strong>{formData.experience||'—'}</strong></div>
                       </div>
                     </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
-                      {(formData.certifications || []).map((cert, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-card-hover)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '4px 8px', fontSize: '0.78rem' }}>
-                          <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{cert.name}</span>
-                          {cert.expiryDate && (
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Exp: {cert.expiryDate}</span>
-                          )}
-                          <button 
-                            type="button" 
-                            style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
-                            onClick={() => setFormData(prev => ({
-                              ...prev,
-                              certifications: prev.certifications.filter((_, i) => i !== idx)
-                            }))}
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
                   </div>
-
                 </div>
               </div>
             )}
           </form>
 
           <div className="form-panel-footer">
+            <div className="wizard-footer-left">
+              <button type="button" className="form-footer-ghost-btn" onClick={handleResetForm}>↺ Reset</button>
+              <button type="button" className="form-footer-ghost-btn" onClick={handleSaveDraft}>💾 Draft</button>
+              {formMode==='add'&&<button type="button" className="form-footer-ghost-btn" onClick={handleGenerateEmployeeId}>🔑 Generate ID</button>}
+            </div>
             <div className="wizard-footer-buttons">
-              {wizardStep > 1 && <Button variant="secondary" icon={ArrowLeft} onClick={handlePrevStep}>Back</Button>}
-              {wizardStep < 5
-                ? <Button variant="primary" onClick={handleNextStep} disabled={!isStepValid()}>Next Step</Button>
-                : <Button variant="primary" onClick={handleFormSubmit}>{formMode === 'add' ? 'Create Employee' : 'Save Changes'}</Button>
-              }
+              {wizardStep>1&&<Button variant="secondary" icon={ArrowLeft} onClick={handlePrevStep}>Back</Button>}
+              {formMode==='edit' && wizardStep<7 && (
+                <Button variant="secondary" icon={Save} onClick={handleFormSubmit}>Save Changes</Button>
+              )}
+              {wizardStep<7 ? <Button variant="primary" onClick={handleNextStep} disabled={!isStepValid()}>Next Step</Button> : <Button variant="primary" onClick={handleFormSubmit}>{formMode==='add'?'Create Employee':'Save Changes'}</Button>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Employee Creation Success Modal ── */}
+      {createdEmpInfo && (
+        <div className="modal-overlay" onClick={()=>setCreatedEmpInfo(null)}>
+          <div className="emp-success-modal" onClick={e=>e.stopPropagation()}>
+            <div className="success-modal-header"><div className="success-checkmark-circle">✅</div><h3>Employee Added Successfully!</h3><p>Share credentials securely with the new employee.</p></div>
+            <div className="success-credentials-card">
+              <div className="cred-row"><span>Employee ID</span><strong className="cred-mono">{createdEmpInfo.id}</strong></div>
+              <div className="cred-row"><span>Full Name</span><strong>{createdEmpInfo.name}</strong></div>
+              <div className="cred-row"><span>Username</span><strong className="cred-mono">{createdEmpInfo.username||createdEmpInfo.id}</strong></div>
+              <div className="cred-row"><span>Work Email</span><strong className="cred-mono">{createdEmpInfo.workEmail}</strong></div>
+              <div className="cred-row"><span>Password</span><strong className="cred-password cred-mono">{createdEmpInfo.password}</strong></div>
+              <div className="cred-row"><span>Department</span><strong>{createdEmpInfo.department}</strong></div>
+              <div className="cred-row"><span>Role</span><strong>{createdEmpInfo.role}</strong></div>
+            </div>
+            <div className="success-modal-actions">
+              <button className="success-btn success-btn-primary" onClick={()=>{addToast('success',`Welcome email queued for ${createdEmpInfo.workEmail}`);setCreatedEmpInfo(null);}}>📧 Send Welcome Email</button>
+              <button className="success-btn" onClick={()=>{setIdCardEmployee(createdEmpInfo);setShowIdCard(true);setCreatedEmpInfo(null);}}>🪪 Download ID Card</button>
+              <button className="success-btn success-btn-ghost" onClick={()=>setCreatedEmpInfo(null)}>✕ Close</button>
             </div>
           </div>
         </div>
       )}
 
       {/* ── View SlideOver ── */}
-      <SlideOver
-        isOpen={slideOverOpen}
-        onClose={() => setSlideOverOpen(false)}
-        title="Employee Profile Detail"
-      >
+      <SlideOver isOpen={slideOverOpen} onClose={() => setSlideOverOpen(false)} title="Employee Profile Detail">
         <div className="employee-detail-view animate-fade-in">
-          <div className="detail-header-card">
-            <Avatar name={formData.name} size="lg" />
-            <h3 className="detail-name">{formData.name}</h3>
-            <Badge variant={formData.status === 'Active' ? 'success' : formData.status === 'On Leave' ? 'warning' : 'danger'}>{formData.status}</Badge>
-          </div>
-          <div className="detail-section-group">
-            <h4 className="detail-group-title">Personal Information</h4>
-            <div className="detail-grid">
-              <div className="detail-item"><label>Email Address</label><span>{formData.email}</span></div>
-              <div className="detail-item"><label>Phone Number</label><span>{formData.phone}</span></div>
-              <div className="detail-item"><label>Date of Birth</label><span>{formData.dob || 'Not set'}</span></div>
-              <div className="detail-item"><label>Gender</label><span>{formData.gender}</span></div>
-            </div>
-          </div>
-          <div className="detail-section-group">
-            <h4 className="detail-group-title">Work Information</h4>
-            <div className="detail-grid">
-              <div className="detail-item"><label>Employee ID</label><span>{formData.id}</span></div>
-              <div className="detail-item"><label>Department</label><span>{formData.department}</span></div>
-              <div className="detail-item"><label>Branch Location</label><span>{formData.branch}</span></div>
-              <div className="detail-item"><label>Assigned Team</label><span>{formData.team || 'None'}</span></div>
-              <div className="detail-item"><label>Designation / Role</label><span>{formData.role}</span></div>
-              <div className="detail-item"><label>Joining Date</label><span>{fmtJoinDate(formData.joinDate)}</span></div>
-            </div>
-          </div>
+          <div className="detail-header-card"><Avatar name={formData.name} size="lg" /><h3 className="detail-name">{formData.name}</h3><Badge variant={formData.status === 'Active' ? 'success' : formData.status === 'On Leave' ? 'warning' : 'danger'}>{formData.status}</Badge></div>
+          <div className="detail-section-group"><h4 className="detail-group-title">Personal Information</h4><div className="detail-grid"><div className="detail-item"><label>Email Address</label><span>{formData.email}</span></div><div className="detail-item"><label>Phone Number</label><span>{formData.phone}</span></div><div className="detail-item"><label>Date of Birth</label><span>{formData.dob || 'Not set'}</span></div><div className="detail-item"><label>Gender</label><span>{formData.gender}</span></div></div></div>
+          <div className="detail-section-group"><h4 className="detail-group-title">Work Information</h4><div className="detail-grid"><div className="detail-item"><label>Employee ID</label><span>{formData.id}</span></div><div className="detail-item"><label>Department</label><span>{formData.department}</span></div><div className="detail-item"><label>Branch Location</label><span>{formData.branch}</span></div><div className="detail-item"><label>Assigned Team</label><span>{formData.team || 'None'}</span></div><div className="detail-item"><label>Designation / Role</label><span>{formData.role}</span></div><div className="detail-item"><label>Joining Date</label><span>{fmtJoinDate(formData.joinDate)}</span></div></div></div>
         </div>
       </SlideOver>
 
@@ -1777,184 +2070,23 @@ const Employees = () => {
         <div className="id-card-overlay" onClick={() => { setShowIdCard(false); setIdCardEmployee(null); }}>
           <div className="id-card-modal" onClick={e => e.stopPropagation()}>
             <button className="id-card-close" onClick={() => { setShowIdCard(false); setIdCardEmployee(null); }}>✕</button>
-            
-            {/* The wrapper that will be captured for download */}
             <div className="id-card-render-wrapper" ref={idCardRef}>
-              
-              {/* FRONT SIDE */}
               <div className="id-card-front">
-                <div className="id-card-front-header-bg">
-                  <div className="id-card-watermark"></div>
-                </div>
+                <div className="id-card-front-header-bg"><div className="id-card-watermark"></div></div>
                 <div className="id-card-front-pink-bg"></div>
-                
-                <div className="id-card-logo-area">
-                  <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg">
-                    <polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" />
-                    <polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" />
-                  </svg>
-                  <div className="id-card-company-title">{idCardEmployee.companyName || 'OM ENTERPRISE'}</div>
-                  <div className="id-card-company-subtitle">{idCardEmployee.branch ? (idCardEmployee.branch.toLowerCase().includes('branch') ? idCardEmployee.branch : `${idCardEmployee.branch} Branch`) : 'Office Management'}</div>
-                </div>
-
-                <div className="id-card-photo-wrap">
-                  <Avatar name={idCardEmployee.name} size="xl" className="id-card-photo-img" />
-                </div>
-
-                <div className="id-card-name-area">
-                  <h2 className="id-card-emp-name">
-                    {renderName(idCardEmployee.name)}
-                  </h2>
-                  <p className="id-card-emp-role">{idCardEmployee.designation || idCardEmployee.role}</p>
-                </div>
-
-                <div className="id-card-details-grid">
-                  <div className="id-detail-label">ID NO</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value">{idCardEmployee.id}</div>
-
-                  <div className="id-detail-label">Dept.</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value">{idCardEmployee.department}</div>
-
-                  <div className="id-detail-label">Deg.</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value">{idCardEmployee.designation || idCardEmployee.role}</div>
-
-                  <div className="id-detail-label">DOB</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value">{fmtDob(idCardEmployee.dob)}</div>
-
-                  <div className="id-detail-label">Email</div>
-                  <div className="id-detail-colon">:</div>
-                  <div className="id-detail-value" title={idCardEmployee.workEmail || idCardEmployee.email}>
-                    {idCardEmployee.workEmail || idCardEmployee.email}
-                  </div>
-                </div>
+                <div className="id-card-logo-area"><svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg><div className="id-card-company-title">{idCardEmployee.companyName || 'OM ENTERPRISE'}</div><div className="id-card-company-subtitle">{idCardEmployee.branch ? (idCardEmployee.branch.toLowerCase().includes('branch') ? idCardEmployee.branch : `${idCardEmployee.branch} Branch`) : 'Office Management'}</div></div>
+                <div className="id-card-photo-wrap"><Avatar name={idCardEmployee.name} size="xl" className="id-card-photo-img" /></div>
+                <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(idCardEmployee.name)}</h2><p className="id-card-emp-role">{idCardEmployee.designation || idCardEmployee.role}</p></div>
+                <div className="id-card-details-grid"><div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.id}</div><div className="id-detail-label">Dept.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.department}</div><div className="id-detail-label">Deg.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.designation || idCardEmployee.role}</div><div className="id-detail-label">DOB</div><div className="id-detail-colon">:</div><div className="id-detail-value">{fmtDob(idCardEmployee.dob)}</div><div className="id-detail-label">Email</div><div className="id-detail-colon">:</div><div className="id-detail-value" title={idCardEmployee.workEmail || idCardEmployee.email}>{idCardEmployee.workEmail || idCardEmployee.email}</div></div>
               </div>
-
-              {/* BACK SIDE */}
               <div className="id-card-back">
-                <div className="id-card-back-bullets">
-                  <div className="id-card-bullet-row">
-                    <span className="id-bullet-dot"></span>
-                    <p>This card is the official property of {idCardEmployee.companyName || 'OM Enterprise'} and must be returned on demand.</p>
-                  </div>
-                  <div className="id-card-bullet-row">
-                    <span className="id-bullet-dot"></span>
-                    <p>If found, please return to the HR Department or dynamic branch address below immediately.</p>
-                  </div>
-                  <div className="id-card-bullet-row">
-                    <span className="id-bullet-dot"></span>
-                    <p style={{ fontWeight: 600 }}>Branch Address: {idCardEmployee.branchAddress || getBranchAddress(idCardEmployee.branch)}</p>
-                  </div>
-                </div>
-
-                <div className="id-card-back-middle">
-                  <div className="id-card-back-dates">
-                    <div className="id-date-row">
-                      <span className="id-date-label">Join Date:</span>
-                      <span className="id-date-val">{fmtJoinDate(idCardEmployee.joinDate)}</span>
-                    </div>
-                    <div className="id-date-row">
-                      <span className="id-date-label">Expire Date:</span>
-                      <span className="id-date-val">{idCardEmployee.contractEndDate ? fmtJoinDate(idCardEmployee.contractEndDate) : calculateExpiry(idCardEmployee.joinDate)}</span>
-                    </div>
-                    <div className="id-card-barcode-area">
-                      <svg viewBox="0 0 100 20" className="id-card-barcode-svg">
-                        <rect x="0" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="5" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="8" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="12" y="0" width="4" height="20" fill="#0f172a" />
-                        <rect x="18" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="21" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="25" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="30" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="33" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="37" y="0" width="5" height="20" fill="#0f172a" />
-                        <rect x="44" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="47" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="52" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="56" y="0" width="4" height="20" fill="#0f172a" />
-                        <rect x="62" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="65" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="69" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="74" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="77" y="0" width="2" height="20" fill="#0f172a" />
-                        <rect x="81" y="0" width="5" height="20" fill="#0f172a" />
-                        <rect x="88" y="0" width="1" height="20" fill="#0f172a" />
-                        <rect x="91" y="0" width="3" height="20" fill="#0f172a" />
-                        <rect x="96" y="0" width="2" height="20" fill="#0f172a" />
-                      </svg>
-                      <div className="id-card-barcode-text">*{idCardEmployee.id}*</div>
-                    </div>
-                  </div>
-
-                  <div className="id-card-back-qr">
-                    <svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg">
-                      <rect x="0" y="0" width="28" height="28" fill="#0f172a" />
-                      <rect x="4" y="4" width="20" height="20" fill="#ffffff" />
-                      <rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" />
-
-                      <rect x="72" y="0" width="28" height="28" fill="#0f172a" />
-                      <rect x="76" y="4" width="20" height="20" fill="#ffffff" />
-                      <rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" />
-
-                      <rect x="0" y="72" width="28" height="28" fill="#0f172a" />
-                      <rect x="4" y="76" width="20" height="20" fill="#ffffff" />
-                      <rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" />
-
-                      <rect x="36" y="4" width="8" height="8" fill="#0f172a" />
-                      <rect x="52" y="4" width="8" height="8" fill="#0f172a" />
-                      <rect x="44" y="12" width="16" height="8" fill="#0f172a" />
-                      <rect x="36" y="24" width="8" height="8" fill="#0f172a" />
-                      
-                      <rect x="4" y="36" width="8" height="8" fill="#0f172a" />
-                      <rect x="16" y="44" width="8" height="8" fill="#0f172a" />
-                      <rect x="24" y="36" width="8" height="8" fill="#0f172a" />
-                      
-                      <rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" />
-                      <rect x="40" y="40" width="8" height="8" fill="#ffffff" />
-                      
-                      <rect x="60" y="36" width="8" height="8" fill="#0f172a" />
-                      <rect x="56" y="48" width="8" height="8" fill="#0f172a" />
-                      
-                      <rect x="36" y="56" width="8" height="8" fill="#0f172a" />
-                      <rect x="48" y="60" width="8" height="8" fill="#0f172a" />
-                      
-                      <rect x="76" y="36" width="8" height="8" fill="#0f172a" />
-                      <rect x="84" y="44" width="12" height="8" fill="#0f172a" />
-                      <rect x="72" y="56" width="8" height="16" fill="#0f172a" />
-                      <rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" />
-                      
-                      <rect x="36" y="76" width="12" height="8" fill="#0f172a" />
-                      <rect x="52" y="72" width="8" height="16" fill="#0f172a" />
-                      <rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" />
-                      
-                      <rect x="76" y="76" width="12" height="8" fill="#0f172a" />
-                      <rect x="84" y="84" width="12" height="8" fill="#0f172a" />
-                    </svg>
-                    <span className="id-qr-label">SCAN ME</span>
-                  </div>
-                </div>
-
-                <div className="id-card-back-signature-area">
-                  <div className="id-signature-font">{idCardEmployee.teamLeader || 'Vikram Singh'}</div>
-                  <div className="id-signature-line"></div>
-                  <div className="id-signature-label">Authorized Signatory</div>
-                </div>
-
-                <div className="id-card-back-bottom-bg">
-                  <div className="id-card-watermark"></div>
-                </div>
-                <div className="id-card-back-pink-bg"></div>
+                <div className="id-card-back-bullets"><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {idCardEmployee.companyName || 'OM Enterprise'} and must be returned on demand.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {idCardEmployee.branchAddress || getBranchAddress(idCardEmployee.branch)}</p></div></div>
+                <div className="id-card-back-middle"><div className="id-card-back-dates"><div className="id-date-row"><span className="id-date-label">Join Date:</span><span className="id-date-val">{fmtJoinDate(idCardEmployee.joinDate)}</span></div><div className="id-date-row"><span className="id-date-label">Expire Date:</span><span className="id-date-val">{idCardEmployee.contractEndDate ? fmtJoinDate(idCardEmployee.contractEndDate) : calculateExpiry(idCardEmployee.joinDate)}</span></div><div className="id-card-barcode-area"><svg viewBox="0 0 100 20" className="id-card-barcode-svg"><rect x="0" y="0" width="3" height="20" fill="#0f172a" /><rect x="5" y="0" width="1" height="20" fill="#0f172a" /><rect x="8" y="0" width="2" height="20" fill="#0f172a" /><rect x="12" y="0" width="4" height="20" fill="#0f172a" /><rect x="18" y="0" width="1" height="20" fill="#0f172a" /><rect x="21" y="0" width="2" height="20" fill="#0f172a" /><rect x="25" y="0" width="3" height="20" fill="#0f172a" /><rect x="30" y="0" width="1" height="20" fill="#0f172a" /><rect x="33" y="0" width="2" height="20" fill="#0f172a" /><rect x="37" y="0" width="5" height="20" fill="#0f172a" /><rect x="44" y="0" width="1" height="20" fill="#0f172a" /><rect x="47" y="0" width="3" height="20" fill="#0f172a" /><rect x="52" y="0" width="2" height="20" fill="#0f172a" /><rect x="56" y="0" width="4" height="20" fill="#0f172a" /><rect x="62" y="0" width="1" height="20" fill="#0f172a" /><rect x="65" y="0" width="2" height="20" fill="#0f172a" /><rect x="69" y="0" width="3" height="20" fill="#0f172a" /><rect x="74" y="0" width="1" height="20" fill="#0f172a" /><rect x="77" y="0" width="2" height="20" fill="#0f172a" /><rect x="81" y="0" width="5" height="20" fill="#0f172a" /><rect x="88" y="0" width="1" height="20" fill="#0f172a" /><rect x="91" y="0" width="3" height="20" fill="#0f172a" /><rect x="96" y="0" width="2" height="20" fill="#0f172a" /></svg><div className="id-card-barcode-text">*{idCardEmployee.id}*</div></div></div><div className="id-card-back-qr"><svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg"><rect x="0" y="0" width="28" height="28" fill="#0f172a" /><rect x="4" y="4" width="20" height="20" fill="#ffffff" /><rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="72" y="0" width="28" height="28" fill="#0f172a" /><rect x="76" y="4" width="20" height="20" fill="#ffffff" /><rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="0" y="72" width="28" height="28" fill="#0f172a" /><rect x="4" y="76" width="20" height="20" fill="#ffffff" /><rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" /><rect x="36" y="4" width="8" height="8" fill="#0f172a" /><rect x="52" y="4" width="8" height="8" fill="#0f172a" /><rect x="44" y="12" width="16" height="8" fill="#0f172a" /><rect x="36" y="24" width="8" height="8" fill="#0f172a" /><rect x="4" y="36" width="8" height="8" fill="#0f172a" /><rect x="16" y="44" width="8" height="8" fill="#0f172a" /><rect x="24" y="36" width="8" height="8" fill="#0f172a" /><rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" /><rect x="40" y="40" width="8" height="8" fill="#ffffff" /><rect x="60" y="36" width="8" height="8" fill="#0f172a" /><rect x="56" y="48" width="8" height="8" fill="#0f172a" /><rect x="36" y="56" width="8" height="8" fill="#0f172a" /><rect x="48" y="60" width="8" height="8" fill="#0f172a" /><rect x="76" y="36" width="8" height="8" fill="#0f172a" /><rect x="84" y="44" width="12" height="8" fill="#0f172a" /><rect x="72" y="56" width="8" height="16" fill="#0f172a" /><rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" /><rect x="36" y="76" width="12" height="8" fill="#0f172a" /><rect x="52" y="72" width="8" height="16" fill="#0f172a" /><rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" /><rect x="76" y="76" width="12" height="8" fill="#0f172a" /><rect x="84" y="84" width="12" height="8" fill="#0f172a" /></svg><span className="id-qr-label">SCAN ME</span></div></div>
+                <div className="id-card-back-signature-area"><div className="id-signature-font">{idCardEmployee.teamLeader || 'Vikram Singh'}</div><div className="id-signature-line"></div><div className="id-signature-label">Authorized Signatory</div></div>
+                <div className="id-card-back-bottom-bg"><div className="id-card-watermark"></div></div><div className="id-card-back-pink-bg"></div>
               </div>
-
             </div>
-
-            <button className="id-card-download-btn" onClick={downloadIdCard}>
-              <Download size={16} /> Download ID Cards
-            </button>
+            <button className="id-card-download-btn" onClick={downloadIdCard}><Download size={16} /> Download ID Cards</button>
           </div>
         </div>
       )}

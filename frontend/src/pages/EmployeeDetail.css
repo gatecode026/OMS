@@ -1570,3 +1570,80 @@ tr.row-red td:first-child   { border-left: 3px solid #ef4444; }
   display:inline-block; background:rgba(255,255,255,.04); border:1px solid var(--border-color);
   border-radius:3px; padding:2px 6px; font-size:.66rem; font-weight:600; color:var(--text-muted); white-space:nowrap;
 }
+/* Workplace Section Styles - ADD THIS AT THE END OF YOUR CSS FILE */
+.workplace-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.workplace-section h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-3);
+  padding-bottom: var(--spacing-2);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Permission Matrix View */
+.perm-matrix-view {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+}
+
+.perm-view-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  min-width: 500px;
+}
+
+.perm-view-table th {
+  padding: 10px 12px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.perm-view-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  text-align: center;
+}
+
+.perm-module {
+  text-align: left !important;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.perm-cell {
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Leave Action Buttons in History Table */
+.leave-action-btn {
+  background: none; border: 1px solid; border-radius: 4px;
+  padding: 4px 8px; font-size: 0.72rem; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-approve {
+  border-color: rgba(34, 197, 94, 0.4); color: #4ade80; background: rgba(34, 197, 94, 0.08);
+}
+.btn-approve:hover {
+  background: rgba(34, 197, 94, 0.16);
+}
+.btn-reject {
+  border-color: rgba(239, 68, 68, 0.4); color: #f87171; background: rgba(239, 68, 68, 0.08);
+}
+.btn-reject:hover {
+  background: rgba(239, 68, 68, 0.16);
+}

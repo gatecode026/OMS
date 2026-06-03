@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import './TeamLeaders.css';
 import { useApp } from '../context/AppContext';
+import { FIELD_LABELS } from '../utils/fieldLabels';
 import usePageLoading from '../hooks/usePageLoading';
 import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
@@ -298,7 +299,7 @@ const TeamLeaders = () => {
 
             <div className="leader-card-details">
               <div className="detail-line">
-                <strong>Email Contact:</strong>
+                <strong>{FIELD_LABELS.officialEmail}:</strong>
                 <span>{leader.email}</span>
               </div>
               <div className="detail-line">

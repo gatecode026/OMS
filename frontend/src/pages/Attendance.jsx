@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import './Attendance.css';
 import { useApp } from '../context/AppContext';
+import { FIELD_LABELS } from '../utils/fieldLabels';
 import { useNavigate } from 'react-router-dom';
 import usePageLoading from '../hooks/usePageLoading';
 import DataTable from '../components/common/DataTable';
@@ -17,7 +18,7 @@ import {
   RefreshCw, Settings, Users, Cpu, TrendingUp, TrendingDown,
   ChevronRight, AlertTriangle, CheckSquare, Coffee, Home,
   Smartphone, Fingerprint, Wifi, Eye, Share2, MoreHorizontal,
-  Target, Layers, BookOpen
+  Target, Layers, BookOpen, Briefcase, Building, Monitor, Smartphone as MobileIcon
 } from 'lucide-react';
 
 const Attendance = () => {
@@ -37,12 +38,15 @@ const Attendance = () => {
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState('2026-05-29');
+  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [deptFilter, setDeptFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [shiftFilter, setShiftFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [workModeFilter, setWorkModeFilter] = useState('');
+
+
 
   // Edit record states
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -63,13 +67,14 @@ const Attendance = () => {
     employeeName: '',
     department: '',
     branch: '',
-    date: '2026-05-29',
-    punchIn: '09:00 AM',
-    punchOut: '06:00 PM',
+    workMode: '',
+    date: new Date().toISOString().split('T')[0],
+    punchIn: '',
+    punchOut: '',
     breakTime: '45 mins',
-    totalHours: 8.25,
+    totalHours: 0,
     status: 'Present',
-    source: 'Biometric'
+    source: 'Web Portal'
   });
 
   // Assign Shift state
@@ -78,6 +83,45 @@ const Attendance = () => {
     employeeId: '',
     shift: 'Morning (09:00 AM - 06:00 PM)'
   });
+
+  // Automation Rules State (with localStorage persistence)
+  const [automationRules, setAutomationRules] = useState(() => {
+    const saved = localStorage.getItem('attendance_automation_rules');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+    return [
+      { id: 1, name: 'Auto Mark Absent', desc: 'Mark absent if no punch by 11 AM', active: true, icon: UserMinus },
+      { id: 2, name: 'Late Alert Email', desc: 'Send email when employee is 30+ min late', active: true, icon: Bell },
+      { id: 3, name: 'OT Calculation', desc: 'Calculate overtime automatically post 8 hrs', active: true, icon: Clock },
+      { id: 4, name: 'Monthly Report', desc: 'Auto-send reports on 1st of each month', active: false, icon: FileText },
+      { id: 5, name: 'Leave Deduction', desc: 'Auto deduct from leave balance on absence', active: true, icon: Target },
+      { id: 6, name: 'SMS Notification', desc: 'Send SMS for consecutive 3-day absences', active: false, icon: Smartphone },
+    ];
+  });
+
+  // Save automation rules to localStorage when changed
+  useEffect(() => {
+    localStorage.setItem('attendance_automation_rules', JSON.stringify(automationRules));
+  }, [automationRules]);
+
+  // Toggle automation rule
+  const toggleAutomationRule = (ruleId) => {
+    setAutomationRules(prev => prev.map(rule => 
+      rule.id === ruleId ? { ...rule, active: !rule.active } : rule
+    ));
+    const rule = automationRules.find(r => r.id === ruleId);
+    addToast('success', `${rule?.name} ${rule?.active ? 'disabled' : 'enabled'} successfully.`);
+  };
+
+  // Get work mode counts
+  const workModeStats = useMemo(() => {
+    const office = employees.filter(e => e.workMode === 'Work From Office' || e.workMode === 'Office').length;
+    const wfh = employees.filter(e => e.workMode === 'Work From Home' || e.workMode === 'WFH').length;
+    const hybrid = employees.filter(e => e.workMode === 'Hybrid').length;
+    return { office, wfh, hybrid, total: employees.length };
+  }, [employees]);
+
 
   // Modals Actions
   const handleOpenEdit = (record) => {
@@ -97,6 +141,33 @@ const Attendance = () => {
     if (!selectedRecord) return;
     updateAttendanceRecord(selectedRecord.id, editFormData);
     setEditModalOpen(false);
+    addToast('success', 'Attendance record updated successfully.');
+  };
+
+  // Auto-set current time for punch in
+  const handleAutoPunchIn = () => {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    setMarkFormData(prev => ({ ...prev, punchIn: timeString }));
+    addToast('info', `Punch In time set to ${timeString}`);
+  };
+
+  // Auto-set current time for punch out and calculate hours
+  const handleAutoPunchOut = () => {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    
+    // Calculate hours if punch in exists
+    if (markFormData.punchIn) {
+      const punchInTime = new Date(`2000/01/01 ${markFormData.punchIn}`);
+      const punchOutTime = new Date(`2000/01/01 ${timeString}`);
+      const diffHours = (punchOutTime - punchInTime) / (1000 * 60 * 60);
+      const totalHours = Math.round(diffHours * 10) / 10;
+      setMarkFormData(prev => ({ ...prev, punchOut: timeString, totalHours: totalHours > 0 ? totalHours : 0 }));
+    } else {
+      setMarkFormData(prev => ({ ...prev, punchOut: timeString }));
+    }
+    addToast('info', `Punch Out time set to ${timeString}`);
   };
 
   const handleMarkSubmit = () => {
@@ -104,20 +175,28 @@ const Attendance = () => {
       addToast('error', 'Please select an employee.');
       return;
     }
+    
+    if (!markFormData.punchIn) {
+      addToast('error', 'Please enter Punch In time.');
+      return;
+    }
+
     const empData = employees.find(e => e.id === markFormData.employeeId);
     const record = {
-      id: `ATT-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `ATT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       employeeId: markFormData.employeeId,
       employeeName: markFormData.employeeName,
       department: markFormData.department || empData?.department || 'Engineering',
       branch: markFormData.branch || empData?.branch || 'Jaipur',
+      workMode: markFormData.workMode || empData?.workMode || 'Work From Office',
       date: markFormData.date,
       punchIn: markFormData.punchIn,
-      punchOut: markFormData.punchOut,
+      punchOut: markFormData.punchOut || '--:--',
       breakTime: markFormData.breakTime,
-      totalHours: parseFloat(markFormData.totalHours) || 8.0,
+      totalHours: parseFloat(markFormData.totalHours) || 0,
       status: markFormData.status,
-      source: markFormData.source
+      source: markFormData.source,
+      overtime: markFormData.totalHours > 8 ? `${(markFormData.totalHours - 8).toFixed(1)} hrs` : '0 hrs'
     };
     addAttendanceRecord(record);
     setMarkModalOpen(false);
@@ -126,14 +205,16 @@ const Attendance = () => {
       employeeName: '',
       department: '',
       branch: '',
-      date: '2026-05-29',
-      punchIn: '09:00 AM',
-      punchOut: '06:00 PM',
+      workMode: '',
+      date: new Date().toISOString().split('T')[0],
+      punchIn: '',
+      punchOut: '',
       breakTime: '45 mins',
-      totalHours: 8.25,
+      totalHours: 0,
       status: 'Present',
-      source: 'Biometric'
+      source: 'Web Portal'
     });
+    addToast('success', `Attendance marked for ${markFormData.employeeName}`);
   };
 
   const handleShiftSubmit = () => {
@@ -160,17 +241,47 @@ const Attendance = () => {
     addToast('info', 'Monthly automatic attendance report scheduled for the 1st of every month.');
   };
 
+  // Navigate to records tab with filter
+  const navigateToRecordsWithFilter = (filterType, filterValue) => {
+    setActiveSection('records');
+    if (filterType === 'status') {
+      setStatusFilter(filterValue);
+    } else if (filterType === 'workMode') {
+      setWorkModeFilter(filterValue);
+    } else if (filterType === 'branch') {
+      setBranchFilter(filterValue);
+    }
+    // Scroll to table after a short delay
+    setTimeout(() => {
+      document.querySelector('.att-records-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
   // Process and Filter Attendance Ledger
   const ledgerData = useMemo(() => {
     return attendance.map(item => {
       const empDetails = employees.find(e => e.id === item.employeeId || e.name === item.employeeName);
+      let status = item.status;
+      if ((status === 'On Leave' || status === 'Leave') && empDetails && empDetails.leaveHistory) {
+        const foundLeave = empDetails.leaveHistory.find(l => 
+          l.status === 'Approved' && 
+          item.date >= l.fromDate && 
+          item.date <= l.toDate
+        );
+        if (foundLeave) {
+          status = foundLeave.type;
+        }
+      }
+      const totalHours = item.totalHours || 0;
       return {
         ...item,
+        status,
         employeeId: item.employeeId || empDetails?.id || 'EMP-2026-999',
         shift: empDetails?.shift || 'Flexible (09:00 AM - 06:00 PM)',
         source: item.source || 'Biometric',
         breakTime: item.breakTime || '45 mins',
-        overtime: item.overtime || (item.totalHours > 8 ? `${(item.totalHours - 8).toFixed(1)} hrs` : '0 hrs')
+        workMode: item.workMode || empDetails?.workMode || 'Work From Office',
+        overtime: item.overtime || (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
       };
     });
   }, [attendance, employees]);
@@ -179,29 +290,47 @@ const Attendance = () => {
   const filteredAttendance = useMemo(() => {
     return ledgerData.filter(a => {
       const matchesSearch = searchQuery
-        ? a.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.employeeId.toLowerCase().includes(searchQuery.toLowerCase())
+        ? a.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          a.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
       const matchesDate = dateFilter ? a.date === dateFilter : true;
       const matchesDept = deptFilter ? a.department === deptFilter : true;
       const matchesBranch = branchFilter ? a.branch === branchFilter : true;
-      const matchesShift = shiftFilter ? a.shift.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
-      const matchesStatus = statusFilter ? a.status.toLowerCase() === statusFilter.toLowerCase() : true;
-      const matchesSource = sourceFilter ? a.source.toLowerCase() === sourceFilter.toLowerCase() : true;
+      const matchesShift = shiftFilter ? a.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
+      const matchesStatus = statusFilter 
+        ? (statusFilter.toLowerCase() === 'on leave'
+            ? (a.status?.toLowerCase() === 'on leave' || a.status?.toLowerCase() === 'leave' || a.status?.toLowerCase().includes('leave'))
+            : a.status?.toLowerCase() === statusFilter.toLowerCase()
+          )
+        : true;
+      const matchesSource = sourceFilter ? a.source?.toLowerCase() === sourceFilter.toLowerCase() : true;
+      const matchesWorkMode = workModeFilter ? a.workMode === workModeFilter : true;
 
-      return matchesSearch && matchesDate && matchesDept && matchesBranch && matchesShift && matchesStatus && matchesSource;
+      return matchesSearch && matchesDate && matchesDept && matchesBranch && matchesShift && matchesStatus && matchesSource && matchesWorkMode;
     });
-  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, statusFilter, sourceFilter]);
+  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, statusFilter, sourceFilter, workModeFilter]);
 
   // Calculations for Summary Statistics
-  const totalEmployees = 1250;
+  const totalEmployees = employees.length;
   const totalPresent = filteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length;
   const totalLate = filteredAttendance.filter(a => a.status === 'Late').length;
   const totalAbsent = filteredAttendance.filter(a => a.status === 'Absent').length;
-  const totalLeave = filteredAttendance.filter(a => ['On Leave', 'Leave'].includes(a.status)).length;
+  const totalLeave = filteredAttendance.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length;
   const totalWFH = filteredAttendance.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length;
   const totalHalfDay = filteredAttendance.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
   const attendanceRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(filteredAttendance.length, 1)) * 100) : 94;
+
+  // Get counts by status for clickable cards
+  const statusCounts = useMemo(() => {
+    return {
+      present: filteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length,
+      absent: filteredAttendance.filter(a => a.status === 'Absent').length,
+      late: filteredAttendance.filter(a => a.status === 'Late').length,
+      leave: filteredAttendance.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length,
+      wfh: filteredAttendance.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length,
+      halfDay: filteredAttendance.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length,
+    };
+  }, [filteredAttendance]);
 
   const handleExport = (format = 'CSV') => {
     addToast('success', `Export generated! attendance_report_${dateFilter || 'all'}.${format.toLowerCase()} downloaded successfully.`);
@@ -216,22 +345,34 @@ const Attendance = () => {
     else if (status === 'Absent') { variant = 'danger'; text = '❌ Absent'; }
     else if (status === 'Half Day' || status === 'Half-Day') { variant = 'info'; text = '🌗 Half Day'; }
     else if (status === 'Work From Home' || status === 'WFH') { variant = 'info'; text = '🏠 WFH'; }
-    else if (status === 'On Leave' || status === 'Leave') { variant = 'warning'; text = '🌴 Leave'; }
+    else if (status === 'On Leave' || status === 'Leave' || (status && status.includes('Leave'))) { variant = 'warning'; text = `🌴 ${status}`; }
     else if (status === 'Overtime') { variant = 'success'; text = '⏰ Overtime'; }
     return <Badge variant={variant}>{text}</Badge>;
+  };
+
+  // Work mode badge helper
+  const getWorkModeBadge = (workMode) => {
+    if (workMode === 'Work From Office' || workMode === 'Office') {
+      return <Badge variant="primary">🏢 Office</Badge>;
+    } else if (workMode === 'Work From Home' || workMode === 'WFH') {
+      return <Badge variant="info">🏠 WFH</Badge>;
+    } else if (workMode === 'Hybrid') {
+      return <Badge variant="warning">🔄 Hybrid</Badge>;
+    }
+    return <Badge variant="neutral">—</Badge>;
   };
 
   // Data Table Columns
   const columns = [
     {
       key: 'employeeId',
-      header: 'Emp ID',
+      header: FIELD_LABELS.id,
       sortable: true,
       render: (row) => (
         <span
           className="clickable-emp-name"
           onClick={() => navigate(`/employees/${row.employeeId}?tab=attendance_punch`)}
-          style={{ fontFamily: 'monospace', fontWeight: 600 }}
+          style={{ fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
         >
           {row.employeeId}
         </span>
@@ -239,12 +380,13 @@ const Attendance = () => {
     },
     {
       key: 'employeeName',
-      header: 'Employee Name',
+      header: FIELD_LABELS.name,
       sortable: true,
       render: (row) => (
         <div
           className="flex-center gap-3 justify-start clickable-emp-name"
           onClick={() => navigate(`/employees/${row.employeeId}?tab=attendance_punch`)}
+          style={{ cursor: 'pointer' }}
         >
           <Avatar name={row.employeeName} size="sm" />
           <span className="emp-name-bold">{row.employeeName}</span>
@@ -252,29 +394,40 @@ const Attendance = () => {
       )
     },
     {
-      key: 'deptBranch',
-      header: 'Dept & Branch',
+      key: 'department',
+      header: FIELD_LABELS.department,
+      sortable: true,
       render: (row) => (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{row.department}</span>
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{row.branch}</span>
-        </div>
+        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{row.department}</span>
       )
     },
-    { key: 'shift', header: 'Shift', sortable: true },
-    { key: 'punchIn', header: 'Punch In', sortable: true },
-    { key: 'punchOut', header: 'Punch Out', sortable: true },
+    {
+      key: 'branch',
+      header: FIELD_LABELS.branch,
+      sortable: true,
+      render: (row) => (
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{row.branch}</span>
+      )
+    },
+    { key: 'shift', header: FIELD_LABELS.shiftTiming, sortable: true },
+    { key: 'punchIn', header: FIELD_LABELS.punchInTime, sortable: true },
+    { key: 'punchOut', header: FIELD_LABELS.punchOutTime, sortable: true },
     { key: 'breakTime', header: 'Break', sortable: true },
     {
       key: 'totalHours',
-      header: 'Hours',
+      header: FIELD_LABELS.workingHours,
       sortable: true,
       render: (row) => <span>{row.totalHours > 0 ? `${row.totalHours} hrs` : '--'}</span>
     },
-    { key: 'overtime', header: 'Overtime', sortable: true },
+    {
+      key: 'overtime',
+      header: 'Overtime',
+      sortable: true,
+      render: (row) => <span style={{ color: row.overtime !== '0 hrs' ? 'var(--color-success)' : 'var(--text-muted)', fontWeight: row.overtime !== '0 hrs' ? 600 : 400 }}>{row.overtime}</span>
+    },
     {
       key: 'status',
-      header: 'Status',
+      header: FIELD_LABELS.attendanceStatus,
       sortable: true,
       render: (row) => getStatusBadge(row.status)
     },
@@ -284,7 +437,7 @@ const Attendance = () => {
       sortable: true,
       render: (row) => (
         <span className="att-source-tag" title="Source Device">
-          {row.source === 'Biometric' ? '⚙️ Bio' : row.source === 'GPS' ? '📍 GPS' : row.source === 'RFID' ? '💳 RFID' : '💻 Web'}
+          {row.source === 'Biometric' ? '⚙️ Bio' : row.source === 'GPS' ? '📍 GPS' : row.source === 'RFID' ? '💳 RFID' : row.source === 'Web Portal' ? '💻 Web' : '📱 App'}
         </span>
       )
     },
@@ -296,7 +449,7 @@ const Attendance = () => {
           className="circle-action-btn btn-success-circle"
           onClick={() => handleOpenEdit(row)}
           title="Edit Log"
-          style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
         >
           <Edit2 size={12} />
         </button>
@@ -304,57 +457,43 @@ const Attendance = () => {
     }
   ];
 
-  // Live punch feed data
-  const livePunchFeed = [
-    { name: 'Rahul Sharma', action: 'Punched In', time: '09:02 AM', source: 'Biometric', type: 'in', dept: 'Engineering' },
-    { name: 'Priya Verma', action: 'Punched Out', time: '06:15 PM', source: 'Web Portal', type: 'out', dept: 'Marketing' },
-    { name: 'Amit Bose', action: 'Punched In', time: '09:00 AM', source: 'Mobile App', type: 'in', dept: 'Sales' },
-    { name: 'Ananya Gupta', action: 'Late Punch In', time: '09:35 AM', source: 'Biometric', type: 'late', dept: 'HR' },
-    { name: 'Vijay Chauhan', action: 'WFH Check-in', time: '09:00 AM', source: 'GPS Location', type: 'wfh', dept: 'Operations' },
-    { name: 'Meena Sharma', action: 'Break Started', time: '01:05 PM', source: 'Biometric', type: 'break', dept: 'Finance' },
-  ];
+  // Branch data for Branch Management
+  const branchData = useMemo(() => {
+    const branches = ['Jaipur', 'Delhi', 'Mumbai', 'Bangalore'];
+    return branches.map(branch => {
+      const branchEmployees = employees.filter(e => e.branch === branch);
+      const activeToday = filteredAttendance.filter(a => a.branch === branch && ['Present', 'Overtime'].includes(a.status)).length;
+      return {
+        name: branch,
+        total: branchEmployees.length,
+        active: activeToday,
+        office: branchEmployees.filter(e => e.workMode === 'Work From Office' || e.workMode === 'Office').length,
+        wfh: branchEmployees.filter(e => e.workMode === 'Work From Home' || e.workMode === 'WFH').length,
+        hybrid: branchEmployees.filter(e => e.workMode === 'Hybrid').length,
+        rate: branchEmployees.length > 0 ? Math.round((activeToday / branchEmployees.length) * 100) : 0
+      };
+    });
+  }, [employees, filteredAttendance]);
 
-  // Department-wise breakdown
-  const deptBreakdown = [
-    { name: 'Engineering', present: 42, total: 50, color: '#4ade80' },
-    { name: 'Marketing', present: 18, total: 22, color: '#60a5fa' },
-    { name: 'Sales', present: 28, total: 35, color: '#fbbf24' },
-    { name: 'Operations', present: 15, total: 20, color: '#a78bfa' },
-    { name: 'Human Resources', present: 10, total: 12, color: '#f472b6' },
-  ];
-
-  // Leave data
-  const leaveData = [
-    { type: 'Casual Leave', availed: 3, total: 12, color: '#60a5fa' },
-    { type: 'Sick Leave', availed: 1, total: 8, color: '#f87171' },
-    { type: 'Privilege Leave', availed: 5, total: 15, color: '#4ade80' },
-    { type: 'Maternity Leave', availed: 0, total: 90, color: '#f472b6' },
-  ];
-
-  // Automation rules
-  const automationRules = [
-    { name: 'Auto Mark Absent', desc: 'Mark absent if no punch by 11 AM', active: true, icon: UserMinus },
-    { name: 'Late Alert Email', desc: 'Send email when employee is 30+ min late', active: true, icon: Bell },
-    { name: 'OT Calculation', desc: 'Calculate overtime automatically post 8 hrs', active: true, icon: Clock },
-    { name: 'Monthly Report', desc: 'Auto-send reports on 1st of each month', active: false, icon: FileText },
-    { name: 'Leave Deduction', desc: 'Auto deduct from leave balance on absence', active: true, icon: Target },
-    { name: 'SMS Notification', desc: 'Send SMS for consecutive 3-day absences', active: false, icon: Smartphone },
-  ];
-
-  // Country/location data
-  const locationData = [
-    { country: 'India', offices: ['Jaipur', 'Delhi', 'Mumbai', 'Bangalore'], employees: 850, active: 782 },
-    { country: 'US', offices: ['New York', 'San Francisco'], employees: 220, active: 198 },
-    { country: 'UK', offices: ['London'], employees: 90, active: 84 },
-    { country: 'UAE', offices: ['Dubai'], employees: 90, active: 80 },
-  ];
+  // Live punch feed data with real employees
+  const livePunchFeed = useMemo(() => {
+    const recentAttendances = [...attendance].reverse().slice(0, 10);
+    return recentAttendances.map(att => ({
+      name: att.employeeName,
+      action: att.punchIn && !att.punchOut ? 'Punched In' : (att.punchOut ? 'Punched Out' : 'No Punch'),
+      time: att.punchIn || '--:--',
+      source: att.source || 'Biometric',
+      type: att.punchIn && !att.punchOut ? 'in' : (att.punchOut ? 'out' : 'absent'),
+      dept: att.department
+    }));
+  }, [attendance]);
 
   if (isLoading) {
     return (
       <div className="attendance-page grid-gap">
         <div className="card" style={{ height: '80px' }}><Skeleton variant="rect" height="100%" /></div>
         <div className="att-skeleton-grid">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="card" style={{ height: '110px' }}>
               <Skeleton variant="rect" height="100%" />
             </div>
@@ -395,9 +534,40 @@ const Attendance = () => {
         </div>
       </div>
 
-      {/* ═══ Top Summary KPI Cards ═══ */}
+      {/* ═══ Work Mode Cards (Office/WFH/Hybrid) - CLICKABLE ═══ */}
+      <div className="att-workmode-strip">
+        <div className="att-workmode-card att-workmode-office" onClick={() => navigateToRecordsWithFilter('workMode', 'Work From Office')}>
+          <div className="att-workmode-icon"><Building size={24} /></div>
+          <div className="att-workmode-info">
+            <span className="att-workmode-label">OFFICE</span>
+            <span className="att-workmode-count">{workModeStats.office}</span>
+            <span className="att-workmode-sub">Employees today</span>
+          </div>
+          <ChevronRight size={16} className="att-workmode-arrow" />
+        </div>
+        <div className="att-workmode-card att-workmode-wfh" onClick={() => navigateToRecordsWithFilter('workMode', 'Work From Home')}>
+          <div className="att-workmode-icon"><Home size={24} /></div>
+          <div className="att-workmode-info">
+            <span className="att-workmode-label">WORK FROM HOME</span>
+            <span className="att-workmode-count">{workModeStats.wfh}</span>
+            <span className="att-workmode-sub">Employees today</span>
+          </div>
+          <ChevronRight size={16} className="att-workmode-arrow" />
+        </div>
+        <div className="att-workmode-card att-workmode-hybrid" onClick={() => navigateToRecordsWithFilter('workMode', 'Hybrid')}>
+          <div className="att-workmode-icon"><RefreshCw size={24} /></div>
+          <div className="att-workmode-info">
+            <span className="att-workmode-label">HYBRID</span>
+            <span className="att-workmode-count">{workModeStats.hybrid}</span>
+            <span className="att-workmode-sub">Employees today</span>
+          </div>
+          <ChevronRight size={16} className="att-workmode-arrow" />
+        </div>
+      </div>
+
+      {/* ═══ Top Summary KPI Cards - CLICKABLE ═══ */}
       <div className="att-kpi-strip">
-        <div className="att-kpi-card att-kpi-blue">
+        <div className="att-kpi-card att-kpi-blue" onClick={() => navigateToRecordsWithFilter('status', '')} style={{ cursor: 'pointer' }}>
           <div className="att-kpi-header">
             <span className="att-kpi-label">Total Employees</span>
             <div className="att-kpi-icon-box att-kpi-icon-blue"><Users size={16} /></div>
@@ -409,83 +579,83 @@ const Attendance = () => {
           </div>
         </div>
 
-        <div className="att-kpi-card att-kpi-green">
+        <div className="att-kpi-card att-kpi-green" onClick={() => navigateToRecordsWithFilter('status', 'Present')} style={{ cursor: 'pointer' }}>
           <div className="att-kpi-header">
             <span className="att-kpi-label">Present Today</span>
             <div className="att-kpi-icon-box att-kpi-icon-green"><CheckCircle2 size={16} /></div>
           </div>
-          <div className="att-kpi-value">{totalPresent + totalHalfDay}</div>
+          <div className="att-kpi-value">{statusCounts.present}</div>
           <div className="att-kpi-sub">
             <span className="att-kpi-sub-tag">{totalHalfDay} Half-Day</span>
             <span>{totalWFH} WFH</span>
           </div>
         </div>
 
-        <div className="att-kpi-card att-kpi-red">
+        <div className="att-kpi-card att-kpi-red" onClick={() => navigateToRecordsWithFilter('status', 'Absent')} style={{ cursor: 'pointer' }}>
           <div className="att-kpi-header">
             <span className="att-kpi-label">Absent Today</span>
             <div className="att-kpi-icon-box att-kpi-icon-red"><UserMinus size={16} /></div>
           </div>
-          <div className="att-kpi-value">{totalAbsent}</div>
+          <div className="att-kpi-value">{statusCounts.absent}</div>
           <div className="att-kpi-sub">
             <TrendingDown size={11} />
             <span>Unexcused absence</span>
           </div>
         </div>
 
-        <div className="att-kpi-card att-kpi-amber">
+        <div className="att-kpi-card att-kpi-amber" onClick={() => navigateToRecordsWithFilter('status', 'On Leave')} style={{ cursor: 'pointer' }}>
           <div className="att-kpi-header">
             <span className="att-kpi-label">Employees on Leave</span>
             <div className="att-kpi-icon-box att-kpi-icon-amber"><BookOpen size={16} /></div>
           </div>
-          <div className="att-kpi-value">{totalLeave}</div>
+          <div className="att-kpi-value">{statusCounts.leave}</div>
           <div className="att-kpi-sub">
             <span>Approved holidays</span>
           </div>
         </div>
 
-        <div className="att-kpi-card att-kpi-purple">
+        <div className="att-kpi-card att-kpi-purple" onClick={() => navigateToRecordsWithFilter('status', 'Late')} style={{ cursor: 'pointer' }}>
           <div className="att-kpi-header">
             <span className="att-kpi-label">Late Arrivals</span>
             <div className="att-kpi-icon-box att-kpi-icon-purple"><AlertCircle size={16} /></div>
           </div>
-          <div className="att-kpi-value">{totalLate}</div>
+          <div className="att-kpi-value">{statusCounts.late}</div>
           <div className="att-kpi-sub">
             <span>After 09:15 AM</span>
           </div>
         </div>
 
-        <div className="att-kpi-card att-kpi-cyan">
+        <div className="att-kpi-card att-kpi-cyan" onClick={() => navigateToRecordsWithFilter('status', 'Work From Home')} style={{ cursor: 'pointer' }}>
           <div className="att-kpi-header">
             <span className="att-kpi-label">Work From Home</span>
             <div className="att-kpi-icon-box att-kpi-icon-cyan"><Home size={16} /></div>
           </div>
-          <div className="att-kpi-value">{totalWFH}</div>
+          <div className="att-kpi-value">{statusCounts.wfh}</div>
           <div className="att-kpi-sub">
             <span>Active WFH logs</span>
           </div>
         </div>
 
-        <div className="att-kpi-card att-kpi-indigo">
+        <div className="att-kpi-card att-kpi-indigo" onClick={() => navigateToRecordsWithFilter('status', 'Half Day')} style={{ cursor: 'pointer' }}>
           <div className="att-kpi-header">
-            <span className="att-kpi-label">Attendance Rate</span>
-            <div className="att-kpi-icon-box att-kpi-icon-indigo"><BarChart2 size={16} /></div>
+            <span className="att-kpi-label">Half Day</span>
+            <div className="att-kpi-icon-box att-kpi-icon-indigo"><Clock size={16} /></div>
           </div>
-          <div className="att-kpi-value">{attendanceRate}%</div>
+          <div className="att-kpi-value">{statusCounts.halfDay}</div>
           <div className="att-kpi-sub">
-            <TrendingUp size={11} />
-            <span>+2.1% vs last week</span>
+            <span>Partial attendance</span>
           </div>
         </div>
 
         <div className="att-kpi-card att-kpi-rose">
           <div className="att-kpi-header">
-            <span className="att-kpi-label">Overtime Today</span>
-            <div className="att-kpi-icon-box att-kpi-icon-rose"><Zap size={16} /></div>
+            <span className="att-kpi-label">Attendance Rate</span>
+            <div className="att-kpi-icon-box att-kpi-icon-rose"><BarChart2 size={16} /></div>
           </div>
-          <div className="att-kpi-value">7</div>
+          <div className="att-kpi-value">{attendanceRate}%</div>
           <div className="att-kpi-sub">
-            <span>~2.3 hrs avg extra</span>
+            <TrendingUp size={11} />
+            <span>+2.1% vs last week</span>
           </div>
         </div>
       </div>
@@ -496,9 +666,7 @@ const Attendance = () => {
           { id: 'overview', label: 'Overview & Analytics', icon: BarChart2 },
           { id: 'records', label: 'Attendance Records', icon: FileText },
           { id: 'monitor', label: 'Live Punch Monitor', icon: Activity },
-          { id: 'locations', label: 'Country Management', icon: Globe },
-          { id: 'leave', label: 'Leave Information', icon: BookOpen },
-          { id: 'automation', label: 'Automation', icon: Cpu },
+          { id: 'branches', label: 'Branch Management', icon: Building },
           { id: 'reports', label: 'Reports & Export', icon: Download },
         ].map(tab => {
           const Icon = tab.icon;
@@ -528,7 +696,6 @@ const Attendance = () => {
               <Badge variant="info">Today</Badge>
             </div>
 
-            {/* Donut-style summary ring */}
             <div className="att-analytics-body">
               <div className="att-donut-section">
                 <div className="att-donut-ring">
@@ -539,29 +706,28 @@ const Attendance = () => {
                         <stop offset="100%" stopColor="#06b6d4" />
                       </linearGradient>
                     </defs>
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="10" />
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border-color)" strokeWidth="10" />
                     <circle cx="60" cy="60" r="50" fill="none"
                       stroke="url(#presentGrad)"
                       strokeWidth="10"
-                      strokeDasharray={`${(totalPresent / Math.max(filteredAttendance.length, 1)) * 314} 314`}
+                      strokeDasharray={`${(statusCounts.present / Math.max(filteredAttendance.length, 1)) * 314} 314`}
                       strokeLinecap="round"
                       transform="rotate(-90 60 60)"
-                      style={{ filter: 'drop-shadow(0 0 5px rgba(34, 211, 238, 0.4))' }}
                     />
-                    <text x="60" y="58" textAnchor="middle" fill="white" fontSize="20" fontWeight="900" style={{ fontFamily: 'var(--font-mono)' }}>{attendanceRate}%</text>
-                    <text x="60" y="74" textAnchor="middle" fill="var(--text-muted)" fontSize="7.5" fontWeight="700" letterSpacing="0.04em" textTransform="uppercase">Present Rate</text>
+                    <text x="60" y="58" textAnchor="middle" fill="var(--text-primary)" fontSize="20" fontWeight="900">{attendanceRate}%</text>
+                    <text x="60" y="74" textAnchor="middle" fill="var(--text-muted)" fontSize="7.5" fontWeight="700">Present Rate</text>
                   </svg>
                 </div>
                 <div className="att-donut-legend">
                   {[
-                    { label: 'Present', count: totalPresent, color: '#4ade80' },
-                    { label: 'Absent', count: totalAbsent, color: '#f87171' },
-                    { label: 'On Leave', count: totalLeave, color: '#fbbf24' },
-                    { label: 'WFH', count: totalWFH, color: '#60a5fa' },
-                    { label: 'Half Day', count: totalHalfDay, color: '#a78bfa' },
-                    { label: 'Late', count: totalLate, color: '#fb923c' },
+                    { label: 'Present', count: statusCounts.present, color: '#4ade80' },
+                    { label: 'Absent', count: statusCounts.absent, color: '#f87171' },
+                    { label: 'On Leave', count: statusCounts.leave, color: '#fbbf24' },
+                    { label: 'WFH', count: statusCounts.wfh, color: '#60a5fa' },
+                    { label: 'Half Day', count: statusCounts.halfDay, color: '#a78bfa' },
+                    { label: 'Late', count: statusCounts.late, color: '#fb923c' },
                   ].map((item, i) => (
-                    <div key={i} className="att-legend-item">
+                    <div key={i} className="att-legend-item" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('status', item.label)}>
                       <span className="att-legend-dot" style={{ background: item.color }} />
                       <span className="att-legend-label">{item.label}</span>
                       <span className="att-legend-count">{item.count}</span>
@@ -570,7 +736,6 @@ const Attendance = () => {
                 </div>
               </div>
 
-              {/* Bar chart for weekly trend */}
               <div className="att-weekly-bars">
                 <div className="att-weekly-title">Weekly Trend</div>
                 <div className="att-bar-group">
@@ -596,24 +761,30 @@ const Attendance = () => {
               </div>
             </div>
 
-            {/* Dept breakdown */}
+            {/* Work Mode Distribution */}
             <div className="att-dept-breakdown">
-              <div className="att-section-mini-title">Department Breakdown</div>
-              {deptBreakdown.map((dept, i) => (
-                <div key={i} className="att-dept-row">
-                  <span className="att-dept-name">{dept.name}</span>
-<div className="att-dept-bar-wrap">
-                    <div
-                      className="att-dept-bar-fill"
-                      style={{
-                        width: `${(dept.present / dept.total) * 100}%`,
-                        background: dept.color
-                      }}
-                    />
-                  </div>
-                  <span className="att-dept-count">{dept.present}/{dept.total}</span>
+              <div className="att-section-mini-title">Work Mode Distribution</div>
+              <div className="att-dept-row" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('workMode', 'Work From Office')}>
+                <span className="att-dept-name">🏢 Office</span>
+                <div className="att-dept-bar-wrap">
+                  <div className="att-dept-bar-fill" style={{ width: `${(workModeStats.office / totalEmployees) * 100}%`, background: '#3b82f6' }} />
                 </div>
-              ))}
+                <span className="att-dept-count">{workModeStats.office}/{totalEmployees}</span>
+              </div>
+              <div className="att-dept-row" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('workMode', 'Work From Home')}>
+                <span className="att-dept-name">🏠 Work From Home</span>
+                <div className="att-dept-bar-wrap">
+                  <div className="att-dept-bar-fill" style={{ width: `${(workModeStats.wfh / totalEmployees) * 100}%`, background: '#10b981' }} />
+                </div>
+                <span className="att-dept-count">{workModeStats.wfh}/{totalEmployees}</span>
+              </div>
+              <div className="att-dept-row" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('workMode', 'Hybrid')}>
+                <span className="att-dept-name">🔄 Hybrid</span>
+                <div className="att-dept-bar-wrap">
+                  <div className="att-dept-bar-fill" style={{ width: `${(workModeStats.hybrid / totalEmployees) * 100}%`, background: '#f59e0b' }} />
+                </div>
+                <span className="att-dept-count">{workModeStats.hybrid}/{totalEmployees}</span>
+              </div>
             </div>
           </div>
 
@@ -630,7 +801,7 @@ const Attendance = () => {
               </div>
             </div>
             <div className="att-punch-feed">
-              {livePunchFeed.map((ev, i) => (
+              {livePunchFeed.length > 0 ? livePunchFeed.map((ev, i) => (
                 <div key={i} className="att-feed-item">
                   <div className={`att-feed-dot att-feed-${ev.type}`} />
                   <Avatar name={ev.name} size="xs" />
@@ -640,45 +811,28 @@ const Attendance = () => {
                     <span className="att-feed-meta">{ev.time} · {ev.source} · {ev.dept}</span>
                   </div>
                   <div className={`att-feed-type-tag att-type-${ev.type}`}>
-                    {ev.type === 'in' ? '↑ In' : ev.type === 'out' ? '↓ Out' : ev.type === 'late' ? '⚠ Late' : ev.type === 'wfh' ? '🏠' : '☕'}
+                    {ev.type === 'in' ? '↑ In' : ev.type === 'out' ? '↓ Out' : ev.type === 'late' ? '⚠ Late' : '❌'}
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="att-empty-feed">No recent punch activity</div>
+              )}
             </div>
             <div className="att-punch-footer">
               <div className="att-punch-stat-row">
                 <div className="att-punch-mini-stat">
                   <span>Today Punched In</span>
-                  <strong style={{ color: '#4ade80' }}>847</strong>
+                  <strong style={{ color: '#4ade80' }}>{statusCounts.present}</strong>
                 </div>
                 <div className="att-punch-mini-stat">
                   <span>Punched Out</span>
-                  <strong style={{ color: '#60a5fa' }}>312</strong>
+                  <strong style={{ color: '#60a5fa' }}>{Math.floor(statusCounts.present * 0.6)}</strong>
                 </div>
                 <div className="att-punch-mini-stat">
                   <span>Still Working</span>
-                  <strong style={{ color: '#fbbf24' }}>535</strong>
+                  <strong style={{ color: '#fbbf24' }}>{statusCounts.present - Math.floor(statusCounts.present * 0.6)}</strong>
                 </div>
               </div>
-            </div>
-
-            {/* Real-time system status */}
-            <div className="att-system-status">
-              <div className="att-section-mini-title">System Status</div>
-              {[
-                { label: 'Biometric Devices', status: 'Online', ok: true },
-                { label: 'GPS Tracking', status: 'Active', ok: true },
-                { label: 'RFID Access', status: 'Online', ok: true },
-                { label: 'Mobile App Sync', status: 'Syncing', ok: true },
-              ].map((sys, i) => (
-                <div key={i} className="att-sys-row">
-                  <span className="att-sys-label">{sys.label}</span>
-                  <span className={`att-sys-status ${sys.ok ? 'att-sys-ok' : 'att-sys-err'}`}>
-                    <span className="att-sys-dot" />
-                    {sys.status}
-                  </span>
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -744,9 +898,19 @@ const Attendance = () => {
                 <option value="Biometric">Biometric</option>
                 <option value="GPS">GPS</option>
                 <option value="RFID">RFID</option>
-                <option value="Web Login">Web Login</option>
+                <option value="Web Portal">Web Portal</option>
                 <option value="Mobile App">Mobile App</option>
               </select>
+              <Button variant="ghost" onClick={() => {
+                setSearchQuery('');
+                setDeptFilter('');
+                setBranchFilter('');
+                setShiftFilter('');
+                setStatusFilter('');
+                setSourceFilter('');
+                setWorkModeFilter('');
+                addToast('info', 'All filters cleared');
+              }}>Clear</Button>
             </div>
           </div>
 
@@ -771,19 +935,19 @@ const Attendance = () => {
             />
           </div>
 
-          {/* Status summary below table */}
+          {/* Status summary below table - CLICKABLE */}
           <div className="att-status-summary-row">
             {[
-              { label: 'Present', count: totalPresent, color: '#4ade80', icon: CheckCircle2 },
-              { label: 'Absent', count: totalAbsent, color: '#f87171', icon: UserMinus },
-              { label: 'Late', count: totalLate, color: '#fb923c', icon: AlertCircle },
-              { label: 'On Leave', count: totalLeave, color: '#fbbf24', icon: BookOpen },
-              { label: 'WFH', count: totalWFH, color: '#60a5fa', icon: Home },
-              { label: 'Half Day', count: totalHalfDay, color: '#a78bfa', icon: Clock },
+              { label: 'Present', count: statusCounts.present, color: '#4ade80', icon: CheckCircle2, filter: 'Present' },
+              { label: 'Absent', count: statusCounts.absent, color: '#f87171', icon: UserMinus, filter: 'Absent' },
+              { label: 'Late', count: statusCounts.late, color: '#fb923c', icon: AlertCircle, filter: 'Late' },
+              { label: 'On Leave', count: statusCounts.leave, color: '#fbbf24', icon: BookOpen, filter: 'On Leave' },
+              { label: 'WFH', count: statusCounts.wfh, color: '#60a5fa', icon: Home, filter: 'Work From Home' },
+              { label: 'Half Day', count: statusCounts.halfDay, color: '#a78bfa', icon: Clock, filter: 'Half Day' },
             ].map((s, i) => {
               const Icon = s.icon;
               return (
-                <div key={i} className="att-status-chip" style={{ borderColor: `${s.color}30` }}>
+                <div key={i} className="att-status-chip" style={{ borderColor: `${s.color}30`, cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('status', s.filter)}>
                   <Icon size={13} style={{ color: s.color }} />
                   <span className="att-status-chip-count" style={{ color: s.color }}>{s.count}</span>
                   <span>{s.label}</span>
@@ -809,7 +973,7 @@ const Attendance = () => {
               </div>
             </div>
             <div className="att-monitor-feed-full">
-              {[...livePunchFeed, ...livePunchFeed].map((ev, i) => (
+              {livePunchFeed.length > 0 ? livePunchFeed.map((ev, i) => (
                 <div key={i} className="att-monitor-feed-row">
                   <div className={`att-feed-dot att-feed-${ev.type}`} style={{ flexShrink: 0 }} />
                   <Avatar name={ev.name} size="sm" />
@@ -821,7 +985,9 @@ const Attendance = () => {
                   <span className="att-monitor-source">{ev.source}</span>
                   <span className="att-monitor-time">{ev.time}</span>
                 </div>
-              ))}
+              )) : (
+                <div className="att-empty-feed-full">No recent punch activity. Mark attendance to see live feed.</div>
+              )}
             </div>
           </div>
 
@@ -835,24 +1001,23 @@ const Attendance = () => {
                 </div>
               </div>
               <div className="att-punch-out-list">
-                {[
-                  { name: 'Rajesh Kumar', dept: 'Engineering', checkin: '09:00 AM', expected: '06:00 PM', status: 'Still Working' },
-                  { name: 'Sunita Patel', dept: 'Marketing', checkin: '09:15 AM', expected: '06:15 PM', status: 'Extended' },
-                  { name: 'Arjun Mehta', dept: 'Sales', checkin: '08:55 AM', expected: '05:55 PM', status: 'On Time' },
-                ].map((emp, i) => (
+                {filteredAttendance.filter(a => a.punchIn && !a.punchOut).slice(0, 5).map((emp, i) => (
                   <div key={i} className="att-pout-row">
-                    <Avatar name={emp.name} size="xs" />
+                    <Avatar name={emp.employeeName} size="xs" />
                     <div className="att-pout-info">
-                      <strong>{emp.name}</strong>
-                      <span>{emp.dept}</span>
+                      <strong>{emp.employeeName}</strong>
+                      <span>{emp.department}</span>
                     </div>
                     <div className="att-pout-times">
-                      <span>In: {emp.checkin}</span>
-                      <span>Out: {emp.expected}</span>
+                      <span>In: {emp.punchIn}</span>
+                      <span>Expected: {emp.shift?.split('-')[1] || '06:00 PM'}</span>
                     </div>
-                    <span className={`att-pout-status ${emp.status === 'On Time' ? 'att-ok' : 'att-warn'}`}>{emp.status}</span>
+                    <span className="att-pout-status att-warn">Still Working</span>
                   </div>
                 ))}
+                {filteredAttendance.filter(a => a.punchIn && !a.punchOut).length === 0 && (
+                  <div className="att-empty-out">No active punches</div>
+                )}
               </div>
             </div>
 
@@ -866,10 +1031,10 @@ const Attendance = () => {
               </div>
               <div className="att-source-list">
                 {[
-                  { label: 'Biometric', count: 482, pct: 57, icon: '⚙️', color: '#4ade80' },
-                  { label: 'GPS (Mobile)', count: 198, pct: 23, icon: '📍', color: '#60a5fa' },
-                  { label: 'RFID', count: 103, pct: 12, icon: '💳', color: '#fbbf24' },
-                  { label: 'Web Portal', count: 64, pct: 8, icon: '💻', color: '#a78bfa' },
+                  { label: 'Biometric', count: filteredAttendance.filter(a => a.source === 'Biometric').length, pct: 57, icon: '⚙️', color: '#4ade80' },
+                  { label: 'GPS (Mobile)', count: filteredAttendance.filter(a => a.source === 'GPS').length, pct: 23, icon: '📍', color: '#60a5fa' },
+                  { label: 'RFID', count: filteredAttendance.filter(a => a.source === 'RFID').length, pct: 12, icon: '💳', color: '#fbbf24' },
+                  { label: 'Web Portal', count: filteredAttendance.filter(a => a.source === 'Web Portal').length, pct: 8, icon: '💻', color: '#a78bfa' },
                 ].map((src, i) => (
                   <div key={i} className="att-src-item">
                     <span className="att-src-icon">{src.icon}</span>
@@ -884,132 +1049,103 @@ const Attendance = () => {
                 ))}
               </div>
             </div>
-
-            {/* Alarms */}
-            <div className="card att-alarms-card">
-              <div className="att-card-header">
-                <div className="att-card-title">
-                  <ShieldAlert size={15} style={{ color: '#f87171' }} />
-                  <span>Attendance Alarms</span>
-                </div>
-                <Badge variant="danger">3 Active</Badge>
-              </div>
-              <div className="att-alarms-list">
-                <div className="att-alarm-item att-alarm-error">
-                  <strong>Missing Clock-Out</strong>
-                  <p>Rajesh Kumar — no clock-out logged for yesterday.</p>
-                </div>
-                <div className="att-alarm-item att-alarm-warning">
-                  <strong>Frequent Late Arrivals (3×)</strong>
-                  <p>Vikram Singh and Ananya Gupta — late 3+ times this week.</p>
-                </div>
-                <div className="att-alarm-item att-alarm-info">
-                  <strong>Consecutive Absence</strong>
-                  <p>Meena Sharma — absent for 3 consecutive working days.</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}
 
-      {/* ═══ COUNTRY / LOCATION MANAGEMENT ═══ */}
-      {activeSection === 'locations' && (
-        <div className="att-locations-grid">
-          <div className="card att-locations-card">
+      {/* ═══ BRANCH MANAGEMENT (Replaced Country) ═══ */}
+      {activeSection === 'branches' && (
+        <div className="att-branches-grid">
+          <div className="card att-branches-card">
             <div className="att-card-header">
               <div className="att-card-title">
-                <Globe size={16} style={{ color: '#60a5fa' }} />
-                <span>Country Management</span>
+                <Building size={16} style={{ color: '#60a5fa' }} />
+                <span>Branch Management</span>
               </div>
-              <Button variant="secondary" size="sm" icon={Plus} onClick={() => addToast('info', 'Add new country/region dialog coming soon.')}>
-                Add Location
+              <Button variant="secondary" size="sm" icon={Plus} onClick={() => addToast('info', 'Add new branch dialog coming soon.')}>
+                Add Branch
               </Button>
             </div>
-            <div className="att-locations-list">
-              {locationData.map((loc, i) => (
-                <div key={i} className="att-location-item">
-                  <div className="att-location-flag">
-                    {loc.country === 'India' ? '🇮🇳' : loc.country === 'US' ? '🇺🇸' : loc.country === 'UK' ? '🇬🇧' : '🇦🇪'}
+            <div className="att-branches-list">
+              {branchData.map((branch, i) => (
+                <div key={i} className="att-branch-item" onClick={() => navigateToRecordsWithFilter('branch', branch.name)} style={{ cursor: 'pointer' }}>
+                  <div className="att-branch-icon">
+                    {branch.name === 'Jaipur' ? '🕌' : branch.name === 'Delhi' ? '🏛️' : branch.name === 'Mumbai' ? '🌊' : '🏙️'}
                   </div>
-                  <div className="att-location-info">
-                    <strong>{loc.country}</strong>
-                    <span className="att-location-offices">{loc.offices.join(', ')}</span>
+                  <div className="att-branch-info">
+                    <strong>{branch.name}</strong>
+                    <span className="att-branch-address">
+                      {branch.name === 'Jaipur' ? 'Malviya Nagar' : 
+                       branch.name === 'Delhi' ? 'Connaught Place' : 
+                       branch.name === 'Mumbai' ? 'BKC' : 'MG Road'}
+                    </span>
                   </div>
-                  <div className="att-location-stats">
-                    <div className="att-location-stat">
-                      <span>{loc.employees}</span>
+                  <div className="att-branch-stats">
+                    <div className="att-branch-stat">
+                      <span>{branch.total}</span>
                       <span>Total</span>
                     </div>
-                    <div className="att-location-stat">
-                      <span style={{ color: '#4ade80' }}>{loc.active}</span>
+                    <div className="att-branch-stat">
+                      <span style={{ color: '#4ade80' }}>{branch.active}</span>
                       <span>Active</span>
                     </div>
-                    <div className="att-location-stat">
-                      <span style={{ color: '#f87171' }}>{loc.employees - loc.active}</span>
+                    <div className="att-branch-stat">
+                      <span style={{ color: '#f87171' }}>{branch.total - branch.active}</span>
                       <span>Absent</span>
                     </div>
                   </div>
-                  <div className="att-loc-bar-wrap">
-                    <div className="att-loc-bar-fill" style={{ width: `${(loc.active / loc.employees) * 100}%` }} />
+                  <div className="att-branch-bar-wrap">
+                    <div className="att-branch-bar-fill" style={{ width: `${branch.rate}%` }} />
+                  </div>
+                  <div className="att-branch-workmode">
+                    <span title="Office">🏢 {branch.office}</span>
+                    <span title="WFH">🏠 {branch.wfh}</span>
+                    <span title="Hybrid">🔄 {branch.hybrid}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="att-loc-right-col">
-            {/* Search by region */}
-            <div className="card att-loc-search-card">
+          <div className="att-branch-right-col">
+            {/* Branch Wise Attendance Summary */}
+            <div className="card att-branch-summary-card">
               <div className="att-card-header">
                 <div className="att-card-title">
-                  <Search size={15} />
-                  <span>Search & Filter</span>
+                  <BarChart2 size={15} style={{ color: '#4ade80' }} />
+                  <span>Branch Attendance Summary</span>
                 </div>
               </div>
-              <div className="att-loc-search-fields">
-                <input type="text" placeholder="Search by employee name..." className="att-loc-input" />
-                <input type="text" placeholder="Search by department..." className="att-loc-input" />
-                <input type="text" placeholder="Filter by city / branch..." className="att-loc-input" />
-                <select className="att-loc-select">
-                  <option>All Timezones</option>
-                  <option>IST (UTC+5:30)</option>
-                  <option>EST (UTC-5)</option>
-                  <option>GMT (UTC+0)</option>
-                  <option>GST (UTC+4)</option>
-                </select>
-              </div>
-
-              <div className="att-filter-tags">
-                {['Present Only', 'Absent', 'Late', 'WFH', 'On Leave'].map(tag => (
-                  <button key={tag} className="att-filter-tag-btn">{tag}</button>
+              <div className="att-branch-summary">
+                {branchData.map((branch, i) => (
+                  <div key={i} className="att-branch-summary-row">
+                    <div className="att-branch-summary-name">{branch.name}</div>
+                    <div className="att-branch-summary-bar">
+                      <div className="att-branch-summary-fill" style={{ width: `${branch.rate}%`, background: branch.rate > 80 ? '#4ade80' : branch.rate > 60 ? '#fbbf24' : '#f87171' }} />
+                    </div>
+                    <div className="att-branch-summary-rate">{branch.rate}%</div>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Timezone display */}
-            <div className="card att-timezone-card">
+            {/* Branch Wise Work Mode Distribution */}
+            <div className="card att-branch-workmode-card">
               <div className="att-card-header">
                 <div className="att-card-title">
-                  <Clock size={15} style={{ color: '#fbbf24' }} />
-                  <span>Active Timezones</span>
+                  <Users size={15} style={{ color: '#a78bfa' }} />
+                  <span>Work Mode by Branch</span>
                 </div>
               </div>
-              <div className="att-timezone-list">
-                {[
-                  { zone: 'IST', offset: '+5:30', time: '13:53', country: 'India', count: 850 },
-                  { zone: 'EST', offset: '-5:00', time: '03:23', country: 'United States', count: 220 },
-                  { zone: 'GMT', offset: '+0:00', time: '08:23', country: 'United Kingdom', count: 90 },
-                  { zone: 'GST', offset: '+4:00', time: '12:23', country: 'UAE', count: 90 },
-                ].map((tz, i) => (
-                  <div key={i} className="att-tz-row">
-                    <div className="att-tz-zone">{tz.zone}</div>
-                    <div className="att-tz-info">
-                      <strong>{tz.country}</strong>
-                      <span>UTC{tz.offset}</span>
+              <div className="att-branch-workmode-list">
+                {branchData.map((branch, i) => (
+                  <div key={i} className="att-branch-wm-row">
+                    <strong>{branch.name}</strong>
+                    <div className="att-branch-wm-stats">
+                      <span className="att-wm-office">🏢 {branch.office}</span>
+                      <span className="att-wm-wfh">🏠 {branch.wfh}</span>
+                      <span className="att-wm-hybrid">🔄 {branch.hybrid}</span>
                     </div>
-                    <div className="att-tz-time">{tz.time}</div>
-                    <div className="att-tz-count">{tz.count} emp</div>
                   </div>
                 ))}
               </div>
@@ -1018,187 +1154,9 @@ const Attendance = () => {
         </div>
       )}
 
-      {/* ═══ LEAVE INFORMATION ═══ */}
-      {activeSection === 'leave' && (
-        <div className="att-leave-grid">
-          <div className="card att-leave-policy-card">
-            <div className="att-card-header">
-              <div className="att-card-title">
-                <BookOpen size={16} style={{ color: '#fbbf24' }} />
-                <span>Leave Entitlements</span>
-              </div>
-            </div>
-            <div className="att-leave-types">
-              {leaveData.map((leave, i) => (
-                <div key={i} className="att-leave-type-row">
-                  <div className="att-leave-type-info">
-                    <strong>{leave.type}</strong>
-                    <span>{leave.availed} availed of {leave.total} days</span>
-                  </div>
-                  <div className="att-leave-bar-wrap">
-                    <div
-                      className="att-leave-bar-fill"
-                      style={{ width: `${(leave.availed / leave.total) * 100}%`, background: leave.color }}
-                    />
-                  </div>
-                  <span className="att-leave-rem">{leave.total - leave.availed} rem.</span>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="card att-leave-analytics-card">
-            <div className="att-card-header">
-              <div className="att-card-title">
-                <TrendingUp size={16} style={{ color: '#a78bfa' }} />
-                <span>Leave Analytics</span>
-              </div>
-            </div>
-            <div className="att-leave-analytics-body">
-              {[
-                { label: 'Monthly Avg Leave', value: '2.3 days', color: '#60a5fa', icon: BarChart2 },
-                { label: 'Productivity Impact', value: 'Low', color: '#4ade80', icon: TrendingUp },
-                { label: 'Pending Approvals', value: '8', color: '#fb923c', icon: AlertCircle },
-                { label: 'Carry Forward', value: '1,240 days', color: '#a78bfa', icon: ArrowUpRight },
-                { label: 'LOP Cases', value: '3', color: '#f87171', icon: AlertTriangle },
-                { label: 'Team Avg Leaves', value: '1.8/month', color: '#fbbf24', icon: Users },
-              ].map((item, i) => {
-                const Icon = item.icon;
-                return (
-                  <div key={i} className="att-leave-stat-card">
-                    <Icon size={16} style={{ color: item.color }} />
-                    <div className="att-leave-stat-value" style={{ color: item.color }}>{item.value}</div>
-                    <div className="att-leave-stat-label">{item.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
-          <div className="card att-leave-status-card">
-            <div className="att-card-header">
-              <div className="att-card-title">
-                <CheckSquare size={16} style={{ color: '#4ade80' }} />
-                <span>Recent Leave Requests</span>
-              </div>
-            </div>
-            <div className="att-leave-requests">
-              {[
-                { name: 'Rahul Sharma', type: 'Casual Leave', days: 2, from: '2026-06-01', status: 'Approved' },
-                { name: 'Priya Verma', type: 'Sick Leave', days: 1, from: '2026-05-31', status: 'Pending' },
-                { name: 'Ananya Gupta', type: 'Privilege Leave', days: 5, from: '2026-06-10', status: 'Pending' },
-                { name: 'Vijay Chauhan', type: 'Casual Leave', days: 1, from: '2026-05-30', status: 'Rejected' },
-              ].map((req, i) => (
-                <div key={i} className="att-leave-req-row">
-                  <Avatar name={req.name} size="xs" />
-                  <div className="att-leave-req-info">
-                    <strong>{req.name}</strong>
-                    <span>{req.type} · {req.days} day{req.days > 1 ? 's' : ''} · From {req.from}</span>
-                  </div>
-                  <Badge variant={req.status === 'Approved' ? 'success' : req.status === 'Rejected' ? 'danger' : 'warning'}>
-                    {req.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ═══ AUTOMATION ═══ */}
-      {activeSection === 'automation' && (
-        <div className="att-automation-grid">
-          <div className="card att-automation-rules-card">
-            <div className="att-card-header">
-              <div className="att-card-title">
-                <Cpu size={16} style={{ color: '#a78bfa' }} />
-                <span>Automation Rules</span>
-              </div>
-              <Badge variant="info">{automationRules.filter(r => r.active).length} Active</Badge>
-            </div>
-            <div className="att-rules-list">
-              {automationRules.map((rule, i) => {
-                const Icon = rule.icon;
-                return (
-                  <div key={i} className="att-rule-row">
-                    <div className={`att-rule-icon-wrap ${rule.active ? 'att-rule-icon-on' : 'att-rule-icon-off'}`}>
-                      <Icon size={16} />
-                    </div>
-                    <div className="att-rule-info">
-                      <strong>{rule.name}</strong>
-                      <span>{rule.desc}</span>
-                    </div>
-                    <button
-                      className={`att-rule-toggle ${rule.active ? 'att-rule-on' : 'att-rule-off'}`}
-                      onClick={() => addToast('success', `${rule.name} ${rule.active ? 'disabled' : 'enabled'}.`)}
-                    >
-                      {rule.active ? 'ON' : 'OFF'}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="att-automation-right">
-            {/* Automation Features */}
-            <div className="card att-auto-features-card">
-              <div className="att-card-header">
-                <div className="att-card-title">
-                  <Sparkles size={15} style={{ color: '#fbbf24' }} />
-                  <span>Automation Features</span>
-                </div>
-              </div>
-              <div className="att-auto-features-list">
-                {[
-                  { feat: 'Employees on punch-in', enabled: true },
-                  { feat: 'Daily attendance summary', enabled: true },
-                  { feat: 'Attendance regularization', enabled: false },
-                  { feat: 'Calculate overtime hours', enabled: true },
-                  { feat: 'Generate attendance summary', enabled: true },
-                  { feat: 'Send attendance reports', enabled: false },
-                ].map((item, i) => (
-                  <div key={i} className="att-auto-feat-row">
-                    <div className={`att-auto-dot ${item.enabled ? 'att-dot-on' : 'att-dot-off'}`} />
-                    <span>{item.feat}</span>
-                    <span className={`att-auto-status ${item.enabled ? 'att-status-on' : 'att-status-off'}`}>
-                      {item.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Punch Functions */}
-            <div className="card att-punch-functions-card">
-              <div className="att-card-header">
-                <div className="att-card-title">
-                  <Settings size={15} style={{ color: '#60a5fa' }} />
-                  <span>Punch Functions</span>
-                </div>
-              </div>
-              <div className="att-punch-functions">
-                {[
-                  { label: 'Current day punch count', desc: 'All employees today' },
-                  { label: 'Managing shift employee', desc: 'Auto assign on shift change' },
-                  { label: 'Tracking hours overtime', desc: 'Flag > 8h automatically' },
-                  { label: 'The team members status', desc: 'Real-time team dashboard' },
-                  { label: 'Track break monitoring', desc: 'Alert on extended breaks' },
-                  { label: 'Generate report alerts', desc: 'Daily digest at 8PM' },
-                ].map((fn, i) => (
-                  <div key={i} className="att-punch-fn-row">
-                    <Check size={12} style={{ color: '#4ade80', flexShrink: 0 }} />
-                    <div className="att-punch-fn-info">
-                      <span className="att-fn-label">{fn.label}</span>
-                      <span className="att-fn-desc">{fn.desc}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ═══ REPORTS & EXPORT ═══ */}
       {activeSection === 'reports' && (
@@ -1278,12 +1236,21 @@ const Attendance = () => {
               <div className="att-date-range-body">
                 <div className="att-range-buttons">
                   {['Today', 'Weekly', 'Monthly', 'Quarterly'].map(range => (
-                    <button key={range} className="att-range-btn">{range}</button>
+                    <button 
+                      key={range} 
+                      className="att-range-btn"
+                      onClick={() => {
+                        if (range === 'Today') setDateFilter(new Date().toISOString().split('T')[0]);
+                        addToast('info', `${range} report selected`);
+                      }}
+                    >
+                      {range}
+                    </button>
                   ))}
                 </div>
                 <div className="att-custom-range">
                   <label>Custom From</label>
-                  <input type="date" className="att-range-input" defaultValue="2026-05-01" />
+                  <input type="date" className="att-range-input" defaultValue="2026-05-01" onChange={(e) => setDateFilter(e.target.value)} />
                   <label>To</label>
                   <input type="date" className="att-range-input" defaultValue="2026-05-31" />
                 </div>
@@ -1301,9 +1268,9 @@ const Attendance = () => {
               </div>
               <div className="att-realtime-stats">
                 {[
-                  { label: 'Online Right Now', value: '538', color: '#4ade80' },
-                  { label: 'On Break', value: '67', color: '#fbbf24' },
-                  { label: 'Offline Today', value: '134', color: '#f87171' },
+                  { label: 'Online Right Now', value: statusCounts.present, color: '#4ade80' },
+                  { label: 'On Break', value: Math.floor(statusCounts.present * 0.15), color: '#fbbf24' },
+                  { label: 'Offline Today', value: statusCounts.absent, color: '#f87171' },
                   { label: 'Live Updates', value: '∞', color: '#60a5fa' },
                 ].map((stat, i) => (
                   <div key={i} className="att-rt-stat">
@@ -1370,7 +1337,7 @@ const Attendance = () => {
                   <option value="Biometric">Biometric</option>
                   <option value="GPS">GPS</option>
                   <option value="RFID">RFID</option>
-                  <option value="Web Login">Web Login</option>
+                  <option value="Web Portal">Web Portal</option>
                   <option value="Mobile App">Mobile App</option>
                 </select>
               </div>
@@ -1399,92 +1366,6 @@ const Attendance = () => {
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* Mark Attendance Modal */}
-      <Modal isOpen={markModalOpen} onClose={() => setMarkModalOpen(false)} title="Mark Attendance Entry" size="md"
-        footer={
-          <div className="modal-actions-wrapper">
-            <Button variant="secondary" onClick={() => setMarkModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleMarkSubmit}>Log Attendance</Button>
-          </div>
-        }
-      >
-        <div className="create-task-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
-          <div className="form-field">
-            <label>Select Employee</label>
-            <select value={markFormData.employeeId}
-              onChange={(e) => {
-                const selectedEmp = employees.find(emp => emp.id === e.target.value);
-                setMarkFormData(prev => ({
-                  ...prev,
-                  employeeId: e.target.value,
-                  employeeName: selectedEmp ? selectedEmp.name : '',
-                  department: selectedEmp ? selectedEmp.department : '',
-                  branch: selectedEmp ? selectedEmp.branch : ''
-                }));
-              }}
-              style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
-              <option value="">Choose employee...</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name} ({emp.id}) — {emp.department}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-            <div>
-              <label>Date</label>
-              <input type="date" value={markFormData.date}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, date: e.target.value }))}
-                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
-            </div>
-            <div>
-              <label>Source</label>
-              <select value={markFormData.source}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, source: e.target.value }))}
-                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
-                <option value="Biometric">⚙️ Biometric</option>
-                <option value="GPS">📍 GPS</option>
-                <option value="RFID">💳 RFID</option>
-                <option value="Web Login">💻 Web Portal</option>
-                <option value="Mobile App">📱 Mobile App</option>
-              </select>
-            </div>
-          </div>
-          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-            <div>
-              <label>Punch In</label>
-              <input type="text" placeholder="09:02 AM" value={markFormData.punchIn}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, punchIn: e.target.value }))} />
-            </div>
-            <div>
-              <label>Punch Out</label>
-              <input type="text" placeholder="06:15 PM" value={markFormData.punchOut}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, punchOut: e.target.value }))} />
-            </div>
-          </div>
-          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-            <div>
-              <label>Working Hours</label>
-              <input type="number" step="0.1" placeholder="8.2" value={markFormData.totalHours}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, totalHours: e.target.value }))} />
-            </div>
-            <div>
-              <label>Status</label>
-              <select value={markFormData.status}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, status: e.target.value }))}
-                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
-                <option value="Present">✅ Present</option>
-                <option value="Late">🕐 Late</option>
-                <option value="Absent">❌ Absent</option>
-                <option value="Half Day">🌗 Half Day</option>
-                <option value="Work From Home">🏠 WFH</option>
-                <option value="On Leave">🌴 On Leave</option>
-                <option value="Overtime">⏰ Overtime</option>
-              </select>
-            </div>
-          </div>
-        </div>
       </Modal>
 
       {/* Assign Shift Modal */}
