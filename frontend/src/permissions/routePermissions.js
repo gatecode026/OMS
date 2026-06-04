@@ -21,7 +21,9 @@ export const ROUTE_PERMISSIONS = {
   '/departments': ROLES.BRANCH_ADMIN,
   '/branches': ROLES.BRANCH_ADMIN,
   '/teams': ROLES.BRANCH_ADMIN,
-  '/payroll': ROLES.BRANCH_ADMIN,
+  '/project-managers': ROLES.PROJECT_MANAGER,
+  '/teams/leaders': ROLES.TEAM_LEADER,
+  '/payroll': ROLES.EMPLOYEE,
 
   // Team Leader and above
   '/leaves': ROLES.TEAM_LEADER,
@@ -40,11 +42,6 @@ export const ROUTE_PERMISSIONS = {
   '/profile': ROLES.EMPLOYEE,
   '/unauthorized': ROLES.EMPLOYEE
 };
-
-/**
- * Utility to match a path with wildcards / dynamic parameters
- * e.g., `/employees/EMP-2026-001` should match `/employees/:id`
- */
 export const getRequiredRoleForPath = (path) => {
   // Normalize path
   if (!path) return ROLES.EMPLOYEE;

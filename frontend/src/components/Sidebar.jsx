@@ -30,7 +30,8 @@ import {
   Terminal,
   UserSquare2,
   LogOut,
-  Sparkles
+  Sparkles,
+  UserCog
 } from 'lucide-react';
 
 const menuStructure = [
@@ -44,14 +45,7 @@ const menuStructure = [
   {
     title: 'People',
     items: [
-      {
-        name: 'Employee Management',
-        icon: Users,
-        subItems: [
-          { name: 'Add Employee', path: '/employees/add' },
-          { name: 'All Employees', path: '/employees' }
-        ]
-      },
+      { name: 'Employee Management', icon: Users, path: '/employees' },
       {
         name: 'Attendance Management',
         icon: Clock,
@@ -68,6 +62,7 @@ const menuStructure = [
         icon: Award,
         path: '/teams',
         subItems: [
+          { name: 'Project Managers', path: '/project-managers' },
           { name: 'Team Leaders', path: '/teams/leaders' }
         ]
       }

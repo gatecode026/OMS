@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import Admin from '../modules/admin/admin.model.js';
 import logger from '../config/logger.js';
+import { isDatabaseConnected } from '../config/database.js';
 
 /**
  * Validates JWT access token stored in Authorization header.
@@ -28,6 +29,18 @@ export const authenticate = async (req, res, next) => {
     // Decode token
     const decoded = jwt.verify(token, env.jwtSecret);
     
+    // In offline sandbox mode, use the token payload directly
+    if (!isDatabaseConnected) {
+      req.user = {
+        id: decoded.id,
+        email: decoded.email,
+        role: decoded.role,
+        name: decoded.name || 'Offline User'
+      };
+      logger.debug(`User authenticated offline successfully: ${req.user.name} (${req.user.role})`);
+      return next();
+    }
+
     // Retrieve associated active account from matching collection
     let user;
     if (decoded.role === 'super_admin') {

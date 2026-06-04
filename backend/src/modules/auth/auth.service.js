@@ -130,6 +130,18 @@ const FALLBACK_EMPLOYEES = [
     department: 'Marketing',
     branch: 'Delhi',
     team: 'Global Campaigns'
+  },
+  {
+    id: 'EMP-2026-011',
+    name: 'Kabir Mehta',
+    email: 'kabir.mehta@saas.com',
+    role: 'Project Manager',
+    roleId: 'project_manager',
+    status: 'Active',
+    designation: 'Project Manager',
+    department: 'Engineering',
+    branch: 'Delhi',
+    team: 'Backend Core'
   }
 ];
 

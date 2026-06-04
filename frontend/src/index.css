@@ -327,36 +327,64 @@ tbody td {
 .flex-center    { display: flex; align-items: center; justify-content: center; }
 .flex-between   { display: flex; align-items: center; justify-content: space-between; }
 .flex-column    { display: flex; flex-direction: column; }
+.flex-row       { display: flex; flex-direction: row; }
+.align-center   { align-items: center; }
+.align-start    { align-items: flex-start; }
+.align-end      { align-items: flex-end; }
 .items-center   { align-items: center; }
 .items-start    { align-items: flex-start; }
 .justify-center { justify-content: center; }
 .justify-between { justify-content: space-between; }
 .justify-end     { justify-content: flex-end; }
 .justify-start  { justify-content: flex-start; }
+.flex-wrap      { flex-wrap: wrap; }
 .flex-1         { flex: 1; }
+.flex-shrink-0  { flex-shrink: 0; }
 .grid-gap       { display: flex; flex-direction: column; gap: var(--space-5); }
+.gap-1          { gap: var(--space-1); }
 .gap-2          { gap: var(--space-2); }
 .gap-3          { gap: var(--space-3); }
 .gap-4          { gap: var(--space-4); }
 .gap-5          { gap: var(--space-5); }
+.gap-6          { gap: var(--space-6); }
 .mt-1           { margin-top: var(--space-1); }
+.mt-2           { margin-top: var(--space-2); }
+.mt-3           { margin-top: var(--space-3); }
 .mb-2           { margin-bottom: var(--space-2); }
+.mb-3           { margin-bottom: var(--space-3); }
+.padding-2      { padding: var(--space-2); }
+.padding-3      { padding: var(--space-3); }
+.padding-4      { padding: var(--space-4); }
+.padding-5      { padding: var(--space-5); }
+.padding-6      { padding: var(--space-6); }
 .text-center    { text-align: center; }
 .text-right     { text-align: right; }
 .text-muted     { color: var(--text-muted); }
+.text-secondary { color: var(--text-secondary); }
+.text-primary-c { color: var(--text-primary); }
 .bold-text      { font-weight: 600; color: var(--text-primary); }
 .text-xs        { font-size: 0.75rem; }
 .text-sm        { font-size: 0.875rem; }
+.text-secondary-sm { font-size: 0.8rem; color: var(--text-secondary); }
+.table-sub-text    { font-size: 0.78rem; color: var(--text-muted); }
+.subtitle          { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
 .pad-6          { padding: var(--space-6); }
 .relative-pie-container { position: relative; }
 .wider-col      { flex: 2; }
 .narrow-col     { flex: 1; }
+.w-full         { width: 100%; }
+.overflow-x-auto { overflow-x: auto; }
 
 /* Glass effect */
 .glass {
   background: rgba(17, 24, 39, 0.75);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+:root.light-theme .glass {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(15, 23, 42, 0.08);
 }
 
 /* ==========================================================================
@@ -678,3 +706,14 @@ tbody td {
   transition: all 0.2s;
 }
 .period-btn.active { background: var(--color-primary); color: white; }
+
+/* Remove Recharts SVG click focus outline */
+.recharts-wrapper:focus,
+.recharts-surface:focus,
+.recharts-surface path:focus,
+svg:focus,
+g:focus,
+path:focus,
+rect:focus {
+  outline: none !important;
+}
