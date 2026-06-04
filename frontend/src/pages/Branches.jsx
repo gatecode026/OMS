@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import './Branches.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -6,12 +6,13 @@ import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
+import { useNavigate } from 'react-router-dom';
 import {
   Network, Plus, Users, MapPin, Globe, TrendingUp, Search,
   Edit2, Trash2, Clock, BarChart3, Building2, Calendar,
   Phone, Mail, AlertCircle, CheckCircle,
   Activity, X, ChevronRight, ChevronDown,
-  Download, Filter, Eye, Briefcase, Award, Target
+  Download, Filter, Eye, Briefcase, Award, Target, ArrowLeft
 } from 'lucide-react';
 
 // Extended mock data with all required fields for complete management
@@ -274,7 +275,8 @@ const branchRanking = [
 
 const Branches = () => {
   const isLoading = usePageLoading(500);
-  const { addToast, showConfirm } = useApp();
+  const navigate = useNavigate();
+  const { addToast, showConfirm, employees } = useApp();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -282,6 +284,8 @@ const Branches = () => {
   const [selectedBranchId, setSelectedBranchId] = useState('BR-001');
   const [showHierarchy, setShowHierarchy] = useState(true);
   const [expandedNodes, setExpandedNodes] = useState(['root']);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'detail'
+  const [localEmpSearch, setLocalEmpSearch] = useState('');
 
   const [branches, setBranches] = useState(mockBranches);
   const [activeTab, setActiveTab] = useState('overview');
@@ -290,6 +294,35 @@ const Branches = () => {
   const [showWfhModal, setShowWfhModal] = useState(false);
   const [showManagerModal, setShowManagerModal] = useState(false);
   const [newDocName, setNewDocName] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleDownloadDocument = (docName) => {
+    // Generate a simple mock content representing a PDF/Text compliance doc
+    const mockContent = `%PDF-1.4\n%...\n%%EOF\nThis is a mock PDF compliance document download for: ${docName}`;
+    const blob = new Blob([mockContent], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = docName.endsWith('.pdf') ? docName : `${docName}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    addToast('success', `Successfully downloaded "${docName}"`);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Add the file name to selectedBranch's documents list
+    const docFile = file.name;
+    setBranches(prev => prev.map(b => b.id === selectedBranchId ? { ...b, documents: [...(b.documents || []), docFile] } : b));
+    addToast('success', `Uploaded "${docFile}" to branch vault.`);
+    
+    // Reset file input value so same file can be selected again
+    e.target.value = '';
+  };
 
   // Form states
   const [newBranch, setNewBranch] = useState({
@@ -342,6 +375,24 @@ const Branches = () => {
     { name: 'Sanjay Das', email: 'sanjay.das@company.com', phone: '+91 98345 67890' }
   ]);
 
+  // Combine static managers list with the employees loaded from context
+  const combinedAvailableManagers = useMemo(() => {
+    const baseList = [...availableManagers];
+    if (employees && employees.length > 0) {
+      employees.forEach(emp => {
+        const alreadyExists = baseList.some(m => m.name.toLowerCase() === emp.name.toLowerCase());
+        if (!alreadyExists) {
+          baseList.push({
+            name: emp.name,
+            email: emp.workEmail || emp.email || '',
+            phone: emp.phone || ''
+          });
+        }
+      });
+    }
+    return baseList;
+  }, [availableManagers, employees]);
+
   const [availableDepts, setAvailableDepts] = useState([
     'Operations', 'Sales', 'Marketing', 'IT', 'HR', 'Finance', 'Legal', 'R&D', 'Engineering', 'Support', 'Product', 'QA', 'DevOps', 'Customer Service'
   ]);
@@ -355,7 +406,7 @@ const Branches = () => {
       addToast('warning', 'Please enter a manager name');
       return;
     }
-    const exists = availableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
+    const exists = combinedAvailableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
     if (exists) {
       addToast('warning', 'Manager with this name already exists');
       return;
@@ -381,7 +432,7 @@ const Branches = () => {
       addToast('warning', 'Please enter a manager name');
       return;
     }
-    const exists = availableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
+    const exists = combinedAvailableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
     if (exists) {
       addToast('warning', 'Manager with this name already exists');
       return;
@@ -426,10 +477,10 @@ const Branches = () => {
         addToast('warning', 'Please enter a manager name or select an existing one');
         return;
       }
-      const exists = availableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
+      const exists = combinedAvailableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
       let newMgr;
       if (exists) {
-        newMgr = availableManagers.find(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
+        newMgr = combinedAvailableManagers.find(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
       } else {
         newMgr = {
           name: newManagerDetails.name.trim(),
@@ -461,6 +512,9 @@ const Branches = () => {
       setNewDeptInput('');
     }
 
+    const empMatch = (employees || []).find(e => e.name.toLowerCase() === managerName.toLowerCase());
+    const managerId = empMatch ? empMatch.id : 'EMP-2026-' + String(combinedAvailableManagers.findIndex(m => m.name === managerName) + 1).padStart(3, '0');
+
     const newId = `BR-00${branches.length + 1}`;
     const formattedBranch = {
       ...newBranch,
@@ -468,6 +522,7 @@ const Branches = () => {
       manager: managerName,
       managerEmail: managerEmail,
       managerPhone: managerPhone,
+      managerId: managerId,
       departments: finalDepts,
       projects: { active: 3, completed: 5, delayed: 0, pending: 1 },
       employeesOnLeave: 2,
@@ -531,10 +586,10 @@ const Branches = () => {
         addToast('warning', 'Please enter a manager name or select an existing one');
         return;
       }
-      const exists = availableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
+      const exists = combinedAvailableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
       let newMgr;
       if (exists) {
-        newMgr = availableManagers.find(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
+        newMgr = combinedAvailableManagers.find(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
       } else {
         newMgr = {
           name: newManagerDetails.name.trim(),
@@ -554,13 +609,17 @@ const Branches = () => {
       return;
     }
 
+    const empMatch = (employees || []).find(e => e.name.toLowerCase() === managerName.toLowerCase());
+    const managerId = empMatch ? empMatch.id : 'EMP-2026-' + String(combinedAvailableManagers.findIndex(m => m.name === managerName) + 1).padStart(3, '0');
+
     setBranches(prev => prev.map(b => {
       if (b.id === managerUpdate.branchId) {
         return {
           ...b,
           manager: managerName,
-          managerEmail: managerEmail || b.managerEmail,
-          managerPhone: managerPhone || b.managerPhone
+          managerEmail: managerEmail,
+          managerPhone: managerPhone,
+          managerId: managerId
         };
       }
       return b;
@@ -636,6 +695,29 @@ const Branches = () => {
 
   const selectedBranch = branches.find(b => b.id === selectedBranchId);
   
+  // Filter employees for the selected branch
+  const branchEmployees = useMemo(() => {
+    if (!selectedBranch) return [];
+    const searchName = selectedBranch.name.split(' ')[0].toLowerCase();
+    return (employees || []).filter(emp => {
+      const loc = (emp.workLocation || emp.branch || emp.branchAgency || '').toLowerCase();
+      return loc.includes(searchName);
+    });
+  }, [employees, selectedBranch]);
+
+  // Local state for search in branch employees table
+  const filteredBranchEmployees = useMemo(() => {
+    return branchEmployees.filter(emp => {
+      const q = localEmpSearch.toLowerCase();
+      return (
+        emp.name.toLowerCase().includes(q) ||
+        emp.id.toLowerCase().includes(q) ||
+        (emp.designation && emp.designation.toLowerCase().includes(q)) ||
+        emp.department.toLowerCase().includes(q)
+      );
+    });
+  }, [branchEmployees, localEmpSearch]);
+  
   const totalBranches = branches.length;
   const activeBranches = branches.filter(b => b.statusType === 'active').length;
   const totalEmployees = branches.reduce((acc, b) => acc + b.employeeCount, 0);
@@ -703,6 +785,806 @@ const Branches = () => {
             </div>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  const renderModals = () => {
+    return (
+      <>
+        {/* Add Branch Modal */}
+        {showAddModal && (
+          <div className="modal-overlay animate-fade-in">
+            <div className="modal-box card animate-scale-up" style={{ maxWidth: '600px', width: '90%' }}>
+              <div className="modal-header">
+                <h3><Plus size={16} /> Add New Office / Branch</h3>
+                <button className="modal-close-btn" onClick={() => setShowAddModal(false)} type="button"><X size={16} /></button>
+              </div>
+              <form onSubmit={handleAddBranchSubmit}>
+                <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Branch Name *</label>
+                      <input type="text" required value={newBranch.name} onChange={e => setNewBranch({...newBranch, name: e.target.value})} placeholder="e.g. Hyderabad Branch" />
+                    </div>
+                    <div className="form-group">
+                      <label>Branch Code *</label>
+                      <input type="text" required value={newBranch.code} onChange={e => setNewBranch({...newBranch, code: e.target.value})} placeholder="e.g. HYD-BR" />
+                    </div>
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Country *</label>
+                      <input type="text" required value={newBranch.country} onChange={e => setNewBranch({...newBranch, country: e.target.value})} />
+                    </div>
+                    <div className="form-group">
+                      <label>Established Date</label>
+                      <input type="date" value={newBranch.established} onChange={e => setNewBranch({...newBranch, established: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>City *</label>
+                      <input type="text" required value={newBranch.city} onChange={e => setNewBranch({...newBranch, city: e.target.value})} placeholder="e.g. Hyderabad" />
+                    </div>
+                    <div className="form-group">
+                      <label>State *</label>
+                      <input type="text" required value={newBranch.state} onChange={e => setNewBranch({...newBranch, state: e.target.value})} placeholder="e.g. Telangana" />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Full Physical Address *</label>
+                    <input type="text" required value={newBranch.address} onChange={e => setNewBranch({...newBranch, address: e.target.value})} placeholder="Full location coordinates..." />
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Manager Name *</label>
+                      <select
+                        value={newBranch.manager}
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === 'ADD_NEW') {
+                            setNewBranch(prev => ({ ...prev, manager: 'ADD_NEW', managerEmail: '', managerPhone: '' }));
+                          } else {
+                            const m = combinedAvailableManagers.find(x => x.name === val);
+                            setNewBranch(prev => ({
+                              ...prev,
+                              manager: val,
+                              managerEmail: m ? m.email : '',
+                              managerPhone: m ? m.phone : ''
+                            }));
+                          }
+                        }}
+                        required
+                      >
+                        <option value="">Select Manager</option>
+                        {combinedAvailableManagers.map(m => (
+                          <option key={m.name} value={m.name}>{m.name}</option>
+                        ))}
+                        <option value="ADD_NEW" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>+ Add New Manager...</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Manager Email</label>
+                      <input type="email" value={newBranch.managerEmail || ''} readOnly placeholder="Auto-populated" />
+                    </div>
+                  </div>
+
+                  {newBranch.manager === 'ADD_NEW' && (
+                    <div className="inline-add-card animate-fade-in" style={{ gridColumn: 'span 2', padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '12px' }}>
+                      <h4 style={{ fontSize: '0.78rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Add New Manager Details</h4>
+                      <div className="form-group-row">
+                        <div className="form-group">
+                          <label>New Manager Name *</label>
+                          <input
+                            type="text"
+                            value={newManagerDetails.name}
+                            onChange={e => setNewManagerDetails(p => ({ ...p, name: e.target.value }))}
+                            placeholder="Name"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Email ID</label>
+                          <input
+                            type="email"
+                            value={newManagerDetails.email}
+                            onChange={e => setNewManagerDetails(p => ({ ...p, email: e.target.value }))}
+                            placeholder="manager@company.com"
+                          />
+                        </div>
+                      </div>
+                      <div className="form-group-row" style={{ marginTop: '8px' }}>
+                        <div className="form-group">
+                          <label>Mobile Number</label>
+                          <input
+                            type="text"
+                            value={newManagerDetails.phone}
+                            onChange={e => setNewManagerDetails(p => ({ ...p, phone: e.target.value }))}
+                            placeholder="+91 98765..."
+                          />
+                        </div>
+                        <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '8px' }}>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setNewBranch(p => ({ ...p, manager: '' }))}>Cancel</Button>
+                          <Button type="button" variant="primary" size="sm" onClick={handleAddNewManagerAddBranch}>Save & Select</Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Status Type</label>
+                      <select value={newBranch.statusType} onChange={e => {
+                        const val = e.target.value;
+                        const labelMap = { active: 'Active', expansion: 'Under Expansion', new: 'New Branch', inactive: 'Inactive' };
+                        setNewBranch({...newBranch, statusType: val, status: labelMap[val] || 'Active'});
+                      }}>
+                        <option value="active">Active</option>
+                        <option value="expansion">Under Expansion</option>
+                        <option value="new">New Branch</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Timezone</label>
+                      <input type="text" value={newBranch.timezone} onChange={e => setNewBranch({...newBranch, timezone: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div className="form-group" style={{ position: 'relative' }}>
+                    <label>Select Departments *</label>
+                    <div 
+                      className="custom-multiselect-trigger" 
+                      onClick={() => setShowDeptDropdown(p => !p)}
+                    >
+                      {newBranch.departments.length === 0 ? (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Select departments...</span>
+                      ) : (
+                        newBranch.departments.map(d => (
+                          <span 
+                            key={d} 
+                            className="dept-tag"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNewBranch(prev => ({
+                                ...prev,
+                                departments: prev.departments.filter(x => x !== d)
+                              }));
+                            }}
+                          >
+                            {d} <span className="dept-tag-close">×</span>
+                          </span>
+                        ))
+                      )}
+                    </div>
+
+                    {showDeptDropdown && (
+                      <div className="custom-multiselect-dropdown card animate-fade-in">
+                        <div className="multiselect-options-list">
+                          {availableDepts.map(d => {
+                            const isChecked = newBranch.departments.includes(d);
+                            return (
+                              <label key={d} className="multiselect-option-label">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isChecked} 
+                                  onChange={() => {
+                                    setNewBranch(prev => {
+                                      const nextDepts = isChecked 
+                                        ? prev.departments.filter(x => x !== d)
+                                        : [...prev.departments, d];
+                                      return { ...prev, departments: nextDepts };
+                                    });
+                                  }}
+                                  className="multiselect-checkbox"
+                                />
+                                {d}
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        <div className="multiselect-add-row" onClick={e => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            placeholder="Add new department..."
+                            value={newDeptInput}
+                            onChange={e => setNewDeptInput(e.target.value)}
+                            className="multiselect-add-input"
+                          />
+                          <button
+                            type="button"
+                            className="multiselect-add-btn"
+                            onClick={() => {
+                              if (!newDeptInput.trim()) return;
+                              const exists = availableDepts.includes(newDeptInput.trim());
+                              if (!exists) {
+                                setAvailableDepts(prev => [...prev, newDeptInput.trim()]);
+                              }
+                              if (!newBranch.departments.includes(newDeptInput.trim())) {
+                                setNewBranch(prev => ({
+                                  ...prev,
+                                  departments: [...prev.departments, newDeptInput.trim()]
+                                }));
+                              }
+                              setNewDeptInput('');
+                              addToast('success', `Department "${newDeptInput.trim()}" added & selected!`);
+                            }}
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Headcount (initial)</label>
+                      <input type="number" value={newBranch.employeeCount} onChange={e => setNewBranch({...newBranch, employeeCount: parseInt(e.target.value) || 0})} />
+                    </div>
+                    <div className="form-group">
+                      <label>YTD Revenue (in USD)</label>
+                      <input type="number" value={newBranch.revenue} onChange={e => setNewBranch({...newBranch, revenue: parseInt(e.target.value) || 0})} />
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <Button variant="outline" size="sm" type="button" onClick={() => setShowAddModal(false)}>Cancel</Button>
+                  <Button variant="primary" size="sm" type="submit">Submit Branch</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Transfer Employee Modal */}
+        {showTransferModal && (
+          <div className="modal-overlay animate-fade-in">
+            <div className="modal-box card animate-scale-up" style={{ maxWidth: '480px', width: '90%' }}>
+              <div className="modal-header">
+                <h3><Users size={16} /> Employee Allocation Transfer</h3>
+                <button className="modal-close-btn" onClick={() => setShowTransferModal(false)} type="button"><X size={16} /></button>
+              </div>
+              <form onSubmit={handleTransferSubmit}>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label>From Branch *</label>
+                    <select
+                      value={transfer.fromBranchId}
+                      onChange={e => setTransfer({...transfer, fromBranchId: e.target.value, employeeName: ''})}
+                    >
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name} ({b.employeeCount} staff)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Employee Name *</label>
+                    <select
+                      required
+                      value={transfer.employeeName}
+                      onChange={e => setTransfer({...transfer, employeeName: e.target.value})}
+                    >
+                      <option value="">Select Employee</option>
+                      {(() => {
+                        const fromBranch = branches.find(b => b.id === transfer.fromBranchId);
+                        const fromBranchKeyword = fromBranch ? fromBranch.name.split(' ')[0].toLowerCase() : '';
+                        const branchEmps = fromBranchKeyword
+                          ? (employees || []).filter(emp => {
+                              const loc = (emp.workLocation || emp.branch || emp.branchAgency || '').toLowerCase();
+                              return loc.includes(fromBranchKeyword);
+                            })
+                          : (employees || []);
+                        const displayEmps = branchEmps.length > 0 ? branchEmps : (employees || []);
+                        return displayEmps.map(emp => (
+                          <option key={emp.id} value={emp.name}>
+                            {emp.name} — {emp.designation || 'Staff'} ({emp.id})
+                          </option>
+                        ));
+                      })()}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>To Target Branch *</label>
+                    <select
+                      value={transfer.toBranchId}
+                      onChange={e => setTransfer({...transfer, toBranchId: e.target.value, department: ''})}
+                    >
+                      {branches.filter(b => b.id !== transfer.fromBranchId).map(b => (
+                        <option key={b.id} value={b.id}>{b.name} ({b.employeeCount} staff)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Target Department</label>
+                    <select
+                      value={transfer.department}
+                      onChange={e => setTransfer({...transfer, department: e.target.value})}
+                    >
+                      <option value="">Select Department</option>
+                      {(() => {
+                        const toBranch = branches.find(b => b.id === transfer.toBranchId);
+                        const depts = toBranch ? toBranch.departments : availableDepts;
+                        return depts.map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ));
+                      })()}
+                    </select>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <Button variant="outline" size="sm" type="button" onClick={() => setShowTransferModal(false)}>Cancel</Button>
+                  <Button variant="primary" size="sm" type="submit">Execute Transfer</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Change Manager Modal */}
+        {showManagerModal && (
+          <div className="modal-overlay animate-fade-in">
+            <div className="modal-box card animate-scale-up" style={{ maxWidth: '480px', width: '90%' }}>
+              <div className="modal-header">
+                <h3><Edit2 size={16} /> Quick Assign Branch Manager</h3>
+                <button className="modal-close-btn" onClick={() => setShowManagerModal(false)} type="button"><X size={16} /></button>
+              </div>
+              <form onSubmit={handleManagerSubmit}>
+                <div className="modal-body">
+                  <div className="form-group">
+                    <label>Selected Branch</label>
+                    <select disabled value={managerUpdate.branchId}>
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Manager Name *</label>
+                    <select
+                      value={managerUpdate.name}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === 'ADD_NEW') {
+                          setManagerUpdate(prev => ({ ...prev, name: 'ADD_NEW', email: '', phone: '' }));
+                        } else {
+                          const m = combinedAvailableManagers.find(x => x.name === val);
+                          setManagerUpdate(prev => ({
+                            ...prev,
+                            name: val,
+                            email: m ? m.email : '',
+                            phone: m ? m.phone : ''
+                          }));
+                        }
+                      }}
+                      required
+                    >
+                      <option value="">Select Manager</option>
+                      {combinedAvailableManagers.map(m => (
+                        <option key={m.name} value={m.name}>{m.name}</option>
+                      ))}
+                      <option value="ADD_NEW" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>+ Add New Manager...</option>
+                    </select>
+                  </div>
+
+                  {managerUpdate.name === 'ADD_NEW' && (
+                    <div className="inline-add-card animate-fade-in" style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '12px' }}>
+                      <h4 style={{ fontSize: '0.78rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Add New Manager Details</h4>
+                      <div className="form-group-row">
+                        <div className="form-group">
+                          <label>New Manager Name *</label>
+                          <input
+                            type="text"
+                            value={newManagerDetails.name}
+                            onChange={e => setNewManagerDetails(p => ({ ...p, name: e.target.value }))}
+                            placeholder="Name"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Email ID</label>
+                          <input
+                            type="email"
+                            value={newManagerDetails.email}
+                            onChange={e => setNewManagerDetails(p => ({ ...p, email: e.target.value }))}
+                            placeholder="manager@company.com"
+                          />
+                        </div>
+                      </div>
+                      <div className="form-group-row" style={{ marginTop: '8px' }}>
+                        <div className="form-group">
+                          <label>Mobile Number</label>
+                          <input
+                            type="text"
+                            value={newManagerDetails.phone}
+                            onChange={e => setNewManagerDetails(p => ({ ...p, phone: e.target.value }))}
+                            placeholder="+91 98765..."
+                          />
+                        </div>
+                        <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '8px' }}>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setManagerUpdate(p => ({ ...p, name: '' }))}>Cancel</Button>
+                          <Button type="button" variant="primary" size="sm" onClick={handleAddNewManagerChangeManager}>Save & Select</Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Email ID</label>
+                      <input type="email" value={managerUpdate.email} readOnly placeholder="Auto-populated" />
+                    </div>
+                    <div className="form-group">
+                      <label>Mobile Number</label>
+                      <input type="text" value={managerUpdate.phone} readOnly placeholder="Auto-populated" />
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <Button variant="outline" size="sm" type="button" onClick={() => setShowManagerModal(false)}>Cancel</Button>
+                  <Button variant="primary" size="sm" type="submit">Assign Manager</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* WFH Approvals Modal */}
+        {showWfhModal && (
+          <div className="modal-overlay animate-fade-in">
+            <div className="modal-box card animate-scale-up" style={{ maxWidth: '600px', width: '90%' }}>
+              <div className="modal-header">
+                <h3><Clock size={16} /> Work From Home Approvals</h3>
+                <button className="modal-close-btn" onClick={() => setShowWfhModal(false)} type="button"><X size={16} /></button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Review pending remote/hybrid requests from different agency and branch hubs.</p>
+                
+                <div className="wfh-requests-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {wfhRequests.length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No pending WFH requests.</div>
+                  ) : (
+                    wfhRequests.map(req => (
+                      <div key={req.id} className="wfh-req-row" style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{req.employeeName}</strong>
+                            <Badge variant="neutral" size="sm">{req.department}</Badge>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            <span>📍 {req.branchName} • 📅 {req.date}</span>
+                            <span style={{ display: 'block', fontStyle: 'italic', marginTop: '2px', color: 'var(--text-muted)' }}>"Reason: {req.reason}"</span>
+                          </div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          {req.status === 'Pending' ? (
+                            <>
+                              <button className="att-btn att-present" style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)' }} onClick={() => handleWfhApproval(req.id, true)} type="button">
+                                Approve
+                              </button>
+                              <button className="att-btn att-absent" style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)' }} onClick={() => handleWfhApproval(req.id, false)} type="button">
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <Badge variant={req.status === 'Approved' ? 'success' : 'danger'}>
+                              {req.status}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="modal-footer">
+                <Button variant="outline" size="sm" onClick={() => setShowWfhModal(false)}>Close View</Button>
+              </div>
+            </div>
+          </div>
+        )}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+        />
+      </>
+    );
+  };
+
+  if (viewMode === 'detail' && selectedBranch) {
+    return (
+      <div className="branches-page branch-detail-page-container">
+        {/* Sleek Breadcrumb / Back Navigation */}
+        <div className="branch-detail-header-nav">
+          <button className="btn-back" onClick={() => setViewMode('list')}>
+            <ArrowLeft size={16} /> Back to Branches List
+          </button>
+          <div className="branch-detail-breadcrumbs">
+            <span>Branches</span>
+            <ChevronRight size={12} />
+            <span className="current">{selectedBranch.name}</span>
+          </div>
+        </div>
+
+        {/* Branch Page Title Block */}
+        <div className="branch-detail-hero card">
+          <div className="branch-hero-left">
+            <span className="branch-hero-flag">{selectedBranch.flag}</span>
+            <div>
+              <h1 className="branch-hero-title">{selectedBranch.name}</h1>
+              <p className="branch-hero-subtitle">
+                <Globe size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                Code: <strong>{selectedBranch.code}</strong> • {selectedBranch.city}, {selectedBranch.state}, {selectedBranch.country}
+              </p>
+            </div>
+          </div>
+          <div className="branch-hero-right">
+            <Badge variant={getStatusBadgeVariant(selectedBranch.statusType)}>
+              {getStatusIcon(selectedBranch.statusType)} {selectedBranch.status}
+            </Badge>
+            <span className="timezone-tag"><Clock size={12} /> {selectedBranch.timezone}</span>
+          </div>
+        </div>
+
+        {/* KPI metrics row specifically for this branch */}
+        <div className="branch-detail-stats-grid">
+          <div className="stat-card card">
+            <div className="stat-card-icon" style={{ background: '#3b82f620', color: '#3b82f6' }}><Users size={20} /></div>
+            <div>
+              <h3>Total Headcount</h3>
+              <p className="val">{selectedBranch.employeeCount} Employees</p>
+              <p className="sub">{selectedBranch.employeesOnLeave} Currently on Leave</p>
+            </div>
+          </div>
+          <div className="stat-card card">
+            <div className="stat-card-icon" style={{ background: '#10b98120', color: '#10b981' }}><TrendingUp size={20} /></div>
+            <div>
+              <h3>Productivity Rate</h3>
+              <p className="val">{selectedBranch.productivity}%</p>
+              <p className="sub">Target: 90% (Average)</p>
+            </div>
+          </div>
+          <div className="stat-card card">
+            <div className="stat-card-icon" style={{ background: '#8b5cf620', color: '#8b5cf6' }}><CheckCircle size={20} /></div>
+            <div>
+              <h3>Attendance Average</h3>
+              <p className="val">{selectedBranch.attendance}%</p>
+              <p className="sub">Present today: {Math.round(selectedBranch.employeeCount * selectedBranch.attendance / 100)} staff</p>
+            </div>
+          </div>
+          <div className="stat-card card">
+            <div className="stat-card-icon" style={{ background: '#f59e0b20', color: '#f59e0b' }}><Briefcase size={20} /></div>
+            <div>
+              <h3>Financial & Projects</h3>
+              <p className="val">${(selectedBranch.revenue / 1000000).toFixed(2)}M YTD</p>
+              <p className="sub" style={{ color: selectedBranch.growthPositive ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                Growth: {selectedBranch.growth}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Major Detail Columns */}
+        <div className="branch-detail-columns">
+          {/* Left Column: General Info, Manager Contact, Vault */}
+          <div className="branch-detail-left-column">
+            {/* General Info Card */}
+            <div className="card detail-info-card">
+              <h2 className="section-title"><Building2 size={16} /> Complete Physical & Org Details</h2>
+              <div className="detail-list">
+                <div className="detail-item"><label>Established On</label><span>{selectedBranch.established}</span></div>
+                <div className="detail-item"><label>TimeZone Code</label><span>{selectedBranch.timezone}</span></div>
+                <div className="detail-item"><label>Official Phone</label><span>{selectedBranch.phone}</span></div>
+                <div className="detail-item"><label>Official Email</label><span>{selectedBranch.email}</span></div>
+                <div className="detail-item"><label>ZIP / Postal Code</label><span>{selectedBranch.zipCode}</span></div>
+                <div className="detail-item" style={{ gridColumn: 'span 2' }}><label>Physical Address</label><span>{selectedBranch.address}</span></div>
+              </div>
+            </div>
+
+            {/* Manager Contact Card */}
+            <div className="card detail-manager-card">
+              <h2 className="section-title"><Users size={16} /> Branch Manager Contact Profile</h2>
+              <div className="manager-profile-body">
+                <Avatar name={selectedBranch.manager} size="lg" />
+                <div className="manager-profile-meta">
+                  <h3>{selectedBranch.manager}</h3>
+                  <p className="designation">Branch Administrator • ID: {selectedBranch.managerId || 'N/A'}</p>
+                  <p className="meta-row"><Mail size={12} /> {selectedBranch.managerEmail || 'No official email record'}</p>
+                  <p className="meta-row"><Phone size={12} /> {selectedBranch.managerPhone || 'No contact phone record'}</p>
+                </div>
+              </div>
+              <div className="manager-actions" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                <Button size="sm" variant="secondary" icon={Edit2} onClick={() => {
+                  setManagerUpdate({
+                    branchId: selectedBranch.id,
+                    name: selectedBranch.manager,
+                    email: selectedBranch.managerEmail || '',
+                    phone: selectedBranch.managerPhone || ''
+                  });
+                  setShowManagerModal(true);
+                }}>Change Branch Manager</Button>
+              </div>
+            </div>
+
+            {/* Compliance Document Vault */}
+            <div className="card detail-vault-card">
+              <h2 className="section-title"><Calendar size={16} /> Branch Compliance Document Vault</h2>
+              <p className="desc text-muted">Upload and manage agreements, structural audits, state license certificates, and other records.</p>
+              
+              <div className="vault-file-list" style={{ marginTop: '12px' }}>
+                {(selectedBranch.documents || []).length === 0 ? (
+                  <p className="empty-text">No compliance documents uploaded yet.</p>
+                ) : (
+                  (selectedBranch.documents || []).map(doc => (
+                    <div key={doc} className="vault-file-row">
+                      <span className="file-icon">📄</span>
+                      <span className="file-name">{doc}</span>
+                      <div className="file-actions">
+                        <button className="btn-file-icon btn-download" onClick={() => handleDownloadDocument(doc)} title="Download Document" type="button">
+                          <Download size={14} />
+                        </button>
+                        <button className="btn-file-icon btn-delete" onClick={() => handleDeleteDocument(doc)} title="Delete Document" type="button">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="vault-upload-form" style={{ marginTop: '16px' }}>
+                <Button 
+                  size="sm" 
+                  variant="primary" 
+                  icon={Plus} 
+                  onClick={() => fileInputRef.current?.click()}
+                  type="button"
+                >
+                  Upload to Vault
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Employees Directory & Department Breakdown */}
+          <div className="branch-detail-right-column">
+            {/* Branch Employees Directory */}
+            <div className="card detail-employees-card">
+              <div className="employees-card-header">
+                <h2 className="section-title"><Users size={16} /> Branch Employees Directory ({branchEmployees.length})</h2>
+                <div className="employees-search">
+                  <Search size={14} className="search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Search employees by name, ID, role..."
+                    value={localEmpSearch}
+                    onChange={e => setLocalEmpSearch(e.target.value)}
+                    className="emp-search-input"
+                  />
+                </div>
+              </div>
+
+              <div className="employees-table-container">
+                {filteredBranchEmployees.length === 0 ? (
+                  <p className="empty-text" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No employees matching search criteria in this branch.
+                  </p>
+                ) : (
+                  <table className="employees-table">
+                    <thead>
+                      <tr>
+                        <th>Employee ID</th>
+                        <th>Name</th>
+                        <th>Designation</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Contact Details</th>
+                        <th>Profile</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBranchEmployees.map(emp => (
+                        <tr key={emp.id}>
+                          <td className="emp-id-cell">{emp.id}</td>
+                          <td className="emp-name-cell">
+                            <div className="emp-avatar-wrapper">
+                              <Avatar name={emp.name} size="xs" />
+                              <strong className="bold-text">{emp.name}</strong>
+                            </div>
+                          </td>
+                          <td>{emp.designation || 'Software Engineer'}</td>
+                          <td>{emp.department}</td>
+                          <td>
+                            <Badge variant={
+                              emp.attendanceStatus === 'Present' || emp.attendanceStatus === 'Overtime' ? 'success' :
+                              emp.attendanceStatus === 'Late' || emp.attendanceStatus === 'Work From Home' ? 'warning' : 'danger'
+                            }>
+                              {emp.attendanceStatus}
+                            </Badge>
+                          </td>
+                          <td className="emp-contact-cell">
+                            <div className="contact-meta">
+                              <span><Mail size={11} /> {emp.workEmail || emp.email}</span>
+                              <span><Phone size={11} /> {emp.phone}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <button
+                              onClick={() => navigate(`/employees/${emp.id}`)}
+                              className="btn-view-profile"
+                              title="Go to Employee Profile page"
+                              type="button"
+                            >
+                              <ChevronRight size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            {/* Department Breakdown */}
+            <div className="card detail-departments-card">
+              <h2 className="section-title"><Building2 size={16} /> Active Departments Structural Breakdown</h2>
+              <div className="departments-list-grid">
+                {selectedBranch.departments.map((dept, index) => {
+                  const deptEmps = branchEmployees.filter(e => e.department.toLowerCase() === dept.toLowerCase());
+                  return (
+                    <div key={dept} className="dept-breakdown-row">
+                      <div className="dept-info">
+                        <span className="dept-bullet" style={{ background: ['#3b82f6', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b', '#ec489a'][index % 6] }}></span>
+                        <strong>{dept}</strong>
+                      </div>
+                      <div className="dept-stats">
+                        <span>Headcount: <strong>{deptEmps.length}</strong></span>
+                        <span>Active: <strong>{deptEmps.filter(e => e.status === 'Active').length}</strong></span>
+                        <span>On Leave: <strong>{deptEmps.filter(e => e.status === 'On Leave').length}</strong></span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Projects & Operational Stats */}
+            <div className="card detail-projects-card">
+              <h2 className="section-title"><Briefcase size={16} /> Operational Projects Status</h2>
+              <div className="projects-status-breakdown">
+                <div className="project-stat-box green">
+                  <strong>{selectedBranch.projects.completed}</strong>
+                  <span>Completed Projects</span>
+                </div>
+                <div className="project-stat-box blue">
+                  <strong>{selectedBranch.projects.active}</strong>
+                  <span>Active Pipelines</span>
+                </div>
+                <div className="project-stat-box orange">
+                  <strong>{selectedBranch.projects.pending}</strong>
+                  <span>Pending Scopes</span>
+                </div>
+                <div className="project-stat-box red">
+                  <strong>{selectedBranch.projects.delayed}</strong>
+                  <span>Delayed Milestones</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {renderModals()}
       </div>
     );
   }
@@ -814,7 +1696,10 @@ const Branches = () => {
                 key={branch.id}
                 className={`card branch-card ${selectedBranchId === branch.id ? 'branch-card-selected' : ''}`}
                 style={{ borderLeft: `4px solid ${branch.color}` }}
-                onClick={() => setSelectedBranchId(branch.id)}
+                onClick={() => {
+                  setSelectedBranchId(branch.id);
+                  setViewMode('detail');
+                }}
               >
                 <div className="branch-card-top">
                   <div className="branch-flag-name">
@@ -1032,7 +1917,7 @@ const Branches = () => {
                     <div className="allocation-action-box" style={{ marginTop: '20px' }}>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Need to transfer employees or update management assignments for this branch?</p>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <Button size="sm" variant="outline" onClick={() => {
+                        <Button size="sm" variant="secondary" onClick={() => {
                           setTransfer({
                             employeeName: '',
                             fromBranchId: selectedBranch.id,
@@ -1041,7 +1926,7 @@ const Branches = () => {
                           });
                           setShowTransferModal(true);
                         }}>Transfer Staff</Button>
-                        <Button size="sm" variant="outline" onClick={() => {
+                        <Button size="sm" variant="secondary" onClick={() => {
                           setManagerUpdate({
                             branchId: selectedBranch.id,
                             name: selectedBranch.manager,
@@ -1069,9 +1954,9 @@ const Branches = () => {
                             <span style={{ fontSize: '1.1rem' }}>📄</span>
                             <span className="doc-name-text">{doc}</span>
                             <div className="doc-vault-actions">
-                              <a href="#" className="doc-vault-download" onClick={(e) => { e.preventDefault(); addToast('success', `Downloading ${doc}...`); }} title="Download Document">
+                              <button className="doc-vault-download" onClick={() => handleDownloadDocument(doc)} title="Download Document" type="button">
                                 <Download size={12} />
-                              </a>
+                              </button>
                               <button className="doc-vault-delete" onClick={() => handleDeleteDocument(doc)} title="Delete Document" type="button">
                                 <Trash2 size={12} />
                               </button>
@@ -1081,16 +1966,17 @@ const Branches = () => {
                       )}
                     </div>
 
-                    <form className="doc-upload-form" onSubmit={handleUploadDocument} style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                      <input
-                        type="text"
-                        placeholder="New document name (e.g. Policy)..."
-                        value={newDocName}
-                        onChange={e => setNewDocName(e.target.value)}
-                        className="doc-upload-input"
-                      />
-                      <Button size="sm" variant="outline" icon={Plus}>Upload</Button>
-                    </form>
+                    <div className="doc-upload-form" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        icon={Plus} 
+                        onClick={() => fileInputRef.current?.click()}
+                        type="button"
+                      >
+                        Upload to Vault
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -1154,7 +2040,18 @@ const Branches = () => {
                 </thead>
                 <tbody>
                   {branchRanking.map(b => (
-                    <tr key={b.rank} className={selectedBranch?.name === b.name ? 'ranking-row-active' : ''}>
+                    <tr
+                      key={b.rank}
+                      className={`ranking-row ${selectedBranch?.name === b.name ? 'ranking-row-active' : ''}`}
+                      onClick={() => {
+                        const targetBranch = branches.find(br => br.name === b.name);
+                        if (targetBranch) {
+                          setSelectedBranchId(targetBranch.id);
+                          setViewMode('detail');
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <td className="ranking-rank">
                         {b.rank === 1 ? '🥇' : b.rank === 2 ? '🥈' : b.rank === 3 ? '🥉' : `#${b.rank}`}
                       </td>
@@ -1190,7 +2087,11 @@ const Branches = () => {
                     <div className="tree-children">
                       {branches.map(branch => (
                         <div key={branch.id} className="tree-node">
-                          <div className="tree-node-item" onClick={() => toggleNode(branch.id)}>
+                          <div className="tree-node-item" onClick={() => {
+                            toggleNode(branch.id);
+                            setSelectedBranchId(branch.id);
+                            setViewMode('detail');
+                          }}>
                             <span className="tree-toggle">{expandedNodes.includes(branch.id) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
                             <span className="branch-dot" style={{ background: branch.color }}></span>
                             <strong>{branch.name}</strong>
@@ -1296,467 +2197,7 @@ const Branches = () => {
       </div>
 
       {/* Modals & Overlays */}
-      
-      {/* Add Branch Modal */}
-      {showAddModal && (
-        <div className="modal-overlay animate-fade-in">
-          <div className="modal-box card animate-scale-up" style={{ maxWidth: '600px', width: '90%' }}>
-            <div className="modal-header">
-              <h3><Plus size={16} /> Add New Office / Branch</h3>
-              <button className="modal-close-btn" onClick={() => setShowAddModal(false)} type="button"><X size={16} /></button>
-            </div>
-            <form onSubmit={handleAddBranchSubmit}>
-              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Branch Name *</label>
-                    <input type="text" required value={newBranch.name} onChange={e => setNewBranch({...newBranch, name: e.target.value})} placeholder="e.g. Hyderabad Branch" />
-                  </div>
-                  <div className="form-group">
-                    <label>Branch Code *</label>
-                    <input type="text" required value={newBranch.code} onChange={e => setNewBranch({...newBranch, code: e.target.value})} placeholder="e.g. HYD-BR" />
-                  </div>
-                </div>
-
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Country *</label>
-                    <input type="text" required value={newBranch.country} onChange={e => setNewBranch({...newBranch, country: e.target.value})} />
-                  </div>
-                  <div className="form-group">
-                    <label>Established Date</label>
-                    <input type="date" value={newBranch.established} onChange={e => setNewBranch({...newBranch, established: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>City *</label>
-                    <input type="text" required value={newBranch.city} onChange={e => setNewBranch({...newBranch, city: e.target.value})} placeholder="e.g. Hyderabad" />
-                  </div>
-                  <div className="form-group">
-                    <label>State *</label>
-                    <input type="text" required value={newBranch.state} onChange={e => setNewBranch({...newBranch, state: e.target.value})} placeholder="e.g. Telangana" />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Full Physical Address *</label>
-                  <input type="text" required value={newBranch.address} onChange={e => setNewBranch({...newBranch, address: e.target.value})} placeholder="Full location coordinates..." />
-                </div>
-
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Manager Name *</label>
-                    <select
-                      value={newBranch.manager}
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (val === 'ADD_NEW') {
-                          setNewBranch(prev => ({ ...prev, manager: 'ADD_NEW', managerEmail: '', managerPhone: '' }));
-                        } else {
-                          const m = availableManagers.find(x => x.name === val);
-                          setNewBranch(prev => ({
-                            ...prev,
-                            manager: val,
-                            managerEmail: m ? m.email : '',
-                            managerPhone: m ? m.phone : ''
-                          }));
-                        }
-                      }}
-                      required
-                    >
-                      <option value="">Select Manager</option>
-                      {availableManagers.map(m => (
-                        <option key={m.name} value={m.name}>{m.name}</option>
-                      ))}
-                      <option value="ADD_NEW" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>+ Add New Manager...</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Manager Email</label>
-                    <input type="email" value={newBranch.managerEmail || ''} readOnly placeholder="Auto-populated" />
-                  </div>
-                </div>
-
-                {newBranch.manager === 'ADD_NEW' && (
-                  <div className="inline-add-card animate-fade-in" style={{ gridColumn: 'span 2', padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '12px' }}>
-                    <h4 style={{ fontSize: '0.78rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Add New Manager Details</h4>
-                    <div className="form-group-row">
-                      <div className="form-group">
-                        <label>New Manager Name *</label>
-                        <input
-                          type="text"
-                          value={newManagerDetails.name}
-                          onChange={e => setNewManagerDetails(p => ({ ...p, name: e.target.value }))}
-                          placeholder="Name"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Email ID</label>
-                        <input
-                          type="email"
-                          value={newManagerDetails.email}
-                          onChange={e => setNewManagerDetails(p => ({ ...p, email: e.target.value }))}
-                          placeholder="manager@company.com"
-                        />
-                      </div>
-                    </div>
-                    <div className="form-group-row" style={{ marginTop: '8px' }}>
-                      <div className="form-group">
-                        <label>Mobile Number</label>
-                        <input
-                          type="text"
-                          value={newManagerDetails.phone}
-                          onChange={e => setNewManagerDetails(p => ({ ...p, phone: e.target.value }))}
-                          placeholder="+91 98765..."
-                        />
-                      </div>
-                      <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '8px' }}>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setNewBranch(p => ({ ...p, manager: '' }))}>Cancel</Button>
-                        <Button type="button" variant="primary" size="sm" onClick={handleAddNewManagerAddBranch}>Save & Select</Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Status Type</label>
-                    <select value={newBranch.statusType} onChange={e => {
-                      const val = e.target.value;
-                      const labelMap = { active: 'Active', expansion: 'Under Expansion', new: 'New Branch', inactive: 'Inactive' };
-                      setNewBranch({...newBranch, statusType: val, status: labelMap[val] || 'Active'});
-                    }}>
-                      <option value="active">Active</option>
-                      <option value="expansion">Under Expansion</option>
-                      <option value="new">New Branch</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Timezone</label>
-                    <input type="text" value={newBranch.timezone} onChange={e => setNewBranch({...newBranch, timezone: e.target.value})} />
-                  </div>
-                </div>
-
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Select Departments *</label>
-                  <div 
-                    className="custom-multiselect-trigger" 
-                    onClick={() => setShowDeptDropdown(p => !p)}
-                  >
-                    {newBranch.departments.length === 0 ? (
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Select departments...</span>
-                    ) : (
-                      newBranch.departments.map(d => (
-                        <span 
-                          key={d} 
-                          className="dept-tag"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setNewBranch(prev => ({
-                              ...prev,
-                              departments: prev.departments.filter(x => x !== d)
-                            }));
-                          }}
-                        >
-                          {d} <span className="dept-tag-close">×</span>
-                        </span>
-                      ))
-                    )}
-                  </div>
-
-                  {showDeptDropdown && (
-                    <div className="custom-multiselect-dropdown card animate-fade-in">
-                      <div className="multiselect-options-list">
-                        {availableDepts.map(d => {
-                          const isChecked = newBranch.departments.includes(d);
-                          return (
-                            <label key={d} className="multiselect-option-label">
-                              <input 
-                                type="checkbox" 
-                                checked={isChecked} 
-                                onChange={() => {
-                                  setNewBranch(prev => {
-                                    const nextDepts = isChecked 
-                                      ? prev.departments.filter(x => x !== d)
-                                      : [...prev.departments, d];
-                                    return { ...prev, departments: nextDepts };
-                                  });
-                                }}
-                                className="multiselect-checkbox"
-                              />
-                              {d}
-                            </label>
-                          );
-                        })}
-                      </div>
-
-                      <div className="multiselect-add-row" onClick={e => e.stopPropagation()}>
-                        <input
-                          type="text"
-                          placeholder="Add new department..."
-                          value={newDeptInput}
-                          onChange={e => setNewDeptInput(e.target.value)}
-                          className="multiselect-add-input"
-                        />
-                        <button
-                          type="button"
-                          className="multiselect-add-btn"
-                          onClick={() => {
-                            if (!newDeptInput.trim()) return;
-                            const exists = availableDepts.includes(newDeptInput.trim());
-                            if (!exists) {
-                              setAvailableDepts(prev => [...prev, newDeptInput.trim()]);
-                            }
-                            if (!newBranch.departments.includes(newDeptInput.trim())) {
-                              setNewBranch(prev => ({
-                                ...prev,
-                                departments: [...prev.departments, newDeptInput.trim()]
-                              }));
-                            }
-                            setNewDeptInput('');
-                            addToast('success', `Department "${newDeptInput.trim()}" added & selected!`);
-                          }}
-                        >
-                          + Add
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Headcount (initial)</label>
-                    <input type="number" value={newBranch.employeeCount} onChange={e => setNewBranch({...newBranch, employeeCount: parseInt(e.target.value) || 0})} />
-                  </div>
-                  <div className="form-group">
-                    <label>YTD Revenue (in USD)</label>
-                    <input type="number" value={newBranch.revenue} onChange={e => setNewBranch({...newBranch, revenue: parseInt(e.target.value) || 0})} />
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <Button variant="outline" size="sm" type="button" onClick={() => setShowAddModal(false)}>Cancel</Button>
-                <Button variant="primary" size="sm" type="submit">Submit Branch</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Transfer Employee Modal */}
-      {showTransferModal && (
-        <div className="modal-overlay animate-fade-in">
-          <div className="modal-box card animate-scale-up" style={{ maxWidth: '480px', width: '90%' }}>
-            <div className="modal-header">
-              <h3><Users size={16} /> Employee Allocation Transfer</h3>
-              <button className="modal-close-btn" onClick={() => setShowTransferModal(false)} type="button"><X size={16} /></button>
-            </div>
-            <form onSubmit={handleTransferSubmit}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Employee Name *</label>
-                  <input type="text" required value={transfer.employeeName} onChange={e => setTransfer({...transfer, employeeName: e.target.value})} placeholder="e.g. Ramesh Chandra" />
-                </div>
-
-                <div className="form-group">
-                  <label>From Branch *</label>
-                  <select value={transfer.fromBranchId} onChange={e => setTransfer({...transfer, fromBranchId: e.target.value})}>
-                    {branches.map(b => (
-                      <option key={b.id} value={b.id}>{b.name} ({b.employeeCount} staff)</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>To Target Branch *</label>
-                  <select value={transfer.toBranchId} onChange={e => setTransfer({...transfer, toBranchId: e.target.value})}>
-                    {branches.map(b => (
-                      <option key={b.id} value={b.id}>{b.name} ({b.employeeCount} staff)</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Target Department</label>
-                  <input type="text" value={transfer.department} onChange={e => setTransfer({...transfer, department: e.target.value})} />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <Button variant="outline" size="sm" type="button" onClick={() => setShowTransferModal(false)}>Cancel</Button>
-                <Button variant="primary" size="sm" type="submit">Execute Transfer</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Change Manager Modal */}
-      {showManagerModal && (
-        <div className="modal-overlay animate-fade-in">
-          <div className="modal-box card animate-scale-up" style={{ maxWidth: '480px', width: '90%' }}>
-            <div className="modal-header">
-              <h3><Edit2 size={16} /> Quick Assign Branch Manager</h3>
-              <button className="modal-close-btn" onClick={() => setShowManagerModal(false)} type="button"><X size={16} /></button>
-            </div>
-            <form onSubmit={handleManagerSubmit}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label>Selected Branch</label>
-                  <select disabled value={managerUpdate.branchId}>
-                    {branches.map(b => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Manager Name *</label>
-                  <select
-                    value={managerUpdate.name}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === 'ADD_NEW') {
-                        setManagerUpdate(prev => ({ ...prev, name: 'ADD_NEW', email: '', phone: '' }));
-                      } else {
-                        const m = availableManagers.find(x => x.name === val);
-                        setManagerUpdate(prev => ({
-                          ...prev,
-                          name: val,
-                          email: m ? m.email : '',
-                          phone: m ? m.phone : ''
-                        }));
-                      }
-                    }}
-                    required
-                  >
-                    <option value="">Select Manager</option>
-                    {availableManagers.map(m => (
-                      <option key={m.name} value={m.name}>{m.name}</option>
-                    ))}
-                    <option value="ADD_NEW" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>+ Add New Manager...</option>
-                  </select>
-                </div>
-
-                {managerUpdate.name === 'ADD_NEW' && (
-                  <div className="inline-add-card animate-fade-in" style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '12px' }}>
-                    <h4 style={{ fontSize: '0.78rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Add New Manager Details</h4>
-                    <div className="form-group-row">
-                      <div className="form-group">
-                        <label>New Manager Name *</label>
-                        <input
-                          type="text"
-                          value={newManagerDetails.name}
-                          onChange={e => setNewManagerDetails(p => ({ ...p, name: e.target.value }))}
-                          placeholder="Name"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Email ID</label>
-                        <input
-                          type="email"
-                          value={newManagerDetails.email}
-                          onChange={e => setNewManagerDetails(p => ({ ...p, email: e.target.value }))}
-                          placeholder="manager@company.com"
-                        />
-                      </div>
-                    </div>
-                    <div className="form-group-row" style={{ marginTop: '8px' }}>
-                      <div className="form-group">
-                        <label>Mobile Number</label>
-                        <input
-                          type="text"
-                          value={newManagerDetails.phone}
-                          onChange={e => setNewManagerDetails(p => ({ ...p, phone: e.target.value }))}
-                          placeholder="+91 98765..."
-                        />
-                      </div>
-                      <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '8px' }}>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setManagerUpdate(p => ({ ...p, name: '' }))}>Cancel</Button>
-                        <Button type="button" variant="primary" size="sm" onClick={handleAddNewManagerChangeManager}>Save & Select</Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Email ID</label>
-                    <input type="email" value={managerUpdate.email} readOnly placeholder="Auto-populated" />
-                  </div>
-                  <div className="form-group">
-                    <label>Mobile Number</label>
-                    <input type="text" value={managerUpdate.phone} readOnly placeholder="Auto-populated" />
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <Button variant="outline" size="sm" type="button" onClick={() => setShowManagerModal(false)}>Cancel</Button>
-                <Button variant="primary" size="sm" type="submit">Assign Manager</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* WFH Approvals Modal */}
-      {showWfhModal && (
-        <div className="modal-overlay animate-fade-in">
-          <div className="modal-box card animate-scale-up" style={{ maxWidth: '600px', width: '90%' }}>
-            <div className="modal-header">
-              <h3><Clock size={16} /> Work From Home Approvals</h3>
-              <button className="modal-close-btn" onClick={() => setShowWfhModal(false)} type="button"><X size={16} /></button>
-            </div>
-            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '16px' }}>Review pending remote/hybrid requests from different agency and branch hubs.</p>
-              
-              <div className="wfh-requests-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {wfhRequests.length === 0 ? (
-                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No pending WFH requests.</div>
-                ) : (
-                  wfhRequests.map(req => (
-                    <div key={req.id} className="wfh-req-row" style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>{req.employeeName}</strong>
-                          <Badge variant="neutral" size="sm">{req.department}</Badge>
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                          <span>📍 {req.branchName} • 📅 {req.date}</span>
-                          <span style={{ display: 'block', fontStyle: 'italic', marginTop: '2px', color: 'var(--text-muted)' }}>"Reason: {req.reason}"</span>
-                        </div>
-                      </div>
-                      
-                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        {req.status === 'Pending' ? (
-                          <>
-                            <button className="att-btn att-present" style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)' }} onClick={() => handleWfhApproval(req.id, true)} type="button">
-                              Approve
-                            </button>
-                            <button className="att-btn att-absent" style={{ padding: '6px 12px', fontSize: '0.75rem', borderRadius: 'var(--radius-sm)' }} onClick={() => handleWfhApproval(req.id, false)} type="button">
-                              Reject
-                            </button>
-                          </>
-                        ) : (
-                          <Badge variant={req.status === 'Approved' ? 'success' : 'danger'}>
-                            {req.status}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            <div className="modal-footer">
-              <Button variant="outline" size="sm" onClick={() => setShowWfhModal(false)}>Close View</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {renderModals()}
     </div>
   );
 };

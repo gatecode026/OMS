@@ -544,10 +544,14 @@
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  color: #ffffff;
   font-size: 0.75rem;
   cursor: pointer;
   transition: var(--transition-all);
+}
+
+.light-theme .quick-act-btn {
+  color: var(--text-primary);
 }
 
 .quick-act-btn:hover {

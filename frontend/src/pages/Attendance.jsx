@@ -114,13 +114,24 @@ const Attendance = () => {
     addToast('success', `${rule?.name} ${rule?.active ? 'disabled' : 'enabled'} successfully.`);
   };
 
-  // Get work mode counts
+  // Get work mode counts (responds to filters)
   const workModeStats = useMemo(() => {
-    const office = employees.filter(e => e.workMode === 'Work From Office' || e.workMode === 'Office').length;
-    const wfh = employees.filter(e => e.workMode === 'Work From Home' || e.workMode === 'WFH').length;
-    const hybrid = employees.filter(e => e.workMode === 'Hybrid').length;
-    return { office, wfh, hybrid, total: employees.length };
-  }, [employees]);
+    const filteredEmployees = employees.filter(e => {
+      const matchesSearch = searchQuery
+        ? e.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          e.id?.toLowerCase().includes(searchQuery.toLowerCase())
+        : true;
+      const matchesDept = deptFilter ? e.department === deptFilter : true;
+      const matchesBranch = branchFilter ? e.branch === branchFilter : true;
+      const matchesShift = shiftFilter ? e.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
+      return matchesSearch && matchesDept && matchesBranch && matchesShift;
+    });
+
+    const office = filteredEmployees.filter(e => e.workMode === 'Work From Office' || e.workMode === 'Office').length;
+    const wfh = filteredEmployees.filter(e => e.workMode === 'Work From Home' || e.workMode === 'WFH').length;
+    const hybrid = filteredEmployees.filter(e => e.workMode === 'Hybrid').length;
+    return { office, wfh, hybrid, total: filteredEmployees.length };
+  }, [employees, searchQuery, deptFilter, branchFilter, shiftFilter]);
 
 
   // Modals Actions
@@ -310,27 +321,61 @@ const Attendance = () => {
     });
   }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, statusFilter, sourceFilter, workModeFilter]);
 
-  // Calculations for Summary Statistics
-  const totalEmployees = employees.length;
-  const totalPresent = filteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length;
-  const totalLate = filteredAttendance.filter(a => a.status === 'Late').length;
-  const totalAbsent = filteredAttendance.filter(a => a.status === 'Absent').length;
-  const totalLeave = filteredAttendance.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length;
-  const totalWFH = filteredAttendance.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length;
-  const totalHalfDay = filteredAttendance.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
-  const attendanceRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(filteredAttendance.length, 1)) * 100) : 94;
+  // Filtered attendance for KPIs (ignores statusFilter and workModeFilter so counts don't zero out on card selection)
+  const kpiFilteredAttendance = useMemo(() => {
+    return ledgerData.filter(a => {
+      const matchesSearch = searchQuery
+        ? a.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          a.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
+        : true;
+      const matchesDate = dateFilter ? a.date === dateFilter : true;
+      const matchesDept = deptFilter ? a.department === deptFilter : true;
+      const matchesBranch = branchFilter ? a.branch === branchFilter : true;
+      const matchesShift = shiftFilter ? a.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
+      const matchesSource = sourceFilter ? a.source?.toLowerCase() === sourceFilter.toLowerCase() : true;
+
+      return matchesSearch && matchesDate && matchesDept && matchesBranch && matchesShift && matchesSource;
+    });
+  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, sourceFilter]);
+
+  // Calculations for Summary Statistics based on active filters
+  const filteredEmployeesCount = useMemo(() => {
+    return employees.filter(e => {
+      const matchesSearch = searchQuery
+        ? e.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          e.id?.toLowerCase().includes(searchQuery.toLowerCase())
+        : true;
+      const matchesDept = deptFilter ? e.department === deptFilter : true;
+      const matchesBranch = branchFilter ? e.branch === branchFilter : true;
+      const matchesShift = shiftFilter ? e.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
+      return matchesSearch && matchesDept && matchesBranch && matchesShift;
+    }).length;
+  }, [employees, searchQuery, deptFilter, branchFilter, shiftFilter]);
+
+  const totalEmployees = filteredEmployeesCount;
+  const totalPresent = useMemo(() => kpiFilteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length, [kpiFilteredAttendance]);
+  const totalLate = useMemo(() => kpiFilteredAttendance.filter(a => a.status === 'Late').length, [kpiFilteredAttendance]);
+  const totalAbsent = useMemo(() => kpiFilteredAttendance.filter(a => a.status === 'Absent').length, [kpiFilteredAttendance]);
+  const totalLeave = useMemo(() => kpiFilteredAttendance.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length, [kpiFilteredAttendance]);
+  const totalWFH = useMemo(() => kpiFilteredAttendance.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length, [kpiFilteredAttendance]);
+  const totalHalfDay = useMemo(() => kpiFilteredAttendance.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length, [kpiFilteredAttendance]);
+  
+  const attendanceRate = useMemo(() => {
+    const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 94;
+    return Math.min(rawRate, 100);
+  }, [totalEmployees, totalPresent, totalHalfDay, totalWFH]);
 
   // Get counts by status for clickable cards
   const statusCounts = useMemo(() => {
     return {
-      present: filteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length,
-      absent: filteredAttendance.filter(a => a.status === 'Absent').length,
-      late: filteredAttendance.filter(a => a.status === 'Late').length,
-      leave: filteredAttendance.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length,
-      wfh: filteredAttendance.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length,
-      halfDay: filteredAttendance.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length,
+      present: totalPresent,
+      absent: totalAbsent,
+      late: totalLate,
+      leave: totalLeave,
+      wfh: totalWFH,
+      halfDay: totalHalfDay
     };
-  }, [filteredAttendance]);
+  }, [totalPresent, totalAbsent, totalLate, totalLeave, totalWFH, totalHalfDay]);
 
   const handleExport = (format = 'CSV') => {
     addToast('success', `Export generated! attendance_report_${dateFilter || 'all'}.${format.toLowerCase()} downloaded successfully.`);

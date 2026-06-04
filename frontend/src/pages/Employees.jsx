@@ -837,7 +837,7 @@ const Employees = () => {
 
   const depts = [...new Set(employees.map(e => e.department))].sort();
   const branches = [...new Set(employees.map(e => e.branch))].sort();
-  const leaders = employees.filter(e => e.roleId === 'team_leader' || e.roleId === 'super_admin');
+  const leaders = employees.filter(e => e.roleId === 'team_leader' || e.roleId === 'project_manager' || e.roleId === 'branch_admin' || e.roleId === 'super_admin');
 
   const handleRemoveDocument = (key, label) => {
     setUploadedDocs(prev => ({ ...prev, [key]: null }));

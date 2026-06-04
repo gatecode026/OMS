@@ -362,6 +362,23 @@ export const mockRoles = [
     }
   },
   {
+    id: 'project_manager',
+    name: 'Project Manager',
+    description: 'Monitor and manage projects, tasks, workflows, and team leader performance.',
+    userCount: 3,
+    accentColor: '#ec4899',
+    permissions: {
+      dashboard: { create: false, read: true, update: false, delete: false },
+      employees: { create: false, read: true, update: false, delete: false },
+      attendance: { create: false, read: true, update: false, delete: false },
+      leaves: { create: true, read: true, update: true, delete: false },
+      tasks: { create: true, read: true, update: true, delete: true },
+      payroll: { create: false, read: false, update: false, delete: false },
+      permissions: { create: false, read: false, update: false, delete: false },
+      settings: { create: false, read: true, update: false, delete: false }
+    }
+  },
+  {
     id: 'team_leader',
     name: 'Team Leader',
     description: 'Manage tasks, reviews, and attendance for assigned team members.',
@@ -500,14 +517,14 @@ const baseEmployees = [
     currentAddress: '55 Malviya Nagar, Jaipur, Rajasthan - 302017', permanentAddress: '55 Malviya Nagar, Jaipur, Rajasthan - 302017', employmentType: 'Part-Time', workLocation: 'Remote'
   },
   {
-    id: 'EMP-2026-011', name: 'Riya Patel', email: 'riya.patel@enterprise.com',
-    phone: '+91 98200 11011', dob: '1996-03-22', gender: 'Female',
-    department: 'Engineering', branch: 'Jaipur', team: 'Backend Core',
-    role: 'Employee', roleId: 'employee', joinDate: '2024-09-01',
-    status: 'Active', avatar: '', designation: 'Backend Developer',
-    teamLeader: 'Aarav Sharma', projectManager: 'Vikram Singh',
-    nationality: 'Indian', emergencyContactName: 'Suresh Patel', emergencyContactPhone: '+91 98200 00011',
-    currentAddress: '7 Civil Lines, Jaipur, Rajasthan - 302006', permanentAddress: '7 Civil Lines, Jaipur, Rajasthan - 302006', employmentType: 'Full-Time', workLocation: 'Jaipur HQ'
+    id: 'EMP-2026-011', name: 'Kabir Mehta', email: 'kabir.mehta@saas.com',
+    phone: '+91 98200 11011', dob: '1989-04-12', gender: 'Male',
+    department: 'Engineering', branch: 'Delhi', team: 'Backend Core',
+    role: 'Project Manager', roleId: 'project_manager', joinDate: '2023-05-15',
+    status: 'Active', avatar: '', designation: 'Project Manager',
+    teamLeader: 'Kabir Mehta', projectManager: 'Kabir Mehta',
+    nationality: 'Indian', emergencyContactName: 'Rohan Mehta', emergencyContactPhone: '+91 98765 10011',
+    currentAddress: '7 Civil Lines, Jaipur, Rajasthan - 302006', permanentAddress: '7 Civil Lines, Jaipur, Rajasthan - 302006', employmentType: 'Full-Time', workLocation: 'Delhi Office'
   },
   {
     id: 'EMP-2026-012', name: 'Manoj Tiwari', email: 'manoj.tiwari@saas.com',
@@ -728,38 +745,62 @@ const baseAttendance = [
   { id: 'ATT-107', employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', department: 'Human Resources', branch: 'Delhi', date: '2026-05-28', punchIn: '--:--', punchOut: '--:--', totalHours: 0, status: 'Absent' }
 ];
 
-// Generate 30 dummy attendance records programmatically
+// Generate dummy attendance records programmatically for yesterday and today
 const extraAttendance = [];
 const allMockEmployees = [...baseEmployees, ...extraEmployees];
-for (let i = 0; i < 30; i++) {
-  const emp = allMockEmployees[i % allMockEmployees.length];
-  const status = ['Present', 'Present', 'Late', 'Present', 'Work From Home', 'Present'][i % 6];
-  let punchIn = '09:00';
-  let punchOut = '18:00';
-  let totalHours = 9.0;
-  if (status === 'Late') {
-    punchIn = '09:45';
-    punchOut = '18:15';
-    totalHours = 8.5;
-  } else if (status === 'Work From Home') {
-    punchIn = '09:00';
-    punchOut = '17:30';
-    totalHours = 8.5;
+
+// Seed for yesterday (2026-06-02) and today (2026-06-03)
+const targetDates = ['2026-06-02', '2026-06-03'];
+let recordIndex = 1;
+
+targetDates.forEach(dateStr => {
+  for (let i = 0; i < allMockEmployees.length; i++) {
+    const emp = allMockEmployees[i];
+    // Skip about 15% of employees to simulate absent/leave states more realistically
+    if ((i + dateStr.charCodeAt(dateStr.length - 1)) % 7 === 0) {
+      extraAttendance.push({
+        id: `ATT-EXTRA-${String(recordIndex++).padStart(3, '0')}`,
+        employeeId: emp.id,
+        employeeName: emp.name,
+        department: emp.department,
+        branch: emp.branch,
+        date: dateStr,
+        punchIn: '--:--',
+        punchOut: '--:--',
+        totalHours: 0,
+        status: (i % 2 === 0) ? 'Absent' : 'On Leave'
+      });
+      continue;
+    }
+
+    const status = ['Present', 'Present', 'Late', 'Present', 'Work From Home', 'Present'][i % 6];
+    let punchIn = '09:00';
+    let punchOut = '18:00';
+    let totalHours = 9.0;
+    if (status === 'Late') {
+      punchIn = '09:45';
+      punchOut = '18:15';
+      totalHours = 8.5;
+    } else if (status === 'Work From Home') {
+      punchIn = '09:00';
+      punchOut = '17:30';
+      totalHours = 8.5;
+    }
+    
+    extraAttendance.push({
+      id: `ATT-EXTRA-${String(recordIndex++).padStart(3, '0')}`,
+      employeeId: emp.id,
+      employeeName: emp.name,
+      department: emp.department,
+      branch: emp.branch,
+      date: dateStr,
+      punchIn: punchIn,
+      punchOut: punchOut,
+      totalHours: totalHours,
+      status: status
+    });
   }
-  
-  extraAttendance.push({
-    id: `ATT-EXTRA-${String(i + 1).padStart(3, '0')}`,
-    employeeId: emp.id,
-    employeeName: emp.name,
-    department: emp.department,
-    branch: emp.branch,
-    date: '2026-06-02', // Today's date
-    punchIn: punchIn,
-    punchOut: punchOut,
-    totalHours: totalHours,
-    status: status
-  });
-}
+});
 
 export const mockAttendance = [...baseAttendance, ...extraAttendance];
 
@@ -807,14 +848,356 @@ export const mockLeaveRequests = [
   }
 ];
 
+// ─── Projects ──────────────────────────────────────────────────────────────────
+export const mockProjects = [
+  { id: 'PRJ-001', name: 'SaaS Platform v2.0', status: 'In Progress', department: 'Engineering' },
+  { id: 'PRJ-002', name: 'Q2 Sales Campaign', status: 'In Progress', department: 'Sales' },
+  { id: 'PRJ-003', name: 'Security Audits', status: 'In Progress', department: 'Operations' },
+  { id: 'PRJ-004', name: 'Global Brand Guidelines', status: 'Completed', department: 'Marketing' }
+];
+
 // ─── Tasks ─────────────────────────────────────────────────────────────────────
 export const mockTasks = [
-  { id: 'TSK-101', title: 'Design Dashboard UI Mockups', project: 'SaaS Platform', description: 'Create high-fidelity screens for the new landing page, overview dashboard, and user analytics pages.', assigneeId: 'EMP-2026-003', assigneeName: 'Ananya Gupta', priority: 'High', dueDate: '2026-05-25', status: 'In Review' },
-  { id: 'TSK-102', title: 'Migrate State to Context API', project: 'SaaS Platform', description: 'Refactor standard props-drilling state management to a unified context manager.', assigneeId: 'EMP-2026-006', assigneeName: 'Arjun Mehta', priority: 'Critical', dueDate: '2026-05-27', status: 'In Progress' },
-  { id: 'TSK-103', title: 'Write Technical Documentation', project: 'Engineering Operations', description: 'Document standard API response designs, mock schemas, developer onboarding steps.', assigneeId: 'EMP-2026-009', assigneeName: "Suresh Kumar", priority: 'Medium', dueDate: '2026-05-24', status: 'To Do' },
-  { id: 'TSK-104', title: 'Conduct Employee Performance Audits', project: 'HR System', description: 'Perform biannual reviews of all departments, check KPI scores, and update leaderboards.', assigneeId: 'EMP-2026-007', assigneeName: 'Neha Verma', priority: 'Low', dueDate: '2026-05-18', status: 'Done' },
-  { id: 'TSK-105', title: 'Optimize Core Recharts Gradients', project: 'SaaS Platform', description: 'Update the main dashboard charts with smooth CSS gradients and custom tooltips.', assigneeId: 'EMP-2026-002', assigneeName: 'Vikram Singh', priority: 'High', dueDate: '2026-05-28', status: 'To Do' },
-  { id: 'TSK-106', title: 'Finalize Q2 Sales Strategy', project: 'Marketing Outreach', description: 'Build pitch decks, analyze competitor campaigns, coordinate regional sales targets.', assigneeId: 'EMP-2026-004', assigneeName: 'Rohit Sharma', priority: 'High', dueDate: '2026-05-30', status: 'In Progress' }
+  {
+    id: 'TSK-101',
+    title: 'Design Dashboard UI Mockups',
+    project: 'SaaS Platform v2.0',
+    projectId: 'PRJ-001',
+    projectName: 'SaaS Platform v2.0',
+    description: 'Create high-fidelity screens for the new landing page, overview dashboard, and user analytics pages.',
+    department: 'Engineering',
+    assigneeId: 'EMP-2026-003',
+    assigneeName: 'Ananya Gupta',
+    teamLeader: 'EMP-2026-003',
+    teamLeaderName: 'Ananya Gupta',
+    projectManager: 'EMP-2026-011',
+    projectManagerName: 'Kabir Mehta',
+    priority: 'High',
+    status: 'In Review',
+    startDate: '2026-05-10',
+    dueDate: '2026-06-15',
+    estimatedHours: 40,
+    actualHours: 35,
+    progress: 90,
+    createdAt: '2026-05-10T09:00:00.000Z',
+    updatedAt: '2026-06-01T17:00:00.000Z',
+    comments: [
+      { id: 'c1', sender: 'Kabir Mehta', role: 'Project Manager', text: 'Please check the typography consistency on the chart tooltips.', time: 'Yesterday 10:15 AM', attachments: [] },
+      { id: 'c2', sender: 'Ananya Gupta', role: 'Team Leader', text: 'Sure, updating the tooltip configurations now.', time: 'Yesterday 11:30 AM', attachments: [] }
+    ],
+    attachments: [
+      { id: 'a1', name: 'dashboard_layout.png', size: '1.2 MB', url: '#' },
+      { id: 'a2', name: 'chart_specs.pdf', size: '4.8 MB', url: '#' }
+    ],
+    approvals: [
+      { level: 1, role: 'Employee', approver: 'Ananya Gupta', status: 'Approved', timestamp: '2026-05-29 11:00 AM', remarks: 'Self completion done.' },
+      { level: 2, role: 'Team Leader Approval', approver: 'Ananya Gupta', status: 'Approved', timestamp: '2026-05-29 02:00 PM', remarks: 'Looks excellent.' },
+      { level: 3, role: 'Project Manager Approval', approver: 'Kabir Mehta', status: 'Pending', timestamp: '', remarks: '' },
+      { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' }
+    ],
+    activityLog: [
+      { id: 'act1', action: 'created', details: 'Task created by Kabir Mehta', timestamp: '2026-05-10 09:00 AM', userName: 'Kabir Mehta' },
+      { id: 'act2', action: 'assigned', details: 'Assigned to Ananya Gupta', timestamp: '2026-05-10 10:00 AM', userName: 'Kabir Mehta' },
+      { id: 'act3', action: 'progress_updated', details: 'Progress set to 90%', timestamp: '2026-06-01 05:00 PM', userName: 'Ananya Gupta' }
+    ]
+  },
+  {
+    id: 'TSK-102',
+    title: 'Migrate State to Context API',
+    project: 'SaaS Platform v2.0',
+    projectId: 'PRJ-001',
+    projectName: 'SaaS Platform v2.0',
+    description: 'Refactor standard props-drilling state management to a unified context manager.',
+    department: 'Engineering',
+    assigneeId: 'EMP-2026-006',
+    assigneeName: 'Arjun Mehta',
+    teamLeader: 'EMP-2026-003',
+    teamLeaderName: 'Ananya Gupta',
+    projectManager: 'EMP-2026-011',
+    projectManagerName: 'Kabir Mehta',
+    priority: 'Critical',
+    status: 'In Progress',
+    startDate: '2026-05-12',
+    dueDate: '2026-06-10',
+    estimatedHours: 60,
+    progress: 65,
+    createdAt: '2026-05-12T09:00:00.000Z',
+    updatedAt: '2026-06-02T14:30:00.000Z',
+    comments: [],
+    attachments: [],
+    approvals: [
+      { level: 1, role: 'Employee', approver: 'Arjun Mehta', status: 'Pending', timestamp: '', remarks: '' },
+      { level: 2, role: 'Team Leader Approval', approver: 'Ananya Gupta', status: 'Pending', timestamp: '', remarks: '' },
+      { level: 3, role: 'Project Manager Approval', approver: 'Kabir Mehta', status: 'Pending', timestamp: '', remarks: '' },
+      { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' }
+    ],
+    activityLog: [
+      { id: 'act4', action: 'created', details: 'Task created', timestamp: '2026-05-12 09:00 AM', userName: 'Kabir Mehta' }
+    ]
+  },
+  {
+    id: 'TSK-103',
+    title: 'Write Technical Documentation',
+    project: 'SaaS Platform v2.0',
+    projectId: 'PRJ-001',
+    projectName: 'SaaS Platform v2.0',
+    description: 'Document standard API response designs, mock schemas, developer onboarding steps.',
+    department: 'Engineering',
+    assigneeId: 'EMP-2026-009',
+    assigneeName: 'Suresh Kumar',
+    teamLeader: 'EMP-2026-003',
+    teamLeaderName: 'Ananya Gupta',
+    projectManager: 'EMP-2026-011',
+    projectManagerName: 'Kabir Mehta',
+    priority: 'Medium',
+    status: 'To Do',
+    startDate: '2026-06-01',
+    dueDate: '2026-06-20',
+    estimatedHours: 20,
+    progress: 0,
+    createdAt: '2026-06-01T09:00:00.000Z',
+    updatedAt: '2026-06-01T09:00:00.000Z',
+    comments: [],
+    attachments: [],
+    approvals: [],
+    activityLog: []
+  },
+  {
+    id: 'TSK-104',
+    title: 'Conduct Employee Performance Audits',
+    project: 'Security Audits',
+    projectId: 'PRJ-003',
+    projectName: 'Security Audits',
+    description: 'Perform reviews of all departments, check KPI scores, and update leaderboards.',
+    department: 'Human Resources',
+    assigneeId: 'EMP-2026-007',
+    assigneeName: 'Neha Verma',
+    teamLeader: 'EMP-2026-001',
+    teamLeaderName: 'Aarav Sharma',
+    projectManager: 'EMP-2026-001',
+    projectManagerName: 'Aarav Sharma',
+    priority: 'Low',
+    status: 'Done',
+    startDate: '2026-05-10',
+    dueDate: '2026-05-25',
+    completedAt: '2026-05-24',
+    estimatedHours: 30,
+    actualHours: 28,
+    progress: 100,
+    createdAt: '2026-05-10T09:00:00.000Z',
+    updatedAt: '2026-05-24T17:00:00.000Z',
+    comments: [],
+    attachments: [],
+    approvals: [
+      { level: 1, role: 'Employee', approver: 'Neha Verma', status: 'Approved', timestamp: '2026-05-24 10:00 AM', remarks: 'Completed audits.' },
+      { level: 2, role: 'Team Leader Approval', approver: 'Aarav Sharma', status: 'Approved', timestamp: '2026-05-24 02:00 PM', remarks: 'Validated.' },
+      { level: 3, role: 'Project Manager Approval', approver: 'Aarav Sharma', status: 'Approved', timestamp: '2026-05-24 02:00 PM', remarks: 'Excellent work.' },
+      { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Approved', timestamp: '2026-05-24 03:00 PM', remarks: 'Archived.' }
+    ],
+    activityLog: []
+  },
+  {
+    id: 'TSK-105',
+    title: 'Optimize Core Recharts Gradients',
+    project: 'SaaS Platform v2.0',
+    projectId: 'PRJ-001',
+    projectName: 'SaaS Platform v2.0',
+    description: 'Update the main dashboard charts with smooth CSS gradients and custom tooltips.',
+    department: 'Engineering',
+    assigneeId: 'EMP-2026-002',
+    assigneeName: 'Vikram Singh',
+    teamLeader: 'EMP-2026-003',
+    teamLeaderName: 'Ananya Gupta',
+    projectManager: 'EMP-2026-011',
+    projectManagerName: 'Kabir Mehta',
+    priority: 'High',
+    status: 'To Do',
+    startDate: '2026-05-10',
+    dueDate: '2026-05-28',
+    estimatedHours: 25,
+    progress: 80,
+    createdAt: '2026-05-10T09:00:00.000Z',
+    updatedAt: '2026-05-28T18:00:00.000Z',
+    comments: [
+      { id: 'c3', sender: 'Kabir Mehta', role: 'Project Manager', text: 'This task is overdue. Please complete it as soon as possible.', time: '2 days ago', attachments: [] }
+    ],
+    attachments: [],
+    approvals: [],
+    activityLog: []
+  },
+  {
+    id: 'TSK-106',
+    title: 'Finalize Q2 Sales Strategy',
+    project: 'Q2 Sales Campaign',
+    projectId: 'PRJ-002',
+    projectName: 'Q2 Sales Campaign',
+    description: 'Build pitch decks, analyze competitor campaigns, coordinate regional sales targets.',
+    department: 'Sales',
+    assigneeId: 'EMP-2026-004',
+    assigneeName: 'Rohit Sharma',
+    teamLeader: 'EMP-2026-004',
+    teamLeaderName: 'Rohit Sharma',
+    projectManager: 'EMP-2026-001',
+    projectManagerName: 'Aarav Sharma',
+    priority: 'High',
+    status: 'In Progress',
+    startDate: '2026-05-15',
+    dueDate: '2026-06-15',
+    estimatedHours: 50,
+    progress: 55,
+    createdAt: '2026-05-15T09:00:00.000Z',
+    updatedAt: '2026-06-02T11:00:00.000Z',
+    comments: [],
+    attachments: [],
+    approvals: [],
+    activityLog: []
+  },
+  {
+    id: 'TSK-107',
+    title: 'Deploy Production Hotfixes',
+    project: 'SaaS Platform v2.0',
+    projectId: 'PRJ-001',
+    projectName: 'SaaS Platform v2.0',
+    description: 'Deploy hotfixes to resolve memory leak in the dashboard charts rendering script.',
+    department: 'Engineering',
+    assigneeId: 'EMP-2026-002',
+    assigneeName: 'Vikram Singh',
+    teamLeader: 'EMP-2026-003',
+    teamLeaderName: 'Ananya Gupta',
+    projectManager: 'EMP-2026-011',
+    projectManagerName: 'Kabir Mehta',
+    priority: 'Critical',
+    status: 'Done',
+    startDate: '2026-05-20',
+    dueDate: '2026-05-22',
+    completedAt: '2026-05-22',
+    estimatedHours: 8,
+    actualHours: 10,
+    progress: 100,
+    createdAt: '2026-05-20T09:00:00.000Z',
+    updatedAt: '2026-05-22T17:00:00.000Z',
+    comments: [],
+    attachments: [],
+    approvals: [],
+    activityLog: []
+  },
+  {
+    id: 'TSK-108',
+    title: 'Setup Brand Assets CDN',
+    project: 'Global Brand Guidelines',
+    projectId: 'PRJ-004',
+    projectName: 'Global Brand Guidelines',
+    description: 'Upload high-resolution media, style assets, and design files to the global CDN endpoint.',
+    department: 'Marketing',
+    assigneeId: 'EMP-2026-005',
+    assigneeName: 'Priya Patel',
+    teamLeader: 'EMP-2026-005',
+    teamLeaderName: 'Priya Patel',
+    projectManager: 'EMP-2026-001',
+    projectManagerName: 'Aarav Sharma',
+    priority: 'Low',
+    status: 'Done',
+    startDate: '2026-05-01',
+    dueDate: '2026-05-15',
+    completedAt: '2026-05-14',
+    estimatedHours: 12,
+    actualHours: 12,
+    progress: 100,
+    createdAt: '2026-05-01T09:00:00.000Z',
+    updatedAt: '2026-05-14T17:00:00.000Z',
+    comments: [],
+    attachments: [],
+    approvals: [],
+    activityLog: []
+  },
+  {
+    id: 'TSK-109',
+    title: 'Draft Q2 Financial Model',
+    project: 'Security Audits',
+    projectId: 'PRJ-003',
+    projectName: 'Security Audits',
+    description: 'Prepare Excel worksheets for Q2 departmental budget distribution and expense forecasts.',
+    department: 'Finance',
+    assigneeId: 'EMP-2026-012',
+    assigneeName: 'Manoj Tiwari',
+    teamLeader: 'EMP-2026-002',
+    teamLeaderName: 'Vikram Singh',
+    projectManager: 'EMP-2026-001',
+    projectManagerName: 'Aarav Sharma',
+    priority: 'High',
+    status: 'In Review',
+    startDate: '2026-05-15',
+    dueDate: '2026-06-05',
+    estimatedHours: 35,
+    progress: 95,
+    createdAt: '2026-05-15T09:00:00.000Z',
+    updatedAt: '2026-06-02T16:00:00.000Z',
+    comments: [],
+    attachments: [],
+    approvals: [
+      { level: 1, role: 'Employee', approver: 'Manoj Tiwari', status: 'Approved', timestamp: '2026-06-02 04:00 PM', remarks: 'Draft complete.' },
+      { level: 2, role: 'Team Leader Approval', approver: 'Vikram Singh', status: 'Approved', timestamp: '2026-06-02 05:00 PM', remarks: 'Figures check out.' },
+      { level: 3, role: 'Project Manager Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' },
+      { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' }
+    ],
+    activityLog: []
+  },
+  {
+    id: 'TSK-110',
+    title: 'Review Brand Launch Campaigns',
+    project: 'Global Brand Guidelines',
+    projectId: 'PRJ-004',
+    projectName: 'Global Brand Guidelines',
+    description: 'Check content calendars and visual assets for the summer marketing campaign.',
+    department: 'Marketing',
+    assigneeId: 'EMP-2026-010',
+    assigneeName: 'Priya Sharma',
+    teamLeader: 'EMP-2026-004',
+    teamLeaderName: 'Rohit Sharma',
+    projectManager: 'EMP-2026-005',
+    projectManagerName: 'Priya Patel',
+    priority: 'Medium',
+    status: 'To Do',
+    startDate: '2026-05-01',
+    dueDate: '2026-05-20',
+    estimatedHours: 15,
+    progress: 40,
+    createdAt: '2026-05-01T09:00:00.000Z',
+    updatedAt: '2026-05-20T17:00:00.000Z',
+    comments: [],
+    attachments: [],
+    approvals: [],
+    activityLog: []
+  },
+  {
+    id: 'TSK-111',
+    title: 'Build Outbound Email Flow',
+    project: 'Q2 Sales Campaign',
+    projectId: 'PRJ-002',
+    projectName: 'Q2 Sales Campaign',
+    description: 'Establish CRM integrations and triggers for marketing leads email flow automation.',
+    department: 'Sales',
+    assigneeId: 'EMP-2026-008',
+    assigneeName: 'Deepak Joshi',
+    teamLeader: 'EMP-2026-004',
+    teamLeaderName: 'Rohit Sharma',
+    projectManager: 'EMP-2026-001',
+    projectManagerName: 'Aarav Sharma',
+    priority: 'Low',
+    status: 'To Do',
+    startDate: '2026-05-18',
+    dueDate: '2026-05-22',
+    estimatedHours: 10,
+    progress: 0,
+    createdAt: '2026-05-18T09:00:00.000Z',
+    updatedAt: '2026-05-22T17:00:00.000Z',
+    comments: [
+      { id: 'c4', sender: 'Aarav Sharma', role: 'Super Admin', text: 'This sub-campaign was cancelled in favor of direct LinkedIn automation.', time: '2026-05-22', attachments: [] }
+    ],
+    attachments: [],
+    approvals: [],
+    activityLog: []
+  }
 ];
 
 // ─── Payroll ───────────────────────────────────────────────────────────────────

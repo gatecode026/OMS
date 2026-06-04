@@ -3,7 +3,7 @@ import styles from '../../styles/projects.module.css';
 import { useApp } from '../../context/AppContext';
 import {
   TrendingUp, CheckCircle, Clock, AlertTriangle, Calendar,
-  Plus, Users, CheckSquare, FileText, Download, BarChart2, Bell
+  Plus, Users, CheckSquare, FileText, Download, BarChart2, Bell, X
 } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -482,7 +482,7 @@ const initialProjects = [
 ];
 
 const Projects = () => {
-  const { addToast } = useApp();
+  const { addToast, employees } = useApp();
 
   // State Management
   const [projects, setProjects] = useState(initialProjects);
@@ -1190,21 +1190,35 @@ const Projects = () => {
                 <div className={styles.basicGrid}>
                   <div className={styles.formGroup}>
                     <label className={styles.formLabel}>Project Manager</label>
-                    <input
-                      type="text"
-                      className={styles.textInput}
+                    <select
+                      className={styles.filterSelect}
+                      style={{ width: '100%' }}
                       value={newProjectForm.manager}
                       onChange={(e) => setNewProjectForm({ ...newProjectForm, manager: e.target.value })}
-                    />
+                    >
+                      <option value="">Select a manager...</option>
+                      {(employees || []).map(emp => (
+                        <option key={emp.id} value={emp.name}>
+                          {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className={styles.formGroup}>
                     <label className={styles.formLabel}>Team Leader</label>
-                    <input
-                      type="text"
-                      className={styles.textInput}
+                    <select
+                      className={styles.filterSelect}
+                      style={{ width: '100%' }}
                       value={newProjectForm.leader}
                       onChange={(e) => setNewProjectForm({ ...newProjectForm, leader: e.target.value })}
-                    />
+                    >
+                      <option value="">Select a team leader...</option>
+                      {(employees || []).map(emp => (
+                        <option key={emp.id} value={emp.name}>
+                          {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className={styles.basicGrid}>
@@ -1295,15 +1309,21 @@ const Projects = () => {
                   </select>
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Employee Full Name</label>
-                  <input
-                    type="text"
+                  <label className={styles.formLabel}>Select Employee</label>
+                  <select
                     required
-                    placeholder="e.g. Rahul Sharma"
-                    className={styles.textInput}
+                    className={styles.filterSelect}
+                    style={{ width: '100%' }}
                     value={assignTeamForm.memberName}
                     onChange={(e) => setAssignTeamForm({ ...assignTeamForm, memberName: e.target.value })}
-                  />
+                  >
+                    <option value="">Select an employee...</option>
+                    {(employees || []).map(emp => (
+                      <option key={emp.id} value={emp.name}>
+                        {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className={styles.modalFooter}>

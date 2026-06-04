@@ -164,6 +164,7 @@ export const AppProvider = ({ children }) => {
     const userMap = {
       super_admin: employees.find(e => e.roleId === 'super_admin') || employees[0],
       branch_admin: employees.find(e => e.roleId === 'branch_admin'),
+      project_manager: employees.find(e => e.roleId === 'project_manager'),
       team_leader: employees.find(e => e.roleId === 'team_leader'),
       employee: employees.find(e => e.roleId === 'employee')
     };
@@ -531,7 +532,7 @@ export const AppProvider = ({ children }) => {
     if (!task) return;
 
     setTasks(prev =>
-      prev.map(t => (t.id === id ? { ...t, status: newStatus } : t))
+      prev.map(t => (t.id === id ? { ...t, status: newStatus, progress: newStatus === 'Done' ? 100 : t.progress } : t))
     );
     addActivityLog(`Moved task "${task.title}" to ${newStatus}`, 'Tasks', 'success');
     addToast('success', `Task moved to ${newStatus}.`);
@@ -540,12 +541,42 @@ export const AppProvider = ({ children }) => {
   const addTask = (taskData) => {
     const id = `TSK-${Math.floor(100 + Math.random() * 900)}`;
     const assignee = employees.find(e => e.id === taskData.assigneeId);
+    
     const entry = {
-      ...taskData,
       id,
+      title: taskData.title,
+      project: taskData.project || 'SaaS Platform v2.0',
+      projectId: taskData.project === 'Q2 Sales Campaign' ? 'PRJ-002' : taskData.project === 'Security Audits' ? 'PRJ-003' : 'PRJ-001',
+      projectName: taskData.project || 'SaaS Platform v2.0',
+      description: taskData.description || '',
+      department: assignee ? assignee.department : 'Engineering',
+      assigneeId: taskData.assigneeId,
       assigneeName: assignee ? assignee.name : 'Unassigned',
-      status: 'To Do'
+      teamLeader: assignee ? assignee.teamLeader || '' : '',
+      teamLeaderName: assignee ? assignee.teamLeader || 'Unassigned' : 'Unassigned',
+      projectManager: assignee ? assignee.projectManager || '' : '',
+      projectManagerName: assignee ? assignee.projectManager || 'Unassigned' : 'Unassigned',
+      priority: taskData.priority || 'Medium',
+      status: 'To Do',
+      startDate: new Date().toISOString().split('T')[0],
+      dueDate: taskData.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      estimatedHours: Number(taskData.estimatedHours) || 20,
+      progress: 0,
+      comments: [],
+      attachments: [],
+      approvals: [
+        { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 2, role: 'Team Leader Approval', approver: assignee ? assignee.teamLeader || 'Team Leader' : 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 3, role: 'Project Manager Approval', approver: assignee ? assignee.projectManager || 'Project Manager' : 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' }
+      ],
+      activityLog: [
+        { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created by ${currentUser?.name || 'System'}`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
+    
     setTasks(prev => [...prev, entry]);
     addActivityLog(`Created task: "${entry.title}"`, 'Tasks', 'success');
     addToast('success', 'Task created successfully.');
@@ -557,6 +588,200 @@ export const AppProvider = ({ children }) => {
     setTasks(prev => prev.filter(t => t.id !== id));
     addActivityLog(`Deleted task "${task.title}"`, 'Tasks', 'danger');
     addToast('warning', `Task "${task.title}" deleted.`);
+  };
+
+  const reassignTask = (taskId, assigneeId, assigneeName) => {
+    const assignee = employees.find(e => e.id === assigneeId);
+    setTasks(prev =>
+      prev.map(t => (t.id === taskId ? {
+        ...t,
+        assigneeId,
+        assigneeName,
+        teamLeader: assignee ? assignee.teamLeader || '' : t.teamLeader,
+        teamLeaderName: assignee ? assignee.teamLeader || 'Unassigned' : t.teamLeaderName,
+        projectManager: assignee ? assignee.projectManager || '' : t.projectManager,
+        projectManagerName: assignee ? assignee.projectManager || 'Unassigned' : t.projectManagerName
+      } : t))
+    );
+    addActivityLog(`Reassigned task ${taskId} to ${assigneeName}`, 'Tasks', 'info');
+    addToast('info', `Task reassigned to ${assigneeName}`);
+  };
+
+  const extendTaskDeadline = (taskId, newDate) => {
+    setTasks(prev =>
+      prev.map(t => (t.id === taskId ? { ...t, dueDate: newDate } : t))
+    );
+    addActivityLog(`Extended deadline for task ${taskId} to ${newDate}`, 'Tasks', 'warning');
+    addToast('success', `Extended deadline to ${newDate}`);
+  };
+
+  const escalateTask = (taskId) => {
+    setTasks(prev =>
+      prev.map(t => (t.id === taskId ? { ...t, priority: 'Critical' } : t))
+    );
+    addActivityLog(`Escalated task ${taskId} to Critical priority`, 'Tasks', 'danger');
+    addToast('error', `Task ${taskId} escalated to Critical!`);
+  };
+
+  const addTaskRemarks = (taskId, remarks) => {
+    setTasks(prev =>
+      prev.map(t => (t.id === taskId ? { ...t, remarks } : t))
+    );
+    addToast('success', 'Remarks added to task.');
+  };
+
+  const addTaskComment = (taskId, text, senderName, senderRole) => {
+    const newComment = {
+      id: `c-${Math.random().toString(36).substring(2, 9)}`,
+      sender: senderName,
+      role: senderRole,
+      text,
+      time: 'Just now',
+      attachments: []
+    };
+    setTasks(prev =>
+      prev.map(t => (t.id === taskId ? { ...t, comments: [...(t.comments || []), newComment] } : t))
+    );
+    addToast('success', 'Comment posted.');
+  };
+
+  const approveTaskLevel = (taskId, level, remarks, approverName) => {
+    setTasks(prev =>
+      prev.map(t => {
+        if (t.id !== taskId) return t;
+        const updatedApprovals = (t.approvals || []).map(app => {
+          if (app.level === level) {
+            return {
+              ...app,
+              status: 'Approved',
+              timestamp: 'Just now',
+              remarks: remarks || 'Approved'
+            };
+          }
+          return app;
+        });
+
+        let finalStatus = t.status;
+        const allCompleted = updatedApprovals.every(app => app.status === 'Approved');
+        if (allCompleted) {
+          finalStatus = 'Done';
+        } else if (level === 2) {
+          finalStatus = 'In Review';
+        }
+
+        return { ...t, approvals: updatedApprovals, status: finalStatus, progress: allCompleted ? 100 : t.progress };
+      })
+    );
+    addToast('success', `Level ${level} Approval submitted.`);
+  };
+
+  const rejectTaskLevel = (taskId, level, remarks, approverName) => {
+    setTasks(prev =>
+      prev.map(t => {
+        if (t.id !== taskId) return t;
+        const updatedApprovals = (t.approvals || []).map(app => {
+          if (app.level === level) {
+            return {
+              ...app,
+              status: 'Rejected',
+              timestamp: 'Just now',
+              remarks: remarks || 'Rejected'
+            };
+          }
+          return app;
+        });
+        return { ...t, approvals: updatedApprovals, status: 'To Do' };
+      })
+    );
+    addToast('error', `Approval rejected at Level ${level}.`);
+  };
+
+  const getTaskStats = () => {
+    const total = tasks.length;
+    const active = tasks.filter(t => t.status === 'In Progress' || t.status === 'in_progress').length;
+    const completed = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
+    const pending = tasks.filter(t => t.status === 'To Do' || t.status === 'todo').length;
+    const todayStr = '2026-06-03';
+    const overdue = tasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
+    const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, active, completed, pending, overdue, completionRate };
+  };
+
+  const getEmployeeTaskSummary = (employeeId) => {
+    const empTasks = tasks.filter(t => t.assigneeId === employeeId);
+    const assigned = empTasks.length;
+    const completed = empTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
+    const pending = empTasks.filter(t => t.status !== 'Done' && t.status !== 'done').length;
+    const todayStr = '2026-06-03';
+    const overdue = empTasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
+    const productivity = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
+    return { assigned, completed, pending, overdue, productivity };
+  };
+
+  const getTeamTaskRanking = () => {
+    const teamMap = {};
+    employees.forEach(emp => {
+      if (!emp.team) return;
+      if (!teamMap[emp.team]) {
+        teamMap[emp.team] = {
+          name: emp.team,
+          leader: emp.teamLeader || 'Unassigned',
+          totalTasks: 0,
+          completedTasks: 0
+        };
+      }
+      const empStats = getEmployeeTaskSummary(emp.id);
+      teamMap[emp.team].totalTasks += empStats.assigned;
+      teamMap[emp.team].completedTasks += empStats.completed;
+    });
+
+    return Object.values(teamMap).map(t => {
+      const productivity = t.totalTasks > 0 ? Math.round((t.completedTasks / t.totalTasks) * 100) : 0;
+      return { ...t, productivity };
+    }).sort((a, b) => b.productivity - a.productivity);
+  };
+
+  const getDepartmentTaskAnalytics = () => {
+    const deptMap = {};
+    employees.forEach(emp => {
+      if (!emp.department) return;
+      if (!deptMap[emp.department]) {
+        deptMap[emp.department] = {
+          department: emp.department,
+          totalTasks: 0,
+          completed: 0,
+          pending: 0
+        };
+      }
+      const empStats = getEmployeeTaskSummary(emp.id);
+      deptMap[emp.department].totalTasks += empStats.assigned;
+      deptMap[emp.department].completed += empStats.completed;
+      deptMap[emp.department].pending += empStats.pending;
+    });
+
+    return Object.values(deptMap).map(d => {
+      const completionRate = d.totalTasks > 0 ? Math.round((d.completed / d.totalTasks) * 100) : 0;
+      return { ...d, completionRate };
+    });
+  };
+
+  const getWorkloadDistribution = () => {
+    return employees.map(emp => {
+      const stats = getEmployeeTaskSummary(emp.id);
+      let workloadStatus = 'Normal';
+      if (stats.assigned > 20) workloadStatus = 'Overloaded';
+      else if (stats.assigned >= 16) workloadStatus = 'High';
+      else if (stats.assigned >= 11) workloadStatus = 'Balanced';
+      return {
+        id: emp.id,
+        name: emp.name,
+        avatar: emp.avatar,
+        assignedTasks: stats.assigned,
+        pendingTasks: stats.pending,
+        overdueTasks: stats.overdue,
+        workloadStatus
+      };
+    });
   };
 
   // Payroll Handlers
@@ -637,6 +862,18 @@ export const AppProvider = ({ children }) => {
         updateTaskStatus,
         addTask,
         deleteTask,
+        reassignTask,
+        extendTaskDeadline,
+        escalateTask,
+        addTaskRemarks,
+        addTaskComment,
+        approveTaskLevel,
+        rejectTaskLevel,
+        getTaskStats,
+        getEmployeeTaskSummary,
+        getTeamTaskRanking,
+        getDepartmentTaskAnalytics,
+        getWorkloadDistribution,
         updateAttendanceRecord,
         addAttendanceRecord,
         runPayroll,
