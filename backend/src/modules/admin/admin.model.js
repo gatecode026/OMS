@@ -3,8 +3,10 @@
  * @description Mongoose model representing the Super Admin only, encapsulated in a separate admin module.
  */
 
+
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+
 
 const adminSchema = new mongoose.Schema({
   id: {
@@ -18,6 +20,7 @@ const adminSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+
   email: {
     type: String,
     required: true,
@@ -66,9 +69,11 @@ adminSchema.pre('save', async function(next) {
   }
 });
 
+
 adminSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
+
 
 const Admin = mongoose.model('Admin', adminSchema);
 export default Admin;

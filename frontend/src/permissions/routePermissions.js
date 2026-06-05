@@ -21,7 +21,7 @@ export const ROUTE_PERMISSIONS = {
   '/departments': ROLES.BRANCH_ADMIN,
   '/branches': ROLES.BRANCH_ADMIN,
   '/teams': ROLES.BRANCH_ADMIN,
-  '/project-managers': ROLES.PROJECT_MANAGER,
+  '/managers': ROLES.MANAGER,
   '/teams/leaders': ROLES.TEAM_LEADER,
   '/payroll': ROLES.EMPLOYEE,
 

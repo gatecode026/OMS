@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useReducer, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './ProjectManagers.css';
+import './Managers.css';
 import usePageLoading from '../hooks/usePageLoading';
 import Avatar from '../components/common/Avatar';
 import Badge from '../components/common/Badge';
@@ -53,12 +53,12 @@ const SEED_TEAM_LEADERS = [
 ];
 
 const SEED_PMS = [
-  { id:'PM-001', empId:'EMP-201', name:'Rahul Sharma',  email:'rahul.sharma@enterprise.com',  phone:'+91-9876543210', department:'IT',        branch:'Head Office',   designation:'Senior Project Manager',  joiningDate:'2019-03-15', status:'Active',    activeProjects:14, teamLeaders:2, teamMembers:320, successRate:97, productivity:96, clientSatisfaction:9.8, projectIds:['PRJ-001','PRJ-002'], teamLeaderIds:['TL-001','TL-002'], departments:['IT','Engineering','QA'] },
-  { id:'PM-002', empId:'EMP-202', name:'Priya Verma',   email:'priya.verma@enterprise.com',   phone:'+91-9765432109', department:'Marketing', branch:'Branch Office', designation:'Project Manager',         joiningDate:'2020-07-01', status:'Active',    activeProjects:10, teamLeaders:2, teamMembers:180, successRate:95, productivity:94, clientSatisfaction:9.2, projectIds:['PRJ-003','PRJ-004'], teamLeaderIds:['TL-003','TL-004'], departments:['Marketing','Design'] },
-  { id:'PM-003', empId:'EMP-203', name:'Amit Singh',    email:'amit.singh@enterprise.com',    phone:'+91-9654321098', department:'Sales',     branch:'Head Office',   designation:'Project Manager',         joiningDate:'2021-01-12', status:'Active',    activeProjects:8,  teamLeaders:1, teamMembers:150, successRate:93, productivity:91, clientSatisfaction:8.7, projectIds:['PRJ-005'],            teamLeaderIds:['TL-005'],            departments:['Sales','Operations'] },
-  { id:'PM-004', empId:'EMP-204', name:'Neha Gupta',    email:'neha.gupta@enterprise.com',    phone:'+91-9543210987', department:'HR',        branch:'Head Office',   designation:'Junior Project Manager',  joiningDate:'2022-06-20', status:'Active',    activeProjects:6,  teamLeaders:1, teamMembers:120, successRate:91, productivity:90, clientSatisfaction:8.3, projectIds:['PRJ-006'],            teamLeaderIds:['TL-006'],            departments:['HR','Admin'] },
-  { id:'PM-005', empId:'EMP-205', name:'Kiran Mehta',   email:'kiran.mehta@enterprise.com',   phone:'+91-9432109876', department:'IT',        branch:'Agency',        designation:'Senior Project Manager',  joiningDate:'2018-09-05', status:'On Leave',  activeProjects:4,  teamLeaders:1, teamMembers:80,  successRate:88, productivity:85, clientSatisfaction:7.8, projectIds:['PRJ-007'],            teamLeaderIds:['TL-001'],            departments:['IT','Infrastructure'] },
-  { id:'PM-006', empId:'EMP-206', name:'Sunita Rao',    email:'sunita.rao@enterprise.com',    phone:'+91-9321098765', department:'HR',        branch:'Branch Office', designation:'Project Manager',         joiningDate:'2021-11-08', status:'Training',  activeProjects:5,  teamLeaders:1, teamMembers:100, successRate:89, productivity:87, clientSatisfaction:7.2, projectIds:['PRJ-008'],            teamLeaderIds:['TL-006'],            departments:['HR','Compliance'] },
+  { id:'PM-001', empId:'EMP-201', name:'Rahul Sharma',  email:'rahul.sharma@enterprise.com',  phone:'+91-9876543210', department:'IT',        branch:'Head Office',   designation:'Senior Manager',  joiningDate:'2019-03-15', status:'Active',    activeProjects:14, teamLeaders:2, teamMembers:320, successRate:97, productivity:96, clientSatisfaction:9.8, projectIds:['PRJ-001','PRJ-002'], teamLeaderIds:['TL-001','TL-002'], departments:['IT','Engineering','QA'] },
+  { id:'PM-002', empId:'EMP-202', name:'Priya Verma',   email:'priya.verma@enterprise.com',   phone:'+91-9765432109', department:'Marketing', branch:'Branch Office', designation:'Manager',         joiningDate:'2020-07-01', status:'Active',    activeProjects:10, teamLeaders:2, teamMembers:180, successRate:95, productivity:94, clientSatisfaction:9.2, projectIds:['PRJ-003','PRJ-004'], teamLeaderIds:['TL-003','TL-004'], departments:['Marketing','Design'] },
+  { id:'PM-003', empId:'EMP-203', name:'Amit Singh',    email:'amit.singh@enterprise.com',    phone:'+91-9654321098', department:'Sales',     branch:'Head Office',   designation:'Manager',         joiningDate:'2021-01-12', status:'Active',    activeProjects:8,  teamLeaders:1, teamMembers:150, successRate:93, productivity:91, clientSatisfaction:8.7, projectIds:['PRJ-005'],            teamLeaderIds:['TL-005'],            departments:['Sales','Operations'] },
+  { id:'PM-004', empId:'EMP-204', name:'Neha Gupta',    email:'neha.gupta@enterprise.com',    phone:'+91-9543210987', department:'HR',        branch:'Head Office',   designation:'Junior Manager',  joiningDate:'2022-06-20', status:'Active',    activeProjects:6,  teamLeaders:1, teamMembers:120, successRate:91, productivity:90, clientSatisfaction:8.3, projectIds:['PRJ-006'],            teamLeaderIds:['TL-006'],            departments:['HR','Admin'] },
+  { id:'PM-005', empId:'EMP-205', name:'Kiran Mehta',   email:'kiran.mehta@enterprise.com',   phone:'+91-9432109876', department:'IT',        branch:'Agency',        designation:'Senior Manager',  joiningDate:'2018-09-05', status:'On Leave',  activeProjects:4,  teamLeaders:1, teamMembers:80,  successRate:88, productivity:85, clientSatisfaction:7.8, projectIds:['PRJ-007'],            teamLeaderIds:['TL-001'],            departments:['IT','Infrastructure'] },
+  { id:'PM-006', empId:'EMP-206', name:'Sunita Rao',    email:'sunita.rao@enterprise.com',    phone:'+91-9321098765', department:'HR',        branch:'Branch Office', designation:'Manager',         joiningDate:'2021-11-08', status:'Training',  activeProjects:5,  teamLeaders:1, teamMembers:100, successRate:89, productivity:87, clientSatisfaction:7.2, projectIds:['PRJ-008'],            teamLeaderIds:['TL-006'],            departments:['HR','Compliance'] },
 ];
 
 const SEED_APPROVALS = [
@@ -72,7 +72,7 @@ const SEED_NOTIFICATIONS = [
   { id:'NTF-001', color:'amber',  icon:'clock',     message:'SaaS Platform v3.0 deadline is 26 days away. Currently 72% complete.',         timestamp:'2 hours ago' },
   { id:'NTF-002', color:'red',    icon:'alert',     message:'Sales Pipeline Automation budget exceeded by 15% (₹1.38M vs ₹1.2M estimated).', timestamp:'5 hours ago' },
   { id:'NTF-003', color:'blue',   icon:'folder',    message:'New project "AI Analytics Module" has been assigned to Rahul Sharma.',           timestamp:'1 day ago'   },
-  { id:'NTF-004', color:'purple', icon:'chart',     message:'Q2 Performance Review is due for all Project Managers by June 30.',             timestamp:'2 days ago'  },
+  { id:'NTF-004', color:'purple', icon:'chart',     message:'Q2 Performance Review is due for all Managers by June 30.',             timestamp:'2 days ago'  },
   { id:'NTF-005', color:'green',  icon:'user_plus', message:'Team Leader Priya Nair has been added to the Marketing project team.',           timestamp:'3 days ago'  },
 ];
 
@@ -307,7 +307,7 @@ function reducer(state, action) {
    ═══════════════════════════════════════════════════════════ */
 const PER_PAGE = 10;
 
-const ProjectManagers = () => {
+const Managers = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(700);
   const { addToast, showConfirm, employees, tasks, addTask } = useApp();
@@ -379,7 +379,7 @@ const ProjectManagers = () => {
   const [rPM,  setRPM]  = useState('');
 
   /* report */
-  const [rType, setRType] = useState('Project Manager Performance Report');
+  const [rType, setRType] = useState('Manager Performance Report');
   const [rFmt,  setRFmt]  = useState('PDF');
   const [rLoading,setRLoading] = useState(false);
 
@@ -585,7 +585,7 @@ const ProjectManagers = () => {
 
   const handleTransferLeader = () => {
     if (!selectedTL || !transferTargetPM) {
-      addToast('danger', 'Please select a target Project Manager.');
+      addToast('danger', 'Please select a target Manager.');
       return;
     }
     dispatch({
@@ -639,8 +639,8 @@ const ProjectManagers = () => {
           {/* ── HEADER ── */}
           <div className="pm-page-header">
             <div className="pm-header-left">
-              <h2>Project Manager Panel</h2>
-              <p className="pm-header-subtitle">Manage, monitor, and evaluate all Project Managers across the organization. Track project performance, team allocation, resource management, deadlines, budgets, task completion, and overall project delivery from a centralized enterprise management dashboard.</p>
+              <h2>Manager Panel</h2>
+              <p className="pm-header-subtitle">Manage, monitor, and evaluate all Managers across the organization. Track project performance, team allocation, resource management, deadlines, budgets, task completion, and overall project delivery from a centralized enterprise management dashboard.</p>
             </div>
             <div className="pm-header-actions">
               <div className="pm-view-toggle">
@@ -661,7 +661,7 @@ const ProjectManagers = () => {
               </div>
               <Button variant="ghost" size="sm" icon={Download} onClick={()=>setExportOpen(true)}>Export Data</Button>
               <Button variant="ghost" size="sm" icon={FileText} onClick={()=>setReportOpen(true)}>Reports</Button>
-              <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>Add Project Manager</Button>
+              <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>Add Manager</Button>
             </div>
           </div>
 
@@ -680,7 +680,7 @@ const ProjectManagers = () => {
                 ibg:'icon-bg-blue',
                 icon:<Users size={18}/>,
                 value:summary.total,
-                label:'Total Project Managers',
+                label:'Total Managers',
                 desc:'All registered PMs',
                 onClick: () => {
                   setViewMode('card');
@@ -688,7 +688,7 @@ const ProjectManagers = () => {
                   dispatch({ type: 'RESET_FILTERS' });
                   setCardFilter('');
                   setPage(1);
-                  addToast('info', 'Viewing All Project Managers in Card view');
+                  addToast('info', 'Viewing All Managers in Card view');
                   scrollToDirectory();
                 }
               },
@@ -697,7 +697,7 @@ const ProjectManagers = () => {
                 ibg:'icon-bg-green',
                 icon:<UserCog size={18}/>,
                 value:summary.active,
-                label:'Active Project Managers',
+                label:'Active Managers',
                 desc:'Currently operational',
                 onClick: () => {
                   setViewMode('card');
@@ -705,7 +705,7 @@ const ProjectManagers = () => {
                   dispatch({ type: 'RESET_FILTERS' });
                   setCardFilter('active');
                   setPage(1);
-                  addToast('info', 'Viewing Active Project Managers in Card view');
+                  addToast('info', 'Viewing Active Managers in Card view');
                   scrollToDirectory();
                 }
               },
@@ -785,9 +785,9 @@ const ProjectManagers = () => {
               },
             ].map((c,i)=>(
               <div key={i} className={`pm-stat-card pm-accent-${c.accent}${
-                (c.label === 'Active Project Managers' && cardFilter === 'active') ||
+                (c.label === 'Active Managers' && cardFilter === 'active') ||
                 (c.label === 'Active Projects' && cardFilter === 'has_active_projects') ||
-                (c.label === 'Total Project Managers' && cardFilter === '' && sortCol === 'name' && viewMode === 'card') ||
+                (c.label === 'Total Managers' && cardFilter === '' && sortCol === 'name' && viewMode === 'card') ||
                 (c.label === 'Total Projects Managed' && sortCol === 'activeProjects' && viewMode === 'card') ||
                 (c.label === 'Team Members Managed' && sortCol === 'teamMembers' && viewMode === 'card') ||
                 (c.label === 'Project Success Rate' && sortCol === 'successRate' && viewMode === 'card')
@@ -811,7 +811,7 @@ const ProjectManagers = () => {
           <div className="card" style={{padding:'var(--space-5)', flexShrink: 0}}>
             <div className="pm-analytics-header">
               <div>
-                <div className="pm-analytics-title">Project Manager Performance Analytics — Leadership Overview</div>
+                <div className="pm-analytics-title">Manager Performance Analytics — Leadership Overview</div>
                 <div className="pm-analytics-subtitle">Delivery, productivity, resource utilization, budget compliance and client satisfaction</div>
               </div>
             </div>
@@ -928,12 +928,12 @@ const ProjectManagers = () => {
           {/* ── RANKING TABLE ── */}
           <div className="pm-dir-card" style={{flexShrink: 0}}>
             <div className="pm-dir-toolbar">
-              <span className="pm-dir-title">Project Manager Ranking</span>
+              <span className="pm-dir-title">Manager Ranking</span>
               <Badge variant="info">{ranking.length} Managers</Badge>
             </div>
             <div className="pm-ranking-table-wrap">
               <table className="pm-dir-table">
-                <thead><tr><th>Rank</th><th>Project Manager</th><th>Projects</th><th>Success Rate</th><th>Performance</th></tr></thead>
+                <thead><tr><th>Rank</th><th>Manager</th><th>Projects</th><th>Success Rate</th><th>Performance</th></tr></thead>
                 <tbody>
                   {ranking.map((pm,idx)=>(
                     <tr key={pm.id} onClick={()=>dispatch({type:'SELECT_PM',pm})} style={{cursor:'pointer'}}>
@@ -981,7 +981,7 @@ const ProjectManagers = () => {
           {/* ── DIRECTORY TABLE ── */}
           <div ref={directoryRef} className="pm-dir-card" style={{flexShrink: 0}}>
             <div className="pm-dir-toolbar">
-              <span className="pm-dir-title">Project Managers Directory</span>
+              <span className="pm-dir-title">Managers Directory</span>
               <Badge variant="neutral">{filtered.length} records</Badge>
             </div>
             {viewMode === 'table' ? (
@@ -1126,10 +1126,10 @@ const ProjectManagers = () => {
 
           {/* ── FOOTER ── */}
           <div className="pm-footer-bar" style={{flexShrink: 0}}>
-            <div className="pm-footer-stat"><span className="pm-footer-stat-label">Total Project Managers</span><span className="pm-footer-stat-value">{pmList.length}</span></div>
+            <div className="pm-footer-stat"><span className="pm-footer-stat-label">Total Managers</span><span className="pm-footer-stat-value">{pmList.length}</span></div>
             <div className="pm-footer-stat"><span className="pm-footer-stat-label">Projects Managed</span><span className="pm-footer-stat-value">{summary.totalProj}</span></div>
             <div className="pm-footer-stat"><span className="pm-footer-stat-label">Last Updated</span><span className="pm-footer-stat-value">Just Now</span></div>
-            <div className="pm-footer-stat"><span className="pm-footer-stat-label">System Status</span><span className="pm-status-dot">Project Manager Module Active</span></div>
+            <div className="pm-footer-stat"><span className="pm-footer-stat-label">System Status</span><span className="pm-status-dot">Manager Module Active</span></div>
           </div>
         </>
       ) : (
@@ -1141,7 +1141,7 @@ const ProjectManagers = () => {
             {/* Breadcrumb + top bar */}
             <div style={{marginBottom:'var(--space-4)'}}>
               <div className="pm-breadcrumb" style={{marginBottom:'var(--space-3)'}}>
-                <span className="pm-breadcrumb-link" onClick={()=>dispatch({type:'GO_BACK'})}>Project Manager Panel</span>
+                <span className="pm-breadcrumb-link" onClick={()=>dispatch({type:'GO_BACK'})}>Manager Panel</span>
                 <ChevronRight size={14} className="pm-breadcrumb-sep"/>
                 <span className="pm-breadcrumb-current">{selectedPM.name}</span>
               </div>
@@ -1615,8 +1615,8 @@ const ProjectManagers = () => {
       {/* ═══════════════════════════════ MODALS ═══════════════════════════════ */}
 
       {/* Add / Edit PM */}
-      <Modal isOpen={addEditOpen} onClose={()=>setAddEditOpen(false)} title={editingPM?`Edit — ${editingPM.name}`:'Add Project Manager'} size="lg"
-        footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAddEditOpen(false)}>Cancel</Button><Button variant="primary" onClick={savePM}>{editingPM?'Update Project Manager':'Save Project Manager'}</Button></div>}>
+      <Modal isOpen={addEditOpen} onClose={()=>setAddEditOpen(false)} title={editingPM?`Edit — ${editingPM.name}`:'Add Manager'} size="lg"
+        footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAddEditOpen(false)}>Cancel</Button><Button variant="primary" onClick={savePM}>{editingPM?'Update Manager':'Save Manager'}</Button></div>}>
         <div className="pm-form-grid">
           <span className="pm-form-section-heading">Personal Information</span>
           <div className="pm-form-group"><label htmlFor="f-empid" className="pm-form-label">Employee ID</label><div className="pm-read-only-field" id="f-empid">{editingPM?editingPM.empId:`EMP-${210+pmList.length}`}</div></div>
@@ -1625,7 +1625,7 @@ const ProjectManagers = () => {
           <div className="pm-form-group"><label htmlFor="f-email" className="pm-form-label">Official Email *</label><input id="f-email" type="email" placeholder="name@enterprise.com" className={formErr.email?'pm-form-input-err':''} value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/>{formErr.email&&<span className="pm-form-err-text">{formErr.email}</span>}</div>
           <div className="pm-form-group"><label htmlFor="f-dept" className="pm-form-label">Department</label><select id="f-dept" value={form.department} onChange={e=>setForm(f=>({...f,department:e.target.value}))}><option>IT</option><option>Marketing</option><option>Sales</option><option>HR</option></select></div>
           <div className="pm-form-group"><label htmlFor="f-branch" className="pm-form-label">Branch / Agency</label><select id="f-branch" value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))}><option>Head Office</option><option>Branch Office</option><option>Agency</option></select></div>
-          <div className="pm-form-group"><label htmlFor="f-desig" className="pm-form-label">Designation *</label><input id="f-desig" type="text" placeholder="e.g. Senior Project Manager" className={formErr.designation?'pm-form-input-err':''} value={form.designation} onChange={e=>setForm(f=>({...f,designation:e.target.value}))}/>{formErr.designation&&<span className="pm-form-err-text">{formErr.designation}</span>}</div>
+          <div className="pm-form-group"><label htmlFor="f-desig" className="pm-form-label">Designation *</label><input id="f-desig" type="text" placeholder="e.g. Senior Manager" className={formErr.designation?'pm-form-input-err':''} value={form.designation} onChange={e=>setForm(f=>({...f,designation:e.target.value}))}/>{formErr.designation&&<span className="pm-form-err-text">{formErr.designation}</span>}</div>
           <div className="pm-form-group"><label htmlFor="f-join" className="pm-form-label">Joining Date</label><input id="f-join" type="date" value={form.joiningDate} onChange={e=>setForm(f=>({...f,joiningDate:e.target.value}))}/></div>
           <div className="pm-form-group"><label htmlFor="f-status" className="pm-form-label">Status</label><select id="f-status" value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option>Active</option><option>On Leave</option><option>Training</option><option>Inactive</option><option>Suspended</option></select></div>
           <span className="pm-form-section-heading">Performance (Optional)</span>
@@ -1648,7 +1648,7 @@ const ProjectManagers = () => {
       <Modal isOpen={assignProjOpen} onClose={()=>setAssignProjOpen(false)} title="Assign Project to PM" size="sm"
         footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAssignProjOpen(false)}>Cancel</Button><Button variant="primary" onClick={()=>{if(!aPM||!aProj){addToast('danger','Select PM and project.');return;} dispatch({type:'ASSIGN_PROJECT',pmId:aPM,projectName:aProj}); setAssignProjOpen(false); setAPM(''); setAProj(''); addToast('success','Project assigned.');}}>Assign</Button></div>}>
         <div className="pm-quick-assign-body">
-          <div className="pm-form-group"><label htmlFor="ap-pm" className="pm-form-label">Project Manager</label><select id="ap-pm" value={aPM} onChange={e=>setAPM(e.target.value)}><option value="">— Select PM —</option>{pmList.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+          <div className="pm-form-group"><label htmlFor="ap-pm" className="pm-form-label">Manager</label><select id="ap-pm" value={aPM} onChange={e=>setAPM(e.target.value)}><option value="">— Select PM —</option>{pmList.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="pm-form-group"><label htmlFor="ap-proj" className="pm-form-label">Project</label><select id="ap-proj" value={aProj} onChange={e=>setAProj(e.target.value)}><option value="">— Select Project —</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}<option value="AI Analytics Module">AI Analytics Module (New)</option></select></div>
         </div>
       </Modal>
@@ -1657,7 +1657,7 @@ const ProjectManagers = () => {
       <Modal isOpen={assignLeaderOpen} onClose={()=>setAssignLeaderOpen(false)} title="Assign Team Leader to PM" size="sm"
         footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAssignLeaderOpen(false)}>Cancel</Button><Button variant="primary" onClick={()=>{if(!alPM||!aLead){addToast('danger','Select PM and team leader.');return;} dispatch({type:'ASSIGN_TEAM_LEADER',pmId:alPM,leaderName:aLead}); setAssignLeaderOpen(false); setALPM(''); setALead(''); addToast('success','Team Leader assigned.');}}>Assign</Button></div>}>
         <div className="pm-quick-assign-body">
-          <div className="pm-form-group"><label htmlFor="al-pm" className="pm-form-label">Project Manager</label><select id="al-pm" value={alPM} onChange={e=>setALPM(e.target.value)}><option value="">— Select PM —</option>{pmList.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+          <div className="pm-form-group"><label htmlFor="al-pm" className="pm-form-label">Manager</label><select id="al-pm" value={alPM} onChange={e=>setALPM(e.target.value)}><option value="">— Select PM —</option>{pmList.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="pm-form-group"><label htmlFor="al-lead" className="pm-form-label">Team Leader</label><select id="al-lead" value={aLead} onChange={e=>setALead(e.target.value)}><option value="">— Select Leader —</option>{teamLeaders.map(tl=><option key={tl.id} value={tl.name}>{tl.name} ({tl.teamName})</option>)}</select></div>
         </div>
       </Modal>
@@ -1666,7 +1666,7 @@ const ProjectManagers = () => {
       <Modal isOpen={allocateOpen} onClose={()=>setAllocateOpen(false)} title="Allocate Resources" size="sm"
         footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAllocateOpen(false)}>Cancel</Button><Button variant="primary" onClick={()=>{if(!rPM){addToast('danger','Select a PM.');return;} const countVal = Number(document.getElementById('ra-count')?.value || 2); dispatch({type:'ALLOCATE_RESOURCES',pmId:rPM,headcount:countVal}); setAllocateOpen(false); setRPM(''); addToast('success','Resources allocated.');}}>Allocate</Button></div>}>
         <div className="pm-quick-assign-body">
-          <div className="pm-form-group"><label htmlFor="ra-pm" className="pm-form-label">Project Manager</label><select id="ra-pm" value={rPM} onChange={e=>setRPM(e.target.value)}><option value="">— Select PM —</option>{pmList.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+          <div className="pm-form-group"><label htmlFor="ra-pm" className="pm-form-label">Manager</label><select id="ra-pm" value={rPM} onChange={e=>setRPM(e.target.value)}><option value="">— Select PM —</option>{pmList.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="pm-form-group"><label htmlFor="ra-type" className="pm-form-label">Resource Type</label><select id="ra-type"><option>Developer</option><option>UI/UX Designer</option><option>QA Engineer</option><option>DevOps Engineer</option><option>Business Analyst</option></select></div>
           <div className="pm-form-group"><label htmlFor="ra-count" className="pm-form-label">Headcount</label><input id="ra-count" type="number" min={1} max={20} defaultValue={2}/></div>
         </div>
@@ -1676,7 +1676,7 @@ const ProjectManagers = () => {
       <Modal isOpen={reportOpen} onClose={()=>setReportOpen(false)} title="Generate Report" size="md"
         footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setReportOpen(false)}>Cancel</Button><Button variant="primary" icon={Download} loading={rLoading} onClick={generateReport}>{rLoading?'Generating...':'Generate & Download'}</Button></div>}>
         <div style={{display:'flex',flexDirection:'column',gap:'var(--space-4)'}}>
-          <div className="pm-form-group"><label htmlFor="rpt-type" className="pm-form-label">Report Type</label><select id="rpt-type" value={rType} onChange={e=>setRType(e.target.value)}><optgroup label="PM Reports"><option>Project Manager Performance Report</option><option>Project Delivery Report</option><option>Budget Utilization Report</option></optgroup><optgroup label="Project Reports"><option>Project Progress Report</option><option>Milestone Report</option><option>Resource Utilization Report</option></optgroup><optgroup label="Team Reports"><option>Team Performance Report</option><option>Productivity Report</option></optgroup></select></div>
+          <div className="pm-form-group"><label htmlFor="rpt-type" className="pm-form-label">Report Type</label><select id="rpt-type" value={rType} onChange={e=>setRType(e.target.value)}><optgroup label="PM Reports"><option>Manager Performance Report</option><option>Project Delivery Report</option><option>Budget Utilization Report</option></optgroup><optgroup label="Project Reports"><option>Project Progress Report</option><option>Milestone Report</option><option>Resource Utilization Report</option></optgroup><optgroup label="Team Reports"><option>Team Performance Report</option><option>Productivity Report</option></optgroup></select></div>
           <div><label className="pm-form-label">Export Format</label><div style={{display:'flex',gap:'var(--space-3)',marginTop:8}}>{['PDF','Excel','CSV'].map(fmt=><label key={fmt} style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:'0.875rem',color:'var(--text-secondary)'}}><input type="radio" name="rpt-fmt" value={fmt} checked={rFmt===fmt} onChange={()=>setRFmt(fmt)} style={{width:'auto'}}/>{fmt}</label>)}</div></div>
           <div style={{background:'var(--bg-elevated)',borderRadius:'var(--radius-md)',padding:'var(--space-4)',fontSize:'0.82rem',color:'var(--text-muted)'}}>📄 <strong style={{color:'var(--text-primary)'}}>{rType}</strong> will be generated as <strong style={{color:'var(--text-primary)'}}>{rFmt}</strong> and downloaded automatically.</div>
         </div>
@@ -1810,9 +1810,9 @@ const ProjectManagers = () => {
       <Modal isOpen={transferTeamOpen} onClose={()=>setTransferTeamOpen(false)} title={`Transfer Team — ${selectedTL?.teamName || ''}`} size="sm"
         footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setTransferTeamOpen(false)}>Cancel</Button><Button variant="primary" onClick={handleTransferLeader}>Confirm Transfer</Button></div>}>
         <div className="pm-quick-assign-body">
-          <div style={{fontSize:'0.82rem',color:'var(--text-muted)',marginBottom:12}}>Transfer team leader <strong style={{color:'var(--text-primary)'}}>{selectedTL?.name}</strong> and their team to another Project Manager.</div>
+          <div style={{fontSize:'0.82rem',color:'var(--text-muted)',marginBottom:12}}>Transfer team leader <strong style={{color:'var(--text-primary)'}}>{selectedTL?.name}</strong> and their team to another Manager.</div>
           <div className="pm-form-group">
-            <label htmlFor="tr-pm" className="pm-form-label">Target Project Manager *</label>
+            <label htmlFor="tr-pm" className="pm-form-label">Target Manager *</label>
             <select id="tr-pm" value={transferTargetPM} onChange={e=>setTransferTargetPM(e.target.value)}>
               <option value="">— Select Target PM —</option>
               {pmList.filter(p => p.id !== selectedPM?.id).map(pm => (
@@ -1928,4 +1928,4 @@ const ProjectManagers = () => {
   );
 };
 
-export default ProjectManagers;
+export default Managers;

@@ -62,7 +62,7 @@ const menuStructure = [
         icon: Award,
         path: '/teams',
         subItems: [
-          { name: 'Project Managers', path: '/project-managers' },
+          { name: 'Managers', path: '/managers' },
           { name: 'Team Leaders', path: '/teams/leaders' }
         ]
       }

@@ -42,7 +42,7 @@ const WorkReports = lazy(() => import('./pages/WorkReports'));
 const Security = lazy(() => import('./pages/Security'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
-const ProjectManagers = lazy(() => import('./pages/ProjectManagers'));
+const Managers = lazy(() => import('./pages/Managers'));
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -74,7 +74,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/teams/leaders" element={<TeamLeaders />} />
                 {/* ── Operations ── */}
                 <Route path="/projects" element={<Projects />} />
-                <Route path="/project-managers" element={<ProjectManagers />} />
+                <Route path="/managers" element={<Managers />} />
                 <Route path="/workflows" element={<Workflows />} />
                 <Route path="/tasks" element={<TaskMonitoring />} />
                 <Route path="/work-reports" element={<WorkReports />} />

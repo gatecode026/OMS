@@ -673,7 +673,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <option value="employee">Employee View</option>
               <option value="team_leader">Team Leader</option>
               <option value="branch_admin">HR Manager</option>
-              <option value="project_manager">Finance Manager</option>
+              <option value="manager">Manager</option>
               <option value="super_admin">Super Admin</option>
             </select>
           </div>
@@ -893,7 +893,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       Bulk Verify (HR)
                     </Button>
                   )}
-                  {perspective === 'project_manager' && (
+                  {perspective === 'manager' && (
                     <Button variant="secondary" onClick={() => handleBulkAction('approve')} icon={CheckCircle}>
                       Bulk Approve (Finance)
                     </Button>
@@ -1447,7 +1447,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                             {perspective === 'branch_admin' && b.status === 'Pending' && (
                               <Button variant="secondary" size="sm" onClick={() => handleBonusStatus(b.id, 'HR Verified')}>Verify</Button>
                             )}
-                            {perspective === 'project_manager' && b.status === 'HR Verified' && (
+                            {perspective === 'manager' && b.status === 'HR Verified' && (
                               <Button variant="secondary" size="sm" onClick={() => handleBonusStatus(b.id, 'Finance Approved')}>Approve</Button>
                             )}
                             {perspective === 'super_admin' && b.status !== 'Super Admin Approved' && (

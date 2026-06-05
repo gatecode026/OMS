@@ -693,7 +693,29 @@ const EmployeeDetail = () => {
                 <div key={i} className="doc-card">
                   <div className={`doc-file-icon ${doc.fileType === 'pdf' ? 'doc-pdf' : 'doc-img'}`}><FileText size={28} /></div>
                   <div className="doc-info"><span className="doc-category">{doc.category}</span><span className="doc-filename">{doc.fileName}</span><span className="doc-date">{fmtDate(doc.uploadDate)}</span></div>
-                  <div className="doc-actions"><button className="doc-action-btn" onClick={() => addToast('success', `Downloading ${doc.fileName}`)}><Download size={14} /></button><button className="doc-action-btn doc-delete-btn" onClick={() => addToast('warning', 'Document removed.')}><Trash2 size={14} /></button></div>
+                  <div className="doc-actions">
+                    {doc.downloadUrl ? (
+                      <a href={doc.downloadUrl} download={doc.fileName} className="doc-action-btn" title={`Download ${doc.fileName}`} onClick={() => addToast('success', `Downloading ${doc.fileName}...`)}>
+                        <Download size={14} />
+                      </a>
+                    ) : (
+                      <button className="doc-action-btn" title="Download" onClick={() => addToast('warning', `No download URL available for ${doc.fileName}`)}>
+                        <Download size={14} />
+                      </button>
+                    )}
+                    <button className="doc-action-btn doc-delete-btn" title="Delete" onClick={() => {
+                      showConfirm(
+                        'Remove Document',
+                        `Are you sure you want to remove the document "${doc.fileName}"?`,
+                        () => {
+                          const updatedDocs = documents.filter((_, index) => index !== i);
+                          updateEmployee(emp.id, { documents: updatedDocs });
+                          addToast('warning', 'Document removed.');
+                        },
+                        'danger'
+                      );
+                    }}><Trash2 size={14} /></button>
+                  </div>
                 </div>
               ))}
               {documents.length === 0 && <p className="text-muted">No documents uploaded.</p>}

@@ -1,36 +1,42 @@
 /**
  * @file src/modules/departments/departments.repository.js
- * @description Data Access layer for Departments module.
+ * @description Data Access layer for Departments module using MongoDB.
  */
 
+import Department from './departments.model.js';
 import logger from '../../config/logger.js';
 
-export const find = async (query) => {
-  logger.debug('Executing DepartmentsRepository::find placeholder');
-  return [
-    { id: 'MOCK-1', name: 'Placeholder Domain Record 1 for Departments', status: 'Active' },
-    { id: 'MOCK-2', name: 'Placeholder Domain Record 2 for Departments', status: 'Inactive' }
-  ];
+export const find = async (query = {}) => {
+  logger.info('DepartmentsRepository::find querying departments from database...');
+  return Department.find(query);
 };
 
 export const findOne = async (id) => {
-  logger.debug('Executing DepartmentsRepository::findOne placeholder for: ' + id);
-  return { id, name: 'Placeholder Single Domain Record for Departments', status: 'Active' };
+  logger.info(`DepartmentsRepository::findOne querying department with ID: ${id}`);
+  return Department.findOne({ id });
 };
 
 export const save = async (data) => {
-  logger.debug('Executing DepartmentsRepository::save placeholder', data);
-  return { id: 'MOCK-' + Math.floor(100 + Math.random() * 900), ...data };
+  logger.info(`DepartmentsRepository::save creating department: ${data.name}`);
+  
+  // Assign a default rotating accent color automatically since the picker was removed
+  const colors = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4'];
+  const count = await Department.countDocuments();
+  if (!data.color) {
+    data.color = colors[count % colors.length];
+  }
+  
+  return Department.create(data);
 };
 
 export const update = async (id, data) => {
-  logger.debug('Executing DepartmentsRepository::update placeholder for: ' + id, data);
-  return { id, ...data };
+  logger.info(`DepartmentsRepository::update updating department with ID: ${id}`);
+  return Department.findOneAndUpdate({ id }, data, { new: true, runValidators: true });
 };
 
 export const remove = async (id) => {
-  logger.debug('Executing DepartmentsRepository::remove placeholder for: ' + id);
-  return { id, status: 'Deleted' };
+  logger.info(`DepartmentsRepository::remove deleting department with ID: ${id}`);
+  return Department.findOneAndDelete({ id });
 };
 
 export default {

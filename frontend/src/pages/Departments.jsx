@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import './Departments.css';
 import { useApp } from '../context/AppContext';
@@ -217,7 +217,7 @@ const mockDocuments = [
 
 const Departments = () => {
   const isLoading = usePageLoading(600);
-  const { employees, addToast, showConfirm } = useApp();
+  const { employees, branches, departments: contextDepartments, addDepartment, updateDepartment, deleteDepartment, addToast, showConfirm } = useApp();
 
   // Tab State: 'directory' | 'analytics' | 'teams' | 'documents' | 'alerts'
   const [activeTab, setActiveTab] = useState('directory');
@@ -229,14 +229,21 @@ const Departments = () => {
   const [perfFilter, setPerfFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All');
 
-  const [branchOptions, setBranchOptions] = useState(() => {
-    return Array.from(new Set(mockDepartments.map(d => d.branch)));
-  });
+  const [branchOptions, setBranchOptions] = useState([]);
+
+  useEffect(() => {
+    if (branches && branches.length > 0) {
+      setBranchOptions(branches.map(b => b.name));
+    } else {
+      setBranchOptions(['Delhi Head Office', 'Jaipur Office', 'Mumbai Agency']);
+    }
+  }, [branches]);
+
   const [showCustomBranchInput, setShowCustomBranchInput] = useState(false);
   const [customBranch, setCustomBranch] = useState('');
 
   // Dynamic Data Lists
-  const [departments, setDepartments] = useState(mockDepartments);
+  const departments = contextDepartments || [];
   const [teams, setTeams] = useState(mockTeams);
   const [alertsFeed, setAlertsFeed] = useState(mockAlerts);
   const [recentActivities, setRecentActivities] = useState(mockActivities);
@@ -249,10 +256,56 @@ const Departments = () => {
   const [transferOpen, setTransferOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
+  const defaultBranch = useMemo(() => {
+    return branches.length > 0 ? branches[0].name : 'Delhi Head Office';
+  }, [branches]);
+
   // Form states
   const [newDeptForm, setNewDeptForm] = useState({
-    name: '', code: '', head: '', branch: 'Delhi Head Office', budget: 100000, description: '', color: '#3b82f6'
+    name: '', code: '', head: '', branch: '', budget: 100000, description: ''
   });
+
+  useEffect(() => {
+    setNewDeptForm(prev => ({
+      ...prev,
+      branch: prev.branch || defaultBranch
+    }));
+  }, [defaultBranch]);
+
+  const availableTeamLeaders = useMemo(() => {
+    if (!employees || employees.length === 0) return [];
+    return employees.filter(emp =>
+      emp.roleId === 'team_leader' ||
+      emp.role === 'Team Leader' ||
+      emp.roleId === 'manager' ||
+      emp.role === 'Manager'
+    );
+  }, [employees]);
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingDeptId, setEditingDeptId] = useState(null);
+
+  const handleEditClick = (dept) => {
+    setIsEditMode(true);
+    setEditingDeptId(dept.id);
+    setNewDeptForm({
+      name: dept.name,
+      code: dept.departmentCode || dept.code || '',
+      head: dept.head,
+      branch: dept.branch,
+      budget: dept.budget,
+      description: dept.description || ''
+    });
+    setAddDeptOpen(true);
+  };
+
+  const handleAddClick = () => {
+    setIsEditMode(false);
+    setEditingDeptId(null);
+    setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, budget: 100000, description: '' });
+    setAddDeptOpen(true);
+  };
+
   const [newTeamForm, setNewTeamForm] = useState({
     name: '', leader: '', department: 'Engineering', count: 0, status: 'Active', members: []
   });
@@ -278,7 +331,7 @@ const Departments = () => {
   const totalBudget = departments.reduce((acc, d) => acc + d.budget, 0);
   const totalSpent = departments.reduce((acc, d) => acc + d.spent, 0);
   const totalEmployees = departments.reduce((acc, d) => acc + d.employeeCount, 0);
-  const avgPerf = Math.round(departments.reduce((acc, d) => acc + d.avgPerformance, 0) / departments.length);
+  const avgPerf = Math.round(departments.reduce((acc, d) => acc + d.avgPerformance, 0) / (departments.length || 1));
   const activeDepts = departments.filter(d => d.status === 'Active').length;
   const totalTeams = teams.length;
 
@@ -309,8 +362,8 @@ const Departments = () => {
 
   const deptEmployees = employees.filter(emp => emp.department === newTeamForm.department);
 
-  // Handle Action - Add Department
-  const handleAddDeptSubmit = (e) => {
+  // Handle Action - Add/Edit Department
+  const handleAddDeptSubmit = async (e) => {
     e.preventDefault();
     if (!newDeptForm.name || !newDeptForm.code || !newDeptForm.head) {
       addToast('error', 'Please fill in all required fields.');
@@ -321,47 +374,73 @@ const Departments = () => {
       addToast('error', 'Please enter a custom branch name.');
       return;
     }
-    const newDeptObj = {
-      id: `DEPT-00${departments.length + 1}`,
-      name: newDeptForm.name,
-      departmentCode: newDeptForm.code,
-      head: newDeptForm.head,
-      headId: 'EMP-2026-999',
-      employeeCount: 0,
-      activeTeams: 0,
-      branch: finalBranch,
-      budget: Number(newDeptForm.budget),
-      spent: 0,
-      projects: 0,
-      activeProjects: 0,
-      completedProjects: 0,
-      pendingProjects: 0,
-      delayedProjects: 0,
-      avgPerformance: 100,
-      attendanceRate: 100,
-      wfhFilings: 0,
-      tasksCompleted: 0,
-      tasksInProgress: 0,
-      color: newDeptForm.color,
-      description: newDeptForm.description,
-      createdDate: new Date().toISOString().split('T')[0],
-      status: 'Active'
-    };
+    
+    const tl = availableTeamLeaders.find(x => x.name === newDeptForm.head);
+    const headId = tl ? tl.id : 'EMP-2026-999';
 
     if (newDeptForm.branch === 'add_custom' && !branchOptions.includes(finalBranch)) {
       setBranchOptions([...branchOptions, finalBranch]);
     }
 
-    setDepartments([newDeptObj, ...departments]);
-    setRecentActivities([
-      { id: `ACT-${Date.now()}`, message: `New Department ${newDeptForm.name} Created`, time: 'Just now', type: 'create' },
-      ...recentActivities
-    ]);
-    setAddDeptOpen(false);
-    addToast('success', `Department "${newDeptForm.name}" created successfully.`);
-    setNewDeptForm({ name: '', code: '', head: '', branch: 'Delhi Head Office', budget: 100000, description: '', color: '#3b82f6' });
-    setShowCustomBranchInput(false);
-    setCustomBranch('');
+    if (isEditMode) {
+      const updated = await updateDepartment(editingDeptId, {
+        name: newDeptForm.name,
+        departmentCode: newDeptForm.code,
+        head: newDeptForm.head,
+        headId: headId,
+        branch: finalBranch,
+        budget: Number(newDeptForm.budget),
+        description: newDeptForm.description
+      });
+      if (updated) {
+        setRecentActivities([
+          { id: `ACT-${Date.now()}`, message: `Department ${newDeptForm.name} Updated`, time: 'Just now', type: 'update' },
+          ...recentActivities
+        ]);
+        setAddDeptOpen(false);
+        setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, budget: 100000, description: '' });
+        setShowCustomBranchInput(false);
+        setCustomBranch('');
+      }
+    } else {
+      const newDeptObj = {
+        id: `DEPT-${Date.now().toString().slice(-4)}`,
+        name: newDeptForm.name,
+        departmentCode: newDeptForm.code,
+        head: newDeptForm.head,
+        headId: headId,
+        employeeCount: 0,
+        activeTeams: 0,
+        branch: finalBranch,
+        budget: Number(newDeptForm.budget),
+        spent: 0,
+        projects: 0,
+        activeProjects: 0,
+        completedProjects: 0,
+        pendingProjects: 0,
+        delayedProjects: 0,
+        avgPerformance: 100,
+        attendanceRate: 100,
+        wfhFilings: 0,
+        tasksCompleted: 0,
+        tasksInProgress: 0,
+        description: newDeptForm.description,
+        createdDate: new Date().toISOString().split('T')[0],
+        status: 'Active'
+      };
+
+      const saved = await addDepartment(newDeptObj);
+      if (saved) {
+        setRecentActivities([
+          { id: `ACT-${Date.now()}`, message: `New Department ${newDeptForm.name} Created`, time: 'Just now', type: 'create' },
+          ...recentActivities
+        ]);
+        setAddDeptOpen(false);
+        setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, budget: 100000, description: '' });
+        setShowCustomBranchInput(false);
+        setCustomBranch('');
+      }
+    }
   };
 
   // Handle Action - Create Team
@@ -386,16 +465,13 @@ const Departments = () => {
       ...recentActivities
     ]);
     // update parent department employee/teams count
-    setDepartments(prev => prev.map(d => {
-      if (d.name === newTeamForm.department) {
-        return {
-          ...d,
-          activeTeams: d.activeTeams + 1,
-          employeeCount: d.employeeCount + Number(newTeamForm.count)
-        };
-      }
-      return d;
-    }));
+    const targetDept = departments.find(d => d.name === newTeamForm.department);
+    if (targetDept) {
+      updateDepartment(targetDept.id, {
+        activeTeams: targetDept.activeTeams + 1,
+        employeeCount: targetDept.employeeCount + Number(newTeamForm.count)
+      });
+    }
     setCreateTeamOpen(false);
     addToast('success', `Team "${newTeamForm.name}" registered successfully.`);
     setNewTeamForm({ name: '', leader: '', department: 'Engineering', count: 0, status: 'Active', members: [] });
@@ -409,15 +485,18 @@ const Departments = () => {
       return;
     }
     // Update department sizes
-    setDepartments(prev => prev.map(d => {
-      if (d.name === transferForm.source) {
-        return { ...d, employeeCount: Math.max(0, d.employeeCount - 1) };
-      }
-      if (d.name === transferForm.target) {
-        return { ...d, employeeCount: d.employeeCount + 1 };
-      }
-      return d;
-    }));
+    const sourceDept = departments.find(d => d.name === transferForm.source);
+    const targetDept = departments.find(d => d.name === transferForm.target);
+    if (sourceDept) {
+      updateDepartment(sourceDept.id, {
+        employeeCount: Math.max(0, sourceDept.employeeCount - 1)
+      });
+    }
+    if (targetDept) {
+      updateDepartment(targetDept.id, {
+        employeeCount: targetDept.employeeCount + 1
+      });
+    }
     setRecentActivities([
       { id: `ACT-${Date.now()}`, message: `Transferred ${transferForm.employee} from ${transferForm.source} to ${transferForm.target}`, time: 'Just now', type: 'assign' },
       ...recentActivities
@@ -535,7 +614,7 @@ const Departments = () => {
         
         {/* Quick Action Buttons on header */}
         <div className="dept-header-actions">
-          <Button variant="primary" icon={Plus} onClick={() => setAddDeptOpen(true)}>
+          <Button variant="primary" icon={Plus} onClick={() => handleAddClick()}>
             Add Dept
           </Button>
           <Button variant="secondary" icon={Users} onClick={() => setCreateTeamOpen(true)}>
@@ -744,7 +823,7 @@ const Departments = () => {
                             <button className="icon-action-btn" title="View Details" onClick={() => setSelectedDept(dept)}>
                               <Eye size={13} />
                             </button>
-                            <button className="icon-action-btn" title="Edit" onClick={() => addToast('info', `Editing ${dept.name}...`)}>
+                            <button className="icon-action-btn" title="Edit" onClick={() => handleEditClick(dept)}>
                               <Edit2 size={13} />
                             </button>
                             <button
@@ -754,8 +833,7 @@ const Departments = () => {
                                 'Delete Department',
                                 `Are you sure you want to delete the ${dept.name} department? This cannot be undone.`,
                                 () => {
-                                  setDepartments(prev => prev.filter(d => d.id !== dept.id));
-                                  addToast('warning', `${dept.name} department deleted.`);
+                                  deleteDepartment(dept.id);
                                 },
                                 'danger'
                               )}
@@ -1181,8 +1259,8 @@ const Departments = () => {
 
       {/* ─── ALL QUICK ACTION MODALS ────────────────────────────────────────── */}
 
-      {/* MODAL 1: ADD DEPARTMENT */}
-      <Modal isOpen={addDeptOpen} onClose={() => setAddDeptOpen(false)} title="Add Department" size="md">
+      {/* MODAL 1: ADD/EDIT DEPARTMENT */}
+      <Modal isOpen={addDeptOpen} onClose={() => setAddDeptOpen(false)} title={isEditMode ? "Edit Department" : "Add Department"} size="md">
         <form onSubmit={handleAddDeptSubmit} className="policy-form flex-column gap-4 py-2">
           <div className="form-group flex-column gap-1">
             <label htmlFor="deptName">Department Name *</label>
@@ -1212,15 +1290,26 @@ const Departments = () => {
 
           <div className="form-group flex-column gap-1">
             <label htmlFor="deptHead">Department Head / Manager *</label>
-            <input
+            <select
               id="deptHead"
-              type="text"
               required
               className="form-control"
-              placeholder="Full Name"
               value={newDeptForm.head}
-              onChange={e => setNewDeptForm({ ...newDeptForm, head: e.target.value })}
-            />
+              onChange={e => {
+                const val = e.target.value;
+                setNewDeptForm({ ...newDeptForm, head: val });
+              }}
+            >
+              <option value="">Select Department Head / Manager</option>
+              {newDeptForm.head && !availableTeamLeaders.some(tl => tl.name === newDeptForm.head) && (
+                <option value={newDeptForm.head}>{newDeptForm.head} (Current Head)</option>
+              )}
+              {availableTeamLeaders.map(tl => (
+                <option key={tl.id} value={tl.name}>
+                  {tl.name} ({tl.role || 'Team Leader'})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="form-group flex-column gap-1">
@@ -1239,6 +1328,9 @@ const Departments = () => {
                 }
               }}
             >
+              {newDeptForm.branch && !branchOptions.includes(newDeptForm.branch) && (
+                <option value={newDeptForm.branch}>{newDeptForm.branch} (Current Branch)</option>
+              )}
               {branchOptions.map(branch => (
                 <option key={branch} value={branch}>{branch}</option>
               ))}
@@ -1272,21 +1364,7 @@ const Departments = () => {
             />
           </div>
 
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="deptColor">Identifier Accent Color</label>
-            <select
-              id="deptColor"
-              className="form-control"
-              value={newDeptForm.color}
-              onChange={e => setNewDeptForm({ ...newDeptForm, color: e.target.value })}
-            >
-              <option value="#3b82f6">Theme Blue</option>
-              <option value="#10b981">Theme Green</option>
-              <option value="#8b5cf6">Theme Purple</option>
-              <option value="#f59e0b">Theme Orange</option>
-              <option value="#ef4444">Theme Red</option>
-            </select>
-          </div>
+          {/* Accent Color picker removed as requested */}
 
           <div className="form-group flex-column gap-1">
             <label htmlFor="deptDesc">Description</label>
@@ -1302,7 +1380,7 @@ const Departments = () => {
 
           <div className="flex-center justify-end gap-2 mt-2">
             <Button variant="secondary" type="button" onClick={() => setAddDeptOpen(false)}>Cancel</Button>
-            <Button variant="primary" type="submit">Create Department</Button>
+            <Button variant="primary" type="submit">{isEditMode ? "Save Changes" : "Create Department"}</Button>
           </div>
         </form>
       </Modal>
