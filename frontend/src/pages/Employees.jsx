@@ -253,7 +253,7 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, branches: dbBranches, departments: dbDepartments } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: dbDepartments } = useApp();
   const location = useLocation();
 
 
@@ -1062,6 +1062,37 @@ const Employees = () => {
   const avgTaskCompletion = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.taskCompletion || 70), 0) / Math.max(employees.length, 1));
   const avgRating = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.overall || 70), 0) / Math.max(employees.length, 1));
 
+  // Leave Management Summary Calculations
+  const pendingApprovalsCount = (leaveRequests || []).filter(r => r.status === 'Pending').length;
+
+  let approvedCount = (leaveRequests || []).filter(r => r.status === 'Approved').length;
+  let rejectedCount = (leaveRequests || []).filter(r => r.status === 'Rejected').length;
+
+  let casualUsed = 0, casualTotal = employees.length * 12;
+  let sickUsed = 0, sickTotal = employees.length * 10;
+  let earnedUsed = 0, earnedTotal = employees.length * 20;
+  let maternityUsed = 0, maternityTotal = employees.filter(e => e.gender === 'Female').length * 180;
+  let unpaidUsed = 0, unpaidTotal = employees.length * 30;
+
+  employees.forEach(emp => {
+    const history = emp.leaveHistory || [];
+    history.forEach(l => {
+      if (l.status === 'Approved') {
+        approvedCount++;
+        const days = l.days || 0;
+        if (l.type === 'Casual Leave') casualUsed += days;
+        else if (l.type === 'Sick Leave') sickUsed += days;
+        else if (l.type === 'Annual Leave' || l.type === 'Earned Leave' || l.type === 'Paid Leave') earnedUsed += days;
+        else if (l.type === 'Maternity Leave') maternityUsed += days;
+        else if (l.type === 'Emergency Leave' || l.type === 'Unpaid Leave') unpaidUsed += days;
+      } else if (l.status === 'Rejected') {
+        rejectedCount++;
+      }
+    });
+  });
+
+  const totalBalanceDays = employees.reduce((sum, e) => sum + (e.leaveBalance || 18), 0);
+
   const renderTH = (col, label, sortable = false, style = undefined) => (
     <th style={style} onClick={sortable ? () => handleSort(col) : undefined}
       className={sortable ? 'sortable-th' : ''} key={col}>
@@ -1237,38 +1268,57 @@ const Employees = () => {
               <span className="widget-title">Leave Management Summary</span>
               <span className="live-dot-badge">Active balances</span>
             </div>
-            <div className="att-metric-list">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Total Balance</span>
-                  <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>124 days</strong>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>Pending Requests</span>
-                  <strong style={{ fontSize: '1.1rem', color: 'var(--color-warning)' }}>5 approvals</strong>
-                </div>
+            <div className="leave-highlights-grid">
+              <div className="leave-highlight-box balance-box">
+                <span className="leave-highlight-label">Total Balance</span>
+                <strong className="leave-highlight-value">{totalBalanceDays} days</strong>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                  <span>Casual Leave</span><strong>42d / 60d</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                  <span>Sick Leave</span><strong>28d / 40d</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                  <span>Earned Leave</span><strong>54d / 80d</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                  <span>Maternity Leave</span><strong>15d / 180d</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                  <span>Unpaid Leave</span><strong>10d / 30d</strong>
-                </div>
+              <div className="leave-highlight-box pending-box">
+                <span className="leave-highlight-label">Pending Requests</span>
+                <strong className="leave-highlight-value">
+                  {pendingApprovalsCount} {pendingApprovalsCount === 1 ? 'approval' : 'approvals'}
+                </strong>
               </div>
             </div>
-            <div className="widget-total" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Approved: <strong>32</strong></span>
-              <span>Rejected: <strong>8</strong></span>
+
+            <div className="leave-progress-list">
+              {[
+                { name: 'Casual Leave', key: 'casual', used: casualUsed, total: casualTotal },
+                { name: 'Sick Leave', key: 'sick', used: sickUsed, total: sickTotal },
+                { name: 'Earned Leave', key: 'earned', used: earnedUsed, total: earnedTotal },
+                { name: 'Maternity Leave', key: 'maternity', used: maternityUsed, total: maternityTotal },
+                { name: 'Unpaid Leave', key: 'unpaid', used: unpaidUsed, total: unpaidTotal }
+              ].map((item, idx) => {
+                const percentage = item.total > 0 ? Math.min(100, Math.round((item.used / item.total) * 100)) : 0;
+                return (
+                  <div key={idx} className="leave-progress-item">
+                    <div className="leave-progress-labels">
+                      <span className="leave-type-name">{item.name}</span>
+                      <span className="leave-type-numbers">
+                        <strong>{item.used}d</strong> / {item.total}d
+                      </span>
+                    </div>
+                    <div className="leave-progress-bar-track">
+                      <div 
+                        className={`leave-progress-bar-fill pb-${item.key}`} 
+                        style={{ width: `${percentage}%` }}
+                        title={`${percentage}% used`}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="leave-footer">
+              <span className="leave-footer-badge approved">
+                <CheckCircle size={13} className="badge-icon" />
+                Approved: <strong>{approvedCount}</strong>
+              </span>
+              <span className="leave-footer-badge rejected">
+                <XCircle size={13} className="badge-icon" />
+                Rejected: <strong>{rejectedCount}</strong>
+              </span>
             </div>
           </div>
 

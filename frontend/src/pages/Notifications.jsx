@@ -613,77 +613,101 @@ const Notifications = () => {
           {/* Stats Cards Row */}
           <div className="notifications-stats-row">
             <div className="notifications-stat-card border-bottom-primary" onClick={() => setActiveTab('all-notifications')}>
-              <div className="stat-card-header flex-center justify-between">
+              <div className="stat-card-header">
                 <span className="stat-label">Total Dispatch Logs</span>
-                <Badge variant="primary">Month</Badge>
+                <div className="stat-icon-chip"><Inbox size={18} /></div>
               </div>
               <div className="stat-num">{formatNumber(125480)}</div>
-              <div className="stat-trend trend-green text-xs"><TrendingUp size={12} style={{ marginRight: 4 }} /> +12.4% vs May</div>
+              <div className="flex-center justify-between">
+                <Badge variant="primary" style={{ fontSize: '0.68rem' }}>Month</Badge>
+                <div className="stat-trend trend-green"><TrendingUp size={11} /> +12.4% vs May</div>
+              </div>
             </div>
 
             <div className="notifications-stat-card border-bottom-info" onClick={() => setActiveTab('settings')}>
-              <div className="stat-card-header flex-center justify-between">
+              <div className="stat-card-header">
                 <span className="stat-label">Automated Trigger Rules</span>
-                <Badge variant="info">Active</Badge>
+                <div className="stat-icon-chip"><Zap size={18} /></div>
               </div>
               <div className="stat-num">24</div>
-              <div className="stat-trend trend-blue text-xs"><Zap size={12} style={{ marginRight: 4 }} /> 8 Rules Configured</div>
+              <div className="flex-center justify-between">
+                <Badge variant="info" style={{ fontSize: '0.68rem' }}>Active</Badge>
+                <div className="stat-trend trend-blue"><Activity size={11} /> 8 Rules Configured</div>
+              </div>
             </div>
 
             <div className="notifications-stat-card border-bottom-success" onClick={() => setActiveTab('all-notifications')}>
-              <div className="stat-card-header flex-center justify-between">
+              <div className="stat-card-header">
                 <span className="stat-label">Dispatched Today</span>
-                <Badge variant="success">Realtime</Badge>
+                <div className="stat-icon-chip"><Send size={18} /></div>
               </div>
               <div className="stat-num">{formatNumber(1285)}</div>
-              <div className="stat-trend trend-green text-xs"><CheckCircle size={12} style={{ marginRight: 4 }} /> 100% gateway uptime</div>
+              <div className="flex-center justify-between">
+                <Badge variant="success" style={{ fontSize: '0.68rem' }}>Realtime</Badge>
+                <div className="stat-trend trend-green"><CheckCircle size={11} /> 100% uptime</div>
+              </div>
             </div>
 
             <div className="notifications-stat-card border-bottom-warning" onClick={() => { setActiveTab('all-notifications'); setFilterStatus('Pending'); }}>
-              <div className="stat-card-header flex-center justify-between">
+              <div className="stat-card-header">
                 <span className="stat-label">Pending / Queued</span>
-                <Badge variant="warning">Scheduler</Badge>
+                <div className="stat-icon-chip"><Clock size={18} /></div>
               </div>
               <div className="stat-num">42</div>
-              <div className="stat-trend text-muted text-xs">Awaiting cron cycle</div>
+              <div className="flex-center justify-between">
+                <Badge variant="warning" style={{ fontSize: '0.68rem' }}>Scheduler</Badge>
+                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Awaiting cron cycle</span>
+              </div>
             </div>
           </div>
 
           <div className="notifications-stats-row">
             <div className="notifications-stat-card border-bottom-success" onClick={() => { setActiveTab('all-notifications'); setFilterStatus('Delivered'); }}>
-              <div className="stat-card-header flex-center justify-between">
+              <div className="stat-card-header">
                 <span className="stat-label">Delivered Dispatches</span>
-                <Badge variant="success">99.2%</Badge>
+                <div className="stat-icon-chip"><CheckCircle size={18} /></div>
               </div>
               <div className="stat-num">{formatNumber(124210)}</div>
-              <div className="stat-trend trend-green text-xs">Gateway confirmed delivery</div>
+              <div className="flex-center justify-between">
+                <Badge variant="success" style={{ fontSize: '0.68rem' }}>99.2%</Badge>
+                <div className="stat-trend trend-green">Gateway confirmed delivery</div>
+              </div>
             </div>
 
             <div className="notifications-stat-card border-bottom-primary">
-              <div className="stat-card-header flex-center justify-between">
+              <div className="stat-card-header">
                 <span className="stat-label">Read / Acknowledged</span>
-                <Badge variant="primary">Audited</Badge>
+                <div className="stat-icon-chip"><Eye size={18} /></div>
               </div>
               <div className="stat-num">{formatNumber(118450)}</div>
-              <div className="stat-trend trend-green text-xs">95.3% engagement rate</div>
+              <div className="flex-center justify-between">
+                <Badge variant="primary" style={{ fontSize: '0.68rem' }}>Audited</Badge>
+                <div className="stat-trend trend-blue">95.3% engagement</div>
+              </div>
             </div>
 
             <div className="notifications-stat-card border-bottom-warning">
-              <div className="stat-card-header flex-center justify-between">
+              <div className="stat-card-header">
                 <span className="stat-label">Unread Notifications</span>
-                <Badge variant="warning">Inbox</Badge>
+                <div className="stat-icon-chip"><Bell size={18} /></div>
               </div>
               <div className="stat-num">{formatNumber(5760)}</div>
-              <div className="stat-trend text-muted text-xs">Pending reader session</div>
+              <div className="flex-center justify-between">
+                <Badge variant="warning" style={{ fontSize: '0.68rem' }}>Inbox</Badge>
+                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Pending reader session</span>
+              </div>
             </div>
 
             <div className="notifications-stat-card border-bottom-success" onClick={() => setActiveTab('analytics')}>
-              <div className="stat-card-header flex-center justify-between">
+              <div className="stat-card-header">
                 <span className="stat-label">Delivery Success Rate</span>
-                <Badge variant="success">KPI</Badge>
+                <div className="stat-icon-chip"><TrendingUp size={18} /></div>
               </div>
               <div className="stat-num">99.2%</div>
-              <div className="stat-trend trend-green text-xs">+0.1% optimization gains</div>
+              <div className="flex-center justify-between">
+                <Badge variant="success" style={{ fontSize: '0.68rem' }}>KPI</Badge>
+                <div className="stat-trend trend-green">+0.1% gains</div>
+              </div>
             </div>
           </div>
 

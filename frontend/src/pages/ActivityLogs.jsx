@@ -430,37 +430,49 @@ const ActivityLogs = () => {
             <div className="logs-stat-card border-bottom-primary" onClick={() => setActiveTab('audit-trails')}>
               <div className="stat-card-header">
                 <span className="stat-label">Total Audit Events</span>
-                <Badge variant="primary">24h</Badge>
+                <div className="stat-icon-chip"><FileText size={18} /></div>
               </div>
               <div className="stat-num">{activityLogs.length}</div>
-              <div className="stat-trend trend-green text-xs"><TrendingUp size={12} style={{ marginRight: 4 }} /> Active Monitoring</div>
+              <div className="flex-center justify-between">
+                <Badge variant="primary" style={{ fontSize: '0.68rem' }}>24h</Badge>
+                <div className="stat-trend trend-green"><TrendingUp size={11} /> Active Monitoring</div>
+              </div>
             </div>
 
             <div className="logs-stat-card border-bottom-success" onClick={() => { setActiveTab('audit-trails'); setFilterStatus('success'); }}>
               <div className="stat-card-header">
                 <span className="stat-label">Successful Actions</span>
-                <Badge variant="success">OK</Badge>
+                <div className="stat-icon-chip"><CheckCircle size={18} /></div>
               </div>
               <div className="stat-num">{activityLogs.filter(l => l.status === 'success').length}</div>
-              <div className="stat-trend trend-green text-xs">98.2% Success rate</div>
+              <div className="flex-center justify-between">
+                <Badge variant="success" style={{ fontSize: '0.68rem' }}>OK</Badge>
+                <div className="stat-trend trend-green">98.2% Success rate</div>
+              </div>
             </div>
 
             <div className="logs-stat-card border-bottom-warning" onClick={() => { setActiveTab('audit-trails'); setFilterStatus('warning'); }}>
               <div className="stat-card-header">
                 <span className="stat-label">Security Warnings</span>
-                <Badge variant="warning">Alert</Badge>
+                <div className="stat-icon-chip"><AlertTriangle size={18} /></div>
               </div>
               <div className="stat-num">{activityLogs.filter(l => l.status === 'warning').length}</div>
-              <div className="stat-trend trend-yellow text-xs">Non-critical logs</div>
+              <div className="flex-center justify-between">
+                <Badge variant="warning" style={{ fontSize: '0.68rem' }}>Alert</Badge>
+                <div className="stat-trend trend-yellow">Non-critical logs</div>
+              </div>
             </div>
 
             <div className="logs-stat-card border-bottom-danger" onClick={() => { setActiveTab('audit-trails'); setFilterStatus('danger'); }}>
               <div className="stat-card-header">
                 <span className="stat-label">Critical Incidents</span>
-                <Badge variant="danger">Security</Badge>
+                <div className="stat-icon-chip"><XCircle size={18} /></div>
               </div>
               <div className="stat-num">{activityLogs.filter(l => l.status === 'danger').length}</div>
-              <div className="stat-trend trend-red text-xs">MFA Failures / Access denied</div>
+              <div className="flex-center justify-between">
+                <Badge variant="danger" style={{ fontSize: '0.68rem' }}>Security</Badge>
+                <div className="stat-trend trend-red">MFA Failures / Access denied</div>
+              </div>
             </div>
           </div>
 
@@ -468,37 +480,49 @@ const ActivityLogs = () => {
             <div className="logs-stat-card border-bottom-info" onClick={() => setActiveTab('security')}>
               <div className="stat-card-header">
                 <span className="stat-label">Active Sessions</span>
-                <Badge variant="info">Online</Badge>
+                <div className="stat-icon-chip"><Globe size={18} /></div>
               </div>
               <div className="stat-num">{activeSessions.filter(s => s.status === 'active').length}</div>
-              <div className="stat-trend trend-blue text-xs">Across 3 regional zones</div>
+              <div className="flex-center justify-between">
+                <Badge variant="info" style={{ fontSize: '0.68rem' }}>Online</Badge>
+                <div className="stat-trend trend-blue">Across 3 regional zones</div>
+              </div>
             </div>
 
             <div className="logs-stat-card border-bottom-primary">
               <div className="stat-card-header">
                 <span className="stat-label">IP Whitelisting Ranges</span>
-                <Badge variant="primary">Rule</Badge>
+                <div className="stat-icon-chip"><Shield size={18} /></div>
               </div>
               <div className="stat-num">{whitelistedIPs.length}</div>
-              <div className="stat-trend text-muted text-xs">Active network layers</div>
+              <div className="flex-center justify-between">
+                <Badge variant="primary" style={{ fontSize: '0.68rem' }}>Rule</Badge>
+                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Active network layers</span>
+              </div>
             </div>
 
             <div className="logs-stat-card border-bottom-warning" onClick={() => setActiveTab('configuration')}>
               <div className="stat-card-header">
                 <span className="stat-label">Configuration Changes</span>
-                <Badge variant="warning">Config</Badge>
+                <div className="stat-icon-chip"><Settings size={18} /></div>
               </div>
               <div className="stat-num">{configChanges.length}</div>
-              <div className="stat-trend text-muted text-xs">Awaiting rollback limits</div>
+              <div className="flex-center justify-between">
+                <Badge variant="warning" style={{ fontSize: '0.68rem' }}>Config</Badge>
+                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Awaiting rollback limits</span>
+              </div>
             </div>
 
             <div className="logs-stat-card border-bottom-success">
               <div className="stat-card-header">
                 <span className="stat-label">Log Integrity Score</span>
-                <Badge variant="success">Secure</Badge>
+                <div className="stat-icon-chip"><ShieldCheck size={18} /></div>
               </div>
               <div className="stat-num">100%</div>
-              <div className="stat-trend trend-green text-xs">Cryptographic verification OK</div>
+              <div className="flex-center justify-between">
+                <Badge variant="success" style={{ fontSize: '0.68rem' }}>Secure</Badge>
+                <div className="stat-trend trend-green">Cryptographic verification OK</div>
+              </div>
             </div>
           </div>
 

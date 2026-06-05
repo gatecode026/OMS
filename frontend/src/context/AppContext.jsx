@@ -116,23 +116,164 @@ export const AppProvider = ({ children }) => {
   // Theme states
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('saas_theme') || 'dark';
-    if (saved === 'light') {
+    let resolved = saved;
+    if (saved === 'auto') {
+      resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    if (resolved === 'light') {
       document.documentElement.classList.add('light-theme');
+    } else {
+      document.documentElement.classList.remove('light-theme');
     }
     return saved;
   });
 
+  const applyTheme = (next) => {
+    if (next === 'light') {
+      document.documentElement.classList.add('light-theme');
+    } else {
+      document.documentElement.classList.remove('light-theme');
+    }
+  };
+
   const toggleTheme = () => {
     setTheme(prev => {
-      const next = prev === 'dark' ? 'light' : 'dark';
+      const currentResolved = prev === 'auto' 
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : prev;
+      const next = currentResolved === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
       localStorage.setItem('saas_theme', next);
-      if (next === 'light') {
-        document.documentElement.classList.add('light-theme');
-      } else {
-        document.documentElement.classList.remove('light-theme');
-      }
       return next;
     });
+  };
+
+  const setThemeMode = (mode) => {
+    // mode: 'dark' | 'light' | 'auto'
+    let resolved = mode;
+    if (mode === 'auto') {
+      resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    setTheme(mode); // keep 'auto' in state for UI
+    applyTheme(resolved);
+    localStorage.setItem('saas_theme', mode);
+  };
+
+  // Listen to media query changes if theme is auto
+  useEffect(() => {
+    if (theme !== 'auto') return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleMediaChange = (e) => {
+      const resolved = e.matches ? 'dark' : 'light';
+      applyTheme(resolved);
+    };
+    mediaQuery.addEventListener('change', handleMediaChange);
+    return () => mediaQuery.removeEventListener('change', handleMediaChange);
+  }, [theme]);
+
+  // Accent color state
+  const [accentColor, setAccentColorState] = useState(() => {
+    return localStorage.getItem('saas_accent') || '#d946ef';
+  });
+
+  const setAccentColor = (color) => {
+    setAccentColorState(color);
+    localStorage.setItem('saas_accent', color);
+    // Convert hex to rgb components for translucent variants
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    document.documentElement.style.setProperty('--color-primary', color);
+    document.documentElement.style.setProperty('--color-primary-hover', color);
+    document.documentElement.style.setProperty('--color-primary-light', `rgba(${r},${g},${b},0.15)`);
+    document.documentElement.style.setProperty('--shadow-focus', `0 0 0 3px rgba(${r},${g},${b},0.3)`);
+  };
+
+  // Initialize accent color on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('saas_accent');
+    if (saved) setAccentColor(saved);
+  }, []);
+
+  // Font size state
+  const [fontSize, setFontSizeState] = useState(() => {
+    return localStorage.getItem('saas_fontsize') || 'medium';
+  });
+
+  const setFontSize = (size) => {
+    setFontSizeState(size);
+    localStorage.setItem('saas_fontsize', size);
+    const sizeMap = { small: '13px', medium: '14px', large: '16px' };
+    document.documentElement.style.setProperty('font-size', sizeMap[size] || '14px');
+  };
+
+  // Initialize font size on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('saas_fontsize') || 'medium';
+    const sizeMap = { small: '13px', medium: '14px', large: '16px' };
+    document.documentElement.style.setProperty('font-size', sizeMap[saved] || '14px');
+  }, []);
+
+  // Compact sidebar (dense) setting
+  const [sidebarDense, setSidebarDenseState] = useState(() => {
+    return localStorage.getItem('saas_sidebar_dense') === 'true';
+  });
+
+  const setSidebarDense = (val) => {
+    setSidebarDenseState(val);
+    localStorage.setItem('saas_sidebar_dense', val ? 'true' : 'false');
+  };
+
+  // General Settings
+  const [generalSettings, setGeneralSettingsState] = useState(() => {
+    const saved = localStorage.getItem('saas_general_settings');
+    return saved ? JSON.parse(saved) : {
+      companyName: 'Office Management Pvt. Ltd.',
+      timezone: 'IST (UTC+5:30)',
+      language: 'English (IN)',
+      dateFormat: 'DD-MM-YYYY',
+      currency: 'INR (₹)',
+      fiscalYear: 'January'
+    };
+  });
+
+  const setGeneralSettings = (settings) => {
+    setGeneralSettingsState(settings);
+    localStorage.setItem('saas_general_settings', JSON.stringify(settings));
+  };
+
+  // Notification Settings
+  const [notificationSettings, setNotificationSettingsState] = useState(() => {
+    const saved = localStorage.getItem('saas_notification_settings');
+    return saved ? JSON.parse(saved) : {
+      emailNotifs: true,
+      pushNotifs: true,
+      leaveAlerts: true,
+      payrollAlerts: true,
+      securityAlerts: true,
+      weeklyDigest: false
+    };
+  });
+
+  const setNotificationSettings = (settings) => {
+    setNotificationSettingsState(settings);
+    localStorage.setItem('saas_notification_settings', JSON.stringify(settings));
+  };
+
+  // Security Settings
+  const [securitySettings, setSecuritySettingsState] = useState(() => {
+    const saved = localStorage.getItem('saas_security_settings');
+    return saved ? JSON.parse(saved) : {
+      twoFactor: false,
+      sessionTimeout: '30 minutes',
+      loginAlerts: true,
+      ipWhitelist: ''
+    };
+  });
+
+  const setSecuritySettings = (settings) => {
+    setSecuritySettingsState(settings);
+    localStorage.setItem('saas_security_settings', JSON.stringify(settings));
   };
 
   // Messages states
@@ -164,6 +305,7 @@ export const AppProvider = ({ children }) => {
     // Sync current user when role changes to demonstrate RBAC
     const userMap = {
       super_admin: employees.find(e => e.roleId === 'super_admin') || employees[0],
+      dept_admin: employees.find(e => e.roleId === 'dept_admin'),
       branch_admin: employees.find(e => e.roleId === 'branch_admin'),
       manager: employees.find(e => e.roleId === 'manager'),
       team_leader: employees.find(e => e.roleId === 'team_leader'),
@@ -349,22 +491,37 @@ export const AppProvider = ({ children }) => {
   };
 
   // Confirm Dialog Handler
-  const showConfirm = (title, message, onConfirm, confirmType = 'primary') => {
+  const showConfirm = (title, message, onConfirmAction, confirmType = 'primary') => {
+    console.log('AppContext: showConfirm called with title =', title);
     setConfirmDialog({
       isOpen: true,
       title,
       message,
       confirmType,
       onConfirm: () => {
-        onConfirm();
+        console.log('AppContext: showConfirm wrapper onConfirm triggered');
+        if (onConfirmAction) {
+          try {
+            onConfirmAction();
+          } catch (err) {
+            console.error('Error in onConfirmAction callback:', err);
+          }
+        }
         closeConfirm();
       },
-      onCancel: closeConfirm
+      onCancel: () => {
+        console.log('AppContext: showConfirm wrapper onCancel triggered');
+        closeConfirm();
+      }
     });
   };
 
   const closeConfirm = () => {
-    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+    console.log('AppContext: closeConfirm executing');
+    setConfirmDialog(prev => {
+      console.log('AppContext: setConfirmDialog setting isOpen = false, previous =', prev);
+      return { ...prev, isOpen: false };
+    });
   };
 
   // Logging Helper
@@ -1306,6 +1463,19 @@ export const AppProvider = ({ children }) => {
         hasPermission,
         theme,
         toggleTheme,
+        setThemeMode,
+        accentColor,
+        setAccentColor,
+        fontSize,
+        setFontSize,
+        sidebarDense,
+        setSidebarDense,
+        generalSettings,
+        setGeneralSettings,
+        notificationSettings,
+        setNotificationSettings,
+        securitySettings,
+        setSecuritySettings,
         messages,
         markMessageRead,
         markAllMessagesRead,

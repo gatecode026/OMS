@@ -36,7 +36,15 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
-  Send
+  Send,
+  UserCheck,
+  Trophy,
+  AlarmClock,
+  Calendar,
+  Hourglass,
+  RefreshCw,
+  Globe,
+  Settings
 } from 'lucide-react';
 import {
   AreaChart,
@@ -482,14 +490,15 @@ const Dashboard = () => {
           sparklineData={[6, 7, 7, 8, 8, 8, 9]}
           onClick={() => navigate('/employees')}
           subMetrics={[
-            { label: 'Active', value: employees.filter(e => e.status !== 'Inactive').length },
-            { label: 'New', value: 3 }
+            { label: 'Active', value: `+ ${employees.filter(e => e.status !== 'Inactive').length}`, icon: UserCheck },
+            { label: 'New', value: '+ 3', icon: UserPlus }
           ]}
+          variant="employees"
         />
         <StatCard
           label="Attendance Overview"
           value={`${attendanceRate}%`}
-          trendVal="Optimal"
+          trendVal="OPTIMAL"
           trendType="success"
           trendLabel="Daily presence score"
           icon={Clock}
@@ -497,11 +506,13 @@ const Dashboard = () => {
           sparklineData={[80, 85, 82, 88, 84, 86, 88]}
           onClick={() => navigate('/attendance')}
           subMetrics={[
-            { label: 'Present', value: presentToday },
-            { label: 'Absent', value: totalEmployeesCount - presentToday - 1 },
-            { label: 'Late', value: 1 },
-            { label: 'Leave', value: 1 }
+            { label: 'Present', value: presentToday, icon: Check },
+            { label: 'Absent', value: totalEmployeesCount - presentToday - 1, icon: X },
+            { label: 'Late', value: 1, icon: Clock },
+            { label: 'Leave', value: 1, icon: Briefcase }
           ]}
+          variant="attendance"
+          sparklinePoints={true}
         />
         <StatCard
           label="Active Projects"
@@ -514,59 +525,63 @@ const Dashboard = () => {
           sparklineData={[2, 2, 3, 3, 4, 4, 4]}
           onClick={() => navigate('/projects')}
           subMetrics={[
-            { label: 'Running', value: 3 },
-            { label: 'Completed', value: 1 },
-            { label: 'Delayed', value: 0 },
-            { label: 'Deadlines', value: 2 }
+            { label: 'Running', value: 3, icon: Settings },
+            { label: 'Completed', value: 1, icon: Trophy },
+            { label: 'Delayed', value: 0, icon: AlarmClock },
+            { label: 'Deadlines', value: 2, icon: Calendar }
           ]}
+          variant="projects"
         />
         <StatCard
           label="Daily Work Reports"
           value={reports.length}
           trendVal="92%"
           trendType="up"
-          trendLabel="Submission compliance"
+          trendLabel="Submission Compliance"
           icon={FileText}
           colorVariant="primary"
           sparklineData={[5, 6, 5, 7, 6, 8, 8]}
           onClick={() => navigate('/work-reports')}
           subMetrics={[
-            { label: 'Submitted', value: 4 },
-            { label: 'Pending', value: 1 },
-            { label: 'Reviewed', value: 3 }
+            { label: 'Submitted', value: 4, icon: Mail },
+            { label: 'Pending', value: 1, icon: Hourglass },
+            { label: 'Reviewed', value: 3, icon: Search }
           ]}
+          variant="reports"
         />
         <StatCard
           label="Task Management Summary"
           value={todoTasks + progressTasks + doneTasks}
-          trendVal={doneTasks}
-          trendType="info"
+          trendVal="-3"
+          trendType="down"
           trendLabel="Tasks marked Done"
           icon={CheckCircle}
           colorVariant="warning"
           sparklineData={[4, 5, 4, 6, 5, 7, 7]}
           onClick={() => navigate('/tasks')}
           subMetrics={[
-            { label: 'Pending', value: todoTasks + progressTasks },
-            { label: 'Completed', value: doneTasks },
-            { label: 'Overdue', value: 2 }
+            { label: 'Pending', value: todoTasks + progressTasks, icon: RefreshCw },
+            { label: 'Completed', value: doneTasks, icon: Check },
+            { label: 'Overdue', value: 2, icon: Calendar }
           ]}
+          variant="tasks"
         />
         <StatCard
           label="Branch / Agency Overview"
           value={mockBranchesData.length}
           trendVal="Active"
-          trendType="up"
-          trendLabel="All nodes operational"
+          trendType="success"
+          trendLabel="All Nodes Operational"
           icon={Building2}
           colorVariant="primary"
-          sparklineData={[4, 4, 4, 4, 4, 4, 4]}
+          chartType="gauge"
           onClick={() => navigate('/branches')}
           subMetrics={[
-            { label: 'Active', value: 4 },
-            { label: 'Avg Perf', value: '91%' },
-            { label: 'HQ Headcount', value: 3 }
+            { label: 'Active', value: '+ 4', icon: Globe },
+            { label: 'Avg Perf', value: '91%', icon: TrendingUp },
+            { label: 'HQ Headcount', value: 3, icon: Building2 }
           ]}
+          variant="branches"
         />
       </div>
       
@@ -858,7 +873,7 @@ const Dashboard = () => {
 
         {/* Communication Center Card */}
         <div className="card split-panel flex-1" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
-          <div className="panel-header-simple" style={{ paddingBottom: 'var(--spacing-3)' }}>
+          <div className="panel-header-simple" style={{ paddingBottom: 'var(--space-3)', paddingLeft: 'var(--space-4)', paddingRight: 'var(--space-4)' }}>
             <div>
               <h3 className="card-title">Communication Center</h3>
               <span className="chart-subtitle">Direct broadcasting & quick updates</span>
@@ -887,7 +902,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', padding: 'var(--spacing-3) var(--spacing-6)', gap: 'var(--spacing-2)', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', padding: 'var(--space-3) var(--space-4)', gap: 'var(--space-2)', borderBottom: '1px solid var(--border-color)' }}>
             <Button size="sm" onClick={() => handleQuickAction('announcement')} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Bell size={12} /> Broadcast
             </Button>
@@ -899,7 +914,7 @@ const Dashboard = () => {
             </Button>
           </div>
 
-          <div className="panel-scroll-list" style={{ padding: 'var(--spacing-4) var(--spacing-6)', flex: 1, overflowY: 'auto' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {announcements[commTab]?.length === 0 ? (
               <div className="empty-panel-view">
                 <h4>No announcements</h4>
@@ -907,12 +922,21 @@ const Dashboard = () => {
               </div>
             ) : (
               announcements[commTab]?.map((ann, idx) => (
-                <div key={idx} className="split-list-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{ann.title}</span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{ann.time}</span>
+                <div key={idx} style={{
+                  background: 'var(--bg-elevated)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '10px 14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', flexShrink: 1, minWidth: 0 }}>{ann.title}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0, whiteSpace: 'nowrap' }}>{ann.time}</span>
                   </div>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>{ann.body}</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{ann.body}</span>
                 </div>
               ))
             )}
@@ -1289,7 +1313,7 @@ const Dashboard = () => {
                   } else if (selectedAlert.id === 'al-4') {
                     navigate('/tasks');
                   } else {
-                    navigate('/activity-logs');
+                    navigate('/security');
                   }
                   setSelectedAlert(null);
                 }}

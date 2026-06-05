@@ -144,14 +144,14 @@
   align-items: center;
   gap: 3px;
   padding: 3px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full, 9999px);
   font-size: 0.72rem;
   font-weight: 700;
   border: 1px solid transparent;
   transition: all 0.2s ease;
 }
 
-.stat-trend-chip.trend-up {
+.stat-trend-chip.trend-up, .stat-trend-chip.trend-success {
   background-color: var(--color-success-light);
   color: var(--color-success);
   border-color: rgba(16, 185, 129, 0.2);
@@ -332,6 +332,311 @@
 .light-theme .sub-metric-val.sub-purple {
   color: var(--color-purple);
   text-shadow: none;
+}
+
+/* Custom 100% matched sub-metric variations */
+.sub-metrics-employees {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.sub-metric-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  transition: transform 0.2s ease;
+}
+
+.sub-metric-block:hover {
+  transform: translateY(-1px);
+}
+
+.sub-metric-block-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.light-theme .sub-metric-block-icon {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+.sub-metric-block-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.sub-metric-block-val {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.sub-metric-block-lbl {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+
+/* Colors for active and new blocks */
+.block-active {
+  background-color: rgba(20, 184, 166, 0.1);
+  color: #0d9488;
+}
+.light-theme .block-active {
+  background-color: #e6f7f4;
+  color: #0d9488;
+}
+
+.block-new {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
+.light-theme .block-new {
+  background-color: #eef2ff;
+  color: #4f46e5;
+}
+
+/* 4 Solid Pills variant */
+.sub-metrics-pills {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.sub-metric-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  border-radius: 6px;
+  color: #ffffff;
+  transition: transform 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.sub-metric-pill:hover {
+  transform: translateY(-1px);
+}
+
+.sub-metric-pill-top {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
+.sub-pill-icon {
+  stroke-width: 2.5px;
+}
+
+.sub-metric-pill-lbl {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-top: 4px;
+  opacity: 0.9;
+  letter-spacing: 0.02em;
+}
+
+.pill-present {
+  background-color: #2e7d32; /* Richer green */
+}
+.pill-absent {
+  background-color: #d84315; /* Richer orange-red */
+}
+.pill-late {
+  background-color: #c2185b; /* Richer pink-red */
+}
+.pill-leave {
+  background-color: #f9a825; /* Richer gold */
+}
+
+.pill-running {
+  background-color: #1565c0; /* Richer blue */
+}
+.pill-completed {
+  background-color: #2e7d32; /* Richer green */
+}
+.pill-delayed {
+  background-color: #c2185b; /* Richer pink-red */
+}
+.pill-deadlines {
+  background-color: #b71c1c; /* Richer dark red */
+}
+
+/* 3 Blocks variant */
+.sub-metrics-three-blocks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.sub-metric-three-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  border-radius: 8px;
+  transition: transform 0.2s ease;
+}
+
+.sub-metric-three-block:hover {
+  transform: translateY(-1px);
+}
+
+.sub-metric-three-block-top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.sub-three-block-icon {
+  stroke-width: 2.5px;
+}
+
+.sub-metric-three-block-lbl {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* 3 Blocks colors (light backgrounds) */
+.block-submitted {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
+.light-theme .block-submitted {
+  background-color: #eef2ff;
+}
+
+.block-pending {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+.light-theme .block-pending {
+  background-color: #fffbeb;
+}
+
+.block-reviewed {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+.light-theme .block-reviewed {
+  background-color: #eff6ff;
+}
+
+.block-completed-task {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+.light-theme .block-completed-task {
+  background-color: #ecfdf5;
+}
+
+.block-overdue {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+.light-theme .block-overdue {
+  background-color: #fef2f2;
+}
+
+.block-active-branch {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+.light-theme .block-active-branch {
+  background-color: #eff6ff;
+}
+
+.block-avg-perf {
+  background-color: rgba(20, 184, 166, 0.1);
+  color: #0d9488;
+}
+.light-theme .block-avg-perf {
+  background-color: #e6f7f4;
+}
+
+.block-hq-headcount {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
+.light-theme .block-hq-headcount {
+  background-color: #eef2ff;
+}
+
+/* Gauge layout CSS */
+.gauge-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.gauge-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.gauge-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.gauge-container {
+  margin-top: -6px;
+  margin-bottom: -6px;
+}
+
+.gauge-val-text {
+  font-family: inherit;
+}
+
+.gauge-lbl-text {
+  font-family: inherit;
+}
+
+/* Optimal tag with check styling */
+.trend-optimal {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+  color: #10b981 !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+.trend-opt-icon {
+  margin-right: 1px;
 }
 
 

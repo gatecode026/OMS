@@ -1,56 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import './RolesPermissions.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
+import DataTable from '../components/common/DataTable';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
+import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
-import { Key, ShieldCheck, Save, Users } from 'lucide-react';
+import {
+  Shield, Key, Users, Lock, ShieldAlert, Award, FileText, CheckCircle,
+  XCircle, Clock, Plus, Edit, Trash2, Sliders, Database, Play,
+  Settings, HelpCircle, Download, Eye, Check, X, FileDown, Search, Filter, RefreshCw,
+  MoreVertical, AlertTriangle, AlertCircle, Info, ChevronRight, ChevronDown, RefreshCcw, Building, ShieldCheck,
+  UserCheck, UserX, Printer, Activity, LogIn, LogOut, Copy, ArrowUpRight, ArrowDownRight
+} from 'lucide-react';
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell
+} from 'recharts';
+
+const defaultIcons = {
+  super_admin: '👑',
+  branch_admin: '🏢',
+  project_manager: '💼',
+  team_leader: '👥',
+  employee: '👤'
+};
+
+const defaultLevels = {
+  super_admin: 'Full Access',
+  branch_admin: 'Administrative',
+  project_manager: 'Managerial',
+  team_leader: 'Lead Access',
+  employee: 'Standard'
+};
+
+const defaultColors = {
+  super_admin: '#8b5cf6',
+  branch_admin: '#3b82f6',
+  project_manager: '#ec4899',
+  team_leader: '#10b981',
+  employee: '#64748b'
+};
 
 const RolesPermissions = () => {
   const isLoading = usePageLoading(600);
-  const { roles, updatePermissions } = useApp();
+  const { roles: contextRoles, updatePermissions, employees, showConfirm, currentUserRole, setCurrentUserRole } = useApp();
 
-  const [selectedRoleId, setSelectedRoleId] = useState('super_admin');
-  
-  // Working local permission state to allow modifying and saving
-  const [localPermissions, setLocalPermissions] = useState(null);
-  const [activeRoleObj, setActiveRoleObj] = useState(null);
+  // Active navigation tab
+  const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Sync state when role changes or on initial load
-  React.useEffect(() => {
-    const roleObj = roles.find(r => r.id === selectedRoleId);
-    if (roleObj) {
-      // Create deep clone of permissions to prevent direct mutation
-      setLocalPermissions(JSON.parse(JSON.stringify(roleObj.permissions)));
-      setActiveRoleObj(roleObj);
+  // Local state for toast notifications
+  const [pageToasts, setPageToasts] = useState([]);
+  const addPageToast = (type, message) => {
+    const id = Date.now();
+    setPageToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setPageToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
+  // Local state for extended Roles list
+  const [localRoles, setLocalRoles] = useState([]);
+
+  // Initialize and Sync localRoles from AppContext roles
+  useEffect(() => {
+    if (contextRoles) {
+      setLocalRoles(prev => {
+        return contextRoles.map(r => {
+          const existing = prev.find(p => p.id === r.id);
+          return {
+            ...r,
+            icon: r.icon || defaultIcons[r.id] || '⚙️',
+            accessLevel: r.accessLevel || defaultLevels[r.id] || 'Custom Access',
+            createdDate: existing?.createdDate || '01-Jan-2024',
+            lastModified: existing?.lastModified || '05-Jun-2026',
+            status: existing?.status || 'Active',
+            color: r.accentColor || defaultColors[r.id] || '#6366f1',
+            description: r.description || 'Granular permissions managed at module level.'
+          };
+        });
+      });
     }
-  }, [selectedRoleId, roles]);
+  }, [contextRoles]);
 
-  const handleCheckboxToggle = (module, operation) => {
-    if (selectedRoleId === 'super_admin') return; // Super admin has locked full access
+  // Selected role for the manual operations matrix
+  const [selectedRoleId, setSelectedRoleId] = useState('branch_admin');
+  const [localPermissions, setLocalPermissions] = useState({});
 
-    setLocalPermissions(prev => ({
-      ...prev,
-      [module]: {
-        ...(prev?.[module] || {}),
-        [operation]: !prev?.[module]?.[operation]
-      }
-    }));
-  };
-
-  const handleSave = () => {
-    updatePermissions(selectedRoleId, localPermissions);
-  };
-
-  const modules = [
+  // Dynamic modules list state
+  const [modulesList, setModulesList] = useState([
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'employees', label: 'Employees' },
     { key: 'attendance', label: 'Attendance' },
     { key: 'leaves', label: 'Leaves' },
-    { key: 'tasks', label: 'Projects' },
-    { key: 'payroll', label: 'Payroll' }
-  ];
+    { key: 'tasks', label: 'Projects & Tasks' },
+    { key: 'payroll', label: 'Payroll' },
+    { key: 'permissions', label: 'Role & Permissions' },
+    { key: 'settings', label: 'Settings' }
+  ]);
 
   const operations = [
     { key: 'read', label: 'VIEW' },
@@ -61,134 +108,1775 @@ const RolesPermissions = () => {
     { key: 'export', label: 'EXPORT' }
   ];
 
-  if (isLoading || !localPermissions) {
+  // Sync localPermissions when selectedRoleId or localRoles changes
+  useEffect(() => {
+    const roleObj = localRoles.find(r => r.id === selectedRoleId);
+    if (roleObj && roleObj.permissions) {
+      setLocalPermissions(JSON.parse(JSON.stringify(roleObj.permissions)));
+    }
+  }, [selectedRoleId, localRoles]);
+
+  // Working permission matrix state
+  const [matrixData, setMatrixData] = useState({
+    dashboard: { super_admin: 'Full', branch_admin: 'Limited', project_manager: 'View', team_leader: 'View', employee: 'View' },
+    employees: { super_admin: 'Full', branch_admin: 'Full', project_manager: 'Limited', team_leader: 'Limited', employee: 'No' },
+    attendance: { super_admin: 'Full', branch_admin: 'Full', project_manager: 'Limited', team_leader: 'Limited', employee: 'Limited' },
+    leaves: { super_admin: 'Full', branch_admin: 'Full', project_manager: 'Full', team_leader: 'Full', employee: 'Limited' },
+    projects: { super_admin: 'Full', branch_admin: 'Full', project_manager: 'Full', team_leader: 'Full', employee: 'Limited' },
+    tasks: { super_admin: 'Full', branch_admin: 'Full', project_manager: 'Full', team_leader: 'Full', employee: 'Limited' },
+    payroll: { super_admin: 'Full', branch_admin: 'Limited', project_manager: 'No', team_leader: 'No', employee: 'View' },
+    permissions: { super_admin: 'Full', branch_admin: 'No', project_manager: 'No', team_leader: 'No', employee: 'No' },
+    settings: { super_admin: 'Full', branch_admin: 'Limited', project_manager: 'No', team_leader: 'No', employee: 'No' },
+    security: { super_admin: 'Full', branch_admin: 'No', project_manager: 'No', team_leader: 'No', employee: 'No' },
+    audit_logs: { super_admin: 'Full', branch_admin: 'No', project_manager: 'No', team_leader: 'No', employee: 'No' },
+    reports: { super_admin: 'Full', branch_admin: 'Limited', project_manager: 'Limited', team_leader: 'No', employee: 'No' }
+  });
+
+  // Add Permission Module Modal states
+  const [showAddPermModal, setShowAddPermModal] = useState(false);
+  const [newPermForm, setNewPermForm] = useState({
+    name: '', defaultLevel: 'No'
+  });
+
+  const handleAddPermissionModule = (e) => {
+    e.preventDefault();
+    if (!newPermForm.name.trim()) return;
+
+    const moduleKey = newPermForm.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    const exists = modulesList.some(m => m.key === moduleKey);
+    if (exists) {
+      addPageToast('danger', `Module "${newPermForm.name}" already exists in the matrix.`);
+      return;
+    }
+
+    setModulesList(prev => [...prev, { key: moduleKey, label: newPermForm.name }]);
+
+    // Initialize the module keys as false in localPermissions
+    setLocalPermissions(prev => ({
+      ...prev,
+      [moduleKey]: { read: false, create: false, update: false, delete: false, approve: false, export: false }
+    }));
+
+    addPageToast('success', `Permission Module "${newPermForm.name}" added successfully.`);
+    setNewPermForm({ name: '', defaultLevel: 'No' });
+    setShowAddPermModal(false);
+  };
+
+  const handleCheckboxToggle = (moduleKey, opKey) => {
+    console.log("CHECKBOX TOGGLE CLICKED:", moduleKey, opKey);
+    if (selectedRoleId === 'super_admin') {
+      addPageToast('warning', 'Super Admin permissions are permanently locked and cannot be modified.');
+      return;
+    }
+    setLocalPermissions(prev => {
+      const modulePerms = prev?.[moduleKey] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
+      const updated = {
+        ...prev,
+        [moduleKey]: {
+          ...modulePerms,
+          [opKey]: !modulePerms[opKey]
+        }
+      };
+      console.log(`Toggled ${moduleKey}.${opKey} -> ${!modulePerms[opKey]}`);
+      return updated;
+    });
+  };
+
+  const handleSaveRolePermissions = () => {
+    if (selectedRoleId === 'super_admin') {
+      addPageToast('warning', 'Super Admin permissions are permanent and cannot be modified.');
+      return;
+    }
+    updatePermissions(selectedRoleId, localPermissions);
+    
+    // Sync into localRoles state so it shows updated count or info
+    setLocalRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, permissions: localPermissions } : r));
+    addPageToast('success', `System permissions updated and saved for "${localRoles.find(r => r.id === selectedRoleId)?.name}" role.`);
+  };
+
+  // Cycle permissions chips (compatibility with other references)
+  const permOptions = ['Full', 'Limited', 'View', 'No'];
+  const handleMatrixCellClick = (moduleKey, roleId) => {
+    console.log("MATRIX CELL CLICKED:", moduleKey, roleId);
+    if (roleId === 'super_admin') {
+      addPageToast('warning', 'Super Admin permissions are permanently locked.');
+      return;
+    }
+    setMatrixData(prev => {
+      const current = prev[moduleKey]?.[roleId] || 'No';
+      const currentIndex = permOptions.indexOf(current);
+      const nextIndex = (currentIndex + 1) % permOptions.length;
+      const nextVal = permOptions[nextIndex];
+      return {
+        ...prev,
+        [moduleKey]: {
+          ...prev[moduleKey],
+          [roleId]: nextVal
+        }
+      };
+    });
+    addPageToast('info', `Updated permission cell for ${roleId} -> ${moduleKey}`);
+  };
+
+  // Custom permission builder states
+  const [builderRole, setBuilderRole] = useState('branch_admin');
+  const [builderCategory, setBuilderCategory] = useState('Employee Management');
+  const [builderPermissions, setBuilderPermissions] = useState({
+    view: true, create: false, edit: false, delete: false, approve: false, export: false
+  });
+
+  const handleBuilderCheckbox = (perm) => {
+    setBuilderPermissions(prev => ({ ...prev, [perm]: !prev[perm] }));
+  };
+
+  const handleGeneratePolicy = () => {
+    addPageToast('success', `Policy generated successfully for Category "${builderCategory}"!`);
+  };
+
+  // Seed user overrides
+  const [userOverrides, setUserOverrides] = useState([
+    { id: 'OVR-001', userId: 'EMP-2026-003', userName: 'Ananya Gupta', module: 'Payroll Management', scope: 'Read & Write', type: 'Temporary Grant', expiry: '2026-06-30' },
+    { id: 'OVR-002', userId: 'EMP-2026-004', userName: 'Rohit Sharma', module: 'Role & Permission', scope: 'None (Restricted)', type: 'Explicit Denial', expiry: 'Permanent' },
+    { id: 'OVR-003', userId: 'EMP-2026-006', userName: 'Arjun Mehta', module: 'Security Control', scope: 'Read Only', type: 'Special Waiver', expiry: '2026-07-15' },
+    { id: 'OVR-004', userId: 'EMP-2026-007', userName: 'Neha Verma', module: 'System Configuration', scope: 'Full Access', type: 'Temporary Grant', expiry: '2026-06-15' }
+  ]);
+
+  // Seed Audit Logs
+  const [auditLogs, setAuditLogs] = useState([
+    { id: 'AUD-001', timestamp: '2026-06-04 15:30', user: 'Aarav Sharma', changedBy: 'System Console', module: 'Security Control', action: 'Enforced global MFA', oldVal: 'Optional', newVal: 'Enforced' },
+    { id: 'AUD-002', timestamp: '2026-06-04 11:20', user: 'Neha Verma', changedBy: 'Aarav Sharma', module: 'Role permissions', action: 'Updated Branch Admin payroll access', oldVal: 'No Access', newVal: 'Limited Access' },
+    { id: 'AUD-003', timestamp: '2026-06-03 16:45', user: 'Vikram Singh', changedBy: 'Aarav Sharma', module: 'User Override', action: 'Granted temp payroll access', oldVal: 'No Access', newVal: 'Full Access' },
+    { id: 'AUD-004', timestamp: '2026-06-02 10:15', user: 'Project Manager Role', changedBy: 'Neha Verma', module: 'Role permissions', action: 'Cloned Project Manager Role permissions', oldVal: 'None', newVal: 'Active' },
+    { id: 'AUD-005', timestamp: '2026-06-01 09:00', user: 'Employee Role', changedBy: 'System Cron', module: 'Role permissions', action: 'System audit validation pass', oldVal: 'Verified', newVal: 'Verified' },
+    { id: 'AUD-006', timestamp: '2026-05-30 14:10', user: 'Team Leader Role', changedBy: 'Aarav Sharma', module: 'Modules Access', action: 'Restricted task deletion', oldVal: 'Allowed', newVal: 'Restricted' },
+    { id: 'AUD-007', timestamp: '2026-05-28 17:22', user: 'Rohit Sharma', changedBy: 'Neha Verma', module: 'User Override', action: 'Revoked leave approval power', oldVal: 'Allowed', newVal: 'Revoked' }
+  ]);
+
+  // Seed security features list
+  const [securityFeatures, setSecurityFeatures] = useState([
+    { id: 'SEC-1', title: 'Two-Factor Authentication', desc: 'Enforces one-time passcodes via authenticator app.', status: 'Active (Enforced)', icon: Lock, variant: 'success' },
+    { id: 'SEC-2', title: 'Idle Session Timeout', desc: 'Logs out inactive users after 15 minutes of inactivity.', status: '15 Minutes', icon: Clock, variant: 'warning' },
+    { id: 'SEC-3', title: 'IP Address Whitelisting', desc: 'Allows Super Admin access only from certified office gateways.', status: 'Configured (3 IPs)', icon: Shield, variant: 'info' },
+    { id: 'SEC-4', title: 'Audit Log Retention', desc: 'Defines archiving duration for system actions logs.', status: '90 Days Retention', icon: Database, variant: 'primary' }
+  ]);
+
+  // Modal Control States
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showRestrictModal, setShowRestrictModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [editingRole, setEditingRole] = useState(null);
+
+  // Form states for modals
+  const [createForm, setCreateForm] = useState({
+    name: '', description: '', parentRole: 'employee', accessLevel: 'Standard', status: 'Active', color: '#3b82f6', icon: '👤'
+  });
+  const [cloneForm, setCloneForm] = useState({
+    sourceRoleId: 'employee', targetName: '', inheritAll: true
+  });
+  const [assignForm, setAssignForm] = useState({
+    userId: 'EMP-2026-006', roleId: 'employee', type: 'Permanent', expiry: '', reason: ''
+  });
+  const [restrictForm, setRestrictForm] = useState({
+    userId: 'EMP-2026-006', module: 'Payroll Management', scope: 'None (Restricted)', type: 'Explicit Denial', expiry: 'Permanent'
+  });
+  const [exportForm, setExportForm] = useState({
+    reportType: 'user_permissions', format: 'PDF', includeAudit: true
+  });
+
+  // Filters
+  const [roleSearch, setRoleSearch] = useState('');
+  const [roleStatusFilter, setRoleStatusFilter] = useState('');
+  const [roleAccessFilter, setRoleAccessFilter] = useState('');
+
+  const [userAccessSearch, setUserAccessSearch] = useState('');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditModuleFilter, setAuditModuleFilter] = useState('');
+
+  // Recharts Seed Data
+  const activityData = [
+    { name: 'Mon', Logins: 145, Changes: 12, Failures: 1 },
+    { name: 'Tue', Logins: 188, Changes: 8, Failures: 0 },
+    { name: 'Wed', Logins: 210, Changes: 15, Failures: 2 },
+    { name: 'Thu', Logins: 195, Changes: 22, Failures: 4 },
+    { name: 'Fri', Logins: 160, Changes: 10, Failures: 0 },
+    { name: 'Sat', Logins: 45, Changes: 3, Failures: 0 },
+    { name: 'Sun', Logins: 32, Changes: 1, Failures: 1 }
+  ];
+
+  const deptData = [
+    { department: 'Engineering', changes: 45 },
+    { department: 'Sales', changes: 28 },
+    { department: 'Operations', changes: 52 },
+    { department: 'HR', changes: 18 },
+    { department: 'Marketing', changes: 14 }
+  ];
+
+  const roleDistributionData = [
+    { name: 'Super Admin', value: 2, color: '#8b5cf6' },
+    { name: 'Branch Admin', value: 4, color: '#3b82f6' },
+    { name: 'Project Manager', value: 3, color: '#ec4899' },
+    { name: 'Team Leader', value: 8, color: '#10b981' },
+    { name: 'Employee', value: 48, color: '#64748b' }
+  ];
+
+  // Handler functions for role actions
+  const handleSaveRole = (e) => {
+    e.preventDefault();
+    if (!createForm.name.trim()) return;
+
+    if (editingRole) {
+      // Edit mode
+      setLocalRoles(prev => prev.map(r => r.id === editingRole.id ? { ...r, ...createForm } : r));
+      addPageToast('success', `Role "${createForm.name}" updated successfully.`);
+      setEditingRole(null);
+    } else {
+      // Create mode
+      const newId = `role_${createForm.name.toLowerCase().replace(/\s+/g, '_')}`;
+      const newRole = {
+        id: newId,
+        name: createForm.name,
+        description: createForm.description,
+        userCount: 0,
+        accentColor: createForm.color,
+        color: createForm.color,
+        icon: createForm.icon,
+        accessLevel: createForm.accessLevel,
+        status: createForm.status,
+        createdDate: new Date().toISOString().split('T')[0],
+        lastModified: new Date().toISOString().split('T')[0],
+        permissions: {
+          dashboard: { create: false, read: true, update: false, delete: false },
+          employees: { create: false, read: true, update: false, delete: false },
+          attendance: { create: false, read: true, update: false, delete: false },
+          leaves: { create: false, read: true, update: false, delete: false },
+          tasks: { create: false, read: true, update: false, delete: false },
+          payroll: { create: false, read: false, update: false, delete: false }
+        }
+      };
+      setLocalRoles(prev => [...prev, newRole]);
+      addPageToast('success', `New role "${createForm.name}" created successfully.`);
+    }
+
+    setCreateForm({ name: '', description: '', parentRole: 'employee', accessLevel: 'Standard', status: 'Active', color: '#3b82f6', icon: '👤' });
+    setShowCreateModal(false);
+  };
+
+  const handleEditRoleClick = (role) => {
+    setEditingRole(role);
+    setCreateForm({
+      name: role.name,
+      description: role.description,
+      parentRole: 'employee',
+      accessLevel: role.accessLevel,
+      status: role.status,
+      color: role.color || role.accentColor || '#3b82f6',
+      icon: role.icon || '👤'
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleDeleteRoleClick = (role) => {
+    if (role.id === 'super_admin' || role.id === 'employee') {
+      addPageToast('danger', `Default role "${role.name}" cannot be deleted.`);
+      return;
+    }
+    showConfirm(
+      'Delete Role Access',
+      `Are you sure you want to permanently delete the role "${role.name}"? This action will migrate all active users to the default Employee role.`,
+      () => {
+        setLocalRoles(prev => prev.filter(r => r.id !== role.id));
+        addPageToast('warning', `Role "${role.name}" has been deleted.`);
+      },
+      'danger'
+    );
+  };
+
+  const handleCloneRole = (e) => {
+    e.preventDefault();
+    if (!cloneForm.targetName.trim()) return;
+
+    const source = localRoles.find(r => r.id === cloneForm.sourceRoleId);
+    if (!source) return;
+
+    const newId = `role_clone_${cloneForm.targetName.toLowerCase().replace(/\s+/g, '_')}`;
+    const cloned = {
+      ...source,
+      id: newId,
+      name: cloneForm.targetName,
+      userCount: 0,
+      createdDate: new Date().toISOString().split('T')[0],
+      lastModified: new Date().toISOString().split('T')[0],
+      description: `Cloned from ${source.name}. ${source.description}`
+    };
+
+    setLocalRoles(prev => [...prev, cloned]);
+    addPageToast('success', `Role "${source.name}" cloned into "${cloneForm.targetName}".`);
+    setCloneForm({ sourceRoleId: 'employee', targetName: '', inheritAll: true });
+    setShowCloneModal(false);
+  };
+
+  const handleAssignRole = (e) => {
+    e.preventDefault();
+    const emp = employees.find(e => e.id === assignForm.userId);
+    const roleObj = localRoles.find(r => r.id === assignForm.roleId);
+    if (!emp || !roleObj) return;
+
+    // Toast and add audit log entry
+    addPageToast('success', `Assigned "${roleObj.name}" role to ${emp.name}.`);
+    
+    // Add audit entry
+    const newAudit = {
+      id: `AUD-${Math.floor(100 + Math.random() * 900)}`,
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      user: emp.name,
+      changedBy: 'Aarav Sharma',
+      module: 'User Access Assignment',
+      action: `Assigned role ${roleObj.name}`,
+      oldVal: emp.role || 'Unassigned',
+      newVal: roleObj.name
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+    setShowAssignModal(false);
+  };
+
+  const handleRestrictAccess = (e) => {
+    e.preventDefault();
+    const emp = employees.find(e => e.id === restrictForm.userId);
+    if (!emp) return;
+
+    const newOverride = {
+      id: `OVR-${Math.floor(100 + Math.random() * 900)}`,
+      userId: restrictForm.userId,
+      userName: emp.name,
+      module: restrictForm.module,
+      scope: restrictForm.scope,
+      type: restrictForm.type,
+      expiry: restrictForm.expiry || 'Permanent'
+    };
+
+    setUserOverrides(prev => [newOverride, ...prev]);
+    addPageToast('success', `Configured permission restriction override for ${emp.name}.`);
+    setShowRestrictModal(false);
+  };
+
+  const handleRemoveOverride = (overrideId, userName) => {
+    setUserOverrides(prev => prev.filter(o => o.id !== overrideId));
+    addPageToast('info', `Removed permission override for ${userName}.`);
+  };
+
+  const handleExportReportSubmit = (e) => {
+    e.preventDefault();
+    addPageToast('info', `Compiling report. Download starting...`);
+    setTimeout(() => {
+      addPageToast('success', `Success: Permissions Audit report downloaded in ${exportForm.format} format.`);
+    }, 1200);
+    setShowExportModal(false);
+  };
+
+  const handleExportReportDirect = (reportName, format) => {
+    addPageToast('info', `Exporting ${reportName} in ${format} format...`);
+    setTimeout(() => {
+      addPageToast('success', `Successfully downloaded: ${reportName}.${format.toLowerCase()}`);
+    }, 1500);
+  };
+
+  // Filter lists
+  const filteredRoles = useMemo(() => {
+    return localRoles.filter(role => {
+      const matchesSearch = role.name.toLowerCase().includes(roleSearch.toLowerCase()) ||
+                            role.description.toLowerCase().includes(roleSearch.toLowerCase());
+      const matchesStatus = !roleStatusFilter || role.status === roleStatusFilter;
+      const matchesAccess = !roleAccessFilter || role.accessLevel === roleAccessFilter;
+      return matchesSearch && matchesStatus && matchesAccess;
+    });
+  }, [localRoles, roleSearch, roleStatusFilter, roleAccessFilter]);
+
+  const filteredUserOverrides = useMemo(() => {
+    return userOverrides.filter(ov => {
+      return ov.userName.toLowerCase().includes(userAccessSearch.toLowerCase()) ||
+             ov.userId.toLowerCase().includes(userAccessSearch.toLowerCase()) ||
+             ov.module.toLowerCase().includes(userAccessSearch.toLowerCase());
+    });
+  }, [userOverrides, userAccessSearch]);
+
+  const filteredAuditLogs = useMemo(() => {
+    return auditLogs.filter(log => {
+      const matchesSearch = log.user.toLowerCase().includes(auditSearch.toLowerCase()) ||
+                            log.action.toLowerCase().includes(auditSearch.toLowerCase()) ||
+                            log.changedBy.toLowerCase().includes(auditSearch.toLowerCase());
+      const matchesModule = !auditModuleFilter || log.module === auditModuleFilter;
+      return matchesSearch && matchesModule;
+    });
+  }, [auditLogs, auditSearch, auditModuleFilter]);
+
+  // Save changes to system context
+  const handleSaveSystemPermissions = () => {
+    localRoles.forEach(role => {
+      // Map Matrix data levels back to Lucide permissions
+      const mappedPermissions = {};
+      Object.keys(matrixData).forEach(moduleKey => {
+        const value = matrixData[moduleKey]?.[role.id] || 'No';
+        let permObj = { create: false, read: false, update: false, delete: false };
+        if (value === 'Full') {
+          permObj = { create: true, read: true, update: true, delete: true };
+        } else if (value === 'Limited') {
+          permObj = { create: false, read: true, update: true, delete: false };
+        } else if (value === 'View') {
+          permObj = { create: false, read: true, update: false, delete: false };
+        }
+        mappedPermissions[moduleKey] = permObj;
+      });
+      // Update in context
+      updatePermissions(role.id, mappedPermissions);
+    });
+    addPageToast('success', 'Enterprise permissions matrix saved globally to AppContext.');
+  };
+  // Skeleton loading wrapper
+  if (isLoading) {
     return (
-      <div className="permissions-page grid-gap">
-        <div className="card" style={{ height: '80px' }}><Skeleton variant="rect" height="100%" /></div>
-        <div className="permissions-split-grid">
-          <div className="card" style={{ height: '360px' }}><Skeleton variant="rect" height="100%" /></div>
-          <div className="card" style={{ height: '360px' }}><Skeleton variant="rect" height="100%" /></div>
+      <div className="rp-page flex-column gap-4 animate-fade-in p-5">
+        <div className="rp-page-header flex-between mb-4">
+          <div>
+            <Skeleton variant="text" width="240px" height="32px" />
+            <Skeleton variant="text" width="380px" height="18px" />
+          </div>
+          <Skeleton variant="rect" width="120px" height="38px" />
+        </div>
+        <div className="rp-stats-row mb-6">
+          <Skeleton variant="rect" height="140px" />
+          <Skeleton variant="rect" height="140px" />
+          <Skeleton variant="rect" height="140px" />
+          <Skeleton variant="rect" height="140px" />
+        </div>
+        <div className="grid-2-col">
+          <Skeleton variant="rect" height="300px" />
+          <Skeleton variant="rect" height="300px" />
         </div>
       </div>
     );
   }
 
-  const isSuperAdmin = selectedRoleId === 'super_admin';
-
   return (
-    <div className="permissions-page flex-column grid-gap">
+    <>
+      <div className="rp-page flex-column gap-4 animate-fade-in p-5">
       
-      {/* Title */}
-      <div className="page-header-row">
+      {/* ─── Page Header ─── */}
+      <div className="rp-page-header flex-between mb-4">
         <div>
-          <h2>System User Access & Roles</h2>
-          <p className="page-desc-text">Configure module access controls and operations for different user groups</p>
+          <h1 className="title-bold">Role & Permission Management</h1>
+          <p className="subtitle">Configure enterprise user access rights, matrix variables, override policies, and audits.</p>
+        </div>
+        
+        {/* Perspective Switcher */}
+        <div className="flex-center gap-3">
+          <div className="perspective-container flex-center gap-2">
+            <Shield size={14} className="text-primary" />
+            <span className="text-xs font-semibold text-muted uppercase tracking-wide">View As:</span>
+            <select
+              value={currentUserRole}
+              onChange={(e) => {
+                setCurrentUserRole(e.target.value);
+                addPageToast('info', `Switched UI perspective view role: ${e.target.value}`);
+              }}
+              className="perspective-select select-clean"
+            >
+              <option value="super_admin">Super Admin</option>
+              <option value="branch_admin">Branch Admin</option>
+              <option value="project_manager">Project Manager</option>
+              <option value="team_leader">Team Leader</option>
+              <option value="employee">Employee</option>
+            </select>
+          </div>
+          
+          <Button variant="primary" onClick={() => setShowCreateModal(true)} icon={Plus}>
+            New Role
+          </Button>
         </div>
       </div>
 
-      {/* Grid split */}
-      <div className="permissions-split-grid">
-        
-        {/* Left Side: Role List Cards */}
-        <div className="roles-list-column">
-          <h3 className="section-column-title">System Roles</h3>
-          <div className="roles-scroll-container">
-            {roles.map((role) => {
-              const isActive = role.id === selectedRoleId;
-              return (
-                <div
-                  key={role.id}
-                  onClick={() => setSelectedRoleId(role.id)}
-                  className={`role-select-card card ${isActive ? 'active-role-card' : ''}`}
-                  style={{ borderLeft: `4px solid ${role.accentColor}` }}
-                >
-                  <div className="role-card-header">
-                    <h4 className="role-name">{role.name}</h4>
-                    <Badge variant={role.id === 'super_admin' ? 'purple' : 'neutral'}>
-                      {role.id.replace('_', ' ')}
-                    </Badge>
+      {/* ─── Navigation Tabs Bar ─── */}
+      <div className="tab-bar-card card p-0 mb-4">
+        <div className="rp-tabs-list">
+          <button className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+            <Sliders size={16} /> Dashboard
+          </button>
+          <button className={`tab-btn ${activeTab === 'roles' ? 'active' : ''}`} onClick={() => setActiveTab('roles')}>
+            <Users size={16} /> Roles
+          </button>
+          <button className={`tab-btn ${activeTab === 'matrix' ? 'active' : ''}`} onClick={() => setActiveTab('matrix')}>
+            <Key size={16} /> Permissions Matrix
+          </button>
+          <button className={`tab-btn ${activeTab === 'user_access' ? 'active' : ''}`} onClick={() => setActiveTab('user_access')}>
+            <Lock size={16} /> User Access
+          </button>
+          <button className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}>
+            <Database size={16} /> Audit Logs
+          </button>
+          <button className={`tab-btn ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
+            <FileText size={16} /> Security Reports
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Tab Content Views ─── */}
+
+      {/* Dashboard Tab */}
+      {activeTab === 'dashboard' && (
+        <div className="flex-column gap-6">
+          {/* Stats Cards */}
+          <div className="rp-stats-row">
+            <div className="rp-stat-card rsc-primary">
+              <div className="rsc-stat-header">
+                <span className="rsc-stat-label">Total System Roles</span>
+                <div className="rsc-icon-chip"><Sliders size={18} /></div>
+              </div>
+              <span className="rsc-stat-num">{localRoles.length}</span>
+              <div className="rsc-stat-footer">
+                <span className="text-xs text-muted">5 system + {localRoles.length - 5} custom</span>
+                <span className="trend-chip trend-up"><ChevronRight size={10} /> View</span>
+              </div>
+            </div>
+
+            <div className="rp-stat-card rsc-success">
+              <div className="rsc-stat-header">
+                <span className="rsc-stat-label">Active Protected Users</span>
+                <div className="rsc-icon-chip"><Users size={18} /></div>
+              </div>
+              <span className="rsc-stat-num">1,250</span>
+              <div className="rsc-stat-footer">
+                <span className="text-xs text-muted">100% covered by RBAC</span>
+                <span className="trend-chip trend-up"><ArrowUpRight size={10} /> +2.4%</span>
+              </div>
+            </div>
+
+            <div className="rp-stat-card rsc-purple">
+              <div className="rsc-stat-header">
+                <span className="rsc-stat-label">Custom Overrides</span>
+                <div className="rsc-icon-chip"><Key size={18} /></div>
+              </div>
+              <span className="rsc-stat-num">{userOverrides.length}</span>
+              <div className="rsc-stat-footer">
+                <span className="text-xs text-muted">Explicit override policies</span>
+                <span className="trend-chip trend-down"><ArrowDownRight size={10} /> 4 active</span>
+              </div>
+            </div>
+
+            <div className="rp-stat-card rsc-danger">
+              <div className="rsc-stat-header">
+                <span className="rsc-stat-label">Auditable Logs</span>
+                <div className="rsc-icon-chip"><Database size={18} /></div>
+              </div>
+              <span className="rsc-stat-num">{auditLogs.length}</span>
+              <div className="rsc-stat-footer">
+                <span className="text-xs text-muted">Archived logs in db</span>
+                <span className="trend-chip trend-up"><Activity size={10} /> Live</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rp-stats-row">
+            <div className="rp-stat-card rsc-warning">
+              <div className="rsc-stat-header">
+                <span className="rsc-stat-label">MFA Adoption Rate</span>
+                <div className="rsc-icon-chip"><Lock size={18} /></div>
+              </div>
+              <span className="rsc-stat-num">98.2%</span>
+              <div className="rsc-stat-footer">
+                <span className="text-xs text-muted">Enforced on admin ranks</span>
+                <span className="trend-chip trend-up"><ArrowUpRight size={10} /> +1.2%</span>
+              </div>
+            </div>
+
+            <div className="rp-stat-card rsc-info">
+              <div className="rsc-stat-header">
+                <span className="rsc-stat-label">System Security Score</span>
+                <div className="rsc-icon-chip"><ShieldCheck size={18} /></div>
+              </div>
+              <span className="rsc-stat-num">A+</span>
+              <div className="rsc-stat-footer">
+                <span className="text-xs text-muted">Complies with ISO 27001</span>
+                <span className="trend-chip trend-flat">Stable</span>
+              </div>
+            </div>
+
+            <div className="rp-stat-card rsc-primary">
+              <div className="rsc-stat-header">
+                <span className="rsc-stat-label">Dept Administrators</span>
+                <div className="rsc-icon-chip"><Building size={18} /></div>
+              </div>
+              <span className="rsc-stat-num">12</span>
+              <div className="rsc-stat-footer">
+                <span className="text-xs text-muted">Across 6 departments</span>
+                <span className="trend-chip trend-flat">Active</span>
+              </div>
+            </div>
+
+            <div className="rp-stat-card rsc-success">
+              <div className="rsc-stat-header">
+                <span className="rsc-stat-label">Branch Administrators</span>
+                <div className="rsc-icon-chip"><Award size={18} /></div>
+              </div>
+              <span className="rsc-stat-num">8</span>
+              <div className="rsc-stat-footer">
+                <span className="text-xs text-muted">Across 4 major offices</span>
+                <span className="trend-chip trend-flat">Active</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid-2-col">
+            <div className="card p-5">
+              <h3 className="chart-title mb-4">
+                <Activity size={16} className="text-primary" /> Security Event Analytics
+              </h3>
+              <div style={{ width: '100%', height: 260 }}>
+                <ResponsiveContainer>
+                  <AreaChart data={activityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorLogins" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorChanges" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+                    <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} />
+                    <YAxis stroke="var(--text-muted)" fontSize={11} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-color)' }} />
+                    <Legend />
+                    <Area type="monotone" dataKey="Logins" stroke="#3b82f6" fillOpacity={1} fill="url(#colorLogins)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="Changes" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorChanges)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <h3 className="chart-title mb-4">
+                <Users size={16} className="text-purple" /> User Access Distribution
+              </h3>
+              <div style={{ width: '100%', height: 260 }} className="flex-center">
+                <div style={{ width: '50%', height: '100%' }}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={roleDistributionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {roleDistributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex-column gap-2" style={{ width: '50%', paddingLeft: 20 }}>
+                  {roleDistributionData.map((r, i) => (
+                    <div key={i} className="flex-center gap-2 text-xs">
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: r.color }}></div>
+                      <span className="font-semibold text-primary">{r.name}:</span>
+                      <span className="text-muted">{r.value} ({Math.round(r.value/65*100)}%)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Hierarchy & Activity Logs split */}
+          <div className="grid-2-col">
+            
+            {/* Role Hierarchy Visual Tree */}
+            <div className="hierarchy-tree-container card">
+              <h3 className="card-sec-title">
+                <Sliders size={16} /> Access Inheritance Hierarchy
+              </h3>
+              <p className="subtitle mb-4">Visual representation of system role priority levels. Higher nodes inherit all sub-nodes.</p>
+              
+              <div className="hierarchy-root pt-3">
+                <div className="hierarchy-node">
+                  <div className="hierarchy-node-icon" style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' }}>👑</div>
+                  <span>Super Admin (Level 1)</span>
+                </div>
+                <div className="hierarchy-children">
+                  <div className="hierarchy-child-row">
+                    <div className="hierarchy-connector"></div>
+                    <div className="hierarchy-node">
+                      <div className="hierarchy-node-icon" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}>🏢</div>
+                      <span>Branch Admin (Level 2)</span>
+                    </div>
                   </div>
-                  <p className="role-desc">{role.description}</p>
-                  
-                  <div className="role-user-count">
-                    <Users size={14} />
-                    <span>{role.userCount} active users</span>
+                  <div className="hierarchy-children">
+                    <div className="hierarchy-child-row">
+                      <div className="hierarchy-connector"></div>
+                      <div className="hierarchy-node">
+                        <div className="hierarchy-node-icon" style={{ background: 'rgba(236,72,153,0.15)', color: '#ec4899' }}>💼</div>
+                        <span>Project Manager (Level 3)</span>
+                      </div>
+                    </div>
+                    <div className="hierarchy-children">
+                      <div className="hierarchy-child-row">
+                        <div className="hierarchy-connector"></div>
+                        <div className="hierarchy-node">
+                          <div className="hierarchy-node-icon" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>👥</div>
+                          <span>Team Leader (Level 4)</span>
+                        </div>
+                      </div>
+                      <div className="hierarchy-children">
+                        <div className="hierarchy-child-row">
+                          <div className="hierarchy-connector"></div>
+                          <div className="hierarchy-node">
+                            <div className="hierarchy-node-icon" style={{ background: 'rgba(100,116,139,0.15)', color: '#64748b' }}>👤</div>
+                            <span>Employee (Level 5)</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            </div>
+
+            {/* Recent permission activity feed */}
+            <div className="card p-5">
+              <h3 className="card-sec-title">
+                <Activity size={16} /> Recent Administrative Activity
+              </h3>
+              <p className="subtitle mb-4">Real-time log of security, permissions updates, and explicit user overrides.</p>
+              
+              <div className="activity-feed-list pt-2">
+                {auditLogs.slice(0, 5).map((log, idx) => {
+                  const initials = log.changedBy.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+                  return (
+                    <div key={idx} className="activity-feed-item">
+                      <div className="activity-avatar" style={{ background: '#3b82f6' }}>
+                        {initials || 'S'}
+                      </div>
+                      <div className="activity-body">
+                        <div className="activity-title">
+                          <strong>{log.changedBy}</strong> performed action on module <span className="font-semibold text-primary">{log.module}</span>
+                        </div>
+                        <p className="text-xs text-muted mb-1">{log.action}</p>
+                        <div className="activity-meta">
+                          <span className="log-id-code text-xs">{log.id}</span>
+                          <span className="flex-center gap-1"><Clock size={12} /> {log.timestamp}</span>
+                        </div>
+                      </div>
+                      <div className="activity-status-icon text-success">
+                        <CheckCircle size={16} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Security Features */}
+          <div className="card p-5">
+            <h3 className="card-sec-title mb-1">
+              <ShieldAlert size={16} /> Core Policy & Security Enforcements
+            </h3>
+            <p className="subtitle mb-4">Configure environment security controls, logins limits, and operational audits policies.</p>
+            
+            <div className="security-features-grid">
+              {securityFeatures.map((sec, i) => {
+                const SecIcon = sec.icon;
+                return (
+                  <div key={i} className="security-feature-card">
+                    <div className="sec-feature-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+                      <SecIcon size={20} />
+                    </div>
+                    <div className="sec-feature-body">
+                      <h4 className="sec-feature-title">{sec.title}</h4>
+                      <p className="sec-feature-desc">{sec.desc}</p>
+                      <span className={`sec-feature-status text-xs bg-${sec.variant}-light text-${sec.variant}`}>
+                        {sec.status}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Right Side: Matrix Permissions Checkboxes */}
-        <div className="matrix-column card">
-          <div className="matrix-header-row">
-            <div>
-              <h3 className="card-title">{activeRoleObj?.name} Permission Matrix</h3>
-              <p className="chart-subtitle">
-                {isSuperAdmin 
-                  ? 'Locked: Super Admin permissions are permanent and cannot be modified.' 
-                  : 'Toggle checkboxes below to instantly update permissions for this role.'}
-              </p>
+      {/* Roles Tab */}
+      {activeTab === 'roles' && (
+        <div className="flex-column gap-4">
+          {/* Filters Bar */}
+          <div className="rp-filter-bar card p-4 flex-between gap-4 flex-wrap">
+            <div className="flex-center gap-3 flex-wrap flex-grow-1">
+              <div className="flex-center gap-2">
+                <Search size={16} className="text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search roles..."
+                  value={roleSearch}
+                  onChange={(e) => setRoleSearch(e.target.value)}
+                  className="table-search-input"
+                />
+              </div>
+
+              <select
+                value={roleStatusFilter}
+                onChange={(e) => setRoleStatusFilter(e.target.value)}
+                className="table-filter-select"
+              >
+                <option value="">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+
+              <select
+                value={roleAccessFilter}
+                onChange={(e) => setRoleAccessFilter(e.target.value)}
+                className="table-filter-select"
+              >
+                <option value="">All Access</option>
+                <option value="Full Access">Full Access</option>
+                <option value="Administrative">Administrative</option>
+                <option value="Managerial">Managerial</option>
+                <option value="Lead Access">Lead Access</option>
+                <option value="Standard">Standard</option>
+              </select>
             </div>
-            
-            {!isSuperAdmin && (
-              <Button variant="primary" onClick={handleSave} icon={Save}>
-                Save Changes
+
+            <div className="flex-center gap-2">
+              <Button variant="outline" onClick={() => setShowCloneModal(true)} icon={Copy}>
+                Clone Role
               </Button>
-            )}
+              <Button variant="outline" onClick={() => setShowAssignModal(true)} icon={Key}>
+                Assign Users
+              </Button>
+            </div>
           </div>
 
-          <div className="matrix-table-wrapper table-responsive">
-            <table>
+          {/* Roles Table */}
+          <div className="card p-0 overflow-x-auto">
+            <table className="width-full custom-table-rp">
               <thead>
                 <tr>
-                  <th>MODULE</th>
-                  {operations.map(op => (
-                    <th key={op.key} className="text-center">{op.label}</th>
-                  ))}
+                  <th>Role Name</th>
+                  <th>ID Code</th>
+                  <th>Protected Users</th>
+                  <th>Inheritance Scope</th>
+                  <th>Date Created</th>
+                  <th>Last Modified</th>
+                  <th>Status</th>
+                  <th className="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {modules.map(mod => (
-                  <tr key={mod.key}>
-                    <td className="bold-text">{mod.label}</td>
-                    {operations.map(op => {
-                      const isChecked = selectedRoleId === 'super_admin' ? true : !!localPermissions[mod.key]?.[op.key];
-                      return (
-                        <td 
-                          key={op.key} 
-                          className="text-center permission-cell"
-                          onClick={() => !isSuperAdmin && handleCheckboxToggle(mod.key, op.key)}
-                          style={{ cursor: isSuperAdmin ? 'default' : 'pointer' }}
+                {filteredRoles.map((role) => (
+                  <tr key={role.id}>
+                    <td>
+                      <div className="role-name-cell">
+                        <div className="role-icon-badge" style={{ background: `${role.color}20`, color: role.color }}>
+                          {role.icon || '👤'}
+                        </div>
+                        <div>
+                          <div className="role-name-txt">{role.name}</div>
+                          <div className="role-desc-txt text-xs text-muted">{role.description}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span className="log-id-code">{role.id}</span></td>
+                    <td className="font-semibold">{role.userCount} active</td>
+                    <td>
+                      <Badge variant={role.id === 'super_admin' ? 'purple' : role.id === 'employee' ? 'neutral' : 'info'}>
+                        {role.accessLevel}
+                      </Badge>
+                    </td>
+                    <td className="text-sm text-muted">{role.createdDate}</td>
+                    <td className="text-sm text-muted">{role.lastModified}</td>
+                    <td>
+                      <Badge variant={role.status === 'Active' ? 'success' : 'danger'}>
+                        {role.status}
+                      </Badge>
+                    </td>
+                    <td>
+                      <div className="flex-center justify-center gap-2">
+                        <button
+                          className="action-circle-btn"
+                          title="Edit Role Details"
+                          onClick={() => handleEditRoleClick(role)}
                         >
-                          {isChecked ? (
-                            <span className="permission-check">✓</span>
-                          ) : (
-                            <span className="permission-cross">X</span>
-                          )}
-                        </td>
-                      );
-                    })}
+                          <Edit size={13} />
+                        </button>
+                        <button
+                          className="action-circle-btn danger-btn"
+                          title="Delete Role"
+                          onClick={() => handleDeleteRoleClick(role)}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          
-          {!isSuperAdmin && (
-            <div className="matrix-footer-actions">
-              <span className="text-muted text-xs">Unsaved changes will be lost if you select another role.</span>
-              <Button variant="primary" onClick={handleSave} icon={Save}>
-                Save Permissions
-              </Button>
+        </div>
+      )}
+
+      {/* Permissions Matrix Tab */}
+      {activeTab === 'matrix' && (
+        <div className="flex-column gap-6">
+          <div className="grid-2-col" style={{ gridTemplateColumns: '1fr 3fr' }}>
+            
+            {/* Left: Role Select List */}
+            <div className="flex-column gap-3">
+              <h3 className="card-sec-title">System Roles</h3>
+              <p className="subtitle">Select a role to view and manually adjust operations permissions.</p>
+              
+              <div className="flex-column gap-3">
+                {localRoles.map((role) => {
+                  const isActive = role.id === selectedRoleId;
+                  return (
+                    <div
+                      key={role.id}
+                      onClick={() => setSelectedRoleId(role.id)}
+                      className={`card p-4 flex-column gap-2 cursor-pointer ${isActive ? 'active-role-card-v2' : ''}`}
+                      style={{
+                        borderLeft: `4px solid ${role.color || '#3b82f6'}`,
+                        background: isActive ? 'var(--bg-elevated)' : 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-lg)',
+                        transition: 'all 0.2s',
+                        boxShadow: isActive ? 'var(--shadow-md)' : 'none'
+                      }}
+                    >
+                      <div className="flex-between">
+                        <h4 className="font-semibold text-primary" style={{ margin: 0, fontSize: '0.9rem' }}>{role.name}</h4>
+                        <Badge variant={role.id === 'super_admin' ? 'purple' : 'neutral'}>
+                          {role.id.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted" style={{ margin: 0, fontSize: '0.75rem', lineHeight: 1.3 }}>
+                        {role.description}
+                      </p>
+                      <div className="flex-center gap-1 text-xs text-muted" style={{ fontSize: '0.7rem' }}>
+                        <Users size={12} />
+                        <span>{role.userCount} active users</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          )}
+
+            {/* Right: Permission Checkbox Matrix for the selected Role */}
+            <div className="card p-5">
+              <div className="flex-between mb-4 pb-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
+                <div>
+                  <h3 className="card-sec-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>{localRoles.find(r => r.id === selectedRoleId)?.name || 'Custom'} Matrix</span>
+                  </h3>
+                  <p className="subtitle" style={{ margin: 0 }}>
+                    {selectedRoleId === 'super_admin' 
+                      ? 'Locked: Super Admin permissions are permanent and cannot be modified.' 
+                      : 'Toggle checkboxes below to manually modify system actions.'}
+                  </p>
+                </div>
+                
+                <div className="flex-center gap-2">
+                  <Button variant="outline" onClick={() => setShowAddPermModal(true)} icon={Plus}>
+                    Add Permission
+                  </Button>
+                  {selectedRoleId !== 'super_admin' && (
+                    <Button variant="primary" onClick={handleSaveRolePermissions}>
+                      Save Permissions
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="perm-matrix-wrapper border-color border-bottom">
+                <table className="perm-matrix-table custom-table-rp">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'left' }}>MODULE / COMPONENT</th>
+                      {operations.map(op => (
+                        <th key={op.key} className="text-center">{op.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modulesList.map(mod => (
+                      <tr key={mod.key}>
+                        <td style={{ textAlign: 'left' }}>
+                          <div className="perm-module-icon font-bold">
+                            <Sliders size={14} className="text-muted" />
+                            <span>{mod.label}</span>
+                          </div>
+                        </td>
+                        {operations.map(op => {
+                          const isChecked = selectedRoleId === 'super_admin' ? true : !!localPermissions[mod.key]?.[op.key];
+                          return (
+                            <td
+                              key={op.key}
+                              className="text-center"
+                              onClick={() => handleCheckboxToggle(mod.key, op.key)}
+                              style={{ cursor: selectedRoleId === 'super_admin' ? 'default' : 'pointer' }}
+                            >
+                              <div className="flex-center justify-center">
+                                <span className={`perm-chip ${isChecked ? 'pchip-full' : 'pchip-none'}`} style={{ minWidth: 42 }}>
+                                  {isChecked ? '✓' : '✗'}
+                                </span>
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {selectedRoleId !== 'super_admin' && (
+                <div className="flex-between pt-4 mt-2">
+                  <span className="text-xs text-muted">Unsaved changes will be lost if you switch to another role in the sidebar.</span>
+                  <Button variant="primary" onClick={handleSaveRolePermissions}>
+                    Save Permissions Matrix
+                  </Button>
+                </div>
+              )}
+          </div>
         </div>
 
+          {/* Granular Permission Builder */}
+          <div className="card p-5">
+            <h3 className="card-sec-title mb-2">
+              <Key size={16} /> Granular Access Policy Builder
+            </h3>
+            <p className="subtitle mb-4">
+              Select a target role and category, then check system actions to build customized overrides policies.
+            </p>
+            
+            <div className="form-grid-2 mb-4">
+              <div className="form-group">
+                <label className="form-label">Target Role Scope</label>
+                <select
+                  value={builderRole}
+                  onChange={(e) => setBuilderRole(e.target.value)}
+                  className="form-select"
+                >
+                  {localRoles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Permission Category</label>
+                <select
+                  value={builderCategory}
+                  onChange={(e) => setBuilderCategory(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="Employee Management">Employee Management</option>
+                  <option value="Attendance Tracking">Attendance Tracking</option>
+                  <option value="Payroll Processing">Payroll Processing</option>
+                  <option value="System Security">System Security</option>
+                  <option value="Task Operations">Task Operations</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="perm-builder-grid mb-6">
+              {Object.keys(builderPermissions).map(perm => (
+                <div key={perm} className="perm-builder-category">
+                  <div className="perm-builder-cat-header bg-elevated border-bottom">
+                    <Lock size={12} className="text-primary" />
+                    <span>Action: {perm.toUpperCase()}</span>
+                  </div>
+                  <div className="perm-builder-options">
+                    <label className="perm-builder-option">
+                      <input
+                        type="checkbox"
+                        checked={builderPermissions[perm]}
+                        onChange={() => handleBuilderCheckbox(perm)}
+                      />
+                      <span>Enable {perm} operations</span>
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex-between">
+              <span className="text-xs text-muted">Policy string compiles to granular JSON schema in real time.</span>
+              <Button variant="primary" onClick={handleGeneratePolicy} icon={Play}>
+                Generate & Apply Policy
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Access Tab */}
+      {activeTab === 'user_access' && (
+        <div className="flex-column gap-4">
+          {/* User access header & quick restrict */}
+          <div className="rp-filter-bar card p-4 flex-between gap-4 flex-wrap">
+            <div className="flex-center gap-3 flex-wrap flex-grow-1">
+              <div className="flex-center gap-2">
+                <Search size={16} className="text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search user access overrides..."
+                  value={userAccessSearch}
+                  onChange={(e) => setUserAccessSearch(e.target.value)}
+                  className="table-search-input"
+                  style={{ minWidth: 280 }}
+                />
+              </div>
+            </div>
+
+            <div className="flex-center gap-2">
+              <Button variant="primary" onClick={() => setShowRestrictModal(true)} icon={ShieldAlert}>
+                Add User Access Override
+              </Button>
+            </div>
+          </div>
+
+          {/* User Overrides Grid */}
+          <div className="user-override-grid">
+            {filteredUserOverrides.map((ov) => {
+              const initials = ov.userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+              const isDenial = ov.scope.includes('Restricted') || ov.type.includes('Denial');
+              return (
+                <div key={ov.id} className="user-override-card card flex-column gap-3">
+                  <div className="flex-between">
+                    <div className="flex-center gap-2">
+                      <Avatar name={ov.userName} size="md" />
+                      <div>
+                        <h4 className="font-semibold text-primary">{ov.userName}</h4>
+                        <span className="text-xs text-muted">{ov.userId}</span>
+                      </div>
+                    </div>
+                    <Badge variant={isDenial ? 'danger' : 'success'}>
+                      {ov.type}
+                    </Badge>
+                  </div>
+
+                  <div className="border-bottom pb-2">
+                    <div className="text-xs text-muteduppercase tracking-wide">Target Module</div>
+                    <div className="font-semibold text-sm">{ov.module}</div>
+                  </div>
+
+                  <div className="flex-between text-xs">
+                    <div>
+                      <span className="text-muted">Scope:</span> <strong className={isDenial ? 'text-danger' : 'text-success'}>{ov.scope}</strong>
+                    </div>
+                    <div>
+                      <span className="text-muted">Expires:</span> <span className="font-semibold">{ov.expiry}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex-center justify-end gap-2 pt-2 border-top">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRemoveOverride(ov.id, ov.userName)}
+                      icon={Trash2}
+                    >
+                      Revoke Override
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+            {filteredUserOverrides.length === 0 && (
+              <div className="card p-6 flex-column flex-center text-center">
+                <Lock size={48} className="text-muted mb-2" />
+                <h4 className="font-semibold text-primary">No user overrides found</h4>
+                <p className="text-xs text-muted">All active employees inherit roles permissions directly. Use override to grant/deny modules access.</p>
+              </div>
+            )}
+        </div>
+      )}
+
+      {/* Audit Logs Tab */}
+      {activeTab === 'audit' && (
+        <div className="flex-column gap-4">
+          <div className="rp-filter-bar card p-4 flex-between gap-4 flex-wrap">
+            <div className="flex-center gap-3 flex-wrap flex-grow-1">
+              <div className="flex-center gap-2">
+                <Search size={16} className="text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search audit logs..."
+                  value={auditSearch}
+                  onChange={(e) => setAuditSearch(e.target.value)}
+                  className="table-search-input"
+                  style={{ minWidth: 260 }}
+                />
+              </div>
+
+              <select
+                value={auditModuleFilter}
+                onChange={(e) => setAuditModuleFilter(e.target.value)}
+                className="table-filter-select"
+              >
+                <option value="">All Modules</option>
+                <option value="Security Control">Security Control</option>
+                <option value="Role permissions">Role permissions</option>
+                <option value="User Override">User Override</option>
+                <option value="Modules Access">Modules Access</option>
+              </select>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => handleExportReportDirect('security_audit_logs', 'CSV')}
+              icon={Download}
+            >
+              Export CSV
+            </Button>
+          </div>
+
+          <div className="card p-0 overflow-x-auto">
+            <table className="width-full custom-table-rp">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Log ID</th>
+                  <th>Target / Role</th>
+                  <th>Changed By</th>
+                  <th>Module</th>
+                  <th>Action Statement</th>
+                  <th>Value Change Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAuditLogs.map((log) => (
+                  <tr key={log.id}>
+                    <td className="text-xs text-muted font-semibold">{log.timestamp}</td>
+                    <td><span className="log-id-code">{log.id}</span></td>
+                    <td className="font-semibold">{log.user}</td>
+                    <td>
+                      <span className="text-sm font-semibold">{log.changedBy}</span>
+                    </td>
+                    <td><Badge variant="neutral">{log.module}</Badge></td>
+                    <td className="text-sm">{log.action}</td>
+                    <td>
+                      <div className="flex-center gap-1 text-xs">
+                        <span className="audit-change-badge old-val">{log.oldVal}</span>
+                        <span className="arrow-val">➔</span>
+                        <span className="audit-change-badge new-val">{log.newVal}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Reports Tab */}
+      {activeTab === 'reports' && (
+        <div className="flex-column gap-6">
+          <div className="card p-5">
+            <h3 className="card-sec-title mb-1">
+              <FileText size={16} /> Compliance & Access Audit Reports
+            </h3>
+            <p className="subtitle mb-4">
+              Compile, schedule and download organizational access structures, security audits and ISO compliance files.
+            </p>
+
+            <div className="report-cards-grid">
+              <div className="report-card">
+                <div className="report-card-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+                  <Users size={22} />
+                </div>
+                <h4 className="report-card-title">User Permissions Audit</h4>
+                <p className="report-card-desc text-xs text-muted">Complete breakdown of every user with roles, overrides, and MFA validation logs.</p>
+                <div className="report-card-formats mt-auto">
+                  <button className="report-format-btn" onClick={() => handleExportReportDirect('user_permissions_audit', 'PDF')}><FileDown size={12} /> PDF</button>
+                  <button className="report-format-btn" onClick={() => handleExportReportDirect('user_permissions_audit', 'CSV')}><FileDown size={12} /> CSV</button>
+                </div>
+              </div>
+
+              <div className="report-card">
+                <div className="report-card-icon" style={{ background: 'rgba(139,92,246,0.12)', color: '#8b5cf6' }}>
+                  <Key size={22} />
+                </div>
+                <h4 className="report-card-title">Role Authorization Matrix</h4>
+                <p className="report-card-desc text-xs text-muted">Export current 12x6 module matrix permission levels mapping for external auditor security checks.</p>
+                <div className="report-card-formats mt-auto">
+                  <button className="report-format-btn" onClick={() => handleExportReportDirect('roles_auth_matrix', 'Excel')}><FileDown size={12} /> Excel</button>
+                  <button className="report-format-btn" onClick={() => handleExportReportDirect('roles_auth_matrix', 'PDF')}><FileDown size={12} /> PDF</button>
+                </div>
+              </div>
+
+              <div className="report-card">
+                <div className="report-card-icon" style={{ background: 'rgba(236,72,153,0.12)', color: '#ec4899' }}>
+                  <Database size={22} />
+                </div>
+                <h4 className="report-card-title">System Audit Log History</h4>
+                <p className="report-card-desc text-xs text-muted">Full sequence of all authorization migrations, overrides additions, and policy modifications.</p>
+                <div className="report-card-formats mt-auto">
+                  <button className="report-format-btn" onClick={() => handleExportReportDirect('audit_log_history', 'CSV')}><FileDown size={12} /> CSV</button>
+                  <button className="report-format-btn" onClick={() => handleExportReportDirect('audit_log_history', 'Excel')}><FileDown size={12} /> Excel</button>
+                </div>
+              </div>
+
+              <div className="report-card">
+                <div className="report-card-icon" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}>
+                  <ShieldAlert size={22} />
+                </div>
+                <h4 className="report-card-title">ISO 27001 Security Audit</h4>
+                <p className="report-card-desc text-xs text-muted">Compliance rating report testing credential standards, privilege access loops and session durations.</p>
+                <div className="report-card-formats mt-auto">
+                  <button className="report-format-btn" onClick={() => handleExportReportDirect('iso_27001_compliance', 'PDF')}><FileDown size={12} /> PDF</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Footer Stats Bar ─── */}
+      <div className="rp-page-footer mt-4">
+        <div className="footer-stat-item">
+          <span className="footer-stat-label">Security Protocol:</span>
+          <span className="footer-stat-value text-success">TLS 1.3 Protected</span>
+        </div>
+        <div className="footer-stat-item">
+          <span className="footer-stat-label">Database Sync Status:</span>
+          <span className="footer-stat-value text-info">Realtime Connected</span>
+        </div>
+        <div className="footer-stat-item">
+          <span className="footer-stat-label">Active Audit Monitor:</span>
+          <span className="footer-stat-value text-warning">Listening</span>
+        </div>
+        <div className="footer-stat-item">
+          <span className="footer-stat-label">Current Node:</span>
+          <span className="footer-stat-value">Node-4A (HQ)</span>
+        </div>
+      </div>
       </div>
 
-    </div>
+      {/* ─── MODALS ─── */}
+
+      {/* 1. Create/Edit Role Modal */}
+      {showCreateModal && (
+        <div className="rp-modal-overlay">
+          <form onSubmit={handleSaveRole} className="rp-modal-container flex-column">
+            <div className="rp-modal-header">
+              <h3 className="rp-modal-title">
+                <Sliders size={18} className="text-primary" />
+                {editingRole ? `Modify Role Details: ${editingRole.name}` : 'Establish New System Role'}
+              </h3>
+              <button type="button" className="rp-modal-close-btn" onClick={() => {
+                setShowCreateModal(false);
+                setEditingRole(null);
+              }}><X size={16} /></button>
+            </div>
+            
+            <div className="rp-modal-body">
+              <div className="form-group">
+                <label className="form-label required">Role Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Finance Auditor, Compliance Officer"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label required">Description</label>
+                <textarea
+                  required
+                  placeholder="Provide scope details for this administrative role."
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="form-textarea"
+                />
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Access Level Inheritance</label>
+                  <select
+                    value={createForm.accessLevel}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, accessLevel: e.target.value }))}
+                    className="form-select"
+                  >
+                    <option value="Full Access">Full Access</option>
+                    <option value="Administrative">Administrative</option>
+                    <option value="Managerial">Managerial</option>
+                    <option value="Lead Access">Lead Access</option>
+                    <option value="Standard">Standard</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Status</label>
+                  <select
+                    value={createForm.status}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, status: e.target.value }))}
+                    className="form-select"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Role Icon Emoji</label>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    value={createForm.icon}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, icon: e.target.value }))}
+                    className="form-input"
+                    style={{ textAlign: 'center' }}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Color Accent Badge</label>
+                  <input
+                    type="color"
+                    value={createForm.color}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, color: e.target.value }))}
+                    className="form-input"
+                    style={{ padding: 2, height: 38, cursor: 'pointer' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rp-modal-footer">
+              <Button type="button" variant="outline" onClick={() => {
+                setShowCreateModal(false);
+                setEditingRole(null);
+              }}>Cancel</Button>
+              <Button type="submit" variant="primary">
+                {editingRole ? 'Save Changes' : 'Initialize Role'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 2. Clone Role Modal */}
+      {showCloneModal && (
+        <div className="rp-modal-overlay">
+          <form onSubmit={handleCloneRole} className="rp-modal-container flex-column">
+            <div className="rp-modal-header">
+              <h3 className="rp-modal-title">
+                <Copy size={18} className="text-primary" /> Clone Authorization Structure
+              </h3>
+              <button type="button" className="rp-modal-close-btn" onClick={() => setShowCloneModal(false)}><X size={16} /></button>
+            </div>
+
+            <div className="rp-modal-body">
+              <div className="form-group">
+                <label className="form-label">Source Role Permissions</label>
+                <select
+                  value={cloneForm.sourceRoleId}
+                  onChange={(e) => setCloneForm(prev => ({ ...prev, sourceRoleId: e.target.value }))}
+                  className="form-select"
+                >
+                  {localRoles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name} permissions matrix</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label required">New Target Role Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Regional Supervisor, Junior Accountant"
+                  value={cloneForm.targetName}
+                  onChange={(e) => setCloneForm(prev => ({ ...prev, targetName: e.target.value }))}
+                  className="form-input"
+                />
+              </div>
+
+              <label className="toggle-control mt-2">
+                <input
+                  type="checkbox"
+                  checked={cloneForm.inheritAll}
+                  onChange={(e) => setCloneForm(prev => ({ ...prev, inheritAll: e.target.checked }))}
+                />
+                <span className="toggle-label">Inherit all matrix checkboxes configurations</span>
+              </label>
+            </div>
+
+            <div className="rp-modal-footer">
+              <Button type="button" variant="outline" onClick={() => setShowCloneModal(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">Generate Cloned Role</Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 3. Assign Role Modal */}
+      {showAssignModal && (
+        <div className="rp-modal-overlay">
+          <form onSubmit={handleAssignRole} className="rp-modal-container flex-column">
+            <div className="rp-modal-header">
+              <h3 className="rp-modal-title">
+                <Key size={18} className="text-primary" /> Assign Role to Employees
+              </h3>
+              <button type="button" className="rp-modal-close-btn" onClick={() => setShowAssignModal(false)}><X size={16} /></button>
+            </div>
+
+            <div className="rp-modal-body">
+              <div className="form-group">
+                <label className="form-label">Select Employee</label>
+                <select
+                  value={assignForm.userId}
+                  onChange={(e) => setAssignForm(prev => ({ ...prev, userId: e.target.value }))}
+                  className="form-select"
+                >
+                  {employees.map(e => (
+                    <option key={e.id} value={e.id}>{e.name} ({e.id} - {e.role || 'No Role'})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Target Role assignment</label>
+                <select
+                  value={assignForm.roleId}
+                  onChange={(e) => setAssignForm(prev => ({ ...prev, roleId: e.target.value }))}
+                  className="form-select"
+                >
+                  {localRoles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Tenure Type</label>
+                  <select
+                    value={assignForm.type}
+                    onChange={(e) => setAssignForm(prev => ({ ...prev, type: e.target.value }))}
+                    className="form-select"
+                  >
+                    <option value="Permanent">Permanent</option>
+                    <option value="Temporary Grant">Temporary Grant (Timed)</option>
+                  </select>
+                </div>
+
+                {assignForm.type === 'Temporary Grant' && (
+                  <div className="form-group">
+                    <label className="form-label required">Expiry Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={assignForm.expiry}
+                      onChange={(e) => setAssignForm(prev => ({ ...prev, expiry: e.target.value }))}
+                      className="form-input"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Operational Reason</label>
+                <textarea
+                  placeholder="Justification for access rights changes."
+                  value={assignForm.reason}
+                  onChange={(e) => setAssignForm(prev => ({ ...prev, reason: e.target.value }))}
+                  className="form-textarea"
+                />
+              </div>
+            </div>
+
+            <div className="rp-modal-footer">
+              <Button type="button" variant="outline" onClick={() => setShowAssignModal(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">Confirm Assignment</Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 4. Restrict Access Override Modal */}
+      {showRestrictModal && (
+        <div className="rp-modal-overlay">
+          <form onSubmit={handleRestrictAccess} className="rp-modal-container flex-column">
+            <div className="rp-modal-header">
+              <h3 className="rp-modal-title">
+                <ShieldAlert size={18} className="text-danger" /> Add Access Override Policy
+              </h3>
+              <button type="button" className="rp-modal-close-btn" onClick={() => setShowRestrictModal(false)}><X size={16} /></button>
+            </div>
+
+            <div className="rp-modal-body">
+              <div className="form-group">
+                <label className="form-label">Target Employee</label>
+                <select
+                  value={restrictForm.userId}
+                  onChange={(e) => setRestrictForm(prev => ({ ...prev, userId: e.target.value }))}
+                  className="form-select"
+                >
+                  {employees.map(e => (
+                    <option key={e.id} value={e.id}>{e.name} ({e.id} - {e.role || 'Employee'})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Target Module Scope</label>
+                <select
+                  value={restrictForm.module}
+                  onChange={(e) => setRestrictForm(prev => ({ ...prev, module: e.target.value }))}
+                  className="form-select"
+                >
+                  <option value="Dashboard Overview">Dashboard Overview</option>
+                  <option value="Employee Directory">Employee Directory</option>
+                  <option value="Attendance Tracking">Attendance Tracking</option>
+                  <option value="Leave Operations">Leave Operations</option>
+                  <option value="Projects & Workflows">Projects & Workflows</option>
+                  <option value="Payroll Processing">Payroll Processing</option>
+                  <option value="Role & Permission">Role & Permission</option>
+                  <option value="Security Controls">Security Controls</option>
+                </select>
+              </div>
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label className="form-label">Override Scope</label>
+                  <select
+                    value={restrictForm.scope}
+                    onChange={(e) => setRestrictForm(prev => ({ ...prev, scope: e.target.value }))}
+                    className="form-select"
+                  >
+                    <option value="None (Restricted)">None (Explicitly Restricted)</option>
+                    <option value="Read Only">Read Only Access</option>
+                    <option value="Read & Write">Read & Write Access</option>
+                    <option value="Full Access">Full Control Waiver</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Grant/Denial Type</label>
+                  <select
+                    value={restrictForm.type}
+                    onChange={(e) => setRestrictForm(prev => ({ ...prev, type: e.target.value }))}
+                    className="form-select"
+                  >
+                    <option value="Explicit Denial">Explicit Restriction Policy</option>
+                    <option value="Temporary Grant">Temporary Access Waiver</option>
+                    <option value="Special Waiver">Permanent Overwrite Waiver</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Expiry Boundary</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Permanent, 2026-06-30"
+                  value={restrictForm.expiry}
+                  onChange={(e) => setRestrictForm(prev => ({ ...prev, expiry: e.target.value }))}
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            <div className="rp-modal-footer">
+              <Button type="button" variant="outline" onClick={() => setShowRestrictModal(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">Authorize Override</Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* 5. Add Permission Module Modal */}
+      {showAddPermModal && (
+        <div className="rp-modal-overlay">
+          <form onSubmit={handleAddPermissionModule} className="rp-modal-container flex-column">
+            <div className="rp-modal-header">
+              <h3 className="rp-modal-title">
+                <Plus size={18} className="text-primary" /> Create New Permission Module
+              </h3>
+              <button type="button" className="rp-modal-close-btn" onClick={() => setShowAddPermModal(false)}><X size={16} /></button>
+            </div>
+
+            <div className="rp-modal-body">
+              <div className="form-group">
+                <label className="form-label required">Permission Module Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Asset Management, Inventory Control"
+                  value={newPermForm.name}
+                  onChange={(e) => setNewPermForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Default Access Level (Non-Admins)</label>
+                <select
+                  value={newPermForm.defaultLevel}
+                  onChange={(e) => setNewPermForm(prev => ({ ...prev, defaultLevel: e.target.value }))}
+                  className="form-select"
+                >
+                  <option value="Full">Full Access</option>
+                  <option value="Limited">Limited Access</option>
+                  <option value="View">View Only</option>
+                  <option value="No">No Access</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="rp-modal-footer">
+              <Button type="button" variant="outline" onClick={() => setShowAddPermModal(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">Add Module</Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Floating toast notifications container */}
+      <div className="page-toast-container">
+        {pageToasts.map((toast) => (
+          <div key={toast.id} className={`page-toast border-left-${toast.type}`}>
+            {toast.type === 'success' && <CheckCircle size={16} className="text-success mr-2" />}
+            {toast.type === 'danger' && <XCircle size={16} className="text-danger mr-2" />}
+            {toast.type === 'warning' && <AlertTriangle size={16} className="text-warning mr-2" />}
+            {toast.type === 'info' && <Info size={16} className="text-info mr-2" />}
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
+
+    </>
   );
 };
 
