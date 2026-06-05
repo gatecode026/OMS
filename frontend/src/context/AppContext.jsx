@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
-  mockEmployees,
   mockAttendance,
   mockLeaveRequests,
   mockTasks,
@@ -83,8 +82,10 @@ export const normalizeEmployee = (emp) => {
 };
 
 export const AppProvider = ({ children }) => {
-  // App Core States
-  const [employees, setEmployees] = useState(() => mockEmployees.map(normalizeEmployee));
+  const [employees, setEmployees] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [token, setToken] = useState(() => localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token') || '');
   const [attendance, setAttendance] = useState(mockAttendance);
   const [leaveRequests, setLeaveRequests] = useState(mockLeaveRequests);
   const [tasks, setTasks] = useState(mockTasks);
@@ -164,7 +165,7 @@ export const AppProvider = ({ children }) => {
     const userMap = {
       super_admin: employees.find(e => e.roleId === 'super_admin') || employees[0],
       branch_admin: employees.find(e => e.roleId === 'branch_admin'),
-      project_manager: employees.find(e => e.roleId === 'project_manager'),
+      manager: employees.find(e => e.roleId === 'manager'),
       team_leader: employees.find(e => e.roleId === 'team_leader'),
       employee: employees.find(e => e.roleId === 'employee')
     };
@@ -219,6 +220,8 @@ export const AppProvider = ({ children }) => {
       localStorage.setItem('saas_role', user.roleId);
       localStorage.setItem('saas_user_id', user.id);
 
+      setToken(token);
+
       // Merge backend loaded user metadata with existing local employee mock arrays
       setEmployees(prev => {
         const index = prev.findIndex(e => e.id === user.id);
@@ -252,7 +255,89 @@ export const AppProvider = ({ children }) => {
     setCurrentUserRole('super_admin');
     setCurrentUserId('');
     setCurrentUser(null);
+    setToken('');
   };
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      if (!token) {
+        setEmployees([]);
+        return;
+      }
+      try {
+        const response = await fetch('http://localhost:5000/api/v1/employees', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.status === 401) {
+          logout();
+          return;
+        }
+
+        const result = await response.json();
+        if (result.status === 'success') {
+          setEmployees((result.data || []).map(normalizeEmployee));
+        }
+      } catch (err) {
+        console.error('Failed to fetch employees from backend:', err);
+        setEmployees([]);
+      }
+    };
+
+    fetchEmployees();
+  }, [token]);
+
+  const fetchBranches = async () => {
+    if (!token) {
+      setBranches([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/branches', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setBranches(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch branches from backend:', err);
+      setBranches([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchBranches();
+  }, [token]);
+
+  const fetchDepartments = async () => {
+    if (!token) {
+      setDepartments([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/departments', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setDepartments(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch departments from backend:', err);
+      setDepartments([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchDepartments();
+  }, [token]);
 
   // Toast Handler
   const addToast = (type, message) => {
@@ -297,8 +382,9 @@ export const AppProvider = ({ children }) => {
   };
 
   // Employee CRUD Handlers
-  const addEmployee = (newEmp) => {
-    const generatedId = `EMP-2026-${String(employees.length + 1).padStart(3, '0')}`;
+  const addEmployee = async (newEmp) => {
+    const year = newEmp.joinDate ? new Date(newEmp.joinDate).getFullYear() : new Date().getFullYear();
+    const generatedId = `EMP-${year}-${100 + employees.length}`;
     const [firstName, ...restParts] = (newEmp.name || '').split(' ');
     const lastName = restParts.join('') || 'user';
     const defaultWorkEmail = firstName ? `${firstName.toLowerCase()}.${lastName.toLowerCase()}@saas.io` : `emp.${employees.length + 1}@saas.io`;
@@ -358,78 +444,264 @@ export const AppProvider = ({ children }) => {
       todayPunchStatus: 'Punched In',
       lastSeen: 'Just now'
     };
-    setEmployees(prev => [...prev, entry]);
-    addActivityLog(`Added new employee: ${entry.name}`, 'Employees', 'success');
-    addToast('success', `Employee ${entry.name} created successfully!`);
-    
-    // Increment User Count in Role Card
-    setRoles(prev =>
-      prev.map(r => (r.id === newEmp.roleId ? { ...r, userCount: r.userCount + 1 } : r))
-    );
+
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/employees', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(entry)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const savedEmp = normalizeEmployee(result.data);
+        setEmployees(prev => [...prev, savedEmp]);
+        addActivityLog(`Added new employee: ${savedEmp.name}`, 'Employees', 'success');
+        addToast('success', `Employee ${savedEmp.name} created successfully!`);
+        
+        // Increment User Count in Role Card
+        setRoles(prev =>
+          prev.map(r => (r.id === newEmp.roleId ? { ...r, userCount: r.userCount + 1 } : r))
+        );
+      } else {
+        addToast('error', result.message || 'Failed to save employee to database');
+      }
+    } catch (err) {
+      console.error('Error creating employee:', err);
+      addToast('error', 'Network error while creating employee');
+    }
   };
 
-  const updateEmployee = (id, updatedData) => {
-    setEmployees(prev =>
-      prev.map(e => (e.id === id ? { ...e, ...updatedData } : e))
-    );
-    addActivityLog(`Updated details for employee ID: ${id}`, 'Employees', 'success');
-    addToast('success', 'Employee details updated successfully!');
+  const updateEmployee = async (id, updatedData) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const savedEmp = normalizeEmployee(result.data);
+        setEmployees(prev =>
+          prev.map(e => (e.id === id ? savedEmp : e))
+        );
+        // Sync manager info in branches dynamically in real-time
+        setBranches(prev =>
+          prev.map(b => b.managerId === id ? {
+            ...b,
+            manager: savedEmp.name,
+            managerPhone: savedEmp.phone || '',
+            managerEmail: savedEmp.email || ''
+          } : b)
+        );
+        addActivityLog(`Updated details for employee ID: ${id}`, 'Employees', 'success');
+        addToast('success', 'Employee details updated successfully!');
+        fetchBranches();
+      } else {
+        addToast('error', result.message || 'Failed to update employee in database');
+      }
+    } catch (err) {
+      console.error('Error updating employee:', err);
+      addToast('error', 'Network error while updating employee');
+    }
   };
 
-  const deactivateEmployee = (id) => {
+  const deactivateEmployee = async (id) => {
     const emp = employees.find(e => e.id === id);
     if (!emp) return;
-    
-    setEmployees(prev =>
-      prev.map(e => (e.id === id ? { ...e, status: 'Inactive' } : e))
-    );
-    addActivityLog(`Deactivated employee: ${emp.name}`, 'Employees', 'danger');
-    addToast('warning', `Employee ${emp.name} has been deactivated.`);
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'Inactive' })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const updatedEmp = normalizeEmployee(result.data);
+        setEmployees(prev =>
+          prev.map(e => (e.id === id ? updatedEmp : e))
+        );
+        addActivityLog(`Deactivated employee: ${emp.name}`, 'Employees', 'danger');
+        addToast('warning', `Employee ${emp.name} has been deactivated.`);
+      } else {
+        addToast('error', result.message || 'Failed to deactivate employee in database');
+      }
+    } catch (err) {
+      console.error('Error deactivating employee:', err);
+      addToast('error', 'Network error while deactivating employee');
+    }
   };
 
-  const activateEmployee = (id) => {
+  const activateEmployee = async (id) => {
     const emp = employees.find(e => e.id === id);
     if (!emp) return;
-    
-    setEmployees(prev =>
-      prev.map(e => (e.id === id ? { ...e, status: 'Active' } : e))
-    );
-    addActivityLog(`Activated employee: ${emp.name}`, 'Employees', 'success');
-    addToast('success', `Employee ${emp.name} has been activated.`);
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'Active' })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const updatedEmp = normalizeEmployee(result.data);
+        setEmployees(prev =>
+          prev.map(e => (e.id === id ? updatedEmp : e))
+        );
+        addActivityLog(`Activated employee: ${emp.name}`, 'Employees', 'success');
+        addToast('success', `Employee ${emp.name} has been activated.`);
+      } else {
+        addToast('error', result.message || 'Failed to activate employee in database');
+      }
+    } catch (err) {
+      console.error('Error activating employee:', err);
+      addToast('error', 'Network error while activating employee');
+    }
   };
 
-
-  const bulkAssignRole = (ids, roleId) => {
+  const bulkAssignRole = async (ids, roleId) => {
     const roleObj = roles.find(r => r.id === roleId);
-    setEmployees(prev =>
-      prev.map(e => (ids.has(e.id) ? { ...e, roleId, role: roleObj ? roleObj.name : e.role } : e))
-    );
-    addActivityLog(`Bulk assigned role "${roleObj?.name}" to ${ids.size} employees`, 'Employees', 'success');
-    addToast('success', `Assigned role "${roleObj?.name}" to ${ids.size} employees.`);
+    try {
+      const updatePromises = Array.from(ids).map(async (id) => {
+        const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ roleId, role: roleObj ? roleObj.name : undefined })
+        });
+        const result = await response.json();
+        return result.status === 'success' ? normalizeEmployee(result.data) : null;
+      });
+
+      const updatedEmps = await Promise.all(updatePromises);
+      const validUpdates = updatedEmps.filter(Boolean);
+      
+      setEmployees(prev =>
+        prev.map(e => {
+          const match = validUpdates.find(u => u.id === e.id);
+          return match || e;
+        })
+      );
+      addActivityLog(`Bulk assigned role "${roleObj?.name}" to ${ids.size} employees`, 'Employees', 'success');
+      addToast('success', `Assigned role "${roleObj?.name}" to ${ids.size} employees.`);
+    } catch (err) {
+      console.error('Error during bulk role assignment:', err);
+      addToast('error', 'Network error during bulk role assignment');
+    }
   };
 
-  const bulkTransferDept = (ids, deptName) => {
-    setEmployees(prev =>
-      prev.map(e => (ids.has(e.id) ? { ...e, department: deptName } : e))
-    );
-    addActivityLog(`Bulk transferred ${ids.size} employees to department: ${deptName}`, 'Employees', 'success');
-    addToast('success', `Transferred ${ids.size} employees to ${deptName}.`);
+  const bulkTransferDept = async (ids, deptName) => {
+    try {
+      const updatePromises = Array.from(ids).map(async (id) => {
+        const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ department: deptName })
+        });
+        const result = await response.json();
+        return result.status === 'success' ? normalizeEmployee(result.data) : null;
+      });
+
+      const updatedEmps = await Promise.all(updatePromises);
+      const validUpdates = updatedEmps.filter(Boolean);
+      
+      setEmployees(prev =>
+        prev.map(e => {
+          const match = validUpdates.find(u => u.id === e.id);
+          return match || e;
+        })
+      );
+      addActivityLog(`Bulk transferred ${ids.size} employees to department: ${deptName}`, 'Employees', 'success');
+      addToast('success', `Transferred ${ids.size} employees to ${deptName}.`);
+    } catch (err) {
+      console.error('Error during bulk department transfer:', err);
+      addToast('error', 'Network error during bulk department transfer');
+    }
   };
 
-  const bulkUpdateStatus = (ids, status) => {
-    setEmployees(prev =>
-      prev.map(e => (ids.has(e.id) ? { ...e, status } : e))
-    );
-    addActivityLog(`Bulk updated status of ${ids.size} employees to "${status}"`, 'Employees', 'success');
-    addToast('success', `Updated status of ${ids.size} employees to "${status}".`);
+  const bulkUpdateStatus = async (ids, status) => {
+    try {
+      const updatePromises = Array.from(ids).map(async (id) => {
+        const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status })
+        });
+        const result = await response.json();
+        return result.status === 'success' ? normalizeEmployee(result.data) : null;
+      });
+
+      const updatedEmps = await Promise.all(updatePromises);
+      const validUpdates = updatedEmps.filter(Boolean);
+      
+      setEmployees(prev =>
+        prev.map(e => {
+          const match = validUpdates.find(u => u.id === e.id);
+          return match || e;
+        })
+      );
+      addActivityLog(`Bulk updated status of ${ids.size} employees to "${status}"`, 'Employees', 'success');
+      addToast('success', `Updated status of ${ids.size} employees to "${status}".`);
+    } catch (err) {
+      console.error('Error during bulk status update:', err);
+      addToast('error', 'Network error during bulk status update');
+    }
   };
 
-  const bulkAllocateLeave = (ids, leaveData) => {
-    setEmployees(prev =>
-      prev.map(e => (ids.has(e.id) ? { ...e, leaveBalance: (e.leaveBalance || 0) + (parseInt(leaveData) || 0) } : e))
-    );
-    addActivityLog(`Bulk allocated ${leaveData} leaves to ${ids.size} employees`, 'Employees', 'success');
-    addToast('success', `Allocated ${leaveData} leaves to ${ids.size} employees.`);
+  const bulkAllocateLeave = async (ids, leaveData) => {
+    try {
+      const increment = parseInt(leaveData) || 0;
+      const updatePromises = Array.from(ids).map(async (id) => {
+        const emp = employees.find(e => e.id === id);
+        if (!emp) return null;
+        
+        const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ leaveBalance: (emp.leaveBalance || 0) + increment })
+        });
+        const result = await response.json();
+        return result.status === 'success' ? normalizeEmployee(result.data) : null;
+      });
+
+      const updatedEmps = await Promise.all(updatePromises);
+      const validUpdates = updatedEmps.filter(Boolean);
+      
+      setEmployees(prev =>
+        prev.map(e => {
+          const match = validUpdates.find(u => u.id === e.id);
+          return match || e;
+        })
+      );
+      addActivityLog(`Bulk allocated ${leaveData} leaves to ${ids.size} employees`, 'Employees', 'success');
+      addToast('success', `Allocated ${leaveData} leaves to ${ids.size} employees.`);
+    } catch (err) {
+      console.error('Error during bulk leave allocation:', err);
+      addToast('error', 'Network error during bulk leave allocation');
+    }
   };
 
   const bulkSendNotification = (ids, message) => {
@@ -588,6 +860,148 @@ export const AppProvider = ({ children }) => {
     setTasks(prev => prev.filter(t => t.id !== id));
     addActivityLog(`Deleted task "${task.title}"`, 'Tasks', 'danger');
     addToast('warning', `Task "${task.title}" deleted.`);
+  };
+
+  const addBranch = async (newBranchData) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/branches', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newBranchData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setBranches(prev => [...prev, result.data]);
+        addToast('success', `Branch "${result.data.name}" added successfully!`);
+        addActivityLog(`Added new branch: ${result.data.name}`, 'Branches', 'success');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to add branch');
+      }
+    } catch (err) {
+      console.error('Error adding branch:', err);
+      addToast('error', 'Network error while adding branch');
+    }
+  };
+
+  const updateBranch = async (id, updatedFields) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/branches/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedFields)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setBranches(prev => prev.map(b => b.id === id ? result.data : b));
+        addActivityLog(`Updated branch ID: ${id}`, 'Branches', 'success');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to update branch');
+      }
+    } catch (err) {
+      console.error('Error updating branch:', err);
+      addToast('error', 'Network error while updating branch');
+    }
+  };
+
+  const deleteBranch = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/branches/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setBranches(prev => prev.filter(b => b.id !== id));
+        addToast('warning', `Branch removed successfully.`);
+        addActivityLog(`Deleted branch ID: ${id}`, 'Branches', 'danger');
+      } else {
+        addToast('error', result.message || 'Failed to delete branch');
+      }
+    } catch (err) {
+      console.error('Error deleting branch:', err);
+      addToast('error', 'Network error while deleting branch');
+    }
+  };
+
+  const addDepartment = async (newDeptData) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/departments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newDeptData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setDepartments(prev => [...prev, result.data]);
+        addToast('success', `Department "${result.data.name}" added successfully!`);
+        addActivityLog(`Added new department: ${result.data.name}`, 'Departments', 'success');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to add department');
+      }
+    } catch (err) {
+      console.error('Error adding department:', err);
+      addToast('error', 'Network error while adding department');
+    }
+  };
+
+  const updateDepartment = async (id, updatedFields) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/departments/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedFields)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setDepartments(prev => prev.map(d => d.id === id ? result.data : d));
+        addActivityLog(`Updated department ID: ${id}`, 'Departments', 'success');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to update department');
+      }
+    } catch (err) {
+      console.error('Error updating department:', err);
+      addToast('error', 'Network error while updating department');
+    }
+  };
+
+  const deleteDepartment = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/departments/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setDepartments(prev => prev.filter(d => d.id !== id));
+        addToast('warning', `Department removed successfully.`);
+        addActivityLog(`Deleted department ID: ${id}`, 'Departments', 'danger');
+      } else {
+        addToast('error', result.message || 'Failed to delete department');
+      }
+    } catch (err) {
+      console.error('Error deleting department:', err);
+      addToast('error', 'Network error while deleting department');
+    }
   };
 
   const reassignTask = (taskId, assigneeId, assigneeName) => {
@@ -829,6 +1243,14 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider
       value={{
         employees: employees.map(normalizeEmployee),
+        branches,
+        addBranch,
+        updateBranch,
+        deleteBranch,
+        departments,
+        addDepartment,
+        updateDepartment,
+        deleteDepartment,
         attendance,
         leaveRequests,
         tasks,

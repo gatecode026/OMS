@@ -1131,7 +1131,7 @@ const TaskMonitoring = () => {
                         <Badge variant={app.status === 'Approved' ? 'success' : app.status === 'Rejected' ? 'danger' : 'warning'}>
                           {app.status}
                         </Badge>
-                        {app.status === 'Pending' && (currentUserRole === 'super_admin' || (currentUserRole === 'project_manager' && app.level === 3) || (currentUserRole === 'team_leader' && app.level === 2)) && (
+                        {app.status === 'Pending' && (currentUserRole === 'super_admin' || (currentUserRole === 'manager' && app.level === 3) || (currentUserRole === 'team_leader' && app.level === 2)) && (
                           <div className="flex-center gap-1">
                             <button className="action-circle-btn approve-btn" onClick={() => handleApproveLevel(app.level)} title="Approve">✓</button>
                             <button className="action-circle-btn reject-btn" onClick={() => handleRejectLevel(app.level)} title="Reject">✗</button>

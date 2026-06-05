@@ -22,6 +22,7 @@ import globalRouter from './routes/index.js';
 
 const app = express();
 
+
 // ─── SECURITY MIDDLEWARES ────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors(corsOptions));
@@ -66,3 +67,5 @@ app.all('*', (req, res, next) => {
 app.use(errorMiddleware);
 
 export default app;
+
+
