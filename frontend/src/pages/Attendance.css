@@ -581,7 +581,7 @@
 }
 .att-filters-row select {
   height:36px; background:var(--bg-elevated); border:1px solid var(--border-color);
-  border-radius:var(--radius-md); color:var(--text-primary); padding:0 10px; font-size:.8rem; width:100%; cursor:pointer;
+  border-radius:var(--radius-md); color:var(--text-primary); padding:0 28px 0 10px; font-size:.8rem; width:100%; cursor:pointer;
 }
 .att-table-header-right { display:flex; align-items:center; gap:10px; }
 .att-status-summary-row { display:flex; flex-wrap:wrap; gap:8px; }

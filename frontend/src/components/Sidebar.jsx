@@ -90,7 +90,6 @@ const menuStructure = [
   {
     title: 'Administration',
     items: [
-      { name: 'Activity Logs', icon: ShieldAlert, path: '/activity-logs' },
       {
         name: 'Role & Permission',
         icon: Key,
@@ -105,8 +104,7 @@ const menuStructure = [
     title: 'System',
     items: [
       { name: 'System Settings', icon: Settings, path: '/settings' },
-      { name: 'Security Settings', icon: Lock, path: '/security' },
-      { name: 'Audit Logs', icon: Terminal, path: '/audit-logs' }
+      { name: 'Security & Audit Logs', icon: Lock, path: '/security' }
     ]
   },
   {
@@ -120,15 +118,21 @@ const menuStructure = [
 
 const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   const navigate = useNavigate();
-  const { sidebarCollapsed, setSidebarCollapsed, notifications, currentUserRole, logout } = useApp();
+  const { sidebarCollapsed, setSidebarCollapsed, notifications, currentUserRole, logout, sidebarDense, generalSettings } = useApp();
   const location = useLocation();
   const [expandedMenus, setExpandedMenus] = useState({});
+  const [isHovered, setIsHovered] = useState(false);
+
+  // When compact sidebar setting is ON, keep the sidebar collapsed, but expand on hover
+  const isCollapsedConfig = sidebarCollapsed || sidebarDense;
+  const effectiveCollapsed = isCollapsedConfig && !isHovered;
+  const companyName = generalSettings?.companyName || 'SaaS Admin';
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const toggleSubmenu = (menuName) => {
-    if (sidebarCollapsed) {
-      setSidebarCollapsed(false);
+    if (effectiveCollapsed) {
+      if (!sidebarDense) setSidebarCollapsed(false);
     }
     setExpandedMenus(prev => {
       const isCurrentlyExpanded = !!prev[menuName];
@@ -201,9 +205,9 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
         <>
           <div className="menu-item-content">
             <Icon size={18} className="menu-icon" />
-            {!sidebarCollapsed && <span className="menu-label-text">{item.name}</span>}
+            {!effectiveCollapsed && <span className="menu-label-text">{item.name}</span>}
           </div>
-          {!sidebarCollapsed && (
+          {!effectiveCollapsed && (
             <ChevronDown
               size={16}
               className={`submenu-chevron ${isExpanded ? 'rotated' : ''}`}
@@ -216,7 +220,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
               }}
             />
           )}
-          {sidebarCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
+          {effectiveCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
         </>
       );
 
@@ -229,23 +233,23 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                 toggleSubmenu(item.name);
                 setMobileOpen(false);
               }}
-              className={`menu-link menu-link-toggle ${isCurrentActive ? 'active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
-              title={sidebarCollapsed ? item.name : ''}
+              className={`menu-link menu-link-toggle ${isCurrentActive ? 'active' : ''} ${effectiveCollapsed ? 'justify-center' : ''}`}
+              title={effectiveCollapsed ? item.name : ''}
             >
               {triggerContent}
             </Link>
           ) : (
             <button
               onClick={() => toggleSubmenu(item.name)}
-              className={`menu-link menu-link-toggle ${sidebarCollapsed ? 'justify-center' : ''}`}
-              title={sidebarCollapsed ? item.name : ''}
+              className={`menu-link menu-link-toggle ${effectiveCollapsed ? 'justify-center' : ''}`}
+              title={effectiveCollapsed ? item.name : ''}
             >
               {triggerContent}
             </button>
           )}
           
           {/* Submenu entries */}
-          <div className={`submenu-wrapper ${isExpanded && !sidebarCollapsed ? 'expanded' : 'collapsed'}`}>
+          <div className={`submenu-wrapper ${isExpanded && !effectiveCollapsed ? 'expanded' : 'collapsed'}`}>
             {item.subItems.map(sub => {
               const subActive = isActive(sub.path);
               return (
@@ -271,12 +275,12 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
           key={item.name}
           href="/logout"
           onClick={handleLogout}
-          className={`menu-link menu-link-danger ${sidebarCollapsed ? 'justify-center' : ''}`}
-          title={sidebarCollapsed ? item.name : ''}
+          className={`menu-link menu-link-danger ${effectiveCollapsed ? 'justify-center' : ''}`}
+          title={effectiveCollapsed ? item.name : ''}
         >
           <Icon size={18} className="menu-icon" />
-          {!sidebarCollapsed && <span className="menu-label-text">{item.name}</span>}
-          {sidebarCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
+          {!effectiveCollapsed && <span className="menu-label-text">{item.name}</span>}
+          {effectiveCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
         </a>
       );
     }
@@ -286,17 +290,17 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
         key={item.name}
         to={item.path}
         onClick={() => setMobileOpen(false)}
-        className={`menu-link ${isCurrentActive ? 'active' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
-        title={sidebarCollapsed ? item.name : ''}
+        className={`menu-link ${isCurrentActive ? 'active' : ''} ${effectiveCollapsed ? 'justify-center' : ''}`}
+        title={effectiveCollapsed ? item.name : ''}
       >
         <div className="menu-item-content">
           <Icon size={18} className="menu-icon" />
-          {!sidebarCollapsed && <span className="menu-label-text">{item.name}</span>}
+          {!effectiveCollapsed && <span className="menu-label-text">{item.name}</span>}
         </div>
-        {!sidebarCollapsed && item.badgeKey === 'notifications' && unreadCount > 0 && (
+        {!effectiveCollapsed && item.badgeKey === 'notifications' && unreadCount > 0 && (
           <span className="sidebar-badge">{unreadCount}</span>
         )}
-        {sidebarCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
+        {effectiveCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
       </Link>
     );
   };
@@ -313,9 +317,17 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
       {/* Main Sidebar */}
       <aside
-        className={`app-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${
+        className={`app-sidebar ${effectiveCollapsed ? 'collapsed' : ''} ${
           mobileOpen ? 'mobile-show' : ''
         }`}
+        onMouseEnter={() => {
+          if (isCollapsedConfig) {
+            setIsHovered(true);
+          }
+        }}
+        onMouseLeave={() => {
+          setIsHovered(false);
+        }}
       >
         {/* Sidebar Header / Logo */}
         <div className="sidebar-header">
@@ -323,7 +335,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
             <div className="logo-icon-holder">
               <Sparkles size={18} className="logo-spark" />
             </div>
-            {!sidebarCollapsed && <span className="sidebar-brand-name">SaaS Admin</span>}
+            {!effectiveCollapsed && <span className="sidebar-brand-name">{companyName}</span>}
           </Link>
         </div>
 
@@ -331,7 +343,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
         <div className="sidebar-menu-container sidebar-scroll">
           {filterMenuByRole(menuStructure, currentUserRole).map((section) => (
             <div key={section.title} className="sidebar-section">
-              {!sidebarCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
+              {!effectiveCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
               <div className="sidebar-section-items">
                 {section.items.map((item) => renderItem(item))}
               </div>

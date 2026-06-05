@@ -12,10 +12,12 @@
   z-index: 900;
   transition: var(--transition-all);
   flex-shrink: 0;
+  overflow-x: hidden;
 }
 
 .app-sidebar.collapsed {
   width: var(--sidebar-width-collapsed);
+  overflow: visible;
 }
 
 /* Header & Logo */

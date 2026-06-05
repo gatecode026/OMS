@@ -28,19 +28,18 @@ const TeamLeaders = lazy(() => import('./pages/TeamLeaders'));
 const Projects = lazy(() => import('./pages/projects/index'));
 const Performance = lazy(() => import('./pages/Performance'));
 const Notifications = lazy(() => import('./pages/Notifications'));
-const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
+// const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
 const Announcements = lazy(() => import('./pages/Announcements'));
 const Documents = lazy(() => import('./pages/Documents'));
 const SystemSettings = lazy(() => import('./pages/SystemSettings'));
-const Profile = lazy(() => import('./pages/Profile'));
+const ProfileSettings = lazy(() => import('./pages/ProfileSettings'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Placeholder = lazy(() => import('./pages/Placeholder'));
 
 // New completed modules
 const Workflows = lazy(() => import('./pages/Workflows'));
 const WorkReports = lazy(() => import('./pages/WorkReports'));
-const Security = lazy(() => import('./pages/Security'));
-const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const SecurityAudit = lazy(() => import('./pages/SecurityAudit'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 const Managers = lazy(() => import('./pages/Managers'));
 
@@ -88,14 +87,14 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
                 {/* ── Administration & Security (Centralized Role Restricted) ── */}
                 <Route path="/permissions" element={<RolesPermissions />} />
-                <Route path="/activity-logs" element={<ActivityLogs />} />
-                <Route path="/security" element={<Security />} />
-                <Route path="/audit-logs" element={<AuditLogs />} />
+                <Route path="/activity-logs" element={<Navigate to="/security" replace />} />
+                <Route path="/security" element={<SecurityAudit />} />
+                <Route path="/audit-logs" element={<SecurityAudit />} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/settings" element={<SystemSettings />} />
 
                 {/* ── Account ── */}
-                <Route path="/profile" element={<Profile />} />
+                <Route path="/profile" element={<ProfileSettings />} />
 
               </Route>
 
