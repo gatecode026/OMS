@@ -345,6 +345,23 @@ export const mockRoles = [
     }
   },
   {
+    id: 'dept_admin',
+    name: 'Department Admin',
+    description: 'Access to employees, attendance, and tasks within the assigned department.',
+    userCount: 5,
+    accentColor: '#8b5cf6',
+    permissions: {
+      dashboard: { create: false, read: true, update: false, delete: false },
+      employees: { create: true, read: true, update: true, delete: false },
+      attendance: { create: true, read: true, update: true, delete: false },
+      leaves: { create: true, read: true, update: true, delete: true },
+      tasks: { create: true, read: true, update: true, delete: true },
+      payroll: { create: false, read: false, update: false, delete: false },
+      permissions: { create: false, read: true, update: false, delete: false },
+      settings: { create: false, read: true, update: false, delete: false }
+    }
+  },
+  {
     id: 'branch_admin',
     name: 'Branch Admin',
     description: 'Access to employees, attendance, payroll, and tasks within the assigned branch.',
@@ -460,7 +477,7 @@ const baseEmployees = [
     id: 'EMP-2026-005', name: 'Priya Patel', email: 'priya.patel@saas.com',
     phone: '+81 3 5555 0143', dob: '1994-12-05', gender: 'Female',
     department: 'Marketing', branch: 'Mumbai', team: 'Digital Marketing',
-    role: 'Branch Admin', roleId: 'branch_admin', joinDate: '2023-11-01',
+    role: 'Department Admin', roleId: 'dept_admin', joinDate: '2023-11-01',
     status: 'Active', avatar: '', designation: 'Marketing Director APAC',
     teamLeader: 'Priya Patel', projectManager: 'Aarav Sharma',
     nationality: 'Indian', emergencyContactName: 'Suresh Patel', emergencyContactPhone: '+91 98765 10005',

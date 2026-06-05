@@ -50,7 +50,7 @@ const PAGES = [
   { name: 'Branches', path: '/branches', icon: 'network', desc: 'Multi-branch management' },
   { name: 'Team Management', path: '/teams', icon: 'users', desc: 'Manage teams, leaders, and projects' },
   { name: 'Roles & Permissions', path: '/permissions', icon: 'shield', desc: 'RBAC access control' },
-  { name: 'Activity Logs', path: '/activity-logs', icon: 'hash', desc: 'Audit trail & system events' },
+  { name: 'Security & Audit Logs', path: '/security', icon: 'shield', desc: 'SOC settings and audit logs' },
   { name: 'Reports & Analytics', path: '/reports', icon: 'briefcase', desc: 'Generate data reports' },
   { name: 'Settings', path: '/settings', icon: 'hash', desc: 'System preferences' },
 ];

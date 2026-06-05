@@ -51,12 +51,10 @@ const navigationItems = [
   { name: 'Announcements', path: '/announcements', section: 'Communication', icon: Megaphone },
   { name: 'Notifications', path: '/notifications', section: 'Communication', icon: Bell },
   { name: 'Document Management', path: '/documents', section: 'Communication', icon: FolderClosed },
-  { name: 'Activity Logs', path: '/activity-logs', section: 'Administration', icon: ShieldAlert },
   { name: 'User Access Control', path: '/permissions', section: 'Administration', icon: Key },
   { name: 'Reports and Analytics', path: '/reports', section: 'Administration', icon: AreaChart },
   { name: 'System Settings', path: '/settings', section: 'System', icon: Settings },
-  { name: 'Security Settings', path: '/security', section: 'System', icon: Lock },
-  { name: 'Audit Logs', path: '/audit-logs', section: 'System', icon: Terminal },
+  { name: 'Security & Audit Logs', path: '/security', section: 'System', icon: Lock },
   { name: 'Profile Settings', path: '/profile', section: 'Account', icon: UserSquare2 },
   { name: 'Logout', path: '/logout', section: 'Account', icon: LogOut, isDanger: true }
 ];
