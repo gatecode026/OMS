@@ -276,7 +276,14 @@ const branchRanking = [
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees } = useApp();
+  const { addToast, showConfirm, employees, branches, departments, addBranch, updateBranch, deleteBranch } = useApp();
+
+  const getBranchDepartments = (b) => {
+    if (!b) return [];
+    const dbDepts = (departments || []).filter(d => d.branch === b.name).map(d => d.name);
+    if (dbDepts.length > 0) return dbDepts;
+    return b.departments || [];
+  };
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -287,7 +294,13 @@ const Branches = () => {
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'detail'
   const [localEmpSearch, setLocalEmpSearch] = useState('');
 
-  const [branches, setBranches] = useState(mockBranches);
+  // Auto-select first branch when branches list loads
+  useEffect(() => {
+    if (branches && branches.length > 0 && !branches.some(b => b.id === selectedBranchId)) {
+      setSelectedBranchId(branches[0].id);
+    }
+  }, [branches, selectedBranchId]);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -311,14 +324,20 @@ const Branches = () => {
     addToast('success', `Successfully downloaded "${docName}"`);
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
     // Add the file name to selectedBranch's documents list
     const docFile = file.name;
-    setBranches(prev => prev.map(b => b.id === selectedBranchId ? { ...b, documents: [...(b.documents || []), docFile] } : b));
-    addToast('success', `Uploaded "${docFile}" to branch vault.`);
+    const targetBranch = branches.find(b => b.id === selectedBranchId);
+    if (targetBranch) {
+      const updatedDocs = [...(targetBranch.documents || []), docFile];
+      const result = await updateBranch(selectedBranchId, { documents: updatedDocs });
+      if (result) {
+        addToast('success', `Uploaded "${docFile}" to branch vault.`);
+      }
+    }
     
     // Reset file input value so same file can be selected again
     e.target.value = '';
@@ -326,8 +345,8 @@ const Branches = () => {
 
   // Form states
   const [newBranch, setNewBranch] = useState({
-    name: '', code: '', country: 'India', flag: '🇮🇳',
-    manager: '', managerEmail: '', managerPhone: '',
+    name: '', code: '', flag: '🇮🇳',
+    manager: '', managerPhone: '',
     address: '', city: '', state: '', zipCode: '', phone: '', email: '',
     status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
     revenue: 500000, departments: ['Sales', 'Marketing'],
@@ -345,8 +364,8 @@ const Branches = () => {
   const [managerUpdate, setManagerUpdate] = useState({
     branchId: 'BR-001',
     name: '',
-    email: '',
-    phone: ''
+    phone: '',
+    email: ''
   });
 
   // WFH requests list
@@ -365,92 +384,108 @@ const Branches = () => {
     { id: 5, text: 'Marketing Department added to Mumbai Branch', time: '3 days ago', type: 'success' }
   ]);
 
-  // Dropdown options and custom additions
-  const [availableManagers, setAvailableManagers] = useState([
-    { name: 'Aarav Sharma', email: 'aarav.sharma@company.com', phone: '+91 98765 43210' },
-    { name: 'Vikram Singh', email: 'vikram.singh@company.com', phone: '+91 98110 22334' },
-    { name: 'Priya Patel', email: 'priya.patel@company.com', phone: '+91 98222 33445' },
-    { name: 'Poojan Patel', email: 'poojan.patel@company.com', phone: '+91 98765 11223' },
-    { name: 'Kavya Iyer', email: 'kavya.iyer@company.com', phone: '+91 98456 78901' },
-    { name: 'Sanjay Das', email: 'sanjay.das@company.com', phone: '+91 98345 67890' }
-  ]);
-
-  // Combine static managers list with the employees loaded from context
+  // Filter employees loaded from context to only display those with manager roles
   const combinedAvailableManagers = useMemo(() => {
-    const baseList = [...availableManagers];
-    if (employees && employees.length > 0) {
-      employees.forEach(emp => {
-        const alreadyExists = baseList.some(m => m.name.toLowerCase() === emp.name.toLowerCase());
-        if (!alreadyExists) {
-          baseList.push({
-            name: emp.name,
-            email: emp.workEmail || emp.email || '',
-            phone: emp.phone || ''
-          });
-        }
-      });
-    }
-    return baseList;
-  }, [availableManagers, employees]);
+    if (!employees || employees.length === 0) return [];
+    return employees
+      .filter(emp => emp.roleId === 'manager' || emp.role === 'Manager')
+      .map(emp => ({
+        name: emp.name,
+        phone: emp.phone || '',
+        email: emp.email || ''
+      }));
+  }, [employees]);
 
   const [availableDepts, setAvailableDepts] = useState([
     'Operations', 'Sales', 'Marketing', 'IT', 'HR', 'Finance', 'Legal', 'R&D', 'Engineering', 'Support', 'Product', 'QA', 'DevOps', 'Customer Service'
   ]);
 
-  const [newManagerDetails, setNewManagerDetails] = useState({ name: '', email: '', phone: '' });
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [newDeptInput, setNewDeptInput] = useState('');
 
-  const handleAddNewManagerAddBranch = () => {
-    if (!newManagerDetails.name.trim()) {
-      addToast('warning', 'Please enter a manager name');
-      return;
-    }
-    const exists = combinedAvailableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
-    if (exists) {
-      addToast('warning', 'Manager with this name already exists');
-      return;
-    }
-    const newMgr = {
-      name: newManagerDetails.name.trim(),
-      email: newManagerDetails.email.trim(),
-      phone: newManagerDetails.phone.trim()
+  // Address autocomplete states
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [isLoadingAddressSuggestions, setIsLoadingAddressSuggestions] = useState(false);
+  const addressDebounceTimeoutRef = useRef(null);
+  const autocompleteContainerRef = useRef(null);
+
+  // Click outside listener for closing address suggestions
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (autocompleteContainerRef.current && !autocompleteContainerRef.current.contains(e.target)) {
+        setShowAddressSuggestions(false);
+      }
     };
-    setAvailableManagers(prev => [...prev, newMgr]);
-    setNewBranch(prev => ({
-      ...prev,
-      manager: newMgr.name,
-      managerEmail: newMgr.email,
-      managerPhone: newMgr.phone
-    }));
-    setNewManagerDetails({ name: '', email: '', phone: '' });
-    addToast('success', `Manager "${newMgr.name}" added and selected!`);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (addressDebounceTimeoutRef.current) {
+        clearTimeout(addressDebounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleAddressChange = (e) => {
+    const val = e.target.value;
+    setNewBranch(prev => ({ ...prev, address: val }));
+
+    if (addressDebounceTimeoutRef.current) {
+      clearTimeout(addressDebounceTimeoutRef.current);
+    }
+
+    if (!val.trim()) {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+      return;
+    }
+
+    setShowAddressSuggestions(true);
+    setIsLoadingAddressSuggestions(true);
+
+    addressDebounceTimeoutRef.current = setTimeout(() => {
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&addressdetails=1&limit=5`)
+        .then(res => {
+          if (!res.ok) throw new Error('API request failed');
+          return res.json();
+        })
+        .then(data => {
+          setAddressSuggestions(data || []);
+          setIsLoadingAddressSuggestions(false);
+        })
+        .catch(err => {
+          console.error('Error fetching address suggestions:', err);
+          setIsLoadingAddressSuggestions(false);
+        });
+    }, 500);
   };
 
-  const handleAddNewManagerChangeManager = () => {
-    if (!newManagerDetails.name.trim()) {
-      addToast('warning', 'Please enter a manager name');
-      return;
+  const handleSelectAddressSuggestion = (suggestion) => {
+    const addr = suggestion.address || {};
+    
+    // Prioritize actual city or district over sub-localities (town, village, suburb) to avoid places like "Kukas" overriding the city name.
+    let cityVal = addr.city || addr.state_district || addr.city_district || addr.county || addr.town || addr.village || addr.municipality || addr.suburb || '';
+    
+    // Remove administrative suffixes if present (e.g. "Jaipur District" -> "Jaipur", "Amber Tehsil" -> "Amber")
+    if (cityVal) {
+      cityVal = cityVal.replace(/\s+(District|Tehsil|Division|Taluk|Subdivision|Urban|Rural)$/i, '');
     }
-    const exists = combinedAvailableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
-    if (exists) {
-      addToast('warning', 'Manager with this name already exists');
-      return;
-    }
-    const newMgr = {
-      name: newManagerDetails.name.trim(),
-      email: newManagerDetails.email.trim(),
-      phone: newManagerDetails.phone.trim()
-    };
-    setAvailableManagers(prev => [...prev, newMgr]);
-    setManagerUpdate(prev => ({
+
+    const stateVal = addr.state || addr.state_district || '';
+
+    setNewBranch(prev => ({
       ...prev,
-      name: newMgr.name,
-      email: newMgr.email,
-      phone: newMgr.phone
+      address: suggestion.display_name,
+      city: cityVal,
+      state: stateVal
     }));
-    setNewManagerDetails({ name: '', email: '', phone: '' });
-    addToast('success', `Manager "${newMgr.name}" added and selected!`);
+
+    setShowAddressSuggestions(false);
+    setAddressSuggestions([]);
   };
 
   // Close department dropdown on click outside
@@ -464,36 +499,11 @@ const Branches = () => {
     return () => document.removeEventListener('click', handleClose);
   }, [showDeptDropdown]);
 
-  const handleAddBranchSubmit = (e) => {
+  const handleAddBranchSubmit = async (e) => {
     e.preventDefault();
     
     let managerName = newBranch.manager;
-    let managerEmail = newBranch.managerEmail;
     let managerPhone = newBranch.managerPhone;
-    
-    // Automatically save manager if "ADD_NEW" is selected and details are filled in
-    if (newBranch.manager === 'ADD_NEW') {
-      if (!newManagerDetails.name.trim()) {
-        addToast('warning', 'Please enter a manager name or select an existing one');
-        return;
-      }
-      const exists = combinedAvailableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
-      let newMgr;
-      if (exists) {
-        newMgr = combinedAvailableManagers.find(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
-      } else {
-        newMgr = {
-          name: newManagerDetails.name.trim(),
-          email: newManagerDetails.email.trim(),
-          phone: newManagerDetails.phone.trim()
-        };
-        setAvailableManagers(prev => [...prev, newMgr]);
-      }
-      managerName = newMgr.name;
-      managerEmail = newMgr.email;
-      managerPhone = newMgr.phone;
-      setNewManagerDetails({ name: '', email: '', phone: '' });
-    }
 
     if (!newBranch.name || !newBranch.code || !managerName) {
       addToast('warning', 'Please fill in Name, Code, and select a valid Manager');
@@ -515,13 +525,14 @@ const Branches = () => {
     const empMatch = (employees || []).find(e => e.name.toLowerCase() === managerName.toLowerCase());
     const managerId = empMatch ? empMatch.id : 'EMP-2026-' + String(combinedAvailableManagers.findIndex(m => m.name === managerName) + 1).padStart(3, '0');
 
-    const newId = `BR-00${branches.length + 1}`;
+    const newId = `BR-${Date.now().toString().slice(-4)}`;
+    const { country, ...restNewBranch } = newBranch;
     const formattedBranch = {
-      ...newBranch,
+      ...restNewBranch,
       id: newId,
       manager: managerName,
-      managerEmail: managerEmail,
       managerPhone: managerPhone,
+      managerEmail: empMatch ? empMatch.email : (newBranch.managerEmail || ''),
       managerId: managerId,
       departments: finalDepts,
       projects: { active: 3, completed: 5, delayed: 0, pending: 1 },
@@ -531,16 +542,17 @@ const Branches = () => {
       documents: ['License.pdf'],
       color: ['#3b82f6', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b', '#ec489a'][branches.length % 6]
     };
-    setBranches(prev => [...prev, formattedBranch]);
-    setActivities(prev => [
-      { id: Date.now(), text: `New Branch Created: ${newBranch.name} (${newBranch.code})`, time: 'Just now', type: 'success' },
-      ...prev
-    ]);
-    addToast('success', `Branch "${newBranch.name}" added successfully!`);
-    setShowAddModal(false);
+    const result = await addBranch(formattedBranch);
+    if (result) {
+      setActivities(prev => [
+        { id: Date.now(), text: `New Branch Created: ${newBranch.name} (${newBranch.code})`, time: 'Just now', type: 'success' },
+        ...prev
+      ]);
+      setShowAddModal(false);
+    }
   };
 
-  const handleTransferSubmit = (e) => {
+  const handleTransferSubmit = async (e) => {
     e.preventDefault();
     if (!transfer.employeeName) {
       addToast('warning', 'Please enter employee name');
@@ -554,55 +566,30 @@ const Branches = () => {
       return;
     }
 
-    setBranches(prev => prev.map(b => {
-      if (b.id === transfer.fromBranchId) {
-        return { ...b, employeeCount: Math.max(0, b.employeeCount - 1) };
-      }
-      if (b.id === transfer.toBranchId) {
-        return { ...b, employeeCount: b.employeeCount + 1 };
-      }
-      return b;
-    }));
+    // Call updateBranch to persist on the server
+    const updatedFrom = await updateBranch(transfer.fromBranchId, { 
+      employeeCount: Math.max(0, fromBranch.employeeCount - 1) 
+    });
+    const updatedTo = await updateBranch(transfer.toBranchId, { 
+      employeeCount: toBranch.employeeCount + 1 
+    });
 
-    setActivities(prev => [
-      { id: Date.now(), text: `${transfer.employeeName} transferred from ${fromBranch.name} to ${toBranch.name}`, time: 'Just now', type: 'info' },
-      ...prev
-    ]);
-
-    addToast('success', `${transfer.employeeName} transferred to ${toBranch.name}!`);
-    setShowTransferModal(false);
+    if (updatedFrom && updatedTo) {
+      setActivities(prev => [
+        { id: Date.now(), text: `${transfer.employeeName} transferred from ${fromBranch.name} to ${toBranch.name}`, time: 'Just now', type: 'info' },
+        ...prev
+      ]);
+      addToast('success', `${transfer.employeeName} transferred to ${toBranch.name}!`);
+      setShowTransferModal(false);
+    }
   };
 
-  const handleManagerSubmit = (e) => {
+  const handleManagerSubmit = async (e) => {
     e.preventDefault();
     
     let managerName = managerUpdate.name;
-    let managerEmail = managerUpdate.email;
     let managerPhone = managerUpdate.phone;
-    
-    // Automatically save manager if "ADD_NEW" is selected and details are filled in
-    if (managerUpdate.name === 'ADD_NEW') {
-      if (!newManagerDetails.name.trim()) {
-        addToast('warning', 'Please enter a manager name or select an existing one');
-        return;
-      }
-      const exists = combinedAvailableManagers.some(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
-      let newMgr;
-      if (exists) {
-        newMgr = combinedAvailableManagers.find(m => m.name.toLowerCase() === newManagerDetails.name.trim().toLowerCase());
-      } else {
-        newMgr = {
-          name: newManagerDetails.name.trim(),
-          email: newManagerDetails.email.trim(),
-          phone: newManagerDetails.phone.trim()
-        };
-        setAvailableManagers(prev => [...prev, newMgr]);
-      }
-      managerName = newMgr.name;
-      managerEmail = newMgr.email;
-      managerPhone = newMgr.phone;
-      setNewManagerDetails({ name: '', email: '', phone: '' });
-    }
+    let managerEmail = managerUpdate.email;
 
     if (!managerName) {
       addToast('warning', 'Please enter manager name');
@@ -611,36 +598,35 @@ const Branches = () => {
 
     const empMatch = (employees || []).find(e => e.name.toLowerCase() === managerName.toLowerCase());
     const managerId = empMatch ? empMatch.id : 'EMP-2026-' + String(combinedAvailableManagers.findIndex(m => m.name === managerName) + 1).padStart(3, '0');
+    const finalEmail = empMatch ? empMatch.email : managerEmail;
 
-    setBranches(prev => prev.map(b => {
-      if (b.id === managerUpdate.branchId) {
-        return {
-          ...b,
-          manager: managerName,
-          managerEmail: managerEmail,
-          managerPhone: managerPhone,
-          managerId: managerId
-        };
-      }
-      return b;
-    }));
+    const result = await updateBranch(managerUpdate.branchId, {
+      manager: managerName,
+      managerPhone: managerPhone,
+      managerId: managerId,
+      managerEmail: finalEmail
+    });
 
-    const targetBranch = branches.find(b => b.id === managerUpdate.branchId);
-    setActivities(prev => [
-      { id: Date.now(), text: `Manager updated for ${targetBranch.name}: ${managerName}`, time: 'Just now', type: 'success' },
-      ...prev
-    ]);
-
-    addToast('success', `Manager updated for ${targetBranch.name}!`);
-    setShowManagerModal(false);
+    if (result) {
+      const targetBranch = branches.find(b => b.id === managerUpdate.branchId);
+      setActivities(prev => [
+        { id: Date.now(), text: `Manager updated for ${targetBranch.name}: ${managerName}`, time: 'Just now', type: 'success' },
+        ...prev
+      ]);
+      addToast('success', `Manager updated for ${targetBranch.name}!`);
+      setShowManagerModal(false);
+    }
   };
 
-  const handleWfhApproval = (reqId, isApproved) => {
+  const handleWfhApproval = async (reqId, isApproved) => {
     setWfhRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: isApproved ? 'Approved' : 'Rejected' } : r));
     const req = wfhRequests.find(r => r.id === reqId);
     
     if (isApproved) {
-      setBranches(prev => prev.map(b => b.id === req.branchId ? { ...b, employeesOnLeave: b.employeesOnLeave + 1 } : b));
+      const targetBranch = branches.find(b => b.id === req.branchId);
+      if (targetBranch) {
+        await updateBranch(req.branchId, { employeesOnLeave: targetBranch.employeesOnLeave + 1 });
+      }
     }
 
     setActivities(prev => [
@@ -651,29 +637,40 @@ const Branches = () => {
     addToast(isApproved ? 'success' : 'warning', `WFH request for ${req.employeeName} ${isApproved ? 'Approved' : 'Rejected'}.`);
   };
 
-  const handleUploadDocument = (e) => {
+  const handleUploadDocument = async (e) => {
     e.preventDefault();
     if (!newDocName.trim()) {
       addToast('warning', 'Please enter document name');
       return;
     }
     const docFile = newDocName.endsWith('.pdf') ? newDocName : `${newDocName}.pdf`;
-    setBranches(prev => prev.map(b => b.id === selectedBranchId ? { ...b, documents: [...(b.documents || []), docFile] } : b));
-    addToast('success', `Uploaded "${docFile}" to branch vault.`);
-    setNewDocName('');
+    const targetBranch = branches.find(b => b.id === selectedBranchId);
+    if (targetBranch) {
+      const updatedDocs = [...(targetBranch.documents || []), docFile];
+      const result = await updateBranch(selectedBranchId, { documents: updatedDocs });
+      if (result) {
+        addToast('success', `Uploaded "${docFile}" to branch vault.`);
+        setNewDocName('');
+      }
+    }
   };
 
   const handleDeleteDocument = (docFile) => {
-    showConfirm('Delete Document', `Are you sure you want to delete "${docFile}"?`, () => {
-      setBranches(prev => prev.map(b => b.id === selectedBranchId ? { ...b, documents: (b.documents || []).filter(d => d !== docFile) } : b));
-      addToast('warning', `Deleted "${docFile}" from vault.`);
+    showConfirm('Delete Document', `Are you sure you want to delete "${docFile}"?`, async () => {
+      const targetBranch = branches.find(b => b.id === selectedBranchId);
+      if (targetBranch) {
+        const updatedDocs = (targetBranch.documents || []).filter(d => d !== docFile);
+        const result = await updateBranch(selectedBranchId, { documents: updatedDocs });
+        if (result) {
+          addToast('warning', `Deleted "${docFile}" from vault.`);
+        }
+      }
     }, 'danger');
   };
 
   const filteredBranches = useMemo(() => {
     return branches.filter(b => {
       const matchesSearch = b.name.toLowerCase().includes(search.toLowerCase()) ||
-        b.country.toLowerCase().includes(search.toLowerCase()) ||
         b.manager.toLowerCase().includes(search.toLowerCase()) ||
         b.city.toLowerCase().includes(search.toLowerCase());
       
@@ -754,9 +751,9 @@ const Branches = () => {
   const handleExportCSV = () => {
     addToast('info', 'Compiling report...');
     setTimeout(() => {
-      const headers = ['ID','Code','Name','Manager','Country','City','Status','Employees','Attendance','Productivity','Revenue'];
+      const headers = ['ID','Code','Name','Manager','City','Status','Employees','Attendance','Productivity','Revenue'];
       const rows = branches.map(b => [
-        b.id, b.code, b.name, b.manager, b.country, b.city, b.status, b.employeeCount, b.attendance, b.productivity, b.revenue
+        b.id, b.code, b.name, b.manager, b.city, b.status, b.employeeCount, b.attendance, b.productivity, b.revenue
       ]);
       const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
@@ -815,13 +812,37 @@ const Branches = () => {
 
                   <div className="form-group-row">
                     <div className="form-group">
-                      <label>Country *</label>
-                      <input type="text" required value={newBranch.country} onChange={e => setNewBranch({...newBranch, country: e.target.value})} />
-                    </div>
-                    <div className="form-group">
                       <label>Established Date</label>
                       <input type="date" value={newBranch.established} onChange={e => setNewBranch({...newBranch, established: e.target.value})} />
                     </div>
+                  </div>
+
+                  <div className="form-group address-autocomplete-container" ref={autocompleteContainerRef}>
+                    <label>Full Physical Address *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newBranch.address}
+                      onChange={handleAddressChange}
+                      placeholder="Full location coordinates..."
+                      autoComplete="off"
+                    />
+                    {showAddressSuggestions && isLoadingAddressSuggestions && (
+                      <div className="address-suggestions-loading">Searching address suggestions...</div>
+                    )}
+                    {showAddressSuggestions && !isLoadingAddressSuggestions && addressSuggestions.length > 0 && (
+                      <ul className="address-suggestions-list">
+                        {addressSuggestions.map((suggestion) => (
+                          <li
+                            key={suggestion.place_id}
+                            className="address-suggestion-item"
+                            onClick={() => handleSelectAddressSuggestion(suggestion)}
+                          >
+                            {suggestion.display_name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   <div className="form-group-row">
@@ -836,201 +857,45 @@ const Branches = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Full Physical Address *</label>
-                    <input type="text" required value={newBranch.address} onChange={e => setNewBranch({...newBranch, address: e.target.value})} placeholder="Full location coordinates..." />
-                  </div>
-
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Manager Name *</label>
-                      <select
-                        value={newBranch.manager}
-                        onChange={e => {
-                          const val = e.target.value;
-                          if (val === 'ADD_NEW') {
-                            setNewBranch(prev => ({ ...prev, manager: 'ADD_NEW', managerEmail: '', managerPhone: '' }));
-                          } else {
-                            const m = combinedAvailableManagers.find(x => x.name === val);
-                            setNewBranch(prev => ({
-                              ...prev,
-                              manager: val,
-                              managerEmail: m ? m.email : '',
-                              managerPhone: m ? m.phone : ''
-                            }));
-                          }
-                        }}
-                        required
-                      >
-                        <option value="">Select Manager</option>
-                        {combinedAvailableManagers.map(m => (
-                          <option key={m.name} value={m.name}>{m.name}</option>
-                        ))}
-                        <option value="ADD_NEW" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>+ Add New Manager...</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Manager Email</label>
-                      <input type="email" value={newBranch.managerEmail || ''} readOnly placeholder="Auto-populated" />
-                    </div>
-                  </div>
-
-                  {newBranch.manager === 'ADD_NEW' && (
-                    <div className="inline-add-card animate-fade-in" style={{ gridColumn: 'span 2', padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '12px' }}>
-                      <h4 style={{ fontSize: '0.78rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Add New Manager Details</h4>
-                      <div className="form-group-row">
-                        <div className="form-group">
-                          <label>New Manager Name *</label>
-                          <input
-                            type="text"
-                            value={newManagerDetails.name}
-                            onChange={e => setNewManagerDetails(p => ({ ...p, name: e.target.value }))}
-                            placeholder="Name"
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Email ID</label>
-                          <input
-                            type="email"
-                            value={newManagerDetails.email}
-                            onChange={e => setNewManagerDetails(p => ({ ...p, email: e.target.value }))}
-                            placeholder="manager@company.com"
-                          />
-                        </div>
-                      </div>
-                      <div className="form-group-row" style={{ marginTop: '8px' }}>
-                        <div className="form-group">
-                          <label>Mobile Number</label>
-                          <input
-                            type="text"
-                            value={newManagerDetails.phone}
-                            onChange={e => setNewManagerDetails(p => ({ ...p, phone: e.target.value }))}
-                            placeholder="+91 98765..."
-                          />
-                        </div>
-                        <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '8px' }}>
-                          <Button type="button" variant="outline" size="sm" onClick={() => setNewBranch(p => ({ ...p, manager: '' }))}>Cancel</Button>
-                          <Button type="button" variant="primary" size="sm" onClick={handleAddNewManagerAddBranch}>Save & Select</Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Status Type</label>
-                      <select value={newBranch.statusType} onChange={e => {
+                    <label>Manager Name *</label>
+                    <select
+                      value={newBranch.manager}
+                      onChange={e => {
                         const val = e.target.value;
-                        const labelMap = { active: 'Active', expansion: 'Under Expansion', new: 'New Branch', inactive: 'Inactive' };
-                        setNewBranch({...newBranch, statusType: val, status: labelMap[val] || 'Active'});
-                      }}>
-                        <option value="active">Active</option>
-                        <option value="expansion">Under Expansion</option>
-                        <option value="new">New Branch</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Timezone</label>
-                      <input type="text" value={newBranch.timezone} onChange={e => setNewBranch({...newBranch, timezone: e.target.value})} />
-                    </div>
-                  </div>
-
-                  <div className="form-group" style={{ position: 'relative' }}>
-                    <label>Select Departments *</label>
-                    <div 
-                      className="custom-multiselect-trigger" 
-                      onClick={() => setShowDeptDropdown(p => !p)}
+                        const m = combinedAvailableManagers.find(x => x.name === val);
+                        setNewBranch(prev => ({
+                          ...prev,
+                          manager: val,
+                          managerEmail: m ? m.email : '',
+                          managerPhone: m ? m.phone : ''
+                        }));
+                      }}
+                      required
                     >
-                      {newBranch.departments.length === 0 ? (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Select departments...</span>
-                      ) : (
-                        newBranch.departments.map(d => (
-                          <span 
-                            key={d} 
-                            className="dept-tag"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setNewBranch(prev => ({
-                                ...prev,
-                                departments: prev.departments.filter(x => x !== d)
-                              }));
-                            }}
-                          >
-                            {d} <span className="dept-tag-close">×</span>
-                          </span>
-                        ))
-                      )}
-                    </div>
-
-                    {showDeptDropdown && (
-                      <div className="custom-multiselect-dropdown card animate-fade-in">
-                        <div className="multiselect-options-list">
-                          {availableDepts.map(d => {
-                            const isChecked = newBranch.departments.includes(d);
-                            return (
-                              <label key={d} className="multiselect-option-label">
-                                <input 
-                                  type="checkbox" 
-                                  checked={isChecked} 
-                                  onChange={() => {
-                                    setNewBranch(prev => {
-                                      const nextDepts = isChecked 
-                                        ? prev.departments.filter(x => x !== d)
-                                        : [...prev.departments, d];
-                                      return { ...prev, departments: nextDepts };
-                                    });
-                                  }}
-                                  className="multiselect-checkbox"
-                                />
-                                {d}
-                              </label>
-                            );
-                          })}
-                        </div>
-
-                        <div className="multiselect-add-row" onClick={e => e.stopPropagation()}>
-                          <input
-                            type="text"
-                            placeholder="Add new department..."
-                            value={newDeptInput}
-                            onChange={e => setNewDeptInput(e.target.value)}
-                            className="multiselect-add-input"
-                          />
-                          <button
-                            type="button"
-                            className="multiselect-add-btn"
-                            onClick={() => {
-                              if (!newDeptInput.trim()) return;
-                              const exists = availableDepts.includes(newDeptInput.trim());
-                              if (!exists) {
-                                setAvailableDepts(prev => [...prev, newDeptInput.trim()]);
-                              }
-                              if (!newBranch.departments.includes(newDeptInput.trim())) {
-                                setNewBranch(prev => ({
-                                  ...prev,
-                                  departments: [...prev.departments, newDeptInput.trim()]
-                                }));
-                              }
-                              setNewDeptInput('');
-                              addToast('success', `Department "${newDeptInput.trim()}" added & selected!`);
-                            }}
-                          >
-                            + Add
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                      <option value="">Select Manager</option>
+                      {combinedAvailableManagers.map(m => (
+                        <option key={m.name} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Headcount (initial)</label>
-                      <input type="number" value={newBranch.employeeCount} onChange={e => setNewBranch({...newBranch, employeeCount: parseInt(e.target.value) || 0})} />
-                    </div>
-                    <div className="form-group">
-                      <label>YTD Revenue (in USD)</label>
-                      <input type="number" value={newBranch.revenue} onChange={e => setNewBranch({...newBranch, revenue: parseInt(e.target.value) || 0})} />
-                    </div>
+                  <div className="form-group">
+                    <label>Status Type</label>
+                    <select value={newBranch.statusType} onChange={e => {
+                      const val = e.target.value;
+                      const labelMap = { active: 'Active', expansion: 'Under Expansion', new: 'New Branch', inactive: 'Inactive' };
+                      setNewBranch({...newBranch, statusType: val, status: labelMap[val] || 'Active'});
+                    }}>
+                      <option value="active">Active</option>
+                      <option value="expansion">Under Expansion</option>
+                      <option value="new">New Branch</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Headcount (initial)</label>
+                    <input type="number" value={newBranch.employeeCount} onChange={e => setNewBranch({...newBranch, employeeCount: parseInt(e.target.value) || 0})} />
                   </div>
                 </div>
                 <div className="modal-footer">
@@ -1154,17 +1019,13 @@ const Branches = () => {
                       value={managerUpdate.name}
                       onChange={e => {
                         const val = e.target.value;
-                        if (val === 'ADD_NEW') {
-                          setManagerUpdate(prev => ({ ...prev, name: 'ADD_NEW', email: '', phone: '' }));
-                        } else {
-                          const m = combinedAvailableManagers.find(x => x.name === val);
-                          setManagerUpdate(prev => ({
-                            ...prev,
-                            name: val,
-                            email: m ? m.email : '',
-                            phone: m ? m.phone : ''
-                          }));
-                        }
+                        const m = combinedAvailableManagers.find(x => x.name === val);
+                        setManagerUpdate(prev => ({
+                          ...prev,
+                          name: val,
+                          phone: m ? m.phone : '',
+                          email: m ? m.email : ''
+                        }));
                       }}
                       required
                     >
@@ -1172,60 +1033,17 @@ const Branches = () => {
                       {combinedAvailableManagers.map(m => (
                         <option key={m.name} value={m.name}>{m.name}</option>
                       ))}
-                      <option value="ADD_NEW" style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>+ Add New Manager...</option>
                     </select>
                   </div>
 
-                  {managerUpdate.name === 'ADD_NEW' && (
-                    <div className="inline-add-card animate-fade-in" style={{ padding: '12px', background: 'rgba(255,255,255,0.01)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: '12px' }}>
-                      <h4 style={{ fontSize: '0.78rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Add New Manager Details</h4>
-                      <div className="form-group-row">
-                        <div className="form-group">
-                          <label>New Manager Name *</label>
-                          <input
-                            type="text"
-                            value={newManagerDetails.name}
-                            onChange={e => setNewManagerDetails(p => ({ ...p, name: e.target.value }))}
-                            placeholder="Name"
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Email ID</label>
-                          <input
-                            type="email"
-                            value={newManagerDetails.email}
-                            onChange={e => setNewManagerDetails(p => ({ ...p, email: e.target.value }))}
-                            placeholder="manager@company.com"
-                          />
-                        </div>
-                      </div>
-                      <div className="form-group-row" style={{ marginTop: '8px' }}>
-                        <div className="form-group">
-                          <label>Mobile Number</label>
-                          <input
-                            type="text"
-                            value={newManagerDetails.phone}
-                            onChange={e => setNewManagerDetails(p => ({ ...p, phone: e.target.value }))}
-                            placeholder="+91 98765..."
-                          />
-                        </div>
-                        <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '8px' }}>
-                          <Button type="button" variant="outline" size="sm" onClick={() => setManagerUpdate(p => ({ ...p, name: '' }))}>Cancel</Button>
-                          <Button type="button" variant="primary" size="sm" onClick={handleAddNewManagerChangeManager}>Save & Select</Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <div className="form-group">
+                    <label>Mobile Number</label>
+                    <input type="text" value={managerUpdate.phone} readOnly placeholder="Auto-populated" />
+                  </div>
 
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Email ID</label>
-                      <input type="email" value={managerUpdate.email} readOnly placeholder="Auto-populated" />
-                    </div>
-                    <div className="form-group">
-                      <label>Mobile Number</label>
-                      <input type="text" value={managerUpdate.phone} readOnly placeholder="Auto-populated" />
-                    </div>
+                  <div className="form-group">
+                    <label>Email Address</label>
+                    <input type="text" value={managerUpdate.email || ''} readOnly placeholder="Auto-populated" />
                   </div>
                 </div>
                 <div className="modal-footer">
@@ -1325,7 +1143,7 @@ const Branches = () => {
               <h1 className="branch-hero-title">{selectedBranch.name}</h1>
               <p className="branch-hero-subtitle">
                 <Globe size={12} style={{ display: 'inline', marginRight: '4px' }} />
-                Code: <strong>{selectedBranch.code}</strong> • {selectedBranch.city}, {selectedBranch.state}, {selectedBranch.country}
+                Code: <strong>{selectedBranch.code}</strong> • {selectedBranch.city}, {selectedBranch.state}
               </p>
             </div>
           </div>
@@ -1400,8 +1218,8 @@ const Branches = () => {
                 <div className="manager-profile-meta">
                   <h3>{selectedBranch.manager}</h3>
                   <p className="designation">Branch Administrator • ID: {selectedBranch.managerId || 'N/A'}</p>
-                  <p className="meta-row"><Mail size={12} /> {selectedBranch.managerEmail || 'No official email record'}</p>
                   <p className="meta-row"><Phone size={12} /> {selectedBranch.managerPhone || 'No contact phone record'}</p>
+                  <p className="meta-row"><Mail size={12} /> {selectedBranch.managerEmail || 'No contact email record'}</p>
                 </div>
               </div>
               <div className="manager-actions" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
@@ -1409,8 +1227,8 @@ const Branches = () => {
                   setManagerUpdate({
                     branchId: selectedBranch.id,
                     name: selectedBranch.manager,
-                    email: selectedBranch.managerEmail || '',
-                    phone: selectedBranch.managerPhone || ''
+                    phone: selectedBranch.managerPhone || '',
+                    email: selectedBranch.managerEmail || ''
                   });
                   setShowManagerModal(true);
                 }}>Change Branch Manager</Button>
@@ -1541,7 +1359,7 @@ const Branches = () => {
             <div className="card detail-departments-card">
               <h2 className="section-title"><Building2 size={16} /> Active Departments Structural Breakdown</h2>
               <div className="departments-list-grid">
-                {selectedBranch.departments.map((dept, index) => {
+                {getBranchDepartments(selectedBranch).map((dept, index) => {
                   const deptEmps = branchEmployees.filter(e => e.department.toLowerCase() === dept.toLowerCase());
                   return (
                     <div key={dept} className="dept-breakdown-row">
@@ -1603,8 +1421,8 @@ const Branches = () => {
           </Button>
           <Button variant="primary" icon={Plus} onClick={() => {
             setNewBranch({
-              name: '', code: '', country: 'India', flag: '🇮🇳',
-              manager: '', managerEmail: '', managerPhone: '',
+              name: '', code: '', flag: '🇮🇳',
+              manager: '', managerPhone: '',
               address: '', city: '', state: '', zipCode: '', phone: '', email: '',
               status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
               revenue: 500000, departments: ['Sales', 'Marketing'],
@@ -1706,7 +1524,7 @@ const Branches = () => {
                     <span className="branch-flag">{branch.flag}</span>
                     <div>
                       <h3 className="branch-card-title">{branch.name}</h3>
-                      <p className="branch-country"><Globe size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} /> {branch.country} • {branch.city}</p>
+                      <p className="branch-country"><Globe size={11} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} /> {branch.city}</p>
                     </div>
                   </div>
                   <div className="branch-status-actions">
@@ -1720,8 +1538,8 @@ const Branches = () => {
                         setManagerUpdate({
                           branchId: branch.id,
                           name: branch.manager,
-                          email: branch.managerEmail || '',
-                          phone: branch.managerPhone || ''
+                          phone: branch.managerPhone || '',
+                          email: branch.managerEmail || ''
                         });
                         setShowManagerModal(true);
                       }}
@@ -1733,13 +1551,12 @@ const Branches = () => {
                       className="icon-action-btn icon-action-danger"
                       onClick={(e) => {
                         e.stopPropagation();
-                        showConfirm('Delete Branch', `Are you sure you want to delete ${branch.name}? All data will be archived.`, () => {
-                          setBranches(prev => prev.filter(b => b.id !== branch.id));
+                        showConfirm('Delete Branch', `Are you sure you want to delete ${branch.name}? All data will be archived.`, async () => {
+                          await deleteBranch(branch.id);
                           setActivities(prev => [
                             { id: Date.now(), text: `Branch Deleted: ${branch.name}`, time: 'Just now', type: 'danger' },
                             ...prev
                           ]);
-                          addToast('warning', `${branch.name} removed successfully.`);
                         }, 'danger');
                       }}
                       title="Delete Branch"
@@ -1776,8 +1593,8 @@ const Branches = () => {
                 <div className="branch-departments">
                   <span className="branch-info-label">Departments</span>
                   <div className="branch-dept-badges">
-                    {branch.departments.slice(0, 3).map(d => <Badge key={d} variant="neutral" size="sm">{d}</Badge>)}
-                    {branch.departments.length > 3 && <Badge variant="neutral" size="sm">+{branch.departments.length - 3}</Badge>}
+                    {getBranchDepartments(branch).slice(0, 3).map(d => <Badge key={d} variant="neutral" size="sm">{d}</Badge>)}
+                    {getBranchDepartments(branch).length > 3 && <Badge variant="neutral" size="sm">+{getBranchDepartments(branch).length - 3}</Badge>}
                   </div>
                 </div>
 
@@ -1801,8 +1618,8 @@ const Branches = () => {
             <div className="quick-actions-grid">
               <button className="quick-action-btn-item" onClick={() => {
                 setNewBranch({
-                  name: '', code: '', country: 'India', flag: '🇮🇳',
-                  manager: '', managerEmail: '', managerPhone: '',
+                  name: '', code: '', flag: '🇮🇳',
+                  manager: '', managerPhone: '',
                   address: '', city: '', state: '', zipCode: '', phone: '', email: '',
                   status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
                   revenue: 500000, departments: ['Sales', 'Marketing'],
@@ -1829,8 +1646,8 @@ const Branches = () => {
                   setManagerUpdate({
                     branchId: selectedBranch.id,
                     name: selectedBranch.manager,
-                    email: selectedBranch.managerEmail || '',
-                    phone: selectedBranch.managerPhone || ''
+                    phone: selectedBranch.managerPhone || '',
+                    email: selectedBranch.managerEmail || ''
                   });
                   setShowManagerModal(true);
                 } else {
@@ -1877,7 +1694,6 @@ const Branches = () => {
                     <h4><Building2 size={14} /> General Branch Information</h4>
                     <div className="detail-grid">
                       <div><label>Branch Name:</label><span>{selectedBranch.name}</span></div>
-                      <div><label>Country:</label><span>{selectedBranch.flag} {selectedBranch.country}</span></div>
                       <div><label>City & State:</label><span>{selectedBranch.city}, {selectedBranch.state}</span></div>
                       <div><label>ZIP Code:</label><span>{selectedBranch.zipCode}</span></div>
                       <div><label>Established:</label><span>{selectedBranch.established}</span></div>
@@ -1890,7 +1706,6 @@ const Branches = () => {
                       <Avatar name={selectedBranch.manager} size="md" />
                       <div className="manager-contact-info">
                         <strong>{selectedBranch.manager}</strong>
-                        <span><Mail size={11} /> {selectedBranch.managerEmail || 'no-email@company.com'}</span>
                         <span><Phone size={11} /> {selectedBranch.managerPhone || 'No phone record'}</span>
                       </div>
                     </div>
@@ -1909,7 +1724,7 @@ const Branches = () => {
 
                     <h4 style={{ marginTop: '16px' }}>Departments Distribution</h4>
                     <div className="detail-dept-badges">
-                      {selectedBranch.departments.map(d => (
+                      {getBranchDepartments(selectedBranch).map(d => (
                         <Badge key={d} variant="neutral">{d}</Badge>
                       ))}
                     </div>
@@ -1930,8 +1745,8 @@ const Branches = () => {
                           setManagerUpdate({
                             branchId: selectedBranch.id,
                             name: selectedBranch.manager,
-                            email: selectedBranch.managerEmail || '',
-                            phone: selectedBranch.managerPhone || ''
+                            phone: selectedBranch.managerPhone || '',
+                            email: selectedBranch.managerEmail || ''
                           });
                           setShowManagerModal(true);
                         }}>Reassign Manager</Button>
@@ -2098,7 +1913,7 @@ const Branches = () => {
                           </div>
                           {expandedNodes.includes(branch.id) && (
                             <div className="tree-children">
-                              {branch.departments.map(dept => (
+                              {getBranchDepartments(branch).map(dept => (
                                 <div key={dept} className="tree-node">
                                   <div className="tree-node-item">
                                     <span className="tree-toggle-placeholder"></span>

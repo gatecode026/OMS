@@ -362,8 +362,8 @@ export const mockRoles = [
     }
   },
   {
-    id: 'project_manager',
-    name: 'Project Manager',
+    id: 'manager',
+    name: 'Manager',
     description: 'Monitor and manage projects, tasks, workflows, and team leader performance.',
     userCount: 3,
     accentColor: '#ec4899',
@@ -520,8 +520,8 @@ const baseEmployees = [
     id: 'EMP-2026-011', name: 'Kabir Mehta', email: 'kabir.mehta@saas.com',
     phone: '+91 98200 11011', dob: '1989-04-12', gender: 'Male',
     department: 'Engineering', branch: 'Delhi', team: 'Backend Core',
-    role: 'Project Manager', roleId: 'project_manager', joinDate: '2023-05-15',
-    status: 'Active', avatar: '', designation: 'Project Manager',
+    role: 'Manager', roleId: 'manager', joinDate: '2023-05-15',
+    status: 'Active', avatar: '', designation: 'Manager',
     teamLeader: 'Kabir Mehta', projectManager: 'Kabir Mehta',
     nationality: 'Indian', emergencyContactName: 'Rohan Mehta', emergencyContactPhone: '+91 98765 10011',
     currentAddress: '7 Civil Lines, Jaipur, Rajasthan - 302006', permanentAddress: '7 Civil Lines, Jaipur, Rajasthan - 302006', employmentType: 'Full-Time', workLocation: 'Delhi Office'

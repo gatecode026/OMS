@@ -564,7 +564,7 @@ const Notifications = () => {
             >
               <option value="super_admin">Super Admin</option>
               <option value="branch_admin">Branch Admin</option>
-              <option value="project_manager">Project Manager</option>
+              <option value="manager">Manager</option>
               <option value="team_leader">Team Leader</option>
               <option value="employee">Employee</option>
             </select>

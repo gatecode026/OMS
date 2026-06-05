@@ -5,6 +5,7 @@
 
 import jwt from 'jsonwebtoken';
 import Admin from '../admin/admin.model.js';
+import Employee from '../employees/employees.model.js';
 import env from '../../config/env.js';
 import logger from '../../config/logger.js';
 import { isDatabaseConnected } from '../../config/database.js';
@@ -135,10 +136,10 @@ const FALLBACK_EMPLOYEES = [
     id: 'EMP-2026-011',
     name: 'Kabir Mehta',
     email: 'kabir.mehta@saas.com',
-    role: 'Project Manager',
-    roleId: 'project_manager',
+    role: 'Manager',
+    roleId: 'manager',
     status: 'Active',
-    designation: 'Project Manager',
+    designation: 'Manager',
     department: 'Engineering',
     branch: 'Delhi',
     team: 'Backend Core'
@@ -172,11 +173,18 @@ export const login = async (email, password) => {
   if (isDatabaseConnected) {
     logger.info(`AuthService::login [Database Mode] Verifying admin credentials for: ${resolvedEmail}`);
 
-    // Fetch account from the dedicated Super Admin collection
-    const user = await Admin.findOne({ email: resolvedEmail }).select('+password');
+    // Fetch account from the dedicated Super Admin collection or Employee collection
+    let user = await Admin.findOne({ email: resolvedEmail }).select('+password');
+    let isEmployee = false;
+    if (!user) {
+      user = await Employee.findOne({ email: resolvedEmail }).select('+password');
+      if (user) {
+        isEmployee = true;
+      }
+    }
     
     if (!user) {
-      logger.warn(`AuthService::login admin record not found in admins collection for: ${resolvedEmail}`);
+      logger.warn(`AuthService::login record not found for: ${resolvedEmail}`);
       const err = new Error('Invalid email or password');
       err.statusCode = 401;
       err.status = 'fail';

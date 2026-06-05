@@ -10,7 +10,7 @@ import SlideOver from '../components/common/SlideOver';
 import Skeleton from '../components/common/Skeleton';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Search, UserPlus, Eye, Edit2, Trash2, ChevronRight, ArrowLeft,
+  Search, UserPlus, Eye, EyeOff, Edit2, Trash2, ChevronRight, ArrowLeft,
   Phone, Mail, Calendar, CheckCircle, XCircle, UserCheck, Download,
   SlidersHorizontal, RefreshCw, Users, Briefcase, Activity,
   X, ChevronUp, ChevronDown, Trophy, AlertTriangle,
@@ -18,18 +18,18 @@ import {
 } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const fmtJoinDate = (dateStr) => {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2,'0')} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+  return `${String(d.getDate()).padStart(2, '0')} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
 };
 
 const fmtDob = (dateStr) => {
   if (!dateStr) return '15/08/1996';
   const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
 const calculateExpiry = (dateStr) => {
@@ -66,7 +66,7 @@ const isNewJoiner = (dateStr) => {
 };
 
 const downloadCSV = (employees) => {
-  const headers = ['ID','Name','Email','Phone','Department','Branch','Role','Status','Account Status'];
+  const headers = ['ID', 'Name', 'Email', 'Phone', 'Department', 'Branch', 'Role', 'Status', 'Account Status'];
   const rows = employees.map(e => [
     e.id, e.name, e.workEmail || e.email, e.phone, e.department, e.branch, e.role, e.status, e.accountStatus || 'Active'
   ]);
@@ -76,6 +76,77 @@ const downloadCSV = (employees) => {
   const a = document.createElement('a'); a.href = url; a.download = 'employees_export.csv'; a.click();
   URL.revokeObjectURL(url);
 };
+
+const isValidEmail = (email) => {
+  if (!email) return false;
+  const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return re.test(email);
+};
+
+const isValidPhone = (phone) => {
+  if (!phone) return false;
+  const cleaned = phone.replace(/\D/g, '');
+  return /^\d{10}$/.test(cleaned);
+};
+
+const isValidAlternatePhone = (phone) => {
+  if (!phone) return true;
+  return isValidPhone(phone);
+};
+
+const isValidPersonalEmail = (email) => {
+  if (!email) return true;
+  return isValidEmail(email);
+};
+
+const isOldEnough = (dobString) => {
+  if (!dobString) return true;
+  const dob = new Date(dobString);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age >= 18;
+};
+
+const isValidZipCode = (zip) => {
+  return /^\d{6}$/.test((zip || '').trim());
+};
+
+const isValidAadhaar = (aadhaar) => {
+  return /^\d{12}$/.test((aadhaar || '').trim());
+};
+
+const isValidPan = (pan) => {
+  return /^[A-Z]{5}\d{4}[A-Z]{1}$/.test((pan || '').trim().toUpperCase());
+};
+
+const isValidBankAccount = (num) => {
+  if (!num) return true;
+  return /^\d{9,18}$/.test(num.trim());
+};
+
+const isValidIfsc = (ifsc) => {
+  if (!ifsc) return true;
+  return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc.trim().toUpperCase());
+};
+
+const isValidUpi = (upi) => {
+  if (!upi) return true;
+  return /^[a-zA-Z0-9.\-_+]+@[a-zA-Z0-9.\-_]+$/.test(upi.trim());
+};
+
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 
 // ─── Attendance Status Badge ─────────────────────────────────────────────────
 const AttBadge = ({ status }) => {
@@ -182,8 +253,33 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, branches: dbBranches, departments: dbDepartments } = useApp();
   const location = useLocation();
+
+
+  const handleZipCodeChange = async (zipVal) => {
+    const digitsOnly = zipVal.replace(/\D/g, '').slice(0, 6);
+    setFormData(p => ({ ...p, zipCode: digitsOnly }));
+    if (!digitsOnly || digitsOnly.length !== 6) return;
+    const currentCountry = formData.country || 'India';
+    if (currentCountry === 'India') {
+      try {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${digitsOnly}`);
+        const data = await res.json();
+        if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
+          const office = data[0].PostOffice[0];
+          setFormData(p => ({
+            ...p,
+            city: office.District || office.Division || p.city,
+            state: office.State || p.state
+          }));
+          addToast('success', `Fetched city & state for PIN ${digitsOnly}`);
+        }
+      } catch (err) {
+        console.error('Indian PIN code fetch error:', err);
+      }
+    }
+  };
 
   // ── Filters ──
   const [searchTerm, setSearchTerm] = useState('');
@@ -214,23 +310,25 @@ const Employees = () => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [wizardStep, setWizardStep] = useState(1);
   const [createdEmpInfo, setCreatedEmpInfo] = useState(null);
-  
+
   const canNavigateToStep = (targetStep) => {
-    if (targetStep < wizardStep) return true;
-    if (targetStep > wizardStep && !isStepValid(wizardStep)) {
-      addToast('warning', `Please complete Step ${wizardStep} first`);
-      return false;
+    if (targetStep <= wizardStep) return true;
+    for (let s = wizardStep; s < targetStep; s++) {
+      if (!isStepValid(s)) {
+        addToast('warning', `Please complete and fix errors in Step ${s} before proceeding.`);
+        return false;
+      }
     }
     return true;
   };
-  
+
   const handleStepClick = (step) => {
     if (canNavigateToStep(step)) {
       setWizardStep(step);
       addToast('info', `Step ${step} selected`);
     }
   };
-  
+
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', dob: '', gender: 'Male',
     personalEmail: '', alternatePhone: '',
@@ -243,7 +341,7 @@ const Employees = () => {
     designation: '', role: 'Employee', roleId: 'employee',
     joinDate: new Date().toISOString().split('T')[0],
     id: '', avatar: '',
-    shiftTiming: '09:00 AM - 06:00 PM',
+    shiftTiming: '09:30 AM - 06:00 PM',
     salaryAmount: '', salaryAllowances: '', salaryDeductions: '',
     teamLeader: '', projectManager: '',
     companyName: '',
@@ -284,7 +382,7 @@ const Employees = () => {
     probationEndDate: '',
     contractEndDate: ''
   });
-  
+
   const [uploadedDocs, setUploadedDocs] = useState({
     aadhaar: null, pan: null, resume: null,
     certificates: null, offerLetter: null, profilePhoto: null,
@@ -314,6 +412,42 @@ const Employees = () => {
   const [bulkLeaveDays, setBulkLeaveDays] = useState(5);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [bulkNotifyMsg, setBulkNotifyMsg] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // --- Form Inline Validation Booleans ---
+  const dupEmail = formData.email && employees.some(e => (e.email === formData.email || e.workEmail === formData.email) && e.id !== selectedEmployeeId);
+  const dupPhone = formData.phone && employees.some(e => e.phone === formData.phone && e.id !== selectedEmployeeId);
+  const dupEmpId = formMode === 'add' && formData.id && employees.some(e => e.id.trim().toLowerCase() === formData.id.trim().toLowerCase());
+  const invalidPass = formData.password && formData.password !== '••••••••' && (formData.password.length < 8 || formData.password.length > 12);
+
+  const invalidEmail = formData.email && !isValidEmail(formData.email);
+  const invalidPhone = formData.phone && !isValidPhone(formData.phone);
+  const invalidAltPhone = formData.alternatePhone && !isValidPhone(formData.alternatePhone);
+  const invalidPersEmail = formData.personalEmail && !isValidEmail(formData.personalEmail);
+  const tooYoung = formData.dob && !isOldEnough(formData.dob);
+  const invalidZip = formData.zipCode && !isValidZipCode(formData.zipCode);
+  const invalidEmergPhone = formData.emergencyContactPhone && !isValidPhone(formData.emergencyContactPhone);
+  const invalidEmergPhoneAlt = formData.emergencyContactPhoneAlt && !isValidPhone(formData.emergencyContactPhoneAlt);
+
+  const invalidDesig = formData.roleId !== 'manager' && formData.designation && formData.designation.trim().length < 2;
+
+  const invalidUsername = formData.username && formData.username.trim().length < 3;
+  const invalidOfficialEmail = formData.officialEmail && !isValidEmail(formData.officialEmail);
+
+  const invalidShiftTiming = !formData.workMode.includes('Home') && formData.shiftType !== 'Flexible Shift' && formData.shiftTiming && !/^\d{2}:\d{2}\s*(?:AM|PM)\s*-\s*\d{2}:\d{2}\s*(?:AM|PM)$/i.test(formData.shiftTiming.trim());
+
+  const invalidPanVal = formData.panNumber && !isValidPan(formData.panNumber);
+  const invalidAadhaarVal = formData.aadhaarNumber && !isValidAadhaar(formData.aadhaarNumber);
+
+  const missingAadhaarDoc = !uploadedDocs.aadhaar && !(formData.documents && formData.documents.some(d => d.category === 'aadhaar' || d.category === 'Aadhaar Card'));
+  const missingPanDoc = !uploadedDocs.pan && !(formData.documents && formData.documents.some(d => d.category === 'pan' || d.category === 'PAN Card'));
+  const missingResumeDoc = !uploadedDocs.resume && !(formData.documents && formData.documents.some(d => d.category === 'resume' || d.category === 'Resume / CV'));
+
+  const invalidBankName = formData.bankName && !/^[a-zA-Z\s]+$/.test(formData.bankName.trim());
+  const invalidBankAccountVal = formData.bankAccountNumber && !isValidBankAccount(formData.bankAccountNumber);
+  const invalidIfscVal = formData.bankIfscCode && !isValidIfsc(formData.bankIfscCode);
+  const invalidUpiVal = formData.bankUpiId && !isValidUpi(formData.bankUpiId);
 
   const handleOpenAdd = () => {
     setFormData({
@@ -328,7 +462,7 @@ const Employees = () => {
       designation: '', role: 'Employee', roleId: 'employee',
       joinDate: new Date().toISOString().split('T')[0],
       id: '', avatar: '',
-      shiftTiming: '09:00 AM - 06:00 PM',
+      shiftTiming: '09:30 AM - 06:00 PM',
       salaryAmount: '', salaryAllowances: '', salaryDeductions: '',
       teamLeader: '', projectManager: '',
       companyName: '',
@@ -376,13 +510,13 @@ const Employees = () => {
     });
     setWizardStep(1); setFormMode('add'); setShowFormPanel(true);
   };
-  
+
   const handleOpenEdit = (emp) => {
     const generatedUsername = emp.username || (emp.name ? `${emp.name.split(' ')[0].toLowerCase()}.${emp.name.split(' ')[1]?.toLowerCase() || 'emp'}` : 'emp');
     const generatedOfficialEmail = emp.officialEmail || emp.workEmail || emp.email || `${emp.name?.split(' ')[0]?.toLowerCase() || 'employee'}@saas.io`;
 
-    setFormData({ 
-      ...emp, 
+    setFormData({
+      ...emp,
       username: generatedUsername,
       officialEmail: generatedOfficialEmail,
       password: '••••••••',
@@ -392,6 +526,45 @@ const Employees = () => {
       probationEndDate: emp.probationEndDate || '',
       contractEndDate: emp.contractEndDate || ''
     });
+
+    const docs = {
+      aadhaar: null, pan: null, resume: null,
+      certificates: null, offerLetter: null, profilePhoto: null,
+      experienceLetter: null, addressProof: null, passportPhoto: null, signedAgreements: null
+    };
+
+    if (emp.documents && Array.isArray(emp.documents)) {
+      emp.documents.forEach(doc => {
+        if (doc.category) {
+          const key = doc.category.toLowerCase().replace(' card', '').replace(' / cv', '').replace(' photo', 'Photo').replace(' letter', 'Letter').replace(' proof', 'Proof').replace(' agreements', 'Agreements');
+          if (key in docs) {
+            const sizeBytes = doc.downloadUrl ? Math.round(doc.downloadUrl.length * 0.75) : 10000;
+            docs[key] = {
+              name: doc.fileName || `${doc.category}.bin`,
+              size: sizeBytes,
+              type: doc.fileType || 'application/octet-stream',
+              downloadUrl: doc.downloadUrl,
+              uploadDate: doc.uploadDate,
+              isExisting: true
+            };
+          }
+        }
+      });
+    }
+
+    if (emp.avatar && emp.avatar.startsWith('data:')) {
+      const sizeBytes = Math.round(emp.avatar.length * 0.75);
+      docs.profilePhoto = {
+        name: 'Profile_Photo.jpg',
+        size: sizeBytes,
+        type: 'image/jpeg',
+        downloadUrl: emp.avatar,
+        isExisting: true
+      };
+    }
+
+    setUploadedDocs(docs);
+
     setWizardStep(1); setFormMode('edit'); setSelectedEmployeeId(emp.id); setShowFormPanel(true);
   };
 
@@ -460,8 +633,8 @@ const Employees = () => {
     const mst = statusFilter ? e.status === statusFilter : true;
     const ma = attFilter ? (
       attFilter === 'WFH' || attFilter === 'Work From Home' ? (e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH') :
-      attFilter === 'On Leave' || attFilter === 'Leave' ? (e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave') :
-      e.attendanceStatus === attFilter
+        attFilter === 'On Leave' || attFilter === 'Leave' ? (e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave') :
+          e.attendanceStatus === attFilter
     ) : true;
     const msh = shiftFilter ? (e.shift && e.shift.toLowerCase().includes(shiftFilter.toLowerCase())) : true;
     const mp = punchFilter ? e.todayPunchStatus === punchFilter : true;
@@ -636,7 +809,7 @@ const Employees = () => {
   const handleBulkExportAttendance = () => {
     addToast('info', 'Exporting attendance logs...');
     setTimeout(() => {
-      const headers = ['ID','Name','Today Status','Today Punch In','Today Punch Out','Working Hours','Last Seen'];
+      const headers = ['ID', 'Name', 'Today Status', 'Today Punch In', 'Today Punch Out', 'Working Hours', 'Last Seen'];
       const rows = selectedEmployees.map(e => [
         e.id, e.name, e.attendanceStatus, e.todayPunchIn || '—', e.todayPunchOut || '—', e.todayWorkingHours ? `${e.todayWorkingHours} hrs` : '0 hrs', e.lastSeen || '—'
       ]);
@@ -650,32 +823,83 @@ const Employees = () => {
   };
 
   const isStepValid = (step = wizardStep) => {
-    if (step === 1) return !!(formData.name && formData.email && formData.phone);
-    if (step === 2) return !!(formData.designation && formData.department && formData.branch && formData.joinDate);
+    if (step === 1) {
+      return !!(
+        formData.name && formData.name.trim().length >= 2 &&
+        formData.email && isValidEmail(formData.email) &&
+        formData.phone && isValidPhone(formData.phone) &&
+        isValidAlternatePhone(formData.alternatePhone) &&
+        isValidPersonalEmail(formData.personalEmail) &&
+        isOldEnough(formData.dob) &&
+        isValidZipCode(formData.zipCode) &&
+        isValidAlternatePhone(formData.emergencyContactPhone) &&
+        isValidAlternatePhone(formData.emergencyContactPhoneAlt)
+      );
+    }
+    if (step === 2) {
+      const isIdDuplicate = formMode === 'add' && formData.id && employees.some(e => e.id.trim().toLowerCase() === formData.id.trim().toLowerCase());
+      const validBankName = !formData.bankName || /^[a-zA-Z\s]+$/.test(formData.bankName.trim());
+      const validBankAccount = !formData.bankAccountNumber || isValidBankAccount(formData.bankAccountNumber);
+      const validIfsc = !formData.bankIfscCode || isValidIfsc(formData.bankIfscCode);
+      const validUpi = !formData.bankUpiId || isValidUpi(formData.bankUpiId);
+
+      return !!(
+        (formData.roleId === 'manager' || (formData.designation && formData.designation.trim().length >= 2)) &&
+        formData.department &&
+        formData.branch &&
+        formData.joinDate &&
+        !isIdDuplicate &&
+        validBankName &&
+        validBankAccount &&
+        validIfsc &&
+        validUpi
+      );
+    }
     if (step === 3) {
-      const hasUsername = !!formData.username;
+      const hasUsername = formData.username && formData.username.trim().length >= 3;
+      const validOfficialEmail = isValidPersonalEmail(formData.officialEmail);
+      if (!validOfficialEmail) return false;
+
       if (formMode === 'add') {
-        return !!(hasUsername && formData.password && formData.password.length >= 8 && formData.password === formData.confirmPassword);
+        return !!(hasUsername && formData.password && formData.password.length >= 8 && formData.password.length <= 12 && formData.password === formData.confirmPassword);
       }
       const isPasswordChanged = formData.password && formData.password !== '••••••••';
       if (isPasswordChanged) {
-        return !!(hasUsername && formData.password.length >= 8 && formData.password === formData.confirmPassword);
+        return !!(hasUsername && formData.password.length >= 8 && formData.password.length <= 12 && formData.password === formData.confirmPassword);
       }
       return hasUsername;
     }
+    if (step === 4) {
+      const isWfh = formData.workMode === 'Work From Home';
+      if (isWfh || formData.shiftType === 'Flexible Shift') return true;
+      return !!(formData.shiftTiming && /^\d{2}:\d{2}\s*(?:AM|PM)\s*-\s*\d{2}:\d{2}\s*(?:AM|PM)$/i.test(formData.shiftTiming.trim()));
+    }
+    if (step === 6) {
+      const hasAadhaarDoc = uploadedDocs.aadhaar || (formData.documents && formData.documents.some(d => d.category === 'aadhaar' || d.category === 'Aadhaar Card'));
+      const hasPanDoc = uploadedDocs.pan || (formData.documents && formData.documents.some(d => d.category === 'pan' || d.category === 'PAN Card'));
+      const hasResumeDoc = uploadedDocs.resume || (formData.documents && formData.documents.some(d => d.category === 'resume' || d.category === 'Resume / CV'));
+
+      return !!(
+        isValidPan(formData.panNumber) &&
+        isValidAadhaar(formData.aadhaarNumber) &&
+        hasAadhaarDoc &&
+        hasPanDoc &&
+        hasResumeDoc
+      );
+    }
     return true;
   };
-  
-  const handleNextStep = () => { 
+
+  const handleNextStep = () => {
     if (isStepValid()) {
       if (wizardStep < 7) setWizardStep(p => p + 1);
     } else {
       addToast('warning', `Please complete all required fields in Step ${wizardStep}`);
     }
   };
-  
+
   const handlePrevStep = () => setWizardStep(p => Math.max(p - 1, 1));
-  
+
   const handleWorkModeChange = (mode) => {
     setFormData(p => {
       if (mode === 'Work From Home') {
@@ -694,7 +918,7 @@ const Employees = () => {
           ...p,
           workMode: mode,
           shiftType: p.shiftType === 'Flexible Shift' ? 'Morning Shift' : p.shiftType,
-          shiftTiming: p.shiftTiming === 'Flexible' ? '09:00 AM - 06:00 PM' : p.shiftTiming,
+          shiftTiming: p.shiftTiming === 'Flexible' ? '09:30 AM - 06:00 PM' : p.shiftTiming,
           attendanceRule: p.attendanceRule === 'Flexible Hours' ? 'Standard 9-6' : p.attendanceRule,
           punchInTime: p.punchInTime === 'Not Applicable' ? '09:00 AM' : p.punchInTime,
           punchOutTime: p.punchOutTime === 'Not Applicable' ? '06:00 PM' : p.punchOutTime
@@ -702,18 +926,73 @@ const Employees = () => {
       }
     });
   };
-  
-  const handleFormSubmit = () => {
+
+  const handleFormSubmit = async () => {
     const matchingRole = roles.find(r => r.id === formData.roleId) || roles[3];
-    const finalData = { 
-      ...formData, 
+    
+    // Convert documents to base64
+    const docsToSave = [];
+    let avatarBase64 = formData.avatar;
+
+    for (const [key, file] of Object.entries(uploadedDocs)) {
+      if (!file) continue;
+      
+      if (key === 'profilePhoto') {
+        if (file.isExisting) {
+          avatarBase64 = file.downloadUrl;
+        } else if (file instanceof File) {
+          try {
+            avatarBase64 = await fileToBase64(file);
+          } catch (err) {
+            console.error('Error converting profile photo:', err);
+          }
+        }
+      } else {
+        if (file.isExisting) {
+          docsToSave.push({
+            category: key,
+            fileName: file.name,
+            uploadDate: file.uploadDate || new Date().toISOString().split('T')[0],
+            fileType: file.type,
+            downloadUrl: file.downloadUrl
+          });
+        } else if (file instanceof File) {
+          try {
+            const base64 = await fileToBase64(file);
+            docsToSave.push({
+              category: key,
+              fileName: file.name,
+              uploadDate: new Date().toISOString().split('T')[0],
+              fileType: file.type,
+              downloadUrl: base64
+            });
+          } catch (err) {
+            console.error(`Error converting document ${key}:`, err);
+          }
+        }
+      }
+    }
+
+    const finalData = {
+      ...formData,
       name: formData.name,
-      roleId: matchingRole.id, 
-      role: matchingRole.name, 
-      avatar: uploadedDocs.profilePhoto ? URL.createObjectURL(uploadedDocs.profilePhoto) : formData.avatar 
+      designation: formData.roleId === 'manager' ? 'Manager' : formData.designation,
+      roleId: matchingRole.id,
+      role: matchingRole.name,
+      avatar: avatarBase64,
+      documents: docsToSave
     };
+
     if (formMode === 'add') {
-      const finalId = finalData.id || `EMP-2026-${String(employees.length + 1).padStart(3, '0')}`;
+      const year = finalData.joinDate ? new Date(finalData.joinDate).getFullYear() : new Date().getFullYear();
+      let finalId = finalData.id;
+      if (!finalId) {
+        let suffix = employees.length;
+        do {
+          finalId = `EMP-${year}-${100 + suffix}`;
+          suffix++;
+        } while (employees.some(e => e.id === finalId));
+      }
       const finalEmail = finalData.officialEmail || `${formData.name.toLowerCase().split(' ').join('.')}@saas.io`;
       setCreatedEmpInfo({
         ...finalData,
@@ -731,45 +1010,29 @@ const Employees = () => {
     setSlideOverOpen(false);
     navigate('/employees');
   };
-  
-  const handleSaveDraft = () => {
-    const matchingRole = roles.find(r => r.id === formData.roleId) || roles[3];
-    const finalData = { 
-      ...formData, 
-      name: formData.name,
-      status: 'Draft',
-      roleId: matchingRole.id, 
-      role: matchingRole.name, 
-      avatar: uploadedDocs.profilePhoto ? URL.createObjectURL(uploadedDocs.profilePhoto) : formData.avatar 
-    };
-    const finalId = finalData.id || `EMP-2026-${String(employees.length + 1).padStart(3, '0')}`;
-    const finalEmail = finalData.officialEmail || `${formData.name.toLowerCase().split(' ').join('.')}@saas.io`;
-    addEmployee({ ...finalData, id: finalId, workEmail: finalEmail });
-    addToast('success', `Draft employee ${formData.name} saved successfully!`);
-    setShowFormPanel(false);
-    navigate('/employees');
-  };
-  
+
+
   const handleResetForm = () => {
     handleOpenAdd();
     addToast('info', 'Form has been reset.');
   };
-  
+
   const handleGenerateEmployeeId = () => {
-    const randomSeq = Math.floor(100 + Math.random() * 900);
-    const newId = `EMP-2026-${randomSeq}`;
+    const year = formData.joinDate ? new Date(formData.joinDate).getFullYear() : new Date().getFullYear();
+    const integerNum = 100 + employees.length;
+    const newId = `EMP-${year}-${integerNum}`;
     setFormData(prev => ({ ...prev, id: newId }));
     addToast('success', `Generated ID: ${newId}`);
   };
-  
+
   const handleDeactivate = (id, name) => {
     showConfirm('Deactivate Employee', `Are you sure you want to deactivate ${name}?`, () => deactivateEmployee(id), 'danger');
   };
-  
+
   const handleActivate = (id, name) => {
     showConfirm('Activate Employee', `Are you sure you want to activate ${name}?`, () => activateEmployee(id), 'primary');
   };
-  
+
   const downloadIdCard = async () => {
     if (!idCardRef.current || !idCardEmployee) return;
     try {
@@ -786,7 +1049,7 @@ const Employees = () => {
       addToast('error', 'Failed to download ID card.');
     }
   };
-  
+
   const handleClearFilters = () => { setSearchTerm(''); setDeptFilter(''); setBranchFilter(''); setStatusFilter(''); setAttFilter(''); setShiftFilter(''); setPunchFilter(''); };
 
   const totalEmp = employees.length;
@@ -806,7 +1069,7 @@ const Employees = () => {
         {label}
         {sortable && (
           sortKey !== col ? <span className="sort-neutral">⇅</span> :
-          sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+            sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
         )}
       </span>
     </th>
@@ -837,10 +1100,20 @@ const Employees = () => {
 
   const depts = [...new Set(employees.map(e => e.department))].sort();
   const branches = [...new Set(employees.map(e => e.branch))].sort();
-  const leaders = employees.filter(e => e.roleId === 'team_leader' || e.roleId === 'project_manager' || e.roleId === 'branch_admin' || e.roleId === 'super_admin');
+  const leaders = employees.filter(e => e.roleId === 'team_leader' || e.roleId === 'manager' || e.roleId === 'branch_admin' || e.roleId === 'super_admin');
 
   const handleRemoveDocument = (key, label) => {
     setUploadedDocs(prev => ({ ...prev, [key]: null }));
+    setFormData(prev => {
+      if (!prev.documents) return prev;
+      return {
+        ...prev,
+        documents: prev.documents.filter(d => {
+          const mappedKey = d.category.toLowerCase().replace(' card', '').replace(' / cv', '').replace(' photo', 'Photo').replace(' letter', 'Letter').replace(' proof', 'Proof').replace(' agreements', 'Agreements');
+          return mappedKey !== key;
+        })
+      };
+    });
     addToast('info', `${label} removed`);
   };
 
@@ -852,6 +1125,10 @@ const Employees = () => {
         certificates: null, offerLetter: null, profilePhoto: null,
         experienceLetter: null, addressProof: null, passportPhoto: null, signedAgreements: null
       });
+      setFormData(prev => ({
+        ...prev,
+        documents: []
+      }));
       addToast('info', 'All documents cleared');
     }
   };
@@ -929,7 +1206,7 @@ const Employees = () => {
                 <span className="att-metric-label">Present</span>
                 <div className="att-metric-right">
                   <span className="att-metric-count present-count">{presentCount}</span>
-                  <div className="mini-bar-track"><div className="mini-bar-fill green-fill" style={{ width: `${Math.round(presentCount / Math.max(totalEmp,1) * 100)}%` }}></div></div>
+                  <div className="mini-bar-track"><div className="mini-bar-fill green-fill" style={{ width: `${Math.round(presentCount / Math.max(totalEmp, 1) * 100)}%` }}></div></div>
                 </div>
               </div>
               <div className="att-metric-row att-absent-row">
@@ -1283,8 +1560,8 @@ const Employees = () => {
                             <Avatar name={row.name} size="sm" />
                           </span>
                           <div className="employee-info-cell">
-                            <span 
-                              className="emp-name-bold emp-name-clickable" 
+                            <span
+                              className="emp-name-bold emp-name-clickable"
                               onClick={e => openPreview(e, row)}
                               onMouseEnter={e => handleNameMouseEnter(e, row)}
                               onMouseLeave={handleNameMouseLeave}
@@ -1369,12 +1646,12 @@ const Employees = () => {
         <div className="emp-page-footer-stats">
           <div className="footer-stat-item">
             <span className="footer-stat-label">Last Added</span>
-            <span className="footer-stat-value">{employees.length>0?employees[employees.length-1].name:'—'}</span>
+            <span className="footer-stat-value">{employees.length > 0 ? employees[employees.length - 1].name : '—'}</span>
           </div>
           <div className="footer-stat-divider" />
           <div className="footer-stat-item">
             <span className="footer-stat-label">Added Today</span>
-            <span className="footer-stat-value">{employees.filter(e=>e.joinDate===new Date().toISOString().split('T')[0]).length}</span>
+            <span className="footer-stat-value">{employees.filter(e => e.joinDate === new Date().toISOString().split('T')[0]).length}</span>
           </div>
           <div className="footer-stat-divider" />
           <div className="footer-stat-item">
@@ -1505,7 +1782,7 @@ const Employees = () => {
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Assign Role to {selectedIds.size} employee(s)</h3>
             <select value={bulkRole} onChange={e => setBulkRole(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>
-              <option value="super_admin">Super Admin</option><option value="project_manager">Project Manager</option>
+              <option value="super_admin">Super Admin</option><option value="manager">Manager</option>
               <option value="team_leader">Team Leader</option><option value="employee">Employee</option>
             </select>
             <div className="modal-footer"><Button variant="secondary" onClick={() => setShowRoleModal(false)}>Cancel</Button><Button variant="primary" onClick={handleBulkRoleAssign}>Assign Role</Button></div>
@@ -1570,7 +1847,7 @@ const Employees = () => {
           <div className="form-panel-header">
             <div>
               <h3>{formMode === 'add' ? 'Add New Employee' : 'Edit Employee'}</h3>
-              <span className="form-step-sub">Step {wizardStep} of 7 — {['Personal Details','Professional Details','Login & Role','Attendance & Shift','Salary & Payroll','Documents','Security'][wizardStep-1]}</span>
+              <span className="form-step-sub">Step {wizardStep} of 7 — {['Personal Details', 'Professional Details', 'Login & Role', 'Shift', 'Salary & Payroll', 'Documents', 'Security'][wizardStep - 1]}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {formMode === 'edit' && (
@@ -1582,20 +1859,7 @@ const Employees = () => {
             </div>
           </div>
 
-          {/* ── Validation Alerts ── */}
-          {(() => {
-            const dupEmail = formData.email && employees.some(e => (e.email === formData.email || e.workEmail === formData.email) && e.id !== selectedEmployeeId);
-            const dupPhone = formData.phone && employees.some(e => e.phone === formData.phone && e.id !== selectedEmployeeId);
-            const weakPass = wizardStep === 3 && formData.password && formData.password !== '••••••••' && formData.password.length < 8;
-            if (!dupEmail && !dupPhone && !weakPass) return null;
-            return (
-              <div className="form-validation-alerts">
-                {dupEmail && <div className="form-alert form-alert-danger">⚠️ <strong>Duplicate Email:</strong> Already registered to another employee.</div>}
-                {dupPhone && <div className="form-alert form-alert-warning">⚠️ <strong>Duplicate Mobile:</strong> Phone number already in use.</div>}
-                {weakPass && <div className="form-alert form-alert-warning">⚠️ <strong>Weak Password:</strong> Must be at least 8 characters.</div>}
-              </div>
-            );
-          })()}
+          {/* Inplace field errors are rendered directly under each input element */}
 
           {/* ── Clickable Wizard Indicators ── */}
           <div className="wizard-indicators-bar">
@@ -1603,17 +1867,17 @@ const Employees = () => {
               { n: 1, l: 'Personal' },
               { n: 2, l: 'Professional' },
               { n: 3, l: 'Login' },
-              { n: 4, l: 'Attendance' },
+              { n: 4, l: 'Shift' },
               { n: 5, l: 'Salary' },
               { n: 6, l: 'Documents' },
               { n: 7, l: 'Security' }
             ].map(({ n, l }, i, arr) => {
               const isCompleted = wizardStep > n;
               const isActive = wizardStep === n;
-              
+
               return (
                 <React.Fragment key={n}>
-                  <div 
+                  <div
                     className={`indicator-step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} clickable`}
                     onClick={() => handleStepClick(n)}
                     title={`Click to go to Step ${n}: ${l}`}
@@ -1633,32 +1897,119 @@ const Employees = () => {
               <div className="wizard-step-form">
                 <h4 className="form-subsection-title">Personal Details</h4>
                 <div className="form-section-grid">
-                  <div className="form-field form-field-full"><label>{FIELD_LABELS.name} *</label><input type="text" placeholder="e.g. Vikram Singh" value={formData.name} onChange={e=>setFormData(p=>({...p,name:e.target.value}))} required /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.dob}</label><input type="date" value={formData.dob} onChange={e=>setFormData(p=>({...p,dob:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.gender}</label><select value={formData.gender} onChange={e=>setFormData(p=>({...p,gender:e.target.value}))}><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
-                  <div className="form-field"><label>{FIELD_LABELS.phone} *</label><input type="text" placeholder="+91 98765 43210" value={formData.phone} onChange={e=>setFormData(p=>({...p,phone:e.target.value}))} required /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.alternatePhone}</label><input type="text" placeholder="+91 98765 43211" value={formData.alternatePhone||''} onChange={e=>setFormData(p=>({...p,alternatePhone:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.email} *</label><input type="email" placeholder="vikram@company.com" value={formData.email} onChange={e=>setFormData(p=>({...p,email:e.target.value}))} required /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.personalEmail}</label><input type="email" placeholder="vikram@gmail.com" value={formData.personalEmail||''} onChange={e=>setFormData(p=>({...p,personalEmail:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.bloodGroup}</label><select value={formData.bloodGroup||''} onChange={e=>setFormData(p=>({...p,bloodGroup:e.target.value}))}><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
-                  <div className="form-field"><label>{FIELD_LABELS.maritalStatus}</label><select value={formData.maritalStatus||''} onChange={e=>setFormData(p=>({...p,maritalStatus:e.target.value}))}><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
-                  <div className="form-field"><label>{FIELD_LABELS.experience}</label><input type="text" placeholder="e.g. 5 years" value={formData.experience} onChange={e=>setFormData(p=>({...p,experience:e.target.value}))} /></div>
+                  <div className="form-field form-field-full">
+                    <label>{FIELD_LABELS.name} *</label>
+                    <input type="text" placeholder="e.g. Vikram Singh" value={formData.name} onChange={e => { const val = e.target.value.replace(/[^\p{L}\s]/gu, ''); setFormData(p => ({ ...p, name: val })); }} required />
+                    {formData.name && formData.name.trim().length < 2 && (
+                      <span className="field-error-msg">⚠️ Name must be at least 2 characters.</span>
+                    )}
+                  </div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.dob}</label>
+                    <input type="date" value={formData.dob} onChange={e => setFormData(p => ({ ...p, dob: e.target.value }))} />
+                    {formData.dob && !isOldEnough(formData.dob) && (
+                      <span className="field-error-msg">⚠️ Employee must be at least 18 years old.</span>
+                    )}
+                  </div>
+                  <div className="form-field"><label>{FIELD_LABELS.gender}</label><select value={formData.gender} onChange={e => setFormData(p => ({ ...p, gender: e.target.value }))}><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.phone} *</label>
+                    <input type="text" placeholder="e.g. 9876543210" value={formData.phone} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData(p => ({ ...p, phone: val })); }} required />
+                    {formData.phone && !isValidPhone(formData.phone) && (
+                      <span className="field-error-msg">⚠️ Number must contain exactly 10 digits.</span>
+                    )}
+                    {dupPhone && (
+                      <span className="field-error-msg">⚠️ Duplicate Mobile: Phone number already in use.</span>
+                    )}
+                  </div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.alternatePhone}</label>
+                    <input type="text" placeholder="e.g. 9876543211" value={formData.alternatePhone || ''} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData(p => ({ ...p, alternatePhone: val })); }} />
+                    {formData.alternatePhone && !isValidPhone(formData.alternatePhone) && (
+                      <span className="field-error-msg">⚠️ Number must contain exactly 10 digits.</span>
+                    )}
+                  </div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.email} *</label>
+                    <input type="email" placeholder="vikram@company.com" value={formData.email} onChange={e => setFormData(p => ({ ...p, email: e.target.value }))} required />
+                    {formData.email && !isValidEmail(formData.email) && (
+                      <span className="field-error-msg">⚠️ Please enter a valid email format.</span>
+                    )}
+                    {dupEmail && (
+                      <span className="field-error-msg">⚠️ Duplicate Email: Already registered to another employee.</span>
+                    )}
+                  </div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.personalEmail}</label>
+                    <input type="email" placeholder="vikram@gmail.com" value={formData.personalEmail || ''} onChange={e => setFormData(p => ({ ...p, personalEmail: e.target.value }))} />
+                    {formData.personalEmail && !isValidEmail(formData.personalEmail) && (
+                      <span className="field-error-msg">⚠️ Please enter a valid email format.</span>
+                    )}
+                  </div>
+                  <div className="form-field"><label>{FIELD_LABELS.bloodGroup}</label><select value={formData.bloodGroup || ''} onChange={e => setFormData(p => ({ ...p, bloodGroup: e.target.value }))}><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+                  <div className="form-field"><label>{FIELD_LABELS.maritalStatus}</label><select value={formData.maritalStatus || ''} onChange={e => setFormData(p => ({ ...p, maritalStatus: e.target.value }))}><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
+                  <div className="form-field"><label>{FIELD_LABELS.experience}</label><input type="text" placeholder="e.g. 5 years" value={formData.experience} onChange={e => setFormData(p => ({ ...p, experience: e.target.value }))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.roleId} *</label><select value={formData.roleId || 'employee'} onChange={e => setFormData(p => ({ ...p, roleId: e.target.value }))}><option value="manager"> Manager</option><option value="team_leader">Team Leader</option><option value="employee">Employee</option></select></div>
                 </div>
-                <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-5)'}}>Address Details</h4>
+                <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-5)' }}>Address Details</h4>
                 <div className="form-section-grid">
-                  <div className="form-field form-field-full"><label>{FIELD_LABELS.currentAddress}</label><textarea rows="2" placeholder="Current residential address" value={formData.currentAddress||''} onChange={e=>setFormData(p=>({...p,currentAddress:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.city}</label><input type="text" placeholder="e.g. Jaipur" value={formData.city||''} onChange={e=>setFormData(p=>({...p,city:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.state}</label><input type="text" placeholder="e.g. Rajasthan" value={formData.state||''} onChange={e=>setFormData(p=>({...p,state:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.country}</label><input type="text" placeholder="e.g. India" value={formData.country||''} onChange={e=>setFormData(p=>({...p,country:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.zipCode}</label><input type="text" placeholder="e.g. 302017" value={formData.zipCode||''} onChange={e=>setFormData(p=>({...p,zipCode:e.target.value}))} /></div>
-                  <div className="form-field form-field-full"><label>{FIELD_LABELS.permanentAddress}</label><textarea rows="2" placeholder="Permanent address (if different)" value={formData.permanentAddress||''} onChange={e=>setFormData(p=>({...p,permanentAddress:e.target.value}))} /></div>
+                  <div className="form-field form-field-full"><label>{FIELD_LABELS.currentAddress}</label><textarea rows="2" placeholder="Current residential address" value={formData.currentAddress || ''} onChange={e => setFormData(p => ({ ...p, currentAddress: e.target.value }))} /></div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.zipCode}</label>
+                    <input type="text" placeholder="e.g. 302017" value={formData.zipCode || ''} onChange={e => handleZipCodeChange(e.target.value)} />
+                    {formData.zipCode && !isValidZipCode(formData.zipCode) && (
+                      <span className="field-error-msg">⚠️ Must contain exactly 6 digits.</span>
+                    )}
+                  </div>
+                  <div className="form-field"><label>{FIELD_LABELS.city}</label><input type="text" placeholder="e.g. Jaipur" value={formData.city || ''} onChange={e => setFormData(p => ({ ...p, city: e.target.value }))} /></div>
+                  <div className="form-field"><label>{FIELD_LABELS.state}</label><input type="text" placeholder="e.g. Rajasthan" value={formData.state || ''} onChange={e => setFormData(p => ({ ...p, state: e.target.value }))} /></div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.country}</label>
+                    <select
+                      value={formData.country || 'India'}
+                      onChange={e => {
+                        const nextCountry = e.target.value;
+                        setFormData(p => ({
+                          ...p,
+                          country: nextCountry,
+                          zipCode: '',
+                          city: '',
+                          state: ''
+                        }));
+                      }}
+                    >
+                      <option value="India">India</option>
+                      <option value="United States">United States</option>
+                      <option value="United Kingdom">United Kingdom</option>
+                      <option value="Canada">Canada</option>
+                      <option value="Australia">Australia</option>
+                      <option value="Germany">Germany</option>
+                      <option value="France">France</option>
+                      <option value="United Arab Emirates">United Arab Emirates</option>
+                      <option value="Singapore">Singapore</option>
+                      <option value="Japan">Japan</option>
+                    </select>
+                  </div>
+                  <div className="form-field form-field-full"><label>{FIELD_LABELS.permanentAddress}</label><textarea rows="2" placeholder="Permanent address (if different)" value={formData.permanentAddress || ''} onChange={e => setFormData(p => ({ ...p, permanentAddress: e.target.value }))} /></div>
                 </div>
-                <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-5)'}}>Emergency Contact</h4>
+                <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-5)' }}>Emergency Contact</h4>
                 <div className="form-section-grid">
-                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactName}</label><input type="text" placeholder="e.g. Priya Sharma" value={formData.emergencyContactName||''} onChange={e=>setFormData(p=>({...p,emergencyContactName:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactPhone}</label><input type="text" placeholder="+91 98765 43211" value={formData.emergencyContactPhone||''} onChange={e=>setFormData(p=>({...p,emergencyContactPhone:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactPhoneAlt}</label><input type="text" placeholder="+91 98765 43212" value={formData.emergencyContactPhoneAlt||''} onChange={e=>setFormData(p=>({...p,emergencyContactPhoneAlt:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactRelation}</label><select value={formData.emergencyContactRelation||''} onChange={e=>setFormData(p=>({...p,emergencyContactRelation:e.target.value}))}><option value="">Select</option><option>Spouse</option><option>Parent</option><option>Sibling</option><option>Friend</option><option>Relative</option><option>Other</option></select></div>
+                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactName}</label><input type="text" placeholder="e.g. Priya Sharma" value={formData.emergencyContactName || ''} onChange={e => { const val = e.target.value.replace(/[^\p{L}\s]/gu, ''); setFormData(p => ({ ...p, emergencyContactName: val })); }} /></div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.emergencyContactPhone}</label>
+                    <input type="text" placeholder="e.g. 9876543211" value={formData.emergencyContactPhone || ''} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData(p => ({ ...p, emergencyContactPhone: val })); }} />
+                    {formData.emergencyContactPhone && !isValidPhone(formData.emergencyContactPhone) && (
+                      <span className="field-error-msg">⚠️ Number must contain exactly 10 digits.</span>
+                    )}
+                  </div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.emergencyContactPhoneAlt}</label>
+                    <input type="text" placeholder="e.g. 9876543212" value={formData.emergencyContactPhoneAlt || ''} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData(p => ({ ...p, emergencyContactPhoneAlt: val })); }} />
+                    {formData.emergencyContactPhoneAlt && !isValidPhone(formData.emergencyContactPhoneAlt) && (
+                      <span className="field-error-msg">⚠️ Number must contain exactly 10 digits.</span>
+                    )}
+                  </div>
+                  <div className="form-field"><label>{FIELD_LABELS.emergencyContactRelation}</label><select value={formData.emergencyContactRelation || ''} onChange={e => setFormData(p => ({ ...p, emergencyContactRelation: e.target.value }))}><option value="">Select</option><option>Spouse</option><option>Parent</option><option>Sibling</option><option>Friend</option><option>Relative</option><option>Other</option></select></div>
                 </div>
               </div>
             )}
@@ -1670,71 +2021,196 @@ const Employees = () => {
               return (
                 <div className="wizard-step-form">
                   <div className="form-section-grid">
-                    <div className="form-field"><label>{FIELD_LABELS.id}</label><input type="text" placeholder="e.g. EMP-2026-100" value={formData.id} onChange={e => setFormData(p => ({ ...p, id: e.target.value }))} disabled={formMode === 'edit'} /></div>
-                    <div className="form-field"><label>{FIELD_LABELS.companyName}</label><input type="text" placeholder="e.g. OM Enterprise" value={formData.companyName || ''} onChange={e => setFormData(p => ({ ...p, companyName: e.target.value }))} /></div>
-                    <div className="form-field"><label>{FIELD_LABELS.designation} *</label><input type="text" placeholder="e.g. Senior Software Engineer" value={formData.designation} onChange={e => setFormData(p => ({ ...p, designation: e.target.value }))} required /></div>
-                    <div className="form-field"><label>{FIELD_LABELS.department} *</label><select value={formData.department} onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}>{depts.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
-                    <div className="form-field"><label>{FIELD_LABELS.branch} *</label><input type="text" placeholder="e.g. Jaipur" value={formData.branch} onChange={e => {const val = e.target.value; setFormData(p => ({ ...p, branch: val }));}} list="branch-list" required /><datalist id="branch-list">{branches.map(b => <option key={b} value={b} />)}</datalist></div>
-                    <div className="form-field"><label>{FIELD_LABELS.branchAddress}</label><input type="text" placeholder="e.g. Malviya Nagar, Jaipur, Rajasthan 302017" value={formData.branchAddress || ''} onChange={e => setFormData(p => ({ ...p, branchAddress: e.target.value }))} /></div>
-                    <div className="form-field"><label>{FIELD_LABELS.teamLeader}</label><select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}><option value="">Select Team Leader</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
-                    <div className="form-field"><label>{FIELD_LABELS.projectManager}</label><select value={formData.projectManager} onChange={e => setFormData(p => ({ ...p, projectManager: e.target.value }))}><option value="">Select Project Manager</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
-                    <div className="form-field"><label>{FIELD_LABELS.joinDate} *</label><input type="date" value={formData.joinDate} onChange={e => setFormData(p => ({ ...p, joinDate: e.target.value }))} required /></div>
-                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
-                      <label>{FIELD_LABELS.shiftTiming}</label>
-                      <input 
-                        type="text" 
-                        placeholder={isWfh ? 'Flexible / Not Applicable' : 'e.g. 09:00 AM - 06:00 PM'} 
-                        value={isWfh ? '' : formData.shiftTiming} 
-                        onChange={e => setFormData(p => ({ ...p, shiftTiming: e.target.value }))} 
-                        disabled={isWfh}
-                      />
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.id}</label>
+                      <div className="id-input-group">
+                        <input
+                          type="text"
+                          placeholder="e.g. EMP-2026-100"
+                          value={formData.id}
+                          onChange={e => setFormData(p => ({ ...p, id: e.target.value }))}
+                          disabled={formMode === 'edit'}
+                        />
+                        {formMode === 'add' && (
+                          <button
+                            type="button"
+                            className="id-generate-btn"
+                            onClick={handleGenerateEmployeeId}
+                            title="Generate ID"
+                          >
+                            🔑
+                          </button>
+                        )}
+                      </div>
+                      {dupEmpId && (
+                        <span className="field-error-msg">⚠️ Duplicate Employee ID: Already assigned to another employee.</span>
+                      )}
                     </div>
-                    <div className="form-field"><label>{FIELD_LABELS.workLocation}</label><input type="text" placeholder="e.g. Tower B, 3rd Floor" value={formData.workLocation||''} onChange={e=>setFormData(p=>({...p,workLocation:e.target.value}))} /></div>
-                  </div>
-                  <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-4)'}}>Work Mode</h4>
-                  <div className="work-mode-selector">
-                    {['Work From Office','Work From Home','Hybrid'].map(mode=>(
-                      <label key={mode} className={`work-mode-option ${formData.workMode===mode?'selected':''}`}>
-                        <input type="radio" name="workMode" value={mode} checked={formData.workMode===mode} onChange={()=>handleWorkModeChange(mode)} hidden />
-                        <span className="work-mode-icon">{mode==='Work From Office'?'🏢':mode==='Work From Home'?'🏠':'🔄'}</span><span>{mode}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-4)'}}>Quick Assign</h4>
-                  <div className={`form-quick-assign-card ${isWfh ? 'disabled-field' : ''}`}>
-                    <p className="quick-assign-desc">Auto-fill related fields by selecting a team or shift preset.</p>
-                    <div className="form-section-grid">
-                      <div className="form-field"><label>Team Assignment</label><select value={formData.teamName||''} onChange={e=>setFormData(p=>({...p,teamName:e.target.value}))}><option value="">Select Team</option>{['Alpha Squad','Beta Unit','Gamma Force','Delta Team','Product Core','Dev Ops'].map(t=><option key={t}>{t}</option>)}</select></div>
-                      <div className="form-field"><label>Shift Preset</label><select value={formData.shiftTiming||''} onChange={e=>setFormData(p=>({...p,shiftTiming:e.target.value}))} disabled={isWfh}><option value="">Select Shift</option><option value="09:00 AM - 06:00 PM">Morning (09:00 AM - 06:00 PM)</option><option value="02:00 PM - 11:00 PM">Evening (02:00 PM - 11:00 PM)</option><option value="10:00 PM - 07:00 AM">Night (10:00 PM - 07:00 AM)</option><option value="Flexible">Flexible</option></select></div>
-                    </div>
-                  </div>
-                  <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Employment Information</h4>
-                  <div className="form-section-grid">
-                    <div className="form-field"><label>{FIELD_LABELS.employeeType}</label>
-                      <select value={formData.employeeType || 'Full Time'} onChange={e => {
-                        const newType = e.target.value;
-                        setFormData(p => ({ ...p, employeeType: newType, probationEndDate: newType === 'Full Time' ? '' : p.probationEndDate }));
-                      }}>
-                        <option value="Full Time">Full Time</option>
-                        <option value="Part Time">Part Time</option>
-                        <option value="Contract">Contract</option>
-                        <option value="Internship">Internship</option>
+                    {formData.roleId !== 'manager' && (
+                      <div className="form-field">
+                        <label>{FIELD_LABELS.designation} *</label>
+                        <input type="text" placeholder="e.g. Senior Software Engineer" value={formData.designation} onChange={e => setFormData(p => ({ ...p, designation: e.target.value }))} required />
+                        {formData.designation && formData.designation.trim().length < 2 && (
+                          <span className="field-error-msg">⚠️ Designation must be at least 2 characters.</span>
+                        )}
+                      </div>
+                    )}
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.branch} *</label>
+                      <select
+                        value={formData.branch}
+                        onChange={e => {
+                          const selectedBranch = e.target.value;
+                          const filtered = (dbDepartments || []).filter(
+                            d => d.branch?.trim().toLowerCase() === selectedBranch.trim().toLowerCase()
+                          );
+                          const firstDept = filtered.length > 0 ? filtered[0].name : '';
+                          setFormData(p => ({
+                            ...p,
+                            branch: selectedBranch,
+                            department: firstDept
+                          }));
+                        }}
+                        required
+                      >
+                        <option value="">Select Branch/Agency</option>
+                        {dbBranches && dbBranches.length > 0 ? (
+                          dbBranches.map(b => (
+                            <option key={b.id || b._id} value={b.name}>
+                              {b.name}
+                            </option>
+                          ))
+                        ) : (
+                          branches.map(bName => (
+                            <option key={bName} value={bName}>
+                              {bName}
+                            </option>
+                          ))
+                        )}
                       </select>
                     </div>
-                    <div className="form-field"><label>{FIELD_LABELS.employmentStatus}</label><select value={formData.employmentStatus || 'Active'} onChange={e => setFormData(p => ({ ...p, employmentStatus: e.target.value }))}><option value="Active">Active</option><option value="Probation">Probation</option><option value="Suspended">Suspended</option><option value="Terminated">Terminated</option></select></div>
                     <div className="form-field">
-                      <label>{FIELD_LABELS.probationEndDate}</label>
-                      <input type="date" value={formData.probationEndDate || ''} onChange={e => setFormData(p => ({ ...p, probationEndDate: e.target.value }))} disabled={isFullTime} style={{ opacity: isFullTime ? 0.5 : 1, cursor: isFullTime ? 'not-allowed' : 'pointer' }} />
-                      {isFullTime && <small style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Disabled for Full Time employees</small>}
+                      <label>{FIELD_LABELS.department} *</label>
+                      <select
+                        value={formData.department}
+                        onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}
+                        required
+                      >
+                        <option value="">Select Department</option>
+                        {dbDepartments && dbDepartments.length > 0 ? (
+                          dbDepartments
+                            .filter(
+                              d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase()
+                            )
+                            .map(d => (
+                              <option key={d.id || d._id} value={d.name}>
+                                {d.name}
+                              </option>
+                            ))
+                        ) : (
+                          depts.map(dName => (
+                            <option key={dName} value={dName}>
+                              {dName}
+                            </option>
+                          ))
+                        )}
+                      </select>
                     </div>
-                    <div className="form-field"><label>{FIELD_LABELS.contractEndDate}</label><input type="date" value={formData.contractEndDate || ''} onChange={e => setFormData(p => ({ ...p, contractEndDate: e.target.value }))} /></div>
+                    {formData.roleId !== 'manager' && (
+                      <>
+                        {formData.roleId !== 'team_leader' && (
+                          <div className="form-field"><label>{FIELD_LABELS.teamLeader}</label><select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}><option value="">Select Team Leader</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
+                        )}
+                        <div className="form-field"><label>{FIELD_LABELS.projectManager}</label><select value={formData.projectManager} onChange={e => setFormData(p => ({ ...p, projectManager: e.target.value }))}><option value="">Select Project Manager</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
+                      </>
+                    )}
+                    <div className="form-field"><label>{FIELD_LABELS.joinDate} *</label><input type="date" value={formData.joinDate} onChange={e => setFormData(p => ({ ...p, joinDate: e.target.value }))} required /></div>
+                    <div className="form-field"><label>{FIELD_LABELS.workLocation}</label><input type="text" placeholder="e.g. Tower B, 3rd Floor" value={formData.workLocation || ''} onChange={e => setFormData(p => ({ ...p, workLocation: e.target.value }))} /></div>
                   </div>
+                  {formData.roleId !== 'manager' && (
+                    <>
+                      {formData.roleId !== 'team_leader' && (
+                        <>
+                          <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Work Mode</h4>
+                          <div className="work-mode-selector">
+                            {['Work From Office', 'Work From Home', 'Hybrid'].map(mode => (
+                              <label key={mode} className={`work-mode-option ${formData.workMode === mode ? 'selected' : ''}`}>
+                                <input type="radio" name="workMode" value={mode} checked={formData.workMode === mode} onChange={() => handleWorkModeChange(mode)} hidden />
+                                <span className="work-mode-icon">{mode === 'Work From Office' ? '🏢' : mode === 'Work From Home' ? '🏠' : '🔄'}</span><span>{mode}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
+
+                      <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Quick Assign</h4>
+                      <div className="form-quick-assign-card">
+                        <p className="quick-assign-desc">Auto-fill related fields by selecting a team preset.</p>
+                        <div className="form-section-grid">
+                          <div className="form-field"><label>Team Assignment</label><select value={formData.teamName || ''} onChange={e => setFormData(p => ({ ...p, teamName: e.target.value }))}><option value="">Select Team</option>{['Alpha Squad', 'Beta Unit', 'Gamma Force', 'Delta Team', 'Product Core', 'Dev Ops'].map(t => <option key={t}>{t}</option>)}</select></div>
+                        </div>
+                      </div>
+
+                      <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Employment Information</h4>
+                      <div className="form-section-grid">
+                        <div className="form-field"><label>{FIELD_LABELS.employeeType}</label>
+                          <select value={formData.employeeType || 'Full Time'} onChange={e => {
+                            const newType = e.target.value;
+                            setFormData(p => ({
+                              ...p,
+                              employeeType: newType,
+                              probationEndDate: newType === 'Full Time' ? '' : p.probationEndDate,
+                              contractEndDate: newType === 'Contract' ? p.contractEndDate : ''
+                            }));
+                          }}>
+                            <option value="Full Time">Full Time</option>
+                            <option value="Part Time">Part Time</option>
+                            <option value="Contract">Contract</option>
+                            <option value="Internship">Internship</option>
+                          </select>
+                        </div>
+                        <div className="form-field"><label>{FIELD_LABELS.employmentStatus}</label><select value={formData.employmentStatus || 'Active'} onChange={e => setFormData(p => ({ ...p, employmentStatus: e.target.value }))}><option value="Active">Active</option><option value="Probation">Probation</option><option value="Suspended">Suspended</option><option value="Terminated">Terminated</option></select></div>
+                        <div className="form-field">
+                          <label>{FIELD_LABELS.probationEndDate}</label>
+                          <input type="date" value={formData.probationEndDate || ''} onChange={e => setFormData(p => ({ ...p, probationEndDate: e.target.value }))} disabled={isFullTime} style={{ opacity: isFullTime ? 0.5 : 1, cursor: isFullTime ? 'not-allowed' : 'pointer' }} />
+                          {isFullTime && <small style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Disabled for Full Time employees</small>}
+                        </div>
+                        {formData.employeeType === 'Contract' && (
+                          <div className="form-field"><label>{FIELD_LABELS.contractEndDate}</label><input type="date" value={formData.contractEndDate || ''} onChange={e => setFormData(p => ({ ...p, contractEndDate: e.target.value }))} /></div>
+                        )}
+                      </div>
+                    </>
+                  )}
                   <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Bank Details</h4>
                   <div className="form-section-grid">
-                    <div className="form-field"><label>{FIELD_LABELS.bankName}</label><input type="text" placeholder="e.g. HDFC Bank" value={formData.bankName || ''} onChange={e => setFormData(p => ({ ...p, bankName: e.target.value }))} /></div>
-                    <div className="form-field"><label>{FIELD_LABELS.bankAccountNumber}</label><input type="text" placeholder="e.g. 501002348271" value={formData.bankAccountNumber || ''} onChange={e => setFormData(p => ({ ...p, bankAccountNumber: e.target.value }))} /></div>
-                    <div className="form-field"><label>{FIELD_LABELS.bankIfscCode}</label><input type="text" placeholder="e.g. HDFC0000123" value={formData.bankIfscCode || ''} onChange={e => setFormData(p => ({ ...p, bankIfscCode: e.target.value }))} /></div>
-                    <div className="form-field"><label>{FIELD_LABELS.bankUpiId}</label><input type="text" placeholder="e.g. employee@okhdfc" value={formData.bankUpiId || ''} onChange={e => setFormData(p => ({ ...p, bankUpiId: e.target.value }))} /></div>
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.bankName}</label>
+                      <input type="text" placeholder="e.g. HDFC Bank" value={formData.bankName || ''} onChange={e => { const val = e.target.value.replace(/[^a-zA-Z\s]/g, ''); setFormData(p => ({ ...p, bankName: val })); }} />
+                      {invalidBankName && (
+                        <span className="field-error-msg">⚠️ Must contain only letters and spaces.</span>
+                      )}
+                    </div>
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.bankAccountNumber}</label>
+                      <input type="text" placeholder="e.g. 501002348271" value={formData.bankAccountNumber || ''} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 18); setFormData(p => ({ ...p, bankAccountNumber: val })); }} />
+                      {invalidBankAccountVal && (
+                        <span className="field-error-msg">⚠️ Must be digits only and between 9 and 18 characters.</span>
+                      )}
+                    </div>
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.bankIfscCode}</label>
+                      <input type="text" placeholder="e.g. HDFC0000123" value={formData.bankIfscCode || ''} onChange={e => { const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11); setFormData(p => ({ ...p, bankIfscCode: val })); }} />
+                      {invalidIfscVal && (
+                        <span className="field-error-msg">⚠️ Must be 11 characters in format: ABCD0123456.</span>
+                      )}
+                    </div>
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.bankUpiId}</label>
+                      <input type="text" placeholder="e.g. employee@okhdfc" value={formData.bankUpiId || ''} onChange={e => { const val = e.target.value.replace(/[^a-zA-Z0-9.\-_@]/g, ''); setFormData(p => ({ ...p, bankUpiId: val })); }} />
+                      {invalidUpiVal && (
+                        <span className="field-error-msg">⚠️ Must be in a valid format (e.g. name@upi).</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1745,65 +2221,109 @@ const Employees = () => {
               <div className="wizard-step-form">
                 <h4 className="form-subsection-title">Login Credentials</h4>
                 <div className="form-section-grid">
-                  <div className="form-field"><label>{FIELD_LABELS.username}</label><input type="text" placeholder="e.g. vikram.singh" value={formData.username||''} onChange={e=>setFormData(p=>({...p,username:e.target.value}))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.officialEmail}</label><input type="email" placeholder="vikram@company.io" value={formData.officialEmail||''} onChange={e=>setFormData(p=>({...p,officialEmail:e.target.value}))} /></div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.username}</label>
+                    <input type="text" placeholder="e.g. vikram.singh" value={formData.username || ''} onChange={e => setFormData(p => ({ ...p, username: e.target.value }))} />
+                    {formData.username && formData.username.trim().length < 3 && (
+                      <span className="field-error-msg">⚠️ Must be at least 3 characters.</span>
+                    )}
+                  </div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.officialEmail}</label>
+                    <input type="email" placeholder="vikram@company.io" value={formData.officialEmail || ''} onChange={e => setFormData(p => ({ ...p, officialEmail: e.target.value }))} />
+                    {formData.officialEmail && !isValidEmail(formData.officialEmail) && (
+                      <span className="field-error-msg">⚠️ Please enter a valid email format.</span>
+                    )}
+                  </div>
                   <div className="form-field">
                     <label>{FIELD_LABELS.password} *</label>
-                    <input type="password" placeholder={formMode==='edit'?'Leave blank to keep current':'Set login password'} value={formData.password||''} onChange={e=>setFormData(p=>({...p,password:e.target.value}))} />
-                    {formData.password && formData.password!=='••••••••' && (
+                    <div className="password-input-wrapper">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder={formMode === 'edit' ? 'Leave blank to keep current' : 'Set login password'}
+                        value={formData.password || ''}
+                        onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
+                        maxLength={12}
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle-btn"
+                        onClick={() => setShowPassword(p => !p)}
+                        title={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {invalidPass && (
+                      <span className="field-error-msg">⚠️ Must be between 8 and 12 characters.</span>
+                    )}
+                    {formData.password && formData.password !== '••••••••' && (
                       <div className="password-strength-bar">
-                        <div className={`pw-bar-fill pw-${formData.password.length<6?'weak':formData.password.length<10?'medium':'strong'}`} style={{width:`${Math.min(100,formData.password.length*10)}%`}} />
-                        <span className={`pw-label pw-label-${formData.password.length<6?'weak':formData.password.length<10?'medium':'strong'}`}>{formData.password.length<6?'🔴 Weak':formData.password.length<10?'🟡 Medium':'🟢 Strong'}</span>
+                        <div className={`pw-bar-fill pw-${formData.password.length < 6 ? 'weak' : formData.password.length < 10 ? 'medium' : 'strong'}`} style={{ width: `${Math.min(100, formData.password.length * 10)}%` }} />
+                        <span className={`pw-label pw-label-${formData.password.length < 6 ? 'weak' : formData.password.length < 10 ? 'medium' : 'strong'}`}>{formData.password.length < 6 ? '🔴 Weak' : formData.password.length < 10 ? '🟡 Medium' : '🟢 Strong'}</span>
                       </div>
                     )}
                   </div>
                   <div className="form-field">
                     <label>{FIELD_LABELS.confirmPassword} *</label>
-                    <input type="password" placeholder="Re-enter password" value={formData.confirmPassword||''} onChange={e=>setFormData(p=>({...p,confirmPassword:e.target.value}))} />
-                    {formData.confirmPassword && formData.confirmPassword!==formData.password && <span style={{fontSize:'0.75rem',color:'var(--color-danger)',marginTop:'4px',display:'block'}}>⚠ Passwords do not match</span>}
-                    {formData.confirmPassword && formData.confirmPassword===formData.password && formData.confirmPassword.length>0 && <span style={{fontSize:'0.75rem',color:'var(--color-success)',marginTop:'4px',display:'block'}}>✓ Passwords match</span>}
+                    <div className="password-input-wrapper">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Re-enter password"
+                        value={formData.confirmPassword || ''}
+                        onChange={e => setFormData(p => ({ ...p, confirmPassword: e.target.value }))}
+                        maxLength={12}
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle-btn"
+                        onClick={() => setShowConfirmPassword(p => !p)}
+                        title={showConfirmPassword ? "Hide password" : "Show password"}
+                      >
+                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    {formData.confirmPassword && formData.confirmPassword !== formData.password && <span style={{ fontSize: '0.75rem', color: 'var(--color-danger)', marginTop: '4px', display: 'block' }}>⚠ Passwords do not match</span>}
+                    {formData.confirmPassword && formData.confirmPassword === formData.password && formData.confirmPassword.length > 0 && <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', marginTop: '4px', display: 'block' }}>✓ Passwords match</span>}
                   </div>
-                  <div className="form-field"><label>{FIELD_LABELS.roleId} *</label><select value={formData.roleId||'employee'} onChange={e=>setFormData(p=>({...p,roleId:e.target.value}))}><option value="super_admin">Super Admin</option><option value="project_manager">Project Manager</option><option value="team_leader">Team Leader</option><option value="employee">Employee</option></select></div>
-                </div>
-                <h4 className="form-subsection-title" style={{marginTop:'var(--spacing-5)'}}>Permission Management Matrix</h4>
-                <p style={{fontSize:'0.8rem',color:'var(--text-muted)',marginBottom:'var(--spacing-3)'}}>Set module-level CRUD access for this employee.</p>
-                <div className="perm-matrix-wrapper">
-                  <table className="perm-matrix-table">
-                    <thead><tr><th className="perm-module-col">Module</th>{['View','Create','Edit','Delete','Approve','Export'].map(p=><th key={p} className="perm-action-col">{p}</th>)}</tr></thead>
-                    <tbody>
-                      {Object.entries(formData.permissions||{}).map(([module,perms])=>(
-                        <tr key={module} className="perm-row">
-                          <td className="perm-module-name">{module.charAt(0).toUpperCase()+module.slice(1)}</td>
-                          {['view','create','edit','delete','approve','export'].map(action=>(
-                            <td key={action} className="perm-check-cell">
-                              {action in perms ? <input type="checkbox" className="perm-checkbox" checked={!!perms[action]} onChange={ev=>setFormData(prev=>({...prev,permissions:{...prev.permissions,[module]:{...prev.permissions[module],[action]:ev.target.checked}}}))} /> : <span className="perm-na">—</span>}
-                             </td>
-                          ))}
-                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             )}
 
-            {/* Step 4: Attendance & Shift Setup */}
+            {/* Step 4: Shift Setup */}
             {wizardStep === 4 && (() => {
               const isWfh = formData.workMode === 'Work From Home';
               return (
                 <div className="wizard-step-form">
                   {isWfh && (
                     <div className="form-alert form-alert-info" style={{ marginBottom: 'var(--spacing-4)' }}>
-                      ℹ️ <strong>Work From Home Active:</strong> Shift timings, rules, and overtime settings are managed automatically under the remote work policy.
+                      ℹ️ <strong>Work From Home Active:</strong> Shift timings are managed automatically under the remote work policy.
                     </div>
                   )}
                   <h4 className="form-subsection-title">Shift Configuration</h4>
                   <div className="form-section-grid">
                     <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
                       <label>{FIELD_LABELS.shiftType}</label>
-                      <select 
-                        value={formData.shiftType || 'Morning Shift'} 
-                        onChange={e => setFormData(p => ({ ...p, shiftType: e.target.value }))}
+                      <select
+                        value={formData.shiftType || 'Morning Shift'}
+                        onChange={e => {
+                          const val = e.target.value;
+                          let timing = '';
+                          if (val === 'Morning Shift') {
+                            timing = '09:30 AM - 06:00 PM';
+                          } else if (val === 'Evening Shift') {
+                            timing = '06:00 PM - 11:00 PM';
+                          } else if (val === 'Night Shift') {
+                            timing = '11:00 PM - 05:00 AM';
+                          } else if (val === 'Flexible Shift') {
+                            timing = 'Flexible';
+                          }
+                          setFormData(p => ({
+                            ...p,
+                            shiftType: val,
+                            shiftTiming: timing
+                          }));
+                        }}
                         disabled={isWfh}
                       >
                         <option value="Morning Shift">🌅 Morning Shift</option>
@@ -1812,81 +2332,34 @@ const Employees = () => {
                         <option value="Flexible Shift">🔄 Flexible Shift</option>
                       </select>
                     </div>
-                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
-                      <label>{FIELD_LABELS.shiftTiming}</label>
-                      <input 
-                        type="text" 
-                        placeholder={isWfh ? 'Flexible / Not Applicable' : '09:00 AM - 06:00 PM'} 
-                        value={formData.shiftTiming || ''} 
-                        onChange={e => setFormData(p => ({ ...p, shiftTiming: e.target.value }))} 
-                        disabled={isWfh}
-                      />
-                    </div>
-                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
-                      <label>{FIELD_LABELS.attendanceRule}</label>
-                      <select 
-                        value={formData.attendanceRule || 'Standard 9-6'} 
-                        onChange={e => setFormData(p => ({ ...p, attendanceRule: e.target.value }))}
-                        disabled={isWfh}
-                      >
-                        <option value="Standard 9-6">Standard 9-6</option>
-                        <option value="Flexible Hours">Flexible Hours</option>
-                        <option value="Night Shift Rule">Night Shift Rule</option>
-                        <option value="Part Time Rule">Part Time Rule</option>
-                      </select>
-                    </div>
-                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
-                      <label>{FIELD_LABELS.punchInTime}</label>
-                      <input 
-                        type="text" 
-                        placeholder={isWfh ? 'Not Applicable' : '09:00 AM'} 
-                        value={formData.punchInTime || ''} 
-                        onChange={e => setFormData(p => ({ ...p, punchInTime: e.target.value }))} 
-                        disabled={isWfh}
-                      />
-                    </div>
-                    <div className={`form-field ${isWfh ? 'disabled-field' : ''}`}>
-                      <label>{FIELD_LABELS.punchOutTime}</label>
-                      <input 
-                        type="text" 
-                        placeholder={isWfh ? 'Not Applicable' : '06:00 PM'} 
-                        value={formData.punchOutTime || ''} 
-                        onChange={e => setFormData(p => ({ ...p, punchOutTime: e.target.value }))} 
-                        disabled={isWfh}
-                      />
-                    </div>
+                    {!isWfh && formData.shiftType !== 'Flexible Shift' && (
+                      <div className="form-field">
+                        <label>{FIELD_LABELS.shiftTiming}</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 09:30 AM - 06:00 PM"
+                          value={formData.shiftTiming || ''}
+                          onChange={e => {
+                            const val = e.target.value.replace(/[^0-9:\s\-aApPmM]/g, '');
+                            setFormData(p => ({ ...p, shiftTiming: val }));
+                          }}
+                        />
+                        {invalidShiftTiming && (
+                          <span className="field-error-msg">⚠️ Must match format: HH:MM AM - HH:MM PM (e.g., 09:30 AM - 06:00 PM).</span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-5)' }}>Weekly Off Days</h4>
-                  <div className={`weekly-off-grid ${isWfh ? 'disabled-grid' : ''}`}>
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                      const isSelected = (formData.weeklyOffDays || []).includes(day);
-                      return (
-                        <label key={day} className={`weekly-off-chip ${isSelected ? 'selected' : ''} ${isWfh ? 'disabled-chip' : ''}`}>
-                          <input 
-                            type="checkbox" 
-                            hidden 
-                            checked={isSelected} 
-                            onChange={e => {
-                              if (isWfh) return;
-                              const d = formData.weeklyOffDays || [];
-                              setFormData(p => ({ ...p, weeklyOffDays: e.target.checked ? [...d, day] : d.filter(x => x !== day) }));
-                            }} 
-                            disabled={isWfh}
-                          />
-                          {day.slice(0, 3)}
-                        </label>
-                      );
-                    })}
-                  </div>
+
                   <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Overtime</h4>
                   <div className={`toggle-field-row ${isWfh ? 'disabled-row' : ''}`}>
                     <div>
                       <span className="toggle-field-label">Overtime Eligibility</span>
                       <span className="toggle-field-desc">Allow this employee to log overtime hours</span>
                     </div>
-                    <button 
-                      type="button" 
-                      className={`toggle-switch ${formData.overtimeEligibility ? 'on' : 'off'} ${isWfh ? 'disabled-switch' : ''}`} 
+                    <button
+                      type="button"
+                      className={`toggle-switch ${formData.overtimeEligibility ? 'on' : 'off'} ${isWfh ? 'disabled-switch' : ''}`}
                       onClick={() => {
                         if (isWfh) return;
                         setFormData(p => ({ ...p, overtimeEligibility: !p.overtimeEligibility }));
@@ -1905,14 +2378,10 @@ const Employees = () => {
               <div className="wizard-step-form">
                 <h4 className="form-subsection-title">Salary Details</h4>
                 <div className="form-section-grid">
-                  <div className="form-field"><label>Salary Type</label><select value={formData.salaryType||'Monthly Fixed'} onChange={e=>setFormData(p=>({...p,salaryType:e.target.value}))}><option value="Monthly Fixed">Monthly Fixed</option><option value="CTC Based">CTC Based</option><option value="Hourly Rate">Hourly Rate</option><option value="Daily Wage">Daily Wage</option></select></div>
-                  <div className="form-field"><label>Monthly Salary (₹)</label><input type="number" placeholder="55000" value={formData.monthlySalary||''} onChange={e=>setFormData(p=>({...p,monthlySalary:e.target.value}))} /></div>
-                  <div className="form-field"><label>Basic Salary (₹)</label><input type="number" placeholder="35000" value={formData.salaryAmount||''} onChange={e=>setFormData(p=>({...p,salaryAmount:e.target.value}))} /></div>
-                  <div className="form-field"><label>Allowances (₹)</label><input type="number" placeholder="12000" value={formData.salaryAllowances||''} onChange={e=>setFormData(p=>({...p,salaryAllowances:e.target.value}))} /></div>
-                  <div className="form-field"><label>Deductions (₹)</label><input type="number" placeholder="5000" value={formData.salaryDeductions||''} onChange={e=>setFormData(p=>({...p,salaryDeductions:e.target.value}))} /></div>
-                  <div className="form-field"><label>Tax Details</label><input type="text" placeholder="e.g. 30% Slab" value={formData.taxDetails||''} onChange={e=>setFormData(p=>({...p,taxDetails:e.target.value}))} /></div>
-                  <div className="form-field"><label>PAN Number</label><input type="text" placeholder="ABCDE1234F" value={formData.panNumber||''} onChange={e=>setFormData(p=>({...p,panNumber:e.target.value.toUpperCase()}))} maxLength={10} /></div>
-                  <div className="form-field"><label>Aadhaar Number</label><input type="text" placeholder="1234 5678 9012" value={formData.aadhaarNumber||''} onChange={e=>setFormData(p=>({...p,aadhaarNumber:e.target.value}))} maxLength={14} /></div>
+                  <div className="form-field"><label>Salary Type</label><select value={formData.salaryType || 'Monthly Fixed'} onChange={e => setFormData(p => ({ ...p, salaryType: e.target.value }))}><option value="Monthly Fixed">Monthly Fixed</option><option value="CTC Based">CTC Based</option><option value="Hourly Rate">Hourly Rate</option><option value="Daily Wage">Daily Wage</option></select></div>
+                  <div className="form-field"><label>Monthly Salary (₹)</label><input type="text" placeholder="55000" value={formData.monthlySalary || ''} onChange={e => { const val = e.target.value.replace(/\D/g, ''); const capped = Number(val) > 500000 ? '500000' : val; setFormData(p => ({ ...p, monthlySalary: capped })); }} /></div>
+                  <div className="form-field"><label>Basic Salary (₹)</label><input type="text" placeholder="35000" value={formData.salaryAmount || ''} onChange={e => { const val = e.target.value.replace(/\D/g, ''); const capped = Number(val) > 500000 ? '500000' : val; setFormData(p => ({ ...p, salaryAmount: capped })); }} /></div>
+                  <div className="form-field"><label>Deductions (₹)</label><input type="text" placeholder="5000" value={formData.salaryDeductions || ''} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setFormData(p => ({ ...p, salaryDeductions: val })); }} /></div>
                 </div>
               </div>
             )}
@@ -1920,58 +2389,86 @@ const Employees = () => {
             {/* Step 6: Document Upload */}
             {wizardStep === 6 && (
               <div className="wizard-step-form">
+                <h4 className="form-subsection-title">Identity Verification</h4>
+                <div className="form-section-grid" style={{ marginBottom: 'var(--spacing-5)' }}>
+                  <div className="form-field">
+                    <label>PAN Number</label>
+                    <input type="text" placeholder="ABCDE1234F" value={formData.panNumber || ''} onChange={e => { const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 10); setFormData(p => ({ ...p, panNumber: val })); }} maxLength={10} />
+                    {invalidPanVal && (
+                      <span className="field-error-msg">⚠️ Must match standard 10 alphanumeric format (e.g., ABCDE1234F).</span>
+                    )}
+                  </div>
+                  <div className="form-field">
+                    <label>Aadhaar Number</label>
+                    <input type="text" placeholder="e.g. 123456789012" value={formData.aadhaarNumber || ''} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 12); setFormData(p => ({ ...p, aadhaarNumber: val })); }} maxLength={12} />
+                    {invalidAadhaarVal && (
+                      <span className="field-error-msg">⚠️ Must contain exactly 12 digits.</span>
+                    )}
+                  </div>
+                </div>
+
                 <h4 className="form-subsection-title">Employee Documents</h4>
-                <p style={{fontSize:'0.8rem',color:'var(--text-muted)',marginBottom:'var(--spacing-4)'}}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--spacing-4)' }}>
                   Accepted: <strong>.pdf .jpg .jpeg .png .docx</strong> (Max 5MB each)
                 </p>
                 <div className="form-section-grid-docs">
                   {[
-                    {key:'aadhaar',label:'Aadhaar Card',required:true},
-                    {key:'pan',label:'PAN Card',required:true},
-                    {key:'resume',label:'Resume / CV',required:true},
-                    {key:'certificates',label:'Certificates',required:false},
-                    {key:'offerLetter',label:'Offer Letter',required:false},
-                    {key:'experienceLetter',label:'Experience Letter',required:false},
-                    {key:'addressProof',label:'Address Proof',required:false},
-                    {key:'passportPhoto',label:'Passport Photo',required:false},
-                    {key:'signedAgreements',label:'Signed Agreements',required:false},
-                    {key:'profilePhoto',label:'Profile Photo',required:false}
-                  ].map(({key,label,required})=>{
-                    const imgOnly=['profilePhoto','passportPhoto'];
-                    const validTypes=imgOnly.includes(key)?['image/jpeg','image/png','image/jpg']:['application/pdf','image/jpeg','image/png','image/jpg','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+                    { key: 'aadhaar', label: 'Aadhaar Card', required: true },
+                    { key: 'pan', label: 'PAN Card', required: true },
+                    { key: 'resume', label: 'Resume / CV', required: true },
+                    { key: 'certificates', label: 'Certificates', required: false },
+                    { key: 'offerLetter', label: 'Offer Letter', required: false },
+                    { key: 'experienceLetter', label: 'Experience Letter', required: false },
+                    { key: 'addressProof', label: 'Address Proof', required: false },
+                    { key: 'passportPhoto', label: 'Passport Photo', required: false },
+                    { key: 'signedAgreements', label: 'Signed Agreements', required: false },
+                    { key: 'profilePhoto', label: 'Profile Photo', required: false }
+                  ].map(({ key, label, required }) => {
+                    const imgOnly = ['profilePhoto', 'passportPhoto'];
+                    const validTypes = imgOnly.includes(key) ? ['image/jpeg', 'image/png', 'image/jpg'] : ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
                     const file = uploadedDocs[key];
                     const isInvalid = file && !validTypes.includes(file.type);
                     const isImage = file && file.type.startsWith('image/');
-                    const filePreview = isImage && file ? URL.createObjectURL(file) : null;
-                    
-                    return(
+                    const filePreview = isImage && file ? (file.downloadUrl || URL.createObjectURL(file)) : null;
+
+                    return (
                       <div key={key} className={`form-doc-upload ${file ? 'has-file' : ''} ${isInvalid ? 'doc-invalid' : ''}`}>
                         <label className="doc-label">{label} {required && <span className="doc-required">*</span>}</label>
                         <div className="doc-upload-container">
                           {!file ? (
                             <label className="doc-upload-box">
-                              <input type="file" accept={imgOnly.includes(key)?'image/*':'.pdf,.jpg,.jpeg,.png,.docx'} onChange={e => {const f = e.target.files[0]; if(f && f.size > 5 * 1024 * 1024) {addToast('error', `${label} exceeds 5MB limit`); return;} if(f && !validTypes.includes(f.type)) {addToast('error', `Invalid type for ${label}`); return;} setUploadedDocs(prev => ({ ...prev, [key]: f || null }));}} hidden />
+                              <input type="file" accept={imgOnly.includes(key) ? 'image/*' : '.pdf,.jpg,.jpeg,.png,.docx'} onChange={e => { const f = e.target.files[0]; if (f && f.size > 5 * 1024 * 1024) { addToast('error', `${label} exceeds 5MB limit`); return; } if (f && !validTypes.includes(f.type)) { addToast('error', `Invalid type for ${label}`); return; } setUploadedDocs(prev => ({ ...prev, [key]: f || null })); }} hidden />
                               <div className="doc-upload-placeholder"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4v16m8-8H4" /></svg><span>Upload</span></div>
                             </label>
                           ) : (
                             <div className="doc-file-preview">
                               {isImage && filePreview ? (
                                 <div className="doc-image-preview">
-                                  <img src={filePreview} alt={label} className="doc-preview-img" />
+                                  <a href={filePreview} download={file.name} target="_blank" rel="noopener noreferrer">
+                                    <img src={filePreview} alt={label} className="doc-preview-img" />
+                                  </a>
                                   <button type="button" className="doc-remove-btn" onClick={() => handleRemoveDocument(key, label)} title="Remove file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
                                 </div>
                               ) : (
                                 <div className="doc-file-info">
                                   <div className="doc-file-icon">{file.type.includes('pdf') ? (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>) : (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><polyline points="13 2 13 9 20 9" /></svg>)}</div>
-                                  <div className="doc-file-details"><span className="doc-file-name" title={file.name}>{file.name.length > 20 ? file.name.slice(0, 18) + '…' : file.name}</span><span className="doc-file-size">{(file.size / 1024).toFixed(1)} KB</span></div>
+                                  <div className="doc-file-details">
+                                    <a href={file.downloadUrl || '#'} download={file.name} target="_blank" rel="noopener noreferrer" className="doc-file-download-link" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>
+                                      <span className="doc-file-name" title={file.name}>{file.name.length > 20 ? file.name.slice(0, 18) + '…' : file.name}</span>
+                                    </a>
+                                    <span className="doc-file-size">{(file.size / 1024).toFixed(1)} KB</span>
+                                  </div>
                                   <button type="button" className="doc-remove-btn doc-remove-file-btn" onClick={() => handleRemoveDocument(key, label)} title="Remove file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
                                 </div>
                               )}
-                              <label className="doc-replace-link"><input type="file" accept={imgOnly.includes(key)?'image/*':'.pdf,.jpg,.jpeg,.png,.docx'} onChange={e => {const f = e.target.files[0]; if(f && f.size > 5 * 1024 * 1024) {addToast('error', `${label} exceeds 5MB limit`); return;} if(f && !validTypes.includes(f.type)) {addToast('error', `Invalid type for ${label}`); return;} setUploadedDocs(prev => ({ ...prev, [key]: f || null })); addToast('success', `${label} updated`);}} hidden /><span>Replace</span></label>
+                              <label className="doc-replace-link"><input type="file" accept={imgOnly.includes(key) ? 'image/*' : '.pdf,.jpg,.jpeg,.png,.docx'} onChange={e => { const f = e.target.files[0]; if (f && f.size > 5 * 1024 * 1024) { addToast('error', `${label} exceeds 5MB limit`); return; } if (f && !validTypes.includes(f.type)) { addToast('error', `Invalid type for ${label}`); return; } setUploadedDocs(prev => ({ ...prev, [key]: f || null })); addToast('success', `${label} updated`); }} hidden /><span>Replace</span></label>
                             </div>
                           )}
                         </div>
                         {isInvalid && <span className="doc-error-msg">❌ Invalid format. Use {imgOnly.includes(key) ? 'JPG, PNG' : 'PDF, JPG, PNG, DOCX'}</span>}
+                        {required && (key === 'aadhaar' ? missingAadhaarDoc : key === 'pan' ? missingPanDoc : key === 'resume' ? missingResumeDoc : false) && (
+                          <span className="doc-error-msg" style={{ color: 'var(--color-warning)' }}>⚠️ Upload required to proceed.</span>
+                        )}
                       </div>
                     );
                   })}
@@ -1985,29 +2482,26 @@ const Employees = () => {
             {/* Step 7: System Access & Security */}
             {wizardStep === 7 && (
               <div className="wizard-step-form">
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'var(--spacing-6)',alignItems:'start'}}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-6)', alignItems: 'start' }}>
                   <div>
-                    <h4 className="form-subsection-title" style={{marginTop:0}}>System Access & Security</h4>
-                    <div className="toggle-field-row"><div><span className="toggle-field-label">Two-Factor Authentication</span><span className="toggle-field-desc">Require 2FA on every login</span></div><button type="button" className={`toggle-switch ${formData.twoFactorAuth?'on':'off'}`} onClick={()=>setFormData(p=>({...p,twoFactorAuth:!p.twoFactorAuth}))}><span className="toggle-knob" /></button></div>
-                    <div className="toggle-field-row"><div><span className="toggle-field-label">Multi-Device Login</span><span className="toggle-field-desc">Allow simultaneous logins</span></div><button type="button" className={`toggle-switch ${formData.multiDeviceLogin?'on':'off'}`} onClick={()=>setFormData(p=>({...p,multiDeviceLogin:!p.multiDeviceLogin}))}><span className="toggle-knob" /></button></div>
-                    <div className="form-field" style={{marginTop:'var(--spacing-4)'}}><label>IP Restriction <span style={{color:'var(--text-muted)',fontWeight:400}}>(Optional)</span></label><input type="text" placeholder="192.168.1.0/24" value={formData.ipRestriction||''} onChange={e=>setFormData(p=>({...p,ipRestriction:e.target.value}))} /></div>
-                    <div className="form-field"><label>Login Activity Tracking</label><select value={formData.loginActivityTracking||'Enabled'} onChange={e=>setFormData(p=>({...p,loginActivityTracking:e.target.value}))}><option value="Enabled">Enabled</option><option value="Disabled">Disabled</option></select></div>
-                    <div className="form-field"><label>Session Timeout</label><select value={formData.sessionTimeout||'30 minutes'} onChange={e=>setFormData(p=>({...p,sessionTimeout:e.target.value}))}><option value="15 minutes">15 minutes</option><option value="30 minutes">30 minutes</option><option value="1 hour">1 hour</option><option value="4 hours">4 hours</option><option value="Never">Never</option></select></div>
+                    <h4 className="form-subsection-title" style={{ marginTop: 0 }}>System Access & Security</h4>
+                    <div className="toggle-field-row"><div><span className="toggle-field-label">Two-Factor Authentication</span><span className="toggle-field-desc">Require 2FA on every login</span></div><button type="button" className={`toggle-switch ${formData.twoFactorAuth ? 'on' : 'off'}`} onClick={() => setFormData(p => ({ ...p, twoFactorAuth: !p.twoFactorAuth }))}><span className="toggle-knob" /></button></div>
+                    <div className="toggle-field-row"><div><span className="toggle-field-label">Multi-Device Login</span><span className="toggle-field-desc">Allow simultaneous logins</span></div><button type="button" className={`toggle-switch ${formData.multiDeviceLogin ? 'on' : 'off'}`} onClick={() => setFormData(p => ({ ...p, multiDeviceLogin: !p.multiDeviceLogin }))}><span className="toggle-knob" /></button></div>
                   </div>
                   <div>
-                    <h4 className="form-subsection-title" style={{marginTop:0}}>Employee Preview</h4>
+                    <h4 className="form-subsection-title" style={{ marginTop: 0 }}>Employee Preview</h4>
                     <div className="pre-save-preview-card">
-                      <div className="pre-save-avatar-row"><Avatar name={formData.name||'New Employee'} size="lg" /><div className="pre-save-name-block"><h4>{formData.name||'New Employee'}</h4><span>{formData.designation||'Designation not set'}</span></div></div>
-                      <div className="pre-save-id-badge">{formData.id||'ID not generated'}</div>
+                      <div className="pre-save-avatar-row"><Avatar name={formData.name || 'New Employee'} size="lg" /><div className="pre-save-name-block"><h4>{formData.name || 'New Employee'}</h4><span>{formData.designation || 'Designation not set'}</span></div></div>
+                      <div className="pre-save-id-badge">{formData.id || 'ID not generated'}</div>
                       <div className="pre-save-detail-list">
-                        <div className="pre-save-detail-row"><span>Department</span><strong>{formData.department||'—'}</strong></div>
-                        <div className="pre-save-detail-row"><span>Branch</span><strong>{formData.branch||'—'}</strong></div>
-                        <div className="pre-save-detail-row"><span>Role</span><strong>{roles.find(r=>r.id===formData.roleId)?.name||'—'}</strong></div>
-                        <div className="pre-save-detail-row"><span>Work Mode</span><strong>{formData.workMode||'—'}</strong></div>
-                        <div className="pre-save-detail-row"><span>Shift</span><strong>{formData.shiftType||'—'}</strong></div>
-                        <div className="pre-save-detail-row"><span>Leader</span><strong>{formData.teamLeader||'—'}</strong></div>
-                        <div className="pre-save-detail-row"><span>Joining</span><strong>{formData.joinDate?fmtJoinDate(formData.joinDate):'—'}</strong></div>
-                        <div className="pre-save-detail-row"><span>Experience</span><strong>{formData.experience||'—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Department</span><strong>{formData.department || '—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Branch</span><strong>{formData.branch || '—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Role</span><strong>{roles.find(r => r.id === formData.roleId)?.name || '—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Work Mode</span><strong>{formData.workMode || '—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Shift</span><strong>{formData.shiftType || '—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Leader</span><strong>{formData.teamLeader || '—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Joining</span><strong>{formData.joinDate ? fmtJoinDate(formData.joinDate) : '—'}</strong></div>
+                        <div className="pre-save-detail-row"><span>Experience</span><strong>{formData.experience || '—'}</strong></div>
                       </div>
                     </div>
                   </div>
@@ -2019,15 +2513,13 @@ const Employees = () => {
           <div className="form-panel-footer">
             <div className="wizard-footer-left">
               <button type="button" className="form-footer-ghost-btn" onClick={handleResetForm}>↺ Reset</button>
-              <button type="button" className="form-footer-ghost-btn" onClick={handleSaveDraft}>💾 Draft</button>
-              {formMode==='add'&&<button type="button" className="form-footer-ghost-btn" onClick={handleGenerateEmployeeId}>🔑 Generate ID</button>}
             </div>
             <div className="wizard-footer-buttons">
-              {wizardStep>1&&<Button variant="secondary" icon={ArrowLeft} onClick={handlePrevStep}>Back</Button>}
-              {formMode==='edit' && wizardStep<7 && (
+              {wizardStep > 1 && <Button variant="secondary" icon={ArrowLeft} onClick={handlePrevStep}>Back</Button>}
+              {formMode === 'edit' && wizardStep < 7 && (
                 <Button variant="secondary" icon={Save} onClick={handleFormSubmit}>Save Changes</Button>
               )}
-              {wizardStep<7 ? <Button variant="primary" onClick={handleNextStep} disabled={!isStepValid()}>Next Step</Button> : <Button variant="primary" onClick={handleFormSubmit}>{formMode==='add'?'Create Employee':'Save Changes'}</Button>}
+              {wizardStep < 7 ? <Button variant="primary" onClick={handleNextStep} disabled={!isStepValid()}>Next Step</Button> : <Button variant="primary" onClick={handleFormSubmit}>{formMode === 'add' ? 'Create Employee' : 'Save Changes'}</Button>}
             </div>
           </div>
         </div>
@@ -2035,22 +2527,22 @@ const Employees = () => {
 
       {/* ── Employee Creation Success Modal ── */}
       {createdEmpInfo && (
-        <div className="modal-overlay" onClick={()=>setCreatedEmpInfo(null)}>
-          <div className="emp-success-modal" onClick={e=>e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setCreatedEmpInfo(null)}>
+          <div className="emp-success-modal" onClick={e => e.stopPropagation()}>
             <div className="success-modal-header"><div className="success-checkmark-circle">✅</div><h3>Employee Added Successfully!</h3><p>Share credentials securely with the new employee.</p></div>
             <div className="success-credentials-card">
               <div className="cred-row"><span>Employee ID</span><strong className="cred-mono">{createdEmpInfo.id}</strong></div>
               <div className="cred-row"><span>Full Name</span><strong>{createdEmpInfo.name}</strong></div>
-              <div className="cred-row"><span>Username</span><strong className="cred-mono">{createdEmpInfo.username||createdEmpInfo.id}</strong></div>
+              <div className="cred-row"><span>Username</span><strong className="cred-mono">{createdEmpInfo.username || createdEmpInfo.id}</strong></div>
               <div className="cred-row"><span>Work Email</span><strong className="cred-mono">{createdEmpInfo.workEmail}</strong></div>
               <div className="cred-row"><span>Password</span><strong className="cred-password cred-mono">{createdEmpInfo.password}</strong></div>
               <div className="cred-row"><span>Department</span><strong>{createdEmpInfo.department}</strong></div>
               <div className="cred-row"><span>Role</span><strong>{createdEmpInfo.role}</strong></div>
             </div>
             <div className="success-modal-actions">
-              <button className="success-btn success-btn-primary" onClick={()=>{addToast('success',`Welcome email queued for ${createdEmpInfo.workEmail}`);setCreatedEmpInfo(null);}}>📧 Send Welcome Email</button>
-              <button className="success-btn" onClick={()=>{setIdCardEmployee(createdEmpInfo);setShowIdCard(true);setCreatedEmpInfo(null);}}>🪪 Download ID Card</button>
-              <button className="success-btn success-btn-ghost" onClick={()=>setCreatedEmpInfo(null)}>✕ Close</button>
+              <button className="success-btn success-btn-primary" onClick={() => { addToast('success', `Welcome email queued for ${createdEmpInfo.workEmail}`); setCreatedEmpInfo(null); }}>📧 Send Welcome Email</button>
+              <button className="success-btn" onClick={() => { setIdCardEmployee(createdEmpInfo); setShowIdCard(true); setCreatedEmpInfo(null); }}>🪪 Download ID Card</button>
+              <button className="success-btn success-btn-ghost" onClick={() => setCreatedEmpInfo(null)}>✕ Close</button>
             </div>
           </div>
         </div>

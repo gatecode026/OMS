@@ -6,6 +6,7 @@
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import Admin from '../modules/admin/admin.model.js';
+import Employee from '../modules/employees/employees.model.js';
 import logger from '../config/logger.js';
 import { isDatabaseConnected } from '../config/database.js';
 
@@ -46,8 +47,7 @@ export const authenticate = async (req, res, next) => {
     if (decoded.role === 'super_admin') {
       user = await Admin.findOne({ id: decoded.id });
     } else {
-      // Other roles will reside in their own dedicated collections in future updates
-      user = null;
+      user = await Employee.findOne({ id: decoded.id });
     }
 
     if (!user) {
