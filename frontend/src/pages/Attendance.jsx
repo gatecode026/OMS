@@ -1889,26 +1889,35 @@ const Attendance = () => {
         <div className="create-task-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
           <div className="form-field">
             <label>Select Employee *</label>
-            <select
-              value={markFormData.employeeId}
-              onChange={(e) => {
-                const found = employees.find(emp => emp.id === e.target.value);
-                setMarkFormData(prev => ({
-                  ...prev,
-                  employeeId: e.target.value,
-                  employeeName: found?.name || '',
-                  department: found?.department || '',
-                  branch: found?.branch || '',
-                  workMode: found?.workMode || ''
-                }));
-              }}
-              style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}
-            >
-              <option value="">Choose employee...</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name} ({emp.id}) — {emp.department}</option>
-              ))}
-            </select>
+            {currentUserRole === 'employee' ? (
+              <input 
+                type="text" 
+                value={currentUser?.name || ''} 
+                disabled 
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)', opacity: 0.7, cursor: 'not-allowed' }} 
+              />
+            ) : (
+              <select
+                value={markFormData.employeeId}
+                onChange={(e) => {
+                  const found = scopedEmployees.find(emp => emp.id === e.target.value);
+                  setMarkFormData(prev => ({
+                    ...prev,
+                    employeeId: e.target.value,
+                    employeeName: found?.name || '',
+                    department: found?.department || '',
+                    branch: found?.branch || '',
+                    workMode: found?.workMode || 'Work From Office'
+                  }));
+                }}
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}
+              >
+                <option value="">Choose employee...</option>
+                {scopedEmployees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.id}) — {emp.department}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {markFormData.employeeName && (
@@ -1936,6 +1945,7 @@ const Attendance = () => {
                 <option value="Late">Late</option>
                 <option value="Absent">Absent</option>
                 <option value="Half Day">Half Day</option>
+                <option value="Work From Home">Work From Home</option>
                 <option value="On Leave">On Leave</option>
                 <option value="Overtime">Overtime</option>
               </select>
@@ -2018,6 +2028,12 @@ const Attendance = () => {
               <label>Date</label>
               <input type="date" value={markFormData.date}
                 onChange={(e) => setMarkFormData(prev => ({ ...prev, date: e.target.value }))}
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
+            </div>
+            <div>
+              <label>Break Time</label>
+              <input type="text" placeholder="e.g. 45 mins" value={markFormData.breakTime}
+                onChange={(e) => setMarkFormData(prev => ({ ...prev, breakTime: e.target.value }))}
                 style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
             </div>
           </div>
@@ -2153,107 +2169,7 @@ const Attendance = () => {
         </div>
       </Modal>
 
-      {/* Mark Attendance Modal */}
-      <Modal isOpen={markModalOpen} onClose={() => setMarkModalOpen(false)} title="Mark Attendance Log" size="md"
-        footer={
-          <div className="modal-actions-wrapper">
-            <Button variant="secondary" onClick={() => setMarkModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleMarkSubmit}>Mark Attendance</Button>
-          </div>
-        }
-      >
-        <div className="create-task-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
-          <div className="form-field">
-            <label>Select Employee</label>
-            {currentUserRole === 'employee' ? (
-              <input type="text" value={currentUser?.name || ''} disabled style={{ opacity: 0.7, cursor: 'not-allowed', background: 'rgba(255,255,255,0.02)' }} />
-            ) : (
-              <select value={markFormData.employeeId}
-                onChange={(e) => {
-                  const emp = employees.find(empData => empData.id === e.target.value);
-                  setMarkFormData(prev => ({
-                    ...prev,
-                    employeeId: e.target.value,
-                    employeeName: emp ? emp.name : '',
-                    department: emp ? emp.department : '',
-                    branch: emp ? emp.branch : '',
-                    workMode: emp ? emp.workMode : 'Work From Office'
-                  }));
-                }}
-                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
-                <option value="">Choose employee...</option>
-                {scopedEmployees.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
-                ))}
-              </select>
-            )}
-          </div>
-          
-          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-            <div>
-              <label>Punch In Time</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type="text" placeholder="e.g. 09:00 AM" value={markFormData.punchIn}
-                  onChange={(e) => setMarkFormData(prev => ({ ...prev, punchIn: e.target.value }))}
-                  style={{ flex: 1 }} />
-                <Button variant="secondary" size="sm" onClick={handleAutoPunchIn}>Now</Button>
-              </div>
-            </div>
-            <div>
-              <label>Punch Out Time</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type="text" placeholder="e.g. 06:00 PM" value={markFormData.punchOut}
-                  onChange={(e) => setMarkFormData(prev => ({ ...prev, punchOut: e.target.value }))}
-                  style={{ flex: 1 }} />
-                <Button variant="secondary" size="sm" onClick={handleAutoPunchOut}>Now</Button>
-              </div>
-            </div>
-          </div>
 
-          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-            <div>
-              <label>Work Mode</label>
-              <select value={markFormData.workMode}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, workMode: e.target.value }))}
-                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
-                <option value="Work From Office">Work From Office</option>
-                <option value="Work From Home">Work From Home</option>
-                <option value="Hybrid">Hybrid</option>
-              </select>
-            </div>
-            <div>
-              <label>Break Time</label>
-              <input type="text" placeholder="e.g. 45 mins" value={markFormData.breakTime}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, breakTime: e.target.value }))} />
-            </div>
-          </div>
-
-          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-            <div>
-              <label>Status</label>
-              <select value={markFormData.status}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, status: e.target.value }))}
-                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
-                <option value="Present">Present</option>
-                <option value="Late">Late</option>
-                <option value="Absent">Absent</option>
-                <option value="Half Day">Half Day</option>
-                <option value="Work From Home">Work From Home</option>
-                <option value="On Leave">On Leave</option>
-                <option value="Overtime">Overtime</option>
-              </select>
-            </div>
-            <div>
-              <label>Date</label>
-              <input type="date" value={markFormData.date}
-                onChange={(e) => setMarkFormData(prev => ({ ...prev, date: e.target.value }))}
-                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
-            </div>
-          </div>
-        </div>
-      </Modal>
-        </div>
-      </Modal>
 
       {/* Floating Bottom Quick Actions Bar */}
       <div className="att-floating-actions-bar">
