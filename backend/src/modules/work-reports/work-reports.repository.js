@@ -1,36 +1,56 @@
 /**
  * @file src/modules/work-reports/work-reports.repository.js
- * @description Data Access layer for WorkReports module.
+ * @description Data Access layer for WorkReports module using MongoDB.
  */
 
+import WorkReport from './work-reports.model.js';
 import logger from '../../config/logger.js';
 
-export const find = async (query) => {
-  logger.debug('Executing WorkReportsRepository::find placeholder');
-  return [
-    { id: 'MOCK-1', name: 'Placeholder Domain Record 1 for WorkReports', status: 'Active' },
-    { id: 'MOCK-2', name: 'Placeholder Domain Record 2 for WorkReports', status: 'Inactive' }
-  ];
+export const find = async (query = {}) => {
+  logger.debug('Executing WorkReportsRepository::find', query);
+  const filter = {};
+  
+  if (query.employeeId) {
+    filter.employeeId = query.employeeId;
+  }
+  if (query.department) {
+    filter.department = query.department;
+  }
+  if (query.status && query.status !== 'All') {
+    filter.status = query.status;
+  }
+  if (query.project && query.project !== 'All') {
+    filter.project = query.project;
+  }
+  if (query.date) {
+    filter.date = query.date;
+  }
+  
+  return WorkReport.find(filter).sort({ submittedTime: -1 });
 };
 
 export const findOne = async (id) => {
-  logger.debug('Executing WorkReportsRepository::findOne placeholder for: ' + id);
-  return { id, name: 'Placeholder Single Domain Record for WorkReports', status: 'Active' };
+  logger.debug('Executing WorkReportsRepository::findOne for: ' + id);
+  return WorkReport.findOne({ id });
 };
 
 export const save = async (data) => {
-  logger.debug('Executing WorkReportsRepository::save placeholder', data);
-  return { id: 'MOCK-' + Math.floor(100 + Math.random() * 900), ...data };
+  logger.debug('Executing WorkReportsRepository::save', data);
+  if (!data.id) {
+    const count = await WorkReport.countDocuments();
+    data.id = `REP-${String(count + 1).padStart(3, '0')}`;
+  }
+  return WorkReport.create(data);
 };
 
 export const update = async (id, data) => {
-  logger.debug('Executing WorkReportsRepository::update placeholder for: ' + id, data);
-  return { id, ...data };
+  logger.debug('Executing WorkReportsRepository::update for: ' + id, data);
+  return WorkReport.findOneAndUpdate({ id }, data, { new: true });
 };
 
 export const remove = async (id) => {
-  logger.debug('Executing WorkReportsRepository::remove placeholder for: ' + id);
-  return { id, status: 'Deleted' };
+  logger.debug('Executing WorkReportsRepository::remove for: ' + id);
+  return WorkReport.findOneAndDelete({ id });
 };
 
 export default {

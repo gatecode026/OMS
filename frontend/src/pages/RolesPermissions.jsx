@@ -44,7 +44,22 @@ const defaultColors = {
 
 const RolesPermissions = () => {
   const isLoading = usePageLoading(600);
-  const { roles: contextRoles, updatePermissions, employees, showConfirm, currentUserRole, setCurrentUserRole } = useApp();
+  const { 
+    roles: contextRoles, 
+    updatePermissions, 
+    employees, 
+    showConfirm, 
+    currentUserRole, 
+    setCurrentUserRole,
+    addRole,
+    updateRole,
+    deleteRole,
+    userOverrides: contextUserOverrides,
+    addUserOverride,
+    deleteUserOverride,
+    updateEmployee,
+    activityLogs
+  } = useApp();
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -162,24 +177,34 @@ const RolesPermissions = () => {
     setShowAddPermModal(false);
   };
 
-  const handleCheckboxToggle = (moduleKey, opKey) => {
+  const handleCheckboxToggle = async (moduleKey, opKey) => {
     console.log("CHECKBOX TOGGLE CLICKED:", moduleKey, opKey);
     if (selectedRoleId === 'super_admin') {
       addPageToast('warning', 'Super Admin permissions are permanently locked and cannot be modified.');
       return;
     }
-    setLocalPermissions(prev => {
-      const modulePerms = prev?.[moduleKey] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
-      const updated = {
-        ...prev,
-        [moduleKey]: {
-          ...modulePerms,
-          [opKey]: !modulePerms[opKey]
-        }
-      };
-      console.log(`Toggled ${moduleKey}.${opKey} -> ${!modulePerms[opKey]}`);
-      return updated;
-    });
+
+    const modulePerms = localPermissions[moduleKey] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
+    const updatedPermissions = {
+      ...localPermissions,
+      [moduleKey]: {
+        ...modulePerms,
+        [opKey]: !modulePerms[opKey]
+      }
+    };
+
+    // Update local states immediately for responsive UI
+    setLocalPermissions(updatedPermissions);
+    setLocalRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, permissions: updatedPermissions } : r));
+
+    try {
+      // Auto-save changes dynamically in real-time
+      await updatePermissions(selectedRoleId, updatedPermissions);
+      addPageToast('success', `Permission '${opKey.toUpperCase()}' for module '${moduleKey}' saved automatically.`);
+    } catch (err) {
+      console.error('Real-time permission save failed:', err);
+      addPageToast('danger', 'Failed to save changes automatically.');
+    }
   };
 
   const handleSaveRolePermissions = () => {
@@ -233,24 +258,20 @@ const RolesPermissions = () => {
     addPageToast('success', `Policy generated successfully for Category "${builderCategory}"!`);
   };
 
-  // Seed user overrides
-  const [userOverrides, setUserOverrides] = useState([
-    { id: 'OVR-001', userId: 'EMP-2026-003', userName: 'Ananya Gupta', module: 'Payroll Management', scope: 'Read & Write', type: 'Temporary Grant', expiry: '2026-06-30' },
-    { id: 'OVR-002', userId: 'EMP-2026-004', userName: 'Rohit Sharma', module: 'Role & Permission', scope: 'None (Restricted)', type: 'Explicit Denial', expiry: 'Permanent' },
-    { id: 'OVR-003', userId: 'EMP-2026-006', userName: 'Arjun Mehta', module: 'Security Control', scope: 'Read Only', type: 'Special Waiver', expiry: '2026-07-15' },
-    { id: 'OVR-004', userId: 'EMP-2026-007', userName: 'Neha Verma', module: 'System Configuration', scope: 'Full Access', type: 'Temporary Grant', expiry: '2026-06-15' }
-  ]);
+  const userOverrides = contextUserOverrides || [];
 
-  // Seed Audit Logs
-  const [auditLogs, setAuditLogs] = useState([
-    { id: 'AUD-001', timestamp: '2026-06-04 15:30', user: 'Aarav Sharma', changedBy: 'System Console', module: 'Security Control', action: 'Enforced global MFA', oldVal: 'Optional', newVal: 'Enforced' },
-    { id: 'AUD-002', timestamp: '2026-06-04 11:20', user: 'Neha Verma', changedBy: 'Aarav Sharma', module: 'Role permissions', action: 'Updated Branch Admin payroll access', oldVal: 'No Access', newVal: 'Limited Access' },
-    { id: 'AUD-003', timestamp: '2026-06-03 16:45', user: 'Vikram Singh', changedBy: 'Aarav Sharma', module: 'User Override', action: 'Granted temp payroll access', oldVal: 'No Access', newVal: 'Full Access' },
-    { id: 'AUD-004', timestamp: '2026-06-02 10:15', user: 'Project Manager Role', changedBy: 'Neha Verma', module: 'Role permissions', action: 'Cloned Project Manager Role permissions', oldVal: 'None', newVal: 'Active' },
-    { id: 'AUD-005', timestamp: '2026-06-01 09:00', user: 'Employee Role', changedBy: 'System Cron', module: 'Role permissions', action: 'System audit validation pass', oldVal: 'Verified', newVal: 'Verified' },
-    { id: 'AUD-006', timestamp: '2026-05-30 14:10', user: 'Team Leader Role', changedBy: 'Aarav Sharma', module: 'Modules Access', action: 'Restricted task deletion', oldVal: 'Allowed', newVal: 'Restricted' },
-    { id: 'AUD-007', timestamp: '2026-05-28 17:22', user: 'Rohit Sharma', changedBy: 'Neha Verma', module: 'User Override', action: 'Revoked leave approval power', oldVal: 'Allowed', newVal: 'Revoked' }
-  ]);
+  const auditLogs = useMemo(() => {
+    return (activityLogs || []).map(log => ({
+      id: log.id,
+      timestamp: log.timestamp,
+      user: log.newValue || '—',
+      changedBy: log.actor || 'System User',
+      module: log.fieldChanged || 'Permissions',
+      action: log.actionType || 'Update',
+      oldVal: log.oldValue || '—',
+      newVal: log.newValue || '—'
+    }));
+  }, [activityLogs]);
 
   // Seed security features list
   const [securityFeatures, setSecurityFeatures] = useState([
@@ -294,73 +315,213 @@ const RolesPermissions = () => {
   const [auditSearch, setAuditSearch] = useState('');
   const [auditModuleFilter, setAuditModuleFilter] = useState('');
 
-  // Recharts Seed Data
-  const activityData = [
-    { name: 'Mon', Logins: 145, Changes: 12, Failures: 1 },
-    { name: 'Tue', Logins: 188, Changes: 8, Failures: 0 },
-    { name: 'Wed', Logins: 210, Changes: 15, Failures: 2 },
-    { name: 'Thu', Logins: 195, Changes: 22, Failures: 4 },
-    { name: 'Fri', Logins: 160, Changes: 10, Failures: 0 },
-    { name: 'Sat', Logins: 45, Changes: 3, Failures: 0 },
-    { name: 'Sun', Logins: 32, Changes: 1, Failures: 1 }
-  ];
+  // Dynamic system and custom roles counts
+  const systemRolesCount = useMemo(() => {
+    const systemIds = ['super_admin', 'branch_admin', 'dept_admin', 'project_manager', 'team_leader', 'employee'];
+    return localRoles.filter(r => systemIds.includes(r.id)).length;
+  }, [localRoles]);
 
-  const deptData = [
-    { department: 'Engineering', changes: 45 },
-    { department: 'Sales', changes: 28 },
-    { department: 'Operations', changes: 52 },
-    { department: 'HR', changes: 18 },
-    { department: 'Marketing', changes: 14 }
-  ];
+  const customRolesCount = useMemo(() => {
+    const systemIds = ['super_admin', 'branch_admin', 'dept_admin', 'project_manager', 'team_leader', 'employee'];
+    return localRoles.filter(r => !systemIds.includes(r.id)).length;
+  }, [localRoles]);
 
-  const roleDistributionData = [
-    { name: 'Super Admin', value: 2, color: '#8b5cf6' },
-    { name: 'Branch Admin', value: 4, color: '#3b82f6' },
-    { name: 'Project Manager', value: 3, color: '#ec4899' },
-    { name: 'Team Leader', value: 8, color: '#10b981' },
-    { name: 'Employee', value: 48, color: '#64748b' }
-  ];
+  // Dynamic MFA Adoption Rate
+  const mfaAdoptionRate = useMemo(() => {
+    if (!employees || employees.length === 0) return '98.2'; // default fallback
+    const mfaAdoptedCount = employees.filter(e => {
+      const mfa = e.securityInfo?.mfaStatus || 'Disabled';
+      return mfa === 'Enabled' || mfa === 'Enforced';
+    }).length;
+    return ((mfaAdoptedCount / employees.length) * 100).toFixed(1);
+  }, [employees]);
+
+  // Dynamic Security Score
+  const securityScore = useMemo(() => {
+    const rate = parseFloat(mfaAdoptionRate);
+    if (rate >= 90) return 'A+';
+    if (rate >= 80) return 'A';
+    if (rate >= 70) return 'B';
+    if (rate >= 60) return 'C';
+    return 'D';
+  }, [mfaAdoptionRate]);
+
+  // Dynamic Dept Administrators Count
+  const deptAdminsCount = useMemo(() => {
+    if (!employees || employees.length === 0) return 12; // default fallback
+    return employees.filter(e => e.roleId === 'dept_admin' || e.roleId === 'project_manager' || e.roleId === 'manager').length;
+  }, [employees]);
+
+  // Unique Departments Count
+  const uniqueDepartmentsCount = useMemo(() => {
+    if (!employees || employees.length === 0) return 6; // default fallback
+    const depts = employees.map(e => e.department).filter(Boolean);
+    return new Set(depts).size || 6;
+  }, [employees]);
+
+  // Dynamic Branch Administrators Count
+  const branchAdminsCount = useMemo(() => {
+    if (!employees || employees.length === 0) return 8; // default fallback
+    return employees.filter(e => e.roleId === 'branch_admin').length;
+  }, [employees]);
+
+  // Unique Branches Count
+  const uniqueBranchesCount = useMemo(() => {
+    if (!employees || employees.length === 0) return 4; // default fallback
+    const branches = employees.map(e => e.branch).filter(Boolean);
+    return new Set(branches).size || 4;
+  }, [employees]);
+
+  // Dynamic total employees count (for distribution percentages)
+  const totalEmployeesCount = useMemo(() => {
+    return employees?.length || 65; // fallback to 65 (sum of mockup roles) if empty
+  }, [employees]);
+
+  // Recharts Dynamic Data derived from database
+  const activityData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const counts = days.reduce((acc, day) => {
+      acc[day] = { name: day, Logins: 0, Changes: 0, Failures: 0 };
+      return acc;
+    }, {});
+
+    let hasData = false;
+    (activityLogs || []).forEach(log => {
+      if (!log.timestamp) return;
+      const date = new Date(log.timestamp);
+      const dayIndex = date.getDay();
+      if (isNaN(dayIndex)) return;
+      const dayName = days[dayIndex];
+      hasData = true;
+
+      const actType = (log.actionType || '').toLowerCase();
+      if (actType === 'login') {
+        counts[dayName].Logins += 1;
+      } else if (actType === 'failed login' || actType.includes('fail')) {
+        counts[dayName].Failures += 1;
+      } else {
+        counts[dayName].Changes += 1;
+      }
+    });
+
+    if (!hasData) {
+      return [
+        { name: 'Mon', Logins: 145, Changes: 12, Failures: 1 },
+        { name: 'Tue', Logins: 188, Changes: 8, Failures: 0 },
+        { name: 'Wed', Logins: 210, Changes: 15, Failures: 2 },
+        { name: 'Thu', Logins: 195, Changes: 22, Failures: 4 },
+        { name: 'Fri', Logins: 160, Changes: 10, Failures: 0 },
+        { name: 'Sat', Logins: 45, Changes: 3, Failures: 0 },
+        { name: 'Sun', Logins: 32, Changes: 1, Failures: 1 }
+      ];
+    }
+
+    const displayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return displayOrder.map(day => counts[day]);
+  }, [activityLogs]);
+
+  const deptData = useMemo(() => {
+    const counts = {};
+    (activityLogs || []).forEach(log => {
+      const emp = (employees || []).find(e => e.name === log.actor);
+      if (emp && emp.department) {
+        counts[emp.department] = (counts[emp.department] || 0) + 1;
+      }
+    });
+
+    const hasData = Object.keys(counts).length > 0;
+    if (!hasData) {
+      return [
+        { department: 'Engineering', changes: 45 },
+        { department: 'Sales', changes: 28 },
+        { department: 'Operations', changes: 52 },
+        { department: 'HR', changes: 18 },
+        { department: 'Marketing', changes: 14 }
+      ];
+    }
+
+    return Object.entries(counts).map(([department, changes]) => ({
+      department,
+      changes
+    }));
+  }, [activityLogs, employees]);
+
+  const roleDistributionData = useMemo(() => {
+    const counts = {};
+    (employees || []).forEach(emp => {
+      const rId = emp.roleId || 'employee';
+      counts[rId] = (counts[rId] || 0) + 1;
+    });
+
+    const totalCount = employees?.length || 0;
+    if (totalCount === 0) {
+      return [
+        { name: 'Super Admin', value: 2, color: '#8b5cf6' },
+        { name: 'Branch Admin', value: 4, color: '#3b82f6' },
+        { name: 'Project Manager', value: 3, color: '#ec4899' },
+        { name: 'Team Leader', value: 8, color: '#10b981' },
+        { name: 'Employee', value: 48, color: '#64748b' }
+      ];
+    }
+
+    return localRoles.map(role => {
+      return {
+        name: role.name,
+        value: counts[role.id] || 0,
+        color: role.color || role.accentColor || '#6366f1'
+      };
+    }).filter(d => d.value > 0);
+  }, [localRoles, employees]);
 
   // Handler functions for role actions
-  const handleSaveRole = (e) => {
+  const handleSaveRole = async (e) => {
     e.preventDefault();
     if (!createForm.name.trim()) return;
 
-    if (editingRole) {
-      // Edit mode
-      setLocalRoles(prev => prev.map(r => r.id === editingRole.id ? { ...r, ...createForm } : r));
-      addPageToast('success', `Role "${createForm.name}" updated successfully.`);
-      setEditingRole(null);
-    } else {
-      // Create mode
-      const newId = `role_${createForm.name.toLowerCase().replace(/\s+/g, '_')}`;
-      const newRole = {
-        id: newId,
-        name: createForm.name,
-        description: createForm.description,
-        userCount: 0,
-        accentColor: createForm.color,
-        color: createForm.color,
-        icon: createForm.icon,
-        accessLevel: createForm.accessLevel,
-        status: createForm.status,
-        createdDate: new Date().toISOString().split('T')[0],
-        lastModified: new Date().toISOString().split('T')[0],
-        permissions: {
-          dashboard: { create: false, read: true, update: false, delete: false },
-          employees: { create: false, read: true, update: false, delete: false },
-          attendance: { create: false, read: true, update: false, delete: false },
-          leaves: { create: false, read: true, update: false, delete: false },
-          tasks: { create: false, read: true, update: false, delete: false },
-          payroll: { create: false, read: false, update: false, delete: false }
-        }
-      };
-      setLocalRoles(prev => [...prev, newRole]);
-      addPageToast('success', `New role "${createForm.name}" created successfully.`);
-    }
+    try {
+      if (editingRole) {
+        // Edit mode
+        await updateRole(editingRole.id, {
+          name: createForm.name,
+          description: createForm.description,
+          accentColor: createForm.color,
+          accessLevel: createForm.accessLevel,
+          status: createForm.status
+        });
+        addPageToast('success', `Role "${createForm.name}" updated successfully.`);
+        setEditingRole(null);
+      } else {
+        // Create mode
+        const newId = `role_${createForm.name.toLowerCase().replace(/\s+/g, '_')}`;
+        const newRole = {
+          id: newId,
+          name: createForm.name,
+          description: createForm.description,
+          userCount: 0,
+          accentColor: createForm.color,
+          accessLevel: createForm.accessLevel,
+          status: createForm.status,
+          permissions: {
+            dashboard: { create: false, read: true, update: false, delete: false, approve: false, export: false },
+            employees: { create: false, read: true, update: false, delete: false, approve: false, export: false },
+            attendance: { create: false, read: true, update: false, delete: false, approve: false, export: false },
+            leaves: { create: false, read: true, update: false, delete: false, approve: false, export: false },
+            tasks: { create: false, read: true, update: false, delete: false, approve: false, export: false },
+            payroll: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+            permissions: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+            settings: { create: false, read: false, update: false, delete: false, approve: false, export: false }
+          }
+        };
+        await addRole(newRole);
+        addPageToast('success', `New role "${createForm.name}" created successfully.`);
+      }
 
-    setCreateForm({ name: '', description: '', parentRole: 'employee', accessLevel: 'Standard', status: 'Active', color: '#3b82f6', icon: '👤' });
-    setShowCreateModal(false);
+      setCreateForm({ name: '', description: '', parentRole: 'employee', accessLevel: 'Standard', status: 'Active', color: '#3b82f6', icon: '👤' });
+      setShowCreateModal(false);
+    } catch (err) {
+      console.error(err);
+      addPageToast('danger', 'Error saving role.');
+    }
   };
 
   const handleEditRoleClick = (role) => {
@@ -385,15 +546,20 @@ const RolesPermissions = () => {
     showConfirm(
       'Delete Role Access',
       `Are you sure you want to permanently delete the role "${role.name}"? This action will migrate all active users to the default Employee role.`,
-      () => {
-        setLocalRoles(prev => prev.filter(r => r.id !== role.id));
-        addPageToast('warning', `Role "${role.name}" has been deleted.`);
+      async () => {
+        try {
+          await deleteRole(role.id);
+          addPageToast('warning', `Role "${role.name}" has been deleted.`);
+        } catch (err) {
+          console.error(err);
+          addPageToast('danger', 'Error deleting role.');
+        }
       },
       'danger'
     );
   };
 
-  const handleCloneRole = (e) => {
+  const handleCloneRole = async (e) => {
     e.preventDefault();
     if (!cloneForm.targetName.trim()) return;
 
@@ -402,52 +568,49 @@ const RolesPermissions = () => {
 
     const newId = `role_clone_${cloneForm.targetName.toLowerCase().replace(/\s+/g, '_')}`;
     const cloned = {
-      ...source,
       id: newId,
       name: cloneForm.targetName,
+      description: `Cloned from ${source.name}. ${source.description}`,
       userCount: 0,
-      createdDate: new Date().toISOString().split('T')[0],
-      lastModified: new Date().toISOString().split('T')[0],
-      description: `Cloned from ${source.name}. ${source.description}`
+      accentColor: source.accentColor || source.color || '#3b82f6',
+      accessLevel: source.accessLevel || 'Standard',
+      status: source.status || 'Active',
+      permissions: JSON.parse(JSON.stringify(source.permissions || {}))
     };
 
-    setLocalRoles(prev => [...prev, cloned]);
-    addPageToast('success', `Role "${source.name}" cloned into "${cloneForm.targetName}".`);
-    setCloneForm({ sourceRoleId: 'employee', targetName: '', inheritAll: true });
-    setShowCloneModal(false);
+    try {
+      await addRole(cloned);
+      addPageToast('success', `Role "${source.name}" cloned into "${cloneForm.targetName}".`);
+      setCloneForm({ sourceRoleId: 'employee', targetName: '', inheritAll: true });
+      setShowCloneModal(false);
+    } catch (err) {
+      console.error(err);
+      addPageToast('danger', 'Error cloning role.');
+    }
   };
 
-  const handleAssignRole = (e) => {
+  const handleAssignRole = async (e) => {
     e.preventDefault();
     const emp = employees.find(e => e.id === assignForm.userId);
     const roleObj = localRoles.find(r => r.id === assignForm.roleId);
     if (!emp || !roleObj) return;
 
-    // Toast and add audit log entry
-    addPageToast('success', `Assigned "${roleObj.name}" role to ${emp.name}.`);
-    
-    // Add audit entry
-    const newAudit = {
-      id: `AUD-${Math.floor(100 + Math.random() * 900)}`,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      user: emp.name,
-      changedBy: 'Aarav Sharma',
-      module: 'User Access Assignment',
-      action: `Assigned role ${roleObj.name}`,
-      oldVal: emp.role || 'Unassigned',
-      newVal: roleObj.name
-    };
-    setAuditLogs(prev => [newAudit, ...prev]);
-    setShowAssignModal(false);
+    try {
+      await updateEmployee(assignForm.userId, { roleId: assignForm.roleId, role: roleObj.name });
+      addPageToast('success', `Assigned "${roleObj.name}" role to ${emp.name}.`);
+      setShowAssignModal(false);
+    } catch (err) {
+      console.error(err);
+      addPageToast('danger', 'Failed to assign role.');
+    }
   };
 
-  const handleRestrictAccess = (e) => {
+  const handleRestrictAccess = async (e) => {
     e.preventDefault();
     const emp = employees.find(e => e.id === restrictForm.userId);
     if (!emp) return;
 
     const newOverride = {
-      id: `OVR-${Math.floor(100 + Math.random() * 900)}`,
       userId: restrictForm.userId,
       userName: emp.name,
       module: restrictForm.module,
@@ -456,14 +619,24 @@ const RolesPermissions = () => {
       expiry: restrictForm.expiry || 'Permanent'
     };
 
-    setUserOverrides(prev => [newOverride, ...prev]);
-    addPageToast('success', `Configured permission restriction override for ${emp.name}.`);
-    setShowRestrictModal(false);
+    try {
+      await addUserOverride(newOverride);
+      addPageToast('success', `Configured permission restriction override for ${emp.name}.`);
+      setShowRestrictModal(false);
+    } catch (err) {
+      console.error(err);
+      addPageToast('danger', 'Failed to add override.');
+    }
   };
 
-  const handleRemoveOverride = (overrideId, userName) => {
-    setUserOverrides(prev => prev.filter(o => o.id !== overrideId));
-    addPageToast('info', `Removed permission override for ${userName}.`);
+  const handleRemoveOverride = async (overrideId, userName) => {
+    try {
+      await deleteUserOverride(overrideId);
+      addPageToast('info', `Removed permission override for ${userName}.`);
+    } catch (err) {
+      console.error(err);
+      addPageToast('danger', 'Failed to remove override.');
+    }
   };
 
   const handleExportReportSubmit = (e) => {
@@ -512,26 +685,16 @@ const RolesPermissions = () => {
   }, [auditLogs, auditSearch, auditModuleFilter]);
 
   // Save changes to system context
-  const handleSaveSystemPermissions = () => {
-    localRoles.forEach(role => {
-      // Map Matrix data levels back to Lucide permissions
-      const mappedPermissions = {};
-      Object.keys(matrixData).forEach(moduleKey => {
-        const value = matrixData[moduleKey]?.[role.id] || 'No';
-        let permObj = { create: false, read: false, update: false, delete: false };
-        if (value === 'Full') {
-          permObj = { create: true, read: true, update: true, delete: true };
-        } else if (value === 'Limited') {
-          permObj = { create: false, read: true, update: true, delete: false };
-        } else if (value === 'View') {
-          permObj = { create: false, read: true, update: false, delete: false };
-        }
-        mappedPermissions[moduleKey] = permObj;
-      });
-      // Update in context
-      updatePermissions(role.id, mappedPermissions);
-    });
-    addPageToast('success', 'Enterprise permissions matrix saved globally to AppContext.');
+  const handleSaveSystemPermissions = async () => {
+    try {
+      await Promise.all(localRoles.map(role => 
+        updatePermissions(role.id, role.permissions)
+      ));
+      addPageToast('success', 'Enterprise permissions matrix saved globally to AppContext.');
+    } catch (err) {
+      console.error(err);
+      addPageToast('danger', 'Failed to save system permissions matrix.');
+    }
   };
   // Skeleton loading wrapper
   if (isLoading) {
@@ -634,7 +797,7 @@ const RolesPermissions = () => {
               </div>
               <span className="rsc-stat-num">{localRoles.length}</span>
               <div className="rsc-stat-footer">
-                <span className="text-xs text-muted">5 system + {localRoles.length - 5} custom</span>
+                <span className="text-xs text-muted">{systemRolesCount} system + {customRolesCount} custom</span>
                 <span className="trend-chip trend-up"><ChevronRight size={10} /> View</span>
               </div>
             </div>
@@ -644,9 +807,9 @@ const RolesPermissions = () => {
                 <span className="rsc-stat-label">Active Protected Users</span>
                 <div className="rsc-icon-chip"><Users size={18} /></div>
               </div>
-              <span className="rsc-stat-num">1,250</span>
+              <span className="rsc-stat-num">{employees?.length || 1250}</span>
               <div className="rsc-stat-footer">
-                <span className="text-xs text-muted">100% covered by RBAC</span>
+                <span className="text-xs text-muted">{(employees && employees.length > 0) ? Math.round((employees.filter(e => e.roleId).length / employees.length) * 100) : 100}% covered by RBAC</span>
                 <span className="trend-chip trend-up"><ArrowUpRight size={10} /> +2.4%</span>
               </div>
             </div>
@@ -659,7 +822,7 @@ const RolesPermissions = () => {
               <span className="rsc-stat-num">{userOverrides.length}</span>
               <div className="rsc-stat-footer">
                 <span className="text-xs text-muted">Explicit override policies</span>
-                <span className="trend-chip trend-down"><ArrowDownRight size={10} /> 4 active</span>
+                <span className="trend-chip trend-down"><ArrowDownRight size={10} /> {userOverrides.length} active</span>
               </div>
             </div>
 
@@ -682,7 +845,7 @@ const RolesPermissions = () => {
                 <span className="rsc-stat-label">MFA Adoption Rate</span>
                 <div className="rsc-icon-chip"><Lock size={18} /></div>
               </div>
-              <span className="rsc-stat-num">98.2%</span>
+              <span className="rsc-stat-num">{mfaAdoptionRate}%</span>
               <div className="rsc-stat-footer">
                 <span className="text-xs text-muted">Enforced on admin ranks</span>
                 <span className="trend-chip trend-up"><ArrowUpRight size={10} /> +1.2%</span>
@@ -694,7 +857,7 @@ const RolesPermissions = () => {
                 <span className="rsc-stat-label">System Security Score</span>
                 <div className="rsc-icon-chip"><ShieldCheck size={18} /></div>
               </div>
-              <span className="rsc-stat-num">A+</span>
+              <span className="rsc-stat-num">{securityScore}</span>
               <div className="rsc-stat-footer">
                 <span className="text-xs text-muted">Complies with ISO 27001</span>
                 <span className="trend-chip trend-flat">Stable</span>
@@ -706,9 +869,9 @@ const RolesPermissions = () => {
                 <span className="rsc-stat-label">Dept Administrators</span>
                 <div className="rsc-icon-chip"><Building size={18} /></div>
               </div>
-              <span className="rsc-stat-num">12</span>
+              <span className="rsc-stat-num">{deptAdminsCount}</span>
               <div className="rsc-stat-footer">
-                <span className="text-xs text-muted">Across 6 departments</span>
+                <span className="text-xs text-muted">Across {uniqueDepartmentsCount} departments</span>
                 <span className="trend-chip trend-flat">Active</span>
               </div>
             </div>
@@ -718,9 +881,9 @@ const RolesPermissions = () => {
                 <span className="rsc-stat-label">Branch Administrators</span>
                 <div className="rsc-icon-chip"><Award size={18} /></div>
               </div>
-              <span className="rsc-stat-num">8</span>
+              <span className="rsc-stat-num">{branchAdminsCount}</span>
               <div className="rsc-stat-footer">
-                <span className="text-xs text-muted">Across 4 major offices</span>
+                <span className="text-xs text-muted">Across {uniqueBranchesCount} major offices</span>
                 <span className="trend-chip trend-flat">Active</span>
               </div>
             </div>
@@ -787,7 +950,7 @@ const RolesPermissions = () => {
                     <div key={i} className="flex-center gap-2 text-xs">
                       <div style={{ width: 10, height: 10, borderRadius: '50%', background: r.color }}></div>
                       <span className="font-semibold text-primary">{r.name}:</span>
-                      <span className="text-muted">{r.value} ({Math.round(r.value/65*100)}%)</span>
+                      <span className="text-muted">{r.value} ({totalEmployeesCount ? Math.round(r.value / totalEmployeesCount * 100) : 0}%)</span>
                     </div>
                   ))}
                 </div>

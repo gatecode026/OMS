@@ -79,3 +79,36 @@ export const getRequiredRoleForPath = (path) => {
   // Fallback to employee
   return ROLES.EMPLOYEE;
 };
+
+/**
+ * Route-to-Permission Matrix Module Mapping
+ * Maps each route path to its corresponding granular matrix module key.
+ */
+export const PATH_TO_MODULE = {
+  '/': 'dashboard',
+  '/employee-dashboard': 'dashboard',
+  '/overview': 'dashboard',
+  '/employees': 'employees',
+  '/employees/add': 'employees',
+  '/employees/:id': 'employees',
+  '/branches': 'employees',
+  '/departments': 'employees',
+  '/teams': 'employees',
+  '/managers': 'employees',
+  '/teams/leaders': 'employees',
+  '/attendance': 'attendance',
+  '/attendance/webportal': 'attendance',
+  '/leaves': 'leaves',
+  '/projects': 'tasks',
+  '/workflows': 'tasks',
+  '/tasks': 'tasks',
+  '/work-reports': 'tasks',
+  '/performance': 'tasks',
+  '/payroll': 'payroll',
+  '/permissions': 'permissions',
+  '/settings': 'settings',
+  '/security': 'permissions',
+  '/audit-logs': 'permissions',
+  '/reports': 'permissions'
+};
+

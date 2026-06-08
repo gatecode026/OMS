@@ -21,6 +21,13 @@ router.route('/')
   .get(controller.getAll)
   .post(validateRequest(validation.create), controller.create);
 
+router.route('/overrides')
+  .get(controller.getAllOverrides)
+  .post(controller.createOverride);
+
+router.route('/overrides/:id')
+  .delete(restrictTo('super_admin'), controller.deleteOverride);
+
 router.route('/:id')
   .get(controller.getById)
   .put(validateRequest(validation.update), controller.update)
