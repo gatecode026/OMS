@@ -819,7 +819,7 @@ targetDates.forEach(dateStr => {
   }
 });
 
-export const mockAttendance = [...baseAttendance, ...extraAttendance];
+export const mockAttendance = [];
 
 // ─── Leave Requests ────────────────────────────────────────────────────────────
 export const mockLeaveRequests = [

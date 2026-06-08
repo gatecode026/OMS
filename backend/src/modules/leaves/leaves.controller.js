@@ -36,11 +36,41 @@ export const getPublicData = asyncHandler(async (req, res) => {
   return successResponse(res, { status: 'mock_public_data' }, 'Public record fetched');
 });
 
+export const getAllPolicies = asyncHandler(async (req, res) => {
+  const data = await service.findAllPolicies();
+  return successResponse(res, data, 'Policies fetched successfully');
+});
+
+export const createPolicy = asyncHandler(async (req, res) => {
+  const data = await service.createPolicyRecord(req.body, req.user);
+  return successResponse(res, data, 'Policy created successfully', 201);
+});
+
+export const updatePolicy = asyncHandler(async (req, res) => {
+  const data = await service.updatePolicyRecord(req.params.id, req.body, req.user);
+  return successResponse(res, data, 'Policy updated successfully');
+});
+
+export const removePolicy = asyncHandler(async (req, res) => {
+  const data = await service.deletePolicyRecord(req.params.id, req.user);
+  return successResponse(res, data, 'Policy deleted successfully');
+});
+
+export const resetPolicies = asyncHandler(async (req, res) => {
+  const data = await service.resetPolicyRecords(req.user);
+  return successResponse(res, data, 'Policies reset to default successfully');
+});
+
 export default {
   getAll,
   getById,
   create,
   update,
   remove,
-  getPublicData
+  getPublicData,
+  getAllPolicies,
+  createPolicy,
+  updatePolicy,
+  removePolicy,
+  resetPolicies
 };

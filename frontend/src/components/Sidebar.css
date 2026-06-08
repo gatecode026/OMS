@@ -337,3 +337,23 @@
     z-index: 1240; /* Just below mobile sidebar menu but above page quick actions bar */
   }
 }
+
+.menu-link-disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  color: var(--text-muted) !important;
+}
+
+.menu-link-disabled:hover {
+  background-color: transparent !important;
+  color: var(--text-muted) !important;
+}
+
+.menu-link-disabled .menu-icon {
+  color: var(--text-muted) !important;
+}
+
+.menu-link-disabled:hover .menu-icon {
+  color: var(--text-muted) !important;
+}
+

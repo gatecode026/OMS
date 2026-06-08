@@ -5,6 +5,8 @@ import bcrypt from 'bcryptjs';
 import env from './env.js';
 import logger from './logger.js';
 import Admin from '../modules/admin/admin.model.js';
+import Holiday from '../modules/holidays/holidays.model.js';
+import Project from '../modules/projects/projects.model.js';
 
 export let isDatabaseConnected = false;
 
@@ -51,6 +53,11 @@ export const database = {
         });
         logger.info('Primary Super Admin created successfully.');
       }
+
+
+
+
+
 
       mongoose.connection.on('error', (err) => {
         logger.error(`Database runtime connection error: ${err}`);

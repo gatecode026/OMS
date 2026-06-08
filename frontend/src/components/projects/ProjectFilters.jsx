@@ -2,7 +2,7 @@ import React from 'react';
 import styles from '../../styles/projects.module.css';
 import { Search } from 'lucide-react';
 
-const ProjectFilters = ({ filters, onFilterChange }) => {
+const ProjectFilters = ({ filters, onFilterChange, departments = [] }) => {
   const handleInputChange = (field, value) => {
     onFilterChange({
       ...filters,
@@ -68,10 +68,11 @@ const ProjectFilters = ({ filters, onFilterChange }) => {
           onChange={(e) => handleInputChange('department', e.target.value)}
         >
           <option value="All">All Departments</option>
-          <option value="IT">IT</option>
-          <option value="HR">HR</option>
-          <option value="Marketing">Marketing</option>
-          <option value="Sales">Sales</option>
+          {(departments || []).map(d => (
+            <option key={d.id || d._id} value={d.name}>
+              {d.name}
+            </option>
+          ))}
         </select>
       </div>
 
