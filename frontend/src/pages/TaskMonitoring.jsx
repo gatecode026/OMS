@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import './TaskMonitoring.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -41,7 +41,8 @@ const TaskMonitoring = () => {
     getDepartmentTaskAnalytics,
     getWorkloadDistribution,
     showConfirm,
-    addToast
+    addToast,
+    projectsList
   } = useApp();
 
   // Active Main View: 'kanban', 'list', 'analytics'
@@ -88,14 +89,18 @@ const TaskMonitoring = () => {
 
   // Create Task Form State
   const [createForm, setCreateForm] = useState({
+    projectId: '',
     title: '',
-    project: 'SaaS Platform v2.0',
-    description: '',
-    assigneeId: employees[0]?.id || '',
-    priority: 'Medium',
-    dueDate: '2026-06-15',
-    estimatedHours: 20
+    dueDate: new Date().toISOString().split('T')[0],
+    priority: 'Medium'
   });
+
+  // When projectsList loads, default the select option
+  useEffect(() => {
+    if (projectsList && projectsList.length > 0 && !createForm.projectId) {
+      setCreateForm(prev => ({ ...prev, projectId: projectsList[0].id }));
+    }
+  }, [projectsList]);
 
   // Export Options State
   const [exportOptions, setExportOptions] = useState({
@@ -105,7 +110,7 @@ const TaskMonitoring = () => {
   });
 
   // Dynamic Date Check constant
-  const todayStr = '2026-06-03';
+  const todayStr = new Date().toISOString().split('T')[0];
 
   // Helper mapping helpers for Status Columns
   const getDisplayStatus = (statusVal) => {
@@ -323,17 +328,14 @@ const TaskMonitoring = () => {
 
   // Form submits handlers
   const handleCreateTask = () => {
-    if (!createForm.title.trim()) return;
+    if (!createForm.projectId || !createForm.title.trim()) return;
     addTask(createForm);
     setIsCreateOpen(false);
     setCreateForm({
+      projectId: projectsList[0]?.id || '',
       title: '',
-      project: 'SaaS Platform v2.0',
-      description: '',
-      assigneeId: employees[0]?.id || '',
-      priority: 'Medium',
-      dueDate: '2026-06-15',
-      estimatedHours: 20
+      dueDate: new Date().toISOString().split('T')[0],
+      priority: 'Medium'
     });
   };
 
@@ -1216,43 +1218,42 @@ const TaskMonitoring = () => {
         footer={
           <div className="modal-actions-wrapper">
             <Button variant="secondary" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleCreateTask} disabled={!createForm.title.trim()}>Create Task</Button>
+            <Button variant="primary" onClick={handleCreateTask} disabled={!createForm.projectId || !createForm.title.trim()}>Create Task</Button>
           </div>
         }
       >
         <div className="create-task-form-body">
           <div className="form-field">
+            <label>Target Project *</label>
+            <select
+              value={createForm.projectId}
+              onChange={e => setCreateForm(prev => ({ ...prev, projectId: e.target.value }))}
+              required
+            >
+              <option value="">Select a project...</option>
+              {(projectsList || []).map(p => (
+                <option key={p.id} value={p.id}>{p.id} - {p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-field">
             <label>Task Title *</label>
             <input
               type="text"
-              placeholder="e.g., Integrate OAuth Verification"
+              placeholder="e.g. Perform compliance checklist audit"
               value={createForm.title}
               onChange={e => setCreateForm(prev => ({ ...prev, title: e.target.value }))}
               required
             />
           </div>
           <div className="form-field">
-            <label>Project Name *</label>
-            <select
-              value={createForm.project}
-              onChange={e => setCreateForm(prev => ({ ...prev, project: e.target.value }))}
-            >
-              <option value="SaaS Platform v2.0">SaaS Platform v2.0</option>
-              <option value="Q2 Sales Campaign">Q2 Sales Campaign</option>
-              <option value="Security Audits">Security Audits</option>
-              <option value="Global Brand Guidelines">Global Brand Guidelines</option>
-            </select>
-          </div>
-          <div className="form-field">
-            <label>Assignee *</label>
-            <select
-              value={createForm.assigneeId}
-              onChange={e => setCreateForm(prev => ({ ...prev, assigneeId: e.target.value }))}
-            >
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name} ({emp.designation})</option>
-              ))}
-            </select>
+            <label>Task Due Date *</label>
+            <input
+              type="date"
+              value={createForm.dueDate}
+              onChange={e => setCreateForm(prev => ({ ...prev, dueDate: e.target.value }))}
+              required
+            />
           </div>
           <div className="form-field">
             <label>Priority</label>
@@ -1260,37 +1261,11 @@ const TaskMonitoring = () => {
               value={createForm.priority}
               onChange={e => setCreateForm(prev => ({ ...prev, priority: e.target.value }))}
             >
-              <option value="Critical">Critical</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
               <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Critical">Critical</option>
             </select>
-          </div>
-          <div className="form-field">
-            <label>Estimated Hours</label>
-            <input
-              type="number"
-              value={createForm.estimatedHours}
-              onChange={e => setCreateForm(prev => ({ ...prev, estimatedHours: Number(e.target.value) }))}
-              min="1"
-            />
-          </div>
-          <div className="form-field">
-            <label>Due Date</label>
-            <input
-              type="date"
-              value={createForm.dueDate}
-              onChange={e => setCreateForm(prev => ({ ...prev, dueDate: e.target.value }))}
-            />
-          </div>
-          <div className="form-field">
-            <label>Task Description</label>
-            <textarea
-              placeholder="Detail deliverables, checklist targets, and workflow contexts..."
-              value={createForm.description}
-              onChange={e => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
-            />
           </div>
         </div>
       </Modal>

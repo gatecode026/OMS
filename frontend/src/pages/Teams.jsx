@@ -19,197 +19,7 @@ import {
 } from 'lucide-react';
 
 // SECTION 2 - 8 initial sample rows
-const initialTeams = [
-  {
-    id: 'TM-001',
-    name: 'Development Team',
-    leader: 'Rahul Sharma',
-    department: 'IT',
-    branch: 'Head Office',
-    activeProjects: 8,
-    completedTasks: 45,
-    productivity: 96,
-    attendance: 92,
-    status: 'Active',
-    description: 'Core product engineering and architecture team responsible for frontend, backend, and DevOps.',
-    createdDate: '2025-01-10',
-    type: 'Permanent',
-    maxSize: 30,
-    shift: 'Flexible',
-    goals: 'Deliver version 2.0 microservices migration and achieve 99.9% uptime.',
-    assistantLeader: 'Vikram Mehta',
-    projectManager: 'Sneha Patel',
-    membersList: [
-      { name: 'Rahul Sharma', id: 'EMP-001', designation: 'Tech Lead', date: '2025-01-10', attendance: 92, productivity: 96 },
-      { name: 'Vikram Mehta', id: 'EMP-005', designation: 'Senior Developer', date: '2025-02-15', attendance: 86, productivity: 91 },
-      { name: 'Suresh Kumar', id: 'EMP-012', designation: 'Frontend Engineer', date: '2025-03-01', attendance: 94, productivity: 90 },
-      { name: 'Ananya Gupta', id: 'EMP-018', designation: 'QA Specialist', date: '2025-04-10', attendance: 95, productivity: 88 }
-    ]
-  },
-  {
-    id: 'TM-002',
-    name: 'Sales Team A',
-    leader: 'Priya Singh',
-    department: 'Sales',
-    branch: 'Branch Office',
-    activeProjects: 6,
-    completedTasks: 38,
-    productivity: 94,
-    attendance: 89,
-    status: 'Active',
-    description: 'Domestic enterprise sales and client relationship management operations.',
-    createdDate: '2025-01-18',
-    type: 'Permanent',
-    maxSize: 20,
-    shift: 'Morning',
-    goals: 'Exceed Q2 pipeline generation target by 15% and increase customer retention.',
-    assistantLeader: 'Raj Verma',
-    projectManager: 'Amit Kumar',
-    membersList: [
-      { name: 'Priya Singh', id: 'EMP-002', designation: 'Sales Manager', date: '2025-01-18', attendance: 89, productivity: 94 },
-      { name: 'Raj Verma', id: 'EMP-007', designation: 'Sales Rep', date: '2025-03-05', attendance: 84, productivity: 85 }
-    ]
-  },
-  {
-    id: 'TM-003',
-    name: 'Marketing Team',
-    leader: 'Amit Kumar',
-    department: 'Marketing',
-    branch: 'Head Office',
-    activeProjects: 5,
-    completedTasks: 29,
-    productivity: 92,
-    attendance: 91,
-    status: 'Active',
-    description: 'Digital campaign strategy, SEO optimization, and social media brand outreach.',
-    createdDate: '2025-02-05',
-    type: 'Permanent',
-    maxSize: 15,
-    shift: 'Morning',
-    goals: 'Launch summer campaign and reduce customer acquisition cost (CAC) by 10%.',
-    assistantLeader: 'Kavita Joshi',
-    projectManager: 'Sneha Patel',
-    membersList: [
-      { name: 'Amit Kumar', id: 'EMP-003', designation: 'Marketing Lead', date: '2025-02-05', attendance: 91, productivity: 92 },
-      { name: 'Kavita Joshi', id: 'EMP-006', designation: 'Content Strategist', date: '2025-03-12', attendance: 90, productivity: 87 }
-    ]
-  },
-  {
-    id: 'TM-004',
-    name: 'HR Operations',
-    leader: 'Sneha Patel',
-    department: 'HR',
-    branch: 'Head Office',
-    activeProjects: 3,
-    completedTasks: 22,
-    productivity: 89,
-    attendance: 88,
-    status: 'Active',
-    description: 'Employee onboarding, talent acquisition, policy compliance, and benefits administration.',
-    createdDate: '2025-02-12',
-    type: 'Permanent',
-    maxSize: 10,
-    shift: 'Morning',
-    goals: 'Revise employee handbook and onboard 50 new engineers in Q2.',
-    assistantLeader: 'Neha Verma',
-    projectManager: 'Rahul Sharma',
-    membersList: [
-      { name: 'Sneha Patel', id: 'EMP-004', designation: 'HR Director', date: '2025-02-12', attendance: 88, productivity: 89 }
-    ]
-  },
-  {
-    id: 'TM-005',
-    name: 'Design Team',
-    leader: 'Vikram Mehta',
-    department: 'IT',
-    branch: 'Agency',
-    activeProjects: 4,
-    completedTasks: 18,
-    productivity: 91,
-    attendance: 86,
-    status: 'Under Review',
-    description: 'User experience design, user interface mockups, prototyping, and graphic elements.',
-    createdDate: '2025-02-28',
-    type: 'Project-based',
-    maxSize: 12,
-    shift: 'Flexible',
-    goals: 'Refresh visual assets of web console and design client portal interface.',
-    assistantLeader: 'Suresh Kumar',
-    projectManager: 'Sneha Patel',
-    membersList: [
-      { name: 'Vikram Mehta', id: 'EMP-005', designation: 'UI/UX Director', date: '2025-02-28', attendance: 86, productivity: 91 }
-    ]
-  },
-  {
-    id: 'TM-006',
-    name: 'Finance Team',
-    leader: 'Kavita Joshi',
-    department: 'Finance',
-    branch: 'Branch Office',
-    activeProjects: 2,
-    completedTasks: 15,
-    productivity: 87,
-    attendance: 90,
-    status: 'Active',
-    description: 'Corporate accounts auditing, budgets analysis, tax reporting, and resource allocations.',
-    createdDate: '2025-03-01',
-    type: 'Permanent',
-    maxSize: 8,
-    shift: 'Morning',
-    goals: 'Audit annual statements and optimize corporate travel expenses policy.',
-    assistantLeader: 'Neha Gupta',
-    projectManager: 'Amit Kumar',
-    membersList: [
-      { name: 'Kavita Joshi', id: 'EMP-006', designation: 'Finance Lead', date: '2025-03-01', attendance: 90, productivity: 87 }
-    ]
-  },
-  {
-    id: 'TM-007',
-    name: 'Support Team',
-    leader: 'Raj Verma',
-    department: 'Operations',
-    branch: 'Agency',
-    activeProjects: 5,
-    completedTasks: 31,
-    productivity: 85,
-    attendance: 84,
-    status: 'Inactive',
-    description: 'Technical customer support desk operations resolving tickets and system status issues.',
-    createdDate: '2025-03-10',
-    type: 'Temporary',
-    maxSize: 15,
-    shift: 'Flexible',
-    goals: 'Maintain customer satisfaction score (CSAT) above 85% and resolve Tier 1 tickets.',
-    assistantLeader: 'Rahul Sharma',
-    projectManager: 'Priya Singh',
-    membersList: [
-      { name: 'Raj Verma', id: 'EMP-007', designation: 'Helpdesk Lead', date: '2025-03-10', attendance: 84, productivity: 85 }
-    ]
-  },
-  {
-    id: 'TM-008',
-    name: 'Research Team',
-    leader: 'Neha Gupta',
-    department: 'IT',
-    branch: 'Head Office',
-    activeProjects: 3,
-    completedTasks: 12,
-    productivity: 93,
-    attendance: 88,
-    status: 'New Team',
-    description: 'Future tech R&D, artificial intelligence prototyping, and machine learning models testing.',
-    createdDate: '2025-04-01',
-    type: 'Project-based',
-    maxSize: 10,
-    shift: 'Flexible',
-    goals: 'Train advanced neural network prototypes on text processing inputs.',
-    assistantLeader: 'Amit Kumar',
-    projectManager: 'Sneha Patel',
-    membersList: [
-      { name: 'Neha Gupta', id: 'EMP-008', designation: 'R&D Lead', date: '2025-04-01', attendance: 88, productivity: 93 }
-    ]
-  }
-];
+const initialTeams = [];
 
 // Recharts Chart Mock Data
 const productivityChartData = [
@@ -271,7 +81,7 @@ const initialActivities = [
 const Teams = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(600);
-  const { addToast, showConfirm, employees, updateEmployee } = useApp();
+  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments, addTeam, updateTeam, deleteTeam } = useApp();
 
   // New Modal States
   const [showExportModal, setShowExportModal] = useState(false);
@@ -286,7 +96,14 @@ const Teams = () => {
   const [schedulerFormState, setSchedulerFormState] = useState({ title: '', date: '', time: '', teamId: '', description: '' });
 
   // Core Team List State
-  const [teams, setTeams] = useState(initialTeams);
+  const [teams, setTeams] = useState([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+
+  React.useEffect(() => {
+    if (dbTeams) {
+      setTeams(dbTeams);
+    }
+  }, [dbTeams]);
 
   // Filters State
   const [search, setSearch] = useState('');
@@ -328,16 +145,10 @@ const Teams = () => {
   const [newTeam, setNewTeam] = useState({
     name: '',
     code: '',
-    department: 'IT',
-    branch: 'Head Office',
+    department: '',
+    branch: '',
     description: '',
-    leader: '',
-    assistantLeader: '',
-    projectManager: '',
-    type: 'Permanent',
-    maxSize: 10,
-    shift: 'Flexible',
-    goals: ''
+    leader: ''
   });
 
   // Table pagination state
@@ -346,6 +157,10 @@ const Teams = () => {
 
   // Validation state
   const [formErrors, setFormErrors] = useState({});
+
+  React.useEffect(() => {
+    setSelectedMemberIds([]);
+  }, [createModalOpen, newTeam.branch, newTeam.department]);
 
   // Filters calculation
   const filteredTeams = useMemo(() => {
@@ -377,12 +192,14 @@ const Teams = () => {
   const totalPages = Math.ceil(filteredTeams.length / itemsPerPage) || 1;
 
   // Form submit handler
-  const handleCreateTeamSubmit = (e) => {
+  const handleCreateTeamSubmit = async (e) => {
     e.preventDefault();
     const errors = {};
     if (!newTeam.name) errors.name = 'Team Name is required';
     if (!newTeam.code) errors.code = 'Team Code is required';
     if (!newTeam.leader) errors.leader = 'Team Leader is required';
+    if (!newTeam.branch) errors.branch = 'Branch is required';
+    if (!newTeam.department) errors.department = 'Department is required';
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -390,7 +207,41 @@ const Teams = () => {
       return;
     }
 
-    // Auto-assemble the new team mock structure
+    const selectedEmpObjects = employees.filter(emp => selectedMemberIds.includes(emp.id));
+    const membersList = selectedEmpObjects.map(emp => ({
+      name: emp.name,
+      id: emp.id,
+      designation: emp.designation || emp.role || 'Specialist',
+      date: new Date().toISOString().split('T')[0],
+      attendance: emp.attendanceRate || 95,
+      productivity: emp.productivityScore || 90
+    }));
+
+    // Find the leader and add them to membersList if not already present
+    const isLeaderInList = membersList.some(m => m.name === newTeam.leader);
+    if (!isLeaderInList && newTeam.leader) {
+      const leaderEmp = employees.find(emp => emp.name === newTeam.leader);
+      if (leaderEmp) {
+        membersList.unshift({
+          name: leaderEmp.name,
+          id: leaderEmp.id,
+          designation: leaderEmp.designation || 'Team Leader',
+          date: new Date().toISOString().split('T')[0],
+          attendance: leaderEmp.attendanceRate || 95,
+          productivity: leaderEmp.productivityScore || 90
+        });
+      } else {
+        membersList.unshift({
+          name: newTeam.leader,
+          id: 'EMP-' + Math.floor(Math.random() * 900 + 100),
+          designation: 'Team Leader',
+          date: new Date().toISOString().split('T')[0],
+          attendance: 95,
+          productivity: 90
+        });
+      }
+    }
+
     const createdTeam = {
       id: newTeam.code,
       name: newTeam.name,
@@ -404,20 +255,12 @@ const Teams = () => {
       status: 'Active',
       description: newTeam.description,
       createdDate: new Date().toISOString().split('T')[0],
-      type: newTeam.type,
-      maxSize: newTeam.maxSize,
-      shift: newTeam.shift,
-      goals: newTeam.goals,
-      assistantLeader: newTeam.assistantLeader,
-      projectManager: newTeam.projectManager,
-      membersList: [
-        { name: newTeam.leader, id: 'EMP-' + Math.floor(Math.random() * 900 + 100), designation: 'Tech Lead', date: new Date().toISOString().split('T')[0], attendance: 100, productivity: 90 }
-      ]
+      membersList
     };
 
-    setTeams(prev => [createdTeam, ...prev]);
+    await addTeam(createdTeam);
     setCreateModalOpen(false);
-    // Add success system alert dynamically
+
     setAlerts(prev => [
       { id: Date.now().toString(), type: 'info', text: `New Team Created: ${newTeam.name}` },
       ...prev
@@ -431,19 +274,13 @@ const Teams = () => {
     setNewTeam({
       name: '',
       code: '',
-      department: 'IT',
-      branch: 'Head Office',
+      department: '',
+      branch: '',
       description: '',
-      leader: '',
-      assistantLeader: '',
-      projectManager: '',
-      type: 'Permanent',
-      maxSize: 10,
-      shift: 'Flexible',
-      goals: ''
+      leader: ''
     });
+    setSelectedMemberIds([]);
     setFormErrors({});
-    addToast('success', 'Team created successfully!');
   };
 
   const handleExport = (format) => {
@@ -534,7 +371,7 @@ Active Teams Mapped: ${teams.length}
     setShowSchedulerModal(false);
   };
 
-  const handleAssignLeaderSubmit = (e) => {
+  const handleAssignLeaderSubmit = async (e) => {
     e.preventDefault();
     const { teamId, employeeId } = assignLeaderForm;
     if (!teamId || !employeeId) {
@@ -544,18 +381,15 @@ Active Teams Mapped: ${teams.length}
     const emp = employees.find(x => x.id === employeeId);
     if (!emp) return;
 
-    setTeams(prev => prev.map(t => {
-      if (t.id === teamId) {
-        // Also add the leader as a member if not already there
-        const isMember = t.membersList?.some(m => m.id === employeeId);
-        const updatedList = isMember ? t.membersList : [
-          ...(t.membersList || []),
-          { name: emp.name, id: emp.id, designation: emp.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 95, productivity: 90 }
-        ];
-        return { ...t, leader: emp.name, membersList: updatedList };
-      }
-      return t;
-    }));
+    const team = teams.find(t => t.id === teamId);
+    if (team) {
+      const isMember = team.membersList?.some(m => m.id === employeeId);
+      const updatedList = isMember ? team.membersList : [
+        ...(team.membersList || []),
+        { name: emp.name, id: emp.id, designation: emp.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 95, productivity: 90 }
+      ];
+      await updateTeam(teamId, { leader: emp.name, membersList: updatedList });
+    }
 
     setActivities(prev => [
       { id: Date.now().toString(), type: 'blue', text: `${emp.name} assigned as leader of ${teams.find(t => t.id === teamId)?.name}`, time: 'Just now' },
@@ -565,7 +399,7 @@ Active Teams Mapped: ${teams.length}
     setShowAssignLeaderModal(false);
   };
 
-  const handleAddMemberSubmit = (e) => {
+  const handleAddMemberSubmit = async (e) => {
     e.preventDefault();
     const { teamId, employeeId } = addMembersForm;
     if (!teamId || !employeeId) {
@@ -581,18 +415,13 @@ Active Teams Mapped: ${teams.length}
       return;
     }
 
-    setTeams(prev => prev.map(t => {
-      if (t.id === teamId) {
-        return {
-          ...t,
-          membersList: [
-            ...(t.membersList || []),
-            { name: emp.name, id: emp.id, designation: emp.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 100, productivity: 90 }
-          ]
-        };
-      }
-      return t;
-    }));
+    if (team) {
+      const updatedList = [
+        ...(team.membersList || []),
+        { name: emp.name, id: emp.id, designation: emp.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 100, productivity: 90 }
+      ];
+      await updateTeam(teamId, { membersList: updatedList });
+    }
 
     setActivities(prev => [
       { id: Date.now().toString(), type: 'green', text: `${emp.name} added to ${team?.name}`, time: 'Just now' },
@@ -602,7 +431,7 @@ Active Teams Mapped: ${teams.length}
     setShowAddMembersModal(false);
   };
 
-  const handleRemoveMemberSubmit = (e) => {
+  const handleRemoveMemberSubmit = async (e) => {
     e.preventDefault();
     const { teamId, employeeId } = removeMembersForm;
     if (!teamId || !employeeId) {
@@ -612,15 +441,10 @@ Active Teams Mapped: ${teams.length}
     const emp = employees.find(x => x.id === employeeId);
     const team = teams.find(t => t.id === teamId);
 
-    setTeams(prev => prev.map(t => {
-      if (t.id === teamId) {
-        return {
-          ...t,
-          membersList: (t.membersList || []).filter(m => m.id !== employeeId)
-        };
-      }
-      return t;
-    }));
+    if (team) {
+      const updatedList = (team.membersList || []).filter(m => m.id !== employeeId);
+      await updateTeam(teamId, { membersList: updatedList });
+    }
 
     setActivities(prev => [
       { id: Date.now().toString(), type: 'red', text: `${emp?.name || 'Employee'} removed from ${team?.name}`, time: 'Just now' },
@@ -630,7 +454,7 @@ Active Teams Mapped: ${teams.length}
     setShowRemoveMembersModal(false);
   };
 
-  const handleTransferSubmitLocal = (e) => {
+  const handleTransferSubmitLocal = async (e) => {
     e.preventDefault();
     const { employeeId, fromTeamId, toTeamId } = transferForm;
     if (!employeeId || !fromTeamId || !toTeamId) {
@@ -645,21 +469,15 @@ Active Teams Mapped: ${teams.length}
     const fromTeam = teams.find(t => t.id === fromTeamId);
     const toTeam = teams.find(t => t.id === toTeamId);
 
-    setTeams(prev => prev.map(t => {
-      if (t.id === fromTeamId) {
-        return { ...t, membersList: (t.membersList || []).filter(m => m.id !== employeeId) };
-      }
-      if (t.id === toTeamId) {
-        return {
-          ...t,
-          membersList: [
-            ...(t.membersList || []),
-            { name: emp?.name || 'Transfer Staff', id: employeeId, designation: emp?.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 95, productivity: 90 }
-          ]
-        };
-      }
-      return t;
-    }));
+    if (fromTeam && toTeam) {
+      const fromUpdatedList = (fromTeam.membersList || []).filter(m => m.id !== employeeId);
+      const toUpdatedList = [
+        ...(toTeam.membersList || []),
+        { name: emp?.name || 'Transfer Staff', id: employeeId, designation: emp?.designation || 'Specialist', date: new Date().toISOString().split('T')[0], attendance: 95, productivity: 90 }
+      ];
+      await updateTeam(fromTeamId, { membersList: fromUpdatedList });
+      await updateTeam(toTeamId, { membersList: toUpdatedList });
+    }
 
     setActivities(prev => [
       { id: Date.now().toString(), type: 'blue', text: `${emp?.name || 'Employee'} transferred from ${fromTeam?.name} to ${toTeam?.name}`, time: 'Just now' },
@@ -669,7 +487,7 @@ Active Teams Mapped: ${teams.length}
     setShowTransferEmployeesModal(false);
   };
 
-  const handleAllocateProjectSubmit = (e) => {
+  const handleAllocateProjectSubmit = async (e) => {
     e.preventDefault();
     const { teamId, projectName } = allocateProjectForm;
     if (!teamId || !projectName) {
@@ -678,12 +496,9 @@ Active Teams Mapped: ${teams.length}
     }
     const team = teams.find(t => t.id === teamId);
 
-    setTeams(prev => prev.map(t => {
-      if (t.id === teamId) {
-        return { ...t, activeProjects: t.activeProjects + 1 };
-      }
-      return t;
-    }));
+    if (team) {
+      await updateTeam(teamId, { activeProjects: (team.activeProjects || 0) + 1 });
+    }
 
     setActivities(prev => [
       { id: Date.now().toString(), type: 'green', text: `Project "${projectName}" allocated to ${team?.name}`, time: 'Just now' },
@@ -890,12 +705,9 @@ Active Teams Mapped: ${teams.length}
                       onChange={e => setDeptFilter(e.target.value)}
                     >
                       <option value="">All Departments</option>
-                      <option value="IT">IT (Tech)</option>
-                      <option value="HR">HR</option>
-                      <option value="Marketing">Marketing</option>
-                      <option value="Sales">Sales</option>
-                      <option value="Finance">Finance</option>
-                      <option value="Operations">Operations</option>
+                      {(departments || []).map(d => (
+                        <option key={d.id || d._id} value={d.name}>{d.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="teams-filter-group">
@@ -906,9 +718,9 @@ Active Teams Mapped: ${teams.length}
                       onChange={e => setBranchFilter(e.target.value)}
                     >
                       <option value="">All Locations</option>
-                      <option value="Head Office">Head Office</option>
-                      <option value="Branch Office">Branch Office</option>
-                      <option value="Agency">Agency</option>
+                      {(branches || []).map(b => (
+                        <option key={b.id || b._id} value={b.name}>{b.name}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="teams-filter-group">
@@ -983,8 +795,7 @@ Active Teams Mapped: ${teams.length}
                                   'Disband Team',
                                   `Are you sure you want to disband ${t.name}?`,
                                   () => {
-                                    setTeams(prev => prev.filter(tm => tm.id !== t.id));
-                                    addToast('warning', `${t.name} has been disbanded.`);
+                                    deleteTeam(t.id);
                                   },
                                   'danger'
                                 )}
@@ -1473,30 +1284,50 @@ Active Teams Mapped: ${teams.length}
                     {formErrors.code && <span className="text-danger text-xs">{formErrors.code}</span>}
                   </div>
                   <div className="teams-form-group">
+                    <label>Branch / Agency*</label>
+                    <select
+                      className="teams-filter-select"
+                      value={newTeam.branch}
+                      onChange={e => {
+                        const selectedBranch = e.target.value;
+                        const filtered = (departments || []).filter(
+                          d => d.branch?.trim().toLowerCase() === selectedBranch.trim().toLowerCase()
+                        );
+                        const firstDept = filtered.length > 0 ? filtered[0].name : '';
+                        setNewTeam(prev => ({
+                          ...prev,
+                          branch: selectedBranch,
+                          department: firstDept
+                        }));
+                      }}
+                      required
+                    >
+                      <option value="">Select Branch/Agency</option>
+                      {(branches || []).map(b => (
+                        <option key={b.id || b._id} value={b.name}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="teams-form-group">
                     <label>Department*</label>
                     <select
                       className="teams-filter-select"
                       value={newTeam.department}
                       onChange={e => setNewTeam(prev => ({ ...prev, department: e.target.value }))}
+                      required
                     >
-                      <option value="IT">IT (Tech)</option>
-                      <option value="HR">HR</option>
-                      <option value="Marketing">Marketing</option>
-                      <option value="Sales">Sales</option>
-                      <option value="Finance">Finance</option>
-                      <option value="Operations">Operations</option>
-                    </select>
-                  </div>
-                  <div className="teams-form-group">
-                    <label>Branch / Agency*</label>
-                    <select
-                      className="teams-filter-select"
-                      value={newTeam.branch}
-                      onChange={e => setNewTeam(prev => ({ ...prev, branch: e.target.value }))}
-                    >
-                      <option value="Head Office">Head Office</option>
-                      <option value="Branch Office">Branch Office</option>
-                      <option value="Agency">Agency</option>
+                      <option value="">Select Department</option>
+                      {(departments || [])
+                        .filter(
+                          d => d.branch?.trim().toLowerCase() === newTeam.branch?.trim().toLowerCase()
+                        )
+                        .map(d => (
+                          <option key={d.id || d._id} value={d.name}>
+                            {d.name}
+                          </option>
+                        ))}
                     </select>
                   </div>
                   <div className="teams-form-full">
@@ -1526,90 +1357,81 @@ Active Teams Mapped: ${teams.length}
                       required
                     >
                       <option value="">Select Team Leader</option>
-                      {employees.map(emp => (
+                      {employees.filter(emp => {
+                        const role = (emp.role || '').toLowerCase();
+                        const roleId = (emp.roleId || '').toLowerCase();
+                        const designation = (emp.designation || '').toLowerCase();
+                        const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                        const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                        return !isManager && !isAdmin;
+                      }).map(emp => (
                         <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
                       ))}
                     </select>
                     {formErrors.leader && <span className="text-danger text-xs">{formErrors.leader}</span>}
                   </div>
-                  <div className="teams-form-group">
-                    <label>Assistant Team Leader</label>
-                    <select
-                      className="teams-filter-select"
-                      value={newTeam.assistantLeader}
-                      onChange={e => setNewTeam(prev => ({ ...prev, assistantLeader: e.target.value }))}
-                    >
-                      <option value="">Select Assistant Leader (optional)</option>
-                      {employees.filter(emp => emp.name !== newTeam.leader).map(emp => (
-                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="teams-form-full">
-                    <label>Reporting Project Manager</label>
-                    <select
-                      className="teams-filter-select"
-                      value={newTeam.projectManager}
-                      onChange={e => setNewTeam(prev => ({ ...prev, projectManager: e.target.value }))}
-                    >
-                      <option value="">Select Project Manager (optional)</option>
-                      {employees.filter(emp => emp.name !== newTeam.leader && emp.name !== newTeam.assistantLeader).map(emp => (
-                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
               </div>
 
-              {/* Team Configuration */}
+              {/* Team Members Assignment */}
               <div>
-                <div className="teams-slideover-section-title">Team Configuration</div>
-                <div className="teams-form-grid">
-                  <div className="teams-form-group">
-                    <label>Team Type</label>
-                    <select
-                      className="teams-filter-select"
-                      value={newTeam.type}
-                      onChange={e => setNewTeam(prev => ({ ...prev, type: e.target.value }))}
-                    >
-                      <option value="Permanent">Permanent</option>
-                      <option value="Project-based">Project-based</option>
-                      <option value="Temporary">Temporary</option>
-                    </select>
+                <div className="teams-slideover-section-title" style={{ marginTop: 16 }}>Team Members Assignment</div>
+                {!newTeam.branch || !newTeam.department ? (
+                  <div className="text-muted text-xs" style={{ padding: '8px 0' }}>
+                    Please select a Branch and Department first to view available employees.
                   </div>
-                  <div className="teams-form-group">
-                    <label>Maximum Team Size</label>
-                    <input
-                      type="number"
-                      value={newTeam.maxSize}
-                      onChange={e => setNewTeam(prev => ({ ...prev, maxSize: parseInt(e.target.value) || 10 }))}
-                    />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: 12, background: 'var(--bg-input)' }}>
+                    {employees.filter(emp => {
+                      const role = (emp.role || '').toLowerCase();
+                      const roleId = (emp.roleId || '').toLowerCase();
+                      const designation = (emp.designation || '').toLowerCase();
+                      const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                      const isLeader = role.includes('leader') || role.includes('lead') || roleId.includes('leader') || roleId.includes('lead') || designation.includes('leader') || designation.includes('lead');
+                      const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                      const isGeneralEmployee = (roleId === 'employee' || role === 'employee') && !isManager && !isLeader && !isAdmin;
+                      return emp.branch?.trim().toLowerCase() === newTeam.branch?.trim().toLowerCase() &&
+                             emp.department?.trim().toLowerCase() === newTeam.department?.trim().toLowerCase() &&
+                             emp.name !== newTeam.leader &&
+                             isGeneralEmployee;
+                    }).length === 0 ? (
+                      <span className="text-muted text-xs">No other employees found in this branch and department.</span>
+                    ) : (
+                      employees.filter(emp => {
+                        const role = (emp.role || '').toLowerCase();
+                        const roleId = (emp.roleId || '').toLowerCase();
+                        const designation = (emp.designation || '').toLowerCase();
+                        const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                        const isLeader = role.includes('leader') || role.includes('lead') || roleId.includes('leader') || roleId.includes('lead') || designation.includes('leader') || designation.includes('lead');
+                        const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                        const isGeneralEmployee = (roleId === 'employee' || role === 'employee') && !isManager && !isLeader && !isAdmin;
+                        return emp.branch?.trim().toLowerCase() === newTeam.branch?.trim().toLowerCase() &&
+                               emp.department?.trim().toLowerCase() === newTeam.department?.trim().toLowerCase() &&
+                               emp.name !== newTeam.leader &&
+                               isGeneralEmployee;
+                      }).map(emp => (
+                        <label key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.82rem', cursor: 'pointer', color: 'var(--text-primary)', width: '100%', margin: '6px 0' }}>
+                          <input
+                            type="checkbox"
+                            style={{ width: '16px', height: '16px', minWidth: '16px', padding: 0, margin: 0, cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                            checked={selectedMemberIds.includes(emp.id)}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSelectedMemberIds(prev => [...prev, emp.id]);
+                              } else {
+                                setSelectedMemberIds(prev => prev.filter(id => id !== emp.id));
+                              }
+                            }}
+                          />
+                          <span>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</span>
+                        </label>
+                      ))
+                    )}
                   </div>
-                  <div className="teams-form-group">
-                    <label>Working Shift</label>
-                    <select
-                      className="teams-filter-select"
-                      value={newTeam.shift}
-                      onChange={e => setNewTeam(prev => ({ ...prev, shift: e.target.value }))}
-                    >
-                      <option value="Morning">Morning</option>
-                      <option value="Evening">Evening</option>
-                      <option value="Night">Night</option>
-                      <option value="Flexible">Flexible</option>
-                    </select>
-                  </div>
-                  <div className="teams-form-full">
-                    <label>Performance Goals</label>
-                    <textarea
-                      rows={2}
-                      placeholder="Outline target team KPI metrics..."
-                      value={newTeam.goals}
-                      onChange={e => setNewTeam(prev => ({ ...prev, goals: e.target.value }))}
-                      style={{ background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: 10, color: 'var(--text-primary)', outline: 'none' }}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
+
+
             </form>
             
             <div className="teams-slideover-footer">
@@ -1676,13 +1498,6 @@ Active Teams Mapped: ${teams.length}
                       {selectedTeam.description || 'No description provided.'}
                     </p>
                   </div>
-                  <div>
-                    <div className="teams-slideover-section-title">Leadership Hierarchy</div>
-                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div><strong>Assistant Leader:</strong> {selectedTeam.assistantLeader || 'Not Assigned'}</div>
-                      <div><strong>Project Manager:</strong> {selectedTeam.projectManager || 'Not Assigned'}</div>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1733,11 +1548,9 @@ Active Teams Mapped: ${teams.length}
                   <div className="teams-slideover-section-title">Structural Tree Roster</div>
                   <div className="teams-tree-wrapper">
 {selectedTeam.leader} (Team Leader)
-├── {selectedTeam.assistantLeader || 'Assistant Leader'} (Senior Developer)
-│   ├── Suresh Kumar (Frontend Dev)
-│   └── Ananya Gupta (QA Analyst)
-│       ├── Interns
-│       └── Trainees
+{selectedTeam.membersList && selectedTeam.membersList.filter(m => m.name !== selectedTeam.leader).map((m, idx) => (
+  <div key={idx} style={{ paddingLeft: 16 }}>├── {m.name} ({m.designation || 'Specialist'})</div>
+))}
                   </div>
                 </div>
               )}
@@ -1839,7 +1652,14 @@ Active Teams Mapped: ${teams.length}
                       required
                     >
                       <option value="">Select Employee</option>
-                      {employees.map(emp => (
+                      {employees.filter(emp => {
+                        const role = (emp.role || '').toLowerCase();
+                        const roleId = (emp.roleId || '').toLowerCase();
+                        const designation = (emp.designation || '').toLowerCase();
+                        const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                        const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                        return !isManager && !isAdmin;
+                      }).map(emp => (
                         <option key={emp.id} value={emp.id}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
                       ))}
                     </select>
@@ -1891,7 +1711,15 @@ Active Teams Mapped: ${teams.length}
                       required
                     >
                       <option value="">Select Employee</option>
-                      {employees.map(emp => (
+                      {employees.filter(emp => {
+                        const role = (emp.role || '').toLowerCase();
+                        const roleId = (emp.roleId || '').toLowerCase();
+                        const designation = (emp.designation || '').toLowerCase();
+                        const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                        const isLeader = role.includes('leader') || role.includes('lead') || roleId.includes('leader') || roleId.includes('lead') || designation.includes('leader') || designation.includes('lead');
+                        const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                        return (roleId === 'employee' || role === 'employee') && !isManager && !isLeader && !isAdmin;
+                      }).map(emp => (
                         <option key={emp.id} value={emp.id}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
                       ))}
                     </select>

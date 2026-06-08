@@ -252,7 +252,7 @@ const Departments = () => {
   // Modals Toggle States
   const [selectedDept, setSelectedDept] = useState(null);
   const [addDeptOpen, setAddDeptOpen] = useState(false);
-  const [createTeamOpen, setCreateTeamOpen] = useState(false);
+
   const [transferOpen, setTransferOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -306,9 +306,7 @@ const Departments = () => {
     setAddDeptOpen(true);
   };
 
-  const [newTeamForm, setNewTeamForm] = useState({
-    name: '', leader: '', department: 'Engineering', count: 0, status: 'Active', members: []
-  });
+
   const [transferForm, setTransferForm] = useState({
     employee: '', source: 'Sales', target: 'Engineering', reason: '', date: '2026-06-01'
   });
@@ -360,7 +358,7 @@ const Departments = () => {
 
   const filteredDepts = departments.filter(handleApplyFilter);
 
-  const deptEmployees = employees.filter(emp => emp.department === newTeamForm.department);
+
 
   // Handle Action - Add/Edit Department
   const handleAddDeptSubmit = async (e) => {
@@ -443,39 +441,7 @@ const Departments = () => {
     }
   };
 
-  // Handle Action - Create Team
-  const handleCreateTeamSubmit = (e) => {
-    e.preventDefault();
-    if (!newTeamForm.name || !newTeamForm.leader) {
-      addToast('error', 'Please specify team name and team leader.');
-      return;
-    }
-    const newTeamObj = {
-      id: `TEAM-00${teams.length + 1}`,
-      name: newTeamForm.name,
-      leader: newTeamForm.leader,
-      department: newTeamForm.department,
-      employeeCount: Number(newTeamForm.count),
-      activeProjects: 1,
-      status: newTeamForm.status
-    };
-    setTeams([...teams, newTeamObj]);
-    setRecentActivities([
-      { id: `ACT-${Date.now()}`, message: `Team ${newTeamForm.name} Formed under ${newTeamForm.leader}`, time: 'Just now', type: 'create' },
-      ...recentActivities
-    ]);
-    // update parent department employee/teams count
-    const targetDept = departments.find(d => d.name === newTeamForm.department);
-    if (targetDept) {
-      updateDepartment(targetDept.id, {
-        activeTeams: targetDept.activeTeams + 1,
-        employeeCount: targetDept.employeeCount + Number(newTeamForm.count)
-      });
-    }
-    setCreateTeamOpen(false);
-    addToast('success', `Team "${newTeamForm.name}" registered successfully.`);
-    setNewTeamForm({ name: '', leader: '', department: 'Engineering', count: 0, status: 'Active', members: [] });
-  };
+
 
   // Handle Action - Transfer Employee
   const handleTransferSubmit = (e) => {
@@ -617,9 +583,7 @@ const Departments = () => {
           <Button variant="primary" icon={Plus} onClick={() => handleAddClick()}>
             Add Dept
           </Button>
-          <Button variant="secondary" icon={Users} onClick={() => setCreateTeamOpen(true)}>
-            Create Team
-          </Button>
+
           <Button variant="secondary" icon={ArrowRight} onClick={() => setTransferOpen(true)}>
             Transfer Staff
           </Button>
@@ -967,9 +931,7 @@ const Departments = () => {
         <div className="dept-tab-wrapper flex-column gap-4">
           <div className="card dept-toolbar">
             <h3 className="card-title">Team Directory</h3>
-            <Button variant="primary" icon={Plus} onClick={() => setCreateTeamOpen(true)}>
-              New Team
-            </Button>
+
           </div>
 
           <div className="card table-responsive">
@@ -1385,182 +1347,7 @@ const Departments = () => {
         </form>
       </Modal>
 
-      {/* MODAL 2: CREATE TEAM */}
-      <Modal isOpen={createTeamOpen} onClose={() => setCreateTeamOpen(false)} title="Create Team" size="md">
-        <form onSubmit={handleCreateTeamSubmit} className="policy-form flex-column gap-4 py-2">
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="teamName">Team Name *</label>
-            <input
-              id="teamName"
-              type="text"
-              required
-              className="form-control"
-              placeholder="e.g. DevOps Core, Digital Ads"
-              value={newTeamForm.name}
-              onChange={e => setNewTeamForm({ ...newTeamForm, name: e.target.value })}
-            />
-          </div>
 
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="teamLeader">Team Leader *</label>
-            <input
-              id="teamLeader"
-              type="text"
-              required
-              className="form-control"
-              placeholder="Full Name"
-              value={newTeamForm.leader}
-              onChange={e => setNewTeamForm({ ...newTeamForm, leader: e.target.value })}
-            />
-          </div>
-
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="teamDept">Parent Department</label>
-            <select
-              id="teamDept"
-              className="form-control"
-              value={newTeamForm.department}
-              onChange={e => setNewTeamForm({ ...newTeamForm, department: e.target.value, members: [], count: 0 })}
-            >
-              {departments.map(d => (
-                <option key={d.id} value={d.name}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group flex-column gap-1">
-            <label>Select Team Members</label>
-            <div style={{
-              maxHeight: '220px',
-              overflowY: 'auto',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--bg-card)'
-            }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textTransform: 'none' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-color-dark)', position: 'sticky', top: 0, backgroundColor: 'var(--bg-elevated)', zIndex: 10 }}>
-                    <th style={{ padding: '8px 10px', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600', border: 'none' }}>Name & Designation</th>
-                    <th style={{ padding: '8px 10px', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600', width: '95px', border: 'none' }}>Performance</th>
-                    <th style={{ padding: '8px 10px', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600', width: '95px', border: 'none' }}>Productivity</th>
-                    <th style={{ padding: '8px 10px', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: '600', width: '95px', border: 'none' }}>Attendance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deptEmployees.map(emp => {
-                    const isSelected = newTeamForm.members?.includes(emp.name);
-                    const perfVal = emp.performanceScore?.overall || 75;
-                    const prodVal = emp.productivityScore || 80;
-                    const attVal = emp.performanceScore?.attendance || 90;
-
-                    return (
-                      <tr key={emp.id} style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: isSelected ? 'var(--color-primary-light)' : 'transparent' }}>
-                        {/* Column 1: Checkbox & Name */}
-                        <td style={{ padding: '8px 10px', verticalAlign: 'middle', border: 'none' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, textTransform: 'none', width: '100%', justifyContent: 'flex-start' }}>
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              style={{ 
-                                cursor: 'pointer',
-                                width: '15px',
-                                height: '15px',
-                                margin: '0',
-                                flexShrink: 0
-                              }}
-                              onChange={() => {
-                                const updatedMembers = isSelected
-                                  ? newTeamForm.members.filter(m => m !== emp.name)
-                                  : [...(newTeamForm.members || []), emp.name];
-                                setNewTeamForm({
-                                  ...newTeamForm,
-                                  members: updatedMembers,
-                                  count: updatedMembers.length
-                                });
-                              }}
-                            />
-                            <div style={{ display: 'flex', flexDirection: 'column', textTransform: 'none' }}>
-                              <span style={{ fontWeight: '600', color: 'var(--text-primary)', textTransform: 'none', lineHeight: '1.2' }}>{emp.name}</span>
-                              <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem', textTransform: 'none', marginTop: '2px' }}>{emp.designation}</span>
-                            </div>
-                          </label>
-                        </td>
-
-                        {/* Column 2: Performance Progress bar */}
-                        <td style={{ padding: '8px 10px', verticalAlign: 'middle', border: 'none' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: '600', minWidth: '24px', color: 'var(--text-primary)' }}>{perfVal}%</span>
-                            <div style={{ width: '40px', height: '5px', backgroundColor: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden', flexShrink: 0 }}>
-                              <div style={{ width: `${perfVal}%`, height: '100%', backgroundColor: 'var(--color-primary)', borderRadius: 'var(--radius-full)' }} />
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Column 3: Productivity Progress bar */}
-                        <td style={{ padding: '8px 10px', verticalAlign: 'middle', border: 'none' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: '600', minWidth: '24px', color: 'var(--text-primary)' }}>{prodVal}%</span>
-                            <div style={{ width: '40px', height: '5px', backgroundColor: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden', flexShrink: 0 }}>
-                              <div style={{ width: `${prodVal}%`, height: '100%', backgroundColor: 'var(--accent-blue-solid)', borderRadius: 'var(--radius-full)' }} />
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Column 4: Attendance Progress bar */}
-                        <td style={{ padding: '8px 10px', verticalAlign: 'middle', border: 'none' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: '600', minWidth: '24px', color: 'var(--text-primary)' }}>{attVal}%</span>
-                            <div style={{ width: '40px', height: '5px', backgroundColor: 'var(--border-color)', borderRadius: 'var(--radius-full)', overflow: 'hidden', flexShrink: 0 }}>
-                              <div style={{ width: `${attVal}%`, height: '100%', backgroundColor: 'var(--color-success)', borderRadius: 'var(--radius-full)' }} />
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {deptEmployees.length === 0 && (
-                    <tr>
-                      <td colSpan="4" style={{ padding: '20px 10px', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', textTransform: 'none', border: 'none' }}>
-                        No employees available in this department.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="teamCount">Initial Workforce Size (Calculated)</label>
-            <input
-              id="teamCount"
-              type="number"
-              className="form-control"
-              disabled
-              value={newTeamForm.count}
-            />
-          </div>
-
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="teamStatus">Current Status</label>
-            <select
-              id="teamStatus"
-              className="form-control"
-              value={newTeamForm.status}
-              onChange={e => setNewTeamForm({ ...newTeamForm, status: e.target.value })}
-            >
-              <option value="Active">Active</option>
-              <option value="Under Review">Under Review</option>
-              <option value="Suspended">Suspended</option>
-            </select>
-          </div>
-
-          <div className="flex-center justify-end gap-2 mt-2">
-            <Button variant="secondary" type="button" onClick={() => setCreateTeamOpen(false)}>Cancel</Button>
-            <Button variant="primary" type="submit">Establish Team</Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* MODAL 3: TRANSFER STAFF */}
       <Modal isOpen={transferOpen} onClose={() => setTransferOpen(false)} title="Transfer Employees" size="md">

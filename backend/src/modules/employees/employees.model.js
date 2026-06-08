@@ -169,6 +169,22 @@ const employeeSchema = new mongoose.Schema({
     type: Number,
     default: 15
   },
+  clBalance: {
+    type: Number,
+    default: 8
+  },
+  slBalance: {
+    type: Number,
+    default: 12
+  },
+  plBalance: {
+    type: Number,
+    default: 15
+  },
+  maternityBalance: {
+    type: Number,
+    default: 0
+  },
   currentProjectsCount: {
     type: Number,
     default: 0

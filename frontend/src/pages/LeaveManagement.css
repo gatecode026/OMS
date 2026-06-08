@@ -775,6 +775,10 @@
 .balance-badge.cl-badge { background-color: rgba(59, 130, 246, 0.15); color: var(--accent-blue-solid); }
 .balance-badge.sl-badge { background-color: rgba(217, 70, 239, 0.15); color: var(--accent-pink-solid); }
 .balance-badge.pl-badge { background-color: rgba(16, 185, 129, 0.15); color: var(--accent-green-solid); }
+.balance-badge.danger-badge { background-color: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.balance-badge.warning-badge { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.balance-badge.neutral-badge { background-color: rgba(148, 163, 184, 0.15); color: var(--text-secondary); }
+
 
 /* Leave types cards */
 .leave-types-grid {
@@ -1545,3 +1549,82 @@
 .policy-add-form::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
+
+/* Searchable dropdown styling */
+.searchable-dropdown-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.searchable-dropdown-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color-dark);
+  border-radius: var(--radius-md);
+  margin-top: 4px;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.searchable-option {
+  padding: var(--spacing-3) var(--spacing-4);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  transition: var(--transition-all);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.searchable-option:last-child {
+  border-bottom: none;
+}
+
+.searchable-option:hover {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+/* Scrollbar styling for searchable select */
+.searchable-dropdown-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+.searchable-dropdown-options::-webkit-scrollbar-track {
+  background: var(--border-color);
+  border-radius: var(--radius-full);
+}
+
+.searchable-dropdown-options::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: var(--radius-full);
+}
+
+.searchable-dropdown-options::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Active policies quick settings in sidebar */
+.active-policies-quick-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-2);
+}
+
+.active-policy-item-box {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-3);
+  transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+}
+
+.active-policy-item-box:hover {
+  border-color: var(--accent-blue-solid);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.15);
+}

@@ -661,7 +661,7 @@ const Managers = () => {
               </div>
               <Button variant="ghost" size="sm" icon={Download} onClick={()=>setExportOpen(true)}>Export Data</Button>
               <Button variant="ghost" size="sm" icon={FileText} onClick={()=>setReportOpen(true)}>Reports</Button>
-              <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>Add Manager</Button>
+              <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>Assign Manager</Button>
             </div>
           </div>
 
@@ -1615,7 +1615,7 @@ const Managers = () => {
       {/* ═══════════════════════════════ MODALS ═══════════════════════════════ */}
 
       {/* Add / Edit PM */}
-      <Modal isOpen={addEditOpen} onClose={()=>setAddEditOpen(false)} title={editingPM?`Edit — ${editingPM.name}`:'Add Manager'} size="lg"
+      <Modal isOpen={addEditOpen} onClose={()=>setAddEditOpen(false)} title={editingPM?`Edit — ${editingPM.name}`:'Assign Manager'} size="lg"
         footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAddEditOpen(false)}>Cancel</Button><Button variant="primary" onClick={savePM}>{editingPM?'Update Manager':'Save Manager'}</Button></div>}>
         <div className="pm-form-grid">
           <span className="pm-form-section-heading">Personal Information</span>
