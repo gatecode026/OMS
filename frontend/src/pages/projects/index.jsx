@@ -16,476 +16,18 @@ import ProjectTimeline from '../../components/projects/ProjectTimeline';
 import ProjectFilters from '../../components/projects/ProjectFilters';
 import ActivityFeed from '../../components/projects/ActivityFeed';
 
-// Initial Mock Projects Data (15 projects)
-const initialProjects = [
-  {
-    id: 'PRJ-001',
-    name: 'SaaS Platform v2.0',
-    description: 'Full redesign and rebuild of the enterprise workforce management platform with new role-based architecture and modern UI.',
-    department: 'IT',
-    client: 'Stark Industries',
-    manager: 'Elena Rostova',
-    leader: 'Liam O\'Connor',
-    members: ['Elena Rostova', 'Liam O\'Connor', 'David Kim', 'Aarav Sharma'],
-    priority: 'High',
-    startDate: '2026-01-15',
-    deadline: '2026-07-30',
-    progress: 75,
-    status: 'In Progress',
-    tasksTotal: 12,
-    tasksDone: 9,
-    budget: 150000,
-    workflowStage: 'Development',
-    pendingApprovals: 3,
-    delayedActivities: 0,
-    productivityScore: 88,
-    workingHours: 320,
-    milestonesCompleted: 4,
-    milestonesTotal: 6,
-    documents: [
-      { name: 'Architecture_Spec.pdf', type: 'pdf', size: '2.4 MB', uploadedBy: 'Elena R.' },
-      { name: 'UI_UX_Guidelines.pdf', type: 'pdf', size: '4.1 MB', uploadedBy: 'Liam O.' }
-    ],
-    tasks: [
-      { id: 't-1.1', title: 'Design system tokens and guidelines', completed: true, dueDate: '2026-02-15', priority: 'High' },
-      { id: 't-1.2', title: 'Implement RBAC authentication guards', completed: true, dueDate: '2026-04-10', priority: 'High' },
-      { id: 't-1.3', title: 'Vite migration and package optimization', completed: true, dueDate: '2026-05-15', priority: 'Medium' },
-      { id: 't-1.4', title: 'Build Project Dashboard page layout', completed: false, dueDate: '2026-06-10', priority: 'High', overdue: true }
-    ]
-  },
-  {
-    id: 'PRJ-002',
-    name: 'Q2 Sales Campaign',
-    description: 'Targeted outbound marketing campaign for enterprise clients. Includes email sequences, demo scheduling, and ROI tracking.',
-    department: 'Sales',
-    client: 'Acme Corp',
-    manager: 'Marcus Vance',
-    leader: 'Carlos Mendez',
-    members: ['Marcus Vance', 'Carlos Mendez', 'Deepak Joshi'],
-    priority: 'High',
-    startDate: '2026-04-01',
-    deadline: '2026-06-30',
-    progress: 80,
-    status: 'Active',
-    tasksTotal: 10,
-    tasksDone: 8,
-    budget: 45000,
-    workflowStage: 'Testing',
-    pendingApprovals: 1,
-    delayedActivities: 0,
-    productivityScore: 92,
-    workingHours: 180,
-    milestonesCompleted: 3,
-    milestonesTotal: 4,
-    documents: [
-      { name: 'Lead_List_Q2.xlsx', type: 'excel', size: '1.2 MB', uploadedBy: 'Carlos M.' }
-    ],
-    tasks: [
-      { id: 't-2.1', title: 'Extract leads from Salesforce database', completed: true, dueDate: '2026-04-15', priority: 'Medium' },
-      { id: 't-2.2', title: 'Draft email outreach sequences', completed: true, dueDate: '2026-05-01', priority: 'High' },
-      { id: 't-2.3', title: 'Set up outreach automation platform', completed: false, dueDate: '2026-06-15', priority: 'Medium' }
-    ]
-  },
-  {
-    id: 'PRJ-003',
-    name: 'Brand Identity Refresh',
-    description: 'Redesign of all brand assets including logo, style guide, website hero section, and social media templates.',
-    department: 'Marketing',
-    client: 'Internal',
-    manager: 'Aiko Tanaka',
-    leader: 'Priya Sharma',
-    members: ['Aiko Tanaka', 'Priya Sharma', 'Vijay Chauhan'],
-    priority: 'Medium',
-    startDate: '2026-05-10',
-    deadline: '2026-08-15',
-    progress: 25,
-    status: 'Pending',
-    tasksTotal: 8,
-    tasksDone: 2,
-    budget: 20000,
-    workflowStage: 'Design',
-    pendingApprovals: 2,
-    delayedActivities: 1,
-    productivityScore: 78,
-    workingHours: 95,
-    milestonesCompleted: 1,
-    milestonesTotal: 5,
-    documents: [
-      { name: 'Logo_Drafts_v1.zip', type: 'zip', size: '15.4 MB', uploadedBy: 'Priya S.' }
-    ],
-    tasks: [
-      { id: 't-3.1', title: 'Conduct competitor brand audits', completed: true, dueDate: '2026-05-20', priority: 'Low' },
-      { id: 't-3.2', title: 'Present logo mood boards', completed: true, dueDate: '2026-06-01', priority: 'High' },
-      { id: 't-3.3', title: 'Finalize brand color palette', completed: false, dueDate: '2026-06-25', priority: 'Medium' }
-    ]
-  },
-  {
-    id: 'PRJ-004',
-    name: 'HR Policy Compliance Audit',
-    description: 'Complete audit of HR policies, employment contracts, and GDPR data handling procedures across all branches.',
-    department: 'HR',
-    client: 'Internal',
-    manager: 'Sophia Laurent',
-    leader: 'Sarah Connor',
-    members: ['Sophia Laurent', 'Sarah Connor', 'Neha Verma', 'Fatima Khan'],
-    priority: 'Low',
-    startDate: '2026-02-01',
-    deadline: '2026-05-15',
-    progress: 100,
-    status: 'Completed',
-    tasksTotal: 15,
-    tasksDone: 15,
-    budget: 15000,
-    workflowStage: 'Deployment',
-    pendingApprovals: 0,
-    delayedActivities: 0,
-    productivityScore: 95,
-    workingHours: 110,
-    milestonesCompleted: 3,
-    milestonesTotal: 3,
-    documents: [
-      { name: 'Compliance_Audit_Final.pdf', type: 'pdf', size: '3.1 MB', uploadedBy: 'Sarah C.' }
-    ],
-    tasks: [
-      { id: 't-4.1', title: 'Compile contracts from global branches', completed: true, dueDate: '2026-02-28', priority: 'Medium' },
-      { id: 't-4.2', title: 'Analyze policies against GDPR guidelines', completed: true, dueDate: '2026-03-31', priority: 'High' },
-      { id: 't-4.3', title: 'Draft compliance feedback report', completed: true, dueDate: '2026-05-10', priority: 'High' }
-    ]
-  },
-  {
-    id: 'PRJ-005',
-    name: 'Legacy Migration Core',
-    description: 'Migration of database and legacy core APIs to the cloud platform. Delayed due to data mapping complexity.',
-    department: 'IT',
-    client: 'Wayne Enterprises',
-    manager: 'David Kim',
-    leader: 'Amit Bose',
-    members: ['David Kim', 'Amit Bose', 'Kavita Singh'],
-    priority: 'High',
-    startDate: '2026-02-01',
-    deadline: '2026-05-30',
-    progress: 45,
-    status: 'Delayed',
-    tasksTotal: 20,
-    tasksDone: 9,
-    budget: 220000,
-    workflowStage: 'Development',
-    pendingApprovals: 4,
-    delayedActivities: 3,
-    productivityScore: 65,
-    workingHours: 410,
-    milestonesCompleted: 2,
-    milestonesTotal: 6,
-    documents: [
-      { name: 'Database_Migration_Map.xlsx', type: 'excel', size: '5.2 MB', uploadedBy: 'Amit B.' }
-    ],
-    tasks: [
-      { id: 't-5.1', title: 'Create DB schema mappings', completed: true, dueDate: '2026-02-20', priority: 'High' },
-      { id: 't-5.2', title: 'Test migration scripts on staging', completed: true, dueDate: '2026-04-15', priority: 'Critical' },
-      { id: 't-5.3', title: 'Migrate user transaction archives', completed: false, dueDate: '2026-05-10', priority: 'High', overdue: true },
-      { id: 't-5.4', title: 'Replicate active schemas to AWS RDS', completed: false, dueDate: '2026-05-25', priority: 'Critical', overdue: true }
-    ]
-  },
-  {
-    id: 'PRJ-006',
-    name: 'Mobile App Checkout Optimization',
-    description: 'Optimize the customer checkout flow in the iOS and Android applications to reduce cart abandonment.',
-    department: 'IT',
-    client: 'Stark Industries',
-    manager: 'Elena Rostova',
-    leader: 'Rahul Jain',
-    members: ['Elena Rostova', 'Rahul Jain', 'Mei Lin'],
-    priority: 'Urgent',
-    startDate: '2026-05-01',
-    deadline: '2026-06-25',
-    progress: 60,
-    status: 'In Progress',
-    tasksTotal: 5,
-    tasksDone: 3,
-    budget: 85000,
-    workflowStage: 'Development',
-    pendingApprovals: 2,
-    delayedActivities: 0,
-    productivityScore: 89,
-    milestonesCompleted: 2,
-    milestonesTotal: 4,
-    documents: [],
-    tasks: [
-      { id: 't-6.1', title: 'Audit cart drop points via Firebase', completed: true, dueDate: '2026-05-10', priority: 'High' },
-      { id: 't-6.2', title: 'Design a single-page layout mockup', completed: true, dueDate: '2026-05-25', priority: 'High' },
-      { id: 't-6.3', title: 'Integrate UPI and Apple Pay API', completed: false, dueDate: '2026-06-15', priority: 'High' }
-    ]
-  },
-  {
-    id: 'PRJ-007',
-    name: 'Customer Onboarding Redesign',
-    description: 'Rebuild the sales funnel interface to allow customers to onboard within 3 minutes.',
-    department: 'Sales',
-    client: 'Acme Corp',
-    manager: 'Marcus Vance',
-    leader: 'Carlos Mendez',
-    members: ['Marcus Vance', 'Carlos Mendez', 'Deepak Joshi'],
-    priority: 'High',
-    startDate: '2026-04-10',
-    deadline: '2026-07-15',
-    progress: 50,
-    status: 'In Progress',
-    tasksTotal: 8,
-    tasksDone: 4,
-    budget: 60000,
-    workflowStage: 'Design',
-    pendingApprovals: 1,
-    delayedActivities: 0,
-    productivityScore: 82,
-    milestonesCompleted: 2,
-    milestonesTotal: 4,
-    documents: [],
-    tasks: [
-      { id: 't-7.1', title: 'Survey current onboarding barriers', completed: true, dueDate: '2026-04-30', priority: 'Medium' },
-      { id: 't-7.2', title: 'Build React prototype forms', completed: false, dueDate: '2026-06-20', priority: 'High' }
-    ]
-  },
-  {
-    id: 'PRJ-008',
-    name: 'Social Media Ads Campaign',
-    description: 'Paid campaigns across LinkedIn, Google, and Meta platforms targeting HR managers.',
-    department: 'Marketing',
-    client: 'Internal',
-    manager: 'Priya Patel',
-    leader: 'Pooja Yadav',
-    members: ['Priya Patel', 'Pooja Yadav', 'Priya Sharma'],
-    priority: 'Medium',
-    startDate: '2026-06-01',
-    deadline: '2026-08-30',
-    progress: 10,
-    status: 'Pending',
-    tasksTotal: 10,
-    tasksDone: 1,
-    budget: 30000,
-    workflowStage: 'Planning',
-    pendingApprovals: 3,
-    delayedActivities: 0,
-    productivityScore: 75,
-    milestonesCompleted: 0,
-    milestonesTotal: 5,
-    documents: [],
-    tasks: [
-      { id: 't-8.1', title: 'Prepare ad assets and creatives', completed: true, dueDate: '2026-06-05', priority: 'Medium' },
-      { id: 't-8.2', title: 'Set up ad account budgets', completed: false, dueDate: '2026-06-18', priority: 'High' }
-    ]
-  },
-  {
-    id: 'PRJ-009',
-    name: 'Recruitment Portal Development',
-    description: 'A custom tool for the recruitment team to screen resumes using parsed criteria keywords.',
-    department: 'HR',
-    client: 'Internal',
-    manager: 'Sophia Laurent',
-    leader: 'Raj Mehta',
-    members: ['Sophia Laurent', 'Raj Mehta', 'Fatima Khan'],
-    priority: 'Medium',
-    startDate: '2026-05-15',
-    deadline: '2026-09-01',
-    progress: 30,
-    status: 'In Progress',
-    tasksTotal: 12,
-    tasksDone: 3,
-    budget: 50000,
-    workflowStage: 'Design',
-    pendingApprovals: 0,
-    delayedActivities: 0,
-    productivityScore: 84,
-    milestonesCompleted: 1,
-    milestonesTotal: 5,
-    documents: [],
-    tasks: [
-      { id: 't-9.1', title: 'Gather keyword screening rules', completed: true, dueDate: '2026-05-25', priority: 'High' },
-      { id: 't-9.2', title: 'Implement resume parsing library', completed: false, dueDate: '2026-07-10', priority: 'High' }
-    ]
-  },
-  {
-    id: 'PRJ-010',
-    name: 'Database Replication Setup',
-    description: 'Configure multi-region database replicas for high availability and failover redundancy.',
-    department: 'IT',
-    client: 'Internal',
-    manager: 'David Kim',
-    leader: 'Amit Bose',
-    members: ['David Kim', 'Amit Bose', 'Sunita Rao'],
-    priority: 'Urgent',
-    startDate: '2026-03-10',
-    deadline: '2026-05-20',
-    progress: 90,
-    status: 'Delayed',
-    tasksTotal: 10,
-    tasksDone: 9,
-    budget: 95000,
-    workflowStage: 'Testing',
-    pendingApprovals: 2,
-    delayedActivities: 1,
-    productivityScore: 78,
-    milestonesCompleted: 4,
-    milestonesTotal: 5,
-    documents: [],
-    tasks: [
-      { id: 't-10.1', title: 'Establish region VPC tunnels', completed: true, dueDate: '2026-03-30', priority: 'High' },
-      { id: 't-10.2', title: 'Test write-lag sync rates', completed: true, dueDate: '2026-05-01', priority: 'Critical' },
-      { id: 't-10.3', title: 'Run automated failover simulation', completed: false, dueDate: '2026-05-18', priority: 'Critical', overdue: true }
-    ]
-  },
-  {
-    id: 'PRJ-011',
-    name: 'Content Strategy Hub',
-    description: 'Audit existing marketing content assets and consolidate them in a centralized library.',
-    department: 'Marketing',
-    client: 'Wayne Enterprises',
-    manager: 'Priya Patel',
-    leader: 'Pooja Yadav',
-    members: ['Priya Patel', 'Pooja Yadav', 'Vijay Chauhan'],
-    priority: 'Low',
-    startDate: '2026-03-01',
-    deadline: '2026-05-10',
-    progress: 100,
-    status: 'Completed',
-    tasksTotal: 6,
-    tasksDone: 6,
-    budget: 18000,
-    workflowStage: 'Deployment',
-    pendingApprovals: 0,
-    delayedActivities: 0,
-    productivityScore: 94,
-    milestonesCompleted: 3,
-    milestonesTotal: 3,
-    documents: [],
-    tasks: [
-      { id: 't-11.1', title: 'Perform blog posts compliance audit', completed: true, dueDate: '2026-03-25', priority: 'Low' },
-      { id: 't-11.2', title: 'Build Notion asset dashboard', completed: true, dueDate: '2026-04-30', priority: 'Medium' }
-    ]
-  },
-  {
-    id: 'PRJ-012',
-    name: 'Sales Enablement Toolkit',
-    description: 'Prepare materials, case study sheets, and templates to assist account managers during pitches.',
-    department: 'Sales',
-    client: 'Internal',
-    manager: 'Marcus Vance',
-    leader: 'Rohit Sharma',
-    members: ['Marcus Vance', 'Rohit Sharma', 'Sneha Reddy'],
-    priority: 'Medium',
-    startDate: '2026-05-01',
-    deadline: '2026-08-01',
-    progress: 40,
-    status: 'On Hold',
-    tasksTotal: 8,
-    tasksDone: 3,
-    budget: 25000,
-    workflowStage: 'Design',
-    pendingApprovals: 1,
-    delayedActivities: 0,
-    productivityScore: 80,
-    milestonesCompleted: 1,
-    milestonesTotal: 4,
-    documents: [],
-    tasks: [
-      { id: 't-12.1', title: 'Draft 3 enterprise case studies', completed: true, dueDate: '2026-05-20', priority: 'High' },
-      { id: 't-12.2', title: 'Build presentation Google Slides layout', completed: false, dueDate: '2026-07-15', priority: 'Medium' }
-    ]
-  },
-  {
-    id: 'PRJ-013',
-    name: 'GDPR Compliance Review',
-    description: 'Ensure data security compliance on all active platforms holding EU customer details.',
-    department: 'HR',
-    client: 'Internal',
-    manager: 'Sophia Laurent',
-    leader: 'Sarah Connor',
-    members: ['Sophia Laurent', 'Sarah Connor', 'Neha Verma'],
-    priority: 'High',
-    startDate: '2026-01-10',
-    deadline: '2026-04-15',
-    progress: 100,
-    status: 'Completed',
-    tasksTotal: 8,
-    tasksDone: 8,
-    budget: 35000,
-    workflowStage: 'Deployment',
-    pendingApprovals: 0,
-    delayedActivities: 0,
-    productivityScore: 97,
-    milestonesCompleted: 4,
-    milestonesTotal: 4,
-    documents: [],
-    tasks: [
-      { id: 't-13.1', title: 'Identify customer location database regions', completed: true, dueDate: '2026-01-30', priority: 'High' },
-      { id: 't-13.2', title: 'Encrypt data fields in backup databases', completed: true, dueDate: '2026-03-15', priority: 'Critical' }
-    ]
-  },
-  {
-    id: 'PRJ-014',
-    name: 'Cloud Migration Phase 3',
-    description: 'Migrating the final components of frontend microservices to AWS Elastic Container Service.',
-    department: 'IT',
-    client: 'Wayne Enterprises',
-    manager: 'David Kim',
-    leader: 'Amit Bose',
-    members: ['David Kim', 'Amit Bose', 'Aarav Sharma'],
-    priority: 'High',
-    startDate: '2026-04-15',
-    deadline: '2026-08-30',
-    progress: 55,
-    status: 'In Progress',
-    tasksTotal: 10,
-    tasksDone: 5,
-    budget: 160000,
-    workflowStage: 'Development',
-    pendingApprovals: 2,
-    delayedActivities: 0,
-    productivityScore: 90,
-    milestonesCompleted: 2,
-    milestonesTotal: 5,
-    documents: [],
-    tasks: [
-      { id: 't-14.1', title: 'Dockerize frontend static assets', completed: true, dueDate: '2026-05-10', priority: 'Medium' },
-      { id: 't-14.2', title: 'Write CloudFormation stacks templates', completed: false, dueDate: '2026-07-20', priority: 'High' }
-    ]
-  },
-  {
-    id: 'PRJ-015',
-    name: 'Annual Performance Review Platform',
-    description: 'Configure and release the internal review dashboard to score employee performance metrics.',
-    department: 'HR',
-    client: 'Internal',
-    manager: 'Sophia Laurent',
-    leader: 'Raj Mehta',
-    members: ['Sophia Laurent', 'Raj Mehta', 'Fatima Khan'],
-    priority: 'High',
-    startDate: '2026-03-01',
-    deadline: '2026-05-25',
-    progress: 80,
-    status: 'Delayed',
-    tasksTotal: 10,
-    tasksDone: 8,
-    budget: 28000,
-    workflowStage: 'Testing',
-    pendingApprovals: 1,
-    delayedActivities: 2,
-    productivityScore: 72,
-    milestonesCompleted: 3,
-    milestonesTotal: 4,
-    documents: [],
-    tasks: [
-      { id: 't-15.1', title: 'Formulate appraisal questions bank', completed: true, dueDate: '2026-03-20', priority: 'High' },
-      { id: 't-15.2', title: 'Build peer feedback layout forms', completed: true, dueDate: '2026-04-20', priority: 'Medium' },
-      { id: 't-15.3', title: 'Audit department weights factors settings', completed: false, dueDate: '2026-05-15', priority: 'High', overdue: true }
-    ]
-  }
-];
 
 const Projects = () => {
-  const { addToast, employees } = useApp();
+  const { addToast, employees, departments, projectsList, addProject, updateProject, deleteProject } = useApp();
 
   // State Management
-  const [projects, setProjects] = useState(initialProjects);
+  const [projects, setProjects] = useState([]);
+
+  React.useEffect(() => {
+    if (projectsList) {
+      setProjects(projectsList);
+    }
+  }, [projectsList]);
   const [filters, setFilters] = useState({
     search: '',
     status: 'All',
@@ -505,12 +47,13 @@ const Projects = () => {
   
   // Form States for Modals
   const [newProjectForm, setNewProjectForm] = useState({
-    name: '', client: '', department: 'IT', manager: '', leader: '', startDate: '', deadline: '', budget: '', priority: 'Medium', description: ''
+    name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', budget: '', priority: 'Medium', description: ''
   });
   const [assignTeamForm, setAssignTeamForm] = useState({ projectId: '', memberName: '' });
+  const [selectedMembers, setSelectedMembers] = useState([]);
   const [addTaskForm, setAddTaskForm] = useState({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
-  const [uploadDocForm, setUploadDocForm] = useState({ projectId: '', docName: '', docType: 'pdf' });
-  const [reportForm, setReportForm] = useState({ reportType: 'progress', format: 'pdf' });
+  const [uploadDocForm, setUploadDocForm] = useState({ projectId: '', docName: '', docType: 'pdf', docSize: '0.8 MB' });
+  const [reportForm, setReportForm] = useState({ projectId: '', reportType: 'progress', format: 'pdf' });
 
   // Filtering Calculation
   const filteredProjects = useMemo(() => {
@@ -647,66 +190,65 @@ const Projects = () => {
 
   const handleOpenAssignTeam = (proj) => {
     setAssignTeamForm({ projectId: proj.id, memberName: '' });
+    setSelectedMembers(proj.members || []);
     setActiveModal('assign');
   };
 
   // Toggle tasks check
-  const handleToggleTask = (projectId, taskId) => {
-    setProjects(prev =>
-      prev.map(p => {
-        if (p.id !== projectId) return p;
-        
-        const updatedTasks = p.tasks.map(t =>
-          t.id === taskId ? { ...t, completed: !t.completed } : t
-        );
-        const tasksDone = updatedTasks.filter(t => t.completed).length;
-        const progress = Math.round((tasksDone / p.tasksTotal) * 100);
-        
-        const updated = {
-          ...p,
-          tasks: updatedTasks,
-          tasksDone,
-          progress,
-          status: progress === 100 ? 'Completed' : p.status
-        };
+  const handleToggleTask = async (projectId, taskId) => {
+    const targetProj = projects.find(p => p.id === projectId);
+    if (!targetProj) return;
 
-        // Update selectedProject in real-time if open
-        if (selectedProject && selectedProject.id === projectId) {
-          setSelectedProject(updated);
-        }
-
-        return updated;
-      })
+    const updatedTasks = targetProj.tasks.map(t =>
+      t.id === taskId ? { ...t, completed: !t.completed } : t
     );
-    addToast('success', 'Task progress updated!');
+    const tasksDone = updatedTasks.filter(t => t.completed).length;
+    const progress = targetProj.tasksTotal > 0 ? Math.round((tasksDone / targetProj.tasksTotal) * 100) : 0;
+    
+    const updatedFields = {
+      tasks: updatedTasks,
+      tasksDone,
+      progress,
+      status: progress === 100 ? 'Completed' : targetProj.status
+    };
+
+    const success = await updateProject(projectId, updatedFields);
+    if (success) {
+      if (selectedProject && selectedProject.id === projectId) {
+        setSelectedProject({ ...targetProj, ...updatedFields });
+      }
+      addToast('success', 'Task progress updated!');
+    }
   };
 
   // Create Project Form Submit
-  const handleCreateProjectSubmit = (e) => {
+  const handleCreateProjectSubmit = async (e) => {
     e.preventDefault();
     if (selectedProject) {
       // Edit mode
-      setProjects(prev => prev.map(p => p.id === selectedProject.id ? { ...p, ...newProjectForm } : p));
-      addToast('success', `Project ${selectedProject.id} updated successfully!`);
-      setSelectedProject(null);
+      const success = await updateProject(selectedProject.id, newProjectForm);
+      if (success) {
+        setSelectedProject(null);
+      }
     } else {
       // Create mode
-      const nextId = `PRJ-${String(projects.length + 1).padStart(3, '0')}`;
+      const count = projects.length;
+      const nextId = `PRJ-${String(count + 1).padStart(3, '0')}`;
       const newProjObj = {
         id: nextId,
         name: newProjectForm.name,
         description: newProjectForm.description,
         department: newProjectForm.department,
         client: newProjectForm.client || 'Internal',
-        manager: newProjectForm.manager || 'Aarav Sharma',
-        leader: newProjectForm.leader || 'Vikram Singh',
-        members: [newProjectForm.manager || 'Aarav Sharma', newProjectForm.leader || 'Vikram Singh'],
+        manager: newProjectForm.manager,
+        leader: newProjectForm.leader,
+        members: [newProjectForm.manager, newProjectForm.leader].filter(Boolean),
         priority: newProjectForm.priority,
-        startDate: newProjectForm.startDate || '2026-06-01',
-        deadline: newProjectForm.deadline || '2026-09-01',
+        startDate: newProjectForm.startDate || new Date().toISOString().split('T')[0],
+        deadline: newProjectForm.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         progress: 0,
         status: 'Pending',
-        tasksTotal: 5,
+        tasksTotal: 1,
         tasksDone: 0,
         budget: Number(newProjectForm.budget) || 50000,
         workflowStage: 'Planning',
@@ -717,104 +259,240 @@ const Projects = () => {
         milestonesTotal: 5,
         documents: [],
         tasks: [
-          { id: `t-${nextId}-1`, title: 'Kickoff meeting and alignment', completed: false, dueDate: newProjectForm.startDate, priority: 'Medium' }
+          { id: `t-${nextId}-1`, title: 'Kickoff meeting and alignment', completed: false, dueDate: newProjectForm.startDate || new Date().toISOString().split('T')[0], priority: 'Medium' }
         ]
       };
-      setProjects(prev => [newProjObj, ...prev]);
-      addToast('success', `New Project ${nextId} created successfully!`);
+      await addProject(newProjObj);
     }
     setActiveModal(null);
     setNewProjectForm({
-      name: '', client: '', department: 'IT', manager: '', leader: '', startDate: '', deadline: '', budget: '', priority: 'Medium', description: ''
+      name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', budget: '', priority: 'Medium', description: ''
+    });
+  };
+
+  const handleToggleMemberSelection = (memberName) => {
+    setSelectedMembers(prev => {
+      if (prev.includes(memberName)) {
+        return prev.filter(m => m !== memberName);
+      } else {
+        return [...prev, memberName];
+      }
     });
   };
 
   // Assign Team Member Submit
-  const handleAssignTeamSubmit = (e) => {
+  const handleAssignTeamSubmit = async (e) => {
     e.preventDefault();
-    const { projectId, memberName } = assignTeamForm;
-    if (!projectId || !memberName.trim()) return;
+    const { projectId } = assignTeamForm;
+    if (!projectId) return;
 
-    setProjects(prev =>
-      prev.map(p => {
-        if (p.id !== projectId) return p;
-        if (p.members.includes(memberName)) return p;
-        const updated = {
-          ...p,
-          members: [...p.members, memberName.trim()]
-        };
-        if (selectedProject && selectedProject.id === projectId) setSelectedProject(updated);
-        return updated;
-      })
-    );
-    addToast('success', `Assigned ${memberName} to Project ${projectId}`);
+    const targetProj = projects.find(p => p.id === projectId);
+    if (!targetProj) return;
+
+    const success = await updateProject(projectId, { members: selectedMembers });
+    if (success) {
+      if (selectedProject && selectedProject.id === projectId) {
+        setSelectedProject({ ...selectedProject, members: selectedMembers });
+      }
+      addToast('success', 'Project team members updated successfully.');
+    }
     setActiveModal(null);
   };
 
   // Add Task Submit
-  const handleAddTaskSubmit = (e) => {
+  const handleAddTaskSubmit = async (e) => {
     e.preventDefault();
     const { projectId, title, dueDate, priority } = addTaskForm;
     if (!projectId || !title.trim()) return;
 
-    setProjects(prev =>
-      prev.map(p => {
-        if (p.id !== projectId) return p;
-        const nextTaskId = `t-${projectId}-${p.tasks.length + 1}`;
-        const newTasks = [...p.tasks, { id: nextTaskId, title: title.trim(), completed: false, dueDate, priority }];
-        const updated = {
-          ...p,
-          tasks: newTasks,
-          tasksTotal: p.tasksTotal + 1,
-          progress: Math.round((p.tasksDone / (p.tasksTotal + 1)) * 100)
-        };
-        if (selectedProject && selectedProject.id === projectId) setSelectedProject(updated);
-        return updated;
-      })
-    );
-    addToast('success', `Added new task to Project ${projectId}`);
+    const targetProj = projects.find(p => p.id === projectId);
+    if (!targetProj) return;
+
+    const nextTaskId = `t-${projectId}-${targetProj.tasks.length + 1}`;
+    const newTasks = [...targetProj.tasks, { id: nextTaskId, title: title.trim(), completed: false, dueDate, priority }];
+    const tasksTotal = targetProj.tasksTotal + 1;
+    const progress = Math.round((targetProj.tasksDone / tasksTotal) * 100);
+
+    const success = await updateProject(projectId, {
+      tasks: newTasks,
+      tasksTotal,
+      progress
+    });
+    if (success) {
+      if (selectedProject && selectedProject.id === projectId) {
+        setSelectedProject({ ...selectedProject, tasks: newTasks, tasksTotal, progress });
+      }
+    }
     setActiveModal(null);
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const name = file.name;
+    const ext = name.split('.').pop().toLowerCase();
+    let docType = 'pdf';
+    if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+      docType = 'excel';
+    } else if (ext === 'docx' || ext === 'doc') {
+      docType = 'word';
+    } else if (ext === 'zip' || ext === 'rar' || ext === '7z' || ext === 'tar' || ext === 'gz') {
+      docType = 'zip';
+    } else if (ext === 'pdf') {
+      docType = 'pdf';
+    }
+
+    let docSize = '0.1 MB';
+    if (file.size > 1024 * 1024) {
+      docSize = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+    } else {
+      docSize = (file.size / 1024).toFixed(0) + ' KB';
+    }
+
+    setUploadDocForm(prev => ({
+      ...prev,
+      docName: name,
+      docType,
+      docSize
+    }));
+  };
+
   // Upload Document Submit
-  const handleUploadDocSubmit = (e) => {
+  const handleUploadDocSubmit = async (e) => {
     e.preventDefault();
-    const { projectId, docName, docType } = uploadDocForm;
+    const { projectId, docName, docType, docSize } = uploadDocForm;
     if (!projectId || !docName.trim()) return;
 
-    setProjects(prev =>
-      prev.map(p => {
-        if (p.id !== projectId) return p;
-        const newDocs = [...p.documents, { name: docName.trim(), type: docType, size: '0.8 MB', uploadedBy: 'Super Admin' }];
-        const updated = {
-          ...p,
-          documents: newDocs
-        };
-        if (selectedProject && selectedProject.id === projectId) setSelectedProject(updated);
-        return updated;
-      })
-    );
-    addToast('success', `Uploaded document to Project ${projectId}`);
+    const targetProj = projects.find(p => p.id === projectId);
+    if (!targetProj) return;
+
+    const newDocs = [...targetProj.documents, { name: docName.trim(), type: docType, size: docSize || '0.8 MB', uploadedBy: 'Super Admin' }];
+    const success = await updateProject(projectId, { documents: newDocs });
+    if (success) {
+      if (selectedProject && selectedProject.id === projectId) {
+        setSelectedProject({ ...selectedProject, documents: newDocs });
+      }
+      addToast('success', 'Document uploaded and linked to project successfully.');
+    }
     setActiveModal(null);
+    setUploadDocForm({ projectId: '', docName: '', docType: 'pdf', docSize: '0.8 MB' });
   };
 
   // Generate Reports Submit
   const handleGenerateReportSubmit = (e) => {
     e.preventDefault();
-    addToast('info', `Generating ${reportForm.reportType} report as ${reportForm.format.toUpperCase()}...`);
-    
-    // Simulate Download
+    const { projectId, reportType, format } = reportForm;
+    if (!projectId) return;
+
+    const targetProj = projects.find(p => p.id === projectId);
+    if (!targetProj) return;
+
+    addToast('info', `Compiling report for "${targetProj.name}"...`);
+
+    let fileContent = '';
+    let mimeType = 'text/plain';
+    let fileExtension = 'txt';
+
+    if (format === 'csv' || format === 'excel') {
+      mimeType = 'text/csv;charset=utf-8;';
+      fileExtension = 'csv';
+
+      // Build detailed CSV
+      const rows = [
+        ['PROJECT REPORT', targetProj.name],
+        ['Report Type', reportType.toUpperCase()],
+        ['Generated At', new Date().toLocaleString()],
+        [],
+        ['PROJECT METRICS', 'VALUE'],
+        ['Project ID', targetProj.id],
+        ['Project Name', targetProj.name],
+        ['Client', targetProj.client || 'Internal'],
+        ['Department', targetProj.department],
+        ['Project Manager', targetProj.manager],
+        ['Team Leader', targetProj.leader],
+        ['Priority', targetProj.priority],
+        ['Start Date', targetProj.startDate],
+        ['Deadline', targetProj.deadline],
+        ['Progress', `${targetProj.progress}%`],
+        ['Status', targetProj.status],
+        ['Budget', `$${targetProj.budget}`],
+        ['Workflow Stage', targetProj.workflowStage || 'Planning'],
+        ['Tasks Total', targetProj.tasksTotal],
+        ['Tasks Done', targetProj.tasksDone],
+        ['Working Hours logged', targetProj.workingHours || 0],
+        ['Productivity Score', `${targetProj.productivityScore || 80}%`],
+        [],
+        ['TEAM ASSIGNED'],
+        ['Name', 'Role'],
+        ...(targetProj.members || []).map(m => [m, m === targetProj.manager ? 'Project Manager' : m === targetProj.leader ? 'Team Leader' : 'Team Member']),
+        [],
+        ['PROJECT WORK TASKS'],
+        ['Task ID', 'Task Title', 'Due Date', 'Priority', 'Completed'],
+        ...(targetProj.tasks || []).map(t => [t.id, t.title, t.dueDate, t.priority, t.completed ? 'YES' : 'NO'])
+      ];
+
+      fileContent = rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
+    } else {
+      // PDF/Text format: Build a beautiful plain-text ASCII report
+      mimeType = 'text/plain;charset=utf-8;';
+      fileExtension = 'txt';
+
+      const divider = '='.repeat(60);
+      const subDivider = '-'.repeat(60);
+
+      fileContent = [
+        divider,
+        `               PROJECT PERFORMANCE REPORT`,
+        `               Project: ${targetProj.name} (${targetProj.id})`,
+        divider,
+        `Report Type  : ${reportType.toUpperCase()}`,
+        `Generated At : ${new Date().toLocaleString()}`,
+        subDivider,
+        `Project Name : ${targetProj.name}`,
+        `Client       : ${targetProj.client || 'Internal'}`,
+        `Department   : ${targetProj.department}`,
+        `Manager      : ${targetProj.manager}`,
+        `Leader       : ${targetProj.leader}`,
+        `Priority     : ${targetProj.priority}`,
+        `Start Date   : ${targetProj.startDate}`,
+        `Deadline     : ${targetProj.deadline}`,
+        `Progress     : ${targetProj.progress}%`,
+        `Status       : ${targetProj.status}`,
+        `Budget       : $${targetProj.budget}`,
+        `Workflow Stage: ${targetProj.workflowStage || 'Planning'}`,
+        `Total Tasks  : ${targetProj.tasksTotal}`,
+        `Tasks Done   : ${targetProj.tasksDone}`,
+        subDivider,
+        `TEAM MEMBERS ASSIGNED:`,
+        ...(targetProj.members || []).map(m => ` - ${m} (${m === targetProj.manager ? 'Project Manager' : m === targetProj.leader ? 'Team Leader' : 'Team Member'})`),
+        subDivider,
+        `PROJECT CHECKLIST TASKS:`,
+        ...(targetProj.tasks || []).map(t => ` [${t.completed ? 'X' : ' '}] ${t.id} - ${t.title} (Due: ${t.dueDate}, Priority: ${t.priority})`),
+        divider
+      ].join('\n');
+    }
+
+    // Trigger standard Blob download
     setTimeout(() => {
+      const blob = new Blob([fileContent], { type: mimeType });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = '#';
-      link.setAttribute('download', `Project_${reportForm.reportType}_Report.${reportForm.format}`);
+      link.href = url;
+
+      // Clean target project name for filename
+      const cleanProjName = targetProj.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      link.setAttribute('download', `${targetProj.id}_${cleanProjName}_report_${reportType}.${fileExtension}`);
+
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      addToast('success', 'Report download started!');
-    }, 1500);
-    
+      URL.revokeObjectURL(url);
+      addToast('success', `${format.toUpperCase()} report downloaded successfully!`);
+    }, 800);
+
     setActiveModal(null);
+    setReportForm({ projectId: '', reportType: 'progress', format: 'pdf' });
   };
 
   // CSV Data Exporter
@@ -1080,7 +758,7 @@ const Projects = () => {
       </div>
 
       {/* Section F — Search & Filters Bar */}
-      <ProjectFilters filters={filters} onFilterChange={setFilters} />
+      <ProjectFilters filters={filters} onFilterChange={setFilters} departments={departments} />
 
       {/* Active filter chip if card filter is on */}
       {selectedCardFilter && (
@@ -1179,11 +857,14 @@ const Projects = () => {
                       style={{ width: '100%' }}
                       value={newProjectForm.department}
                       onChange={(e) => setNewProjectForm({ ...newProjectForm, department: e.target.value })}
+                      required
                     >
-                      <option value="IT">IT (Engineering)</option>
-                      <option value="HR">HR (Compliance)</option>
-                      <option value="Marketing">Marketing</option>
-                      <option value="Sales">Sales</option>
+                      <option value="">Select a department...</option>
+                      {(departments || []).map(d => (
+                        <option key={d.id || d._id} value={d.name}>
+                          {d.name} ({d.departmentCode})
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1195,13 +876,16 @@ const Projects = () => {
                       style={{ width: '100%' }}
                       value={newProjectForm.manager}
                       onChange={(e) => setNewProjectForm({ ...newProjectForm, manager: e.target.value })}
+                      required
                     >
                       <option value="">Select a manager...</option>
-                      {(employees || []).map(emp => (
-                        <option key={emp.id} value={emp.name}>
-                          {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
-                        </option>
-                      ))}
+                      {(employees || [])
+                        .filter(emp => emp.roleId === 'manager' || emp.role?.toLowerCase() === 'manager' || emp.designation?.toLowerCase().includes('manager'))
+                        .map(emp => (
+                          <option key={emp.id} value={emp.name}>
+                            {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
+                          </option>
+                        ))}
                     </select>
                   </div>
                   <div className={styles.formGroup}>
@@ -1211,13 +895,16 @@ const Projects = () => {
                       style={{ width: '100%' }}
                       value={newProjectForm.leader}
                       onChange={(e) => setNewProjectForm({ ...newProjectForm, leader: e.target.value })}
+                      required
                     >
                       <option value="">Select a team leader...</option>
-                      {(employees || []).map(emp => (
-                        <option key={emp.id} value={emp.name}>
-                          {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
-                        </option>
-                      ))}
+                      {(employees || [])
+                        .filter(emp => emp.roleId === 'team_leader' || emp.role?.toLowerCase().includes('leader') || emp.designation?.toLowerCase().includes('leader') || emp.designation?.toLowerCase().includes('lead'))
+                        .map(emp => (
+                          <option key={emp.id} value={emp.name}>
+                            {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
+                          </option>
+                        ))}
                     </select>
                   </div>
                 </div>
@@ -1291,7 +978,7 @@ const Projects = () => {
         <div className={styles.modalBackdrop} onClick={(e) => e.target.classList.contains(styles.modalBackdrop) && setActiveModal(null)}>
           <div className={styles.modalContent}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Assign Team Member</h3>
+              <h3 className={styles.modalTitle}>Assign Team Members</h3>
               <button className={styles.closeBtn} onClick={() => setActiveModal(null)}><X size={18} /></button>
             </div>
             <form onSubmit={handleAssignTeamSubmit}>
@@ -1302,34 +989,56 @@ const Projects = () => {
                     className={styles.filterSelect}
                     style={{ width: '100%' }}
                     value={assignTeamForm.projectId}
-                    onChange={(e) => setAssignTeamForm({ ...assignTeamForm, projectId: e.target.value })}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      setAssignTeamForm({ ...assignTeamForm, projectId: selectedId });
+                      const targetProj = projects.find(p => p.id === selectedId);
+                      setSelectedMembers(targetProj ? targetProj.members : []);
+                    }}
                   >
                     <option value="">Select a project...</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
                   </select>
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Select Employee</label>
-                  <select
-                    required
-                    className={styles.filterSelect}
-                    style={{ width: '100%' }}
-                    value={assignTeamForm.memberName}
-                    onChange={(e) => setAssignTeamForm({ ...assignTeamForm, memberName: e.target.value })}
-                  >
-                    <option value="">Select an employee...</option>
-                    {(employees || []).map(emp => (
-                      <option key={emp.id} value={emp.name}>
-                        {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
-                      </option>
-                    ))}
-                  </select>
+                  <label className={styles.formLabel}>Select Employees</label>
+                  {assignTeamForm.projectId ? (
+                    <div className={styles.employeeCheckboxList}>
+                      {(employees || []).map(emp => {
+                        const isChecked = selectedMembers.includes(emp.name);
+                        return (
+                          <div 
+                            key={emp.id} 
+                            className={styles.employeeCheckboxItem}
+                            onClick={() => handleToggleMemberSelection(emp.name)}
+                          >
+                            <input
+                              type="checkbox"
+                              className={styles.employeeCheckbox}
+                              checked={isChecked}
+                              readOnly
+                            />
+                            <div className={styles.employeeText}>
+                              <span className={styles.employeeName}>{emp.name}</span>
+                              <span className={styles.employeeDetails}>
+                                {emp.designation || emp.position || 'Staff'} ({emp.id})
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+                      Please select a target project first to see and manage employees.
+                    </div>
+                  )}
                 </div>
               </div>
               <div className={styles.modalFooter}>
                 <button type="button" className={styles.pageBtn} onClick={() => setActiveModal(null)}>Cancel</button>
                 <button type="submit" className={`${styles.pageBtn} ${styles.primaryAction}`} disabled={!assignTeamForm.projectId}>
-                  Assign Employee
+                  Save Team Assignments
                 </button>
               </div>
             </form>
@@ -1431,6 +1140,16 @@ const Projects = () => {
                   </select>
                 </div>
                 <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Choose File</label>
+                  <input
+                    type="file"
+                    className={styles.textInput}
+                    style={{ padding: '8px' }}
+                    onChange={handleFileChange}
+                    required
+                  />
+                </div>
+                <div className={styles.formGroup}>
                   <label className={styles.formLabel}>Document File Name</label>
                   <input
                     type="text"
@@ -1477,6 +1196,19 @@ const Projects = () => {
             </div>
             <form onSubmit={handleGenerateReportSubmit}>
               <div className={styles.modalBody}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Target Project</label>
+                  <select
+                    className={styles.filterSelect}
+                    style={{ width: '100%' }}
+                    value={reportForm.projectId}
+                    onChange={(e) => setReportForm({ ...reportForm, projectId: e.target.value })}
+                    required
+                  >
+                    <option value="">Select a project...</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
+                  </select>
+                </div>
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>Select Report Focus Area</label>
                   <select

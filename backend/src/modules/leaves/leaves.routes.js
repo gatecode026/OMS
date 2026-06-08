@@ -17,6 +17,17 @@ router.get('/public', controller.getPublicData);
 // Secured routes boundary
 router.use(authenticate);
 
+router.route('/policies')
+  .get(controller.getAllPolicies)
+  .post(controller.createPolicy);
+
+router.route('/policies/reset')
+  .post(controller.resetPolicies);
+
+router.route('/policies/:id')
+  .put(controller.updatePolicy)
+  .delete(controller.removePolicy);
+
 router.route('/')
   .get(controller.getAll)
   .post(validateRequest(validation.create), controller.create);

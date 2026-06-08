@@ -1363,11 +1363,54 @@
   /* .stickyFooter left override removed */
 }
 
-@media (max-width: 480px) {
-  .summaryGrid {
-    grid-template-columns: 1fr;
-  }
-  .pageBtn span {
-    display: none;
-  }
+/* Multi-select employee list for Assign Team Modal */
+.employeeCheckboxList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background-color: var(--bg-elevated);
 }
+
+.employeeCheckboxItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.employeeCheckboxItem:hover {
+  background-color: var(--bg-card);
+}
+
+.employeeCheckbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.employeeText {
+  display: flex;
+  flex-direction: column;
+}
+
+.employeeName {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.employeeDetails {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+

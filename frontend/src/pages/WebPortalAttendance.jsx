@@ -140,12 +140,21 @@ const ToggleSwitch = ({ on, onChange }) => (
   </span>
 );
 
+const getLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 const WebPortalAttendance = () => {
   const isLoading = usePageLoading(600);
   const {
     attendance,
     employees,
+    branches,
     updateAttendanceRecord,
     addAttendanceRecord,
     deleteAttendanceRecord,
@@ -158,7 +167,8 @@ const WebPortalAttendance = () => {
   const [wpBranch, setWpBranch] = useState('');
   const [wpDept, setWpDept] = useState('');
   const [wpStatus, setWpStatus] = useState('');
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [wpWorkMode, setWpWorkMode] = useState('');
+  const [dateFilter, setDateFilter] = useState(getLocalDateString());
   const [wpState, setWpState] = useState({});
   const [viewMode, setViewMode] = useState('table');
 
@@ -181,7 +191,7 @@ const WebPortalAttendance = () => {
     department: '',
     branch: '',
     workMode: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     punchIn: '',
     punchOut: '',
     breakTime: '45 mins',
@@ -298,7 +308,7 @@ const WebPortalAttendance = () => {
     setQuickFormOpen(false);
     setQuickFormData({
       employeeId: '', employeeName: '', department: '', branch: '', workMode: '',
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(),
       punchIn: '', punchOut: '', breakTime: '45 mins',
       totalHours: 0, status: 'Present', source: 'Web Portal', notes: ''
     });
@@ -336,7 +346,8 @@ const WebPortalAttendance = () => {
         recordId: record?.id || null,
         source: record?.source || 'Web Portal',
         notes: record?.notes || '',
-        lastUpdated: record?.updatedAt || record?.date || ''
+        lastUpdated: record?.updatedAt || record?.date || '',
+        workMode: record?.workMode || emp.workMode || 'WFO'
       };
     });
     setWpState(initialState);
@@ -353,9 +364,12 @@ const WebPortalAttendance = () => {
       const matchStatus = wpStatus
         ? (wpState[emp.id]?.status || '').toLowerCase() === wpStatus.toLowerCase()
         : true;
-      return matchSearch && matchBranch && matchDept && matchStatus;
+      const matchWorkMode = wpWorkMode
+        ? (wpState[emp.id]?.workMode || '').toLowerCase() === wpWorkMode.toLowerCase()
+        : true;
+      return matchSearch && matchBranch && matchDept && matchStatus && matchWorkMode;
     });
-  }, [employees, wpSearch, wpBranch, wpDept, wpStatus, wpState]);
+  }, [employees, wpSearch, wpBranch, wpDept, wpStatus, wpWorkMode, wpState]);
 
   // ── Statistics ──
   const stats = useMemo(() => {
@@ -429,7 +443,7 @@ const WebPortalAttendance = () => {
       employeeName: empData.name,
       department: empData.department || 'Engineering',
       branch: empData.branch || 'Jaipur',
-      workMode: empData.workMode || 'Work From Office',
+      workMode: row.workMode || empData.workMode || 'WFO',
       date: dateFilter,
       punchIn: row.punchIn,
       punchOut: row.punchOut || '--:--',
@@ -460,7 +474,8 @@ const WebPortalAttendance = () => {
       punchOut: row?.punchOut || '',
       status: row?.status || 'Present',
       totalHours: row?.totalHours || 0,
-      notes: row?.notes || ''
+      notes: row?.notes || '',
+      workMode: row?.workMode || 'WFO'
     });
     setEditModalOpen(true);
   };
@@ -476,7 +491,8 @@ const WebPortalAttendance = () => {
         punchOut: editFormData.punchOut,
         status: editFormData.status,
         totalHours: editFormData.totalHours,
-        notes: editFormData.notes
+        notes: editFormData.notes,
+        workMode: editFormData.workMode || 'WFO'
       }
     }));
     handleWpMarkSubmit(empId);
@@ -563,7 +579,7 @@ const WebPortalAttendance = () => {
     );
   }
 
-  const activeFilters = [wpSearch, wpBranch, wpDept, wpStatus].filter(Boolean).length;
+  const activeFilters = [wpSearch, wpBranch, wpDept, wpStatus, wpWorkMode].filter(Boolean).length;
 
   return (
     <div className="wp-attendance-page">
@@ -704,10 +720,12 @@ const WebPortalAttendance = () => {
 
               <select value={wpBranch} onChange={e => setWpBranch(e.target.value)} className="wp-filter-select">
                 <option value="">Branch</option>
-                <option value="Jaipur">🕌 Jaipur</option>
-                <option value="Delhi">🏛️ Delhi</option>
-                <option value="Mumbai">🌊 Mumbai</option>
-                <option value="Bangalore">🏙️ Bangalore</option>
+                {(branches && branches.length > 0 ? branches.map(b => b.name) : Array.from(new Set(employees.map(e => e.branch).filter(Boolean)))).map(branchName => {
+                  const emoji = branchName.toLowerCase().includes('jaipur') ? '🕌' : branchName.toLowerCase().includes('delhi') ? '🏛️' : branchName.toLowerCase().includes('mumbai') ? '🌊' : '🏙️';
+                  return (
+                    <option key={branchName} value={branchName}>{emoji} {branchName}</option>
+                  );
+                })}
               </select>
 
               <select value={wpStatus} onChange={e => setWpStatus(e.target.value)} className="wp-filter-select">
@@ -715,13 +733,19 @@ const WebPortalAttendance = () => {
                 <option value="Present">✅ Present</option>
                 <option value="Absent">❌ Absent</option>
                 <option value="Late">🕐 Late</option>
-                <option value="Work From Home">🏠 WFH</option>
                 <option value="On Leave">🌴 On Leave</option>
                 <option value="Overtime">⏰ Overtime</option>
               </select>
 
+              <select value={wpWorkMode} onChange={e => setWpWorkMode(e.target.value)} className="wp-filter-select">
+                <option value="">Mode</option>
+                <option value="WFO">🏢 WFO</option>
+                <option value="WFH">🏠 WFH</option>
+                <option value="Hybrid">🔄 Hybrid</option>
+              </select>
+
               {activeFilters > 0 && (
-                <button className="wp-clear-filters" onClick={() => { setWpSearch(''); setWpBranch(''); setWpDept(''); setWpStatus(''); }}>
+                <button className="wp-clear-filters" onClick={() => { setWpSearch(''); setWpBranch(''); setWpDept(''); setWpStatus(''); setWpWorkMode(''); }}>
                   <X size={13} /> Clear
                 </button>
               )}
@@ -973,7 +997,6 @@ const WebPortalAttendance = () => {
                               <option value="Late">🕐 Late</option>
                               <option value="Absent">❌ Absent</option>
                               <option value="Half Day">🌗 Half Day</option>
-                              <option value="Work From Home">🏠 WFH</option>
                               <option value="On Leave">🌴 On Leave</option>
                               <option value="Overtime">⏰ Overtime</option>
                             </select>
@@ -1127,10 +1150,10 @@ const WebPortalAttendance = () => {
               <div className="wp-card-title"><MapPin size={16} /><span>Branch Distribution</span></div>
             </div>
             <div className="wp-branch-list">
-              {['Jaipur', 'Delhi', 'Mumbai', 'Bangalore'].map(branch => {
+              {(branches && branches.length > 0 ? branches.map(b => b.name) : Array.from(new Set(employees.map(e => e.branch).filter(Boolean)))).map(branch => {
                 const count = wpFilteredEmployees.filter(e => e.branch === branch).length;
                 const percentage = stats.totalEmployees > 0 ? Math.round((count / stats.totalEmployees) * 100) : 0;
-                const emoji = branch === 'Jaipur' ? '🕌' : branch === 'Delhi' ? '🏛️' : branch === 'Mumbai' ? '🌊' : '🏙️';
+                const emoji = branch.toLowerCase().includes('jaipur') ? '🕌' : branch.toLowerCase().includes('delhi') ? '🏛️' : branch.toLowerCase().includes('mumbai') ? '🌊' : '🏙️';
                 return (
                   <div key={branch} className="wp-branch-item">
                     <div className="wp-branch-row">
@@ -1223,9 +1246,17 @@ const WebPortalAttendance = () => {
                 <option value="Late">🕐 Late</option>
                 <option value="Absent">❌ Absent</option>
                 <option value="Half Day">🌗 Half Day</option>
-                <option value="Work From Home">🏠 Work From Home</option>
                 <option value="On Leave">🌴 On Leave</option>
                 <option value="Overtime">⏰ Overtime</option>
+              </select>
+            </div>
+
+            <div className="wp-form-field">
+              <label>Mode</label>
+              <select value={quickFormData.workMode} onChange={e => setQuickFormData(prev => ({ ...prev, workMode: e.target.value }))}>
+                <option value="WFO">WFO</option>
+                <option value="WFH">WFH</option>
+                <option value="Hybrid">Hybrid</option>
               </select>
             </div>
 
@@ -1257,9 +1288,16 @@ const WebPortalAttendance = () => {
               <option value="Late">🕐 Late</option>
               <option value="Absent">❌ Absent</option>
               <option value="Half Day">🌗 Half Day</option>
-              <option value="Work From Home">🏠 Work From Home</option>
               <option value="On Leave">🌴 On Leave</option>
               <option value="Overtime">⏰ Overtime</option>
+            </select>
+          </div>
+          <div className="wp-edit-field">
+            <label>Mode</label>
+            <select value={editFormData.workMode} onChange={e => setEditFormData(prev => ({ ...prev, workMode: e.target.value }))}>
+              <option value="WFO">WFO</option>
+              <option value="WFH">WFH</option>
+              <option value="Hybrid">Hybrid</option>
             </select>
           </div>
           <div className="wp-edit-field"><label>Notes</label><textarea rows="2" placeholder="Any remarks..." value={editFormData.notes} onChange={e => setEditFormData(prev => ({ ...prev, notes: e.target.value }))} /></div>
@@ -1284,7 +1322,6 @@ const WebPortalAttendance = () => {
               <option value="Late">🕐 Late</option>
               <option value="Absent">❌ Absent</option>
               <option value="Half Day">🌗 Half Day</option>
-              <option value="Work From Home">🏠 Work From Home</option>
               <option value="On Leave">🌴 On Leave</option>
               <option value="Overtime">⏰ Overtime</option>
             </select>
