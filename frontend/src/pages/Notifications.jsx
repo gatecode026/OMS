@@ -71,7 +71,7 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#d
 
 const Notifications = () => {
   const isLoading = usePageLoading(600);
-  const { currentUserRole, showConfirm } = useApp();
+  const { currentUserRole, showConfirm, notifications, addNotification, updateNotification, deleteNotification } = useApp();
 
   // Selected Month/Year
   const [month, setMonth] = useState('June');
@@ -133,25 +133,6 @@ const Notifications = () => {
     if (num === undefined || num === null) return '0';
     return num.toLocaleString();
   };
-
-  // --- Seed Data inside state for full interactivity ---
-  const [notifications, setNotifications] = useState([
-    { id: 'NTF-001', title: 'Q2 Performance Appraisals Initiated', message: 'Annual performance evaluations for the second quarter are officially open. All managers must finalize feedback submissions.', category: 'HR', priority: 'High', recipientType: 'All Managers', sentBy: 'HR Manager', sentDate: '2026-06-02', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '2 hours ago', recipients: 45, delivered: 45, read: 42, failed: 0 },
-    { id: 'NTF-002', title: 'Production DB Offline Maintenance Warning', message: 'The primary PostgreSQL cluster will go offline for version upgrades on June 6th at 12:00 AM IST.', category: 'Emergency', priority: 'Critical', recipientType: 'Engineering Dept', sentBy: 'DevOps Lead', sentDate: '2026-06-03', deliveryStatus: 'Scheduled', readStatus: 'Unread', readTime: '—', recipients: 120, delivered: 0, read: 0, failed: 0 },
-    { id: 'NTF-003', title: 'SaaS Platform v3.0 Scope Finalization', message: 'The product specifications for the v3.0 releases have been approved. All stakeholders must sign off by end of day.', category: 'Project', priority: 'Medium', recipientType: 'Product Team', sentBy: 'Product Director', sentDate: '2026-06-01', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '1 day ago', recipients: 18, delivered: 18, read: 18, failed: 0 },
-    { id: 'NTF-004', title: 'Jaipur Office Reopening & Hybrid Schedule', message: 'The physical workspace renovation is complete. Jaipur staff is expected to report in-office Tuesdays and Thursdays.', category: 'Company', priority: 'Normal', recipientType: 'Jaipur Branch', sentBy: 'Ops Manager', sentDate: '2026-05-28', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '3 days ago', recipients: 88, delivered: 86, read: 75, failed: 2 },
-    { id: 'NTF-005', title: 'Annual Healthcare Policy Renewal Update', message: 'Insurance cards have been updated for all enrolled employees. Please download the new health cards from your profile.', category: 'HR', priority: 'Normal', recipientType: 'All Employees', sentBy: 'Benefits Specialist', sentDate: '2026-05-25', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '5 days ago', recipients: 320, delivered: 318, read: 290, failed: 2 },
-    { id: 'NTF-006', title: 'Critical Bug Alert in Client Payment Gateway', message: 'Stripe webhook exceptions detected in production. Payouts for June 3rd are temporarily suspended.', category: 'Emergency', priority: 'Critical', recipientType: 'Billing & QA', sentBy: 'CTO Office', sentDate: '2026-06-04', deliveryStatus: 'Delivered', readStatus: 'Unread', readTime: '—', recipients: 12, delivered: 10, read: 8, failed: 2 },
-    { id: 'NTF-007', title: 'Summer Hackathon 2026 Registrations Open', message: 'Form your teams and submit pitches for the annual summer hackathon. Grand prize includes ₹5,00,000 cash rewards.', category: 'Event', priority: 'Normal', recipientType: 'All Employees', sentBy: 'Culture Committee', sentDate: '2026-06-01', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '2 days ago', recipients: 320, delivered: 320, read: 145, failed: 0 },
-    { id: 'NTF-008', title: 'Mandatory ISO Security Compliance Audit', message: 'All employees must finish the cybersecurity awareness test. Access credentials will be restricted after June 15th.', category: 'Emergency', priority: 'Critical', recipientType: 'All Employees', sentBy: 'IT Compliance', sentDate: '2026-06-03', deliveryStatus: 'Delivered', readStatus: 'Unread', readTime: '—', recipients: 320, delivered: 319, read: 205, failed: 1 },
-    { id: 'NTF-009', title: 'Client Meeting: AWS Cloud Strategy Review', message: 'AWS representatives will present cloud optimization options tomorrow at 3:00 PM in Conference Room A.', category: 'Project', priority: 'Medium', recipientType: 'Infrastructure Lead', sentBy: 'Rahul Sharma', sentDate: '2026-06-03', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '5 hours ago', recipients: 5, delivered: 5, read: 5, failed: 0 },
-    { id: 'NTF-010', title: 'Bonus Distribution Schedule Confirmation', message: 'Q2 Performance Incentives have been disbursed to accounts. Summary slips are available in the Payroll section.', category: 'HR', priority: 'High', recipientType: 'All Employees', sentBy: 'Finance Ops', sentDate: '2026-05-30', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '4 days ago', recipients: 320, delivered: 317, read: 310, failed: 3 },
-    { id: 'NTF-011', title: 'Marketing Creative Assets Upload Complete', message: 'New brand assets and templates for H2 campaign collateral are uploaded in the Shared Drive repository.', category: 'Project', priority: 'Normal', recipientType: 'Marketing Team', sentBy: 'Creative Lead', sentDate: '2026-05-27', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '6 days ago', recipients: 15, delivered: 15, read: 12, failed: 0 },
-    { id: 'NTF-012', title: 'System Downtime Postponed Notice', message: 'The database server migration scheduled for June 6th is postponed to June 13th due to release delays.', category: 'Emergency', priority: 'High', recipientType: 'Engineering Dept', sentBy: 'DevOps Lead', sentDate: '2026-06-04', deliveryStatus: 'Delivered', readStatus: 'Unread', readTime: '—', recipients: 120, delivered: 120, read: 95, failed: 0 },
-    { id: 'NTF-013', title: 'Employee Engagement Survey Q2 Deadline', message: 'Only 40% of the team members have filled the engagement survey. Please share your honest feedback by tomorrow.', category: 'HR', priority: 'Medium', recipientType: 'All Employees', sentBy: 'HR Specialist', sentDate: '2026-06-02', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '1 day ago', recipients: 320, delivered: 319, read: 120, failed: 1 },
-    { id: 'NTF-014', title: 'Office Safety Mock Drill Scheduled', message: 'A mandatory fire evacuation and safety mock drill will run tomorrow between 11:30 AM and 12:00 PM IST.', category: 'Company', priority: 'Normal', recipientType: 'Head Office Staff', sentBy: 'Facility Mgr', sentDate: '2026-06-03', deliveryStatus: 'Delivered', readStatus: 'Read', readTime: '16 hours ago', recipients: 140, delivered: 140, read: 132, failed: 0 },
-    { id: 'NTF-015', title: 'Failed SMS API Webhook Payout Failures', message: 'Failed SMS delivery alerts for customer alerts. Integrations must re-authenticate the Nexmo API keys.', category: 'Emergency', priority: 'Critical', recipientType: 'Integrations Team', sentBy: 'System Monitor', sentDate: '2026-06-04', deliveryStatus: 'Failed', readStatus: 'Unread', readTime: '—', recipients: 8, delivered: 0, read: 0, failed: 8 }
-  ]);
 
   // Automation Rules
   const [automationRules, setAutomationRules] = useState([
@@ -259,12 +240,12 @@ const Notifications = () => {
   };
 
   // Bulk Actions
-  const handleBulkMarkRead = () => {
+  const handleBulkMarkRead = async () => {
     if (selectedRowIds.length === 0) {
       addPageToast('warning', 'No notifications selected.');
       return;
     }
-    setNotifications(prev => prev.map(n => selectedRowIds.includes(n.id) ? { ...n, readStatus: 'Read', readTime: 'Just now' } : n));
+    await Promise.all(selectedRowIds.map(id => updateNotification(id, { readStatus: 'Read', readTime: 'Just now', read: true })));
     addPageToast('success', `Marked ${selectedRowIds.length} notifications as read.`);
     setSelectedRowIds([]);
   };
@@ -277,8 +258,8 @@ const Notifications = () => {
     showConfirm(
       `Delete ${selectedRowIds.length} Notifications?`,
       'Are you sure you want to permanently delete the selected dispatch logs?',
-      () => {
-        setNotifications(prev => prev.filter(n => !selectedRowIds.includes(n.id)));
+      async () => {
+        await Promise.all(selectedRowIds.map(id => deleteNotification(id)));
         addPageToast('danger', `Permanently deleted ${selectedRowIds.length} records.`);
         setSelectedRowIds([]);
       },
@@ -286,32 +267,31 @@ const Notifications = () => {
     );
   };
 
-  const handleBulkResend = () => {
+  const handleBulkResend = async () => {
     if (selectedRowIds.length === 0) {
       addPageToast('warning', 'No notifications selected.');
       return;
     }
-    setNotifications(prev => prev.map(n => {
-      if (selectedRowIds.includes(n.id) && n.deliveryStatus === 'Failed') {
-        return { ...n, deliveryStatus: 'Delivered', delivered: n.delivered + n.failed, failed: 0 };
+    await Promise.all(selectedRowIds.map(id => {
+      const n = notifications.find(x => x.id === id);
+      if (n && n.deliveryStatus === 'Failed') {
+        return updateNotification(id, { deliveryStatus: 'Delivered', delivered: n.delivered + n.failed, failed: 0 });
       }
-      return n;
+      return Promise.resolve();
     }));
     addPageToast('success', `Initiated resend job for failed channels.`);
     setSelectedRowIds([]);
   };
 
   // Submit Create form
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
     if (!createForm.title.trim() || !createForm.message.trim()) {
       addPageToast('warning', 'Title and Message are required.');
       return;
     }
 
-    const newId = `NTF-${String(notifications.length + 1).padStart(3, '0')}`;
     const newNotif = {
-      id: newId,
       title: createForm.title,
       message: createForm.message,
       category: createForm.category,
@@ -328,7 +308,7 @@ const Notifications = () => {
       failed: 0
     };
 
-    setNotifications(prev => [newNotif, ...prev]);
+    await addNotification(newNotif);
     addPageToast('success', `Notification "${createForm.title}" dispatched successfully.`);
     setShowCreateModal(false);
 
@@ -410,33 +390,26 @@ const Notifications = () => {
     setShowDetailModal(true);
   };
 
-  const handleToggleReadStatus = (notifId) => {
-    setNotifications(prev => prev.map(n => {
-      if (n.id === notifId) {
-        const isRead = n.readStatus === 'Read';
-        return {
-          ...n,
-          readStatus: isRead ? 'Unread' : 'Read',
-          readTime: isRead ? '—' : 'Just now'
-        };
-      }
-      return n;
-    }));
+  const handleToggleReadStatus = async (notifId) => {
+    const n = notifications.find(x => x.id === notifId);
+    if (!n) return;
+    const isRead = n.readStatus === 'Read';
+    await updateNotification(notifId, {
+      readStatus: isRead ? 'Unread' : 'Read',
+      readTime: isRead ? '—' : 'Just now',
+      read: !isRead
+    });
     addPageToast('info', 'Notification read status updated.');
   };
 
-  const handleResendSingle = (notifId) => {
-    setNotifications(prev => prev.map(n => {
-      if (n.id === notifId) {
-        return {
-          ...n,
-          deliveryStatus: 'Delivered',
-          delivered: n.recipients,
-          failed: 0
-        };
-      }
-      return n;
-    }));
+  const handleResendSingle = async (notifId) => {
+    const n = notifications.find(x => x.id === notifId);
+    if (!n) return;
+    await updateNotification(notifId, {
+      deliveryStatus: 'Delivered',
+      delivered: n.recipients,
+      failed: 0
+    });
     addPageToast('success', `Redelivered logs via notification channels.`);
   };
 
@@ -444,8 +417,8 @@ const Notifications = () => {
     showConfirm(
       'Delete Log Record?',
       'This will clear this notification log from the database indices.',
-      () => {
-        setNotifications(prev => prev.filter(n => n.id !== notifId));
+      async () => {
+        await deleteNotification(notifId);
         addPageToast('danger', 'Notification log deleted.');
       },
       'danger'

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { getRequiredRoleForPath, hasRoleAccess } from '../../permissions/permissions';
+import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE } from '../../permissions/permissions';
 
 /**
  * Route protector checking if the user session token is present.
@@ -27,7 +27,7 @@ export const ProtectedRoute = AuthGuard;
  * Redirects to `/unauthorized` if forbidden.
  */
 export const RoleGuard = ({ allowedRoles = [], children }) => {
-  const { currentUserRole, currentUser } = useApp();
+  const { currentUserRole, currentUser, hasPermission } = useApp();
   const location = useLocation();
 
   let isAuthorized = false;
@@ -38,6 +38,39 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
     // Dynamic resolution based on URL path
     const requiredRole = getRequiredRoleForPath(location.pathname);
     isAuthorized = hasRoleAccess(currentUserRole, requiredRole);
+
+    // Apply real-time database matrix permission checks
+    if (isAuthorized) {
+      const pathParts = location.pathname.split('/').filter(Boolean);
+      let moduleKey = null;
+
+      if (PATH_TO_MODULE[location.pathname]) {
+        moduleKey = PATH_TO_MODULE[location.pathname];
+      } else {
+        // Parametric path match
+        for (const route of Object.keys(PATH_TO_MODULE)) {
+          const routeParts = route.split('/').filter(Boolean);
+          if (routeParts.length !== pathParts.length) continue;
+          
+          let match = true;
+          for (let i = 0; i < routeParts.length; i++) {
+            if (routeParts[i].startsWith(':')) continue;
+            if (routeParts[i] !== pathParts[i]) {
+              match = false;
+              break;
+            }
+          }
+          if (match) {
+            moduleKey = PATH_TO_MODULE[route];
+            break;
+          }
+        }
+      }
+
+      if (moduleKey) {
+        isAuthorized = hasPermission(moduleKey, 'read');
+      }
+    }
 
     // Dynamic checks for specific resource endpoints (e.g., self-service or team visibility)
     if (!isAuthorized && currentUser) {
@@ -64,4 +97,5 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
 
   return children ? children : <Outlet />;
 };
+
 

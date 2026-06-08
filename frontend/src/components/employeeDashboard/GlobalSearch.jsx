@@ -73,7 +73,7 @@ const GlobalSearch = ({
         matches.push({
           id: r.id,
           category: 'Reports',
-          title: `Daily Work Report: ${r.date}`,
+          title: `Work Report: ${r.date}`,
           sub: `Status: ${r.status} | Summary: ${r.summary}`,
           icon: FileText,
           path: '/work-reports'

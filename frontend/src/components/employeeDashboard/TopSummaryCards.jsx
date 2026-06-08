@@ -50,9 +50,9 @@ const TopSummaryCards = ({
     },
     {
       id: 'dwr',
-      label: 'DWR Status',
+      label: 'Report Status',
       value: dwrStatus || 'Pending',
-      detail: 'Daily Work Report',
+      detail: 'Work Report',
       icon: FileText,
       color: 'text-warning',
       path: '/work-reports'

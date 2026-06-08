@@ -1,14 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  mockAttendance,
-  mockLeaveRequests,
-  mockTasks,
-  mockPayroll,
-  mockNotifications,
-  mockActivityLogs,
-  mockRoles,
-  mockDailyReports
-} from '../data/mockData';
 
 
 const AppContext = createContext(undefined);
@@ -186,8 +176,8 @@ export const AppProvider = ({ children }) => {
             assigneeName: t.assigneeName || proj.leader || 'Unassigned',
             description: t.description || '',
             estimatedHours: t.estimatedHours || 20,
-            status: t.status || (t.completed ? 'Done' : 'To Do'),
-            progress: t.progress !== undefined ? t.progress : (t.completed ? 100 : 0),
+            status: t.completed ? 'Done' : (t.status === 'Done' || t.status === 'done' ? 'To Do' : t.status || 'To Do'),
+            progress: t.completed ? 100 : (t.progress !== undefined ? t.progress : 0),
             comments: t.comments || [],
             attachments: t.attachments || [],
             approvals: t.approvals && t.approvals.length > 0 ? t.approvals : [
@@ -205,11 +195,33 @@ export const AppProvider = ({ children }) => {
     });
     return aggregatedTasks;
   }, [projectsList]);
-  const [payroll, setPayroll] = useState(mockPayroll);
-  const [notifications, setNotifications] = useState(mockNotifications);
-  const [activityLogs, setActivityLogs] = useState(mockActivityLogs);
-  const [roles, setRoles] = useState(mockRoles);
-  const [dailyReports, setDailyReports] = useState(mockDailyReports);
+  const [payroll, setPayroll] = useState([]);
+  const [payrollGrades, setPayrollGrades] = useState([]);
+  const [payrollReimbursements, setPayrollReimbursements] = useState([]);
+  const [payrollLoans, setPayrollLoans] = useState([]);
+  const [payrollAdvances, setPayrollAdvances] = useState([]);
+  const [payrollBonuses, setPayrollBonuses] = useState([]);
+  const [payrollPayments, setPayrollPayments] = useState([]);
+  const [payrollConfigs, setPayrollConfigs] = useState({
+    id: 'GLOBAL_CONFIG',
+    leaveDeductionRate: 2000,
+    lateArrivalPenalty: 300,
+    overtimeHourlyRate: 500,
+    taxProfiles: {},
+    salaryStructures: {},
+    attendanceDaysMap: {}
+  });
+  const [notifications, setNotifications] = useState([]);
+  const [documentsList, setDocumentsList] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [userOverrides, setUserOverrides] = useState([]);
+  const [dailyReports, setDailyReports] = useState([]);
+  const [appraisalReviews, setAppraisalReviews] = useState([]);
+  const [announcementsList, setAnnouncementsList] = useState([]);
+  const [emergencyAlert, setEmergencyAlert] = useState({ isActive: false, title: '', description: '', date: '' });
+  const [announcementTrackingLogs, setAnnouncementTrackingLogs] = useState([]);
+  const [announcementAuditLogs, setAnnouncementAuditLogs] = useState([]);
 
   // Shell Features States
   const [toasts, setToasts] = useState([]);
@@ -544,8 +556,54 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const fetchPayrollData = async () => {
+    if (!token) {
+      setPayroll([]);
+      setPayrollGrades([]);
+      setPayrollReimbursements([]);
+      setPayrollLoans([]);
+      setPayrollAdvances([]);
+      setPayrollBonuses([]);
+      setPayrollPayments([]);
+      setPayrollConfigs({
+        id: 'GLOBAL_CONFIG',
+        leaveDeductionRate: 2000,
+        lateArrivalPenalty: 300,
+        overtimeHourlyRate: 500,
+        taxProfiles: {},
+        salaryStructures: {},
+        attendanceDaysMap: {}
+      });
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/payroll/all', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const { grades, reimbursements, loans, advances, bonuses, payments, config } = result.data;
+        setPayrollGrades(grades || []);
+        setPayrollReimbursements(reimbursements || []);
+        setPayrollLoans(loans || []);
+        setPayrollAdvances(advances || []);
+        setPayrollBonuses(bonuses || []);
+        setPayrollPayments(payments || []);
+        setPayroll(payments || []);
+        if (config) {
+          setPayrollConfigs(config);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch payroll data from backend:', err);
+    }
+  };
+
   useEffect(() => {
     fetchEmployees();
+    fetchPayrollData();
   }, [token]);
 
   const fetchBranches = async () => {
@@ -732,11 +790,724 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const fetchNotifications = async () => {
+    if (!token) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/notifications', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setNotifications(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+      setNotifications([]);
+    }
+  };
+
+  const fetchDocuments = async () => {
+    if (!token) {
+      setDocumentsList([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/documents', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setDocumentsList(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch documents:', err);
+      setDocumentsList([]);
+    }
+  };
+
+  const addDocument = async (docData) => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(docData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDocuments();
+        addActivityLog(`Uploaded document: ${docData.name}`, 'Documents', 'success');
+        addToast('success', 'Document uploaded successfully.');
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to upload document.');
+      }
+    } catch (err) {
+      console.error('Failed to upload document:', err);
+      addToast('danger', 'Error uploading document.');
+    }
+  };
+
+  const deleteDocument = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/documents/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDocuments();
+        addActivityLog(`Deleted document ID: ${id}`, 'Documents', 'warning');
+        addToast('warning', 'Document deleted successfully.');
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to delete document.');
+      }
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+      addToast('danger', 'Error deleting document.');
+    }
+  };
+
+  const addNotification = async (notifData) => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(notifData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchNotifications();
+        addActivityLog(`Created notification: ${notifData.title}`, 'Notifications', 'success');
+        addToast('success', 'Notification dispatch record created.');
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to dispatch notification.');
+      }
+    } catch (err) {
+      console.error('Failed to dispatch notification:', err);
+      addToast('danger', 'Error dispatching notification.');
+    }
+  };
+
+  const updateNotification = async (id, updatedFields) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/notifications/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedFields)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchNotifications();
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to update notification:', err);
+    }
+  };
+
+  const deleteNotification = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/notifications/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchNotifications();
+        addToast('warning', 'Notification log deleted.');
+        return true;
+      }
+    } catch (err) {
+      console.error('Failed to delete notification:', err);
+    }
+  };
+
+  const fetchActivityLogs = async () => {
+    if (!token) {
+      setActivityLogs([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/activity-logs', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setActivityLogs(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch activity logs:', err);
+      setActivityLogs([]);
+    }
+  };
+
+  const fetchRoles = async () => {
+    if (!token) {
+      setRoles([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/roles', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setRoles(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch roles:', err);
+      setRoles([]);
+    }
+  };
+
+  const addRole = async (roleData) => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/roles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(roleData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchRoles();
+        addActivityLog(`Created role: ${roleData.name}`, 'Permissions', 'success');
+        addToast('success', `Role ${roleData.name} created successfully.`);
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to create role.');
+      }
+    } catch (err) {
+      console.error('Error creating role:', err);
+      addToast('danger', 'Network error while creating role.');
+    }
+  };
+
+  const updateRole = async (id, roleData) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/roles/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(roleData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchRoles();
+        addActivityLog(`Updated role: ${roleData.name || id}`, 'Permissions', 'success');
+        addToast('success', `Role details updated successfully.`);
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to update role.');
+      }
+    } catch (err) {
+      console.error('Error updating role:', err);
+      addToast('danger', 'Network error while updating role.');
+    }
+  };
+
+  const deleteRole = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/roles/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchRoles();
+        addActivityLog(`Deleted role ID: ${id}`, 'Permissions', 'danger');
+        addToast('warning', `Role deleted successfully.`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to delete role.');
+      }
+    } catch (err) {
+      console.error('Error deleting role:', err);
+      addToast('danger', 'Network error while deleting role.');
+    }
+  };
+
+  const fetchUserOverrides = async () => {
+    if (!token) {
+      setUserOverrides([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/roles/overrides', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setUserOverrides(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user overrides:', err);
+      setUserOverrides([]);
+    }
+  };
+
+  const addUserOverride = async (overrideData) => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/roles/overrides', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(overrideData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchUserOverrides();
+        addActivityLog(`Added override for user: ${overrideData.userName}`, 'Permissions', 'success');
+        addToast('success', `Override rule added successfully.`);
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to add override.');
+      }
+    } catch (err) {
+      console.error('Error adding user override:', err);
+      addToast('danger', 'Network error while adding user override.');
+    }
+  };
+
+  const deleteUserOverride = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/roles/overrides/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchUserOverrides();
+        addActivityLog(`Deleted override ID: ${id}`, 'Permissions', 'danger');
+        addToast('warning', `Override rule deleted successfully.`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to delete override.');
+      }
+    } catch (err) {
+      console.error('Error deleting user override:', err);
+      addToast('danger', 'Network error while deleting override.');
+    }
+  };
+
+  const fetchDailyReports = async () => {
+    if (!token) {
+      setDailyReports([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/work-reports', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setDailyReports(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch daily reports from backend:', err);
+      setDailyReports([]);
+    }
+  };
+
+  const fetchAppraisalReviews = async () => {
+    if (!token) {
+      setAppraisalReviews([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/appraisal-reviews', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setAppraisalReviews(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch appraisal reviews from backend:', err);
+      setAppraisalReviews([]);
+    }
+  };
+
+  const fetchAnnouncements = async () => {
+    if (!token) {
+      setAnnouncementsList([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/announcements', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setAnnouncementsList(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch announcements:', err);
+      setAnnouncementsList([]);
+    }
+  };
+
+  const fetchEmergencyAlert = async () => {
+    if (!token) {
+      setEmergencyAlert({ isActive: false, title: '', description: '', date: '' });
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/announcements/emergency', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setEmergencyAlert(result.data || { isActive: false, title: '', description: '', date: '' });
+      }
+    } catch (err) {
+      console.error('Failed to fetch emergency alert:', err);
+    }
+  };
+
+  const fetchAnnouncementTracking = async () => {
+    if (!token) {
+      setAnnouncementTrackingLogs([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/announcements/tracking', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setAnnouncementTrackingLogs(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tracking logs:', err);
+      setAnnouncementTrackingLogs([]);
+    }
+  };
+
+  const fetchAnnouncementAudits = async () => {
+    if (!token) {
+      setAnnouncementAuditLogs([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/announcements/audit-logs', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setAnnouncementAuditLogs(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch audit logs:', err);
+      setAnnouncementAuditLogs([]);
+    }
+  };
+
+  const createAnnouncement = async (annData) => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/announcements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(annData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchAnnouncements();
+        fetchAnnouncementAudits();
+        fetchAnnouncementTracking();
+        addToast('success', 'Announcement published/scheduled successfully.');
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to create announcement.');
+      }
+    } catch (err) {
+      console.error('Failed to create announcement:', err);
+      addToast('danger', 'Error creating announcement.');
+    }
+  };
+
+  const updateAnnouncement = async (id, annData) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(annData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchAnnouncements();
+        fetchAnnouncementAudits();
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to update announcement:', err);
+    }
+  };
+
+  const deleteAnnouncement = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchAnnouncements();
+        fetchAnnouncementAudits();
+        addToast('success', 'Announcement deleted successfully.');
+      }
+    } catch (err) {
+      console.error('Failed to delete announcement:', err);
+    }
+  };
+
+  const acknowledgeAnnouncement = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/acknowledge`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchAnnouncements();
+        fetchAnnouncementTracking();
+        addToast('success', 'Announcement / Policy acknowledged successfully.');
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to acknowledge announcement:', err);
+    }
+  };
+
+  const likeAnnouncement = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/like`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchAnnouncements();
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to like announcement:', err);
+    }
+  };
+
+  const addAnnouncementComment = async (id, commentText) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: commentText })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchAnnouncements();
+        addToast('success', 'Comment posted.');
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to post comment:', err);
+    }
+  };
+
+  const deleteAnnouncementComment = async (id, commentId) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/comment/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchAnnouncements();
+        addToast('success', 'Comment deleted.');
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+    }
+  };
+
+  const triggerEmergencyAlert = async (alertData) => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/announcements/emergency', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(alertData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchEmergencyAlert();
+        fetchAnnouncementAudits();
+        addToast('success', 'Emergency broadcast updated.');
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to trigger emergency alert:', err);
+    }
+  };
+
+  const viewAnnouncement = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/view`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchAnnouncements();
+        fetchAnnouncementTracking();
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to log announcement view:', err);
+    }
+  };
+
+  const addAppraisalReview = async (reviewData) => {
+    if (!token) return;
+    try {
+      const emp = employees.find(e => e.name === reviewData.employeeName);
+      const payload = {
+        ...reviewData,
+        employeeId: emp ? emp.id : 'EMP-UNKNOWN'
+      };
+
+      const response = await fetch('http://localhost:5000/api/v1/appraisal-reviews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const newReview = result.data;
+        setAppraisalReviews(prev => [newReview, ...prev]);
+        addActivityLog(`Submitted appraisal review for ${reviewData.employeeName}`, 'Performance', 'success');
+        addToast('success', `Appraisal review for ${reviewData.employeeName} submitted successfully.`);
+        fetchEmployees();
+        return newReview;
+      } else {
+        addToast('danger', result.message || 'Failed to submit appraisal review.');
+      }
+    } catch (err) {
+      console.error('Failed to submit appraisal review to backend:', err);
+      addToast('danger', 'Error submitting appraisal review.');
+    }
+  };
+
   useEffect(() => {
     fetchAttendance();
     fetchLeaves();
     fetchLeavePolicies();
     fetchHolidays();
+    fetchDailyReports();
+    fetchAppraisalReviews();
+    fetchPayrollData();
+    fetchAnnouncements();
+    fetchEmergencyAlert();
+    fetchAnnouncementTracking();
+    fetchAnnouncementAudits();
+    fetchNotifications();
+    fetchDocuments();
+    fetchActivityLogs();
+    fetchRoles();
+    fetchUserOverrides();
   }, [token]);
 
   // Real-time polling for attendance logs and employee statuses every 5 seconds
@@ -748,6 +1519,18 @@ export const AppProvider = ({ children }) => {
       fetchLeaves();
       fetchHolidays();
       fetchProjects();
+      fetchDailyReports();
+      fetchAppraisalReviews();
+      fetchPayrollData();
+      fetchAnnouncements();
+      fetchEmergencyAlert();
+      fetchAnnouncementTracking();
+      fetchAnnouncementAudits();
+      fetchNotifications();
+      fetchDocuments();
+      fetchActivityLogs();
+      fetchRoles();
+      fetchUserOverrides();
     }, 5000);
     return () => clearInterval(interval);
   }, [token]);
@@ -796,17 +1579,37 @@ export const AppProvider = ({ children }) => {
   };
 
   // Logging Helper
-  const addActivityLog = (action, module, status = 'success') => {
-    const newLog = {
-      id: `LOG-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-      employeeName: currentUser?.name || 'System User',
-      department: currentUser?.department || 'Operations',
-      action,
-      module,
-      timestamp: 'Just now',
-      status
+  const addActivityLog = async (action, module, status = 'success', details = '', target = '') => {
+    const logId = `LOG-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+    const logData = {
+      id: logId,
+      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+      actor: currentUser?.name || 'System User',
+      actionType: action,
+      fieldChanged: module,
+      oldValue: status,
+      newValue: details || target || '—',
+      ip: '127.0.0.1'
     };
-    setActivityLogs(prev => [newLog, ...prev]);
+
+    if (token) {
+      try {
+        await fetch('http://localhost:5000/api/v1/activity-logs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(logData)
+        });
+        fetchActivityLogs();
+      } catch (err) {
+        console.error('Failed to post activity log:', err);
+        setActivityLogs(prev => [logData, ...prev]);
+      }
+    } else {
+      setActivityLogs(prev => [logData, ...prev]);
+    }
   };
 
   // Employee CRUD Handlers
@@ -1399,6 +2202,7 @@ export const AppProvider = ({ children }) => {
     if (success) {
       addActivityLog(`Updated task status to ${status} (${progress}%)`, 'Tasks', 'success');
       addToast('success', `Task updated successfully.`);
+      return updatedTasks.find(t => t.id === id);
     }
   };
 
@@ -1907,6 +2711,7 @@ export const AppProvider = ({ children }) => {
     if (success) {
       addActivityLog(`Moved task to ${newStatus}`, 'Tasks', 'success');
       addToast('success', `Task moved to ${newStatus}.`);
+      return updatedTasks.find(t => t.id === id);
     }
   };
 
@@ -1973,6 +2778,7 @@ export const AppProvider = ({ children }) => {
     if (success) {
       addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
       addToast('success', 'Task created successfully.');
+      return newTask;
     }
   };
 
@@ -2029,6 +2835,7 @@ export const AppProvider = ({ children }) => {
     if (success) {
       addActivityLog(`Reassigned task ${taskId} to ${assigneeName}`, 'Tasks', 'info');
       addToast('info', `Task reassigned to ${assigneeName}`);
+      return updatedTasks.find(t => t.id === taskId);
     }
   };
 
@@ -2060,6 +2867,7 @@ export const AppProvider = ({ children }) => {
     if (success) {
       addActivityLog(`Extended deadline for task ${taskId} to ${newDate}`, 'Tasks', 'warning');
       addToast('success', `Extended deadline to ${newDate}`);
+      return updatedTasks.find(t => t.id === taskId);
     }
   };
 
@@ -2091,6 +2899,7 @@ export const AppProvider = ({ children }) => {
     if (success) {
       addActivityLog(`Escalated task ${taskId} to Critical priority`, 'Tasks', 'danger');
       addToast('error', `Task ${taskId} escalated to Critical!`);
+      return updatedTasks.find(t => t.id === taskId);
     }
   };
 
@@ -2121,6 +2930,7 @@ export const AppProvider = ({ children }) => {
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
       addToast('success', 'Remarks added to task.');
+      return updatedTasks.find(t => t.id === taskId);
     }
   };
 
@@ -2159,6 +2969,7 @@ export const AppProvider = ({ children }) => {
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
       addToast('success', 'Comment posted.');
+      return updatedTasks.find(t => t.id === taskId);
     }
   };
 
@@ -2219,6 +3030,7 @@ export const AppProvider = ({ children }) => {
 
     if (success) {
       addToast('success', `Level ${level} Approval submitted.`);
+      return updatedTasks.find(t => t.id === taskId);
     }
   };
 
@@ -2270,6 +3082,7 @@ export const AppProvider = ({ children }) => {
 
     if (success) {
       addToast('error', `Approval rejected at Level ${level}.`);
+      return updatedTasks.find(t => t.id === taskId);
     }
   };
 
@@ -2363,99 +3176,589 @@ export const AppProvider = ({ children }) => {
 
   // Payroll Handlers
   const runPayroll = (month, year) => {
-    setPayroll(prev =>
-      prev.map(p => ({ ...p, status: 'Paid' }))
-    );
-    addActivityLog(`Processed payroll for period: ${month} ${year}`, 'Payroll', 'success');
-    addToast('success', `Payroll processed and disbursed for ${month} ${year}!`);
+    bulkUpdatePayrollStatus(month, year, 'release');
   };
 
   const generatePayslip = (employeeName) => {
     addToast('success', `Payslip generated for ${employeeName}. Sent to Document Vault.`);
   };
 
-  // Daily Work Reports Handlers
-  const addDailyReport = (reportData) => {
-    const newId = `REP-${String(dailyReports.length + 1).padStart(3, '0')}`;
-    const newReport = {
-      ...reportData,
-      id: newId,
-      submittedTime: new Date().toISOString(),
-      approvalHistory: [
-        { role: 'Employee', user: reportData.employeeName, action: 'Submitted', timestamp: new Date().toISOString(), comments: '' }
-      ]
-    };
-    setDailyReports(prev => [newReport, ...prev]);
-    addActivityLog(`Submitted Daily Report for ${reportData.date}`, 'Work Reports', 'success');
-    addToast('success', `Daily report ${newId} submitted successfully.`);
-    
-    // Add Notification
-    setNotifications(prev => [
-      {
-        id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
-        type: 'info',
-        message: `${reportData.employeeName} submitted a daily work report.`,
-        timestamp: 'Just now',
-        read: false
-      },
-      ...prev
-    ]);
+  const addOrUpdateSalaryGrade = async (gradeForm) => {
+    if (!token) return false;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/payroll/grades', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(gradeForm)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`${gradeForm.id ? 'Updated' : 'Created'} salary grade ${gradeForm.grade}`, 'Payroll', 'success');
+        addToast('success', `Salary grade saved successfully.`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to save salary grade.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error saving salary grade.');
+      return false;
+    }
   };
 
-  const updateDailyReportStatus = (id, status, feedback) => {
-    setDailyReports(prev =>
-      prev.map(r => {
-        if (r.id === id) {
-          const actionLabel = status === 'Approved' ? 'Approved' : status === 'Rejected' ? 'Rejected' : status === 'Changes Requested' ? 'Requested Changes' : 'Escalated';
-          const updatedHistory = [
-            ...(r.approvalHistory || []),
-            {
-              role: currentUserRole === 'team_leader' ? 'Team Leader' : currentUserRole === 'manager' ? 'Project Manager' : 'Admin',
-              user: currentUser?.name || 'Manager',
-              action: actionLabel,
-              timestamp: new Date().toISOString(),
-              comments: feedback || ''
-            }
-          ];
-          return {
-            ...r,
-            status: status,
-            feedback: feedback || r.feedback,
-            approvalHistory: updatedHistory
-          };
+  const deleteSalaryGrade = async (id) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/payroll/grades/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-        return r;
-      })
-    );
-    addActivityLog(`Updated report ${id} status to ${status}`, 'Work Reports', 'success');
-    addToast('success', `Report ${id} successfully updated to ${status}.`);
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Deleted salary grade ${id}`, 'Payroll', 'warning');
+        addToast('success', 'Salary grade deleted successfully.');
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to delete salary grade.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error deleting salary grade.');
+      return false;
+    }
   };
+
+  const createLoanOrAdvance = async (applyForm) => {
+    if (!token) return false;
+    try {
+      const emp = employees.find(e => e.id === applyForm.employeeId);
+      const payload = {
+        ...applyForm,
+        employeeName: emp ? emp.name : 'Unknown Employee',
+        remainingBalance: applyForm.amount,
+        progress: 0,
+        status: 'Approved'
+      };
+      const response = await fetch('http://localhost:5000/api/v1/payroll/loans-advances', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Created ${applyForm.type} for ${payload.employeeName}`, 'Payroll', 'success');
+        addToast('success', `${applyForm.type} created successfully.`);
+        return true;
+      } else {
+        addToast('danger', result.message || `Failed to create ${applyForm.type}.`);
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error creating loan or advance.');
+      return false;
+    }
+  };
+
+  const recommendBonus = async (bonusForm) => {
+    if (!token) return false;
+    try {
+      const emp = employees.find(e => e.id === bonusForm.employeeId);
+      const payload = {
+        ...bonusForm,
+        employeeName: emp ? emp.name : 'Unknown Employee',
+        requestDate: new Date().toISOString().split('T')[0],
+        status: 'Pending',
+        approvalFlow: ['TL Approved']
+      };
+      const response = await fetch('http://localhost:5000/api/v1/payroll/bonuses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Recommended bonus for ${payload.employeeName}`, 'Payroll', 'success');
+        addToast('success', 'Bonus recommendation submitted successfully.');
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to submit bonus recommendation.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error submitting bonus recommendation.');
+      return false;
+    }
+  };
+
+  const updateReimbursementStatus = async (id, newStatus) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/payroll/reimbursements/status/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Updated reimbursement ${id} status to ${newStatus}`, 'Payroll', 'success');
+        addToast('success', `Reimbursement ${id} set to: ${newStatus}`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to update reimbursement status.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error updating reimbursement status.');
+      return false;
+    }
+  };
+
+  const updateBonusStatus = async (id, newStatus) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/payroll/bonuses/status/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Updated bonus ${id} status to ${newStatus}`, 'Payroll', 'success');
+        addToast('success', `Bonus ${id} status updated: ${newStatus}`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to update bonus status.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error updating bonus status.');
+      return false;
+    }
+  };
+
+  const processPayrollCalculations = async (month, year, calculatedData) => {
+    if (!token) return false;
+    try {
+      const promises = calculatedData.map(payment => {
+        return fetch('http://localhost:5000/api/v1/payroll/payments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            ...payment,
+            month,
+            year
+          })
+        });
+      });
+      await Promise.all(promises);
+      await fetchPayrollData();
+      addActivityLog(`Processed payroll for ${month} ${year}`, 'Payroll', 'success');
+      addToast('success', `Recalculated salary figures and verified attendance links for ${month} ${year}.`);
+      return true;
+    } catch (err) {
+      console.error('Failed to process payroll:', err);
+      addToast('danger', 'Error processing payroll.');
+      return false;
+    }
+  };
+
+  const bulkUpdatePayrollStatus = async (month, year, actionType) => {
+    if (!token) return false;
+    let nextStatus = 'Calculated';
+    if (actionType === 'verify') nextStatus = 'HR Verified';
+    if (actionType === 'approve') nextStatus = 'Finance Approved';
+    if (actionType === 'release') nextStatus = 'Released';
+    if (actionType === 'hold') nextStatus = 'Hold';
+
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/payroll/payments/bulk-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ month, year, status: nextStatus })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Bulk Action: ${actionType} for ${month} ${year}`, 'Payroll', 'success');
+        addToast('success', `Successfully processed bulk action: ${actionType.toUpperCase()}`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to perform bulk action.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error during bulk action.');
+      return false;
+    }
+  };
+
+  const updateSinglePayrollStatus = async (empId, month, year, status) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/payroll/payments/${empId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ month, year, status })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Updated payroll status for ${empId} to ${status}`, 'Payroll', 'success');
+        addToast('info', `Status of employee ${empId} set to: ${status}`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to update employee payroll status.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error updating employee payroll status.');
+      return false;
+    }
+  };
+
+  const toggleEmployeeTaxRegime = async (empId) => {
+    if (!token) return false;
+    const current = payrollConfigs.taxProfiles[empId] || { pan: 'AAAPS1234F', regime: 'New', taxableIncome: 900000 };
+    const nextRegime = current.regime === 'New' ? 'Old' : 'New';
+    const updatedTaxProfiles = {
+      ...payrollConfigs.taxProfiles,
+      [empId]: { ...current, regime: nextRegime }
+    };
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/payroll/configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...payrollConfigs,
+          taxProfiles: updatedTaxProfiles
+        })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Toggled tax regime for ${empId} to ${nextRegime}`, 'Payroll', 'success');
+        addToast('success', `Tax regime toggled for ${empId} to ${nextRegime}.`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to toggle tax regime.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error toggling tax regime.');
+      return false;
+    }
+  };
+
+  const savePayrollSalaryRevision = async (empId, newBasic) => {
+    if (!token) return false;
+    const current = payrollConfigs.salaryStructures[empId] || { basic: 50000 };
+    const updatedSalaryStructures = {
+      ...payrollConfigs.salaryStructures,
+      [empId]: {
+        ...current,
+        basic: parseInt(newBasic),
+        hra: Math.round(parseInt(newBasic) * 0.4),
+        pf: Math.round(parseInt(newBasic) * 0.12),
+        tds: Math.round(parseInt(newBasic) * 0.1)
+      }
+    };
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/payroll/configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...payrollConfigs,
+          salaryStructures: updatedSalaryStructures
+        })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Revised salary for ${empId} to ${newBasic}`, 'Payroll', 'success');
+        addToast('success', `Revised salary for ${empId} successfully.`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to revise salary.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error revising salary.');
+      return false;
+    }
+  };
+
+  const updatePayrollConfig = async (configs) => {
+    if (!token) return false;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/payroll/configs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...payrollConfigs,
+          ...configs
+        })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog('Updated global payroll configuration settings', 'Payroll', 'success');
+        addToast('success', 'Global payroll configurations updated successfully.');
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to update configurations.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error updating configurations.');
+      return false;
+    }
+  };
+
+  // Daily Work Reports Handlers
+
+  const updateDailyReportStatus = async (id, status, feedback) => {
+    if (!token) return;
+    try {
+      const report = dailyReports.find(r => r.id === id);
+      if (!report) {
+        addToast('danger', `Report ${id} not found.`);
+        return;
+      }
+      
+      const actionLabel = status === 'Approved' ? 'Approved' : status === 'Rejected' ? 'Rejected' : status === 'Changes Requested' ? 'Requested Changes' : 'Escalated';
+      const updatedHistory = [
+        ...(report.approvalHistory || []),
+        {
+          role: currentUserRole === 'team_leader' ? 'Team Leader' : currentUserRole === 'manager' ? 'Project Manager' : 'Admin',
+          user: currentUser?.name || 'Manager',
+          action: actionLabel,
+          timestamp: new Date().toISOString(),
+          comments: feedback || ''
+        }
+      ];
+      
+      const calculatedProd = Math.round((report.tasksCompleted / Math.max(1, report.tasksAssigned)) * 100);
+      const newProductivityScore = status === 'Approved' ? calculatedProd : Math.round(calculatedProd * 0.7);
+
+      const payload = {
+        status,
+        feedback: feedback || report.feedback,
+        productivityScore: newProductivityScore,
+        approvalHistory: updatedHistory
+      };
+
+      const response = await fetch(`http://localhost:5000/api/v1/work-reports/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const updatedReport = result.data;
+        setDailyReports(prev =>
+          prev.map(r => (r.id === id ? updatedReport : r))
+        );
+        addActivityLog(`Updated report ${id} status to ${status}`, 'Work Reports', 'success');
+        addToast('success', `Report ${id} successfully updated to ${status}.`);
+        return updatedReport;
+      } else {
+        addToast('danger', result.message || 'Failed to update report status.');
+      }
+    } catch (err) {
+      console.error('Failed to update report status on backend:', err);
+      addToast('danger', 'Error updating report status.');
+    }
+  };
+
 
   // Role Permissions Handler
-  const updatePermissions = (roleId, updatedPermissions) => {
-    setRoles(prev =>
-      prev.map(r => (r.id === roleId ? { ...r, permissions: updatedPermissions } : r))
-    );
-    addActivityLog(`Modified system permissions for role: ${roleId}`, 'Permissions', 'success');
-    addToast('success', `Permissions updated for ${roleId} role.`);
+  const updatePermissions = async (roleId, updatedPermissions) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/roles/${roleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ permissions: updatedPermissions })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        fetchRoles();
+        addActivityLog(`Modified system permissions for role: ${roleId}`, 'Permissions', 'success');
+        addToast('success', `Permissions updated for ${roleId} role.`);
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to update permissions.');
+      }
+    } catch (err) {
+      console.error('Error updating permissions:', err);
+      addToast('danger', 'Error updating permissions in database.');
+    }
   };
 
   // Notifications Handlers
-  const markAllNotificationsRead = () => {
+  const markAllNotificationsRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     addToast('info', 'All notifications marked as read.');
+    try {
+      const unread = notifications.filter(n => !n.read);
+      await Promise.all(unread.map(n => {
+        return fetch(`http://localhost:5000/api/v1/notifications/${n.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ read: true, readStatus: 'Read', readTime: 'Just now' })
+        });
+      }));
+      await fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const markNotificationRead = (id) => {
+  const markNotificationRead = async (id) => {
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    try {
+      await fetch(`http://localhost:5000/api/v1/notifications/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ read: true, readStatus: 'Read', readTime: 'Just now' })
+      });
+      await fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // Check RBAC permission helper
+  // Check RBAC permission helper with Overrides support
   const hasPermission = (module, action) => {
     // Super admin has permission for everything
     if (currentUserRole === 'super_admin') return true;
+
+    // 1. Check User Overrides first
+    const activeUserId = currentUserId || currentUser?.id;
+    if (activeUserId && userOverrides && userOverrides.length > 0) {
+      // Find matching overrides for this user and module
+      const userOvs = userOverrides.filter(ov => {
+        if (ov.userId !== activeUserId) return false;
+        
+        // Normalize names
+        const ovModule = (ov.module || '').toLowerCase();
+        const targetModule = (module || '').toLowerCase();
+        
+        // Match base module names
+        const matchPayroll = ovModule.includes('payroll') && targetModule.includes('payroll');
+        const matchLeave = ovModule.includes('leave') && targetModule.includes('leave');
+        const matchEmployee = ovModule.includes('employee') && targetModule.includes('employee');
+        const matchTask = (ovModule.includes('project') || ovModule.includes('task')) && (targetModule.includes('task') || targetModule.includes('project'));
+        const matchPermission = (ovModule.includes('permission') || ovModule.includes('role')) && targetModule.includes('permission');
+        const matchSetting = ovModule.includes('setting') && targetModule.includes('setting');
+        const matchAttendance = ovModule.includes('attendance') && targetModule.includes('attendance');
+        const matchDashboard = ovModule.includes('dashboard') && targetModule.includes('dashboard');
+        
+        return matchPayroll || matchLeave || matchEmployee || matchTask || matchPermission || matchSetting || matchAttendance || matchDashboard || ovModule === targetModule;
+      });
+
+      for (const ov of userOvs) {
+        // Verify expiry
+        let isExpired = false;
+        if (ov.expiry && ov.expiry !== 'Permanent') {
+          const expDate = new Date(ov.expiry);
+          if (!isNaN(expDate.getTime()) && expDate < new Date()) {
+            isExpired = true;
+          }
+        }
+
+        if (!isExpired) {
+          const scope = (ov.scope || '').toLowerCase();
+          const type = (ov.type || '').toLowerCase();
+
+          // Explicit Denial or None scope denies everything
+          if (type.includes('deny') || type.includes('denial') || scope.includes('none') || scope.includes('restricted')) {
+            return false;
+          }
+
+          // Temporary Grant overrides default role settings
+          if (type.includes('grant') || type.includes('allow') || scope.includes('read') || scope.includes('write') || scope.includes('full')) {
+            if (scope.includes('read only')) {
+              return action === 'read';
+            }
+            if (scope.includes('read & write') || scope.includes('write')) {
+              return ['read', 'create', 'update', 'delete'].includes(action);
+            }
+            if (scope.includes('full')) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Fallback to Role-based default permissions
     const roleObj = roles.find(r => r.id === currentUserRole);
-    if (!roleObj) return false;
+    if (!roleObj || !roleObj.permissions) return false;
     return !!roleObj.permissions[module]?.[action];
   };
 
@@ -2483,13 +3786,54 @@ export const AppProvider = ({ children }) => {
         leaveRequests,
         tasks,
         payroll,
+        payrollGrades,
+        payrollReimbursements,
+        payrollLoans,
+        payrollAdvances,
+        payrollBonuses,
+        payrollPayments,
+        payrollConfigs,
+        fetchPayrollData,
+        addOrUpdateSalaryGrade,
+        deleteSalaryGrade,
+        createLoanOrAdvance,
+        recommendBonus,
+        updateReimbursementStatus,
+        updateBonusStatus,
+        processPayrollCalculations,
+        bulkUpdatePayrollStatus,
+        updateSinglePayrollStatus,
+        toggleEmployeeTaxRegime,
+        savePayrollSalaryRevision,
+        updatePayrollConfig,
+        token,
         notifications,
+        setNotifications,
+        fetchNotifications,
+        addNotification,
+        updateNotification,
+        deleteNotification,
+        documentsList,
+        fetchDocuments,
+        addDocument,
+        deleteDocument,
         activityLogs,
+        addActivityLog,
+        fetchActivityLogs,
         roles,
+        fetchRoles,
+        addRole,
+        updateRole,
+        deleteRole,
+        userOverrides,
+        fetchUserOverrides,
+        addUserOverride,
+        deleteUserOverride,
         dailyReports,
         setDailyReports,
-        addDailyReport,
         updateDailyReportStatus,
+        appraisalReviews,
+        addAppraisalReview,
         toasts,
         confirmDialog,
         commandPaletteOpen,
@@ -2573,7 +3917,24 @@ export const AppProvider = ({ children }) => {
         fetchEmployees,
         fetchBranches,
         fetchDepartments,
-        fetchTeams
+        fetchTeams,
+        announcementsList,
+        emergencyAlert,
+        announcementTrackingLogs,
+        announcementAuditLogs,
+        fetchAnnouncements,
+        fetchEmergencyAlert,
+        fetchAnnouncementTracking,
+        fetchAnnouncementAudits,
+        createAnnouncement,
+        updateAnnouncement,
+        deleteAnnouncement,
+        acknowledgeAnnouncement,
+        likeAnnouncement,
+        addAnnouncementComment,
+        deleteAnnouncementComment,
+        triggerEmergencyAlert,
+        viewAnnouncement
       }}
     >
       {children}

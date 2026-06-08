@@ -25,12 +25,9 @@ import GlobalSearch from '../components/employeeDashboard/GlobalSearch';
 
 // Modals
 import MarkAttendanceModal from '../components/employeeDashboard/modals/MarkAttendanceModal';
-import SubmitReportModal from '../components/employeeDashboard/modals/SubmitReportModal';
 import ApplyLeaveModal from '../components/employeeDashboard/modals/ApplyLeaveModal';
 import UpdateTaskStatusModal from '../components/employeeDashboard/modals/UpdateTaskStatusModal';
 import UploadFileModal from '../components/employeeDashboard/modals/UploadFileModal';
-
-import { mockProjects } from '../data/mockData';
 
 const EmployeeDashboard = () => {
   const isLoading = usePageLoading(600);
@@ -43,6 +40,7 @@ const EmployeeDashboard = () => {
     notifications,
     activityLogs,
     updateTaskStatus,
+    projectsList,
     addToast
   } = useApp();
 
@@ -64,7 +62,6 @@ const EmployeeDashboard = () => {
 
   // Modals Open State
   const [punchOpen, setPunchOpen] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [updateTaskOpen, setUpdateTaskOpen] = useState(false);
   const [uploadFileOpen, setUploadFileOpen] = useState(false);
@@ -100,7 +97,7 @@ const EmployeeDashboard = () => {
   const myTasks = tasks.filter(t => t.assigneeId === currentUser.id);
   
   // Projects: Dynamically map projects containing user's tasks or matches user's department
-  const myProjects = mockProjects.filter(p => 
+  const myProjects = (projectsList || []).filter(p => 
     p.department === currentUser.department || 
     myTasks.some(t => t.project === p.name || t.projectName === p.name)
   );
@@ -203,10 +200,9 @@ const EmployeeDashboard = () => {
             onOpenUploadModal={() => setUploadFileOpen(true)}
           />
 
-          {/* Daily Work Report Status Widget */}
+          {/* Work Report Status Widget */}
           <DailyWorkReportWidget
             myReports={myReports}
-            onOpenReportModal={() => setReportOpen(true)}
           />
         </div>
 
@@ -256,7 +252,6 @@ const EmployeeDashboard = () => {
       {/* SECTION 5: Quick Access Floating Panel */}
       <QuickAccessPanel
         onPunchClick={() => setPunchOpen(true)}
-        onReportClick={() => setReportOpen(true)}
         onLeaveClick={() => setLeaveOpen(true)}
       />
 
@@ -278,13 +273,7 @@ const EmployeeDashboard = () => {
         />
       )}
 
-      {reportOpen && (
-        <SubmitReportModal
-          isOpen={reportOpen}
-          onClose={() => setReportOpen(false)}
-          currentUser={currentUser}
-        />
-      )}
+
 
       {leaveOpen && (
         <ApplyLeaveModal

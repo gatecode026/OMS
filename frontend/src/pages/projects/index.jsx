@@ -199,9 +199,18 @@ const Projects = () => {
     const targetProj = projects.find(p => p.id === projectId);
     if (!targetProj) return;
 
-    const updatedTasks = targetProj.tasks.map(t =>
-      t.id === taskId ? { ...t, completed: !t.completed } : t
-    );
+    const updatedTasks = targetProj.tasks.map(t => {
+      if (t.id === taskId) {
+        const nextCompleted = !t.completed;
+        return {
+          ...t,
+          completed: nextCompleted,
+          status: nextCompleted ? 'Done' : 'To Do',
+          progress: nextCompleted ? 100 : 0
+        };
+      }
+      return t;
+    });
     const tasksDone = updatedTasks.filter(t => t.completed).length;
     const progress = targetProj.tasksTotal > 0 ? Math.round((tasksDone / targetProj.tasksTotal) * 100) : 0;
     
@@ -209,7 +218,7 @@ const Projects = () => {
       tasks: updatedTasks,
       tasksDone,
       progress,
-      status: progress === 100 ? 'Completed' : targetProj.status
+      status: progress === 100 ? 'Completed' : (targetProj.status === 'Completed' ? 'In Progress' : targetProj.status)
     };
 
     const success = await updateProject(projectId, updatedFields);
@@ -309,7 +318,7 @@ const Projects = () => {
     if (!targetProj) return;
 
     const nextTaskId = `t-${projectId}-${targetProj.tasks.length + 1}`;
-    const newTasks = [...targetProj.tasks, { id: nextTaskId, title: title.trim(), completed: false, dueDate, priority }];
+    const newTasks = [...targetProj.tasks, { id: nextTaskId, title: title.trim(), completed: false, status: 'To Do', progress: 0, dueDate, priority }];
     const tasksTotal = targetProj.tasksTotal + 1;
     const progress = Math.round((targetProj.tasksDone / tasksTotal) * 100);
 

@@ -114,9 +114,9 @@ const mkActivity      = (action,actor) => ({id:`ACT-${Math.random().toString(36)
 
 
 const INIT = {
-  pmList: SEED_PMS,
-  projects: SEED_PROJECTS,
-  teamLeaders: SEED_TEAM_LEADERS,
+  pmList: [],
+  projects: [],
+  teamLeaders: [],
   selectedPM: null,
   view: 'list',
   filters: { search:'', status:'', department:'', performance:'', branch:'' },
@@ -128,6 +128,81 @@ const INIT = {
 function reducer(state, action) {
   const trim20 = arr => arr.slice(0,20);
   switch(action.type) {
+    case 'SYNC_DATA': {
+      const pmList = action.employees
+        .filter(e => e.roleId === 'manager' || e.designation?.toLowerCase().includes('manager'))
+        .map(emp => {
+          const managedProjects = action.projectsList.filter(p => p.manager === emp.name || p.managerId === emp.id);
+          const projectIds = managedProjects.map(p => p.id);
+          const managedTeams = action.teams.filter(t => managedProjects.some(p => p.leader === t.leader || p.id === t.projectId) || t.department === emp.department);
+          const teamLeaderNames = managedTeams.map(t => t.leader);
+          const teamLeadersUnderManager = action.employees.filter(e => e.roleId === 'team_leader' && teamLeaderNames.includes(e.name));
+          const teamLeaderIds = teamLeadersUnderManager.map(e => e.id);
+          const teamMembersCount = new Set(managedTeams.flatMap(t => (t.membersList || []).map(m => m.id))).size;
+          
+          return {
+            id: emp.id,
+            empId: emp.id,
+            name: emp.name,
+            email: emp.email || emp.workEmail || '',
+            phone: emp.phone || '',
+            department: emp.department || 'Management',
+            branch: emp.branch || 'Head Office',
+            designation: emp.designation || 'Manager',
+            joiningDate: emp.joinDate || '2026-01-01',
+            status: emp.status || 'Active',
+            activeProjects: managedProjects.filter(p => p.status === 'In Progress' || p.status === 'Active' || p.status === 'Planning').length,
+            teamLeaders: teamLeadersUnderManager.length,
+            teamMembers: teamMembersCount || 5,
+            successRate: emp.productivityScore || 90,
+            productivity: emp.productivityScore || 90,
+            clientSatisfaction: 9.0,
+            projectIds,
+            teamLeaderIds,
+            departments: [emp.department].filter(Boolean)
+          };
+        });
+
+      const projects = action.projectsList.map(proj => {
+        const pm = action.employees.find(e => e.name === proj.manager);
+        return {
+          id: proj.id,
+          name: proj.name,
+          pmId: pm ? pm.id : 'PM-001',
+          teamLeader: proj.leader || 'Sneha Patel',
+          startDate: proj.startDate || '2026-01-10',
+          endDate: proj.deadline || '2026-07-30',
+          progress: proj.progress || 0,
+          status: proj.status || 'In Progress',
+          clientName: proj.client || 'Internal',
+          budget: proj.budget || 10
+        };
+      });
+
+      const teamLeaders = action.employees
+        .filter(e => e.roleId === 'team_leader' || e.designation?.toLowerCase().includes('team leader'))
+        .map(emp => {
+          const ledTeam = action.teams.find(t => t.leader === emp.name);
+          return {
+            id: emp.id,
+            name: emp.name,
+            department: emp.department || 'IT',
+            teamName: ledTeam ? ledTeam.name : (emp.team || 'Dev Team Alpha'),
+            teamMembers: ledTeam ? ledTeam.membersList?.length : 5,
+            activeProjects: ledTeam ? ledTeam.activeProjects : 2,
+            productivity: emp.productivityScore || 90,
+            attendance: 95
+          };
+        });
+
+      return {
+        ...state,
+        pmList,
+        projects,
+        teamLeaders,
+        selectedPM: state.selectedPM ? (pmList.find(p => p.id === state.selectedPM.id) || state.selectedPM) : null
+      };
+    }
     case 'SELECT_PM':    return {...state, selectedPM:action.pm, view:'detail'};
     case 'GO_BACK':      return {...state, selectedPM:null, view:'list'};
     case 'ADD_PM':       return {...state, pmList:[action.pm,...state.pmList], activityFeed:trim20([mkActivity(`PM Added: ${action.pm.name}`,'Admin'),...state.activityFeed])};
@@ -310,12 +385,18 @@ const PER_PAGE = 10;
 const Managers = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(700);
-  const { addToast, showConfirm, employees, tasks, addTask } = useApp();
+  const { addToast, showConfirm, employees, tasks, addTask, departments, branches, addEmployee, updateEmployee, deactivateEmployee, projectsList, teams, updateProject, updateTeam } = useApp();
   const directoryRef = useRef(null);
   const [activeDetailTab, setActiveDetailTab] = useState('overview');
 
   const [state, dispatch] = useReducer(reducer, INIT);
   const { pmList, projects, teamLeaders, selectedPM, view, filters, notifications, activityFeed, approvals } = state;
+
+  React.useEffect(() => {
+    if (employees && projectsList && teams) {
+      dispatch({ type: 'SYNC_DATA', employees, projectsList, teams });
+    }
+  }, [employees, projectsList, teams]);
 
   const scrollToDirectory = () => {
     setTimeout(() => {
@@ -523,14 +604,44 @@ const Managers = () => {
     setFormErr(e); return Object.keys(e).length===0;
   };
 
-  const savePM = ()=>{
+  const savePM = async () => {
     if(!validateForm()) return;
-    if(editingPM){ dispatch({type:'UPDATE_PM',pm:{...editingPM,...form}}); addToast('success',`${form.name} updated.`); }
-    else { dispatch({type:'ADD_PM',pm:{...form,id:`PM-${String(pmList.length+1).padStart(3,'0')}`,empId:`EMP-${210+pmList.length}`,activeProjects:0,teamLeaders:0,teamMembers:0,projectIds:[],teamLeaderIds:[],departments:[form.department]}}); addToast('success',`${form.name} added to panel.`); }
+    if(editingPM){
+      await updateEmployee(editingPM.empId || editingPM.id, {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        department: form.department,
+        branch: form.branch,
+        designation: form.designation,
+        status: form.status,
+        productivityScore: form.productivity
+      });
+      addToast('success',`${form.name} updated.`);
+    }
+    else {
+      await addEmployee({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        department: form.department,
+        branch: form.branch,
+        designation: form.designation,
+        roleId: 'manager',
+        role: 'Manager',
+        status: form.status,
+        productivityScore: form.productivity,
+        joinDate: form.joiningDate || new Date().toISOString().split('T')[0]
+      });
+      addToast('success',`${form.name} added to panel.`);
+    }
     setAddEditOpen(false);
   };
 
-  const deletePM = pm => showConfirm(`Delete "${pm.name}"?`,'This will permanently remove this PM from the panel.',()=>{ dispatch({type:'DELETE_PM',id:pm.id}); addToast('warning',`${pm.name} removed.`); },'danger');
+  const deletePM = pm => showConfirm(`Delete "${pm.name}"?`,'This will permanently remove this PM from the panel.', async ()=>{
+    await deactivateEmployee(pm.empId || pm.id);
+    addToast('warning',`${pm.name} deactivated.`);
+  },'danger');
   const approve  = item=>{ dispatch({type:'APPROVE',id:item.id,item}); addToast('success','Request approved.'); };
   const rejectSubmit=()=>{ if(!rejectRemarks.trim()){addToast('danger','Enter rejection remarks.');return;} dispatch({type:'REJECT',id:rejectingItem.id,item:rejectingItem,remarks:rejectRemarks}); addToast('warning','Request rejected.'); setRejectingItem(null); setRejectRemarks(''); };
 
@@ -569,8 +680,11 @@ const Managers = () => {
     setWorkAssignee('');
   };
 
-  const handleReviewLeader = () => {
+  const handleReviewLeader = async () => {
     if (!selectedTL) return;
+    await updateEmployee(selectedTL.id, {
+      productivityScore: Number(revProductivity)
+    });
     dispatch({
       type: 'REVIEW_LEADER',
       leaderId: selectedTL.id,
@@ -583,18 +697,26 @@ const Managers = () => {
     setRevComments('');
   };
 
-  const handleTransferLeader = () => {
+  const handleTransferLeader = async () => {
     if (!selectedTL || !transferTargetPM) {
       addToast('danger', 'Please select a target Manager.');
       return;
     }
-    dispatch({
-      type: 'TRANSFER_LEADER',
-      leaderId: selectedTL.id,
-      currentPmId: selectedPM.id,
-      targetPmId: transferTargetPM
-    });
-    addToast('success', `Team Leader ${selectedTL.name} transferred successfully.`);
+    const targetPM = pmList.find(p => p.id === transferTargetPM);
+    if (targetPM) {
+      await updateEmployee(selectedTL.id, {
+        projectManager: targetPM.name
+      });
+      dispatch({
+        type: 'TRANSFER_LEADER',
+        leaderId: selectedTL.id,
+        currentPmId: selectedPM.id,
+        targetPmId: transferTargetPM
+      });
+      addToast('success', `Team Leader ${selectedTL.name} transferred successfully.`);
+    } else {
+      addToast('warning', 'Target Manager not found.');
+    }
     setTransferTeamOpen(false);
     setTransferTargetPM('');
     setTransferReason('');
@@ -964,13 +1086,23 @@ const Managers = () => {
                 <option value="">All Statuses</option><option>Active</option><option>On Leave</option><option>Training</option><option>Inactive</option><option>Suspended</option>
               </select>
               <select className="pm-filter-select" value={filters.department} onChange={e=>setFilter('department',e.target.value)}>
-                <option value="">All Departments</option><option>IT</option><option>Marketing</option><option>Sales</option><option>HR</option>
+                <option value="">All Departments</option>
+                {(departments && departments.length > 0 ? departments : [
+                  { name: 'IT' }, { name: 'Marketing' }, { name: 'Sales' }, { name: 'HR' }
+                ]).map(d => (
+                  <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                ))}
               </select>
               <select className="pm-filter-select" value={filters.performance}onChange={e=>setFilter('performance',e.target.value)}>
                 <option value="">All Performance</option><option value="high">High (90%+)</option><option value="average">Average (70–89%)</option><option value="low">Low (&lt;70%)</option>
               </select>
               <select className="pm-filter-select" value={filters.branch}    onChange={e=>setFilter('branch',e.target.value)}>
-                <option value="">All Branches</option><option>Head Office</option><option>Branch Office</option><option>Agency</option>
+                <option value="">All Branches</option>
+                {(branches && branches.length > 0 ? branches : [
+                  { name: 'Head Office' }, { name: 'Branch Office' }, { name: 'Agency' }
+                ]).map(b => (
+                  <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                ))}
               </select>
               {hasFilters&&<Button variant="ghost" size="sm" onClick={()=>{dispatch({type:'RESET_FILTERS'});setCardFilter('');setPage(1);}}>Reset All</Button>}
               <span className="pm-filter-count">Showing {filtered.length} of {pmList.length} managers</span>
@@ -1646,7 +1778,19 @@ const Managers = () => {
 
       {/* Assign Project */}
       <Modal isOpen={assignProjOpen} onClose={()=>setAssignProjOpen(false)} title="Assign Project to PM" size="sm"
-        footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAssignProjOpen(false)}>Cancel</Button><Button variant="primary" onClick={()=>{if(!aPM||!aProj){addToast('danger','Select PM and project.');return;} dispatch({type:'ASSIGN_PROJECT',pmId:aPM,projectName:aProj}); setAssignProjOpen(false); setAPM(''); setAProj(''); addToast('success','Project assigned.');}}>Assign</Button></div>}>
+        footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAssignProjOpen(false)}>Cancel</Button><Button variant="primary" onClick={async ()=>{
+          if(!aPM||!aProj){addToast('danger','Select PM and project.');return;}
+          const targetPM = pmList.find(p => p.id === aPM);
+          const targetProj = projects.find(p => p.name === aProj);
+          if (targetPM && targetProj) {
+            await updateProject(targetProj.id, { manager: targetPM.name });
+            addToast('success', `Project "${targetProj.name}" assigned to ${targetPM.name}.`);
+          } else {
+            dispatch({type:'ASSIGN_PROJECT',pmId:aPM,projectName:aProj});
+            addToast('success','Project assigned.');
+          }
+          setAssignProjOpen(false); setAPM(''); setAProj('');
+        }}>Assign</Button></div>}>
         <div className="pm-quick-assign-body">
           <div className="pm-form-group"><label htmlFor="ap-pm" className="pm-form-label">Manager</label><select id="ap-pm" value={aPM} onChange={e=>setAPM(e.target.value)}><option value="">— Select PM —</option>{pmList.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="pm-form-group"><label htmlFor="ap-proj" className="pm-form-label">Project</label><select id="ap-proj" value={aProj} onChange={e=>setAProj(e.target.value)}><option value="">— Select Project —</option>{projects.map(p=><option key={p.id} value={p.name}>{p.name}</option>)}<option value="AI Analytics Module">AI Analytics Module (New)</option></select></div>
@@ -1655,7 +1799,19 @@ const Managers = () => {
 
       {/* Assign Team Leader */}
       <Modal isOpen={assignLeaderOpen} onClose={()=>setAssignLeaderOpen(false)} title="Assign Team Leader to PM" size="sm"
-        footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAssignLeaderOpen(false)}>Cancel</Button><Button variant="primary" onClick={()=>{if(!alPM||!aLead){addToast('danger','Select PM and team leader.');return;} dispatch({type:'ASSIGN_TEAM_LEADER',pmId:alPM,leaderName:aLead}); setAssignLeaderOpen(false); setALPM(''); setALead(''); addToast('success','Team Leader assigned.');}}>Assign</Button></div>}>
+        footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setAssignLeaderOpen(false)}>Cancel</Button><Button variant="primary" onClick={async ()=>{
+          if(!alPM||!aLead){addToast('danger','Select PM and team leader.');return;}
+          const targetPM = pmList.find(p => p.id === alPM);
+          const targetLeader = teamLeaders.find(tl => tl.name === aLead);
+          if (targetPM && targetLeader) {
+            await updateEmployee(targetLeader.id, { projectManager: targetPM.name });
+            addToast('success', `Team Leader "${targetLeader.name}" assigned to ${targetPM.name}.`);
+          } else {
+            dispatch({type:'ASSIGN_TEAM_LEADER',pmId:alPM,leaderName:aLead});
+            addToast('success','Team Leader assigned.');
+          }
+          setAssignLeaderOpen(false); setALPM(''); setALead('');
+        }}>Assign</Button></div>}>
         <div className="pm-quick-assign-body">
           <div className="pm-form-group"><label htmlFor="al-pm" className="pm-form-label">Manager</label><select id="al-pm" value={alPM} onChange={e=>setALPM(e.target.value)}><option value="">— Select PM —</option>{pmList.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="pm-form-group"><label htmlFor="al-lead" className="pm-form-label">Team Leader</label><select id="al-lead" value={aLead} onChange={e=>setALead(e.target.value)}><option value="">— Select Leader —</option>{teamLeaders.map(tl=><option key={tl.id} value={tl.name}>{tl.name} ({tl.teamName})</option>)}</select></div>

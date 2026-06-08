@@ -4,7 +4,6 @@ import { Zap, Clock, CheckSquare, Briefcase, FileText, Calendar, DollarSign, X }
 
 const QuickAccessPanel = ({
   onPunchClick,
-  onReportClick,
   onLeaveClick
 }) => {
   const navigate = useNavigate();
@@ -31,14 +30,7 @@ const QuickAccessPanel = ({
       bgLight: 'rgba(16, 185, 129, 0.12)',
       action: onPunchClick
     },
-    {
-      name: 'Submit DWR',
-      desc: 'Log today\'s work report',
-      icon: FileText,
-      color: '#f59e0b',
-      bgLight: 'rgba(245, 158, 11, 0.12)',
-      action: onReportClick
-    },
+
     {
       name: 'Apply Leave',
       desc: 'Request time off',
@@ -131,10 +123,7 @@ const QuickAccessPanel = ({
           <Clock size={18} className="text-success" />
           <span>Punch In/Out</span>
         </button>
-        <button onClick={onReportClick} className="mobile-bar-action" style={{ background: 'none', border: 'none' }}>
-          <FileText size={18} className="text-warning" />
-          <span>Log DWR</span>
-        </button>
+
         <button onClick={onLeaveClick} className="mobile-bar-action" style={{ background: 'none', border: 'none' }}>
           <Calendar size={18} className="text-purple" />
           <span>Apply Leave</span>

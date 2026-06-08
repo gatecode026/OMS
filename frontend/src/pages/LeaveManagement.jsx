@@ -42,7 +42,8 @@ const LeaveManagement = () => {
     holidaysList,
     addHoliday,
     deleteHoliday,
-    updateEmployee
+    updateEmployee,
+    departments
   } = useApp();
 
   // Primary Tab state: 'requests' | 'analytics' | 'balances' | 'holidays' | 'policies'
@@ -1078,11 +1079,11 @@ const LeaveManagement = () => {
                   <label>Department</label>
                   <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
                     <option value="All">All Departments</option>
-                    <option value="Engineering">Engineering</option>
-                    <option value="Human Resources">Human Resources</option>
-                    <option value="Sales">Sales</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Operations">Operations</option>
+                    {(departments && departments.length > 0 ? departments : [
+                      { name: 'Engineering' }, { name: 'Human Resources' }, { name: 'Sales' }, { name: 'Marketing' }, { name: 'Operations' }
+                    ]).map(d => (
+                      <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                    ))}
                   </select>
                 </div>
 

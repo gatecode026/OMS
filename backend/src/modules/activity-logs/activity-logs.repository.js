@@ -1,36 +1,34 @@
 /**
  * @file src/modules/activity-logs/activity-logs.repository.js
- * @description Data Access layer for ActivityLogs module.
+ * @description Data Access layer for ActivityLogs module using MongoDB.
  */
 
+import ActivityLog from './activity-log.model.js';
 import logger from '../../config/logger.js';
 
-export const find = async (query) => {
-  logger.debug('Executing ActivityLogsRepository::find placeholder');
-  return [
-    { id: 'MOCK-1', name: 'Placeholder Domain Record 1 for ActivityLogs', status: 'Active' },
-    { id: 'MOCK-2', name: 'Placeholder Domain Record 2 for ActivityLogs', status: 'Inactive' }
-  ];
+export const find = async (query = {}) => {
+  logger.info('ActivityLogsRepository::find querying logs from database...');
+  return ActivityLog.find(query).sort({ createdAt: -1 });
 };
 
 export const findOne = async (id) => {
-  logger.debug('Executing ActivityLogsRepository::findOne placeholder for: ' + id);
-  return { id, name: 'Placeholder Single Domain Record for ActivityLogs', status: 'Active' };
+  logger.info(`ActivityLogsRepository::findOne querying log with ID: ${id}`);
+  return ActivityLog.findOne({ id });
 };
 
 export const save = async (data) => {
-  logger.debug('Executing ActivityLogsRepository::save placeholder', data);
-  return { id: 'MOCK-' + Math.floor(100 + Math.random() * 900), ...data };
+  logger.info(`ActivityLogsRepository::save creating activity log: ${data.actionType}`);
+  return ActivityLog.create(data);
 };
 
 export const update = async (id, data) => {
-  logger.debug('Executing ActivityLogsRepository::update placeholder for: ' + id, data);
-  return { id, ...data };
+  logger.info(`ActivityLogsRepository::update updating log with ID: ${id}`);
+  return ActivityLog.findOneAndUpdate({ id }, data, { new: true });
 };
 
 export const remove = async (id) => {
-  logger.debug('Executing ActivityLogsRepository::remove placeholder for: ' + id);
-  return { id, status: 'Deleted' };
+  logger.info(`ActivityLogsRepository::remove deleting log with ID: ${id}`);
+  return ActivityLog.findOneAndDelete({ id });
 };
 
 export default {

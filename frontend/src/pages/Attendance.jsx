@@ -44,6 +44,7 @@ const Attendance = () => {
     attendance,
     employees,
     branches,
+    departments,
     updateAttendanceRecord,
     addAttendanceRecord,
     updateEmployee,
@@ -1320,11 +1321,9 @@ const Attendance = () => {
               </div>
               <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
                 <option value="">All Departments</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Sales">Sales</option>
-                <option value="Operations">Operations</option>
-                <option value="Human Resources">Human Resources</option>
+                {(departments || []).map(dept => (
+                  <option key={dept.id || dept.name} value={dept.name}>{dept.name}</option>
+                ))}
               </select>
               <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
                 <option value="">All Branches</option>

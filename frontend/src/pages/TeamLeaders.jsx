@@ -15,17 +15,6 @@ import {
   Award, Search, User, Mail, Users, CheckCircle2, Clock, ArrowUpRight, Lock, Shield, Plus, Check, Percent
 } from 'lucide-react';
 
-const initialLeaders = [
-  { id: 'EMP-001', name: 'Rahul Sharma', email: 'rahul.sharma@enterprise.com', team: 'Development Team', dept: 'IT', exp: '8 years senior track', score: 98 },
-  { id: 'EMP-002', name: 'Priya Singh', email: 'priya.singh@enterprise.com', team: 'Sales Team A', dept: 'Sales', exp: '6 years lead track', score: 94 },
-  { id: 'EMP-003', name: 'Amit Kumar', email: 'amit.kumar@enterprise.com', team: 'Marketing Team', dept: 'Marketing', exp: '5 years execution track', score: 92 },
-  { id: 'EMP-004', name: 'Sneha Patel', email: 'sneha.patel@enterprise.com', team: 'HR Operations', dept: 'HR', exp: '7 years management track', score: 89 },
-  { id: 'EMP-005', name: 'Vikram Mehta', email: 'vikram.mehta@enterprise.com', team: 'Design Team', dept: 'IT', exp: '6 years creative track', score: 91 },
-  { id: 'EMP-006', name: 'Kavita Joshi', email: 'kavita.joshi@enterprise.com', team: 'Finance Team', dept: 'Finance', exp: '7 years analytical track', score: 87 },
-  { id: 'EMP-007', name: 'Raj Verma', email: 'raj.verma@enterprise.com', team: 'Support Team', dept: 'Operations', exp: '5 years client-facing track', score: 85 },
-  { id: 'EMP-008', name: 'Neha Gupta', email: 'neha.gupta@enterprise.com', team: 'Research Team', dept: 'IT', exp: '4 years research track', score: 93 }
-];
-
 const mockPerformanceHistory = [
   { month: 'Jan', rating: 88 },
   { month: 'Feb', rating: 90 },
@@ -37,9 +26,8 @@ const mockPerformanceHistory = [
 
 const TeamLeaders = () => {
   const isLoading = usePageLoading(600);
-  const { addToast } = useApp();
+  const { addToast, employees, addEmployee, updateEmployee, teams, updateTeam } = useApp();
 
-  const [leaders, setLeaders] = useState(initialLeaders);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
 
@@ -63,6 +51,26 @@ const TeamLeaders = () => {
     documents: true
   });
 
+  // Derive leaders dynamically from database-backed context employees
+  const leaders = useMemo(() => {
+    if (!employees) return [];
+    return employees
+      .filter(e => e.roleId === 'team_leader' || e.designation?.toLowerCase().includes('team leader'))
+      .map(emp => {
+        const ledTeam = (teams || []).find(t => t.leader === emp.name);
+        return {
+          id: emp.id,
+          name: emp.name,
+          email: emp.email || emp.workEmail || `${emp.name.toLowerCase().replace(/\s+/g, '.')}@enterprise.com`,
+          team: ledTeam ? ledTeam.name : (emp.team || 'Unassigned Team'),
+          teamId: ledTeam ? ledTeam.id : null,
+          dept: emp.department || 'IT',
+          exp: emp.experience || '6 years track',
+          score: emp.productivityScore || 90
+        };
+      });
+  }, [employees, teams]);
+
   // Filtered leaders
   const filteredLeaders = useMemo(() => {
     return leaders.filter(l => {
@@ -82,66 +90,75 @@ const TeamLeaders = () => {
     return { total, avgScore, highest };
   }, [leaders]);
 
-  const handleCreateLeader = (e) => {
-    e.preventDefault();
+  const handleCreateLeader = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!newLeader.name || !newLeader.team || !newLeader.exp) {
       addToast('danger', 'Please fill in all required fields.');
       return;
     }
-    const created = {
-      id: 'EMP-' + Math.floor(Math.random() * 900 + 100),
+
+    await addEmployee({
       name: newLeader.name,
-      email: newLeader.name.toLowerCase().replace(' ', '.') + '@enterprise.com',
+      email: newLeader.name.toLowerCase().replace(/\s+/g, '.') + '@enterprise.com',
+      phone: '+91-9999999999',
+      department: newLeader.dept,
       team: newLeader.team,
-      dept: newLeader.dept,
-      exp: newLeader.exp,
-      score: parseInt(newLeader.score) || 90
-    };
-    setLeaders(prev => [created, ...prev]);
+      experience: newLeader.exp,
+      productivityScore: parseInt(newLeader.score) || 90,
+      roleId: 'team_leader',
+      role: 'Team Leader',
+      status: 'Active',
+      joinDate: new Date().toISOString().split('T')[0]
+    });
+
     setAssignModalOpen(false);
     setNewLeader({ name: '', team: '', dept: 'IT', exp: '', score: 90 });
-    addToast('success', `${created.name} successfully assigned as Leader!`);
   };
 
-  const handleChangeLeaderSubmit = (e) => {
-    e.preventDefault();
+  const handleChangeLeaderSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!transferTarget) {
       addToast('danger', 'Please specify a transfer candidate.');
       return;
     }
-    setLeaders(prev => prev.map(l => {
-      if (l.id === activeLeader.id) {
-        return {
-          ...l,
-          name: transferTarget,
-          email: transferTarget.toLowerCase().replace(' ', '.') + '@enterprise.com',
-          score: 90
-        };
-      }
-      return l;
-    }));
+
+    const targetTeam = (teams || []).find(t => t.id === activeLeader.teamId || t.name === activeLeader.team);
+    if (targetTeam) {
+      await updateTeam(targetTeam.id, { leader: transferTarget });
+      addToast('success', `Leadership of ${targetTeam.name} successfully transferred to ${transferTarget}.`);
+    } else {
+      addToast('warning', 'Team not found in database.');
+    }
+
     setChangeModalOpen(false);
-    addToast('success', `Leadership of ${activeLeader.team} successfully transferred to ${transferTarget}.`);
     setTransferTarget('');
   };
 
-  const handleChangeTeamSubmit = (e) => {
-    e.preventDefault();
+  const handleChangeTeamSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     if (!teamTarget) {
       addToast('danger', 'Please select a new team.');
       return;
     }
-    setLeaders(prev => prev.map(l => {
-      if (l.id === activeLeader.id) {
-        return {
-          ...l,
-          team: teamTarget
-        };
+
+    // 1. Clear previous leadership role on old team
+    if (activeLeader.teamId) {
+      const oldTeam = (teams || []).find(t => t.id === activeLeader.teamId);
+      if (oldTeam && oldTeam.leader === activeLeader.name) {
+        await updateTeam(oldTeam.id, { leader: 'Unassigned' });
       }
-      return l;
-    }));
+    }
+
+    // 2. Assign leader to the new target team
+    const newTeam = (teams || []).find(t => t.name === teamTarget || t.id === teamTarget);
+    if (newTeam) {
+      await updateTeam(newTeam.id, { leader: activeLeader.name });
+      addToast('success', `Team for ${activeLeader.name} successfully updated to ${newTeam.name}.`);
+    } else {
+      addToast('warning', `Team "${teamTarget}" not found in database.`);
+    }
+
     setChangeTeamModalOpen(false);
-    addToast('success', `Team for ${activeLeader.name} successfully updated to ${teamTarget}.`);
     setTeamTarget('');
   };
 

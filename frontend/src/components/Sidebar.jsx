@@ -75,7 +75,7 @@ const menuStructure = [
       { name: 'Project Management', icon: Briefcase, path: '/projects' },
       { name: 'Workflow Management', icon: GitFork, path: '/workflows', disabled: true },
       { name: 'Task Monitoring', icon: KanbanSquare, path: '/tasks' },
-      { name: 'Daily Work Reports', icon: FileText, path: '/work-reports' },
+      { name: 'Work Reports', icon: FileText, path: '/work-reports' },
       { name: 'Performance Analytics', icon: BarChart3, path: '/performance' },
       { name: 'Payroll Management', icon: DollarSign, path: '/payroll' }
     ]
@@ -97,8 +97,7 @@ const menuStructure = [
         subItems: [
           { name: 'User Access Control', path: '/permissions' }
         ]
-      },
-      { name: 'Reports and Analytics', icon: AreaChart, path: '/reports' }
+      }
     ]
   },
   {
@@ -119,7 +118,7 @@ const menuStructure = [
 
 const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   const navigate = useNavigate();
-  const { sidebarCollapsed, setSidebarCollapsed, notifications, currentUserRole, logout, sidebarDense, generalSettings } = useApp();
+  const { sidebarCollapsed, setSidebarCollapsed, notifications, currentUserRole, logout, sidebarDense, generalSettings, hasPermission } = useApp();
   const location = useLocation();
   const [expandedMenus, setExpandedMenus] = useState({});
   const [isHovered, setIsHovered] = useState(false);
@@ -362,7 +361,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
         {/* Scrollable menu items */}
         <div className="sidebar-menu-container sidebar-scroll">
-          {filterMenuByRole(menuStructure, currentUserRole).map((section) => (
+          {filterMenuByRole(menuStructure, currentUserRole, hasPermission).map((section) => (
             <div key={section.title} className="sidebar-section">
               {!effectiveCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
               <div className="sidebar-section-items">

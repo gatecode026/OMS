@@ -61,7 +61,31 @@ import {
 
 const Payroll = () => {
   const isLoading = usePageLoading(600);
-  const { employees, runPayroll, showConfirm, currentUserRole, currentUser } = useApp();
+  const {
+    employees,
+    runPayroll,
+    showConfirm,
+    currentUserRole,
+    currentUser,
+    payrollGrades,
+    payrollReimbursements,
+    payrollLoans,
+    payrollAdvances,
+    payrollBonuses,
+    payrollPayments,
+    payrollConfigs,
+    activityLogs,
+    addOrUpdateSalaryGrade,
+    deleteSalaryGrade,
+    createLoanOrAdvance,
+    recommendBonus,
+    updateBonusStatus,
+    processPayrollCalculations,
+    bulkUpdatePayrollStatus,
+    updateSinglePayrollStatus,
+    toggleEmployeeTaxRegime,
+    savePayrollSalaryRevision
+  } = useApp();
 
   // Selected Month/Year
   const [month, setMonth] = useState('June');
@@ -102,14 +126,13 @@ const Payroll = () => {
     }, 4000);
   };
 
-  // --- Seed Data inside state for full interactivity ---
-  // Salary Grades
-  const [salaryGrades, setSalaryGrades] = useState([
-    { id: 'GRD-A', grade: 'Grade A - Executive', payBand: '₹1,20,000 - ₹2,00,000', basic: 130000, hra: 52000, travel: 8000, medical: 4000, special: 10000, pf: 15600, esi: 0, pt: 200, tdsRate: 20, effectiveDate: '2026-01-01' },
-    { id: 'GRD-B', grade: 'Grade B - Managerial', payBand: '₹80,000 - ₹1,19,000', basic: 85000, hra: 34000, travel: 6000, medical: 3000, special: 7000, pf: 10200, esi: 0, pt: 200, tdsRate: 15, effectiveDate: '2026-01-01' },
-    { id: 'GRD-C', grade: 'Grade C - Senior Professional', payBand: '₹55,000 - ₹79,000', basic: 60000, hra: 24000, travel: 5000, medical: 3000, special: 5000, pf: 7200, esi: 0, pt: 200, tdsRate: 10, effectiveDate: '2026-01-01' },
-    { id: 'GRD-D', grade: 'Grade D - Professional', payBand: '₹30,000 - ₹54,000', basic: 40000, hra: 16000, travel: 4000, medical: 2000, special: 3000, pf: 4800, esi: 1300, pt: 200, tdsRate: 5, effectiveDate: '2026-01-01' }
-  ]);
+  // --- Database values destructured with local fallbacks ---
+  const salaryGrades = payrollGrades || [];
+  const reimbursements = payrollReimbursements || [];
+  const loans = payrollLoans || [];
+  const advances = payrollAdvances || [];
+  const bonuses = payrollBonuses || [];
+  const payrollState = payrollPayments || [];
 
   // Form states for creating/editing salary grade
   const [showGradeModal, setShowGradeModal] = useState(false);
@@ -118,106 +141,54 @@ const Payroll = () => {
     id: '', grade: '', payBand: '', basic: 0, hra: 0, travel: 0, medical: 0, special: 0, pf: 0, esi: 0, pt: 200, tdsRate: 10, effectiveDate: ''
   });
 
-  // Reimbursements
-  const [reimbursements, setReimbursements] = useState([
-    { id: 'REIM-001', employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', category: 'Travel Expenses', amount: 8450, requestDate: '2026-05-24', status: 'Approved', approvedBy: 'HR Manager' },
-    { id: 'REIM-002', employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', category: 'Internet Reimbursement', amount: 1500, requestDate: '2026-05-27', status: 'Pending', approvedBy: '—' },
-    { id: 'REIM-003', employeeId: 'EMP-2026-004', employeeName: 'Rohit Sharma', category: 'Client Meeting Expenses', amount: 4800, requestDate: '2026-05-29', status: 'Approved', approvedBy: 'Finance Manager' },
-    { id: 'REIM-004', employeeId: 'EMP-2026-006', employeeName: 'Arjun Mehta', category: 'Office Expenses', amount: 2400, requestDate: '2026-06-01', status: 'Pending', approvedBy: '—' },
-    { id: 'REIM-005', employeeId: 'EMP-2026-001', employeeName: 'Aarav Sharma', category: 'Training Expenses', amount: 12000, requestDate: '2026-05-18', status: 'Released', approvedBy: 'Super Admin' }
-  ]);
-
-  // Loans
-  const [loans, setLoans] = useState([
-    { id: 'LON-001', employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', loanType: 'Personal Loan', amount: 100000, emi: 10000, remainingBalance: 60000, recoverySchedule: '10 Months (4 Paid)', progress: 40 },
-    { id: 'LON-002', employeeId: 'EMP-2026-005', employeeName: 'Priya Patel', loanType: 'Emergency Loan', amount: 30000, emi: 5000, remainingBalance: 15000, recoverySchedule: '6 Months (3 Paid)', progress: 50 }
-  ]);
-
-  // Advances
-  const [advances, setAdvances] = useState([
-    { id: 'ADV-001', employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', amount: 15000, approvedAmount: 15000, recoverySchedule: 'Single Deduct (June)', remainingBalance: 15000, progress: 0, status: 'Approved' },
-    { id: 'ADV-002', employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', amount: 20000, approvedAmount: 20000, recoverySchedule: '2 Months Installment', remainingBalance: 10000, progress: 50, status: 'Approved' }
-  ]);
-
   // Form states for Loan/Advance
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyType, setApplyType] = useState('Loan'); // Loan or Advance
   const [applyForm, setApplyForm] = useState({
-    employeeId: 'EMP-2026-001', type: 'Personal Loan', amount: 10000, emi: 1000, recoverySchedule: '10 Months'
+    employeeId: '', type: 'Personal Loan', amount: 10000, emi: 1000, recoverySchedule: '10 Months'
   });
-
-  // Bonuses
-  const [bonuses, setBonuses] = useState([
-    { id: 'BNS-001', employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', type: 'Performance Bonus', amount: 25000, requestDate: '2026-05-20', status: 'HR Verified', approvalFlow: ['TL Approved', 'Manager Approved', 'HR Verified'] },
-    { id: 'BNS-002', employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', type: 'Project Completion Bonus', amount: 15000, requestDate: '2026-05-22', status: 'Super Admin Approved', approvalFlow: ['TL Approved', 'Manager Approved', 'HR Verified', 'Finance Approved', 'Super Admin Approved'] },
-    { id: 'BNS-003', employeeId: 'EMP-2026-004', employeeName: 'Rohit Sharma', type: 'Sales Incentive', amount: 18400, requestDate: '2026-05-25', status: 'Pending', approvalFlow: ['TL Approved'] },
-    { id: 'BNS-004', employeeId: 'EMP-2026-006', employeeName: 'Arjun Mehta', type: 'Referral Bonus', amount: 10000, requestDate: '2026-05-28', status: 'Finance Approved', approvalFlow: ['TL Approved', 'Manager Approved', 'HR Verified', 'Finance Approved'] }
-  ]);
 
   // Form states for Bonus Recommendation
   const [showBonusModal, setShowBonusModal] = useState(false);
   const [bonusForm, setBonusForm] = useState({
-    employeeId: 'EMP-2026-002', type: 'Performance Bonus', amount: 10000
+    employeeId: '', type: 'Performance Bonus', amount: 10000
   });
 
-  // Attendance adjustments configurations
-  const [attendanceConfigs, setAttendanceConfigs] = useState({
-    leaveDeductionRate: 2000, // INR per unpaid leave
-    lateArrivalPenalty: 300,   // INR per late punch
-    overtimeHourlyRate: 500    // INR per overtime hour
-  });
+  // Automatically initialize first employeeId on load
+  React.useEffect(() => {
+    if (employees && employees.length > 0) {
+      if (!applyForm.employeeId) {
+        setApplyForm(prev => ({ ...prev, employeeId: employees[0].id }));
+      }
+      if (!bonusForm.employeeId) {
+        setBonusForm(prev => ({ ...prev, employeeId: employees[0].id }));
+      }
+    }
+  }, [employees]);
 
-  // Audit Logs inside Payroll
-  const [auditLogs, setAuditLogs] = useState([
-    { id: 'PAUD-001', user: 'Aarav Sharma', action: 'Approved Salary Release (May)', timestamp: '2026-05-31 18:30', prevVal: 'Finance Approved', newVal: 'Released' },
-    { id: 'PAUD-002', user: 'Neha Verma', action: 'Modified Base Salary for Ananya Gupta', timestamp: '2026-05-28 11:20', prevVal: '₹68,000', newVal: '₹72,000' },
-    { id: 'PAUD-003', user: 'Suresh Kumar', action: 'Created Salary Structure - Grade D', timestamp: '2026-05-25 15:45', prevVal: 'None', newVal: 'GRD-D Active' },
-    { id: 'PAUD-004', user: 'Vikram Singh', action: 'Approved Team Reimbursement for Rohit Sharma', timestamp: '2026-05-29 09:15', prevVal: 'Pending', newVal: 'Approved' }
-  ]);
+  // Derived Configurations
+  const attendanceConfigs = useMemo(() => ({
+    leaveDeductionRate: payrollConfigs?.leaveDeductionRate ?? 2000,
+    lateArrivalPenalty: payrollConfigs?.lateArrivalPenalty ?? 300,
+    overtimeHourlyRate: payrollConfigs?.overtimeHourlyRate ?? 500
+  }), [payrollConfigs]);
 
-  // TAX configurations mapping by employeeId
-  const [taxProfiles, setTaxProfiles] = useState({
-    'EMP-2026-001': { pan: 'AAAPS1234F', regime: 'New', taxableIncome: 1800000, deductions80C: 150000, health80D: 25000, state: 'Delhi' },
-    'EMP-2026-002': { pan: 'BBAPS5678F', regime: 'New', taxableIncome: 1100000, deductions80C: 120000, health80D: 20000, state: 'Maharashtra' },
-    'EMP-2026-003': { pan: 'CCAPS9012F', regime: 'Old', taxableIncome: 950000, deductions80C: 150000, health80D: 25000, state: 'Karnataka' },
-    'EMP-2026-004': { pan: 'DDAPS3456F', regime: 'New', taxableIncome: 1150000, deductions80C: 80000, health80D: 15000, state: 'Haryana' },
-    'EMP-2026-005': { pan: 'EEAPS7890F', regime: 'New', taxableIncome: 850000, deductions80C: 100000, health80D: 10000, state: 'Gujarat' },
-    'EMP-2026-006': { pan: 'FFAPS2345F', regime: 'Old', taxableIncome: 750000, deductions80C: 140000, health80D: 15000, state: 'Uttar Pradesh' },
-    'EMP-2026-007': { pan: 'GGAPS6789F', regime: 'New', taxableIncome: 820000, deductions80C: 90000, health80D: 20000, state: 'Telangana' }
-  });
+  const taxProfiles = useMemo(() => payrollConfigs?.taxProfiles || {}, [payrollConfigs]);
+  const attendanceDaysMap = useMemo(() => payrollConfigs?.attendanceDaysMap || {}, [payrollConfigs]);
+  const salaryStructures = useMemo(() => payrollConfigs?.salaryStructures || {}, [payrollConfigs]);
 
-  // Seed attendance data for calculation
-  const [attendanceDaysMap, setAttendanceDaysMap] = useState({
-    'EMP-2026-001': { present: 22, absent: 0, halfDays: 0, paidLeaves: 2, unpaidLeaves: 0, overtimeHours: 16, lateArrivals: 1 },
-    'EMP-2026-002': { present: 20, absent: 1, halfDays: 1, paidLeaves: 1, unpaidLeaves: 1, overtimeHours: 20, lateArrivals: 4 },
-    'EMP-2026-003': { present: 21, absent: 0, halfDays: 0, paidLeaves: 3, unpaidLeaves: 0, overtimeHours: 8, lateArrivals: 2 },
-    'EMP-2026-004': { present: 19, absent: 2, halfDays: 2, paidLeaves: 1, unpaidLeaves: 0, overtimeHours: 12, lateArrivals: 5 },
-    'EMP-2026-005': { present: 22, absent: 0, halfDays: 0, paidLeaves: 2, unpaidLeaves: 0, overtimeHours: 0, lateArrivals: 0 },
-    'EMP-2026-006': { present: 18, absent: 3, halfDays: 1, paidLeaves: 1, unpaidLeaves: 1, overtimeHours: 4, lateArrivals: 3 },
-    'EMP-2026-007': { present: 23, absent: 0, halfDays: 0, paidLeaves: 1, unpaidLeaves: 0, overtimeHours: 6, lateArrivals: 1 }
-  });
-
-  // Dynamic salary structures mapping by employeeId
-  const [salaryStructures, setSalaryStructures] = useState({
-    'EMP-2026-001': { basic: 125000, hra: 50000, travel: 5000, medical: 3000, special: 7000, pf: 15000, esi: 0, pt: 200, tds: 22000 },
-    'EMP-2026-002': { basic: 85000, hra: 34000, travel: 4000, medical: 2000, special: 4000, pf: 10200, esi: 0, pt: 200, tds: 12000 },
-    'EMP-2026-003': { basic: 72000, hra: 28800, travel: 4000, medical: 2000, special: 2000, pf: 8640, esi: 0, pt: 200, tds: 9000 },
-    'EMP-2026-004': { basic: 68000, hra: 27200, travel: 3500, medical: 2000, special: 3000, pf: 8160, esi: 0, pt: 200, tds: 8500 },
-    'EMP-2026-005': { basic: 65000, hra: 26000, travel: 3000, medical: 2000, special: 1000, pf: 7800, esi: 0, pt: 200, tds: 7000 },
-    'EMP-2026-006': { basic: 55000, hra: 22000, travel: 3000, medical: 2000, special: 1000, pf: 6600, esi: 1780, pt: 200, tds: 4500 },
-    'EMP-2026-007': { basic: 58000, hra: 23200, travel: 3000, medical: 2000, special: 1800, pf: 6960, esi: 1880, pt: 200, tds: 5000 }
-  });
-
-  // Payroll processing list state
-  const [payrollState, setPayrollState] = useState([
-    { employeeId: 'EMP-2026-001', employeeName: 'Aarav Sharma', department: 'Operations', designation: 'Super Admin', branch: 'Delhi HQ', status: 'Calculated' },
-    { employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', department: 'Engineering', designation: 'Engineering Manager', branch: 'Delhi HQ', status: 'Calculated' },
-    { employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', department: 'Engineering', designation: 'Senior Developer', branch: 'Bangalore Office', status: 'Calculated' },
-    { employeeId: 'EMP-2026-004', employeeName: 'Rohit Sharma', department: 'Sales', designation: 'Sales Representative', branch: 'Mumbai Branch', status: 'HR Verified' },
-    { employeeId: 'EMP-2026-005', employeeName: 'Priya Patel', department: 'Marketing', designation: 'Marketing Lead', branch: 'Bangalore Office', status: 'Finance Approved' },
-    { employeeId: 'EMP-2026-006', employeeName: 'Arjun Mehta', department: 'Engineering', designation: 'QA Associate', branch: 'Mumbai Branch', status: 'Finance Approved' },
-    { employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', department: 'Human Resources', designation: 'HR Executive', branch: 'Delhi HQ', status: 'Released' }
-  ]);
+  const auditLogs = useMemo(() => {
+    return (activityLogs || [])
+      .filter(log => log.module === 'Payroll')
+      .map(log => ({
+        id: log.id,
+        user: log.employeeName || 'System',
+        action: log.action,
+        prevVal: log.details || '—',
+        newVal: log.target || '—',
+        timestamp: log.timestamp
+      }));
+  }, [activityLogs]);
 
   const scopedPayrollState = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return payrollState;
@@ -337,11 +308,10 @@ const Payroll = () => {
       const att = attendanceDaysMap[empId] || { present: 22, absent: 0, halfDays: 0, paidLeaves: 2, unpaidLeaves: 0, overtimeHours: 0, lateArrivals: 0 };
 
       // Allowances Sum
-      const totalAllowances = struct.hra + struct.travel + struct.medical + struct.special;
+      const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
 
       // Unpaid Leave Deduction
-      // Basic / 24 working days per day cost
-      const leaveDeduction = att.unpaidLeaves * Math.round(struct.basic / 24);
+      const leaveDeduction = att.unpaidLeaves * Math.round((struct.basic || 50000) / 24);
 
       // Late penalty
       const lateDeduction = att.lateArrivals * attendanceConfigs.lateArrivalPenalty;
@@ -369,20 +339,20 @@ const Payroll = () => {
         .reduce((sum, curr) => sum + curr.amount, 0);
 
       // Total Statutory Deductions
-      const statutoryDeductions = struct.pf + struct.esi + struct.pt + struct.tds;
+      const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 200) + (struct.tds || 0);
 
       // Total Deductions
       const totalDeductions = statutoryDeductions + leaveDeduction + lateDeduction + loanEMI + advanceDeduct;
 
       // Gross Salary
-      const grossSalary = struct.basic + totalAllowances + overtimePay + approvedBonuses;
+      const grossSalary = (struct.basic || 50000) + totalAllowances + overtimePay + approvedBonuses;
 
       // Net Salary
       const netSalary = grossSalary - totalDeductions;
 
       return {
         ...p,
-        basicSalary: struct.basic,
+        basicSalary: struct.basic || 50000,
         grossSalary,
         attendanceDays: att.present + att.paidLeaves + (att.halfDays * 0.5),
         leaveDeductions: leaveDeduction,
@@ -428,31 +398,12 @@ const Payroll = () => {
 
   // --- Actions ---
   // Apply Salary Revision
-  const handleSalaryRevision = (empId, newBasic) => {
+  const handleSalaryRevision = async (empId, newBasic) => {
     if (!newBasic || isNaN(newBasic)) return;
-    const oldBasic = salaryStructures[empId]?.basic || 50000;
-    setSalaryStructures(prev => ({
-      ...prev,
-      [empId]: {
-        ...prev[empId],
-        basic: parseInt(newBasic),
-        hra: Math.round(parseInt(newBasic) * 0.4),
-        pf: Math.round(parseInt(newBasic) * 0.12),
-        tds: Math.round(parseInt(newBasic) * 0.1)
-      }
-    }));
-    setAuditLogs(prev => [
-      {
-        id: `PAUD-${Date.now().toString().slice(-4)}`,
-        user: 'HR Manager',
-        action: `Revised Basic Salary for employee ${empId}`,
-        timestamp: 'Just now',
-        prevVal: formatCurrency(oldBasic),
-        newVal: formatCurrency(newBasic)
-      },
-      ...prev
-    ]);
-    addPageToast('success', `Revised salary for ${empId} to ${formatCurrency(newBasic)} successfully.`);
+    const success = await savePayrollSalaryRevision(empId, newBasic);
+    if (success) {
+      addPageToast('success', `Revised salary for ${empId} to ${formatCurrency(newBasic)} successfully.`);
+    }
   };
 
   // Run Payroll Action for selected Month/Year
@@ -460,142 +411,109 @@ const Payroll = () => {
     showConfirm(
       'Process Payroll Calculations',
       `Calculate and verify attendance metrics for ${month} ${year}? This will recalculate HRA, Overtime, Leaves, and Deductions.`,
-      () => {
-        setPayrollState(prev => prev.map(p => ({ ...p, status: 'Calculated' })));
-        addPageToast('success', `Recalculated salary figures and verified attendance links for ${month} ${year}.`);
-        setAuditLogs(prev => [
-          { id: `PAUD-${Date.now().toString().slice(-4)}`, user: 'HR Manager', action: `Ran Attendance Calculation for ${month} ${year}`, timestamp: 'Just now', prevVal: 'Various', newVal: 'Calculated' },
-          ...prev
-        ]);
+      async () => {
+        const success = await processPayrollCalculations(month, year, calculatedPayrollData);
+        if (success) {
+          addPageToast('success', `Recalculated salary figures and verified attendance links for ${month} ${year}.`);
+        }
       }
     );
   };
 
   // Bulk Actions
   const handleBulkAction = (actionType) => {
-    let nextStatus = 'Calculated';
-    if (actionType === 'verify') nextStatus = 'HR Verified';
-    if (actionType === 'approve') nextStatus = 'Finance Approved';
-    if (actionType === 'release') nextStatus = 'Released';
-    if (actionType === 'hold') nextStatus = 'Hold';
-
     showConfirm(
       `Bulk ${actionType.toUpperCase()} Payroll`,
       `Are you sure you want to execute [${actionType}] action on all matching employee records?`,
-      () => {
-        setPayrollState(prev => prev.map(p => ({ ...p, status: nextStatus })));
-        addPageToast('success', `Successfully processed bulk action: ${actionType.toUpperCase()}`);
-        setAuditLogs(prev => [
-          { id: `PAUD-${Date.now().toString().slice(-4)}`, user: 'Super Admin', action: `Bulk Action: ${actionType}`, timestamp: 'Just now', prevVal: 'Mixed', newVal: nextStatus },
-          ...prev
-        ]);
+      async () => {
+        const success = await bulkUpdatePayrollStatus(month, year, actionType);
+        if (success) {
+          addPageToast('success', `Successfully processed bulk action: ${actionType.toUpperCase()}`);
+        }
       }
     );
   };
 
   // Handle single status change
-  const handleStatusChange = (empId, nextStatus) => {
-    setPayrollState(prev => prev.map(p => p.employeeId === empId ? { ...p, status: nextStatus } : p));
-    addPageToast('info', `Status of employee ${empId} set to: ${nextStatus}`);
-    setAuditLogs(prev => [
-      { id: `PAUD-${Date.now().toString().slice(-4)}`, user: 'Finance Manager', action: `Updated payroll status for ${empId}`, timestamp: 'Just now', prevVal: 'Previous', newVal: nextStatus },
-      ...prev
-    ]);
+  const handleStatusChange = async (empId, nextStatus) => {
+    const success = await updateSinglePayrollStatus(empId, month, year, nextStatus);
+    if (success) {
+      addPageToast('info', `Status of employee ${empId} set to: ${nextStatus}`);
+    }
   };
 
-  // Approve Reimbursement
-  const handleReimbursementStatus = (id, newStatus) => {
-    setReimbursements(prev => prev.map(r => r.id === id ? { ...r, status: newStatus, approvedBy: 'Finance Manager' } : r));
-    addPageToast('success', `Reimbursement ${id} set to: ${newStatus}`);
+  // Approve Reimbursement (obsolete but kept for API shape compatibility)
+  const handleReimbursementStatus = async (id, newStatus) => {
+    addPageToast('info', `Reimbursement status update requested.`);
   };
 
   // Approve Bonus Request
-  const handleBonusStatus = (id, newStatus) => {
-    setBonuses(prev => prev.map(b => b.id === id ? {
-      ...b,
-      status: newStatus,
-      approvalFlow: [...b.approvalFlow, `${newStatus} by Manager`]
-    } : b));
-    addPageToast('success', `Bonus ${id} status updated: ${newStatus}`);
+  const handleBonusStatus = async (id, newStatus) => {
+    const success = await updateBonusStatus(id, newStatus);
+    if (success) {
+      addPageToast('success', `Bonus ${id} status updated: ${newStatus}`);
+    }
   };
 
   // Apply new loan or advance
-  const handleCreateLoanAdvance = (e) => {
+  const handleCreateLoanAdvance = async (e) => {
     e.preventDefault();
-    const targetEmp = employees.find(emp => emp.id === applyForm.employeeId) || { name: 'Aarav Sharma' };
+    const targetEmp = employees.find(emp => emp.id === applyForm.employeeId) || { name: 'Employee' };
+    const payload = {
+      employeeId: applyForm.employeeId,
+      amount: parseInt(applyForm.amount),
+      recoverySchedule: applyForm.recoverySchedule,
+    };
     if (applyType === 'Loan') {
-      const newLoan = {
-        id: `LON-${Date.now().toString().slice(-3)}`,
-        employeeId: applyForm.employeeId,
-        employeeName: targetEmp.name,
-        loanType: applyForm.type,
-        amount: parseInt(applyForm.amount),
-        emi: parseInt(applyForm.emi),
-        remainingBalance: parseInt(applyForm.amount),
-        recoverySchedule: applyForm.recoverySchedule,
-        progress: 0
-      };
-      setLoans(prev => [...prev, newLoan]);
-      addPageToast('success', `Loan application approved for ${targetEmp.name}`);
+      payload.type = 'Loan';
+      payload.loanType = applyForm.type;
+      payload.emi = parseInt(applyForm.emi) || 0;
     } else {
-      const newAdvance = {
-        id: `ADV-${Date.now().toString().slice(-3)}`,
-        employeeId: applyForm.employeeId,
-        employeeName: targetEmp.name,
-        amount: parseInt(applyForm.amount),
-        approvedAmount: parseInt(applyForm.amount),
-        recoverySchedule: applyForm.recoverySchedule,
-        remainingBalance: parseInt(applyForm.amount),
-        progress: 0,
-        status: 'Approved'
-      };
-      setAdvances(prev => [...prev, newAdvance]);
-      addPageToast('success', `Salary Advance issued to ${targetEmp.name}`);
+      payload.type = 'Advance';
+      payload.loanType = 'Advance Salary';
+      payload.emi = 0;
     }
-    setShowApplyModal(false);
+    const success = await createLoanOrAdvance(payload);
+    if (success) {
+      addPageToast('success', `${applyType === 'Loan' ? 'Loan application approved' : 'Salary Advance issued'} for ${targetEmp.name}`);
+      setShowApplyModal(false);
+    }
   };
 
   // Submit Bonus Request
-  const handleCreateBonus = (e) => {
+  const handleCreateBonus = async (e) => {
     e.preventDefault();
-    const targetEmp = employees.find(emp => emp.id === bonusForm.employeeId) || { name: 'Aarav Sharma' };
-    const newBonus = {
-      id: `BNS-${Date.now().toString().slice(-3)}`,
+    const targetEmp = employees.find(emp => emp.id === bonusForm.employeeId) || { name: 'Employee' };
+    const payload = {
       employeeId: bonusForm.employeeId,
-      employeeName: targetEmp.name,
       type: bonusForm.type,
-      amount: parseInt(bonusForm.amount),
-      requestDate: new Date().toISOString().split('T')[0],
-      status: 'Pending',
-      approvalFlow: ['TL Recommended']
+      amount: parseInt(bonusForm.amount)
     };
-    setBonuses(prev => [...prev, newBonus]);
-    addPageToast('success', `Bonus recommended for ${targetEmp.name}`);
-    setShowBonusModal(false);
+    const success = await recommendBonus(payload);
+    if (success) {
+      addPageToast('success', `Bonus recommended for ${targetEmp.name}`);
+      setShowBonusModal(false);
+    }
   };
 
   // Create/Edit Salary Grade
-  const handleGradeSubmit = (e) => {
+  const handleGradeSubmit = async (e) => {
     e.preventDefault();
-    if (editingGrade) {
-      setSalaryGrades(prev => prev.map(g => g.id === editingGrade.id ? { ...g, ...gradeForm } : g));
-      addPageToast('success', `Updated salary grade: ${gradeForm.grade}`);
-    } else {
-      const newGrade = {
-        ...gradeForm,
-        id: `GRD-${Date.now().toString().slice(-3)}`
-      };
-      setSalaryGrades(prev => [...prev, newGrade]);
-      addPageToast('success', `Added new salary grade: ${gradeForm.grade}`);
+    const payload = editingGrade ? { ...gradeForm, id: editingGrade.id } : gradeForm;
+    const success = await addOrUpdateSalaryGrade(payload);
+    if (success) {
+      addPageToast('success', `${editingGrade ? 'Updated' : 'Added new'} salary grade: ${gradeForm.grade}`);
+      setShowGradeModal(false);
+      setEditingGrade(null);
     }
-    setShowGradeModal(false);
-    setEditingGrade(null);
   };
 
   // Delete Grade
-  const handleDeleteGrade = (id) => {
-    setSalaryGrades(prev => prev.filter(g => g.id !== id));
-    addPageToast('warning', `Deleted Salary Grade structure.`);
+  const handleDeleteGrade = async (id) => {
+    const success = await deleteSalaryGrade(id);
+    if (success) {
+      addPageToast('warning', `Deleted Salary Grade structure.`);
+    }
   };
 
   // Open Edit Grade Form
@@ -606,16 +524,11 @@ const Payroll = () => {
   };
 
   // Regime Toggle
-  const handleToggleRegime = (empId) => {
-    setTaxProfiles(prev => {
-      const current = prev[empId] || { pan: 'AAAPS1234F', regime: 'New' };
-      const nextRegime = current.regime === 'New' ? 'Old' : 'New';
-      return {
-        ...prev,
-        [empId]: { ...current, regime: nextRegime }
-      };
-    });
-    addPageToast('info', `Tax regime toggled for ${empId}.`);
+  const handleToggleRegime = async (empId) => {
+    const success = await toggleEmployeeTaxRegime(empId);
+    if (success) {
+      addPageToast('info', `Tax regime toggled for ${empId}.`);
+    }
   };
 
   // Filtered Payroll Data for search query and select drops
@@ -713,29 +626,50 @@ BANK PAYMENT & COMPLIANCE DETAIL:
     addPageToast('success', `Downloaded PDF payslip for ${empObj.employeeName}.`);
   };
 
-  // Recharts Chart Mock Series
-  const monthlyCostSeries = [
-    { name: 'Jan', expense: 480000 },
-    { name: 'Feb', expense: 495000 },
-    { name: 'Mar', expense: 512000 },
-    { name: 'Apr', expense: 535000 },
-    { name: 'May', expense: 540000 },
-    { name: 'Jun', expense: currentMonthCost }
-  ];
+  // Recharts Chart Series derived from DB
+  const monthlyCostSeries = useMemo(() => {
+    const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const shortMonths = {
+      'January': 'Jan', 'February': 'Feb', 'March': 'Mar', 'April': 'Apr', 'May': 'May', 'June': 'Jun',
+      'July': 'Jul', 'August': 'Aug', 'September': 'Sep', 'October': 'Oct', 'November': 'Nov', 'December': 'Dec'
+    };
+    const map = {};
+    payrollState.forEach(p => {
+      const mShort = shortMonths[p.month] || p.month?.slice(0, 3) || 'Other';
+      map[mShort] = (map[mShort] || 0) + (p.netSalary || 0);
+    });
 
-  const deptDistributionData = [
-    { name: 'Engineering', value: 310000 },
-    { name: 'Operations', value: 130000 },
-    { name: 'Sales', value: 89000 },
-    { name: 'HR', value: 60000 },
-    { name: 'Marketing', value: 67000 }
-  ];
+    const series = monthsOrder
+      .filter(m => map[m] !== undefined || m === month.slice(0, 3))
+      .map(m => ({
+        name: m,
+        expense: map[m] || (m === month.slice(0, 3) ? currentMonthCost : 0)
+      }));
 
-  const branchRankingsData = [
-    { name: 'Delhi HQ', amount: 94000 },
-    { name: 'Bangalore Office', amount: 71500 },
-    { name: 'Mumbai Branch', amount: 73000 }
-  ];
+    return series.length > 0 ? series : [{ name: month.slice(0, 3), expense: currentMonthCost }];
+  }, [payrollState, month, currentMonthCost]);
+
+  const deptDistributionData = useMemo(() => {
+    const map = {};
+    calculatedPayrollData.forEach(p => {
+      const dept = p.department || 'Other';
+      map[dept] = (map[dept] || 0) + p.netSalary;
+    });
+    return Object.keys(map).length > 0
+      ? Object.keys(map).map(name => ({ name, value: map[name] }))
+      : [{ name: 'No Data', value: 0 }];
+  }, [calculatedPayrollData]);
+
+  const branchRankingsData = useMemo(() => {
+    const map = {};
+    calculatedPayrollData.forEach(p => {
+      const branch = p.branch || 'Other';
+      map[branch] = (map[branch] || 0) + p.netSalary;
+    });
+    return Object.keys(map).length > 0
+      ? Object.keys(map).map(name => ({ name, amount: map[name] }))
+      : [{ name: 'No Data', amount: 0 }];
+  }, [calculatedPayrollData]);
 
   const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
 
@@ -823,10 +757,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         <div className="payroll-tabs-list">
           <button onClick={() => setActiveTab('dashboard')} className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}><TrendingUp size={16} />Dashboard & Analytics</button>
           <button onClick={() => setActiveTab('processing')} className={`tab-btn ${activeTab === 'processing' ? 'active' : ''}`}><Sliders size={16} />Processing Center</button>
-          <button onClick={() => setActiveTab('attendance')} className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`}><Clock size={16} />Attendance Link</button>
           {perspective !== 'employee' && <button onClick={() => setActiveTab('structures')} className={`tab-btn ${activeTab === 'structures' ? 'active' : ''}`}><Settings size={16} />Salary Structures</button>}
           <button onClick={() => setActiveTab('bonuses')} className={`tab-btn ${activeTab === 'bonuses' ? 'active' : ''}`}><Award size={16} />Bonuses & Incentives</button>
-          <button onClick={() => setActiveTab('reimbursements')} className={`tab-btn ${activeTab === 'reimbursements' ? 'active' : ''}`}><Receipt size={16} />Reimbursements</button>
           <button onClick={() => setActiveTab('loans')} className={`tab-btn ${activeTab === 'loans' ? 'active' : ''}`}><Scale size={16} />Loans & Advances</button>
           <button onClick={() => setActiveTab('taxes')} className={`tab-btn ${activeTab === 'taxes' ? 'active' : ''}`}><FileText size={16} />Tax Vault</button>
           <button onClick={() => setActiveTab('calendar')} className={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`}><Calendar size={16} />Payroll Calendar</button>
@@ -1140,202 +1072,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         </div>
       )}
 
-      {/* ==================== TAB CONTENT: ATTENDANCE INTEGRATION ==================== */}
-      {activeTab === 'attendance' && (
-        <div className="flex-column grid-gap animate-fade-in">
-          <div className="grid-2-col gap-6">
-            {/* Left Column: Select Employee & Punch Card */}
-            <div className="card p-5 flex-column gap-4">
-              <div className="flex-center justify-between border-bottom pb-3">
-                <h3 className="card-sec-title">Attendance Punch Records Link</h3>
-                <span className="badge badge-primary">{selectedEmployeeObj.branch}</span>
-              </div>
 
-              <div className="flex-center gap-3 justify-start">
-                <Avatar name={selectedEmployeeObj.employeeName} size="md" />
-                <div>
-                  <h4 style={{ margin: 0 }}>{selectedEmployeeObj.employeeName}</h4>
-                  <p className="text-muted font-small" style={{ margin: '2px 0 0 0' }}>{selectedEmployeeObj.designation} • {selectedEmployeeObj.employeeId}</p>
-                </div>
-              </div>
-
-              {/* Attendance metrics details */}
-              <div className="attendance-grid-panel">
-                <div className="metric-box">
-                  <span className="label">Present Days</span>
-                  <span className="value text-success">{attendanceDaysMap[selectedEmployeeObj.employeeId]?.present || 20}</span>
-                </div>
-                <div className="metric-box">
-                  <span className="label">Paid Leaves</span>
-                  <span className="value text-success">{attendanceDaysMap[selectedEmployeeObj.employeeId]?.paidLeaves || 2}</span>
-                </div>
-                <div className="metric-box">
-                  <span className="label">Half Days</span>
-                  <span className="value text-warning">{attendanceDaysMap[selectedEmployeeObj.employeeId]?.halfDays || 0}</span>
-                </div>
-                <div className="metric-box">
-                  <span className="label">Unpaid Leaves</span>
-                  <span className="value text-danger">{attendanceDaysMap[selectedEmployeeObj.employeeId]?.unpaidLeaves || 0}</span>
-                </div>
-                <div className="metric-box">
-                  <span className="label">Late Arrivals</span>
-                  <span className="value text-danger">{attendanceDaysMap[selectedEmployeeObj.employeeId]?.lateArrivals || 0}</span>
-                </div>
-                <div className="metric-box">
-                  <span className="label">Overtime Hours</span>
-                  <span className="value text-primary">{attendanceDaysMap[selectedEmployeeObj.employeeId]?.overtimeHours || 0} hrs</span>
-                </div>
-              </div>
-
-              {/* Adjust numbers form */}
-              {perspective !== 'employee' && (
-                <div className="flex-column gap-3 p-3 bg-secondary rounded">
-                  <span className="font-semibold text-primary font-small">Adjust Month Attendance Exceptions</span>
-                  <div className="grid-2-col gap-3">
-                    <div>
-                      <label className="input-label font-xsmall">Unpaid Leaves</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="30"
-                        value={attendanceDaysMap[selectedEmployeeObj.employeeId]?.unpaidLeaves || 0}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setAttendanceDaysMap(prev => ({
-                            ...prev,
-                            [selectedEmployeeObj.employeeId]: {
-                              ...prev[selectedEmployeeObj.employeeId],
-                              unpaidLeaves: val
-                            }
-                          }));
-                        }}
-                        className="table-search-input font-small p-2 width-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="input-label font-xsmall">Overtime Hours</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={attendanceDaysMap[selectedEmployeeObj.employeeId]?.overtimeHours || 0}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setAttendanceDaysMap(prev => ({
-                            ...prev,
-                            [selectedEmployeeObj.employeeId]: {
-                              ...prev[selectedEmployeeObj.employeeId],
-                              overtimeHours: val
-                            }
-                          }));
-                        }}
-                        className="table-search-input font-small p-2 width-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="input-label font-xsmall">Late Arrivals</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={attendanceDaysMap[selectedEmployeeObj.employeeId]?.lateArrivals || 0}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setAttendanceDaysMap(prev => ({
-                            ...prev,
-                            [selectedEmployeeObj.employeeId]: {
-                              ...prev[selectedEmployeeObj.employeeId],
-                              lateArrivals: val
-                            }
-                          }));
-                        }}
-                        className="table-search-input font-small p-2 width-full"
-                      />
-                    </div>
-                    <div className="flex-end">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => addPageToast('success', 'Attendance adjustments saved into memory.')}
-                        style={{ height: '36px' }}
-                      >
-                        Save Adjustments
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Column: Live Calculations Calculator Panel */}
-            <div className="card p-5 flex-column gap-4 border-left-primary">
-              <h3 className="card-sec-title">Live Calculations Summary</h3>
-              
-              <div className="flex-column gap-3">
-                <div className="flex-center justify-between border-bottom pb-2 font-small">
-                  <span className="text-muted">Basic Salary</span>
-                  <span className="font-semibold">{formatCurrency(selectedEmployeeObj.basicSalary)}</span>
-                </div>
-                <div className="flex-center justify-between border-bottom pb-2 font-small">
-                  <span className="text-muted">Allowances (HRA + Travel + Med)</span>
-                  <span className="text-success">+{formatCurrency(selectedEmployeeObj.grossSalary - selectedEmployeeObj.basicSalary - selectedEmployeeObj.overtimeAmount - selectedEmployeeObj.bonusAmount)}</span>
-                </div>
-                <div className="flex-center justify-between border-bottom pb-2 font-small">
-                  <span className="text-muted">Overtime Payments ({attendanceDaysMap[selectedEmployeeObj.employeeId]?.overtimeHours || 0} hrs @ ₹{attendanceConfigs.overtimeHourlyRate}/hr)</span>
-                  <span className="text-success">+{formatCurrency(selectedEmployeeObj.overtimeAmount)}</span>
-                </div>
-                <div className="flex-center justify-between border-bottom pb-2 font-small">
-                  <span className="text-muted">Unpaid Leaves Deductions ({attendanceDaysMap[selectedEmployeeObj.employeeId]?.unpaidLeaves || 0} days)</span>
-                  <span className="text-danger">-{formatCurrency(selectedEmployeeObj.leaveDeductions)}</span>
-                </div>
-                <div className="flex-center justify-between border-bottom pb-2 font-small">
-                  <span className="text-muted">Late Penalties ({attendanceDaysMap[selectedEmployeeObj.employeeId]?.lateArrivals || 0} occurrences @ ₹{attendanceConfigs.lateArrivalPenalty}/each)</span>
-                  <span className="text-danger">-{formatCurrency(selectedEmployeeObj.lateDeductions)}</span>
-                </div>
-                <div className="flex-center justify-between border-bottom pb-2 font-small">
-                  <span className="text-muted">Statutory Taxes (ESI + PF + TDS)</span>
-                  <span className="text-danger">-{formatCurrency(selectedEmployeeObj.statutoryDeductions)}</span>
-                </div>
-                <div className="flex-center justify-between border-bottom pb-2 font-small">
-                  <span className="text-muted">Advances & Loan Recoveries</span>
-                  <span className="text-danger">-{formatCurrency(selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct)}</span>
-                </div>
-                <div className="flex-center justify-between pt-3 font-medium border-top border-primary">
-                  <span className="font-bold text-primary">Final Take-Home Net Pay</span>
-                  <span className="font-bold text-success font-large">{formatCurrency(selectedEmployeeObj.netSalary)}</span>
-                </div>
-              </div>
-
-              {/* Adjust global configs */}
-              {perspective !== 'employee' && (
-                <div className="p-3 border rounded bg-secondary">
-                  <span className="font-semibold text-primary font-small flex-center gap-1 mb-2"><Settings size={14} /> Global Deductions Config</span>
-                  <div className="flex-column gap-3 font-xsmall">
-                    <div className="flex-center justify-between">
-                      <span>Late Penalty Rate:</span>
-                      <input
-                        type="number"
-                        value={attendanceConfigs.lateArrivalPenalty}
-                        onChange={(e) => setAttendanceConfigs(prev => ({ ...prev, lateArrivalPenalty: parseInt(e.target.value) || 0 }))}
-                        className="table-search-input p-1"
-                        style={{ width: '80px', height: '24px' }}
-                      />
-                    </div>
-                    <div className="flex-center justify-between">
-                      <span>OT Hourly Pay Rate:</span>
-                      <input
-                        type="number"
-                        value={attendanceConfigs.overtimeHourlyRate}
-                        onChange={(e) => setAttendanceConfigs(prev => ({ ...prev, overtimeHourlyRate: parseInt(e.target.value) || 0 }))}
-                        className="table-search-input p-1"
-                        style={{ width: '80px', height: '24px' }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ==================== TAB CONTENT: SALARY STRUCTURES ==================== */}
       {activeTab === 'structures' && perspective !== 'employee' && (
@@ -1583,103 +1320,6 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         </div>
       )}
 
-      {/* ==================== TAB CONTENT: REIMBURSEMENTS ==================== */}
-      {activeTab === 'reimbursements' && (
-        <div className="flex-column grid-gap animate-fade-in">
-          <div className="flex-center justify-between">
-            <h3 className="card-sec-title">Reimbursement Claims Tracker</h3>
-            {perspective === 'employee' && (
-              <Button
-                variant="primary"
-                size="sm"
-                icon={Plus}
-                onClick={() => {
-                  const newClaim = {
-                    id: `REIM-${Date.now().toString().slice(-3)}`,
-                    employeeId: currentUser?.id || 'EMP-2026-001',
-                    employeeName: currentUser?.name || 'Aarav Sharma',
-                    category: 'Fuel Expenses',
-                    amount: 3200,
-                    requestDate: new Date().toISOString().split('T')[0],
-                    status: 'Pending',
-                    approvedBy: '—'
-                  };
-                  setReimbursements(prev => [newClaim, ...prev]);
-                  addPageToast('success', 'Submitted Fuel Reimbursement Request.');
-                }}
-              >
-                Submit Expense Claim
-              </Button>
-            )}
-          </div>
-
-          <div className="card table-wrapper-card">
-            <div className="overflow-x-auto">
-              <table className="payroll-data-table">
-                <thead>
-                  <tr>
-                    <th>Request ID</th>
-                    <th>Employee</th>
-                    <th>Expense Category</th>
-                    <th>Amount</th>
-                    <th>Request Date</th>
-                    <th>Status</th>
-                    <th>Reviewed By</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scopedReimbursements.map(r => (
-                    <tr key={r.id}>
-                      <td className="font-semibold">{r.id}</td>
-                      <td>{r.employeeName}</td>
-                      <td><span className="text-info font-medium">{r.category}</span></td>
-                      <td className="font-semibold">{formatCurrency(r.amount)}</td>
-                      <td>{r.requestDate}</td>
-                      <td>
-                        <Badge variant={
-                          r.status === 'Released' ? 'success' :
-                          r.status === 'Approved' ? 'info' : 'warning'
-                        }>
-                          {r.status}
-                        </Badge>
-                      </td>
-                      <td>{r.approvedBy}</td>
-                      <td>
-                        <div className="flex-center gap-2 justify-start">
-                          {perspective !== 'employee' && r.status === 'Pending' && (
-                            <>
-                              <button
-                                className="action-circle-btn success-btn"
-                                onClick={() => handleReimbursementStatus(r.id, 'Approved')}
-                                title="Approve Reimbursement"
-                              >
-                                <Check size={14} />
-                              </button>
-                              <button
-                                className="action-circle-btn text-danger"
-                                onClick={() => handleReimbursementStatus(r.id, 'Rejected')}
-                                title="Reject Reimbursement"
-                              >
-                                <X size={14} />
-                              </button>
-                            </>
-                          )}
-                          {perspective === 'super_admin' && r.status === 'Approved' && (
-                            <Button variant="secondary" size="sm" onClick={() => handleReimbursementStatus(r.id, 'Released')}>Release Payout</Button>
-                          )}
-                          {r.status === 'Released' && <span className="font-xsmall text-success font-semibold flex-center gap-1"><Check size={12} /> Settled</span>}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ==================== TAB CONTENT: LOANS & ADVANCES ==================== */}
       {activeTab === 'loans' && (
         <div className="flex-column grid-gap animate-fade-in">
@@ -1691,7 +1331,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               icon={Plus}
               onClick={() => {
                 setApplyForm({
-                  employeeId: 'EMP-2026-002',
+                  employeeId: employees[0]?.id || '',
                   type: 'Personal Loan',
                   amount: 50000,
                   emi: 5000,

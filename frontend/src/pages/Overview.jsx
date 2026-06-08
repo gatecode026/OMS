@@ -154,7 +154,7 @@ const MiniDonut = ({ percentage, color }) => {
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 const Overview = () => {
-  const { addToast } = useApp();
+  const { addToast, branches, departments } = useApp();
   const navigate = useNavigate();
   const loading = usePageLoading(600);
 
@@ -455,15 +455,15 @@ const Overview = () => {
           
           <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
             <option value="All">All Branches</option>
-            {mockBranchesList.map(b => (
-              <option key={b.id} value={b.name}>{b.name}</option>
+            {(branches && branches.length > 0 ? branches : mockBranchesList).map(b => (
+              <option key={b.id || b.name} value={b.name}>{b.name}</option>
             ))}
           </select>
           
           <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
             <option value="All">All Departments</option>
-            {mockDeptsList.map(d => (
-              <option key={d.name} value={d.name}>{d.name}</option>
+            {(departments && departments.length > 0 ? departments : mockDeptsList).map(d => (
+              <option key={d.id || d.name} value={d.name}>{d.name}</option>
             ))}
           </select>
           
@@ -1322,23 +1322,22 @@ const Overview = () => {
               <label>Branch Target</label>
               <select value={reportConfig.branch} onChange={(e) => setReportConfig(prev => ({ ...prev, branch: e.target.value }))}>
                 <option value="All">All Offices</option>
-                <option value="Jaipur HQ">Jaipur HQ</option>
-                <option value="Delhi Office">Delhi Office</option>
-                <option value="Mumbai Office">Mumbai Office</option>
-                <option value="Kolkata Office">Kolkata Office</option>
-                <option value="Chennai Office">Chennai Office</option>
+                {(branches && branches.length > 0 ? branches : [
+                  { name: 'Jaipur HQ' }, { name: 'Delhi Office' }, { name: 'Mumbai Office' }, { name: 'Kolkata Office' }, { name: 'Chennai Office' }
+                ]).map(b => (
+                  <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                ))}
               </select>
             </div>
             <div className="form-group-select">
               <label>Department Target</label>
               <select value={reportConfig.dept} onChange={(e) => setReportConfig(prev => ({ ...prev, dept: e.target.value }))}>
                 <option value="All">All Divisions</option>
-                <option value="IT">IT</option>
-                <option value="HR">HR</option>
-                <option value="Sales">Sales</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Finance">Finance</option>
-                <option value="Operations">Operations</option>
+                {(departments && departments.length > 0 ? departments : [
+                  { name: 'IT' }, { name: 'HR' }, { name: 'Sales' }, { name: 'Marketing' }, { name: 'Finance' }, { name: 'Operations' }
+                ]).map(d => (
+                  <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                ))}
               </select>
             </div>
           </div>

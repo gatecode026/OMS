@@ -4,6 +4,7 @@
  */
 
 import repository from './roles.repository.js';
+import overridesRepository from './overrides.repository.js';
 import logger from '../../config/logger.js';
 
 export const findAll = async (query) => {
@@ -31,10 +32,28 @@ export const deleteRecord = async (id, currentUser) => {
   return repository.remove(id);
 };
 
+export const findAllOverrides = async (query) => {
+  logger.info('Executing RolesService::findAllOverrides query');
+  return overridesRepository.find(query);
+};
+
+export const createOverrideRecord = async (data, currentUser) => {
+  logger.info('Executing RolesService::createOverrideRecord by user: ' + currentUser?.id);
+  return overridesRepository.save(data);
+};
+
+export const deleteOverrideRecord = async (id, currentUser) => {
+  logger.info('Executing RolesService::deleteOverrideRecord for: ' + id + ' by user: ' + currentUser?.id);
+  return overridesRepository.remove(id);
+};
+
 export default {
   findAll,
   findById,
   createRecord,
   updateRecord,
-  deleteRecord
+  deleteRecord,
+  findAllOverrides,
+  createOverrideRecord,
+  deleteOverrideRecord
 };

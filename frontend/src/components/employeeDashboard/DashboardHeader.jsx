@@ -12,7 +12,7 @@ const DashboardHeader = ({ currentUser }) => {
       <div className="flex-column gap-1">
         <h1 className="bold-text">Employee Dashboard</h1>
         <p className="subtitle">
-          Welcome to your personalized workspace. Track your attendance, tasks, projects, daily work reports, leave balance, performance, notifications, and work activities from a single dashboard.
+          Welcome to your personalized workspace. Track your attendance, tasks, projects, work reports, leave balance, performance, notifications, and work activities from a single dashboard.
         </p>
       </div>
       <div className="flex-center gap-3">
