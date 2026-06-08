@@ -18,7 +18,7 @@ import {
   RefreshCw, Settings, Users, Cpu, TrendingUp, TrendingDown,
   ChevronRight, AlertTriangle, CheckSquare, Coffee, Home,
   Smartphone, Fingerprint, Wifi, Eye, Share2, MoreHorizontal,
-  Target, Layers, BookOpen, Briefcase, Building, Monitor, Smartphone as MobileIcon
+  Target, Layers, BookOpen, Briefcase, Building, Monitor
 } from 'lucide-react';
 
 const Attendance = () => {
@@ -30,8 +30,24 @@ const Attendance = () => {
     updateAttendanceRecord,
     addAttendanceRecord,
     updateEmployee,
-    addToast
+    addToast,
+    currentUser,
+    currentUserRole
   } = useApp();
+
+  const scopedEmployees = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin') return employees;
+    if (currentUserRole === 'branch_admin') {
+      return employees.filter(e => e.branch === currentUser?.branch);
+    }
+    if (currentUserRole === 'dept_admin') {
+      return employees.filter(e => e.department === currentUser?.department);
+    }
+    if (currentUserRole === 'employee') {
+      return employees.filter(e => e.id === currentUser?.id);
+    }
+    return employees;
+  }, [employees, currentUser, currentUserRole]);
 
   // Active view tab state
   const [activeSection, setActiveSection] = useState('overview');
@@ -77,6 +93,19 @@ const Attendance = () => {
     source: 'Web Portal'
   });
 
+  useEffect(() => {
+    if (currentUser && currentUserRole === 'employee') {
+      setMarkFormData(prev => ({
+        ...prev,
+        employeeId: currentUser.id,
+        employeeName: currentUser.name,
+        department: currentUser.department || '',
+        branch: currentUser.branch || '',
+        workMode: currentUser.workMode || 'Work From Office'
+      }));
+    }
+  }, [currentUser, currentUserRole]);
+
   // Assign Shift state
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
   const [shiftFormData, setShiftFormData] = useState({
@@ -88,7 +117,23 @@ const Attendance = () => {
   const [automationRules, setAutomationRules] = useState(() => {
     const saved = localStorage.getItem('attendance_automation_rules');
     if (saved) {
-      return JSON.parse(saved);
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map(rule => {
+            let icon = Cpu;
+            if (rule.id === 1) icon = UserMinus;
+            else if (rule.id === 2) icon = Bell;
+            else if (rule.id === 3) icon = Clock;
+            else if (rule.id === 4) icon = FileText;
+            else if (rule.id === 5) icon = Target;
+            else if (rule.id === 6) icon = Smartphone;
+            return { ...rule, icon };
+          });
+        }
+      } catch (e) {
+        console.error("Error parsing automation rules from localStorage", e);
+      }
     }
     return [
       { id: 1, name: 'Auto Mark Absent', desc: 'Mark absent if no punch by 11 AM', active: true, icon: UserMinus },
@@ -116,7 +161,7 @@ const Attendance = () => {
 
   // Get work mode counts (responds to filters)
   const workModeStats = useMemo(() => {
-    const filteredEmployees = employees.filter(e => {
+    const filteredEmployees = scopedEmployees.filter(e => {
       const matchesSearch = searchQuery
         ? e.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           e.id?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -131,7 +176,7 @@ const Attendance = () => {
     const wfh = filteredEmployees.filter(e => e.workMode === 'Work From Home' || e.workMode === 'WFH').length;
     const hybrid = filteredEmployees.filter(e => e.workMode === 'Hybrid').length;
     return { office, wfh, hybrid, total: filteredEmployees.length };
-  }, [employees, searchQuery, deptFilter, branchFilter, shiftFilter]);
+  }, [scopedEmployees, searchQuery, deptFilter, branchFilter, shiftFilter]);
 
 
   // Modals Actions
@@ -270,7 +315,22 @@ const Attendance = () => {
 
   // Process and Filter Attendance Ledger
   const ledgerData = useMemo(() => {
-    return attendance.map(item => {
+    const scopedAttendance = attendance.filter(item => {
+      if (!currentUserRole || currentUserRole === 'super_admin') return true;
+      const emp = employees.find(e => e.id === item.employeeId || e.name === item.employeeName);
+      if (currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (currentUserRole === 'dept_admin') {
+        return item.department === currentUser?.department || emp?.department === currentUser?.department;
+      }
+      if (currentUserRole === 'employee') {
+        return item.employeeId === currentUser?.id || emp?.id === currentUser?.id;
+      }
+      return true;
+    });
+
+    return scopedAttendance.map(item => {
       const empDetails = employees.find(e => e.id === item.employeeId || e.name === item.employeeName);
       let status = item.status;
       if ((status === 'On Leave' || status === 'Leave') && empDetails && empDetails.leaveHistory) {
@@ -295,7 +355,7 @@ const Attendance = () => {
         overtime: item.overtime || (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
       };
     });
-  }, [attendance, employees]);
+  }, [attendance, employees, currentUserRole, currentUser]);
 
   // Filter Predicates
   const filteredAttendance = useMemo(() => {
@@ -340,7 +400,7 @@ const Attendance = () => {
 
   // Calculations for Summary Statistics based on active filters
   const filteredEmployeesCount = useMemo(() => {
-    return employees.filter(e => {
+    return scopedEmployees.filter(e => {
       const matchesSearch = searchQuery
         ? e.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           e.id?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -350,7 +410,7 @@ const Attendance = () => {
       const matchesShift = shiftFilter ? e.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
       return matchesSearch && matchesDept && matchesBranch && matchesShift;
     }).length;
-  }, [employees, searchQuery, deptFilter, branchFilter, shiftFilter]);
+  }, [scopedEmployees, searchQuery, deptFilter, branchFilter, shiftFilter]);
 
   const totalEmployees = filteredEmployeesCount;
   const totalPresent = useMemo(() => kpiFilteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length, [kpiFilteredAttendance]);
@@ -408,105 +468,111 @@ const Attendance = () => {
   };
 
   // Data Table Columns
-  const columns = [
-    {
-      key: 'employeeId',
-      header: FIELD_LABELS.id,
-      sortable: true,
-      render: (row) => (
-        <span
-          className="clickable-emp-name"
-          onClick={() => navigate(`/employees/${row.employeeId}?tab=attendance_punch`)}
-          style={{ fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
-        >
-          {row.employeeId}
-        </span>
-      )
-    },
-    {
-      key: 'employeeName',
-      header: FIELD_LABELS.name,
-      sortable: true,
-      render: (row) => (
-        <div
-          className="flex-center gap-3 justify-start clickable-emp-name"
-          onClick={() => navigate(`/employees/${row.employeeId}?tab=attendance_punch`)}
-          style={{ cursor: 'pointer' }}
-        >
-          <Avatar name={row.employeeName} size="sm" />
-          <span className="emp-name-bold">{row.employeeName}</span>
-        </div>
-      )
-    },
-    {
-      key: 'department',
-      header: FIELD_LABELS.department,
-      sortable: true,
-      render: (row) => (
-        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{row.department}</span>
-      )
-    },
-    {
-      key: 'branch',
-      header: FIELD_LABELS.branch,
-      sortable: true,
-      render: (row) => (
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{row.branch}</span>
-      )
-    },
-    { key: 'shift', header: FIELD_LABELS.shiftTiming, sortable: true },
-    { key: 'punchIn', header: FIELD_LABELS.punchInTime, sortable: true },
-    { key: 'punchOut', header: FIELD_LABELS.punchOutTime, sortable: true },
-    { key: 'breakTime', header: 'Break', sortable: true },
-    {
-      key: 'totalHours',
-      header: FIELD_LABELS.workingHours,
-      sortable: true,
-      render: (row) => <span>{row.totalHours > 0 ? `${row.totalHours} hrs` : '--'}</span>
-    },
-    {
-      key: 'overtime',
-      header: 'Overtime',
-      sortable: true,
-      render: (row) => <span style={{ color: row.overtime !== '0 hrs' ? 'var(--color-success)' : 'var(--text-muted)', fontWeight: row.overtime !== '0 hrs' ? 600 : 400 }}>{row.overtime}</span>
-    },
-    {
-      key: 'status',
-      header: FIELD_LABELS.attendanceStatus,
-      sortable: true,
-      render: (row) => getStatusBadge(row.status)
-    },
-    {
-      key: 'source',
-      header: 'Source',
-      sortable: true,
-      render: (row) => (
-        <span className="att-source-tag" title="Source Device">
-          {row.source === 'Biometric' ? '⚙️ Bio' : row.source === 'GPS' ? '📍 GPS' : row.source === 'RFID' ? '💳 RFID' : row.source === 'Web Portal' ? '💻 Web' : '📱 App'}
-        </span>
-      )
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (row) => (
-        <button
-          className="circle-action-btn btn-success-circle"
-          onClick={() => handleOpenEdit(row)}
-          title="Edit Log"
-          style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-        >
-          <Edit2 size={12} />
-        </button>
-      )
+  const columns = useMemo(() => {
+    const cols = [
+      {
+        key: 'employeeId',
+        header: FIELD_LABELS.id,
+        sortable: true,
+        render: (row) => (
+          <span
+            className="clickable-emp-name"
+            onClick={() => navigate(`/employees/${row.employeeId}?tab=attendance_punch`)}
+            style={{ fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
+          >
+            {row.employeeId}
+          </span>
+        )
+      },
+      {
+        key: 'employeeName',
+        header: FIELD_LABELS.name,
+        sortable: true,
+        render: (row) => (
+          <div
+            className="flex-center gap-3 justify-start clickable-emp-name"
+            onClick={() => navigate(`/employees/${row.employeeId}?tab=attendance_punch`)}
+            style={{ cursor: 'pointer' }}
+          >
+            <Avatar name={row.employeeName} size="sm" />
+            <span className="emp-name-bold">{row.employeeName}</span>
+          </div>
+        )
+      },
+      {
+        key: 'department',
+        header: FIELD_LABELS.department,
+        sortable: true,
+        render: (row) => (
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{row.department}</span>
+        )
+      },
+      {
+        key: 'branch',
+        header: FIELD_LABELS.branch,
+        sortable: true,
+        render: (row) => (
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{row.branch}</span>
+        )
+      },
+      { key: 'shift', header: FIELD_LABELS.shiftTiming, sortable: true },
+      { key: 'punchIn', header: FIELD_LABELS.punchInTime, sortable: true },
+      { key: 'punchOut', header: FIELD_LABELS.punchOutTime, sortable: true },
+      { key: 'breakTime', header: 'Break', sortable: true },
+      {
+        key: 'totalHours',
+        header: FIELD_LABELS.workingHours,
+        sortable: true,
+        render: (row) => <span>{row.totalHours > 0 ? `${row.totalHours} hrs` : '--'}</span>
+      },
+      {
+        key: 'overtime',
+        header: 'Overtime',
+        sortable: true,
+        render: (row) => <span style={{ color: row.overtime !== '0 hrs' ? 'var(--color-success)' : 'var(--text-muted)', fontWeight: row.overtime !== '0 hrs' ? 600 : 400 }}>{row.overtime}</span>
+      },
+      {
+        key: 'status',
+        header: FIELD_LABELS.attendanceStatus,
+        sortable: true,
+        render: (row) => getStatusBadge(row.status)
+      },
+      {
+        key: 'source',
+        header: 'Source',
+        sortable: true,
+        render: (row) => (
+          <span className="att-source-tag" title="Source Device">
+            {row.source === 'Biometric' ? '⚙️ Bio' : row.source === 'GPS' ? '📍 GPS' : row.source === 'RFID' ? '💳 RFID' : row.source === 'Web Portal' ? '💻 Web' : '📱 App'}
+          </span>
+        )
+      },
+      {
+        key: 'actions',
+        header: 'Actions',
+        render: (row) => (
+          <button
+            className="circle-action-btn btn-success-circle"
+            onClick={() => handleOpenEdit(row)}
+            title="Edit Log"
+            style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+          >
+            <Edit2 size={12} />
+          </button>
+        )
+      }
+    ];
+    if (currentUserRole === 'employee') {
+      return cols.filter(c => c.key !== 'actions');
     }
-  ];
+    return cols;
+  }, [currentUserRole, employees, navigate]);
 
   // Branch data for Branch Management
   const branchData = useMemo(() => {
     const branches = ['Jaipur', 'Delhi', 'Mumbai', 'Bangalore'];
     return branches.map(branch => {
-      const branchEmployees = employees.filter(e => e.branch === branch);
+      const branchEmployees = scopedEmployees.filter(e => e.branch === branch);
       const activeToday = filteredAttendance.filter(a => a.branch === branch && ['Present', 'Overtime'].includes(a.status)).length;
       return {
         name: branch,
@@ -518,7 +584,7 @@ const Attendance = () => {
         rate: branchEmployees.length > 0 ? Math.round((activeToday / branchEmployees.length) * 100) : 0
       };
     });
-  }, [employees, filteredAttendance]);
+  }, [scopedEmployees, filteredAttendance]);
 
   // Live punch feed data with real employees
   const livePunchFeed = useMemo(() => {
@@ -567,12 +633,16 @@ const Attendance = () => {
           <Button variant="secondary" onClick={() => addToast('info', 'Refreshing live data...')} icon={RefreshCw} size="sm">
             Refresh
           </Button>
-          <Button variant="secondary" onClick={() => setShiftModalOpen(true)} icon={Clock} size="sm">
-            Assign Shift
-          </Button>
-          <Button variant="secondary" onClick={handleApproveAll} icon={ShieldCheck} size="sm">
-            Approve All
-          </Button>
+          {currentUserRole !== 'employee' && (
+            <>
+              <Button variant="secondary" onClick={() => setShiftModalOpen(true)} icon={Clock} size="sm">
+                Assign Shift
+              </Button>
+              <Button variant="secondary" onClick={handleApproveAll} icon={ShieldCheck} size="sm">
+                Approve All
+              </Button>
+            </>
+          )}
           <Button variant="primary" onClick={() => setMarkModalOpen(true)} icon={Plus}>
             Mark Attendance
           </Button>
@@ -880,6 +950,42 @@ const Attendance = () => {
               </div>
             </div>
           </div>
+
+          {currentUserRole !== 'employee' && (
+            <div className="card att-automation-rules-card" style={{ gridColumn: 'span 2' }}>
+              <div className="att-card-header">
+                <div className="att-card-title">
+                  <Cpu size={16} style={{ color: 'var(--color-primary)' }} />
+                  <span>Attendance Automation & Alert Rules</span>
+                </div>
+                <Button variant="secondary" size="sm" onClick={handleScheduleReport}>
+                  Schedule Reports
+                </Button>
+              </div>
+              <div className="att-rules-list">
+                {automationRules.map(rule => {
+                  const RuleIcon = rule.icon || Cpu;
+                  return (
+                    <div key={rule.id} className="att-rule-row">
+                      <div className={`att-rule-icon-wrap ${rule.active ? 'att-rule-icon-on' : 'att-rule-icon-off'}`}>
+                        <RuleIcon size={16} />
+                      </div>
+                      <div className="att-rule-info">
+                        <strong>{rule.name}</strong>
+                        <span>{rule.desc}</span>
+                      </div>
+                      <button
+                        className={`att-rule-toggle ${rule.active ? 'att-rule-on' : 'att-rule-off'}`}
+                        onClick={() => toggleAutomationRule(rule.id)}
+                      >
+                        {rule.active ? 'Active' : 'Disabled'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1429,7 +1535,7 @@ const Attendance = () => {
               onChange={(e) => setShiftFormData(prev => ({ ...prev, employeeId: e.target.value }))}
               style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
               <option value="">Choose employee...</option>
-              {employees.map(emp => (
+              {scopedEmployees.map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.name} — {emp.shift || 'Flexible'}</option>
               ))}
             </select>
@@ -1448,6 +1554,106 @@ const Attendance = () => {
         </div>
       </Modal>
 
+      {/* Mark Attendance Modal */}
+      <Modal isOpen={markModalOpen} onClose={() => setMarkModalOpen(false)} title="Mark Attendance Log" size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setMarkModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleMarkSubmit}>Mark Attendance</Button>
+          </div>
+        }
+      >
+        <div className="create-task-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+          <div className="form-field">
+            <label>Select Employee</label>
+            {currentUserRole === 'employee' ? (
+              <input type="text" value={currentUser?.name || ''} disabled style={{ opacity: 0.7, cursor: 'not-allowed', background: 'rgba(255,255,255,0.02)' }} />
+            ) : (
+              <select value={markFormData.employeeId}
+                onChange={(e) => {
+                  const emp = employees.find(empData => empData.id === e.target.value);
+                  setMarkFormData(prev => ({
+                    ...prev,
+                    employeeId: e.target.value,
+                    employeeName: emp ? emp.name : '',
+                    department: emp ? emp.department : '',
+                    branch: emp ? emp.branch : '',
+                    workMode: emp ? emp.workMode : 'Work From Office'
+                  }));
+                }}
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                <option value="">Choose employee...</option>
+                {scopedEmployees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                ))}
+              </select>
+            )}
+          </div>
+          
+          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
+            <div>
+              <label>Punch In Time</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" placeholder="e.g. 09:00 AM" value={markFormData.punchIn}
+                  onChange={(e) => setMarkFormData(prev => ({ ...prev, punchIn: e.target.value }))}
+                  style={{ flex: 1 }} />
+                <Button variant="secondary" size="sm" onClick={handleAutoPunchIn}>Now</Button>
+              </div>
+            </div>
+            <div>
+              <label>Punch Out Time</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" placeholder="e.g. 06:00 PM" value={markFormData.punchOut}
+                  onChange={(e) => setMarkFormData(prev => ({ ...prev, punchOut: e.target.value }))}
+                  style={{ flex: 1 }} />
+                <Button variant="secondary" size="sm" onClick={handleAutoPunchOut}>Now</Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
+            <div>
+              <label>Work Mode</label>
+              <select value={markFormData.workMode}
+                onChange={(e) => setMarkFormData(prev => ({ ...prev, workMode: e.target.value }))}
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                <option value="Work From Office">Work From Office</option>
+                <option value="Work From Home">Work From Home</option>
+                <option value="Hybrid">Hybrid</option>
+              </select>
+            </div>
+            <div>
+              <label>Break Time</label>
+              <input type="text" placeholder="e.g. 45 mins" value={markFormData.breakTime}
+                onChange={(e) => setMarkFormData(prev => ({ ...prev, breakTime: e.target.value }))} />
+            </div>
+          </div>
+
+          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
+            <div>
+              <label>Status</label>
+              <select value={markFormData.status}
+                onChange={(e) => setMarkFormData(prev => ({ ...prev, status: e.target.value }))}
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                <option value="Present">Present</option>
+                <option value="Late">Late</option>
+                <option value="Absent">Absent</option>
+                <option value="Half Day">Half Day</option>
+                <option value="Work From Home">Work From Home</option>
+                <option value="On Leave">On Leave</option>
+                <option value="Overtime">Overtime</option>
+              </select>
+            </div>
+            <div>
+              <label>Date</label>
+              <input type="date" value={markFormData.date}
+                onChange={(e) => setMarkFormData(prev => ({ ...prev, date: e.target.value }))}
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
       {/* Floating Bottom Quick Actions Bar */}
       <div className="att-floating-actions-bar">
         <div className="att-fab-title">
@@ -1457,14 +1663,14 @@ const Attendance = () => {
         <div className="att-fab-buttons">
           {[
             { label: 'Mark Attendance', icon: CheckSquare, color: '#4ade80', action: () => setMarkModalOpen(true) },
-            { label: 'Assign Shift', icon: Clock, color: '#60a5fa', action: () => setShiftModalOpen(true) },
-            { label: 'Request Check-In', icon: UserCheck, color: '#fbbf24', action: handleRequestAttendance },
-            { label: 'Approve All', icon: ShieldCheck, color: '#a78bfa', action: handleApproveAll },
-            { label: 'Schedule Report', icon: Calendar, color: '#f472b6', action: handleScheduleReport },
+            { label: 'Assign Shift', icon: Clock, color: '#60a5fa', action: () => setShiftModalOpen(true), adminOnly: true },
+            { label: 'Request Check-In', icon: UserCheck, color: '#fbbf24', action: handleRequestAttendance, adminOnly: true },
+            { label: 'Approve All', icon: ShieldCheck, color: '#a78bfa', action: handleApproveAll, adminOnly: true },
+            { label: 'Schedule Report', icon: Calendar, color: '#f472b6', action: handleScheduleReport, adminOnly: true },
             { label: 'Download Report', icon: Download, color: '#38bdf8', action: () => handleExport('CSV') },
-            { label: 'Alerts', icon: Bell, color: '#fb923c', action: () => addToast('info', 'Showing attendance alerts...') },
-            { label: 'System Status', icon: Activity, color: '#2ec4b6', action: () => addToast('success', 'All systems online.') },
-          ].map((action, i) => {
+            { label: 'Alerts', icon: Bell, color: '#fb923c', action: () => addToast('info', 'Showing attendance alerts...'), adminOnly: true },
+            { label: 'System Status', icon: Activity, color: '#2ec4b6', action: () => addToast('success', 'All systems online.'), adminOnly: true },
+          ].filter(act => !act.adminOnly || currentUserRole !== 'employee').map((action, i) => {
             const Icon = action.icon;
             return (
               <button key={i} className="att-fab-btn" onClick={action.action} title={action.label}>

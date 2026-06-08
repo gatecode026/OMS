@@ -61,7 +61,7 @@ import {
 
 const Payroll = () => {
   const isLoading = usePageLoading(600);
-  const { employees, runPayroll, showConfirm, currentUserRole } = useApp();
+  const { employees, runPayroll, showConfirm, currentUserRole, currentUser } = useApp();
 
   // Selected Month/Year
   const [month, setMonth] = useState('June');
@@ -69,6 +69,12 @@ const Payroll = () => {
 
   // Role Perspective override (defaults to currentUserRole, but can be switched)
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
+
+  React.useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('employee');
+    }
+  }, [currentUserRole]);
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -213,9 +219,119 @@ const Payroll = () => {
     { employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', department: 'Human Resources', designation: 'HR Executive', branch: 'Delhi HQ', status: 'Released' }
   ]);
 
+  const scopedPayrollState = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return payrollState;
+    return payrollState.filter(p => {
+      const emp = employees.find(e => e.id === p.employeeId);
+      if (perspective === 'employee' || currentUserRole === 'employee') {
+        return p.employeeId === currentUser?.id;
+      }
+      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        return emp?.department === currentUser?.department;
+      }
+      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+        return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
+      }
+      return true;
+    });
+  }, [payrollState, employees, currentUser, currentUserRole, perspective]);
+
+  const scopedReimbursements = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return reimbursements;
+    return reimbursements.filter(r => {
+      const emp = employees.find(e => e.id === r.employeeId);
+      if (perspective === 'employee' || currentUserRole === 'employee') {
+        return r.employeeId === currentUser?.id;
+      }
+      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        return emp?.department === currentUser?.department;
+      }
+      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+        return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
+      }
+      return true;
+    });
+  }, [reimbursements, employees, currentUser, currentUserRole, perspective]);
+
+  const scopedLoans = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return loans;
+    return loans.filter(l => {
+      const emp = employees.find(e => e.id === l.employeeId);
+      if (perspective === 'employee' || currentUserRole === 'employee') {
+        return l.employeeId === currentUser?.id;
+      }
+      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        return emp?.department === currentUser?.department;
+      }
+      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+        return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
+      }
+      return true;
+    });
+  }, [loans, employees, currentUser, currentUserRole, perspective]);
+
+  const scopedAdvances = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return advances;
+    return advances.filter(a => {
+      const emp = employees.find(e => e.id === a.employeeId);
+      if (perspective === 'employee' || currentUserRole === 'employee') {
+        return a.employeeId === currentUser?.id;
+      }
+      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        return emp?.department === currentUser?.department;
+      }
+      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+        return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
+      }
+      return true;
+    });
+  }, [advances, employees, currentUser, currentUserRole, perspective]);
+
+  const scopedBonuses = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return bonuses;
+    return bonuses.filter(b => {
+      const emp = employees.find(e => e.id === b.employeeId);
+      if (perspective === 'employee' || currentUserRole === 'employee') {
+        return b.employeeId === currentUser?.id;
+      }
+      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        return emp?.department === currentUser?.department;
+      }
+      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+        return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
+      }
+      return true;
+    });
+  }, [bonuses, employees, currentUser, currentUserRole, perspective]);
+
+  const scopedAuditLogs = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return auditLogs;
+    return auditLogs.filter(log => {
+      if (perspective === 'employee' || currentUserRole === 'employee') {
+        return log.user === currentUser?.name;
+      }
+      return true;
+    });
+  }, [auditLogs, currentUser, currentUserRole, perspective]);
+
   // --- Dynamic Calculator Engine logic ---
   const calculatedPayrollData = useMemo(() => {
-    return payrollState.map(p => {
+    return scopedPayrollState.map(p => {
       const empId = p.employeeId;
       const struct = salaryStructures[empId] || { basic: 50000, hra: 20000, travel: 3000, medical: 2000, special: 1000, pf: 6000, esi: 0, pt: 200, tds: 4000 };
       const att = attendanceDaysMap[empId] || { present: 22, absent: 0, halfDays: 0, paidLeaves: 2, unpaidLeaves: 0, overtimeHours: 0, lateArrivals: 0 };
@@ -294,9 +410,9 @@ const Payroll = () => {
   const totalIncentives = calculatedPayrollData.reduce((sum, curr) => sum + curr.bonusAmount, 0);
   const totalDeductionsSum = calculatedPayrollData.reduce((sum, curr) => sum + curr.totalDeductions, 0);
   
-  const totalReimbursementsPending = reimbursements.filter(r => r.status === 'Pending').length;
-  const pendingReimbursementAmount = reimbursements.filter(r => r.status === 'Pending').reduce((sum, curr) => sum + curr.amount, 0);
-  const outstandingAdvances = advances.reduce((sum, curr) => sum + curr.remainingBalance, 0);
+  const totalReimbursementsPending = scopedReimbursements.filter(r => r.status === 'Pending').length;
+  const pendingReimbursementAmount = scopedReimbursements.filter(r => r.status === 'Pending').reduce((sum, curr) => sum + curr.amount, 0);
+  const outstandingAdvances = scopedAdvances.reduce((sum, curr) => sum + curr.remainingBalance, 0);
 
   const processedCount = calculatedPayrollData.filter(p => p.status === 'Released').length;
   const pendingCount = calculatedPayrollData.filter(p => p.status !== 'Released').length;
@@ -523,24 +639,24 @@ const Payroll = () => {
         }
       }
 
-      // If perspective is Employee, restrict view to current employee only (Aarav Sharma is EMP-2026-001)
-      const matchesPerspective = perspective === 'employee' ? row.employeeId === 'EMP-2026-001' : true;
+      // If perspective is Employee, restrict view to current employee only
+      const matchesPerspective = perspective === 'employee' ? row.employeeId === (currentUser?.id || 'EMP-2026-001') : true;
 
       return matchesSearch && matchesDept && matchesBranch && matchesStatus && matchesPerspective;
     });
-  }, [calculatedPayrollData, searchQuery, filterDept, filterBranch, filterStatus, perspective]);
+  }, [calculatedPayrollData, searchQuery, filterDept, filterBranch, filterStatus, perspective, currentUser]);
 
   // Selected Employee Data for Details Tab
   const selectedEmployeeObj = useMemo(() => {
-    const targetId = selectedEmpId || 'EMP-2026-002';
-    return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[1];
-  }, [calculatedPayrollData, selectedEmpId]);
+    const targetId = selectedEmpId || (currentUserRole === 'employee' || perspective === 'employee' ? currentUser?.id : 'EMP-2026-002');
+    return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
+  }, [calculatedPayrollData, selectedEmpId, currentUser, currentUserRole, perspective]);
 
   // Selected Employee Payslip Modal Data
   const payslipEmployeeObj = useMemo(() => {
-    const targetId = payslipEmpId || 'EMP-2026-001';
+    const targetId = payslipEmpId || (currentUserRole === 'employee' || perspective === 'employee' ? currentUser?.id : 'EMP-2026-001');
     return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
-  }, [calculatedPayrollData, payslipEmpId]);
+  }, [calculatedPayrollData, payslipEmpId, currentUser, currentUserRole, perspective]);
 
   // Download PDF Action handler
   const handleDownloadPayslip = (empObj) => {
@@ -660,23 +776,25 @@ BANK PAYMENT & COMPLIANCE DETAIL:
 
         <div className="flex-center gap-3 wrap-content">
           {/* Perspective Switching simulation */}
-          <div className="flex-center gap-1 perspective-container">
-            <span className="text-muted font-small uppercase font-semibold">Perspective:</span>
-            <select
-              value={perspective}
-              onChange={(e) => {
-                setPerspective(e.target.value);
-                addPageToast('info', `Switched view perspective to: ${e.target.value.toUpperCase()}`);
-              }}
-              className="payroll-selector perspective-select"
-            >
-              <option value="employee">Employee View</option>
-              <option value="team_leader">Team Leader</option>
-              <option value="branch_admin">HR Manager</option>
-              <option value="manager">Manager</option>
-              <option value="super_admin">Super Admin</option>
-            </select>
-          </div>
+          {currentUserRole !== 'employee' && (
+            <div className="flex-center gap-1 perspective-container">
+              <span className="text-muted font-small uppercase font-semibold">Perspective:</span>
+              <select
+                value={perspective}
+                onChange={(e) => {
+                  setPerspective(e.target.value);
+                  addPageToast('info', `Switched view perspective to: ${e.target.value.toUpperCase()}`);
+                }}
+                className="payroll-selector perspective-select"
+              >
+                <option value="employee">Employee View</option>
+                <option value="team_leader">Team Leader</option>
+                <option value="branch_admin">HR Manager</option>
+                <option value="manager">Manager</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+            </div>
+          )}
 
           <select value={month} onChange={(e) => setMonth(e.target.value)} className="payroll-selector">
             <option value="January">January</option>
@@ -1416,7 +1534,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   </tr>
                 </thead>
                 <tbody>
-                  {bonuses.map(b => (
+                  {scopedBonuses.map(b => (
                     <tr key={b.id}>
                       <td className="font-semibold">{b.id}</td>
                       <td>{b.employeeName}</td>
@@ -1478,8 +1596,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 onClick={() => {
                   const newClaim = {
                     id: `REIM-${Date.now().toString().slice(-3)}`,
-                    employeeId: 'EMP-2026-001',
-                    employeeName: 'Aarav Sharma',
+                    employeeId: currentUser?.id || 'EMP-2026-001',
+                    employeeName: currentUser?.name || 'Aarav Sharma',
                     category: 'Fuel Expenses',
                     amount: 3200,
                     requestDate: new Date().toISOString().split('T')[0],
@@ -1511,7 +1629,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   </tr>
                 </thead>
                 <tbody>
-                  {reimbursements.map(r => (
+                  {scopedReimbursements.map(r => (
                     <tr key={r.id}>
                       <td className="font-semibold">{r.id}</td>
                       <td>{r.employeeName}</td>
@@ -1593,7 +1711,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <h4 className="text-primary font-bold">Active Employee Loans</h4>
               
               <div className="flex-column gap-4">
-                {loans.map(l => (
+                {scopedLoans.map(l => (
                   <div key={l.id} className="p-3 border rounded bg-secondary flex-column gap-2">
                     <div className="flex-center justify-between font-small">
                       <span className="font-semibold">{l.employeeName} ({l.loanType})</span>
@@ -1616,7 +1734,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <h4 className="text-success font-bold">Salary Advances Outstanding</h4>
               
               <div className="flex-column gap-4">
-                {advances.map(a => (
+                {scopedAdvances.map(a => (
                   <div key={a.id} className="p-3 border rounded bg-secondary flex-column gap-2">
                     <div className="flex-center justify-between font-small">
                       <span className="font-semibold">{a.employeeName}</span>
@@ -1760,7 +1878,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     </tr>
                   </thead>
                   <tbody>
-                    {auditLogs.map(log => (
+                    {scopedAuditLogs.map(log => (
                       <tr key={log.id}>
                         <td className="font-semibold">{log.user}</td>
                         <td>{log.action}</td>
@@ -2125,9 +2243,22 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   onChange={(e) => setBonusForm(prev => ({ ...prev, employeeId: e.target.value }))}
                   className="table-filter-select width-full p-2"
                 >
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
-                  ))}
+                  {employees
+                    .filter(emp => {
+                      if (currentUserRole === 'manager' || perspective === 'manager') {
+                        return emp.department === currentUser?.department;
+                      }
+                      if (currentUserRole === 'team_leader' || perspective === 'team_leader') {
+                        return emp.department === currentUser?.department || emp.team === currentUser?.team;
+                      }
+                      if (currentUserRole === 'branch_admin' || perspective === 'branch_admin') {
+                        return emp.branch === currentUser?.branch;
+                      }
+                      return true;
+                    })
+                    .map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                    ))}
                 </select>
               </div>
 
@@ -2194,9 +2325,11 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   onChange={(e) => setApplyForm(prev => ({ ...prev, employeeId: e.target.value }))}
                   className="table-filter-select width-full p-2"
                 >
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
-                  ))}
+                  {employees
+                    .filter(emp => (currentUserRole === 'employee' || perspective === 'employee' ? emp.id === currentUser?.id : true))
+                    .map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                    ))}
                 </select>
               </div>
 

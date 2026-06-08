@@ -17,7 +17,8 @@ import {
   Info,
   Check,
   CheckCheck,
-  Search
+  Search,
+  Settings
 } from 'lucide-react';
 
 const Topbar = ({ onMenuToggle }) => {
@@ -278,6 +279,17 @@ const Topbar = ({ onMenuToggle }) => {
                   <h4 className="profile-panel-name">{currentUser?.name}</h4>
                   <p className="profile-panel-email">{currentUser?.email}</p>
                 </div>
+              </div>
+
+              <div className="profile-panel-actions">
+                <Link
+                  to="/my-profile"
+                  className="profile-action-link"
+                  onClick={() => setProfileOpen(false)}
+                >
+                  <Settings size={14} className="action-icon" />
+                  <span>Profile Settings</span>
+                </Link>
               </div>
               
               <div className="role-switcher-section">

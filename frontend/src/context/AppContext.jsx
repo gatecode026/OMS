@@ -6,8 +6,10 @@ import {
   mockPayroll,
   mockNotifications,
   mockActivityLogs,
-  mockRoles
+  mockRoles,
+  mockDailyReports
 } from '../data/mockData';
+
 
 const AppContext = createContext(undefined);
 
@@ -78,6 +80,76 @@ export const normalizeEmployee = (emp) => {
   normalized.employmentStatus = est;
   normalized.accountStatus = est;
 
+  // Address Parsing
+  if (typeof normalized.currentAddress === 'string') {
+    const parts = normalized.currentAddress.split(', ');
+    normalized.currentAddress = {
+      line1: parts[0] || normalized.currentAddress,
+      city: parts[1] || 'Jaipur',
+      state: parts[2] ? parts[2].split(' - ')[0] : 'Rajasthan',
+      country: 'India',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : '302015'
+    };
+  } else if (!normalized.currentAddress) {
+    normalized.currentAddress = { line1: '12 Lal Kothi', city: 'Jaipur', state: 'Rajasthan', country: 'India', pincode: '302015' };
+  }
+
+  if (typeof normalized.permanentAddress === 'string') {
+    const parts = normalized.permanentAddress.split(', ');
+    normalized.permanentAddress = {
+      line1: parts[0] || normalized.permanentAddress,
+      city: parts[1] || 'Jaipur',
+      state: parts[2] ? parts[2].split(' - ')[0] : 'Rajasthan',
+      country: 'India',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : '302015'
+    };
+  } else if (!normalized.permanentAddress) {
+    normalized.permanentAddress = { line1: '12 Lal Kothi', city: 'Jaipur', state: 'Rajasthan', country: 'India', pincode: '302015' };
+  }
+
+  // Emergency Contact
+  normalized.emergencyName = normalized.emergencyContactName || normalized.emergencyName || 'Priya Sharma';
+  normalized.emergencyRelation = normalized.emergencyRelation || 'Spouse';
+  normalized.emergencyMobile = normalized.emergencyContactPhone || normalized.emergencyMobile || '+91 98001 00001';
+
+  // Banking
+  normalized.bank = normalized.bank || {
+    accountName: normalized.name,
+    bankName: normalized.bankName || 'HDFC Bank',
+    branch: normalized.bankBranch || 'Jaipur Main',
+    accountNumber: normalized.bankAccountNumber || '1234567890',
+    ifsc: normalized.bankIfscCode || 'HDFC0001234',
+    upiId: normalized.bankUpiId || '',
+    verified: true
+  };
+
+  // Documents
+  normalized.documents = normalized.documents || [
+    { id: 'doc1', type: 'aadhaar', name: 'Aadhaar Card', status: 'verified', uploadedAt: '2025-02-01' },
+    { id: 'doc2', type: 'pan', name: 'PAN Card', status: 'verified', uploadedAt: '2025-02-01' },
+    { id: 'doc3', type: 'offer_letter', name: 'Offer Letter', status: 'available', uploadedAt: '2025-01-15' }
+  ];
+
+  // Activities
+  normalized.activities = normalized.activities || [
+    { id: 'act1', date: '2026-06-05', action: 'Photo Updated', details: 'Profile photo changed' },
+    { id: 'act2', date: '2026-06-04', action: 'Bank Verified', details: 'Bank account verified by admin' },
+    { id: 'act3', date: '2026-06-02', action: 'Password Changed', details: 'Security update' }
+  ];
+
+  // MFA
+  normalized.mfaEnabled = normalized.mfaEnabled || { email: true, mobile: true, authenticator: false };
+
+  // General fields
+  normalized.photoUrl = normalized.photoUrl || normalized.avatar || null;
+  normalized.dob = normalized.dob || '1995-03-15';
+  normalized.maritalStatus = normalized.maritalStatus || 'Married';
+  normalized.bloodGroup = normalized.bloodGroup || 'O+';
+  normalized.nationality = normalized.nationality || 'Indian';
+  normalized.officialEmail = normalized.officialEmail || normalized.email || '';
+  normalized.officialMobile = normalized.officialMobile || normalized.phone || '';
+  normalized.teamName = normalized.teamName || normalized.team || 'Operations Core';
+
   return normalized;
 };
 
@@ -93,6 +165,7 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState(mockNotifications);
   const [activityLogs, setActivityLogs] = useState(mockActivityLogs);
   const [roles, setRoles] = useState(mockRoles);
+  const [dailyReports, setDailyReports] = useState(mockDailyReports);
 
   // Shell Features States
   const [toasts, setToasts] = useState([]);
@@ -937,8 +1010,21 @@ export const AppProvider = ({ children }) => {
           : l
       )
     );
-    addActivityLog(`Rejected leave request for ${leave.employeeName}`, 'Leaves', 'danger');
-    addToast('error', `Leave request for ${leave.employeeName} rejected.`);
+  };
+
+  const applyLeave = (leaveData) => {
+    const newId = `LR-${String(leaveRequests.length + 1).padStart(3, '0')}`;
+    const newRequest = {
+      ...leaveData,
+      id: newId,
+      status: 'Pending',
+      appliedDate: new Date().toISOString().split('T')[0],
+      history: [{ date: new Date().toISOString().split('T')[0], status: 'Pending', comment: `Applied by ${leaveData.employeeName}` }],
+      approverNotes: ''
+    };
+    setLeaveRequests(prev => [newRequest, ...prev]);
+    addActivityLog(`Applied for ${leaveData.type} from ${leaveData.fromDate} to ${leaveData.toDate}`, 'Leaves', 'warning');
+    addToast('success', `Leave request ${newId} submitted successfully.`);
   };
 
   const addAttendanceRecord = (newRecord) => {
@@ -965,6 +1051,22 @@ export const AppProvider = ({ children }) => {
     );
     addActivityLog(`Moved task "${task.title}" to ${newStatus}`, 'Tasks', 'success');
     addToast('success', `Task moved to ${newStatus}.`);
+  };
+
+  const updateTaskProgress = (id, status, progress, remarks) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    setTasks(prev =>
+      prev.map(t => (t.id === id ? {
+        ...t,
+        status: status,
+        progress: Number(progress),
+        remarks: remarks || t.remarks
+      } : t))
+    );
+    addActivityLog(`Updated task "${task.title}" status to ${status} (${progress}%)`, 'Tasks', 'success');
+    addToast('success', `Task "${task.title}" updated successfully.`);
   };
 
   const addTask = (taskData) => {
@@ -1368,6 +1470,63 @@ export const AppProvider = ({ children }) => {
     addToast('success', `Payslip generated for ${employeeName}. Sent to Document Vault.`);
   };
 
+  // Daily Work Reports Handlers
+  const addDailyReport = (reportData) => {
+    const newId = `REP-${String(dailyReports.length + 1).padStart(3, '0')}`;
+    const newReport = {
+      ...reportData,
+      id: newId,
+      submittedTime: new Date().toISOString(),
+      approvalHistory: [
+        { role: 'Employee', user: reportData.employeeName, action: 'Submitted', timestamp: new Date().toISOString(), comments: '' }
+      ]
+    };
+    setDailyReports(prev => [newReport, ...prev]);
+    addActivityLog(`Submitted Daily Report for ${reportData.date}`, 'Work Reports', 'success');
+    addToast('success', `Daily report ${newId} submitted successfully.`);
+    
+    // Add Notification
+    setNotifications(prev => [
+      {
+        id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
+        type: 'info',
+        message: `${reportData.employeeName} submitted a daily work report.`,
+        timestamp: 'Just now',
+        read: false
+      },
+      ...prev
+    ]);
+  };
+
+  const updateDailyReportStatus = (id, status, feedback) => {
+    setDailyReports(prev =>
+      prev.map(r => {
+        if (r.id === id) {
+          const actionLabel = status === 'Approved' ? 'Approved' : status === 'Rejected' ? 'Rejected' : status === 'Changes Requested' ? 'Requested Changes' : 'Escalated';
+          const updatedHistory = [
+            ...(r.approvalHistory || []),
+            {
+              role: currentUserRole === 'team_leader' ? 'Team Leader' : currentUserRole === 'manager' ? 'Project Manager' : 'Admin',
+              user: currentUser?.name || 'Manager',
+              action: actionLabel,
+              timestamp: new Date().toISOString(),
+              comments: feedback || ''
+            }
+          ];
+          return {
+            ...r,
+            status: status,
+            feedback: feedback || r.feedback,
+            approvalHistory: updatedHistory
+          };
+        }
+        return r;
+      })
+    );
+    addActivityLog(`Updated report ${id} status to ${status}`, 'Work Reports', 'success');
+    addToast('success', `Report ${id} successfully updated to ${status}.`);
+  };
+
   // Role Permissions Handler
   const updatePermissions = (roleId, updatedPermissions) => {
     setRoles(prev =>
@@ -1415,6 +1574,10 @@ export const AppProvider = ({ children }) => {
         notifications,
         activityLogs,
         roles,
+        dailyReports,
+        setDailyReports,
+        addDailyReport,
+        updateDailyReportStatus,
         toasts,
         confirmDialog,
         commandPaletteOpen,
@@ -1438,7 +1601,9 @@ export const AppProvider = ({ children }) => {
         bulkSendNotification,
         approveLeaveRequest,
         rejectLeaveRequest,
+        applyLeave,
         updateTaskStatus,
+        updateTaskProgress,
         addTask,
         deleteTask,
         reassignTask,

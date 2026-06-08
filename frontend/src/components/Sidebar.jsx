@@ -39,6 +39,7 @@ const menuStructure = [
     title: 'Core',
     items: [
       { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
+      { name: 'Employee Dashboard', icon: LayoutDashboard, path: '/employee-dashboard' },
       { name: 'Company Overview', icon: Building2, path: '/overview' }
     ]
   },
@@ -110,7 +111,7 @@ const menuStructure = [
   {
     title: 'Account',
     items: [
-      { name: 'Profile Settings', icon: UserSquare2, path: '/profile' },
+      { name: 'Profile Settings', icon: UserSquare2, path: '/my-profile' },
       { name: 'Logout', icon: LogOut, path: '/logout', isDanger: true }
     ]
   }

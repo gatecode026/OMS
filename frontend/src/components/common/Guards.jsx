@@ -27,7 +27,7 @@ export const ProtectedRoute = AuthGuard;
  * Redirects to `/unauthorized` if forbidden.
  */
 export const RoleGuard = ({ allowedRoles = [], children }) => {
-  const { currentUserRole } = useApp();
+  const { currentUserRole, currentUser } = useApp();
   const location = useLocation();
 
   let isAuthorized = false;
@@ -38,6 +38,24 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
     // Dynamic resolution based on URL path
     const requiredRole = getRequiredRoleForPath(location.pathname);
     isAuthorized = hasRoleAccess(currentUserRole, requiredRole);
+
+    // Dynamic checks for specific resource endpoints (e.g., self-service or team visibility)
+    if (!isAuthorized && currentUser) {
+      const pathParts = location.pathname.split('/').filter(Boolean);
+      // Check if accessing '/employees/:id'
+      if (pathParts.length === 2 && pathParts[0] === 'employees') {
+        const targetEmployeeId = pathParts[1];
+        
+        // 1. Self-service exception: any user can view their own profile
+        if (currentUser.id === targetEmployeeId) {
+          isAuthorized = true;
+        }
+        // 2. Supervisor exceptions: managers and team leaders can view employee profiles
+        else if (currentUserRole === 'manager' || currentUserRole === 'team_leader') {
+          isAuthorized = true;
+        }
+      }
+    }
   }
 
   if (!isAuthorized) {

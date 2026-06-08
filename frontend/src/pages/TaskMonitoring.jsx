@@ -44,6 +44,37 @@ const TaskMonitoring = () => {
     addToast
   } = useApp();
 
+  const scopedEmployees = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin') return employees;
+    if (currentUserRole === 'branch_admin') {
+      return employees.filter(e => e.branch === currentUser?.branch);
+    }
+    if (currentUserRole === 'dept_admin') {
+      return employees.filter(e => e.department === currentUser?.department);
+    }
+    if (currentUserRole === 'employee') {
+      return employees.filter(e => e.id === currentUser?.id);
+    }
+    return employees;
+  }, [employees, currentUser, currentUserRole]);
+
+  const scopedTasksList = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin') return tasks;
+    return tasks.filter(t => {
+      const assignee = employees.find(e => e.id === t.assigneeId || e.name === t.assigneeName);
+      if (currentUserRole === 'branch_admin') {
+        return t.branch === currentUser?.branch || assignee?.branch === currentUser?.branch;
+      }
+      if (currentUserRole === 'dept_admin') {
+        return t.department === currentUser?.department || assignee?.department === currentUser?.department;
+      }
+      if (currentUserRole === 'employee') {
+        return t.assigneeId === currentUser?.id || assignee?.id === currentUser?.id;
+      }
+      return true;
+    });
+  }, [tasks, employees, currentUser, currentUserRole]);
+
   // Active Main View: 'kanban', 'list', 'analytics'
   const [activeView, setActiveView] = useState('kanban');
 
@@ -166,18 +197,18 @@ const TaskMonitoring = () => {
 
   // Compute live calculations
   const stats = useMemo(() => {
-    const total = tasks.length;
-    const active = tasks.filter(t => getDisplayStatus(t.status) === 'In Progress').length;
-    const completed = tasks.filter(t => getDisplayStatus(t.status) === 'Done').length;
-    const pending = tasks.filter(t => getDisplayStatus(t.status) === 'To Do').length;
-    const overdue = tasks.filter(isTaskOverdue).length;
+    const total = scopedTasksList.length;
+    const active = scopedTasksList.filter(t => getDisplayStatus(t.status) === 'In Progress').length;
+    const completed = scopedTasksList.filter(t => getDisplayStatus(t.status) === 'Done').length;
+    const pending = scopedTasksList.filter(t => getDisplayStatus(t.status) === 'To Do').length;
+    const overdue = scopedTasksList.filter(isTaskOverdue).length;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, active, completed, pending, overdue, completionRate };
-  }, [tasks]);
+  }, [scopedTasksList]);
 
   // Filter Tasks list
   const filteredTasks = useMemo(() => {
-    return tasks.filter(t => {
+    return scopedTasksList.filter(t => {
       // 1. Interactive top card filter
       if (activeCardFilter === 'active' && getDisplayStatus(t.status) !== 'In Progress') return false;
       if (activeCardFilter === 'completed' && getDisplayStatus(t.status) !== 'Done') return false;
@@ -209,11 +240,11 @@ const TaskMonitoring = () => {
 
       return true;
     });
-  }, [tasks, activeCardFilter, searchTerm, statusFilter, priorityFilter, deptFilter, projectFilter, dateFilter]);
+  }, [scopedTasksList, activeCardFilter, searchTerm, statusFilter, priorityFilter, deptFilter, projectFilter, dateFilter]);
 
   // Calculate tables data dynamically
   const employeeSummaries = useMemo(() => {
-    return employees.map(emp => {
+    return scopedEmployees.map(emp => {
       const stats = getEmployeeTaskSummary(emp.id);
       let rating = 'Average';
       if (stats.productivity >= 90) rating = 'Excellent';
@@ -227,7 +258,7 @@ const TaskMonitoring = () => {
         rating
       };
     });
-  }, [employees, tasks, getEmployeeTaskSummary]);
+  }, [scopedEmployees, scopedTasksList, getEmployeeTaskSummary]);
 
   const teamRankings = useMemo(() => {
     const list = getTeamTaskRanking();
@@ -240,12 +271,12 @@ const TaskMonitoring = () => {
       if (av > bv) return teamSortDir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [tasks, teamSortKey, teamSortDir, getTeamTaskRanking]);
+  }, [scopedTasksList, teamSortKey, teamSortDir, getTeamTaskRanking]);
 
   const projectSummaries = useMemo(() => {
     // Project statistics computed dynamically from tasks
     const map = {};
-    tasks.forEach(t => {
+    scopedTasksList.forEach(t => {
       const projName = t.project || 'Unassigned';
       if (!map[projName]) {
         map[projName] = {
@@ -270,24 +301,32 @@ const TaskMonitoring = () => {
       const progress = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
       return { ...p, progress };
     });
-  }, [tasks]);
+  }, [scopedTasksList]);
 
   const departmentSummaries = useMemo(() => {
-    return getDepartmentTaskAnalytics();
-  }, [tasks, getDepartmentTaskAnalytics]);
+    const list = getDepartmentTaskAnalytics();
+    if (currentUserRole === 'employee') {
+      return list.filter(d => d.department === currentUser?.department);
+    }
+    return list;
+  }, [scopedTasksList, getDepartmentTaskAnalytics, currentUser, currentUserRole]);
 
   const workloadDistribution = useMemo(() => {
-    return getWorkloadDistribution();
-  }, [employees, tasks, getWorkloadDistribution]);
+    const list = getWorkloadDistribution();
+    if (currentUserRole === 'employee') {
+      return list.filter(w => w.id === currentUser?.id);
+    }
+    return list;
+  }, [scopedEmployees, scopedTasksList, getWorkloadDistribution, currentUser, currentUserRole]);
 
   const overdueTasksList = useMemo(() => {
-    return tasks.filter(isTaskOverdue);
-  }, [tasks]);
+    return scopedTasksList.filter(isTaskOverdue);
+  }, [scopedTasksList]);
 
   // Aggregate recent activities timeline from all tasks
   const recentActivities = useMemo(() => {
     const logs = [];
-    tasks.forEach(t => {
+    scopedTasksList.forEach(t => {
       if (t.activityLog) {
         t.activityLog.forEach(log => {
           logs.push({
@@ -301,7 +340,7 @@ const TaskMonitoring = () => {
     return logs
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, 10);
-  }, [tasks]);
+  }, [scopedTasksList]);
 
   // Recharts Chart structures
   const pieData = useMemo(() => {
@@ -441,7 +480,9 @@ const TaskMonitoring = () => {
         </div>
         <div className="flex-center gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => setIsExportOpen(true)} icon={Download}>Export Report</Button>
-          <Button variant="primary" onClick={() => setIsCreateOpen(true)} icon={Plus}>Create Task</Button>
+          {currentUserRole !== 'employee' && (
+            <Button variant="primary" onClick={() => setIsCreateOpen(true)} icon={Plus}>Create Task</Button>
+          )}
         </div>
       </div>
 
@@ -908,12 +949,16 @@ const TaskMonitoring = () => {
                             <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
                           </td>
                           <td>
-                            <div className="flex-center gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsReassignOpen(true); }}>Reassign</Button>
-                              <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsDeadlineOpen(true); }}>Extend</Button>
-                              <Button variant="ghost" size="sm" onClick={() => escalateTask(task.id)}>Escalate</Button>
-                              <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsRemarksOpen(true); }}>Remarks</Button>
-                            </div>
+                            {currentUserRole !== 'employee' ? (
+                              <div className="flex-center gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsReassignOpen(true); }}>Reassign</Button>
+                                <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsDeadlineOpen(true); }}>Extend</Button>
+                                <Button variant="ghost" size="sm" onClick={() => escalateTask(task.id)}>Escalate</Button>
+                                <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsRemarksOpen(true); }}>Remarks</Button>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No actions allowed</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1131,7 +1176,13 @@ const TaskMonitoring = () => {
                         <Badge variant={app.status === 'Approved' ? 'success' : app.status === 'Rejected' ? 'danger' : 'warning'}>
                           {app.status}
                         </Badge>
-                        {app.status === 'Pending' && (currentUserRole === 'super_admin' || (currentUserRole === 'manager' && app.level === 3) || (currentUserRole === 'team_leader' && app.level === 2)) && (
+                        {app.status === 'Pending' && (
+                          currentUserRole === 'super_admin' ||
+                          (app.level === 1 && (currentUser?.id === selectedTask.assigneeId || currentUser?.name === app.approver)) ||
+                          (app.level === 2 && (currentUserRole === 'team_leader' || currentUser?.name === app.approver)) ||
+                          (app.level === 3 && (currentUserRole === 'manager' || currentUserRole === 'branch_admin' || currentUser?.name === app.approver)) ||
+                          (app.level === 4 && currentUserRole === 'super_admin')
+                        ) && (
                           <div className="flex-center gap-1">
                             <button className="action-circle-btn approve-btn" onClick={() => handleApproveLevel(app.level)} title="Approve">✓</button>
                             <button className="action-circle-btn reject-btn" onClick={() => handleRejectLevel(app.level)} title="Reject">✗</button>
@@ -1196,12 +1247,14 @@ const TaskMonitoring = () => {
 
             <div className="slide-over-footer flex-row justify-between">
               <Button variant="secondary" onClick={() => setIsDetailOpen(false)}>Close</Button>
-              <Button variant="danger" onClick={() => {
-                showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, () => {
-                  deleteTask(selectedTask.id);
-                  setIsDetailOpen(false);
-                }, 'danger');
-              }} icon={Trash2}>Delete</Button>
+              {currentUserRole !== 'employee' && (
+                <Button variant="danger" onClick={() => {
+                  showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, () => {
+                    deleteTask(selectedTask.id);
+                    setIsDetailOpen(false);
+                  }, 'danger');
+                }} icon={Trash2}>Delete</Button>
+              )}
             </div>
           </div>
         </div>

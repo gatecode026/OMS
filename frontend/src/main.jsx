@@ -32,7 +32,7 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const Announcements = lazy(() => import('./pages/Announcements'));
 const Documents = lazy(() => import('./pages/Documents'));
 const SystemSettings = lazy(() => import('./pages/SystemSettings'));
-const ProfileSettings = lazy(() => import('./pages/ProfileSettings'));
+const MyProfile = lazy(() => import('./pages/MyProfile'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Placeholder = lazy(() => import('./pages/Placeholder'));
 
@@ -42,6 +42,7 @@ const WorkReports = lazy(() => import('./pages/WorkReports'));
 const SecurityAudit = lazy(() => import('./pages/SecurityAudit'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 const Managers = lazy(() => import('./pages/Managers'));
+const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -59,6 +60,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 {/* ── Core ── */}
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/overview" element={<Overview />} />
+                <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
 
                 {/* ── People ── */}
                 <Route path="/employees" element={<Employees />} />
@@ -94,7 +96,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/settings" element={<SystemSettings />} />
 
                 {/* ── Account ── */}
-                <Route path="/profile" element={<ProfileSettings />} />
+                <Route path="/profile" element={<MyProfile />} />
+                <Route path="/my-profile" element={<MyProfile />} />
 
               </Route>
 

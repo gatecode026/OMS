@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './LeaveManagement.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
@@ -11,7 +11,7 @@ import Modal from '../components/common/Modal';
 import Skeleton from '../components/common/Skeleton';
 import {
   Check, X, Eye, FileText, CalendarDays, Search, Filter, Plus, Settings,
-  AlertCircle, Calendar, TrendingUp, Users, BarChart3, PieChart, ArrowRight,
+  AlertCircle, Calendar, TrendingUp, Users, BarChart3, ArrowRight,
   Clock, Settings2, FileSpreadsheet, FileUp, Download, Info, Bell, Briefcase,
   HeartPulse, Umbrella, UserCheck, Smile, ShieldAlert, Trash2, Edit, CheckCircle2,
   Database, Save, RefreshCw
@@ -29,7 +29,9 @@ const LeaveManagement = () => {
     approveLeaveRequest,
     rejectLeaveRequest,
     showConfirm,
-    addToast
+    addToast,
+    currentUser,
+    currentUserRole
   } = useApp();
 
   // Primary Tab state: 'requests' | 'analytics' | 'balances' | 'holidays' | 'policies'
@@ -47,12 +49,6 @@ const LeaveManagement = () => {
 
   // Leave List state (includes user-added leaves locally)
   const [leavesList, setLeavesList] = useState([]);
-
-  useEffect(() => {
-    if (leaveRequests) {
-      setLeavesList(leaveRequests);
-    }
-  }, [leaveRequests]);
 
   // ==================== ADMIN LEAVE POLICY TABLE STATE ====================
   const [leavePolicyConfigs, setLeavePolicyConfigs] = useState([
@@ -148,6 +144,49 @@ const LeaveManagement = () => {
     { id: 'BAL-006', employeeId: 'EMP-2026-006', employeeName: 'Arjun Mehta', cl: 9, sl: 11, pl: 20, maternity: 0 },
     { id: 'BAL-007', employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', cl: 3, sl: 9, pl: 8, maternity: 0 }
   ]);
+
+  useEffect(() => {
+    if (leaveRequests) {
+      const scoped = leaveRequests.filter(req => {
+        if (!currentUserRole || currentUserRole === 'super_admin') return true;
+        const emp = employees.find(e => e.id === req.employeeId);
+        if (currentUserRole === 'branch_admin') {
+          return emp?.branch === currentUser?.branch;
+        }
+        if (currentUserRole === 'dept_admin') {
+          return req.department === currentUser?.department;
+        }
+        if (currentUserRole === 'employee') {
+          return req.employeeId === currentUser?.id;
+        }
+        return true;
+      });
+      setLeavesList(scoped);
+    }
+  }, [leaveRequests, currentUser, currentUserRole, employees]);
+
+  useEffect(() => {
+    if (applyModalOpen && currentUserRole === 'employee' && currentUser) {
+      setApplyForm(prev => ({ ...prev, employeeId: currentUser.id }));
+    }
+  }, [applyModalOpen, currentUserRole, currentUser]);
+
+  const scopedBalancesList = useMemo(() => {
+    return balancesList.filter(bal => {
+      if (!currentUserRole || currentUserRole === 'super_admin') return true;
+      const emp = employees.find(e => e.id === bal.employeeId);
+      if (currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (currentUserRole === 'dept_admin') {
+        return emp?.department === currentUser?.department;
+      }
+      if (currentUserRole === 'employee') {
+        return bal.employeeId === currentUser?.id;
+      }
+      return true;
+    });
+  }, [balancesList, currentUser, currentUserRole, employees]);
 
   // Mock static Holiday lists
   const [holidaysList, setHolidaysList] = useState([
@@ -743,7 +782,7 @@ const LeaveManagement = () => {
           >
             <Edit size={14} />
           </button>
-          {row.status === 'Pending' && (
+          {row.status === 'Pending' && currentUserRole !== 'employee' && (
             <>
               <button
                 className="action-btn-mini success-btn"
@@ -788,12 +827,16 @@ const LeaveManagement = () => {
           <Button variant="primary" icon={Plus} onClick={() => setApplyModalOpen(true)}>
             Add New Leave
           </Button>
-          <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('policies'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
-            Policy Controls
-          </Button>
-          <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
-            Add Holiday
-          </Button>
+          {currentUserRole !== 'employee' && (
+            <>
+              <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('policies'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
+                Policy Controls
+              </Button>
+              <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
+                Add Holiday
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -806,7 +849,12 @@ const LeaveManagement = () => {
             { key: 'balances', label: 'Balances & Policy Limits', icon: HeartPulse },
             { key: 'holidays', label: 'Holiday & Report Exports', icon: Calendar },
             { key: 'policies', label: 'Admin Leave Table', icon: Database }
-          ].map(tab => (
+          ].filter(tab => {
+            if (currentUserRole === 'employee') {
+              return tab.key === 'requests' || tab.key === 'holidays';
+            }
+            return true;
+          }).map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -1317,8 +1365,8 @@ const LeaveManagement = () => {
                       <th>Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {balancesList.map((bal) => (
+                   <tbody>
+                    {scopedBalancesList.map((bal) => (
                       <tr key={bal.id}>
                         <td><strong className="text-xs font-mono">{bal.employeeId}</strong></td>
                         <td>{bal.employeeName}</td>
@@ -1327,13 +1375,15 @@ const LeaveManagement = () => {
                         <td><span className="balance-badge pl-badge">{bal.pl} days</span></td>
                         <td>{bal.maternity} days</td>
                         <td>
-                          <button
-                            className="action-btn-mini edit-btn"
-                            onClick={() => handleEditBalanceClick(bal)}
-                            title="Edit Quotas"
-                          >
-                            <Edit size={14} />
-                          </button>
+                          {currentUserRole !== 'employee' && (
+                            <button
+                              className="action-btn-mini edit-btn"
+                              onClick={() => handleEditBalanceClick(bal)}
+                              title="Edit Quotas"
+                            >
+                              <Edit size={14} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2264,7 +2314,7 @@ const LeaveManagement = () => {
         title="Leave Request Details"
         size="md"
         footer={
-          selectedLeave?.status === 'Pending' ? (
+          (selectedLeave?.status === 'Pending' && currentUserRole !== 'employee') ? (
             <div className="modal-actions-wrapper">
               <Button
                 variant="secondary"
