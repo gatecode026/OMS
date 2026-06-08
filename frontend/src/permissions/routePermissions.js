@@ -34,11 +34,13 @@ export const ROUTE_PERMISSIONS = {
   '/performance': ROLES.TEAM_LEADER,
 
   // Employee and above (General Access)
+  '/employee-dashboard': ROLES.EMPLOYEE,
   '/': ROLES.EMPLOYEE,
   '/announcements': ROLES.EMPLOYEE,
   '/notifications': ROLES.EMPLOYEE,
   '/documents': ROLES.EMPLOYEE,
   '/profile': ROLES.EMPLOYEE,
+  '/my-profile': ROLES.EMPLOYEE,
   '/unauthorized': ROLES.EMPLOYEE
 };
 export const getRequiredRoleForPath = (path) => {

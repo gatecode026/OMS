@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './LeaveManagement.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
@@ -11,7 +11,7 @@ import Modal from '../components/common/Modal';
 import Skeleton from '../components/common/Skeleton';
 import {
   Check, X, Eye, FileText, CalendarDays, Search, Filter, Plus, Settings,
-  AlertCircle, Calendar, TrendingUp, Users, BarChart3, PieChart, ArrowRight,
+  AlertCircle, Calendar, TrendingUp, Users, BarChart3, ArrowRight,
   Clock, Settings2, FileSpreadsheet, FileUp, Download, Info, Bell, Briefcase,
   HeartPulse, Umbrella, UserCheck, Smile, ShieldAlert, Trash2, Edit, CheckCircle2,
   Database, Save, RefreshCw
@@ -32,6 +32,8 @@ const LeaveManagement = () => {
     updateLeaveRequest,
     showConfirm,
     addToast,
+    currentUser,
+    currentUserRole,
     leavePolicyConfigs,
     addLeavePolicy,
     updateLeavePolicy,
@@ -137,6 +139,88 @@ const LeaveManagement = () => {
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [approverNotesInput, setApproverNotesInput] = useState('');
   const [editingLeave, setEditingLeave] = useState(null);
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
+  const [applyForm, setApplyForm] = useState({
+    employeeId: '',
+    customLeaveType: 'CL',
+    startDate: '',
+    days: 1,
+    reason: ''
+  });
+
+  const handleEditLeaveClick = (leave) => {
+    setEditingLeave(leave);
+    setApplyForm({
+      employeeId: leave.employeeId,
+      customLeaveType: leave.type,
+      startDate: leave.fromDate,
+      days: leave.days,
+      reason: leave.reason
+    });
+    setApplyModalOpen(true);
+  };
+
+  const handleApplySubmit = (e) => {
+    if (e) e.preventDefault();
+    const empId = currentUser?.id || applyForm.employeeId;
+    const emp = employees.find(e => e.id === empId);
+    
+    if (!empId) {
+      addToast('warning', 'Employee ID is required.');
+      return;
+    }
+    if (!applyForm.customLeaveType || !applyForm.startDate || !applyForm.days) {
+      addToast('warning', 'Please fill in all required fields.');
+      return;
+    }
+
+    const start = new Date(applyForm.startDate);
+    const end = new Date(start);
+    end.setDate(start.getDate() + parseInt(applyForm.days) - 1);
+    const endDateStr = end.toISOString().split('T')[0];
+
+    if (editingLeave) {
+      const updatedRequest = {
+        ...editingLeave,
+        type: applyForm.customLeaveType,
+        fromDate: applyForm.startDate,
+        toDate: endDateStr,
+        days: parseInt(applyForm.days),
+        reason: applyForm.reason
+      };
+      updateLeaveRequest(editingLeave.id, updatedRequest);
+      addToast('success', 'Leave request updated successfully.');
+      setEditingLeave(null);
+    } else {
+      const newRequest = {
+        id: `LR-${Math.floor(100 + Math.random() * 900)}`,
+        employeeId: empId,
+        employeeName: emp?.name || currentUser?.name || 'Employee',
+        department: emp?.department || currentUser?.department || 'Engineering',
+        type: applyForm.customLeaveType,
+        fromDate: applyForm.startDate,
+        toDate: endDateStr,
+        days: parseInt(applyForm.days),
+        reason: applyForm.reason || '',
+        status: 'Pending',
+        appliedDate: new Date().toISOString().split('T')[0],
+        history: [
+          { date: new Date().toISOString().split('T')[0], status: 'Pending', comment: 'Applied by employee' }
+        ]
+      };
+      addLeaveRequest(newRequest);
+      addToast('success', 'Leave request submitted successfully.');
+    }
+
+    setApplyModalOpen(false);
+    setApplyForm({
+      employeeId: '',
+      customLeaveType: 'CL',
+      startDate: '',
+      days: 1,
+      reason: ''
+    });
+  };
 
   // Leave Assignment states
   const [showAssignLeaveModal, setShowAssignLeaveModal] = useState(false);
@@ -160,8 +244,47 @@ const LeaveManagement = () => {
   const [calendarMonth, setCalendarMonth] = useState('June 2026');
 
 
+  useEffect(() => {
+    if (leaveRequests) {
+      const scoped = leaveRequests.filter(req => {
+        if (!currentUserRole || currentUserRole === 'super_admin') return true;
+        const emp = employees.find(e => e.id === req.employeeId);
+        if (currentUserRole === 'branch_admin') {
+          return emp?.branch === currentUser?.branch;
+        }
+        if (currentUserRole === 'dept_admin') {
+          return req.department === currentUser?.department;
+        }
+        if (currentUserRole === 'employee') {
+          return req.employeeId === currentUser?.id;
+        }
+        return true;
+      });
+      setLeavesList(scoped);
+    }
+  }, [leaveRequests, currentUser, currentUserRole, employees]);
 
+  useEffect(() => {
+    if (applyModalOpen && currentUserRole === 'employee' && currentUser) {
+      setApplyForm(prev => ({ ...prev, employeeId: currentUser.id }));
+    }
+  }, [applyModalOpen, currentUserRole, currentUser]);
 
+  const scopedEmployees = useMemo(() => {
+    return employees.filter(emp => {
+      if (!currentUserRole || currentUserRole === 'super_admin') return true;
+      if (currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (currentUserRole === 'dept_admin') {
+        return emp?.department === currentUser?.department;
+      }
+      if (currentUserRole === 'employee') {
+        return emp?.id === currentUser?.id;
+      }
+      return true;
+    });
+  }, [employees, currentUser, currentUserRole]);
 
   // Mock department metrics
   const departmentAnalyticsData = [
@@ -716,8 +839,14 @@ const LeaveManagement = () => {
           >
             <Eye size={14} />
           </button>
-
-          {row.status === 'Pending' && (
+          <button
+            className="action-btn-mini edit-btn"
+            onClick={() => handleEditLeaveClick(row)}
+            title="Edit Leave Request"
+          >
+            <Edit size={14} />
+          </button>
+          {row.status === 'Pending' && currentUserRole !== 'employee' && (
             <>
               <button
                 className="action-btn-mini success-btn"
@@ -759,12 +888,19 @@ const LeaveManagement = () => {
           <p className="page-desc-text">Oversee balances, request approvals, policy overrides, and company calendars</p>
         </div>
         <div className="flex-center gap-3">
-          <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('policies'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
-            Policy Controls
+          <Button variant="primary" icon={Plus} onClick={() => setApplyModalOpen(true)}>
+            Add New Leave
           </Button>
-          <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
-            Add Holiday
-          </Button>
+          {currentUserRole !== 'employee' && (
+            <>
+              <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('policies'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
+                Policy Controls
+              </Button>
+              <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
+                Add Holiday
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -777,7 +913,12 @@ const LeaveManagement = () => {
             { key: 'balances', label: 'Balances & Policy Limits', icon: HeartPulse },
             { key: 'holidays', label: 'Holiday & Report Exports', icon: Calendar },
             { key: 'policies', label: 'Admin Leave Table', icon: Database }
-          ].map(tab => (
+          ].filter(tab => {
+            if (currentUserRole === 'employee') {
+              return tab.key === 'requests' || tab.key === 'holidays';
+            }
+            return true;
+          }).map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
@@ -1291,7 +1432,7 @@ const LeaveManagement = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map((emp) => (
+                    {scopedEmployees.map((emp) => (
                       <tr key={emp.id}>
                         <td><strong className="text-xs font-mono">{emp.id}</strong></td>
                         <td>{emp.name}</td>
@@ -1334,13 +1475,15 @@ const LeaveManagement = () => {
                           );
                         })}
                         <td>
-                          <button
-                            className="action-btn-mini edit-btn"
-                            onClick={() => handleEditBalanceClick(emp)}
-                            title="Edit Quotas"
-                          >
-                            <Edit size={14} />
-                          </button>
+                          {currentUserRole !== 'employee' && (
+                            <button
+                              className="action-btn-mini edit-btn"
+                              onClick={() => handleEditBalanceClick(emp)}
+                              title="Edit Quotas"
+                            >
+                              <Edit size={14} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2110,7 +2253,7 @@ const LeaveManagement = () => {
         title="Leave Request Details"
         size="md"
         footer={
-          selectedLeave?.status === 'Pending' ? (
+          (selectedLeave?.status === 'Pending' && currentUserRole !== 'employee') ? (
             <div className="modal-actions-wrapper">
               <Button
                 variant="secondary"
@@ -2493,6 +2636,64 @@ const LeaveManagement = () => {
                 rows={1}
               />
             </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Apply Leave Modal */}
+      <Modal isOpen={applyModalOpen} onClose={() => setApplyModalOpen(false)} title={editingLeave ? "Edit Leave Request" : "Apply for Leave"} size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setApplyModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleApplySubmit}>{editingLeave ? "Update Request" : "Submit Request"}</Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleApplySubmit} className="apply-leave-modal-body animate-fade-in flex-column gap-4">
+          <div className="policy-form-field">
+            <label>Leave Type *</label>
+            <select
+              value={applyForm.customLeaveType}
+              onChange={(e) => setApplyForm({ ...applyForm, customLeaveType: e.target.value })}
+              required
+            >
+              {activePolicies.map(p => (
+                <option key={p.id} value={p.leaveCode}>{p.leaveName} ({p.leaveCode})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="apply-fields-grid-2">
+            <div className="policy-form-field">
+              <label>Start Date *</label>
+              <input
+                type="date"
+                value={applyForm.startDate}
+                onChange={(e) => setApplyForm({ ...applyForm, startDate: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="policy-form-field">
+              <label>Days *</label>
+              <input
+                type="number"
+                min="1"
+                value={applyForm.days}
+                onChange={(e) => setApplyForm({ ...applyForm, days: parseInt(e.target.value) || 1 })}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="policy-form-field">
+            <label>Reason / Description</label>
+            <textarea
+              placeholder="Provide details for leave request..."
+              value={applyForm.reason}
+              onChange={(e) => setApplyForm({ ...applyForm, reason: e.target.value })}
+              rows={3}
+            />
           </div>
         </form>
       </Modal>

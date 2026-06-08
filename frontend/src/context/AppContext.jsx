@@ -6,8 +6,10 @@ import {
   mockPayroll,
   mockNotifications,
   mockActivityLogs,
-  mockRoles
+  mockRoles,
+  mockDailyReports
 } from '../data/mockData';
+
 
 const AppContext = createContext(undefined);
 
@@ -78,6 +80,76 @@ export const normalizeEmployee = (emp) => {
   normalized.employmentStatus = est;
   normalized.accountStatus = est;
 
+  // Address Parsing
+  if (typeof normalized.currentAddress === 'string') {
+    const parts = normalized.currentAddress.split(', ');
+    normalized.currentAddress = {
+      line1: parts[0] || normalized.currentAddress,
+      city: parts[1] || 'Jaipur',
+      state: parts[2] ? parts[2].split(' - ')[0] : 'Rajasthan',
+      country: 'India',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : '302015'
+    };
+  } else if (!normalized.currentAddress) {
+    normalized.currentAddress = { line1: '12 Lal Kothi', city: 'Jaipur', state: 'Rajasthan', country: 'India', pincode: '302015' };
+  }
+
+  if (typeof normalized.permanentAddress === 'string') {
+    const parts = normalized.permanentAddress.split(', ');
+    normalized.permanentAddress = {
+      line1: parts[0] || normalized.permanentAddress,
+      city: parts[1] || 'Jaipur',
+      state: parts[2] ? parts[2].split(' - ')[0] : 'Rajasthan',
+      country: 'India',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : '302015'
+    };
+  } else if (!normalized.permanentAddress) {
+    normalized.permanentAddress = { line1: '12 Lal Kothi', city: 'Jaipur', state: 'Rajasthan', country: 'India', pincode: '302015' };
+  }
+
+  // Emergency Contact
+  normalized.emergencyName = normalized.emergencyContactName || normalized.emergencyName || 'Priya Sharma';
+  normalized.emergencyRelation = normalized.emergencyRelation || 'Spouse';
+  normalized.emergencyMobile = normalized.emergencyContactPhone || normalized.emergencyMobile || '+91 98001 00001';
+
+  // Banking
+  normalized.bank = normalized.bank || {
+    accountName: normalized.name,
+    bankName: normalized.bankName || 'HDFC Bank',
+    branch: normalized.bankBranch || 'Jaipur Main',
+    accountNumber: normalized.bankAccountNumber || '1234567890',
+    ifsc: normalized.bankIfscCode || 'HDFC0001234',
+    upiId: normalized.bankUpiId || '',
+    verified: true
+  };
+
+  // Documents
+  normalized.documents = normalized.documents || [
+    { id: 'doc1', type: 'aadhaar', name: 'Aadhaar Card', status: 'verified', uploadedAt: '2025-02-01' },
+    { id: 'doc2', type: 'pan', name: 'PAN Card', status: 'verified', uploadedAt: '2025-02-01' },
+    { id: 'doc3', type: 'offer_letter', name: 'Offer Letter', status: 'available', uploadedAt: '2025-01-15' }
+  ];
+
+  // Activities
+  normalized.activities = normalized.activities || [
+    { id: 'act1', date: '2026-06-05', action: 'Photo Updated', details: 'Profile photo changed' },
+    { id: 'act2', date: '2026-06-04', action: 'Bank Verified', details: 'Bank account verified by admin' },
+    { id: 'act3', date: '2026-06-02', action: 'Password Changed', details: 'Security update' }
+  ];
+
+  // MFA
+  normalized.mfaEnabled = normalized.mfaEnabled || { email: true, mobile: true, authenticator: false };
+
+  // General fields
+  normalized.photoUrl = normalized.photoUrl || normalized.avatar || null;
+  normalized.dob = normalized.dob || '1995-03-15';
+  normalized.maritalStatus = normalized.maritalStatus || 'Married';
+  normalized.bloodGroup = normalized.bloodGroup || 'O+';
+  normalized.nationality = normalized.nationality || 'Indian';
+  normalized.officialEmail = normalized.officialEmail || normalized.email || '';
+  normalized.officialMobile = normalized.officialMobile || normalized.phone || '';
+  normalized.teamName = normalized.teamName || normalized.team || 'Operations Core';
+
   // 12. Individual Leave Balances
   normalized.clBalance = typeof normalized.clBalance === 'number' ? normalized.clBalance : 8;
   normalized.slBalance = typeof normalized.slBalance === 'number' ? normalized.slBalance : 12;
@@ -137,6 +209,7 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState(mockNotifications);
   const [activityLogs, setActivityLogs] = useState(mockActivityLogs);
   const [roles, setRoles] = useState(mockRoles);
+  const [dailyReports, setDailyReports] = useState(mockDailyReports);
 
   // Shell Features States
   const [toasts, setToasts] = useState([]);
@@ -1183,6 +1256,10 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const applyLeave = async (leaveData) => {
+    return await addLeaveRequest(leaveData);
+  };
+
   const addLeaveRequest = async (newLeave) => {
     try {
       const response = await fetch('http://localhost:5000/api/v1/leaves', {
@@ -1278,6 +1355,50 @@ export const AppProvider = ({ children }) => {
       console.error('Error adding policy:', err);
       addToast('error', 'Network error while adding policy');
       return false;
+    }
+  };
+
+  const updateTaskProgress = async (id, status, progress, remarks) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === id));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === id) {
+        const completed = status === 'Done' || status === 'done' || status === 'completed' || Number(progress) === 100;
+        return {
+          ...t,
+          status: status,
+          progress: Number(progress),
+          completed,
+          remarks: remarks || t.remarks,
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'progress_updated',
+              details: `Progress set to ${progress}% (Status: ${status})`,
+              timestamp: 'Just now',
+              userName: currentUser?.name || 'System'
+            }
+          ]
+        };
+      }
+      return t;
+    });
+
+    const tasksDone = updatedTasks.filter(t => t.completed).length;
+    const progressTotal = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
+
+    const success = await updateProject(project.id, {
+      tasks: updatedTasks,
+      tasksDone,
+      progress: progressTotal,
+      status: progressTotal === 100 ? 'Completed' : project.status
+    });
+
+    if (success) {
+      addActivityLog(`Updated task status to ${status} (${progress}%)`, 'Tasks', 'success');
+      addToast('success', `Task updated successfully.`);
     }
   };
 
@@ -1790,50 +1911,67 @@ export const AppProvider = ({ children }) => {
   };
 
   const addTask = async (taskData) => {
-    const { projectId, title, dueDate, priority } = taskData;
-    const targetProj = projectsList.find(p => p.id === projectId);
-    if (!targetProj) {
+    let projectId = taskData.projectId;
+    let project = projectsList.find(p => p.id === projectId);
+    
+    // If not found by ID, try finding by name (since Managers.jsx passes project name as taskData.project)
+    if (!project && taskData.project) {
+      project = projectsList.find(p => p.name === taskData.project);
+    }
+    
+    // Fallback to first project if still not found
+    if (!project) {
+      project = projectsList[0];
+    }
+    
+    if (!project) {
       addToast('error', 'Project not found');
       return;
     }
-
-    const nextTaskId = `t-${projectId}-${targetProj.tasks.length + 1}`;
-    const newTasks = [...targetProj.tasks, {
+    
+    projectId = project.id;
+    const nextTaskId = `t-${projectId}-${project.tasks.length + 1}`;
+    
+    const assignee = employees.find(e => e.id === taskData.assigneeId);
+    
+    const newTask = {
       id: nextTaskId,
-      title: title.trim(),
+      title: taskData.title.trim(),
       completed: false,
-      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      priority: priority || 'Medium',
+      dueDate: taskData.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      priority: taskData.priority || 'Medium',
       status: 'To Do',
       overdue: false,
-      assigneeId: '',
-      assigneeName: 'Unassigned',
-      description: '',
-      estimatedHours: 20,
+      assigneeId: taskData.assigneeId || '',
+      assigneeName: assignee ? assignee.name : 'Unassigned',
+      description: taskData.description || '',
+      estimatedHours: Number(taskData.estimatedHours) || 20,
       progress: 0,
       comments: [],
       attachments: [],
       approvals: [
-        { level: 1, role: 'Employee', approver: 'Employee', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 2, role: 'Team Leader Approval', approver: targetProj.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 3, role: 'Project Manager Approval', approver: targetProj.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
         { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
       ]
-    }];
-    const tasksTotal = targetProj.tasksTotal + 1;
-    const progress = Math.round((targetProj.tasksDone / tasksTotal) * 100);
-
+    };
+    
+    const newTasks = [...project.tasks, newTask];
+    const tasksTotal = project.tasksTotal + 1;
+    const progress = Math.round((project.tasksDone / tasksTotal) * 100);
+    
     const success = await updateProject(projectId, {
       tasks: newTasks,
       tasksTotal,
       progress
     });
-
+    
     if (success) {
-      addActivityLog(`Created task: "${title}"`, 'Tasks', 'success');
+      addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
       addToast('success', 'Task created successfully.');
     }
   };
@@ -2236,6 +2374,63 @@ export const AppProvider = ({ children }) => {
     addToast('success', `Payslip generated for ${employeeName}. Sent to Document Vault.`);
   };
 
+  // Daily Work Reports Handlers
+  const addDailyReport = (reportData) => {
+    const newId = `REP-${String(dailyReports.length + 1).padStart(3, '0')}`;
+    const newReport = {
+      ...reportData,
+      id: newId,
+      submittedTime: new Date().toISOString(),
+      approvalHistory: [
+        { role: 'Employee', user: reportData.employeeName, action: 'Submitted', timestamp: new Date().toISOString(), comments: '' }
+      ]
+    };
+    setDailyReports(prev => [newReport, ...prev]);
+    addActivityLog(`Submitted Daily Report for ${reportData.date}`, 'Work Reports', 'success');
+    addToast('success', `Daily report ${newId} submitted successfully.`);
+    
+    // Add Notification
+    setNotifications(prev => [
+      {
+        id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
+        type: 'info',
+        message: `${reportData.employeeName} submitted a daily work report.`,
+        timestamp: 'Just now',
+        read: false
+      },
+      ...prev
+    ]);
+  };
+
+  const updateDailyReportStatus = (id, status, feedback) => {
+    setDailyReports(prev =>
+      prev.map(r => {
+        if (r.id === id) {
+          const actionLabel = status === 'Approved' ? 'Approved' : status === 'Rejected' ? 'Rejected' : status === 'Changes Requested' ? 'Requested Changes' : 'Escalated';
+          const updatedHistory = [
+            ...(r.approvalHistory || []),
+            {
+              role: currentUserRole === 'team_leader' ? 'Team Leader' : currentUserRole === 'manager' ? 'Project Manager' : 'Admin',
+              user: currentUser?.name || 'Manager',
+              action: actionLabel,
+              timestamp: new Date().toISOString(),
+              comments: feedback || ''
+            }
+          ];
+          return {
+            ...r,
+            status: status,
+            feedback: feedback || r.feedback,
+            approvalHistory: updatedHistory
+          };
+        }
+        return r;
+      })
+    );
+    addActivityLog(`Updated report ${id} status to ${status}`, 'Work Reports', 'success');
+    addToast('success', `Report ${id} successfully updated to ${status}.`);
+  };
+
   // Role Permissions Handler
   const updatePermissions = (roleId, updatedPermissions) => {
     setRoles(prev =>
@@ -2291,6 +2486,10 @@ export const AppProvider = ({ children }) => {
         notifications,
         activityLogs,
         roles,
+        dailyReports,
+        setDailyReports,
+        addDailyReport,
+        updateDailyReportStatus,
         toasts,
         confirmDialog,
         commandPaletteOpen,
@@ -2314,6 +2513,7 @@ export const AppProvider = ({ children }) => {
         bulkSendNotification,
         approveLeaveRequest,
         rejectLeaveRequest,
+        applyLeave,
         addLeaveRequest,
         updateLeaveRequest,
         fetchLeaves,
@@ -2326,6 +2526,7 @@ export const AppProvider = ({ children }) => {
         addHoliday,
         deleteHoliday,
         updateTaskStatus,
+        updateTaskProgress,
         addTask,
         deleteTask,
         reassignTask,
