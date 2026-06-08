@@ -233,8 +233,51 @@ const WebPortalAttendance = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // ── Helper: parse break string to numeric hours ──
+  const parseBreakToHours = (breakStr) => {
+    if (!breakStr) return 0;
+    const num = parseInt(breakStr, 10);
+    if (isNaN(num)) return 0;
+    if (breakStr.toLowerCase().includes('min')) {
+      return num / 60;
+    }
+    if (breakStr.toLowerCase().includes('hr') || breakStr.toLowerCase().includes('hour')) {
+      return num;
+    }
+    return 0;
+  };
+
+  // ── Helper: parse time to minutes since midnight ──
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr) return null;
+    try {
+      const cleaned = timeStr.trim().toUpperCase();
+      const isPM = cleaned.includes('PM');
+      const isAM = cleaned.includes('AM');
+      const [timePart] = cleaned.split(/\s+/);
+      let [hours, minutes] = timePart.split(':').map(Number);
+      if (isNaN(hours)) hours = 0;
+      if (isNaN(minutes)) minutes = 0;
+      if (isPM && hours < 12) hours += 12;
+      if (isAM && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // ── Helper: parse shift timing string to punch in/out default times ──
+  const parseShiftTimes = (shiftStr) => {
+    if (!shiftStr) return { punchIn: '09:00 AM', punchOut: '06:00 PM' };
+    const match = shiftStr.match(/(\d{2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{2}:\d{2}\s*(?:AM|PM))/i);
+    if (match) {
+      return { punchIn: match[1], punchOut: match[2] };
+    }
+    return { punchIn: '09:00 AM', punchOut: '06:00 PM' };
+  };
+
   // ── Helper: calculate hours ──
-  const helperCalculateHours = (inStr, outStr) => {
+  const helperCalculateHours = (inStr, outStr, breakStr = '') => {
     if (!inStr || !outStr || inStr === '--:--' || outStr === '--:--') return 0;
     try {
       const parseTime = (timeStr) => {
@@ -256,7 +299,9 @@ const WebPortalAttendance = () => {
       if (outTime < inTime) outTime.setDate(outTime.getDate() + 1);
       const diffMs = outTime - inTime;
       const hours = diffMs / (1000 * 60 * 60);
-      return Math.max(0, Math.round(hours * 10) / 10);
+      const breakHrs = parseBreakToHours(breakStr);
+      const netHours = Math.max(0, hours - breakHrs);
+      return Math.max(0, Math.round(netHours * 10) / 10);
     } catch (e) {
       return 0;
     }
@@ -274,7 +319,7 @@ const WebPortalAttendance = () => {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     setQuickFormData(prev => {
-      const totalHours = helperCalculateHours(prev.punchIn, timeString);
+      const totalHours = helperCalculateHours(prev.punchIn, timeString, prev.breakTime);
       return { ...prev, punchOut: timeString, totalHours };
     });
     addToast('info', `Punch Out set to ${timeString}`);
@@ -336,12 +381,17 @@ const WebPortalAttendance = () => {
     const initialState = {};
     employees.forEach(emp => {
       const record = attendance.find(a => a.employeeId === emp.id && a.date === dateFilter);
+      const breakTime = record?.breakTime || '45 mins';
+      const punchIn = record?.punchIn || '';
+      const punchOut = record?.punchOut || '';
+      const totalHours = record ? (record.totalHours || 0) : helperCalculateHours(punchIn, punchOut, breakTime);
+
       initialState[emp.id] = {
-        punchIn: record?.punchIn || '',
-        punchOut: record?.punchOut || '',
+        punchIn: punchIn,
+        punchOut: punchOut,
         status: record?.status || 'Present',
-        totalHours: record?.totalHours || 0,
-        breakTime: record?.breakTime || '45 mins',
+        totalHours: totalHours,
+        breakTime: breakTime,
         isNew: !record,
         recordId: record?.id || null,
         source: record?.source || 'Web Portal',
@@ -381,8 +431,8 @@ const WebPortalAttendance = () => {
 
     const onTimeCount = todayRecords.filter(a => {
       if (!a.punchIn) return false;
-      const punchTime = a.punchIn.toLowerCase();
-      return punchTime <= '09:15 am' || punchTime <= '09:15';
+      const mins = timeToMinutes(a.punchIn);
+      return mins !== null && mins <= 555; // 09:15 AM is 555 minutes
     }).length;
 
     return {
@@ -401,8 +451,8 @@ const WebPortalAttendance = () => {
     setWpState(prev => {
       const row = { ...prev[empId] };
       row[field] = value;
-      if (field === 'punchIn' || field === 'punchOut') {
-        row.totalHours = helperCalculateHours(row.punchIn, row.punchOut);
+      if (field === 'punchIn' || field === 'punchOut' || field === 'breakTime') {
+        row.totalHours = helperCalculateHours(row.punchIn, row.punchOut, row.breakTime);
       }
       return { ...prev, [empId]: row };
     });
@@ -413,7 +463,7 @@ const WebPortalAttendance = () => {
     const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     setWpState(prev => {
       const row = { ...prev[empId], punchIn: timeString };
-      row.totalHours = helperCalculateHours(row.punchIn, row.punchOut);
+      row.totalHours = helperCalculateHours(row.punchIn, row.punchOut, row.breakTime);
       return { ...prev, [empId]: row };
     });
     addToast('info', `Punch In set for ${empId} to ${timeString}`);
@@ -424,19 +474,28 @@ const WebPortalAttendance = () => {
     const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     setWpState(prev => {
       const row = { ...prev[empId], punchOut: timeString };
-      row.totalHours = helperCalculateHours(row.punchIn, row.punchOut);
+      row.totalHours = helperCalculateHours(row.punchIn, row.punchOut, row.breakTime);
       return { ...prev, [empId]: row };
     });
     addToast('info', `Punch Out set for ${empId} to ${timeString}`);
   };
 
-  const handleWpMarkSubmit = (empId) => {
-    const row = wpState[empId];
+  const handleWpMarkSubmit = (empId, updatedRow = null) => {
+    const row = updatedRow || wpState[empId];
     if (!row) return;
-    if (!row.punchIn) { addToast('error', 'Please enter a Punch In time.'); return; }
+
+    const isStatusWithoutPunch = ['absent', 'on leave', 'leave'].includes((row.status || '').toLowerCase());
+    if (!isStatusWithoutPunch && (!row.punchIn || row.punchIn === '--:--')) {
+      addToast('error', 'Please enter a Punch In time.');
+      return;
+    }
 
     const empData = employees.find(e => e.id === empId);
     if (!empData) return;
+
+    const punchIn = isStatusWithoutPunch ? '--:--' : row.punchIn;
+    const punchOut = isStatusWithoutPunch ? '--:--' : (row.punchOut || '--:--');
+    const totalHours = isStatusWithoutPunch ? 0 : (parseFloat(row.totalHours) || 0);
 
     const record = {
       employeeId: empId,
@@ -445,23 +504,42 @@ const WebPortalAttendance = () => {
       branch: empData.branch || 'Jaipur',
       workMode: row.workMode || empData.workMode || 'WFO',
       date: dateFilter,
-      punchIn: row.punchIn,
-      punchOut: row.punchOut || '--:--',
-      breakTime: '45 mins',
-      totalHours: parseFloat(row.totalHours) || 0,
+      punchIn: punchIn,
+      punchOut: punchOut,
+      breakTime: row.breakTime || '45 mins',
+      totalHours: totalHours,
       status: row.status,
       source: 'Web Portal',
       notes: row.notes || '',
-      overtime: row.totalHours > 8 ? `${(row.totalHours - 8).toFixed(1)} hrs` : '0 hrs'
+      overtime: totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs'
     };
 
     if (row.isNew) {
       const newRecord = { ...record, id: `ATT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}` };
       addAttendanceRecord(newRecord);
-      setWpState(prev => ({ ...prev, [empId]: { ...prev[empId], isNew: false, recordId: newRecord.id } }));
+      setWpState(prev => ({
+        ...prev,
+        [empId]: {
+          ...prev[empId],
+          punchIn,
+          punchOut,
+          totalHours,
+          isNew: false,
+          recordId: newRecord.id
+        }
+      }));
       addToast('success', `Attendance marked for ${empData.name}`);
     } else {
       updateAttendanceRecord(row.recordId, record);
+      setWpState(prev => ({
+        ...prev,
+        [empId]: {
+          ...prev[empId],
+          punchIn,
+          punchOut,
+          totalHours
+        }
+      }));
       addToast('success', `Attendance updated for ${empData.name}`);
     }
   };
@@ -483,27 +561,31 @@ const WebPortalAttendance = () => {
   const handleEditSubmit = () => {
     if (!selectedEditEmp) return;
     const empId = selectedEditEmp.id;
+    const updatedRow = {
+      ...wpState[empId],
+      punchIn: editFormData.punchIn,
+      punchOut: editFormData.punchOut,
+      status: editFormData.status,
+      totalHours: editFormData.totalHours,
+      notes: editFormData.notes,
+      workMode: editFormData.workMode || 'WFO'
+    };
     setWpState(prev => ({
       ...prev,
-      [empId]: {
-        ...prev[empId],
-        punchIn: editFormData.punchIn,
-        punchOut: editFormData.punchOut,
-        status: editFormData.status,
-        totalHours: editFormData.totalHours,
-        notes: editFormData.notes,
-        workMode: editFormData.workMode || 'WFO'
-      }
+      [empId]: updatedRow
     }));
-    handleWpMarkSubmit(empId);
+    handleWpMarkSubmit(empId, updatedRow);
     setEditModalOpen(false);
-    addToast('success', `Attendance updated for ${selectedEditEmp.name}`);
   };
 
   const handleBulkStatusUpdate = () => {
     selectedForBulk.forEach(empId => {
-      setWpState(prev => ({ ...prev, [empId]: { ...prev[empId], status: bulkStatus } }));
-      handleWpMarkSubmit(empId);
+      const currentRow = wpState[empId];
+      if (currentRow) {
+        const updatedRow = { ...currentRow, status: bulkStatus };
+        setWpState(prev => ({ ...prev, [empId]: updatedRow }));
+        handleWpMarkSubmit(empId, updatedRow);
+      }
     });
     setBulkActionModal(false);
     setSelectedForBulk([]);
@@ -512,8 +594,14 @@ const WebPortalAttendance = () => {
 
   const handleBulkMarkStatus = (status) => {
     selectedForBulk.forEach(empId => {
-      setWpState(prev => ({ ...prev, [empId]: { ...prev[empId], status } }));
+      const currentRow = wpState[empId];
+      if (currentRow) {
+        const updatedRow = { ...currentRow, status };
+        setWpState(prev => ({ ...prev, [empId]: updatedRow }));
+        handleWpMarkSubmit(empId, updatedRow);
+      }
     });
+    setSelectedForBulk([]);
     addToast('success', `Marked ${selectedForBulk.length} employees as ${status}`);
   };
 
@@ -860,6 +948,7 @@ const WebPortalAttendance = () => {
                 {wpFilteredEmployees.map(emp => {
                   const rowState = wpState[emp.id] || { punchIn: '', punchOut: '', status: '', totalHours: 0, breakTime: '45 mins', isNew: true };
                   const isSelected = selectedForBulk.includes(emp.id);
+                  const shiftTimes = parseShiftTimes(emp.shift || emp.shiftTiming);
                   return (
                     <tr key={emp.id} className={`wp-emp-row ${isSelected ? 'wp-row-selected' : ''}`}>
                       {colVis.checkbox && (
@@ -918,7 +1007,7 @@ const WebPortalAttendance = () => {
                           <div className="wp-time-input-group">
                             <input
                               type="text"
-                              placeholder="09:00 AM"
+                              placeholder={shiftTimes.punchIn}
                               value={rowState.punchIn}
                               onChange={e => handleWpChange(emp.id, 'punchIn', e.target.value)}
                               className="wp-time-input"
@@ -939,7 +1028,7 @@ const WebPortalAttendance = () => {
                           <div className="wp-time-input-group">
                             <input
                               type="text"
-                              placeholder="06:00 PM"
+                              placeholder={shiftTimes.punchOut}
                               value={rowState.punchOut}
                               onChange={e => handleWpChange(emp.id, 'punchOut', e.target.value)}
                               className="wp-time-input"
@@ -1228,11 +1317,11 @@ const WebPortalAttendance = () => {
 
             <div className="wp-form-field">
               <label>Punch In Time</label>
-              <input type="text" placeholder="09:00 AM" value={quickFormData.punchIn} onChange={e => setQuickFormData(prev => ({ ...prev, punchIn: e.target.value, totalHours: helperCalculateHours(e.target.value, prev.punchOut) }))} />
+              <input type="text" placeholder="09:00 AM" value={quickFormData.punchIn} onChange={e => setQuickFormData(prev => ({ ...prev, punchIn: e.target.value, totalHours: helperCalculateHours(e.target.value, prev.punchOut, prev.breakTime) }))} />
             </div>
             <div className="wp-form-field">
               <label>Punch Out Time</label>
-              <input type="text" placeholder="06:00 PM" value={quickFormData.punchOut} onChange={e => setQuickFormData(prev => ({ ...prev, punchOut: e.target.value, totalHours: helperCalculateHours(prev.punchIn, e.target.value) }))} />
+              <input type="text" placeholder="06:00 PM" value={quickFormData.punchOut} onChange={e => setQuickFormData(prev => ({ ...prev, punchOut: e.target.value, totalHours: helperCalculateHours(prev.punchIn, e.target.value, prev.breakTime) }))} />
             </div>
             <div className="wp-form-field">
               <label>Total Hours</label>
@@ -1278,9 +1367,45 @@ const WebPortalAttendance = () => {
       {/* ═══ Edit Modal ═══ */}
       <Modal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} title={`Edit Attendance: ${selectedEditEmp?.name}`} size="sm">
         <div className="wp-edit-form">
-          <div className="wp-edit-field"><label>Punch In Time</label><input type="text" placeholder="09:00 AM" value={editFormData.punchIn} onChange={e => setEditFormData(prev => ({ ...prev, punchIn: e.target.value }))} /></div>
-          <div className="wp-edit-field"><label>Punch Out Time</label><input type="text" placeholder="06:00 PM" value={editFormData.punchOut} onChange={e => setEditFormData(prev => ({ ...prev, punchOut: e.target.value }))} /></div>
-          <div className="wp-edit-field"><label>Total Hours</label><input type="number" step="0.1" value={editFormData.totalHours} onChange={e => setEditFormData(prev => ({ ...prev, totalHours: parseFloat(e.target.value) || 0 }))} /></div>
+          <div className="wp-edit-field">
+            <label>Punch In Time</label>
+            <input
+              type="text"
+              placeholder="09:00 AM"
+              value={editFormData.punchIn}
+              onChange={e => {
+                const val = e.target.value;
+                setEditFormData(prev => {
+                  const breakTime = selectedEditEmp ? wpState[selectedEditEmp.id]?.breakTime : '45 mins';
+                  return { ...prev, punchIn: val, totalHours: helperCalculateHours(val, prev.punchOut, breakTime) };
+                });
+              }}
+            />
+          </div>
+          <div className="wp-edit-field">
+            <label>Punch Out Time</label>
+            <input
+              type="text"
+              placeholder="06:00 PM"
+              value={editFormData.punchOut}
+              onChange={e => {
+                const val = e.target.value;
+                setEditFormData(prev => {
+                  const breakTime = selectedEditEmp ? wpState[selectedEditEmp.id]?.breakTime : '45 mins';
+                  return { ...prev, punchOut: val, totalHours: helperCalculateHours(prev.punchIn, val, breakTime) };
+                });
+              }}
+            />
+          </div>
+          <div className="wp-edit-field">
+            <label>Total Hours</label>
+            <input
+              type="number"
+              step="0.1"
+              value={editFormData.totalHours}
+              onChange={e => setEditFormData(prev => ({ ...prev, totalHours: parseFloat(e.target.value) || 0 }))}
+            />
+          </div>
           <div className="wp-edit-field">
             <label>Status</label>
             <select value={editFormData.status} onChange={e => setEditFormData(prev => ({ ...prev, status: e.target.value }))}>

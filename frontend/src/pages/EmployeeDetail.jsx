@@ -8,7 +8,7 @@ import {
   ArrowLeft, Edit2, Trash2, User, Briefcase, Calendar, Shield,
   FileText, Activity, CheckSquare, BarChart2, Download, Upload,
   ChevronDown, ChevronUp, Clock, TrendingUp, CheckCircle,
-  Building2, Lock
+  Building2, Lock, X
 } from 'lucide-react';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];

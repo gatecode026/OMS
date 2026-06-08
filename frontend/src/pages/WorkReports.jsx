@@ -282,17 +282,44 @@ const formatTime = (isoString) => {
    MAIN MODULE COMPONENT
    ═══════════════════════════════════════════════════════════ */
 const WorkReports = () => {
-  const { addToast } = useApp();
+  const { addToast, currentUser, currentUserRole, employees, dailyReports: rawReports, setDailyReports: setReports } = useApp();
   const loading = usePageLoading(800);
 
+  const initialUserRole = useMemo(() => {
+    if (currentUserRole === 'super_admin') return 'Super Admin';
+    if (currentUserRole === 'branch_admin' || currentUserRole === 'dept_admin') return 'HR/Admin';
+    if (currentUserRole === 'project_manager') return 'Project Manager';
+    if (currentUserRole === 'team_leader') return 'Team Leader';
+    return 'Employee';
+  }, [currentUserRole]);
+
   /* Simulated user perspective configuration */
-  const [userRole, setUserRole] = useState('Super Admin'); // Employee, Team Leader, PM, HR/Admin, Super Admin
+  const [userRole, setUserRole] = useState(initialUserRole);
+
+  React.useEffect(() => {
+    setUserRole(initialUserRole);
+  }, [initialUserRole]);
 
   /* Page Tabs Controller */
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, directory, submit, calendar, analytics, leaderboards, logs
 
-  /* Reports Master State */
-  const [reports, setReports] = useState(SEED_REPORTS);
+  const reports = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin') return rawReports;
+    return rawReports.filter(r => {
+      const emp = employees.find(e => e.id === r.employeeId || e.name === r.employeeName);
+      if (currentUserRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (currentUserRole === 'dept_admin') {
+        return r.department === currentUser?.department || emp?.department === currentUser?.department;
+      }
+      if (currentUserRole === 'employee') {
+        return r.employeeId === currentUser?.id || emp?.id === currentUser?.id;
+      }
+      return true;
+    });
+  }, [rawReports, employees, currentUser, currentUserRole]);
+
   const [auditLogs, setAuditLogs] = useState(AUDIT_TRAIL);
   const [notifications, setNotifications] = useState(NOTIFICATION_SEEDS);
 
@@ -388,10 +415,10 @@ const WorkReports = () => {
     const newReportId = `REP-${String(reports.length + 1).padStart(3, '0')}`;
     const newReport = {
       id: newReportId,
-      employeeName: 'Rahul Sharma',
-      employeeId: 'EMP-201',
-      department: 'IT',
-      team: 'Dev Team Alpha',
+      employeeName: currentUser?.name || 'Rahul Sharma',
+      employeeId: currentUser?.id || 'EMP-201',
+      department: currentUser?.department || 'IT',
+      team: currentUser?.teamName || 'Dev Team Alpha',
       project: formProject,
       date: formDate,
       tasksAssigned: Number(tasksAssigned),
@@ -416,13 +443,13 @@ const WorkReports = () => {
       productivityScore: Math.round((Number(tasksCompleted) / Math.max(1, Number(tasksAssigned))) * 100),
       feedback: '',
       approvalHistory: [
-        { role: 'Employee', user: 'Rahul Sharma', action: 'Submitted', timestamp: new Date().toISOString(), comments: '' }
+        { role: 'Employee', user: currentUser?.name || 'Rahul Sharma', action: 'Submitted', timestamp: new Date().toISOString(), comments: '' }
       ]
     };
 
     setReports(prev => [newReport, ...prev]);
-    pushNotification(`Rahul Sharma (REP-${newReport.id}) submitted daily work report.`);
-    addAuditLog('Submission', newReportId, `Rahul Sharma submitted daily report for ${formDate}`);
+    pushNotification(`${currentUser?.name || 'Rahul Sharma'} (REP-${newReport.id}) submitted daily work report.`);
+    addAuditLog('Submission', newReportId, `${currentUser?.name || 'Rahul Sharma'} submitted daily report for ${formDate}`);
 
     addToast('success', `Daily work report ${newReportId} submitted successfully.`);
 
@@ -726,23 +753,25 @@ const WorkReports = () => {
 
         {/* Dynamic Role Switcher & Tabs */}
         <div className="flex-center gap-3 flex-wrap">
-          <div className="role-switcher-container">
-            <span className="role-switcher-label">View Perspective:</span>
-            <select
-              value={userRole}
-              onChange={(e) => {
-                setUserRole(e.target.value);
-                addToast('info', `Dashboard view role changed to: ${e.target.value}`);
-              }}
-              className="role-selector-input"
-            >
-              <option>Employee</option>
-              <option>Team Leader</option>
-              <option>Project Manager</option>
-              <option>HR/Admin</option>
-              <option>Super Admin</option>
-            </select>
-          </div>
+          {currentUserRole !== 'employee' && (
+            <div className="role-switcher-container">
+              <span className="role-switcher-label">View Perspective:</span>
+              <select
+                value={userRole}
+                onChange={(e) => {
+                  setUserRole(e.target.value);
+                  addToast('info', `Dashboard view role changed to: ${e.target.value}`);
+                }}
+                className="role-selector-input"
+              >
+                <option>Employee</option>
+                <option>Team Leader</option>
+                <option>Project Manager</option>
+                <option>HR/Admin</option>
+                <option>Super Admin</option>
+              </select>
+            </div>
+          )}
           
           <Button variant="ghost" size="sm" icon={Download} onClick={() => handleExportSystem('CSV')}>
             {exporting ? 'Exporting...' : 'Export Directory'}
@@ -761,9 +790,9 @@ const WorkReports = () => {
           { id: 'submit', label: 'Submit Daily Report', icon: <Send size={15} /> },
           { id: 'calendar', label: 'Calendar Grid', icon: <Calendar size={15} /> },
           { id: 'analytics', label: 'Analytics & Heatmap', icon: <TrendingUp size={15} /> },
-          { id: 'leaderboards', label: 'Leaderboard & Reminders', icon: <Award size={15} /> },
-          { id: 'logs', label: 'Notifications & Audits', icon: <ShieldAlert size={15} /> }
-        ].map(t => (
+          currentUserRole !== 'employee' && { id: 'leaderboards', label: 'Leaderboard & Reminders', icon: <Award size={15} /> },
+          currentUserRole !== 'employee' && { id: 'logs', label: 'Notifications & Audits', icon: <ShieldAlert size={15} /> }
+        ].filter(Boolean).map(t => (
           <button
             key={t.id}
             className={`reports-tab-btn ${activeTab === t.id ? 'active' : ''}`}
@@ -807,31 +836,41 @@ const WorkReports = () => {
             </div>
           </div>
 
-          <div className="reports-stats" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-            <div className="card stat-metric-card border-left-teal">
-              <span className="card-lbl-gray">Active Workforce Logged</span>
-              <div className="card-value-display text-teal">{stats.activeReporting} Staff</div>
-              <span className="card-sub-desc">Reporting to date</span>
-            </div>
+          {currentUserRole !== 'employee' ? (
+            <div className="reports-stats" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+              <div className="card stat-metric-card border-left-teal">
+                <span className="card-lbl-gray">Active Workforce Logged</span>
+                <div className="card-value-display text-teal">{stats.activeReporting} Staff</div>
+                <span className="card-sub-desc">Reporting to date</span>
+              </div>
 
-            <div className="card stat-metric-card border-left-purple">
-              <span className="card-lbl-gray">Avg Productivity Score</span>
-              <div className="card-value-display text-purple">{stats.avgProductivity}%</div>
-              <span className="card-sub-desc">Calculated completion matrix</span>
-            </div>
+              <div className="card stat-metric-card border-left-purple">
+                <span className="card-lbl-gray">Avg Productivity Score</span>
+                <div className="card-value-display text-purple">{stats.avgProductivity}%</div>
+                <span className="card-sub-desc">Calculated completion matrix</span>
+              </div>
 
-            <div className="card stat-metric-card border-left-orange">
-              <span className="card-lbl-gray">Missing Reports</span>
-              <div className="card-value-display text-orange">3 Alerts</div>
-              <span className="card-sub-desc">From active roster teams</span>
-            </div>
+              <div className="card stat-metric-card border-left-orange">
+                <span className="card-lbl-gray">Missing Reports</span>
+                <div className="card-value-display text-orange">3 Alerts</div>
+                <span className="card-sub-desc">From active roster teams</span>
+              </div>
 
-            <div className="card stat-metric-card border-left-neutral">
-              <span className="card-lbl-gray">Late Submissions</span>
-              <div className="card-value-display text-white">2 Records</div>
-              <span className="card-sub-desc">Past 18:00 cutoff deadline</span>
+              <div className="card stat-metric-card border-left-neutral">
+                <span className="card-lbl-gray">Late Submissions</span>
+                <div className="card-value-display text-white">2 Records</div>
+                <span className="card-sub-desc">Past 18:00 cutoff deadline</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="reports-stats" style={{ gridTemplateColumns: '1fr' }}>
+              <div className="card stat-metric-card border-left-purple">
+                <span className="card-lbl-gray">My Avg Productivity Score</span>
+                <div className="card-value-display text-purple">{stats.avgProductivity}%</div>
+                <span className="card-sub-desc">Based on submitted daily reports</span>
+              </div>
+            </div>
+          )}
 
           {/* Quick Analytics overview */}
           <div className="reports-kpi-grid">
@@ -1799,7 +1838,7 @@ const WorkReports = () => {
             </div>
 
             {/* Manager Review inputs */}
-            {(userRole !== 'Employee') && (
+            {(userRole !== 'Employee' && currentUserRole !== 'employee') && (
               <div className="drawer-review-inputs-wrapper" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
                 <span className="box-title" style={{ fontSize: '0.85rem', color: 'var(--color-primary)' }}>Manager Evaluation & Review Details</span>
                 
