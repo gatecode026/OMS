@@ -56,130 +56,6 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-const mockBranchesData = [
-  { name: 'Jaipur HQ', country: 'India', flag: '🇮🇳', headcount: 3, projects: 2, status: 'Optimal', score: 97, revenue: '₹20.4Cr' },
-  { name: 'Delhi Office', country: 'India', flag: '🇮🇳', headcount: 4, projects: 2, status: 'Active', score: 89, revenue: '₹15.3Cr' },
-  { name: 'Mumbai Office', country: 'India', flag: '🇮🇳', headcount: 1, projects: 1, status: 'Optimal', score: 82, revenue: '₹7.8Cr' },
-  { name: 'Bangalore Office', country: 'India', flag: '🇮🇳', headcount: 1, projects: 1, status: 'Active', score: 75, revenue: '₹5.7Cr' }
-];
-
-const mockDeptsData = [
-  { name: 'IT', employees: 220, productivity: '92%', activeTasks: 180, color: 'var(--color-primary)' },
-  { name: 'HR', employees: 45, productivity: '88%', activeTasks: 24, color: '#f59e0b' },
-  { name: 'Sales', employees: 160, productivity: '95%', activeTasks: 110, color: '#10b981' },
-  { name: 'Marketing', employees: 85, productivity: '90%', activeTasks: 72, color: '#8b5cf6' }
-];
-
-const mockReportsData = [
-  { id: 'R-1', employee: 'Aarav Sharma', avatar: 'AS', project: 'SaaS Platform v2', hours: 8, status: 'Approved', summary: 'Refactored lazy routes, authorization guards, and theme settings.', blockers: 'None. Clean build outputs verified.', tomorrowGoals: 'Develop active theme toggling and setup inbox messaging.' },
-  { id: 'R-2', employee: 'Rajesh Kumar', avatar: 'RK', project: 'Marketing Website', hours: 7.5, status: 'Submitted', summary: 'Designed fresh layouts, vector assets, and brand color systems.', blockers: 'None. Client review pending.', tomorrowGoals: 'Finalize SVG icons export and coordinate assets deployment.' },
-  { id: 'R-3', employee: 'Meena Sharma', avatar: 'MS', project: 'Q2 Promo Campaign', hours: 6, status: 'Flagged', summary: 'Attended client reviews. Did not log detailed task logs.', blockers: 'Awaiting copy approval from operations.', tomorrowGoals: 'Submit corrected hours sheet.' },
-  { id: 'R-4', employee: 'Prakash Patel', avatar: 'PP', project: 'Branch Deployments', hours: 8.5, status: 'Approved', summary: 'Configured workstations, user controls, and IP whitelist profiles.', blockers: 'Network latency issues resolved.', tomorrowGoals: 'Verify backup cron schedules and session timeouts.' }
-];
-
-const mockActivitiesData = [
-  {
-    id: 'act-1',
-    type: 'success',
-    time: '10 mins ago',
-    icon: Clock,
-    title: <span><strong>Aarav Sharma</strong> punched in at Jaipur HQ office</span>,
-    details: 'Checked in physically at 08:58 AM using biometric hardware at Jaipur Malviya Nagar office.'
-  },
-  {
-    id: 'act-2',
-    type: 'warning',
-    time: '1 hour ago',
-    icon: CalendarDays,
-    title: <span><strong>Vikram Singh</strong> submitted a medical leave request</span>,
-    details: 'Medical leave request submitted for 3 days starting June 1st. Attachment uploaded.'
-  },
-  {
-    id: 'act-3',
-    type: 'primary',
-    time: '3 hours ago',
-    icon: CheckCircle,
-    title: <span><strong>Ananya Gupta</strong> updated task <strong>Deploy production v2.1</strong> to Done</span>,
-    details: 'Task moved to Done status. Commit hash: 9a2f1c8d. All unit tests passed.'
-  },
-  {
-    id: 'act-4',
-    type: 'purple',
-    time: '5 hours ago',
-    icon: UserPlus,
-    title: <span>New employee <strong>Neha Patel</strong> added to IT department</span>,
-    details: 'Onboarded Neha Patel as Frontend Engineer. Provisioned email: neha.patel@saas.com.'
-  },
-  {
-    id: 'act-5',
-    type: 'success',
-    time: '1 day ago',
-    icon: FileText,
-    title: <span><strong>Rohit Sharma</strong> submitted Q2 Marketing Work Report</span>,
-    details: 'Logged 8.5 hours. Core focus: campaign assets creation and ad copywriting draft.'
-  },
-  {
-    id: 'act-6',
-    type: 'primary',
-    time: '1 day ago',
-    icon: FileCheck,
-    title: <span><strong>Neha Verma</strong> approved DevOps CI/CD pipeline automation workflow</span>,
-    details: 'Workflow recipe triggered. Production deployments now run on staging success.'
-  }
-];
-
-const mockAlertsData = [
-  {
-    id: 'al-1',
-    type: 'danger',
-    title: 'Late Attendance Alert',
-    desc: '3 employees clocked in late at Jaipur HQ today.',
-    time: 'Just now',
-    icon: AlertTriangle,
-    details: 'Neha Patel, Vikram Singh, and Aarav Sharma checked in after the grace period (09:15 AM). Late flags applied.',
-    resolution: 'Notify employees or waive compliance flag.'
-  },
-  {
-    id: 'al-2',
-    type: 'danger',
-    title: 'Missing Punch-Outs',
-    desc: 'Missing punch-out detected for Rajesh Kumar yesterday.',
-    time: '2 hours ago',
-    icon: AlertCircle,
-    details: 'Rajesh Kumar failed to log checkout session. Current active status is still open.',
-    resolution: 'Force logout session or manually input check-out timesheet.'
-  },
-  {
-    id: 'al-3',
-    type: 'warning',
-    title: 'Pending Approvals',
-    desc: '5 leave requests are awaiting manager approval reviews.',
-    time: '4 hours ago',
-    icon: Clock,
-    details: 'Leave queue has reached threshold level. Delay is blocking sprint allocation.',
-    resolution: 'Go to Leave Management page to audit pending requests.'
-  },
-  {
-    id: 'al-4',
-    type: 'purple',
-    title: 'Upcoming Deadline',
-    desc: '"Security Audit and Penetration Test" is due in 2 hours.',
-    time: '5 hours ago',
-    icon: Activity,
-    details: 'High-severity task is pending final QA review. Assigned to Aarav Sharma.',
-    resolution: 'Ping assignee or reassign deadline.'
-  },
-  {
-    id: 'al-5',
-    type: 'primary',
-    title: 'System Notification',
-    desc: 'Automatic cloud backup completed successfully at 04:00 AM.',
-    time: '6 hours ago',
-    icon: Info,
-    details: 'Database incremental storage pool successfully replicated across region blocks. Integrity status: green.',
-    resolution: 'View audit logs or configure schedules.'
-  }
-];
 // Custom Tooltip component to color text according to line/wave color
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -280,7 +156,16 @@ const Dashboard = () => {
     tasks,
     currentUser,
     addToast,
-    showConfirm
+    showConfirm,
+    branches,
+    departments,
+    dailyReports,
+    updateDailyReportStatus,
+    activityLogs,
+    notifications,
+    announcementsList,
+    createAnnouncement,
+    projectsList
   } = useApp();
 
   const navigate = useNavigate();
@@ -289,44 +174,39 @@ const Dashboard = () => {
   const [selectedActivity, setSelectedActivity] = useState(null);
 
   const [leaderboardTab, setLeaderboardTab] = useState('employee'); // 'employee' or 'branch'
-  const [reports, setReports] = useState(mockReportsData);
   const [showExtendedStats, setShowExtendedStats] = useState(false);
 
   // Communication Center State
   const [commTab, setCommTab] = useState('company');
   const [commModal, setCommModal] = useState(null); // 'announcement', 'notification', 'email'
   const [commForm, setCommForm] = useState({ title: '', body: '', target: 'All' });
-  const [announcements, setAnnouncements] = useState({
-    company: [
-      { title: 'CEO Townhall Meeting', body: 'Q2 All-Hands meeting scheduled for June 5th at 3 PM IST.', time: '1d ago' },
-      { title: 'New Office Policy', body: 'Updated remote work policy document uploaded in Document Vault.', time: '3d ago' }
-    ],
-    department: [
-      { title: 'Engineering Sprint Sync', body: 'All devs please update task statuses before end of sprint.', time: '2h ago' },
-      { title: 'HR Compliance Audit', body: 'Please verify and update document list under employee profile.', time: '1d ago' }
-    ],
-    team: [
-      { title: 'Frontend UI Polish', body: 'Meeting today at 4:30 PM to discuss dashboard custom gradient colors.', time: '30m ago' }
-    ]
-  });
+
+  const announcements = React.useMemo(() => {
+    const list = announcementsList || [];
+    return {
+      company: list.filter(a => !a.target || a.target === 'All' || a.target.toLowerCase() === 'company' || a.target.toLowerCase() === 'all').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '1d ago' })),
+      department: list.filter(a => a.target && a.target.toLowerCase() !== 'all' && a.target.toLowerCase() !== 'company' && a.target.toLowerCase() !== 'team').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '2h ago' })),
+      team: list.filter(a => a.target && a.target.toLowerCase() === 'team').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '30m ago' }))
+    };
+  }, [announcementsList]);
 
   const handleQuickAction = (type) => {
-    setCommForm({ title: '', body: '', target: type === 'email' ? 'All Employees' : 'All Departments' });
+    setCommForm({ title: '', body: '', target: type === 'email' ? 'All Employees' : 'All' });
     setCommModal(type);
   };
 
-  const handleCommSubmit = () => {
+  const handleCommSubmit = async () => {
     if (!commForm.title || !commForm.body) {
       addToast('warning', 'Please fill in all fields.');
       return;
     }
     if (commModal === 'announcement') {
-      const newAnn = { title: commForm.title, body: commForm.body, time: 'Just now' };
-      setAnnouncements(prev => ({
-        ...prev,
-        company: [newAnn, ...prev.company]
-      }));
-      addToast('success', 'Announcement published successfully!');
+      await createAnnouncement({
+        title: commForm.title,
+        content: commForm.body,
+        target: commForm.target,
+        type: 'Standard'
+      });
     } else if (commModal === 'notification') {
       addToast('success', `Alert sent to target group: ${commForm.target}`);
     } else {
@@ -335,99 +215,138 @@ const Dashboard = () => {
     setCommModal(null);
   };
 
-  // Org Chart Hierarchy Data
-  const orgChartData = {
-    name: 'Aarav Sharma',
-    role: 'Chief Executive Officer / COO',
-    subItems: [
-      {
-        name: 'Vikram Singh',
-        role: 'Engineering Director / Branch Admin',
-        subItems: [
-          {
-            name: 'Ananya Gupta',
-            role: 'Engineering Manager / Team Leader',
-            subItems: [
-              { name: 'Suresh Kumar', role: 'Frontend Developer', subItems: [] },
-              { name: 'Kavita Singh', role: 'QA Engineer', subItems: [] }
-            ]
-          },
-          {
-            name: 'Arjun Mehta',
-            role: 'Data Manager / Team Leader',
-            subItems: [
-              { name: 'Amit Bose', role: 'Cloud Engineer', subItems: [] }
-            ]
-          }
-        ]
-      },
-      {
-        name: 'Priya Patel',
-        role: 'Marketing Director / Branch Admin',
-        subItems: [
-          {
-            name: 'Rohit Sharma',
-            role: 'Sales Manager / Team Leader',
-            subItems: [
-              { name: 'Deepak Joshi', role: 'Account Executive', subItems: [] },
-              { name: 'Naveen Saxena', role: 'Sales Specialist', subItems: [] }
-            ]
-          }
-        ]
-      }
-    ]
-  };
+  // Org Chart Hierarchy Data dynamically computed
+  const orgChartData = React.useMemo(() => {
+    const ceo = (employees || []).find(e => e.roleId === 'super_admin' || e.designation?.toLowerCase().includes('ceo') || e.designation?.toLowerCase().includes('chief')) || employees[0];
+    if (!ceo) return { name: 'Aarav Sharma', role: 'Chief Executive Officer', subItems: [] };
+
+    const buildTree = (managerName) => {
+      const reports = (employees || []).filter(e => e.teamLeader === managerName && e.name !== managerName);
+      return reports.map(e => ({
+        name: e.name,
+        role: e.designation || e.role || 'Employee',
+        subItems: buildTree(e.name)
+      }));
+    };
+
+    return {
+      name: ceo.name,
+      role: ceo.designation || 'Chief Executive Officer',
+      subItems: buildTree(ceo.name)
+    };
+  }, [employees]);
 
   // Stats Calculations
   const totalEmployeesCount = employees.length || 8;
-  const activeProjectsCount = 4; // Mock projects total count
-  const presentToday = attendance.filter(a => a.date === '2026-05-29' && a.status === 'Present').length || 7;
+  const activeProjectsCount = (projectsList || []).length || 4;
+  
+  const todayStr = '2026-06-03';
+  const presentToday = attendance.filter(a => a.date === todayStr && (a.status === 'Present' || a.status === 'Late' || a.status === 'Work From Home')).length || 7;
   const attendanceRate = Math.round((presentToday / totalEmployeesCount) * 100);
 
-  const todoTasks = tasks.filter(t => t.status === 'To Do').length;
-  const progressTasks = tasks.filter(t => t.status === 'In Progress').length;
-  const doneTasks = tasks.filter(t => t.status === 'Done').length;
+  const todoTasks = tasks.filter(t => t.status === 'To Do' || t.status === 'To Do').length;
+  const progressTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'in progress').length;
+  const doneTasks = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
 
   const totalDepts = [...new Set(employees.map(e => e.department))].length || 4;
   const totalTeams = [...new Set(employees.map(e => e.team).filter(Boolean))].length || 6;
-  const probationCount = employees.filter(e => e.employmentStatus === 'Probation').length || 3;
-  const contractExpiringCount = employees.filter(e => e.employeeType === 'Contract').length || 2;
-  const missingDocsCount = employees.filter(e => !e.documents || e.documents.length < 3).length || 5;
+  const probationCount = employees.filter(e => e.employmentStatus === 'Probation').length || 0;
+  const contractExpiringCount = employees.filter(e => e.employeeType === 'Contract').length || 0;
+  const missingDocsCount = employees.filter(e => !e.documents || e.documents.length < 3).length || 0;
   const notMarkedAttendanceCount = Math.max(0, employees.length - presentToday);
   const avgTenure = "2.4 Years";
   const turnoverRate = "4.8%";
   const satisfactionScore = "88%";
 
-  // Chart Data
-  const attendanceChartData = [
-    { date: '05-22', present: 8, absent: 1, late: 1, leave: 1 },
-    { date: '05-23', present: 9, absent: 0, late: 0, leave: 1 },
-    { date: '05-24', present: 7, absent: 2, late: 1, leave: 0 },
-    { date: '05-25', present: 8, absent: 1, late: 2, leave: 0 },
-    { date: '05-26', present: 9, absent: 0, late: 1, leave: 1 },
-    { date: '05-27', present: 8, absent: 1, late: 0, leave: 2 },
-    { date: '05-28', present: 7, absent: 2, late: 1, leave: 1 },
-    { date: '05-29', present: 8, absent: 1, late: 1, leave: 1 }
-  ];
+  // Dynamic Chart Data
+  const attendanceChartData = React.useMemo(() => {
+    if (!attendance || attendance.length === 0) {
+      return [
+        { date: '06-01', present: 0, absent: 0, late: 0, leave: 0 },
+        { date: '06-02', present: 0, absent: 0, late: 0, leave: 0 },
+        { date: '06-03', present: 0, absent: 0, late: 0, leave: 0 }
+      ];
+    }
+    const groups = {};
+    attendance.forEach(att => {
+      const dateStr = att.date ? att.date.slice(5) : 'Unknown';
+      if (!groups[dateStr]) {
+        groups[dateStr] = { date: dateStr, present: 0, absent: 0, late: 0, leave: 0 };
+      }
+      const status = (att.status || '').toLowerCase();
+      if (status === 'present' || status === 'work from home') {
+        groups[dateStr].present++;
+      } else if (status === 'absent') {
+        groups[dateStr].absent++;
+      } else if (status === 'late') {
+        groups[dateStr].late++;
+      } else if (status === 'on leave' || status === 'leave' || status === 'half day') {
+        groups[dateStr].leave++;
+      }
+    });
+    return Object.values(groups).sort((a, b) => a.date.localeCompare(b.date)).slice(-8);
+  }, [attendance]);
 
-  // Leaderboard data
-  const employeeLeaderboard = [
-    { name: 'Ananya Gupta', dept: 'Engineering', score: 98, color: '#10b981' },
-    { name: 'Aarav Sharma', dept: 'Operations', score: 95, color: '#3b82f6' },
-    { name: 'Rohit Sharma', dept: 'Sales', score: 88, color: '#8b5cf6' },
-    { name: 'Vikram Singh', dept: 'Engineering', score: 76, color: '#f59e0b' }
-  ];
+  // Dynamic Leaderboard data
+  const employeeLeaderboard = React.useMemo(() => {
+    return (employees || [])
+      .map(e => ({
+        name: e.name,
+        dept: e.department || 'Engineering',
+        score: e.productivityScore || (e.performanceScore?.overall) || 75,
+        color: (e.productivityScore || 75) > 90 ? '#10b981' : (e.productivityScore || 75) > 80 ? '#3b82f6' : '#f59e0b'
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4);
+  }, [employees]);
 
-  const branchLeaderboard = mockBranchesData.map(b => ({
-    name: b.name,
-    dept: `${b.country} • ${b.headcount} Emps`,
-    score: b.score,
-    color: b.status === 'Optimal' ? '#10b981' : '#3b82f6'
-  }));
+  const branchLeaderboard = React.useMemo(() => {
+    return (branches || []).map(b => ({
+      name: b.name,
+      dept: `${b.city || 'India'} • ${employees.filter(e => e.branch === b.name).length} Emps`,
+      score: b.productivity || 85,
+      color: (b.productivity || 85) >= 90 ? '#10b981' : '#3b82f6'
+    })).sort((a, b) => b.score - a.score).slice(0, 4);
+  }, [branches, employees]);
+
+  // Department statistics derived from live context
+  const departmentsData = React.useMemo(() => {
+    return (departments || []).map((d, index) => {
+      const deptEmployees = employees.filter(e => e.department === d.name);
+      const deptTasks = tasks.filter(t => t.department === d.name);
+      const colors = ['var(--color-primary)', '#f59e0b', '#10b981', '#8b5cf6', '#d946ef'];
+      
+      const totalProd = deptEmployees.reduce((sum, e) => sum + (e.productivityScore || 75), 0);
+      const avgProd = deptEmployees.length > 0 ? Math.round(totalProd / deptEmployees.length) : 85;
+
+      return {
+        name: d.name,
+        employees: deptEmployees.length,
+        productivity: `${avgProd}%`,
+        activeTasks: deptTasks.filter(t => t.status !== 'Done').length,
+        color: colors[index % colors.length]
+      };
+    });
+  }, [departments, employees, tasks]);
+
+  const branchesData = React.useMemo(() => {
+    return (branches || []).map(b => ({
+      name: b.name,
+      country: b.city || 'India',
+      flag: '🇮🇳',
+      headcount: employees.filter(e => e.branch === b.name).length,
+      projects: b.projects?.active || 0,
+      status: b.status === 'Active' ? 'Active' : 'Optimal',
+      score: b.productivity || 90,
+      revenue: b.revenue ? `₹${(b.revenue / 10000000).toFixed(1)}Cr` : '₹0.0Cr'
+    }));
+  }, [branches, employees]);
+
+  const reports = dailyReports || [];
 
   const handleReportAction = (id, nextStatus, isModal = false) => {
     const report = reports.find(r => r.id === id);
-    const empName = report ? report.employee : 'Employee';
+    const empName = report ? (report.employeeName || report.employee) : 'Employee';
     const actionName = nextStatus === 'Approved' ? 'Approve' : 'Flag';
     const title = `${actionName} Work Report`;
     const message = `Are you sure you want to ${nextStatus === 'Approved' ? 'approve' : 'flag'} the work report for ${empName}?`;
@@ -436,14 +355,8 @@ const Dashboard = () => {
     showConfirm(
       title,
       message,
-      () => {
-        setReports(prev =>
-          prev.map(r => (r.id === id ? { ...r, status: nextStatus } : r))
-        );
-        addToast(
-          nextStatus === 'Approved' ? 'success' : 'warning',
-          `Work report status updated to ${nextStatus}.`
-        );
+      async () => {
+        await updateDailyReportStatus(id, nextStatus, nextStatus === 'Approved' ? 'Approved by Admin' : 'Flagged by Admin');
         if (isModal) {
           setSelectedReport(null);
         }
@@ -533,7 +446,7 @@ const Dashboard = () => {
           variant="projects"
         />
         <StatCard
-          label="Daily Work Reports"
+          label="Work Reports"
           value={reports.length}
           trendVal="92%"
           trendType="up"
@@ -568,7 +481,7 @@ const Dashboard = () => {
         />
         <StatCard
           label="Branch / Agency Overview"
-          value={mockBranchesData.length}
+          value={branches.length}
           trendVal="Active"
           trendType="success"
           trendLabel="All Nodes Operational"
@@ -577,9 +490,9 @@ const Dashboard = () => {
           chartType="gauge"
           onClick={() => navigate('/branches')}
           subMetrics={[
-            { label: 'Active', value: '+ 4', icon: Globe },
+            { label: 'Active', value: `+ ${branches.length}`, icon: Globe },
             { label: 'Avg Perf', value: '91%', icon: TrendingUp },
-            { label: 'HQ Headcount', value: 3, icon: Building2 }
+            { label: 'HQ Headcount', value: employees.filter(e => e.branch === 'Jaipur HQ' || e.workLocation === 'Jaipur HQ').length || 3, icon: Building2 }
           ]}
           variant="branches"
         />
@@ -719,7 +632,7 @@ const Dashboard = () => {
             <span className="chart-subtitle">Corporate office branches status</span>
           </div>
           <div className="branch-overview-list">
-            {mockBranchesData.map((branch, idx) => (
+            {branchesData.map((branch, idx) => (
               <div key={idx} className="branch-overview-item branch-overview-item-clickable" onClick={() => navigate('/branches')}>
                 <div className="branch-overview-main">
                   <span className="branch-flag-emoji">{branch.flag}</span>
@@ -764,7 +677,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {mockDeptsData.map((d, i) => (
+                {departmentsData.map((d, i) => (
                   <tr key={i}>
                     <td>
                       <div className="dept-cell">
@@ -945,11 +858,11 @@ const Dashboard = () => {
 
       </div>
 
-      {/* 4. Daily Work Reports table grid */}
+      {/* 4. Work Reports table grid */}
       <div className="card table-card animate-slide-up">
         <div className="table-card-header">
           <div>
-            <h3 className="card-title">Daily Work Reports Summary</h3>
+            <h3 className="card-title">Work Reports Summary</h3>
             <span className="chart-subtitle">Audit entries submitted by active workspace employees</span>
           </div>
         </div>
@@ -971,15 +884,15 @@ const Dashboard = () => {
                 <tr key={report.id} className="clickable-row" onClick={() => setSelectedReport(report)}>
                   <td>
                     <div className="flex-center gap-3 justify-start">
-                      <Avatar name={report.employee} size="sm" />
-                      <span className="bold-text">{report.employee}</span>
+                      <Avatar name={report.employeeName || report.employee} size="sm" />
+                      <span className="bold-text">{report.employeeName || report.employee}</span>
                     </div>
                   </td>
                   <td>
                     <Badge variant="purple">{report.project}</Badge>
                   </td>
                   <td>
-                    <strong>{report.hours} hrs</strong>
+                    <strong>{report.hours || report.workingHours} hrs</strong>
                   </td>
                   <td>
                     <p className="report-summary-text" style={{ maxWidth: '400px' }}>{report.summary}</p>
@@ -1040,21 +953,47 @@ const Dashboard = () => {
           </div>
           
           <div className="panel-scroll-list activity-feed" style={{ padding: 'var(--spacing-4) var(--spacing-6)' }}>
-            {mockActivitiesData.map((act) => {
-              const IconComp = act.icon;
+            {(activityLogs || []).slice(0, 6).map((log) => {
+              let icon = Clock;
+              let typeClass = 'primary';
+              const actionLower = (log.actionType || '').toLowerCase();
+              if (actionLower.includes('punch') || actionLower.includes('attendance')) {
+                icon = Clock;
+                typeClass = 'success';
+              } else if (actionLower.includes('leave')) {
+                icon = Calendar;
+                typeClass = 'warning';
+              } else if (actionLower.includes('task')) {
+                icon = CheckCircle;
+                typeClass = 'primary';
+              } else if (actionLower.includes('employee') || actionLower.includes('user')) {
+                icon = UserPlus;
+                typeClass = 'purple';
+              } else if (actionLower.includes('role') || actionLower.includes('permission')) {
+                icon = ShieldCheck;
+                typeClass = 'danger';
+              }
+
               return (
                 <div
-                  key={act.id}
-                  className="feed-item feed-item-clickable"
-                  onClick={() => setSelectedActivity(act)}
+                  key={log.id}
+                  className="feed-item"
+                  onClick={() => setSelectedActivity({
+                    id: log.id,
+                    type: typeClass,
+                    time: log.timestamp,
+                    icon: icon,
+                    title: `${log.actor} performed: ${log.actionType}`,
+                    details: `Action: ${log.actionType} on Module: ${log.fieldChanged || '—'}. Details: oldValue: ${log.oldValue}, newValue: ${log.newValue}. IP: ${log.ip || '127.0.0.1'}`
+                  })}
                   style={{ cursor: 'pointer' }}
                 >
-                  <div className={`feed-icon-holder ${act.type}`}>
-                    <IconComp size={14} />
+                  <div className={`feed-icon-holder ${typeClass}`}>
+                    {React.createElement(icon, { size: 14 })}
                   </div>
                   <div className="feed-content">
-                    <span className="feed-title">{act.title}</span>
-                    <span className="feed-time">{act.time}</span>
+                    <span className="feed-title"><strong>{log.actor}</strong>: {log.actionType}</span>
+                    <span className="feed-time">{log.timestamp}</span>
                   </div>
                 </div>
               );
@@ -1069,25 +1008,49 @@ const Dashboard = () => {
               <h3 className="card-title">Notifications & Alerts</h3>
               <span className="chart-subtitle">Actionable alerts and compliance indicators</span>
             </div>
-            <Badge variant="danger">5 Alerts</Badge>
+            <Badge variant="danger">{notifications.filter(n => !n.read).length} Alerts</Badge>
           </div>
           
           <div className="panel-scroll-list alert-feed" style={{ padding: 'var(--spacing-4) var(--spacing-6)' }}>
-            {mockAlertsData.map((alert) => {
-              const IconComp = alert.icon;
+            {(notifications || []).slice(0, 6).map((notif) => {
+              let icon = Info;
+              let typeClass = 'primary';
+              if (notif.type === 'warning' || notif.type === 'security') {
+                icon = AlertTriangle;
+                typeClass = 'warning';
+              } else if (notif.type === 'error') {
+                icon = AlertCircle;
+                typeClass = 'danger';
+              } else if (notif.type === 'success') {
+                icon = CheckCircle;
+                typeClass = 'success';
+              } else if (notif.type === 'task') {
+                icon = Clock;
+                typeClass = 'purple';
+              }
+              
               return (
                 <div
-                  key={alert.id}
-                  className="feed-item feed-item-clickable"
-                  onClick={() => setSelectedAlert(alert)}
+                  key={notif.id}
+                  className="feed-item"
+                  onClick={() => setSelectedAlert({
+                    id: notif.id,
+                    type: typeClass,
+                    title: notif.title || 'System Notification',
+                    desc: notif.message,
+                    time: notif.time,
+                    icon: icon,
+                    details: notif.message,
+                    resolution: 'View details in the relevant page.'
+                  })}
                   style={{ cursor: 'pointer' }}
                 >
-                  <div className={`feed-icon-holder ${alert.type}`}>
-                    <IconComp size={14} />
+                  <div className={`feed-icon-holder ${typeClass}`}>
+                    {React.createElement(icon, { size: 14 })}
                   </div>
                   <div className="feed-content">
-                    <span className="feed-title"><strong>{alert.title}:</strong> {alert.desc}</span>
-                    <span className="feed-time">{alert.time}</span>
+                    <span className="feed-title"><strong>{notif.title || 'Notification'}:</strong> {notif.message}</span>
+                    <span className="feed-time">{notif.time}</span>
                   </div>
                 </div>
               );
@@ -1242,9 +1205,9 @@ const Dashboard = () => {
           <div className="report-detail-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
             <div className="report-detail-meta" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--spacing-3)' }}>
               <div className="detail-meta-row" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)' }}>
-                <Avatar name={selectedReport.employee} size="md" />
+                <Avatar name={selectedReport.employeeName || selectedReport.employee} size="md" />
                 <div>
-                  <h4 style={{ margin: 0, fontWeight: 700, color: 'var(--text-primary)' }}>{selectedReport.employee}</h4>
+                  <h4 style={{ margin: 0, fontWeight: 700, color: 'var(--text-primary)' }}>{selectedReport.employeeName || selectedReport.employee}</h4>
                   <p className="subtitle" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>{selectedReport.project}</p>
                 </div>
               </div>
@@ -1259,7 +1222,7 @@ const Dashboard = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', backgroundColor: 'rgba(255,255,255,0.01)', padding: 'var(--spacing-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
               <div>
                 <span style={{ display: 'block', fontSize: '0.6875rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.02em', marginBottom: '4px' }}>Hours Logged</span>
-                <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{selectedReport.hours} hours</strong>
+                <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{selectedReport.hours || selectedReport.workingHours} hours</strong>
               </div>
               <div>
                 <span style={{ display: 'block', fontSize: '0.6875rem', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.02em', marginBottom: '4px' }}>Report ID</span>

@@ -81,7 +81,7 @@ const initialActivities = [
 const Teams = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(600);
-  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments, addTeam, updateTeam, deleteTeam } = useApp();
+  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments, addTeam, updateTeam, deleteTeam, projectsList } = useApp();
 
   // New Modal States
   const [showExportModal, setShowExportModal] = useState(false);
@@ -104,6 +104,25 @@ const Teams = () => {
       setTeams(dbTeams);
     }
   }, [dbTeams]);
+
+  // Dynamic KPI calculations for team management cards
+  const totalTeamsCount = teams.length;
+  const activeTeamsCount = useMemo(() => teams.filter(t => t.status === 'Active').length, [teams]);
+  const teamLeadersCount = useMemo(() => {
+    return new Set(teams.map(t => t.leader).filter(Boolean)).size;
+  }, [teams]);
+  const totalMembersCount = useMemo(() => {
+    const allMemberIds = teams.flatMap(t => (t.membersList || []).map(m => m.id || m.employeeId || m._id));
+    return new Set(allMemberIds.filter(Boolean)).size;
+  }, [teams]);
+  const activeProjectsCount = useMemo(() => {
+    return teams.reduce((acc, t) => acc + (t.activeProjects || 0), 0);
+  }, [teams]);
+  const averageProductivity = useMemo(() => {
+    if (teams.length === 0) return 0;
+    const sum = teams.reduce((acc, t) => acc + (t.productivity || 0), 0);
+    return Math.round(sum / teams.length);
+  }, [teams]);
 
   // Filters State
   const [search, setSearch] = useState('');
@@ -625,12 +644,12 @@ Active Teams Mapped: ${teams.length}
             {showSummary && (
               <div className="teams-top-cards">
                 {[
-                  { label: 'Total Teams', desc: 'Active organizational groups', value: '86', trend: '↑ 4.2% this month', icon: Users, colorClass: 'teams-top-icon-blue' },
-                  { label: 'Active Teams', desc: 'Teams with active task pipelines', value: '78', trend: '↑ 2.1% this month', icon: CheckCircle2, colorClass: 'teams-top-icon-green' },
-                  { label: 'Team Leaders', desc: 'Designated team commanders', value: '86', trend: '↑ 1.8% this month', icon: Award, colorClass: 'teams-top-icon-purple' },
-                  { label: 'Total Members', desc: 'Employees assigned to groups', value: '1,250', trend: '↑ 6.3% this month', icon: Users, colorClass: 'teams-top-icon-amber' },
-                  { label: 'Active Projects', desc: 'Ongoing deliverables mapped', value: '42', trend: '↑ 3.5% this month', icon: Briefcase, colorClass: 'teams-top-icon-coral' },
-                  { label: 'Productivity Rate', desc: 'Average velocity rating', value: '92%', trend: '↑ 1.2% this month', icon: BarChart2, colorClass: 'teams-top-icon-teal' }
+                  { label: 'Total Teams', desc: 'Active organizational groups', value: totalTeamsCount, trend: '↑ 4.2% this month', icon: Users, colorClass: 'teams-top-icon-blue' },
+                  { label: 'Active Teams', desc: 'Teams with active task pipelines', value: activeTeamsCount, trend: '↑ 2.1% this month', icon: CheckCircle2, colorClass: 'teams-top-icon-green' },
+                  { label: 'Team Leaders', desc: 'Designated team commanders', value: teamLeadersCount, trend: '↑ 1.8% this month', icon: Award, colorClass: 'teams-top-icon-purple' },
+                  { label: 'Total Members', desc: 'Employees assigned to groups', value: totalMembersCount.toLocaleString(), trend: '↑ 6.3% this month', icon: Users, colorClass: 'teams-top-icon-amber' },
+                  { label: 'Active Projects', desc: 'Ongoing deliverables mapped', value: activeProjectsCount, trend: '↑ 3.5% this month', icon: Briefcase, colorClass: 'teams-top-icon-coral' },
+                  { label: 'Productivity Rate', desc: 'Average velocity rating', value: `${averageProductivity}%`, trend: '↑ 1.2% this month', icon: BarChart2, colorClass: 'teams-top-icon-teal' }
                 ].map((c, i) => {
                   const Icon = c.icon;
                   return (

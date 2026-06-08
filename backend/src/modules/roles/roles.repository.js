@@ -1,36 +1,34 @@
 /**
  * @file src/modules/roles/roles.repository.js
- * @description Data Access layer for Roles module.
+ * @description Repository layer for Roles module.
  */
 
+import Role from './roles.model.js';
 import logger from '../../config/logger.js';
 
-export const find = async (query) => {
-  logger.debug('Executing RolesRepository::find placeholder');
-  return [
-    { id: 'MOCK-1', name: 'Placeholder Domain Record 1 for Roles', status: 'Active' },
-    { id: 'MOCK-2', name: 'Placeholder Domain Record 2 for Roles', status: 'Inactive' }
-  ];
+export const find = async (query = {}) => {
+  logger.info('RolesRepository::find querying roles from database...');
+  return Role.find(query);
 };
 
 export const findOne = async (id) => {
-  logger.debug('Executing RolesRepository::findOne placeholder for: ' + id);
-  return { id, name: 'Placeholder Single Domain Record for Roles', status: 'Active' };
+  logger.info(`RolesRepository::findOne querying role with ID: ${id}`);
+  return Role.findOne({ id });
 };
 
 export const save = async (data) => {
-  logger.debug('Executing RolesRepository::save placeholder', data);
-  return { id: 'MOCK-' + Math.floor(100 + Math.random() * 900), ...data };
+  logger.info(`RolesRepository::save creating role: ${data.name}`);
+  return Role.create(data);
 };
 
 export const update = async (id, data) => {
-  logger.debug('Executing RolesRepository::update placeholder for: ' + id, data);
-  return { id, ...data };
+  logger.info(`RolesRepository::update updating role with ID: ${id}`);
+  return Role.findOneAndUpdate({ id }, data, { new: true });
 };
 
 export const remove = async (id) => {
-  logger.debug('Executing RolesRepository::remove placeholder for: ' + id);
-  return { id, status: 'Deleted' };
+  logger.info(`RolesRepository::remove deleting role with ID: ${id}`);
+  return Role.findOneAndDelete({ id });
 };
 
 export default {

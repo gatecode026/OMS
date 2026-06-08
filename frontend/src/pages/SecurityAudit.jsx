@@ -61,7 +61,7 @@ import {
 
 const SecurityAudit = () => {
   const isLoading = usePageLoading(600);
-  const { employees, showConfirm, currentUserRole, addToast } = useApp();
+  const { employees, showConfirm, currentUserRole, addToast, token, activityLogs } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -140,12 +140,7 @@ const SecurityAudit = () => {
   });
 
   // 4. IP Whitelist State (CRUD)
-  const [allowedIps, setAllowedIps] = useState([
-    { id: 'IP-101', ip: '192.168.1.50', startRange: '192.168.1.1', endRange: '192.168.1.254', location: 'Jaipur HQ', purpose: 'Office Network', status: 'Active' },
-    { id: 'IP-102', ip: '10.8.0.45', startRange: '10.8.0.1', endRange: '10.8.0.100', location: 'Mumbai DC', purpose: 'VPN Network', status: 'Active' },
-    { id: 'IP-103', ip: '172.16.2.10', startRange: '172.16.2.1', endRange: '172.16.2.50', location: 'Delhi Branch', purpose: 'Branch Network', status: 'Active' },
-    { id: 'IP-104', ip: '192.168.12.8', startRange: '192.168.12.1', endRange: '192.168.12.30', location: 'Remote Employees', purpose: 'Remote Access', status: 'Inactive' }
-  ]);
+  const [allowedIps, setAllowedIps] = useState([]);
 
   const [ipForm, setIpForm] = useState({
     ip: '', startRange: '', endRange: '', location: '', purpose: 'Office Network', status: 'Active'
@@ -153,11 +148,7 @@ const SecurityAudit = () => {
   const [editingIpId, setEditingIpId] = useState(null);
 
   // Restricted/Blocked IPs (Read Only with Unblock option)
-  const [restrictedIps, setRestrictedIps] = useState([
-    { id: 'BLK-001', ipAddress: '198.51.100.72', reason: 'Failed Login Limit Exceeded', blockDate: '2026-06-05 09:14', attempts: 12, blockedBy: 'Auth Gate' },
-    { id: 'BLK-002', ipAddress: '203.0.113.88', reason: 'Suspicious Bot Behavior Detected', blockDate: '2026-06-04 18:22', attempts: 45, blockedBy: 'WAF Console' },
-    { id: 'BLK-003', ipAddress: '45.227.254.12', reason: 'Brute Force Attempt on Admin Route', blockDate: '2026-06-03 23:40', attempts: 98, blockedBy: 'Super Admin' }
-  ]);
+  const [restrictedIps, setRestrictedIps] = useState([]);
 
   // 5. Device Restrictions State
   const [deviceConfig, setDeviceConfig] = useState({
@@ -171,13 +162,7 @@ const SecurityAudit = () => {
   });
 
   // Authorized Devices List
-  const [authorizedDevices, setAuthorizedDevices] = useState([
-    { id: 'DEV-001', name: 'Aarav Macbook Pro', type: 'Laptop', browser: 'Chrome', os: 'macOS', registeredBy: 'Aarav Sharma', regDate: '2026-04-12', lastLogin: '2026-06-05 11:20', status: 'Active' },
-    { id: 'DEV-002', name: 'Divya HP EliteBook', type: 'Laptop', browser: 'Edge', os: 'Windows', registeredBy: 'Divya Singh', regDate: '2026-04-15', lastLogin: '2026-06-05 10:45', status: 'Active' },
-    { id: 'DEV-003', name: 'Sanjay iPhone 15', type: 'Mobile', browser: 'Safari', os: 'iOS', registeredBy: 'Sanjay Gupta', regDate: '2026-05-02', lastLogin: '2026-06-05 09:10', status: 'Active' },
-    { id: 'DEV-004', name: 'Meena Tablet Pro', type: 'Tablet', browser: 'Chrome', os: 'Android', registeredBy: 'Meena Sharma', regDate: '2026-05-20', lastLogin: '2026-06-04 15:30', status: 'Blocked' },
-    { id: 'DEV-005', name: 'Unknown Windows Client', type: 'Desktop', browser: 'Firefox', os: 'Windows', registeredBy: 'Ravi Yadav', regDate: '2026-06-01', lastLogin: '2026-06-05 08:00', status: 'Pending' }
-  ]);
+  const [authorizedDevices, setAuthorizedDevices] = useState([]);
 
   // 6. Timing Restrictions State
   const [timingConfig, setTimingConfig] = useState({
@@ -191,41 +176,100 @@ const SecurityAudit = () => {
   });
 
   // 7. Active Sessions State (Tab 4)
-  const [activeSessions, setActiveSessions] = useState([
-    { id: 'SES-001', employeeName: 'Aarav Sharma', employeeId: 'EMP-2026-001', role: 'Super Admin', loginTime: '2026-06-05 08:30', lastActivity: '2026-06-05 11:58', duration: '3h 28m', deviceType: 'Laptop', browser: 'Chrome', os: 'macOS', ipAddress: '192.168.1.50', location: 'Jaipur, India', status: 'Active' },
-    { id: 'SES-002', employeeName: 'Divya Singh', employeeId: 'EMP-2026-002', role: 'Super Admin', loginTime: '2026-06-05 09:15', lastActivity: '2026-06-05 11:55', duration: '2h 40m', deviceType: 'Laptop', browser: 'Edge', os: 'Windows', ipAddress: '192.168.1.120', location: 'Jaipur, India', status: 'Active' },
-    { id: 'SES-003', employeeName: 'Sanjay Gupta', employeeId: 'EMP-2026-003', role: 'Branch Admin', loginTime: '2026-06-05 09:00', lastActivity: '2026-06-05 11:30', duration: '2h 55m', deviceType: 'Mobile', browser: 'Safari', os: 'iOS', ipAddress: '10.8.0.45', location: 'Mumbai, India', status: 'Idle' },
-    { id: 'SES-004', employeeName: 'Ananya Gupta', employeeId: 'EMP-2026-004', role: 'Team Leader', loginTime: '2026-06-05 10:00', lastActivity: '2026-06-05 11:50', duration: '1h 50m', deviceType: 'Laptop', browser: 'Chrome', os: 'Linux', ipAddress: '172.16.2.10', location: 'Delhi, India', status: 'Active' },
-    { id: 'SES-005', employeeName: 'Ravi Yadav', employeeId: 'EMP-2026-005', role: 'Employee', loginTime: '2026-06-05 10:15', lastActivity: '2026-06-05 10:45', duration: '30m', deviceType: 'Desktop', browser: 'Firefox', os: 'Windows', ipAddress: '192.168.12.8', location: 'Delhi, India', status: 'Idle' }
-  ]);
+  const [activeSessions, setActiveSessions] = useState([]);
   const [sessionSearch, setSessionSearch] = useState('');
   const [sessionRoleFilter, setSessionRoleFilter] = useState('All');
   const [selectedSession, setSelectedSession] = useState(null);
   const [showSessionModal, setShowSessionModal] = useState(false);
 
   // 8. Security Alerts State (Tab 5)
-  const [securityAlerts, setSecurityAlerts] = useState([
-    { id: 'ALT-101', timestamp: '2026-06-05 11:42', severity: 'Critical', alertType: 'Multiple Failed Logins', description: 'User Sanjay Gupta attempted login 8 times with incorrect credentials', user: 'Sanjay Gupta', ipAddress: '198.51.100.72', location: 'Beijing, China', status: 'New' },
-    { id: 'ALT-102', timestamp: '2026-06-05 11:15', severity: 'High', alertType: 'Suspicious Location Login', description: 'Access granted to Aarav Sharma from an unrecognized IP range', user: 'Aarav Sharma', ipAddress: '203.0.113.88', location: 'London, UK', status: 'Investigating' },
-    { id: 'ALT-103', timestamp: '2026-06-05 10:05', severity: 'Medium', alertType: 'Data Export Attempt', description: 'Employee Meena Sharma attempted to export salary records of 45+ users', user: 'Meena Sharma', ipAddress: '192.168.1.135', location: 'Jaipur, India', status: 'New' },
-    { id: 'ALT-104', timestamp: '2026-06-04 17:30', severity: 'Low', alertType: 'New Device Login', description: 'Ravi Yadav logged in from new device: Unknown Windows Client', user: 'Ravi Yadav', ipAddress: '192.168.12.8', location: 'Delhi, India', status: 'Resolved' },
-    { id: 'ALT-105', timestamp: '2026-06-04 14:20', severity: 'High', alertType: 'Permission Changed', description: 'Super Admin changed permissions for Branch Admin role', user: 'Divya Singh', ipAddress: '192.168.1.120', location: 'Jaipur, India', status: 'Resolved' }
-  ]);
+  const [securityAlerts, setSecurityAlerts] = useState([]);
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [showAlertModal, setShowAlertModal] = useState(false);
 
   // 9. Complete Audit Trail State (Tab 6)
-  const [auditLogsData, setAuditLogsData] = useState([
-    { id: 'AUD-8801', timestamp: '2026-06-05 11:55', user: 'Divya Singh', empId: 'EMP-2026-002', role: 'Super Admin', eventType: 'Permission Change', module: 'Security', action: 'Enforced MFA requirement for all Branch Administrators', oldVal: 'Optional', newVal: 'Required', ipAddress: '192.168.1.120', device: 'Chrome / Windows', location: 'Jaipur, India', status: 'Success', severity: 'High' },
-    { id: 'AUD-8802', timestamp: '2026-06-05 11:42', user: 'Sanjay Gupta', empId: 'EMP-2026-003', role: 'Branch Admin', eventType: 'Failed Login', module: 'Authentication', action: 'Failed authentication: Incorrect password entered', oldVal: '—', newVal: '—', ipAddress: '198.51.100.72', device: 'Firefox / Linux', location: 'Beijing, China', status: 'Failed', severity: 'Critical' },
-    { id: 'AUD-8803', timestamp: '2026-06-05 11:20', user: 'Aarav Sharma', empId: 'EMP-2026-001', role: 'Super Admin', eventType: 'Login', module: 'Authentication', action: 'User logged in successfully via Authenticator App', oldVal: '—', newVal: '—', ipAddress: '203.0.113.88', device: 'Safari / macOS', location: 'London, UK', status: 'Success', severity: 'Info' },
-    { id: 'AUD-8804', timestamp: '2026-06-05 10:15', user: 'Ananya Gupta', empId: 'EMP-2026-004', role: 'Team Leader', eventType: 'Update', module: 'Task', action: 'Modified task status: SOC Setup Phase 1 to Completed', oldVal: 'In Progress', newVal: 'Completed', ipAddress: '172.16.2.10', device: 'Chrome / Linux', location: 'Delhi, India', status: 'Success', severity: 'Info' },
-    { id: 'AUD-8805', timestamp: '2026-06-05 10:05', user: 'Meena Sharma', empId: 'EMP-2026-006', role: 'Employee', eventType: 'Export', module: 'Payroll', action: 'Attempted export of June Payroll Draft excel sheet', oldVal: '—', newVal: 'JunePayrollDraft.xlsx', ipAddress: '192.168.1.135', device: 'Chrome / Windows', location: 'Jaipur, India', status: 'Warning', severity: 'Medium' },
-    { id: 'AUD-8806', timestamp: '2026-06-04 18:00', user: 'Divya Singh', empId: 'EMP-2026-002', role: 'Super Admin', eventType: 'Create', module: 'Employee', action: 'Created new Employee Profile: Ravi Yadav', oldVal: '—', newVal: 'EMP-2026-005 Active', ipAddress: '192.168.1.120', device: 'Edge / Windows', location: 'Jaipur, India', status: 'Success', severity: 'Info' },
-    { id: 'AUD-8807', timestamp: '2026-06-04 15:30', user: 'Sanjay Gupta', empId: 'EMP-2026-003', role: 'Branch Admin', eventType: 'Password Change', module: 'Authentication', action: 'User changed password from profile dashboard', oldVal: '******', newVal: '******', ipAddress: '10.8.0.45', device: 'Chrome / macOS', location: 'Mumbai, India', status: 'Success', severity: 'Medium' },
-    { id: 'AUD-8808', timestamp: '2026-06-03 14:15', user: 'Ravi Yadav', empId: 'EMP-2026-005', role: 'Employee', eventType: 'Access', module: 'Documents', action: 'Accessed document: NDA Agreement policy', oldVal: '—', newVal: 'NDA_Policy_Sign.pdf', ipAddress: '192.168.12.8', device: 'Chrome / Windows', location: 'Delhi, India', status: 'Success', severity: 'Info' },
-    { id: 'AUD-8809', timestamp: '2026-06-02 09:10', user: 'Divya Singh', empId: 'EMP-2026-002', role: 'Super Admin', eventType: 'Delete', module: 'Security', action: 'Removed whitelisted IP range: 192.168.10.0/24', oldVal: 'Allowed', newVal: 'Removed', ipAddress: '192.168.1.120', device: 'Chrome / Windows', location: 'Jaipur, India', status: 'Success', severity: 'High' }
-  ]);
+  const [auditLogsData, setAuditLogsData] = useState([]);
+
+  // Fetch all security data from backend
+  const fetchSecurityData = async () => {
+    if (!token) return;
+    try {
+      // Allowed IPs
+      const wlRes = await fetch('http://localhost:5000/api/v1/security/whitelist', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const wlData = await wlRes.json();
+      if (wlData.status === 'success') {
+        setAllowedIps(wlData.data || []);
+      }
+
+      // Blocked IPs
+      const blRes = await fetch('http://localhost:5000/api/v1/security/blocklist', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const blData = await blRes.json();
+      if (blData.status === 'success') {
+        setRestrictedIps(blData.data || []);
+      }
+
+      // Devices
+      const devRes = await fetch('http://localhost:5000/api/v1/security/devices', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const devData = await devRes.json();
+      if (devData.status === 'success') {
+        setAuthorizedDevices(devData.data || []);
+      }
+
+      // Sessions
+      const sesRes = await fetch('http://localhost:5000/api/v1/security/sessions', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const sesData = await sesRes.json();
+      if (sesData.status === 'success') {
+        setActiveSessions(sesData.data || []);
+      }
+
+      // Alerts
+      const altRes = await fetch('http://localhost:5000/api/v1/security/alerts', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const altData = await altRes.json();
+      if (altData.status === 'success') {
+        setSecurityAlerts(altData.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch security data:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSecurityData();
+  }, [token]);
+
+  // Sync audit trail from activity logs in context
+  useEffect(() => {
+    if (activityLogs) {
+      const mapped = activityLogs.map(log => ({
+        id: log.id || log._id,
+        timestamp: log.timestamp,
+        user: log.actor,
+        empId: log.actorId || '—',
+        role: 'Staff',
+        eventType: log.fieldChanged || 'System',
+        module: log.fieldChanged || 'System',
+        action: log.actionType,
+        oldVal: log.oldValue || '—',
+        newVal: log.newValue || '—',
+        ipAddress: log.ip || '127.0.0.1',
+        device: 'Chrome / Windows',
+        location: 'Jaipur, India',
+        status: 'Success',
+        severity: 'Info'
+      }));
+      setAuditLogsData(mapped);
+    }
+  }, [activityLogs]);
 
   // Audit Logs filters
   const [auditSearch, setAuditSearch] = useState('');
@@ -287,30 +331,52 @@ const SecurityAudit = () => {
   // --- CRUD Handlers ---
 
   // IP Whitelist CRUD
-  const handleSaveIp = (e) => {
+  const handleSaveIp = async (e) => {
     e.preventDefault();
     if (!ipForm.ip.trim()) return;
 
-    if (editingIpId) {
-      // Update
-      setAllowedIps(prev => prev.map(item => item.id === editingIpId ? { ...item, ...ipForm } : item));
-      addPageToast('success', `Whitelisted IP ${ipForm.ip} updated successfully.`);
-      setEditingIpId(null);
-    } else {
-      // Create
-      const newEntry = {
-        ...ipForm,
-        id: `IP-${Math.floor(100 + Math.random() * 900)}`
-      };
-      setAllowedIps(prev => [...prev, newEntry]);
-      addPageToast('success', `Whitelisted IP range ${newEntry.ip} added successfully.`);
+    try {
+      if (editingIpId) {
+        // Update
+        const response = await fetch(`http://localhost:5000/api/v1/security/whitelist/${editingIpId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(ipForm)
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          addPageToast('success', `Whitelisted IP ${ipForm.ip} updated successfully.`);
+          setEditingIpId(null);
+          fetchSecurityData();
+        }
+      } else {
+        // Create
+        const response = await fetch('http://localhost:5000/api/v1/security/whitelist', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(ipForm)
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          addPageToast('success', `Whitelisted IP range ${ipForm.ip} added successfully.`);
+          fetchSecurityData();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save IP Whitelist entry:', err);
     }
 
     setIpForm({ ip: '', startRange: '', endRange: '', location: '', purpose: 'Office Network', status: 'Active' });
   };
 
   const handleEditIpClick = (item) => {
-    setEditingIpId(item.id);
+    setEditingIpId(item._id || item.id);
     setIpForm({
       ip: item.ip,
       startRange: item.startRange,
@@ -325,33 +391,88 @@ const SecurityAudit = () => {
     showConfirm(
       'Remove Whitelist Range',
       `Are you sure you want to remove whitelisted IP "${label}"? Systems on this IP will be subject to standard rules.`,
-      () => {
-        setAllowedIps(prev => prev.filter(item => item.id !== id));
-        addPageToast('warning', `Whitelisted IP "${label}" removed.`);
+      async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/v1/security/whitelist/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+            addPageToast('warning', `Whitelisted IP "${label}" removed.`);
+            fetchSecurityData();
+          }
+        } catch (err) {
+          console.error('Failed to delete whitelist IP:', err);
+        }
       },
       'danger'
     );
   };
 
   const handleUnblockIp = (id, ip) => {
-    setRestrictedIps(prev => prev.filter(item => item.id !== id));
-    addPageToast('success', `IP Address ${ip} has been unblocked successfully.`);
+    showConfirm(
+      'Unblock IP Address',
+      `Are you sure you want to unblock IP address "${ip}"?`,
+      async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/v1/security/blocklist/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+            addPageToast('success', `IP Address ${ip} has been unblocked successfully.`);
+            fetchSecurityData();
+          }
+        } catch (err) {
+          console.error('Failed to unblock IP:', err);
+        }
+      },
+      'primary'
+    );
   };
 
   // Device Management Toggles
-  const handleToggleDeviceStatus = (id, name, currentStatus) => {
+  const handleToggleDeviceStatus = async (id, name, currentStatus) => {
     const nextStatus = currentStatus === 'Active' ? 'Blocked' : 'Active';
-    setAuthorizedDevices(prev => prev.map(d => d.id === id ? { ...d, status: nextStatus } : d));
-    addPageToast(nextStatus === 'Blocked' ? 'warning' : 'success', `Device "${name}" status set to ${nextStatus}.`);
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/security/devices/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: nextStatus })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addPageToast(nextStatus === 'Blocked' ? 'warning' : 'success', `Device "${name}" status set to ${nextStatus}.`);
+        fetchSecurityData();
+      }
+    } catch (err) {
+      console.error('Failed to update device status:', err);
+    }
   };
 
   const handleRemoveDevice = (id, name) => {
     showConfirm(
       'Remove Device Registry',
       `Are you sure you want to remove the authorized device "${name}"? Access from this device will require re-registration.`,
-      () => {
-        setAuthorizedDevices(prev => prev.filter(d => d.id !== id));
-        addPageToast('warning', `Device "${name}" registry deleted.`);
+      async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/v1/security/devices/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+            addPageToast('warning', `Device "${name}" registry deleted.`);
+            fetchSecurityData();
+          }
+        } catch (err) {
+          console.error('Failed to remove device:', err);
+        }
       },
       'danger'
     );
@@ -362,9 +483,20 @@ const SecurityAudit = () => {
     showConfirm(
       'Force Logout Session',
       `Are you sure you want to immediately terminate the session for user "${userName}"? The user will be redirected to the login screen.`,
-      () => {
-        setActiveSessions(prev => prev.filter(s => s.id !== sessionId));
-        addPageToast('success', `User "${userName}" session terminated successfully.`);
+      async () => {
+        try {
+          const response = await fetch(`http://localhost:5000/api/v1/security/sessions/${sessionId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+            addPageToast('success', `User "${userName}" session terminated successfully.`);
+            fetchSecurityData();
+          }
+        } catch (err) {
+          console.error('Failed to terminate session:', err);
+        }
       },
       'danger'
     );
@@ -374,24 +506,64 @@ const SecurityAudit = () => {
     showConfirm(
       'Force Logout All Users',
       'WARNING: This will immediately terminate all active user sessions except for your current active session. Do you wish to proceed?',
-      () => {
-        // SES-001 is current user (Aarav Sharma)
-        setActiveSessions(prev => prev.filter(s => s.id === 'SES-001'));
-        addPageToast('warning', 'All remote administrator and staff sessions terminated successfully.');
+      async () => {
+        try {
+          const response = await fetch('http://localhost:5000/api/v1/security/sessions/terminate-others', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+            addPageToast('warning', 'All remote administrator and staff sessions terminated successfully.');
+            fetchSecurityData();
+          }
+        } catch (err) {
+          console.error('Failed to terminate sessions:', err);
+        }
       },
       'danger'
     );
   };
 
   // Alert Resolution
-  const handleResolveAlert = (alertId) => {
-    setSecurityAlerts(prev => prev.map(alt => alt.id === alertId ? { ...alt, status: 'Resolved' } : alt));
-    addPageToast('success', `Security Alert "${alertId}" marked as Resolved.`);
+  const handleResolveAlert = async (alertId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/security/alerts/${alertId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'Resolved' })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addPageToast('success', `Security Alert "${alertId}" marked as Resolved.`);
+        fetchSecurityData();
+      }
+    } catch (err) {
+      console.error('Failed to resolve alert:', err);
+    }
   };
 
-  const handleDismissAlert = (alertId) => {
-    setSecurityAlerts(prev => prev.map(alt => alt.id === alertId ? { ...alt, status: 'Ignored' } : alt));
-    addPageToast('info', `Security Alert "${alertId}" dismissed.`);
+  const handleDismissAlert = async (alertId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/security/alerts/${alertId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'Ignored' })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addPageToast('info', `Security Alert "${alertId}" dismissed.`);
+        fetchSecurityData();
+      }
+    } catch (err) {
+      console.error('Failed to dismiss alert:', err);
+    }
   };
 
   // Save Settings forms

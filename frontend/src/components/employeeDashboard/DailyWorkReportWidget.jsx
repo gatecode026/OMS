@@ -40,7 +40,7 @@ const DailyWorkReportWidget = ({
   return (
     <div className="dashboard-widget">
       <div className="widget-header">
-        <h3>Daily Work Report Status</h3>
+        <h3>Work Report Status</h3>
         <button
           onClick={() => navigate('/work-reports')}
           className="text-xs text-primary-500 hover:text-primary-400 font-semibold"
@@ -116,16 +116,9 @@ const DailyWorkReportWidget = ({
         {/* Action Buttons */}
         <div className="flex-row gap-3 mt-1 flex-wrap">
           <button
-            onClick={onOpenReportModal}
+            onClick={() => navigate('/work-reports')}
             className="flex-1 padding-2 text-xs bold-text bg-primary-500 hover:bg-primary-hover text-white rounded flex-center gap-1 transition-all"
             style={{ border: 'none', cursor: 'pointer', background: 'var(--color-primary)' }}
-          >
-            <Send size={14} /> Submit Daily Report
-          </button>
-          <button
-            onClick={() => navigate('/work-reports')}
-            className="flex-1 padding-2 text-xs bold-text bg-surface border-border text-primary-500 hover:text-primary-400 rounded flex-center gap-1 transition-all"
-            style={{ cursor: 'pointer' }}
           >
             View My Reports
           </button>

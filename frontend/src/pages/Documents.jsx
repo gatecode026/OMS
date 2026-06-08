@@ -10,128 +10,70 @@ import {
   Download, Trash2, Eye, FolderOpen, Clock, User
 } from 'lucide-react';
 
-const mockDocuments = [
-  {
-    id: 'DOC-001',
-    name: 'Employee Handbook 2026.pdf',
-    type: 'PDF',
-    size: '2.4 MB',
-    category: 'HR Policies',
-    uploadedBy: 'Sophia Laurent',
-    uploadDate: '2026-05-01',
-    downloads: 23,
-    color: '#ef4444',
-    icon: FileText
-  },
-  {
-    id: 'DOC-002',
-    name: 'Remote Work Policy v2.pdf',
-    type: 'PDF',
-    size: '890 KB',
-    category: 'HR Policies',
-    uploadedBy: 'Sophia Laurent',
-    uploadDate: '2026-05-26',
-    downloads: 38,
-    color: '#ef4444',
-    icon: FileText
-  },
-  {
-    id: 'DOC-003',
-    name: 'Q2 Payroll Summary.xlsx',
-    type: 'XLSX',
-    size: '1.1 MB',
-    category: 'Payroll',
-    uploadedBy: 'Sarah Connor',
-    uploadDate: '2026-05-29',
-    downloads: 5,
-    color: '#10b981',
-    icon: FileText
-  },
-  {
-    id: 'DOC-004',
-    name: 'Brand Logo Pack.zip',
-    type: 'ZIP',
-    size: '14.2 MB',
-    category: 'Marketing',
-    uploadedBy: 'Aiko Tanaka',
-    uploadDate: '2026-05-20',
-    downloads: 12,
-    color: '#8b5cf6',
-    icon: FileImage
-  },
-  {
-    id: 'DOC-005',
-    name: 'System Architecture Diagram.png',
-    type: 'PNG',
-    size: '3.8 MB',
-    category: 'Engineering',
-    uploadedBy: 'Elena Rostova',
-    uploadDate: '2026-05-15',
-    downloads: 9,
-    color: '#3b82f6',
-    icon: FileImage
-  },
-  {
-    id: 'DOC-006',
-    name: 'Q2 Sales Performance Report.pdf',
-    type: 'PDF',
-    size: '1.6 MB',
-    category: 'Reports',
-    uploadedBy: 'Marcus Vance',
-    uploadDate: '2026-05-28',
-    downloads: 7,
-    color: '#f59e0b',
-    icon: FileText
-  },
-  {
-    id: 'DOC-007',
-    name: 'GDPR Compliance Audit 2026.docx',
-    type: 'DOCX',
-    size: '540 KB',
-    category: 'Compliance',
-    uploadedBy: 'Sarah Connor',
-    uploadDate: '2026-04-30',
-    downloads: 4,
-    color: '#06b6d4',
-    icon: FileText
-  },
-  {
-    id: 'DOC-008',
-    name: 'Sprint Review Presentation.pptx',
-    type: 'PPTX',
-    size: '5.2 MB',
-    category: 'Engineering',
-    uploadedBy: 'Elena Rostova',
-    uploadDate: '2026-05-22',
-    downloads: 11,
-    color: '#3b82f6',
-    icon: File
-  }
-];
-
-const categories = ['All', ...new Set(mockDocuments.map(d => d.category))];
+const categories = ['All', 'HR Policies', 'Payroll', 'Marketing', 'Engineering', 'Reports', 'Compliance'];
 
 const typeColorMap = {
   PDF: '#ef4444', XLSX: '#10b981', PNG: '#8b5cf6',
   ZIP: '#f59e0b', DOCX: '#3b82f6', PPTX: '#f97316'
 };
 
+const getIconForType = (type) => {
+  const t = type ? type.toUpperCase() : 'FILE';
+  if (t === 'PDF' || t === 'DOCX') return FileText;
+  if (t === 'PNG' || t === 'JPG') return FileImage;
+  return File;
+};
+
 const Documents = () => {
   const isLoading = usePageLoading(500);
-  const { addToast, showConfirm } = useApp();
+  const { addToast, showConfirm, documentsList, addDocument, deleteDocument, currentUser } = useApp();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
-  const [docs, setDocs] = useState(mockDocuments);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadForm, setUploadForm] = useState({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
 
-  const filtered = docs.filter(d => {
+  const filtered = documentsList.filter(d => {
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) ||
       d.uploadedBy.toLowerCase().includes(search.toLowerCase());
     const matchCat = category === 'All' || d.category === category;
     return matchSearch && matchCat;
   });
 
-  const totalSize = '30.2 MB';
+  const computeTotalSize = (list) => {
+    let sum = 0;
+    list.forEach(d => {
+      const sizeStr = d.size || '0 KB';
+      const num = parseFloat(sizeStr);
+      if (sizeStr.toUpperCase().includes('MB')) {
+        sum += num;
+      } else if (sizeStr.toUpperCase().includes('KB')) {
+        sum += num / 1024;
+      }
+    });
+    return sum.toFixed(1) + ' MB';
+  };
+  const totalSize = computeTotalSize(documentsList);
+
+  const handleUploadSubmit = async (e) => {
+    e.preventDefault();
+    if (!uploadForm.name.trim()) {
+      addToast('warning', 'Document name is required.');
+      return;
+    }
+    const docData = {
+      name: uploadForm.name,
+      type: uploadForm.type,
+      category: uploadForm.category,
+      size: uploadForm.size,
+      uploadedBy: currentUser?.name || 'Aarav Sharma',
+      uploadDate: new Date().toISOString().split('T')[0],
+      downloads: 0
+    };
+    await addDocument(docData);
+    setShowUploadModal(false);
+    setUploadForm({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
+  };
 
   if (isLoading) {
     return (
@@ -158,10 +100,10 @@ const Documents = () => {
           </div>
           <div>
             <h2 className="ann-page-title">Document Vault</h2>
-            <p className="ann-page-sub">{docs.length} documents • {totalSize} total</p>
+            <p className="ann-page-sub">{documentsList.length} documents • {totalSize} total</p>
           </div>
         </div>
-        <Button variant="primary" icon={Upload} onClick={() => addToast('success', 'File upload dialog would open here.')}>
+        <Button variant="primary" icon={Upload} onClick={() => setShowUploadModal(true)}>
           Upload Document
         </Button>
       </div>
@@ -194,7 +136,7 @@ const Documents = () => {
       {/* Documents Grid */}
       <div className="docs-grid">
         {filtered.map(doc => {
-          const Icon = doc.icon;
+          const Icon = getIconForType(doc.type);
           const typeColor = typeColorMap[doc.type] || '#64748b';
           return (
             <div key={doc.id} className="card doc-card animate-fade-in">
@@ -241,9 +183,8 @@ const Documents = () => {
                   onClick={() => showConfirm(
                     'Delete Document',
                     `Delete "${doc.name}" permanently?`,
-                    () => {
-                      setDocs(prev => prev.filter(d => d.id !== doc.id));
-                      addToast('warning', 'Document deleted.');
+                    async () => {
+                      await deleteDocument(doc.id);
                     },
                     'danger'
                   )}
@@ -260,6 +201,85 @@ const Documents = () => {
           );
         })}
       </div>
+
+      {/* Upload Document Modal */}
+      {showUploadModal && (
+        <div className="modal-backdrop" onClick={() => setShowUploadModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
+            <div className="modal-header">
+              <h3>Upload Document</h3>
+              <button className="close-btn" onClick={() => setShowUploadModal(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleUploadSubmit} className="modal-form flex-column gap-3 padding-1">
+              <div className="form-group flex-column gap-1">
+                <label>Document Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Employee Handbook 2026.pdf"
+                  value={uploadForm.name}
+                  onChange={e => setUploadForm({ ...uploadForm, name: e.target.value })}
+                  className="dept-search-input"
+                  style={{ width: '100%', padding: '8px 12px' }}
+                />
+              </div>
+
+              <div className="form-group flex-column gap-1">
+                <label>Document Category</label>
+                <select
+                  value={uploadForm.category}
+                  onChange={e => setUploadForm({ ...uploadForm, category: e.target.value })}
+                  className="dept-search-input"
+                  style={{ width: '100%', padding: '8px 12px' }}
+                >
+                  {categories.filter(c => c !== 'All').map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group flex-column gap-1">
+                <label>File Type</label>
+                <select
+                  value={uploadForm.type}
+                  onChange={e => setUploadForm({ ...uploadForm, type: e.target.value })}
+                  className="dept-search-input"
+                  style={{ width: '100%', padding: '8px 12px' }}
+                >
+                  <option value="PDF">PDF Document</option>
+                  <option value="XLSX">Excel Sheet (XLSX)</option>
+                  <option value="PNG">Image file (PNG)</option>
+                  <option value="ZIP">ZIP Archive</option>
+                  <option value="DOCX">Word Document (DOCX)</option>
+                  <option value="PPTX">PowerPoint Presentation (PPTX)</option>
+                </select>
+              </div>
+
+              <div className="form-group flex-column gap-1">
+                <label>File Size</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 1.2 MB"
+                  value={uploadForm.size}
+                  onChange={e => setUploadForm({ ...uploadForm, size: e.target.value })}
+                  className="dept-search-input"
+                  style={{ width: '100%', padding: '8px 12px' }}
+                />
+              </div>
+
+              <div className="flex-row gap-3 justify-end mt-2">
+                <Button type="button" variant="secondary" onClick={() => setShowUploadModal(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary">
+                  Upload
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

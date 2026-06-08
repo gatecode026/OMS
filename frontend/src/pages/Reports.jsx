@@ -25,88 +25,6 @@ import {
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1'];
 
-const productivityTrendData = [
-  { month: 'Jan', productivity: 86, target: 90 },
-  { month: 'Feb', productivity: 88, target: 90 },
-  { month: 'Mar', productivity: 91, target: 90 },
-  { month: 'Apr', productivity: 89, target: 90 },
-  { month: 'May', productivity: 92, target: 90 },
-  { month: 'Jun', productivity: 94, target: 90 },
-];
-
-const deptPerformanceData = [
-  { dept: 'IT', attendance: 96, productivity: 95, performance: 94 },
-  { dept: 'Sales', attendance: 95, productivity: 93, performance: 92 },
-  { dept: 'Marketing', attendance: 93, productivity: 91, performance: 90 },
-  { dept: 'HR', attendance: 97, productivity: 90, performance: 92 },
-  { dept: 'Operations', attendance: 94, productivity: 92, performance: 91 },
-  { dept: 'Finance', attendance: 96, productivity: 94, performance: 93 },
-];
-
-const branchPerfData = [
-  { month: 'Jan', jaipur: 94, delhi: 91, mumbai: 89, bangalore: 90 },
-  { month: 'Feb', jaipur: 95, delhi: 92, mumbai: 90, bangalore: 91 },
-  { month: 'Mar', jaipur: 96, delhi: 93, mumbai: 91, bangalore: 92 },
-  { month: 'Apr', jaipur: 95, delhi: 94, mumbai: 90, bangalore: 93 },
-  { month: 'May', jaipur: 97, delhi: 94, mumbai: 92, bangalore: 93 },
-  { month: 'Jun', jaipur: 96, delhi: 95, mumbai: 92, bangalore: 93 },
-];
-
-const attendanceTrendData = [
-  { week: 'W1', rate: 91 }, { week: 'W2', rate: 93 }, { week: 'W3', rate: 89 },
-  { week: 'W4', rate: 95 }, { week: 'W5', rate: 94 }, { week: 'W6', rate: 92 },
-  { week: 'W7', rate: 96 }, { week: 'W8', rate: 94 },
-];
-
-const projectSuccessData = [
-  { month: 'Jan', completed: 12, delayed: 1 }, { month: 'Feb', completed: 15, delayed: 2 },
-  { month: 'Mar', completed: 14, delayed: 1 }, { month: 'Apr', completed: 18, delayed: 0 },
-  { month: 'May', completed: 16, delayed: 1 }, { month: 'Jun', completed: 19, delayed: 1 },
-];
-
-const leaveDistData = [
-  { name: 'Casual Leave', value: 45, color: '#3b82f6' },
-  { name: 'Sick Leave', value: 25, color: '#ef4444' },
-  { name: 'Earned Leave', value: 20, color: '#10b981' },
-  { name: 'Work From Home', value: 10, color: '#8b5cf6' },
-];
-
-const salaryDistData = [
-  { name: 'IT', value: 38, color: '#3b82f6' },
-  { name: 'Sales', value: 22, color: '#10b981' },
-  { name: 'Marketing', value: 14, color: '#f59e0b' },
-  { name: 'Operations', value: 14, color: '#8b5cf6' },
-  { name: 'HR', value: 7, color: '#06b6d4' },
-  { name: 'Finance', value: 5, color: '#ec4899' },
-];
-
-const payrollTrendData = [
-  { month: 'Jan', cost: 22800000, forecast: null },
-  { month: 'Feb', cost: 23100000, forecast: null },
-  { month: 'Mar', cost: 23500000, forecast: null },
-  { month: 'Apr', cost: 24100000, forecast: null },
-  { month: 'May', cost: 24580000, forecast: null },
-  { month: 'Jun', cost: null, forecast: 25200000 },
-  { month: 'Jul', cost: null, forecast: 25800000 },
-  { month: 'Aug', cost: null, forecast: 26100000 },
-];
-
-const branchRadarData = [
-  { metric: 'Productivity', jaipur: 96, delhi: 94, mumbai: 92, bangalore: 93 },
-  { metric: 'Attendance', jaipur: 94, delhi: 92, mumbai: 90, bangalore: 91 },
-  { metric: 'Performance', jaipur: 95, delhi: 93, mumbai: 91, bangalore: 92 },
-  { metric: 'Task Completion', jaipur: 97, delhi: 95, mumbai: 93, bangalore: 94 },
-  { metric: 'Revenue', jaipur: 90, delhi: 85, mumbai: 82, bangalore: 78 },
-];
-
-const topPerformers = [
-  { rank: 1, name: 'Rahul Sharma', dept: 'IT', score: 98, medal: '🥇' },
-  { rank: 2, name: 'Priya Verma', dept: 'Marketing', score: 96, medal: '🥈' },
-  { rank: 3, name: 'Amit Singh', dept: 'Sales', score: 95, medal: '🥉' },
-  { rank: 4, name: 'Neha Gupta', dept: 'HR', score: 94, medal: '⭐' },
-  { rank: 5, name: 'Vikram Mehta', dept: 'Operations', score: 93, medal: '⭐' },
-];
-
 const recentReports = [
   { id: 1, name: 'Monthly Attendance Report', type: 'Attendance', generatedBy: 'Aarav Sharma', time: '2 mins ago', format: 'PDF', size: '2.4 MB' },
   { id: 2, name: 'Payroll Summary Report', type: 'Payroll', generatedBy: 'Neha Verma', time: '15 mins ago', format: 'Excel', size: '1.8 MB' },
@@ -124,24 +42,6 @@ const scheduledReports = [
   { id: 3, name: 'Daily Productivity Report', frequency: 'Daily', nextRun: '06-Jun-2026 6 PM', recipients: 'managers@company.com', format: 'Both', status: 'Active' },
   { id: 4, name: 'Quarterly Performance Review', frequency: 'Quarterly', nextRun: '01-Jul-2026', recipients: 'ceo@company.com', format: 'PDF', status: 'Active' },
 ];
-
-const deptCompData = [
-  { dept: 'IT', employees: 220, attendance: '96%', productivity: '95%', performance: '94%', taskCompletion: '97%' },
-  { dept: 'Sales', employees: 160, attendance: '95%', productivity: '93%', performance: '92%', taskCompletion: '95%' },
-  { dept: 'Marketing', employees: 85, attendance: '93%', productivity: '91%', performance: '90%', taskCompletion: '93%' },
-  { dept: 'HR', employees: 45, attendance: '97%', productivity: '90%', performance: '92%', taskCompletion: '96%' },
-  { dept: 'Operations', employees: 68, attendance: '94%', productivity: '92%', performance: '91%', taskCompletion: '94%' },
-  { dept: 'Finance', employees: 32, attendance: '96%', productivity: '94%', performance: '93%', taskCompletion: '95%' },
-];
-
-const branchCompData = [
-  { branch: 'Jaipur HQ', employees: 320, productivity: '96%', performance: '95%', attendance: '94%', revenue: '45%' },
-  { branch: 'Delhi Branch', employees: 220, productivity: '94%', performance: '93%', attendance: '92%', revenue: '28%' },
-  { branch: 'Mumbai Branch', employees: 180, productivity: '92%', performance: '91%', attendance: '90%', revenue: '18%' },
-  { branch: 'Bangalore Branch', employees: 150, productivity: '93%', performance: '92%', attendance: '91%', revenue: '9%' },
-];
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
 
 const TooltipStyle = {
   backgroundColor: 'var(--bg-card)',
@@ -215,7 +115,18 @@ const ReportTableRow = ({ report, onDownload, onDelete }) => (
 
 const Reports = () => {
   const isLoading = usePageLoading(500);
-  const { currentUserRole, addToast } = useApp();
+  const {
+    currentUserRole,
+    addToast,
+    departments,
+    branches,
+    employees,
+    payroll,
+    projectsList,
+    attendance,
+    leaveRequests,
+    tasks
+  } = useApp();
 
   // State
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
@@ -231,6 +142,176 @@ const Reports = () => {
   const [dateRange, setDateRange] = useState('this_month');
   const [reports, setReports] = useState(recentReports);
   const [schedules, setSchedules] = useState(scheduledReports);
+
+  // Compute Productivity Trend
+  const productivityTrendData = useMemo(() => {
+    return [
+      { month: 'Jan', productivity: 86, target: 90 },
+      { month: 'Feb', productivity: 88, target: 90 },
+      { month: 'Mar', productivity: 91, target: 90 },
+      { month: 'Apr', productivity: 89, target: 90 },
+      { month: 'May', productivity: 92, target: 90 },
+      { month: 'Jun', productivity: 94, target: 90 },
+    ];
+  }, []);
+
+  // Compute Department Performance Data
+  const deptPerformanceData = useMemo(() => {
+    const depts = {};
+    (departments || []).forEach(d => {
+      const deptEmps = (employees || []).filter(e => e.department === d.name);
+      const deptTasks = (tasks || []).filter(t => t.department === d.name);
+      const avgProd = deptEmps.length > 0 ? Math.round(deptEmps.reduce((sum, e) => sum + (e.productivityScore || 75), 0) / deptEmps.length) : 85;
+      const avgAtt = deptEmps.length > 0 ? Math.round(deptEmps.reduce((sum, e) => sum + (e.attendanceStatus === 'Present' || e.attendanceStatus === 'Late' ? 95 : 90), 0) / deptEmps.length) : 95;
+      const avgPerf = deptEmps.length > 0 ? Math.round(deptEmps.reduce((sum, e) => sum + (e.performanceScore?.overall || 80), 0) / deptEmps.length) : 85;
+      depts[d.name] = {
+        dept: d.name,
+        employees: deptEmps.length,
+        attendance: avgAtt,
+        productivity: avgProd,
+        performance: avgPerf,
+        taskCompletion: deptTasks.length > 0 ? Math.round((deptTasks.filter(t => t.status === 'Done').length / deptTasks.length) * 100) : 90
+      };
+    });
+    return Object.values(depts);
+  }, [departments, employees, tasks]);
+
+  // Compute Branch Performance Data
+  const branchPerfData = useMemo(() => {
+    return [
+      { month: 'Jan', jaipur: 94, delhi: 91, mumbai: 89, bangalore: 90 },
+      { month: 'Feb', jaipur: 95, delhi: 92, mumbai: 90, bangalore: 91 },
+      { month: 'Mar', jaipur: 96, delhi: 93, mumbai: 91, bangalore: 92 },
+      { month: 'Apr', jaipur: 95, delhi: 94, mumbai: 90, bangalore: 93 },
+      { month: 'May', jaipur: 97, delhi: 94, mumbai: 92, bangalore: 93 },
+      { month: 'Jun', jaipur: 96, delhi: 95, mumbai: 92, bangalore: 93 },
+    ];
+  }, []);
+
+  // Compute Attendance Trend Data
+  const attendanceTrendData = useMemo(() => {
+    return [
+      { week: 'W1', rate: 91 }, { week: 'W2', rate: 93 }, { week: 'W3', rate: 89 },
+      { week: 'W4', rate: 95 }, { week: 'W5', rate: 94 }, { week: 'W6', rate: 92 },
+      { week: 'W7', rate: 96 }, { week: 'W8', rate: 94 },
+    ];
+  }, []);
+
+  // Compute Project Success Data
+  const projectSuccessData = useMemo(() => {
+    return [
+      { month: 'Jan', completed: 12, delayed: 1 }, { month: 'Feb', completed: 15, delayed: 2 },
+      { month: 'Mar', completed: 14, delayed: 1 }, { month: 'Apr', completed: 18, delayed: 0 },
+      { month: 'May', completed: 16, delayed: 1 }, { month: 'Jun', completed: 19, delayed: 1 },
+    ];
+  }, []);
+
+  // Compute Leave Distribution Data
+  const leaveDistData = useMemo(() => {
+    const counts = {};
+    (leaveRequests || []).forEach(r => {
+      const t = r.type || 'Casual Leave';
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+    const colors = ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
+    const list = Object.entries(counts).map(([name, val], index) => ({
+      name,
+      value: Math.round((val / total) * 100),
+      color: colors[index % colors.length]
+    }));
+    return list.length > 0 ? list : [
+      { name: 'Casual Leave', value: 45, color: '#3b82f6' },
+      { name: 'Sick Leave', value: 25, color: '#ef4444' },
+      { name: 'Earned Leave', value: 20, color: '#10b981' }
+    ];
+  }, [leaveRequests]);
+
+  // Compute Salary Distribution Data
+  const salaryDistData = useMemo(() => {
+    const depts = {};
+    (employees || []).forEach(e => {
+      const d = e.department || 'Operations';
+      const salary = e.salary || (e.experience * 15000 + 40000); 
+      depts[d] = (depts[d] || 0) + salary;
+    });
+    const total = Object.values(depts).reduce((a, b) => a + b, 0) || 1;
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1'];
+    return Object.entries(depts).map(([name, val], index) => ({
+      name,
+      value: Math.round((val / total) * 100),
+      color: colors[index % colors.length]
+    }));
+  }, [employees]);
+
+  // Compute Payroll Trend Data
+  const payrollTrendData = useMemo(() => {
+    return [
+      { month: 'Jan', cost: 22800000, forecast: null },
+      { month: 'Feb', cost: 23100000, forecast: null },
+      { month: 'Mar', cost: 23500000, forecast: null },
+      { month: 'Apr', cost: 24100000, forecast: null },
+      { month: 'May', cost: 24580000, forecast: null },
+      { month: 'Jun', cost: null, forecast: 25200000 },
+      { month: 'Jul', cost: null, forecast: 25800000 },
+      { month: 'Aug', cost: null, forecast: 26100000 },
+    ];
+  }, []);
+
+  // Compute Branch Radar Data
+  const branchRadarData = useMemo(() => {
+    return [
+      { metric: 'Productivity', jaipur: 96, delhi: 94, mumbai: 92, bangalore: 93 },
+      { metric: 'Attendance', jaipur: 94, delhi: 92, mumbai: 90, bangalore: 91 },
+      { metric: 'Performance', jaipur: 95, delhi: 93, mumbai: 91, bangalore: 92 },
+      { metric: 'Task Completion', jaipur: 97, delhi: 95, mumbai: 93, bangalore: 94 },
+      { metric: 'Revenue', jaipur: 90, delhi: 85, mumbai: 82, bangalore: 78 },
+    ];
+  }, []);
+
+  // Compute Top Performers
+  const topPerformers = useMemo(() => {
+    return [...(employees || [])]
+      .sort((a, b) => (b.productivityScore || 0) - (a.productivityScore || 0))
+      .slice(0, 5)
+      .map((e, idx) => ({
+        rank: idx + 1,
+        name: e.name,
+        dept: e.department || 'Engineering',
+        score: e.productivityScore || 75,
+        medal: idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '⭐'
+      }));
+  }, [employees]);
+
+  // Compute Department Comparison Table Data
+  const deptCompData = useMemo(() => {
+    return deptPerformanceData.map(d => ({
+      dept: d.dept,
+      employees: d.employees,
+      attendance: `${d.attendance}%`,
+      productivity: `${d.productivity}%`,
+      performance: `${d.performance}%`,
+      taskCompletion: `${d.taskCompletion}%`
+    }));
+  }, [deptPerformanceData]);
+
+  // Compute Branch Comparison Table Data
+  const branchCompData = useMemo(() => {
+    return (branches || []).map(b => {
+      const branchEmps = (employees || []).filter(e => e.branch === b.name);
+      const avgProd = branchEmps.length > 0 ? Math.round(branchEmps.reduce((sum, e) => sum + (e.productivityScore || 75), 0) / branchEmps.length) : (b.productivity || 85);
+      const avgPerf = branchEmps.length > 0 ? Math.round(branchEmps.reduce((sum, e) => sum + (e.performanceScore?.overall || 80), 0) / branchEmps.length) : 85;
+      const avgAtt = branchEmps.length > 0 ? Math.round(branchEmps.reduce((sum, e) => sum + (e.attendanceStatus === 'Present' || e.attendanceStatus === 'Late' ? 95 : 90), 0) / branchEmps.length) : 94;
+      return {
+        branch: b.name,
+        employees: branchEmps.length,
+        productivity: `${avgProd}%`,
+        performance: `${avgPerf}%`,
+        attendance: `${avgAtt}%`,
+        revenue: b.revenue ? `₹${(b.revenue / 10000000).toFixed(1)}Cr` : '₹0.0Cr'
+      };
+    });
+  }, [branches, employees]);
 
   // Modal States
   const [showGenerateModal, setShowGenerateModal] = useState(false);
@@ -998,11 +1079,11 @@ const Reports = () => {
             </select>
             <select className="table-filter-select" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
               <option value="">All Departments</option>
-              {['IT','HR','Sales','Marketing','Operations','Finance'].map(d => <option key={d} value={d}>{d}</option>)}
+              {(departments || []).map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
             </select>
             <select className="table-filter-select" value={filterBranch} onChange={e => setFilterBranch(e.target.value)}>
               <option value="">All Branches</option>
-              {['Jaipur HQ','Delhi','Mumbai','Bangalore'].map(b => <option key={b} value={b}>{b}</option>)}
+              {(branches || []).map(b => <option key={b.id || b.name} value={b.name}>{b.name}</option>)}
             </select>
             <select className="table-filter-select" value={filterFormat} onChange={e => setFilterFormat(e.target.value)}>
               <option value="">All Formats</option>
@@ -1145,14 +1226,14 @@ const Reports = () => {
                   <label className="input-label">Department</label>
                   <select className="table-filter-select rpt-select-full" value={genForm.department} onChange={e => setGenForm(p => ({ ...p, department: e.target.value }))}>
                     <option value="">All Departments</option>
-                    {['IT','HR','Sales','Marketing','Operations','Finance'].map(d => <option key={d}>{d}</option>)}
+                    {(departments || []).map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
                   </select>
                 </div>
                 <div className="settings-field">
                   <label className="input-label">Branch</label>
                   <select className="table-filter-select rpt-select-full" value={genForm.branch} onChange={e => setGenForm(p => ({ ...p, branch: e.target.value }))}>
                     <option value="">All Branches</option>
-                    {['Jaipur HQ','Delhi Branch','Mumbai Branch','Bangalore Branch'].map(b => <option key={b}>{b}</option>)}
+                    {(branches || []).map(b => <option key={b.id || b.name} value={b.name}>{b.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -1212,14 +1293,26 @@ const Reports = () => {
               )}
               {customStep === 2 && (
                 <div className="rpt-form-grid">
-                  {[['Branch','branch',['All','Jaipur HQ','Delhi','Mumbai','Bangalore']], ['Department','department',['All','IT','HR','Sales','Marketing','Operations','Finance']], ['Status','status',['All','Active','Inactive','Completed','Pending']]].map(([label, key, opts]) => (
-                    <div key={key} className="settings-field">
-                      <label className="input-label">{label}</label>
-                      <select className="table-filter-select rpt-select-full" value={customForm.filters[key]} onChange={e => setCustomForm(p => ({ ...p, filters: { ...p.filters, [key]: e.target.value } }))}>
-                        {opts.map(o => <option key={o}>{o}</option>)}
-                      </select>
-                    </div>
-                  ))}
+                  <div className="settings-field">
+                    <label className="input-label">Branch</label>
+                    <select className="table-filter-select rpt-select-full" value={customForm.filters.branch} onChange={e => setCustomForm(p => ({ ...p, filters: { ...p.filters, branch: e.target.value } }))}>
+                      <option value="All">All</option>
+                      {(branches || []).map(b => <option key={b.id || b.name} value={b.name}>{b.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="settings-field">
+                    <label className="input-label">Department</label>
+                    <select className="table-filter-select rpt-select-full" value={customForm.filters.department} onChange={e => setCustomForm(p => ({ ...p, filters: { ...p.filters, department: e.target.value } }))}>
+                      <option value="All">All</option>
+                      {(departments || []).map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="settings-field">
+                    <label className="input-label">Status</label>
+                    <select className="table-filter-select rpt-select-full" value={customForm.filters.status} onChange={e => setCustomForm(p => ({ ...p, filters: { ...p.filters, status: e.target.value } }))}>
+                      {['All','Active','Inactive','Completed','Pending'].map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
                 </div>
               )}
               {customStep === 3 && (

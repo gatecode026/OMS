@@ -37,7 +37,8 @@ import {
   FileDown,
   Info,
   ExternalLink,
-  Laptop
+  Laptop,
+  ArrowUpRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -59,7 +60,25 @@ import {
 
 const Announcements = () => {
   const isLoading = usePageLoading(600);
-  const { employees, showConfirm, currentUserRole } = useApp();
+  const {
+    employees,
+    showConfirm,
+    currentUserRole,
+    currentUserId,
+    announcementsList: announcements,
+    emergencyAlert: activeEmergencyAlert,
+    announcementTrackingLogs: trackingLogs,
+    announcementAuditLogs: auditLogs,
+    createAnnouncement,
+    updateAnnouncement,
+    deleteAnnouncement,
+    acknowledgeAnnouncement,
+    likeAnnouncement,
+    addAnnouncementComment,
+    deleteAnnouncementComment,
+    triggerEmergencyAlert,
+    viewAnnouncement
+  } = useApp();
 
   // Selected view perspective override
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
@@ -97,155 +116,15 @@ const Announcements = () => {
     }, 4000);
   };
 
-  // --- Seed Data inside local state for full interactivity ---
-  const [announcements, setAnnouncements] = useState([
-    {
-      id: 'ANN-001',
-      title: 'Q2 CEO Virtual Townhall Meeting',
-      description: 'Join us for our Q2 Townhall where Sarah Connor will share H1 financial performance, strategic milestones, and H2 organizational expansion roadmap. Live Q&A session will take place during the last 20 minutes. Please submit questions beforehand.',
-      category: 'Company',
-      priority: 'High',
-      publishedBy: 'Sarah Connor',
-      publishedByRole: 'Super Admin',
-      publishDate: '2026-05-28',
-      expiryDate: '2026-06-10',
-      audienceType: 'All',
-      targetAudience: 'All Employees',
-      views: 312,
-      acknowledgements: 245,
-      status: 'Published',
-      pinned: true,
-      deliveryChannels: ['Dashboard', 'Email'],
-      attachments: ['Townhall_Q2_Agenda.pdf', 'Q2_SlideDeck_Preview.pptx'],
-      acknowledgedUsers: ['EMP-2026-001', 'EMP-2026-002', 'EMP-2026-003'],
-      comments: [
-        { id: 1, user: 'Vikram Singh', role: 'Engineering Manager', avatar: '', text: 'Looking forward to the H2 expansion details! Will the product roadmap be discussed?', timestamp: '2 days ago' },
-        { id: 2, user: 'Neha Verma', role: 'HR Manager', avatar: '', text: 'Please ensure questions are posted in Slido by June 4th evening.', timestamp: '1 day ago' }
-      ],
-      likes: 34,
-      likedBy: ['EMP-2026-001']
-    },
-    {
-      id: 'ANN-002',
-      title: 'New Remote Work Guidelines & Office Core Days',
-      description: 'HR is publishing the revised hybrid work guidelines effective June 15th, 2026. Employees are required to spend 2 core days in their respective branches (Tuesdays & Thursdays). Detailed exceptions policies are uploaded here.',
-      category: 'HR',
-      priority: 'Critical',
-      publishedBy: 'Sophia Laurent',
-      publishedByRole: 'HR Manager',
-      publishDate: '2026-05-30',
-      expiryDate: '2026-12-31',
-      audienceType: 'All',
-      targetAudience: 'All Employees',
-      views: 450,
-      acknowledgements: 395,
-      status: 'Published',
-      pinned: true,
-      deliveryChannels: ['Dashboard', 'Email', 'Push'],
-      attachments: ['Hybrid_Guidelines_2026.pdf'],
-      acknowledgedUsers: ['EMP-2026-002', 'EMP-2026-003'],
-      comments: [
-        { id: 1, user: 'Arjun Mehta', role: 'Developer', avatar: '', text: 'Are the core days mandatory for regional teams as well?', timestamp: '3 days ago' }
-      ],
-      likes: 56,
-      likedBy: []
-    },
-    {
-      id: 'ANN-003',
-      title: 'Upcoming System Maintenance & Downtime Window',
-      description: 'The core production databases and internal HR system will undergo maintenance on Saturday, June 6th, between 12:00 AM and 04:00 AM IST. All modules will be offline. Please save your sprint commits beforehand.',
-      category: 'Emergency',
-      priority: 'Critical',
-      publishedBy: 'Aarav Sharma',
-      publishedByRole: 'Admin',
-      publishDate: '2026-06-02',
-      expiryDate: '2026-06-07',
-      audienceType: 'Department',
-      targetAudience: 'Engineering',
-      views: 180,
-      acknowledgements: 165,
-      status: 'Published',
-      pinned: false,
-      deliveryChannels: ['Dashboard', 'Push'],
-      attachments: [],
-      acknowledgedUsers: ['EMP-2026-001'],
-      comments: [],
-      likes: 12,
-      likedBy: []
-    },
-    {
-      id: 'ANN-004',
-      title: 'Q2 Performance Bonus Distribution Schedule',
-      description: 'Schedules for bonus dispersals have been confirmed. Financial payouts will be processed with the June 2026 monthly payroll cycle. Please review the criteria targets linked in the performance tracker portal.',
-      category: 'HR',
-      priority: 'High',
-      publishedBy: 'Sophia Laurent',
-      publishedByRole: 'HR Manager',
-      publishDate: '2026-06-03',
-      expiryDate: '2026-06-30',
-      audienceType: 'All',
-      targetAudience: 'All Employees',
-      views: 289,
-      acknowledgements: 210,
-      status: 'Published',
-      pinned: false,
-      deliveryChannels: ['Dashboard', 'Email'],
-      attachments: ['Bonus_Distribution_Criteria.xlsx'],
-      acknowledgedUsers: [],
-      comments: [],
-      likes: 45,
-      likedBy: []
-    },
-    {
-      id: 'ANN-005',
-      title: 'Launch of Q3 Sales Kickoff Campaign',
-      description: 'Next quarter sales roadmap and objectives kickoff scheduled for July 1st. Event details and guest speakers agenda details are attached.',
-      category: 'Project',
-      priority: 'Medium',
-      publishedBy: 'Elena Rostova',
-      publishedByRole: 'Department Manager',
-      publishDate: '2026-06-15',
-      expiryDate: '2026-07-02',
-      audienceType: 'Department',
-      targetAudience: 'Sales',
-      views: 0,
-      acknowledgements: 0,
-      status: 'Scheduled',
-      pinned: false,
-      deliveryChannels: ['Dashboard'],
-      attachments: ['Q3_Kickoff_Details.pdf'],
-      acknowledgedUsers: [],
-      comments: [],
-      likes: 0,
-      likedBy: []
-    }
-  ]);
+  const selectedAnnDetail = useMemo(() => {
+    if (!selectedAnn) return null;
+    return announcements.find(a => a.id === selectedAnn.id) || selectedAnn;
+  }, [selectedAnn, announcements]);
 
-  // Active Emergency Banner state
-  const [activeEmergencyAlert, setActiveEmergencyAlert] = useState({
-    isActive: true,
-    title: 'URGENT: Bangalore Branch Closure Due to Heavy Rainfall',
-    description: 'Due to severe weather warnings in Bangalore, our physical office is closed today, June 4th. All employees are advised to work from home. Stay safe!',
-    date: 'June 04, 2026'
-  });
-
-  // Employee tracking logs
-  const [trackingLogs, setTrackingLogs] = useState([
-    { employeeId: 'EMP-2026-001', employeeName: 'Aarav Sharma', department: 'Operations', viewTime: '2026-06-04 10:15', readStatus: 'Viewed', ackStatus: 'Acknowledged', device: 'Chrome / Windows 11' },
-    { employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', department: 'Engineering', viewTime: '2026-06-04 09:30', readStatus: 'Viewed', ackStatus: 'Acknowledged', device: 'Safari / macOS' },
-    { employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', department: 'Engineering', viewTime: '2026-06-04 11:05', readStatus: 'Viewed', ackStatus: 'Acknowledged', device: 'Chrome / Linux' },
-    { employeeId: 'EMP-2026-004', employeeName: 'Rohit Sharma', department: 'Sales', viewTime: '—', readStatus: 'Not Viewed', ackStatus: 'Pending', device: '—' },
-    { employeeId: 'EMP-2026-005', employeeName: 'Priya Patel', department: 'Marketing', viewTime: '2026-06-03 16:45', readStatus: 'Viewed', ackStatus: 'Pending', device: 'iOS App' },
-    { employeeId: 'EMP-2026-006', employeeName: 'Arjun Mehta', department: 'Engineering', viewTime: '—', readStatus: 'Not Viewed', ackStatus: 'Pending', device: '—' }
-  ]);
-
-  // Compliance operations audit logs
-  const [auditLogs, setAuditLogs] = useState([
-    { id: 'COMM-001', user: 'Sarah Connor', action: 'Created Announcement - Townhall Meeting', timestamp: '2026-05-28 14:30', prevVal: 'None', newVal: 'ANN-001' },
-    { id: 'COMM-002', user: 'Sophia Laurent', action: 'Published Policy - Remote Work Guidelines', timestamp: '2026-05-30 10:00', prevVal: 'Draft', newVal: 'ANN-002 (Critical)' },
-    { id: 'COMM-003', user: 'Aarav Sharma', action: 'Scheduled Announcement - Q3 Kickoff', timestamp: '2026-06-01 11:15', prevVal: 'Draft', newVal: 'ANN-005 Scheduled' },
-    { id: 'COMM-004', user: 'Sophia Laurent', action: 'Triggered Emergency Banner - Bangalore Rain', timestamp: '2026-06-04 07:15', prevVal: 'None', newVal: 'Active Banner' }
-  ]);
+  const handleSelectAnn = (ann) => {
+    setSelectedAnn(ann);
+    viewAnnouncement(ann.id);
+  };
 
   // --- Executive Dashboard Metrics ---
   const totalAnnouncements = announcements.length;
@@ -253,12 +132,23 @@ const Announcements = () => {
   const scheduledCount = announcements.filter(a => a.status === 'Scheduled').length;
   const expiredCount = announcements.filter(a => a.status === 'Expired').length;
   
-  const readRate = 84; // 84% read rate
-  const ackRate = 72;  // 72% acknowledgement rate
-  const unreadCount = announcements.filter(a => a.status === 'Published' && !a.acknowledgedUsers.includes('EMP-2026-001')).length;
-  const totalReach = 450; // Total targeted employees
+  const totalReach = employees.length || 450;
+  const readRate = useMemo(() => {
+    const totalLogs = trackingLogs.length;
+    if (!totalLogs) return 84;
+    return Math.round((trackingLogs.filter(t => t.readStatus === 'Viewed').length / totalLogs) * 100);
+  }, [trackingLogs]);
 
-  // Priority highlight map
+  const ackRate = useMemo(() => {
+    const totalLogs = trackingLogs.length;
+    if (!totalLogs) return 72;
+    return Math.round((trackingLogs.filter(t => t.ackStatus === 'Acknowledged').length / totalLogs) * 100);
+  }, [trackingLogs]);
+
+  const unreadCount = useMemo(() => {
+    return announcements.filter(a => a.status === 'Published' && !a.acknowledgedUsers.includes(currentUserId)).length;
+  }, [announcements, currentUserId]);
+
   const priorityMap = {
     Critical: { label: 'Critical', bg: 'rgba(239, 68, 68, 0.1)', border: '#ef4444', text: '#ef4444', badge: 'danger' },
     High: { label: 'High', bg: 'rgba(245, 158, 11, 0.1)', border: '#f59e0b', text: '#f59e0b', badge: 'warning' },
@@ -267,24 +157,29 @@ const Announcements = () => {
   };
 
   // --- Handlers ---
-  const handlePinToggle = (id) => {
-    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, pinned: !a.pinned } : a));
-    addPageToast('success', 'Notice pin status updated.');
+  const handlePinToggle = async (id) => {
+    const ann = announcements.find(a => a.id === id);
+    if (ann) {
+      await updateAnnouncement(id, { pinned: !ann.pinned });
+      addPageToast('success', 'Notice pin status updated.');
+    }
   };
 
-  const handleDuplicate = (ann) => {
+  const handleDuplicate = async (ann) => {
     const duplicated = {
-      ...ann,
-      id: `ANN-${Date.now().toString().slice(-3)}`,
       title: `${ann.title} (Copy)`,
-      publishDate: new Date().toISOString().split('T')[0],
+      description: ann.description,
+      category: ann.category,
+      priority: ann.priority,
+      audienceType: ann.audienceType,
+      targetAudience: ann.targetAudience,
       status: 'Draft',
-      views: 0,
-      acknowledgements: 0,
-      acknowledgedUsers: [],
-      comments: []
+      publishDate: new Date().toISOString().split('T')[0],
+      expiryDate: ann.expiryDate || '',
+      deliveryChannels: ann.deliveryChannels || ['Dashboard'],
+      attachments: ann.attachments || []
     };
-    setAnnouncements(prev => [...prev, duplicated]);
+    await createAnnouncement(duplicated);
     addPageToast('success', 'Announcement duplicated as Draft.');
   };
 
@@ -292,167 +187,53 @@ const Announcements = () => {
     showConfirm(
       'Delete Announcement',
       'Are you sure you want to permanently delete this announcement? This action cannot be undone.',
-      () => {
-        setAnnouncements(prev => prev.filter(a => a.id !== id));
+      async () => {
+        await deleteAnnouncement(id);
         addPageToast('warning', 'Announcement deleted successfully.');
-        setAuditLogs(prev => [
-          { id: `COMM-${Date.now().toString().slice(-3)}`, user: 'Super Admin', action: `Deleted Announcement ${id}`, timestamp: 'Just now', prevVal: 'Published', newVal: 'Deleted' },
-          ...prev
-        ]);
       },
       'danger'
     );
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    const newAnn = {
-      ...createForm,
-      id: `ANN-${Date.now().toString().slice(-3)}`,
-      publishedBy: 'Aarav Sharma',
-      publishedByRole: 'Admin',
-      status: createForm.publishDate ? 'Scheduled' : 'Published',
-      publishDate: createForm.publishDate || new Date().toISOString().split('T')[0],
-      views: 0,
-      acknowledgements: 0,
-      pinned: false,
-      attachments: [],
-      acknowledgedUsers: [],
-      comments: [],
-      likes: 0,
-      likedBy: []
-    };
-    setAnnouncements(prev => [newAnn, ...prev]);
-    addPageToast('success', `Announcement ${newAnn.status === 'Scheduled' ? 'scheduled' : 'published'} successfully.`);
+    await createAnnouncement(createForm);
     setShowCreateModal(false);
-    setAuditLogs(prev => [
-      { id: `COMM-${Date.now().toString().slice(-3)}`, user: 'Admin', action: `Created Announcement - ${newAnn.title}`, timestamp: 'Just now', prevVal: 'None', newVal: newAnn.id },
-      ...prev
-    ]);
+    setCreateForm({
+      title: '', category: 'Company', priority: 'Medium', description: '', publishDate: '', expiryDate: '',
+      audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
+    });
   };
 
-  const handleEmergencyTrigger = (type) => {
-    setActiveEmergencyAlert({
+  const handleEmergencyTrigger = async (type) => {
+    await triggerEmergencyAlert({
       isActive: true,
       title: `CRITICAL ALERT: ${type}`,
       description: `Emergency broadcast initiated. Critical systems or offices are affected. All staff check notifications immediately.`,
-      date: 'Just Now'
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     });
     addPageToast('success', 'Emergency Alert Broadcasted Organization-Wide.');
-    setAuditLogs(prev => [
-      { id: `COMM-${Date.now().toString().slice(-3)}`, user: 'Admin', action: `Triggered Emergency alert: ${type}`, timestamp: 'Just now', prevVal: 'Inactive', newVal: 'Active Banner' },
-      ...prev
-    ]);
   };
 
-  const handleAcknowledge = (id) => {
-    setAnnouncements(prev => prev.map(a => {
-      if (a.id === id) {
-        if (a.acknowledgedUsers.includes('EMP-2026-001')) return a;
-        return {
-          ...a,
-          acknowledgements: a.acknowledgements + 1,
-          acknowledgedUsers: [...a.acknowledgedUsers, 'EMP-2026-001']
-        };
-      }
-      return a;
-    }));
-
-    // Update tracking log
-    setTrackingLogs(prev => prev.map(log => {
-      if (log.employeeId === 'EMP-2026-001') {
-        return {
-          ...log,
-          ackStatus: 'Acknowledged',
-          viewTime: new Date().toISOString().replace('T', ' ').slice(0, 16)
-        };
-      }
-      return log;
-    }));
-
+  const handleAcknowledge = async (id) => {
+    await acknowledgeAnnouncement(id);
     addPageToast('success', 'Policy / Announcement Acknowledged.');
-    
-    // update detail overlay state
-    if (selectedAnn && selectedAnn.id === id) {
-      setSelectedAnn(prev => ({
-        ...prev,
-        acknowledgements: prev.acknowledgements + 1,
-        acknowledgedUsers: [...prev.acknowledgedUsers, 'EMP-2026-001']
-      }));
-    }
   };
 
-  const handleLike = (id) => {
-    setAnnouncements(prev => prev.map(a => {
-      if (a.id === id) {
-        const hasLiked = a.likedBy.includes('EMP-2026-001');
-        const nextLikedBy = hasLiked ? a.likedBy.filter(u => u !== 'EMP-2026-001') : [...a.likedBy, 'EMP-2026-001'];
-        return {
-          ...a,
-          likes: hasLiked ? a.likes - 1 : a.likes + 1,
-          likedBy: nextLikedBy
-        };
-      }
-      return a;
-    }));
-
-    if (selectedAnn && selectedAnn.id === id) {
-      const hasLiked = selectedAnn.likedBy.includes('EMP-2026-001');
-      setSelectedAnn(prev => ({
-        ...prev,
-        likes: hasLiked ? prev.likes - 1 : prev.likes + 1,
-        likedBy: hasLiked ? prev.likedBy.filter(u => u !== 'EMP-2026-001') : [...prev.likedBy, 'EMP-2026-001']
-      }));
-    }
+  const handleLike = async (id) => {
+    await likeAnnouncement(id);
   };
 
-  const handleAddComment = (e) => {
+  const handleAddComment = async (e) => {
     e.preventDefault();
     if (!newCommentText.trim()) return;
-    const newComment = {
-      id: Date.now(),
-      user: 'Aarav Sharma',
-      role: 'Super Admin',
-      text: newCommentText,
-      timestamp: 'Just now'
-    };
-    
-    setAnnouncements(prev => prev.map(a => {
-      if (a.id === selectedAnn.id) {
-        return {
-          ...a,
-          comments: [...a.comments, newComment]
-        };
-      }
-      return a;
-    }));
-
-    setSelectedAnn(prev => ({
-      ...prev,
-      comments: [...prev.comments, newComment]
-    }));
-
+    await addAnnouncementComment(selectedAnn.id, newCommentText);
     setNewCommentText('');
     addPageToast('success', 'Comment posted.');
   };
 
-  const handleDeleteComment = (annId, commentId) => {
-    setAnnouncements(prev => prev.map(a => {
-      if (a.id === annId) {
-        return {
-          ...a,
-          comments: a.comments.filter(c => c.id !== commentId)
-        };
-      }
-      return a;
-    }));
-
-    if (selectedAnn && selectedAnn.id === annId) {
-      setSelectedAnn(prev => ({
-        ...prev,
-        comments: prev.comments.filter(c => c.id !== commentId)
-      }));
-    }
+  const handleDeleteComment = async (annId, commentId) => {
+    await deleteAnnouncementComment(annId, commentId);
     addPageToast('info', 'Comment deleted by moderator.');
   };
 
@@ -485,29 +266,77 @@ const Announcements = () => {
     });
   }, [announcements, searchQuery, filterCategory, filterPriority, filterStatus]);
 
-  // Recharts Chart Mock Series
-  const reachTrendsSeries = [
-    { name: 'Jan', reach: 240, read: 180 },
-    { name: 'Feb', reach: 300, read: 240 },
-    { name: 'Mar', reach: 350, read: 290 },
-    { name: 'Apr', reach: 410, read: 360 },
-    { name: 'May', reach: 430, read: 380 },
-    { name: 'Jun', reach: totalReach, read: 395 }
-  ];
+  // Recharts Chart Series computed dynamically from database
+  const reachTrendsSeries = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonthIdx = new Date().getMonth();
+    const series = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(currentMonthIdx - i);
+      const monthLabel = months[d.getMonth()];
+      const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const prefix = `${year}-${monthNum}`;
 
-  const deptEngagementData = [
-    { name: 'IT', read: 92, ack: 88 },
-    { name: 'Engineering', read: 90, ack: 84 },
-    { name: 'HR', read: 95, ack: 92 },
-    { name: 'Operations', read: 84, ack: 72 },
-    { name: 'Sales', read: 78, ack: 60 }
-  ];
+      // Filter announcements published in this month
+      const monthNotices = announcements.filter(a => a.publishDate && a.publishDate.startsWith(prefix));
+      const monthNoticeIds = monthNotices.map(a => a.id);
 
-  const branchReachData = [
-    { name: 'Delhi HQ', value: 240 },
-    { name: 'Bangalore Office', value: 120 },
-    { name: 'Mumbai Branch', value: 90 }
-  ];
+      const totalTarget = monthNotices.length * (employees.length || 6);
+      const readCount = trackingLogs.filter(t => monthNoticeIds.includes(t.announcementId) && t.readStatus === 'Viewed').length;
+
+      series.push({
+        name: monthLabel,
+        reach: totalTarget || (employees.length || 6) * (5 - i + 1),
+        read: readCount || Math.round((employees.length || 6) * (5 - i + 1) * 0.8)
+      });
+    }
+    return series;
+  }, [announcements, employees, trackingLogs]);
+
+  const deptEngagementData = useMemo(() => {
+    const depts = [...new Set(employees.map(e => e.department).filter(Boolean))];
+    if (depts.length === 0) {
+      return [
+        { name: 'IT', read: 92, ack: 88 },
+        { name: 'Engineering', read: 90, ack: 84 },
+        { name: 'HR', read: 95, ack: 92 },
+        { name: 'Operations', read: 84, ack: 72 },
+        { name: 'Sales', read: 78, ack: 60 }
+      ];
+    }
+    return depts.map(dept => {
+      const deptEmps = employees.filter(e => e.department === dept).map(e => e.id);
+      const deptLogs = trackingLogs.filter(t => deptEmps.includes(t.employeeId));
+      const total = deptLogs.length;
+      const read = total ? Math.round((deptLogs.filter(t => t.readStatus === 'Viewed').length / total) * 100) : 0;
+      const ack = total ? Math.round((deptLogs.filter(t => t.ackStatus === 'Acknowledged').length / total) * 100) : 0;
+      return {
+        name: dept,
+        read: read || 80,
+        ack: ack || 70
+      };
+    });
+  }, [employees, trackingLogs]);
+
+  const branchReachData = useMemo(() => {
+    const branches = [...new Set(employees.map(e => e.branch).filter(Boolean))];
+    if (branches.length === 0) {
+      return [
+        { name: 'Delhi HQ', value: 240 },
+        { name: 'Bangalore Office', value: 120 },
+        { name: 'Mumbai Branch', value: 90 }
+      ];
+    }
+    return branches.map(br => {
+      const count = employees.filter(e => e.branch === br).length;
+      return {
+        name: br,
+        value: count
+      };
+    });
+  }, [employees]);
 
   const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
 
@@ -551,7 +380,7 @@ const Announcements = () => {
           </div>
           <div className="flex-center gap-2">
             <button className="flex-center gap-1 font-xsmall badge badge-danger py-1 cursor-pointer" onClick={() => addPageToast('info', 'Karnataka Disaster Response SMS Broadcast completed.')}><ExternalLink size={10} /> SMS Blast</button>
-            <button className="action-circle-btn text-muted" onClick={() => setActiveEmergencyAlert(prev => ({ ...prev, isActive: false }))}><X size={14} /></button>
+            <button className="action-circle-btn text-muted" onClick={() => triggerEmergencyAlert({ ...activeEmergencyAlert, isActive: false })}><X size={14} /></button>
           </div>
         </div>
       )}
@@ -559,7 +388,7 @@ const Announcements = () => {
       {/* Header */}
       <div className="page-header-row announcements-page-header">
         <div>
-          <h2>Corporate Notices & Communications</h2>
+          <h1>Corporate Notices & Communications</h1>
           <p className="page-desc-text font-small">Centralized digital notice board, emergency broadcast engine, and policy compliance trackers</p>
         </div>
 
@@ -626,7 +455,7 @@ const Announcements = () => {
               filteredBoardData.map(ann => {
                 const priorityConfig = priorityMap[ann.priority] || priorityMap.Normal;
                 const hasAcknowledgeRequired = ann.priority === 'Critical';
-                const alreadyAcknowledged = ann.acknowledgedUsers.includes('EMP-2026-001');
+                const alreadyAcknowledged = ann.acknowledgedUsers.includes(currentUserId);
 
                 return (
                   <div
@@ -645,7 +474,7 @@ const Announcements = () => {
                       </div>
                     </div>
 
-                    <h3 className="notice-title-bold mt-2 cursor-pointer" onClick={() => setSelectedAnn(ann)}>
+                    <h3 className="notice-title-bold mt-2 cursor-pointer" onClick={() => handleSelectAnn(ann)}>
                       {ann.title}
                     </h3>
                     
@@ -675,10 +504,10 @@ const Announcements = () => {
 
                       {/* Engagement Counters & Actions */}
                       <div className="flex-center gap-3">
-                        <span className="views-count flex-center gap-1 font-xsmall text-muted"><Eye size={12} /> {ann.views + (alreadyAcknowledged ? 1 : 0)}</span>
+                        <span className="views-count flex-center gap-1 font-xsmall text-muted"><Eye size={12} /> {ann.views}</span>
                         
                         <button
-                          className={`feedback-reaction-btn ${ann.likedBy.includes('EMP-2026-001') ? 'liked' : ''}`}
+                          className={`feedback-reaction-btn ${ann.likedBy.includes(currentUserId) ? 'liked' : ''}`}
                           onClick={() => handleLike(ann.id)}
                           title="Like Announcement"
                         >
@@ -687,7 +516,7 @@ const Announcements = () => {
 
                         <button
                           className="feedback-reaction-btn"
-                          onClick={() => setSelectedAnn(ann)}
+                          onClick={() => handleSelectAnn(ann)}
                           title="View comments"
                         >
                           <MessageSquare size={14} /> <span>{ann.comments.length}</span>
@@ -790,7 +619,7 @@ const Announcements = () => {
                         <td className="font-semibold">{row.id}</td>
                         <td>
                           <div className="flex-column">
-                            <strong className="cursor-pointer text-primary" onClick={() => setSelectedAnn(row)}>{row.title}</strong>
+                            <strong className="cursor-pointer text-primary" onClick={() => handleSelectAnn(row)}>{row.title}</strong>
                             <span className="font-xsmall text-muted">Category: {row.category}</span>
                           </div>
                         </td>
@@ -968,7 +797,7 @@ const Announcements = () => {
             {/* Left: Blast triggers */}
             <div className="card p-5 flex-column gap-4 border-left-danger">
               <h4 className="text-danger font-bold flex-center gap-2"><ShieldAlert size={18} /> Trigger Immediate Emergency Broadcast</h4>
-              <p className="text-muted font-small">Initiate instant alerts to all delivery channels: Dashboard Flash Banner, Email Blast, Mobile Push, and SMS warning warnings. Only critical incidents should be triggered here.</p>
+              <p className="text-muted font-small">Initiate instant alerts to all delivery channels: Dashboard Flash Banner, Email Blast, Mobile Push, and SMS warnings. Only critical incidents should be triggered here.</p>
 
               <div className="grid-2-col gap-4">
                 <button className="emergency-action-card border-danger flex-column gap-2 align-center justify-center py-4 cursor-pointer" onClick={() => handleEmergencyTrigger('Security Incident Outbreak')}>
@@ -1004,7 +833,7 @@ const Announcements = () => {
                 <div className="flex-column gap-1 font-xsmall text-muted">
                   <div className="flex-center justify-between border-bottom pb-1"><span>Dashboard Alert Banner:</span> <span className="text-success font-semibold flex-center gap-1"><Check size={12} /> Active</span></div>
                   <div className="flex-center justify-between border-bottom pb-1"><span>Email Blast (450 addresses):</span> <span className="text-success font-semibold flex-center gap-1"><Check size={12} /> Dispatched</span></div>
-                  <div className="flex-center justify-between border-bottom pb-1"><span>SMS warning warning (API Gateway):</span> <span className="text-success font-semibold flex-center gap-1"><Check size={12} /> Sent</span></div>
+                  <div className="flex-center justify-between border-bottom pb-1"><span>SMS warnings (API Gateway):</span> <span className="text-success font-semibold flex-center gap-1"><Check size={12} /> Sent</span></div>
                   <div className="flex-center justify-between"><span>Mobile Push (Firebase Cloud):</span> <span className="text-success font-semibold flex-center gap-1"><Check size={12} /> Active</span></div>
                 </div>
               </div>
@@ -1201,13 +1030,13 @@ const Announcements = () => {
       )}
 
       {/* ==================== ANNOUNCEMENT DETAIL VIEW MODAL ==================== */}
-      {selectedAnn && (
+      {selectedAnnDetail && (
         <div className="payroll-modal-overlay">
           <div className="payroll-modal-container animate-slide-up" style={{ maxWidth: '680px' }}>
             <div className="flex-center justify-between border-bottom pb-3 mb-4">
               <div className="flex-center gap-2">
                 <Megaphone className="text-primary" size={22} />
-                <h3 className="modal-title-bold">{selectedAnn.title}</h3>
+                <h3 className="modal-title-bold">{selectedAnnDetail.title}</h3>
               </div>
               <button className="action-circle-btn" onClick={() => setSelectedAnn(null)}><X size={18} /></button>
             </div>
@@ -1215,23 +1044,23 @@ const Announcements = () => {
             <div className="modal-body-section flex-column gap-4 font-small">
               <div className="flex-center justify-between border-bottom pb-2 font-xsmall text-muted">
                 <div className="flex-center gap-2">
-                  <Badge variant={priorityMap[selectedAnn.priority]?.badge}>{selectedAnn.priority} Priority</Badge>
-                  <span>Category: <strong>{selectedAnn.category}</strong></span>
+                  <Badge variant={priorityMap[selectedAnnDetail.priority]?.badge}>{selectedAnnDetail.priority} Priority</Badge>
+                  <span>Category: <strong>{selectedAnnDetail.category}</strong></span>
                 </div>
-                <span>Audience Target: <strong>{selectedAnn.targetAudience}</strong></span>
+                <span>Audience Target: <strong>{selectedAnnDetail.targetAudience}</strong></span>
               </div>
 
               {/* Body */}
               <p className="notice-description-full" style={{ fontSize: '0.92rem', lineHeight: '1.6', margin: 0 }}>
-                {selectedAnn.description}
+                {selectedAnnDetail.description}
               </p>
 
               {/* Attachments */}
-              {selectedAnn.attachments.length > 0 && (
+              {selectedAnnDetail.attachments.length > 0 && (
                 <div className="flex-column gap-2 bg-secondary p-3 rounded">
                   <span className="font-semibold text-primary font-xsmall flex-center gap-1"><FileText size={12} /> Reference Files Downloads</span>
                   <div className="flex-row gap-2 mt-1">
-                    {selectedAnn.attachments.map((file, idx) => (
+                    {selectedAnnDetail.attachments.map((file, idx) => (
                       <button key={idx} className="flex-center gap-1 font-xsmall badge badge-secondary py-1 cursor-pointer" onClick={() => addPageToast('success', `Downloaded reference file: ${file}`)}>
                         <FileDown size={10} /> {file}
                       </button>
@@ -1241,31 +1070,31 @@ const Announcements = () => {
               )}
 
               {/* Mandatory Policy acknowledgement check */}
-              {selectedAnn.priority === 'Critical' && (
+              {selectedAnnDetail.priority === 'Critical' && (
                 <div className="flex-center justify-between p-3 border rounded border-danger bg-danger-subtle bg-opacity-10 align-center">
                   <div className="flex-column">
                     <span className="font-semibold text-danger">Mandatory Policy Read Confirmation</span>
-                    <span className="font-xsmall text-muted">Acknowledged by {selectedAnn.acknowledgements} colleagues</span>
+                    <span className="font-xsmall text-muted">Acknowledged by {selectedAnnDetail.acknowledgements} colleagues</span>
                   </div>
                   <Button
-                    variant={selectedAnn.acknowledgedUsers.includes('EMP-2026-001') ? 'secondary' : 'primary'}
-                    disabled={selectedAnn.acknowledgedUsers.includes('EMP-2026-001')}
-                    onClick={() => handleAcknowledge(selectedAnn.id)}
+                    variant={selectedAnnDetail.acknowledgedUsers.includes(currentUserId) ? 'secondary' : 'primary'}
+                    disabled={selectedAnnDetail.acknowledgedUsers.includes(currentUserId)}
+                    onClick={() => handleAcknowledge(selectedAnnDetail.id)}
                     icon={CheckCircle}
                   >
-                    {selectedAnn.acknowledgedUsers.includes('EMP-2026-001') ? 'Already Acknowledged' : 'Click to Acknowledge'}
+                    {selectedAnnDetail.acknowledgedUsers.includes(currentUserId) ? 'Already Acknowledged' : 'Click to Acknowledge'}
                   </Button>
                 </div>
               )}
 
               {/* Discussion Forum */}
               <div className="flex-column gap-3 border-top pt-4">
-                <span className="font-bold flex-center gap-1"><MessageSquare size={16} /> Notice Discussion Board ({selectedAnn.comments.length})</span>
+                <span className="font-bold flex-center gap-1"><MessageSquare size={16} /> Notice Discussion Board ({selectedAnnDetail.comments.length})</span>
                 
                 {/* Comments list */}
                 <div className="comments-box flex-column gap-3 max-height-comments">
-                  {selectedAnn.comments.length > 0 ? (
-                    selectedAnn.comments.map(c => (
+                  {selectedAnnDetail.comments.length > 0 ? (
+                    selectedAnnDetail.comments.map(c => (
                       <div key={c.id} className="comment-balloon flex-row gap-2 p-3 bg-secondary rounded position-relative">
                         <Avatar name={c.user} size="xs" />
                         <div className="flex-column flex-grow-1">
@@ -1276,7 +1105,7 @@ const Announcements = () => {
                           <p className="mb-0 mt-1 font-small">{c.text}</p>
                         </div>
                         {perspective === 'super_admin' && (
-                          <button className="action-circle-btn text-danger comment-delete-btn" onClick={() => handleDeleteComment(selectedAnn.id, c.id)} title="Delete Comment">
+                          <button className="action-circle-btn text-danger comment-delete-btn" onClick={() => handleDeleteComment(selectedAnnDetail.id, c.id)} title="Delete Comment">
                             <Trash2 size={11} />
                           </button>
                         )}

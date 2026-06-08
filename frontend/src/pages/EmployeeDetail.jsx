@@ -600,7 +600,7 @@ const EmployeeDetail = () => {
         {/* ── Daily Work Reports ── */}
         {activeTab === 'reports' && (
           <div className="ed-tab-body">
-            <div className="ed-section-title-row"><h3>Daily Work Reports</h3></div>
+            <div className="ed-section-title-row"><h3>Work Reports</h3></div>
             <div className="reports-list">
               {[
                 { date: '2026-05-28', summary: 'Completed UI review and API integration tests.', status: 'Acknowledged', tasks: ['API integration testing for module A', 'UI review for dashboard changes'], hours: '8.5h', blockers: 'None', plan: 'Deploy to staging tomorrow morning.' },

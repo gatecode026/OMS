@@ -32,6 +32,21 @@ export const remove = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Record deleted successfully');
 });
 
+export const getAllOverrides = asyncHandler(async (req, res) => {
+  const data = await service.findAllOverrides(req.query);
+  return successResponse(res, data, 'Overrides fetched successfully');
+});
+
+export const createOverride = asyncHandler(async (req, res) => {
+  const data = await service.createOverrideRecord(req.body, req.user);
+  return successResponse(res, data, 'Override created successfully', 201);
+});
+
+export const deleteOverride = asyncHandler(async (req, res) => {
+  const data = await service.deleteOverrideRecord(req.params.id, req.user);
+  return successResponse(res, data, 'Override deleted successfully');
+});
+
 export const getPublicData = asyncHandler(async (req, res) => {
   return successResponse(res, { status: 'mock_public_data' }, 'Public record fetched');
 });
@@ -42,5 +57,8 @@ export default {
   create,
   update,
   remove,
+  getAllOverrides,
+  createOverride,
+  deleteOverride,
   getPublicData
 };

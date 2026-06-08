@@ -24,6 +24,10 @@ import activityLogsRouter from '../modules/activity-logs/activity-logs.routes.js
 import rolesRouter from '../modules/roles/roles.routes.js';
 import documentsRouter from '../modules/documents/documents.routes.js';
 import settingsRouter from '../modules/settings/settings.routes.js';
+import appraisalReviewsRouter from '../modules/appraisal-reviews/appraisal-reviews.routes.js';
+import announcementsRouter from '../modules/announcements/announcements.routes.js';
+import performanceRouter from '../modules/performance/performance.routes.js';
+import securityRouter from '../modules/security/security.routes.js';
 
 const router = express.Router();
 
@@ -46,5 +50,9 @@ router.use('/activity-logs', activityLogsRouter);
 router.use('/roles', rolesRouter);
 router.use('/documents', documentsRouter);
 router.use('/settings', settingsRouter);
+router.use('/appraisal-reviews', appraisalReviewsRouter);
+router.use('/announcements', announcementsRouter);
+router.use('/performance', performanceRouter);
+router.use('/security', securityRouter);
 
 export default router;

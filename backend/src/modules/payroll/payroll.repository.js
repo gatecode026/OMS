@@ -1,42 +1,158 @@
 /**
  * @file src/modules/payroll/payroll.repository.js
- * @description Data Access layer for Payroll module.
+ * @description Data Access layer for Payroll module utilizing MongoDB/Mongoose.
  */
 
+import {
+  PayrollGrade,
+  PayrollReimbursement,
+  PayrollLoanAdvance,
+  PayrollBonus,
+  PayrollPayment,
+  PayrollConfig
+} from './payroll.model.js';
 import logger from '../../config/logger.js';
 
-export const find = async (query) => {
-  logger.debug('Executing PayrollRepository::find placeholder');
-  return [
-    { id: 'MOCK-1', name: 'Placeholder Domain Record 1 for Payroll', status: 'Active' },
-    { id: 'MOCK-2', name: 'Placeholder Domain Record 2 for Payroll', status: 'Inactive' }
-  ];
+// Get unified master dataset
+export const getMasterPayrollData = async () => {
+  logger.debug('Executing PayrollRepository::getMasterPayrollData');
+  
+  const grades = await PayrollGrade.find().lean();
+  const reimbursements = await PayrollReimbursement.find().lean();
+  const loans = await PayrollLoanAdvance.find().lean();
+  const bonuses = await PayrollBonus.find().lean();
+  const payments = await PayrollPayment.find().lean();
+  
+  // Find or create global config
+  let config = await PayrollConfig.findOne({ id: 'GLOBAL_CONFIG' }).lean();
+  if (!config) {
+    config = await PayrollConfig.create({
+      id: 'GLOBAL_CONFIG',
+      leaveDeductionRate: 2000,
+      lateArrivalPenalty: 300,
+      overtimeHourlyRate: 500,
+      taxProfiles: {},
+      salaryStructures: {},
+      attendanceDaysMap: {}
+    });
+    config = config.toObject();
+  }
+
+  return {
+    grades,
+    reimbursements,
+    loans: loans.filter(l => l.type === 'Loan'),
+    advances: loans.filter(l => l.type === 'Advance'),
+    bonuses,
+    payments,
+    config
+  };
 };
 
-export const findOne = async (id) => {
-  logger.debug('Executing PayrollRepository::findOne placeholder for: ' + id);
-  return { id, name: 'Placeholder Single Domain Record for Payroll', status: 'Active' };
+// CRUD for Salary Grade structures
+export const saveGrade = async (gradeData) => {
+  logger.debug('Executing PayrollRepository::saveGrade', gradeData);
+  if (!gradeData.id) {
+    const count = await PayrollGrade.countDocuments();
+    gradeData.id = `GRD-${Date.now().toString().slice(-3)}-${count + 1}`;
+  }
+  return PayrollGrade.findOneAndUpdate({ id: gradeData.id }, gradeData, { upsert: true, new: true }).lean();
 };
 
-export const save = async (data) => {
-  logger.debug('Executing PayrollRepository::save placeholder', data);
-  return { id: 'MOCK-' + Math.floor(100 + Math.random() * 900), ...data };
+export const deleteGrade = async (id) => {
+  logger.debug('Executing PayrollRepository::deleteGrade for: ' + id);
+  return PayrollGrade.findOneAndDelete({ id }).lean();
 };
 
-export const update = async (id, data) => {
-  logger.debug('Executing PayrollRepository::update placeholder for: ' + id, data);
-  return { id, ...data };
+// CRUD for Loans & Advances
+export const saveLoanAdvance = async (loanData) => {
+  logger.debug('Executing PayrollRepository::saveLoanAdvance', loanData);
+  if (loanData.type === 'Advance') {
+    loanData.loanType = 'Advance Salary';
+    loanData.emi = 0;
+  }
+  if (!loanData.id) {
+    const count = await PayrollLoanAdvance.countDocuments();
+    const prefix = loanData.type === 'Loan' ? 'LON' : 'ADV';
+    loanData.id = `${prefix}-${Date.now().toString().slice(-3)}-${count + 1}`;
+  }
+  return PayrollLoanAdvance.findOneAndUpdate({ id: loanData.id }, loanData, { upsert: true, new: true }).lean();
 };
 
-export const remove = async (id) => {
-  logger.debug('Executing PayrollRepository::remove placeholder for: ' + id);
-  return { id, status: 'Deleted' };
+// CRUD for Bonuses
+export const saveBonus = async (bonusData) => {
+  logger.debug('Executing PayrollRepository::saveBonus', bonusData);
+  if (!bonusData.id) {
+    const count = await PayrollBonus.countDocuments();
+    bonusData.id = `BNS-${Date.now().toString().slice(-3)}-${count + 1}`;
+  }
+  return PayrollBonus.findOneAndUpdate({ id: bonusData.id }, bonusData, { upsert: true, new: true }).lean();
+};
+
+export const updateBonusStatus = async (id, status, reviewerName) => {
+  logger.debug(`Executing PayrollRepository::updateBonusStatus: ${id} -> ${status}`);
+  const bonus = await PayrollBonus.findOne({ id });
+  if (!bonus) return null;
+  
+  bonus.status = status;
+  if (reviewerName) {
+    bonus.approvalFlow.push(`${status} by ${reviewerName}`);
+  }
+  await bonus.save();
+  return bonus.toObject();
+};
+
+// CRUD for Reimbursements
+export const updateReimbursementStatus = async (id, status, approvedBy) => {
+  logger.debug(`Executing PayrollRepository::updateReimbursementStatus: ${id} -> ${status}`);
+  return PayrollReimbursement.findOneAndUpdate(
+    { id },
+    { status, approvedBy },
+    { new: true }
+  ).lean();
+};
+
+// CRUD for Monthly Processed Payments
+export const saveMonthlyPayment = async (paymentData) => {
+  logger.debug('Executing PayrollRepository::saveMonthlyPayment', paymentData);
+  if (!paymentData.id) {
+    paymentData.id = `${paymentData.employeeId}-${paymentData.month}-${paymentData.year}`;
+  }
+  return PayrollPayment.findOneAndUpdate({ id: paymentData.id }, paymentData, { upsert: true, new: true }).lean();
+};
+
+export const updatePaymentStatus = async (empId, month, year, status) => {
+  logger.debug(`Executing PayrollRepository::updatePaymentStatus: ${empId} for ${month} ${year} -> ${status}`);
+  const id = `${empId}-${month}-${year}`;
+  return PayrollPayment.findOneAndUpdate({ id }, { status }, { new: true }).lean();
+};
+
+export const bulkUpdatePaymentStatus = async (month, year, status) => {
+  logger.debug(`Executing PayrollRepository::bulkUpdatePaymentStatus: ${month} ${year} -> ${status}`);
+  await PayrollPayment.updateMany({ month, year }, { status });
+  return PayrollPayment.find({ month, year }).lean();
+};
+
+// Global config mutations
+export const saveGlobalConfigs = async (configs) => {
+  logger.debug('Executing PayrollRepository::saveGlobalConfigs', configs);
+  return PayrollConfig.findOneAndUpdate(
+    { id: 'GLOBAL_CONFIG' },
+    configs,
+    { upsert: true, new: true }
+  ).lean();
 };
 
 export default {
-  find,
-  findOne,
-  save,
-  update,
-  remove
+  getMasterPayrollData,
+  saveGrade,
+  deleteGrade,
+  saveLoanAdvance,
+  saveBonus,
+  updateBonusStatus,
+  updateReimbursementStatus,
+  saveMonthlyPayment,
+  updatePaymentStatus,
+  bulkUpdatePaymentStatus,
+  saveGlobalConfigs
 };

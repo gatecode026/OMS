@@ -366,9 +366,9 @@ const TaskMonitoring = () => {
   }, [departmentSummaries]);
 
   // Form submits handlers
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
     if (!createForm.projectId || !createForm.title.trim()) return;
-    addTask(createForm);
+    await addTask(createForm);
     setIsCreateOpen(false);
     setCreateForm({
       projectId: projectsList[0]?.id || '',
@@ -383,69 +383,64 @@ const TaskMonitoring = () => {
     setIsExportOpen(false);
   };
 
-  const handleReassignSubmit = () => {
+  const handleReassignSubmit = async () => {
     if (!newAssigneeId) return;
     const assignee = employees.find(e => e.id === newAssigneeId);
-    reassignTask(actionTaskId, newAssigneeId, assignee ? assignee.name : 'Unassigned');
+    const updatedTask = await reassignTask(actionTaskId, newAssigneeId, assignee ? assignee.name : 'Unassigned');
     setIsReassignOpen(false);
     setActionTaskId(null);
     setNewAssigneeId('');
     // Sync drawer detail if open
-    if (selectedTask && selectedTask.id === actionTaskId) {
-      setSelectedTask(prev => ({
-        ...prev,
-        assigneeId: newAssigneeId,
-        assigneeName: assignee ? assignee.name : 'Unassigned'
-      }));
+    if (updatedTask && selectedTask && selectedTask.id === actionTaskId) {
+      setSelectedTask(updatedTask);
     }
   };
 
-  const handleDeadlineSubmit = () => {
+  const handleDeadlineSubmit = async () => {
     if (!newDueDate) return;
-    extendTaskDeadline(actionTaskId, newDueDate);
+    const updatedTask = await extendTaskDeadline(actionTaskId, newDueDate);
     setIsDeadlineOpen(false);
     setActionTaskId(null);
     setNewDueDate('');
-    if (selectedTask && selectedTask.id === actionTaskId) {
-      setSelectedTask(prev => ({ ...prev, dueDate: newDueDate }));
+    if (updatedTask && selectedTask && selectedTask.id === actionTaskId) {
+      setSelectedTask(updatedTask);
     }
   };
 
-  const handleRemarksSubmit = () => {
-    addTaskRemarks(actionTaskId, newTaskRemarks);
+  const handleRemarksSubmit = async () => {
+    const updatedTask = await addTaskRemarks(actionTaskId, newTaskRemarks);
     setIsRemarksOpen(false);
     setActionTaskId(null);
     setNewTaskRemarks('');
+    if (updatedTask && selectedTask && selectedTask.id === actionTaskId) {
+      setSelectedTask(updatedTask);
+    }
   };
 
-  const handleAddCommentSubmit = () => {
+  const handleAddCommentSubmit = async () => {
     if (!newCommentText.trim()) return;
-    addTaskComment(selectedTask.id, newCommentText, currentUser?.name || 'Aarav Sharma', currentUser?.role || 'Super Admin');
+    const updatedTask = await addTaskComment(selectedTask.id, newCommentText, currentUser?.name || 'Aarav Sharma', currentUser?.role || 'Super Admin');
     setNewCommentText('');
-    // refresh details
-    const updatedTask = tasks.find(t => t.id === selectedTask.id);
     if (updatedTask) {
       setSelectedTask(updatedTask);
     }
   };
 
-  const handleApproveLevel = (level) => {
-    approveTaskLevel(selectedTask.id, level, 'Approved at level ' + level, currentUser?.name);
-    const updated = tasks.find(t => t.id === selectedTask.id);
-    if (updated) setSelectedTask(updated);
+  const handleApproveLevel = async (level) => {
+    const updatedTask = await approveTaskLevel(selectedTask.id, level, 'Approved at level ' + level, currentUser?.name);
+    if (updatedTask) setSelectedTask(updatedTask);
   };
 
-  const handleRejectLevel = (level) => {
-    rejectTaskLevel(selectedTask.id, level, 'Rejected at level ' + level, currentUser?.name);
-    const updated = tasks.find(t => t.id === selectedTask.id);
-    if (updated) setSelectedTask(updated);
+  const handleRejectLevel = async (level) => {
+    const updatedTask = await rejectTaskLevel(selectedTask.id, level, 'Rejected at level ' + level, currentUser?.name);
+    if (updatedTask) setSelectedTask(updatedTask);
   };
 
   const handleDragStart = (e, taskId) => {
     e.dataTransfer.setData('text/plain', taskId);
   };
 
-  const handleDrop = (e, targetCol) => {
+  const handleDrop = async (e, targetCol) => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData('text/plain');
     if (taskId) {
@@ -454,7 +449,7 @@ const TaskMonitoring = () => {
       if (targetCol === 'In Progress') statusVal = 'in_progress';
       else if (targetCol === 'In Review') statusVal = 'review';
       else if (targetCol === 'Done') statusVal = 'done';
-      updateTaskStatus(taskId, statusVal);
+      await updateTaskStatus(taskId, statusVal);
     }
   };
 
@@ -955,7 +950,7 @@ const TaskMonitoring = () => {
                               <div className="flex-center gap-1">
                                 <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsReassignOpen(true); }}>Reassign</Button>
                                 <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsDeadlineOpen(true); }}>Extend</Button>
-                                <Button variant="ghost" size="sm" onClick={() => escalateTask(task.id)}>Escalate</Button>
+                                <Button variant="ghost" size="sm" onClick={async () => await escalateTask(task.id)}>Escalate</Button>
                                 <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsRemarksOpen(true); }}>Remarks</Button>
                               </div>
                             ) : (
@@ -1251,8 +1246,8 @@ const TaskMonitoring = () => {
               <Button variant="secondary" onClick={() => setIsDetailOpen(false)}>Close</Button>
               {currentUserRole !== 'employee' && (
                 <Button variant="danger" onClick={() => {
-                  showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, () => {
-                    deleteTask(selectedTask.id);
+                  showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, async () => {
+                    await deleteTask(selectedTask.id);
                     setIsDetailOpen(false);
                   }, 'danger');
                 }} icon={Trash2}>Delete</Button>

@@ -1,46 +1,84 @@
 /**
  * @file src/modules/payroll/payroll.controller.js
- * @description Controllers for Payroll module.
+ * @description Controllers mapping HTTP routes to Payroll services.
  */
 
 import service from './payroll.service.js';
 import { successResponse } from '../../utils/response.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
-export const getAll = asyncHandler(async (req, res) => {
-  const data = await service.findAll(req.query);
-  return successResponse(res, data, 'Records fetched successfully');
+export const getMasterData = asyncHandler(async (req, res) => {
+  const data = await service.getMasterPayrollData();
+  return successResponse(res, data, 'Master payroll data fetched successfully');
 });
 
-export const getById = asyncHandler(async (req, res) => {
-  const data = await service.findById(req.params.id);
-  return successResponse(res, data, 'Record fetched successfully');
+export const saveSalaryGrade = asyncHandler(async (req, res) => {
+  const data = await service.saveGrade(req.body, req.user);
+  return successResponse(res, data, 'Salary grade saved successfully');
 });
 
-export const create = asyncHandler(async (req, res) => {
-  const data = await service.createRecord(req.body, req.user);
-  return successResponse(res, data, 'Record created successfully', 201);
+export const deleteSalaryGrade = asyncHandler(async (req, res) => {
+  const data = await service.deleteGrade(req.params.id, req.user);
+  return successResponse(res, data, 'Salary grade deleted successfully');
 });
 
-export const update = asyncHandler(async (req, res) => {
-  const data = await service.updateRecord(req.params.id, req.body, req.user);
-  return successResponse(res, data, 'Record updated successfully');
+export const createLoanAdvance = asyncHandler(async (req, res) => {
+  const data = await service.createLoanAdvance(req.body, req.user);
+  return successResponse(res, data, 'Loan or Advance record created successfully', 201);
 });
 
-export const remove = asyncHandler(async (req, res) => {
-  const data = await service.deleteRecord(req.params.id, req.user);
-  return successResponse(res, data, 'Record deleted successfully');
+export const recommendBonus = asyncHandler(async (req, res) => {
+  const data = await service.createBonus(req.body, req.user);
+  return successResponse(res, data, 'Bonus recommendation submitted successfully', 201);
 });
 
-export const getPublicData = asyncHandler(async (req, res) => {
-  return successResponse(res, { status: 'mock_public_data' }, 'Public record fetched');
+export const updateBonusStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const data = await service.updateBonusStatus(id, status, req.user);
+  return successResponse(res, data, 'Bonus status updated successfully');
+});
+
+export const updateReimbursementStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const data = await service.updateReimbursementStatus(id, status, req.user);
+  return successResponse(res, data, 'Reimbursement status updated successfully');
+});
+
+export const saveMonthlyPayment = asyncHandler(async (req, res) => {
+  const data = await service.saveMonthlyPayment(req.body, req.user);
+  return successResponse(res, data, 'Monthly payment record saved successfully');
+});
+
+export const updatePaymentStatus = asyncHandler(async (req, res) => {
+  const { empId } = req.params;
+  const { month, year, status } = req.body;
+  const data = await service.updatePaymentStatus(empId, month, year, status, req.user);
+  return successResponse(res, data, 'Payment status updated successfully');
+});
+
+export const bulkUpdatePaymentStatus = asyncHandler(async (req, res) => {
+  const { month, year, status } = req.body;
+  const data = await service.bulkUpdatePaymentStatus(month, year, status, req.user);
+  return successResponse(res, data, 'Bulk payment statuses updated successfully');
+});
+
+export const saveGlobalConfigs = asyncHandler(async (req, res) => {
+  const data = await service.saveGlobalConfigs(req.body, req.user);
+  return successResponse(res, data, 'Global payroll configuration updated successfully');
 });
 
 export default {
-  getAll,
-  getById,
-  create,
-  update,
-  remove,
-  getPublicData
+  getMasterData,
+  saveSalaryGrade,
+  deleteSalaryGrade,
+  createLoanAdvance,
+  recommendBonus,
+  updateBonusStatus,
+  updateReimbursementStatus,
+  saveMonthlyPayment,
+  updatePaymentStatus,
+  bulkUpdatePaymentStatus,
+  saveGlobalConfigs
 };

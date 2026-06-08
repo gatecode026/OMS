@@ -380,11 +380,17 @@ const PROJECT_RANKINGS = [
   { name: 'Employee Wellness Portal', manager: 'Sunita Rao', progress: 40, score: 85, budget: '50%' }
 ];
 
-/* ═══════════════════════════════════════════════════════════
-   MAIN COMPONENT DEFINITION
-   ═══════════════════════════════════════════════════════════ */
 const Performance = () => {
-  const { addToast } = useApp();
+  const {
+    token,
+    employees: contextEmployees,
+    updateEmployee,
+    addToast,
+    departments,
+    branches,
+    appraisalReviews,
+    addAppraisalReview
+  } = useApp();
   const isLoading = usePageLoading(800);
 
   /* Simulated view perspective */
@@ -394,12 +400,56 @@ const Performance = () => {
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, directory, framework, goals, reviews, pips, audits
 
   /* Master States */
-  const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
-  const [goals, setGoals] = useState(SEED_GOALS);
-  const [reviews, setReviews] = useState(SEED_REVIEWS);
-  const [pips, setPips] = useState(SEED_PIPS);
+  const [employees, setEmployees] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [pips, setPips] = useState([]);
   const [alerts, setAlerts] = useState(SEED_ALERTS);
   const [auditLogs, setAuditLogs] = useState(SEED_AUDITS);
+
+  // Sync employees from context
+  React.useEffect(() => {
+    if (contextEmployees) {
+      setEmployees(contextEmployees);
+    }
+  }, [contextEmployees]);
+
+  // Sync reviews from context
+  React.useEffect(() => {
+    if (appraisalReviews) {
+      setReviews(appraisalReviews);
+    }
+  }, [appraisalReviews]);
+
+  // Fetch goals and pips from API
+  const fetchGoalsAndPips = async () => {
+    if (!token) return;
+    try {
+      // Fetch goals
+      const goalsRes = await fetch('http://localhost:5000/api/v1/performance/goals', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const goalsData = await goalsRes.json();
+      if (goalsData.status === 'success') {
+        setGoals(goalsData.data || []);
+      }
+
+      // Fetch pips
+      const pipsRes = await fetch('http://localhost:5000/api/v1/performance/pips', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const pipsData = await pipsRes.json();
+      if (pipsData.status === 'success') {
+        setPips(pipsData.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch goals and pips:', err);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchGoalsAndPips();
+  }, [token]);
 
   /* Weights framework states */
   const [weights, setWeights] = useState({
@@ -519,25 +569,46 @@ const Performance = () => {
   };
 
   /* OKR Goal wizard submit */
-  const handleGoalSubmit = (e) => {
+  const handleGoalSubmit = async (e) => {
     e.preventDefault();
     if (!goalForm.title.trim() || !goalForm.assignee.trim()) {
       addToast('danger', 'Please enter a goal title and select an assignee.');
       return;
     }
 
-    const newGoalId = `GOAL-${String(goals.length + 1).padStart(3, '0')}`;
-    const newGoal = {
-      ...goalForm,
-      id: newGoalId,
+    const payload = {
+      title: goalForm.title,
+      description: goalForm.description,
+      type: goalForm.type,
+      startDate: goalForm.startDate || new Date().toISOString().split('T')[0],
+      dueDate: goalForm.dueDate || new Date().toISOString().split('T')[0],
+      targetValue: Number(goalForm.targetValue),
+      currentProgress: Number(goalForm.currentProgress),
       status: Number(goalForm.currentProgress) >= Number(goalForm.targetValue) ? 'Completed' : 'In Progress',
-      completionPercentage: Math.min(100, Math.round((Number(goalForm.currentProgress) / Math.max(1, Number(goalForm.targetValue))) * 100))
+      assignee: goalForm.assignee,
+      department: goalForm.department
     };
 
-    setGoals(prev => [newGoal, ...prev]);
-    addAuditLog('Create OKR Goal', newGoalId, 'None', `Title: ${goalForm.title}`);
-    pushAlert(`New Goal Assigned: "${goalForm.title}" to ${goalForm.assignee}`, 'Goal Assignment');
-    addToast('success', `Goal "${goalForm.title}" assigned successfully.`);
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/performance/goals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addToast('success', `Goal "${goalForm.title}" assigned successfully.`);
+        fetchGoalsAndPips();
+      } else {
+        addToast('danger', result.message || 'Failed to assign goal.');
+      }
+    } catch (err) {
+      console.error('Failed to create goal:', err);
+      addToast('danger', 'Error creating goal.');
+    }
     
     // Reset goal form
     setGoalForm({
@@ -548,150 +619,177 @@ const Performance = () => {
   };
 
   /* OKR progress incremental booster */
-  const incrementGoalProgress = (id) => {
-    setGoals(prev =>
-      prev.map(g => {
-        if (g.id === id) {
-          const nextVal = Math.min(g.targetValue, g.currentProgress + 10);
-          const isDone = nextVal >= g.targetValue;
-          return {
-            ...g,
-            currentProgress: nextVal,
-            status: isDone ? 'Completed' : 'In Progress'
-          };
-        }
-        return g;
-      })
-    );
-    addToast('info', 'Goal progress updated by +10%');
+  const incrementGoalProgress = async (id) => {
+    const goal = goals.find(g => g.id === id || g._id === id);
+    if (!goal) return;
+
+    const nextVal = Math.min(goal.targetValue, goal.currentProgress + 10);
+    const isDone = nextVal >= goal.targetValue;
+    const payload = {
+      currentProgress: nextVal,
+      status: isDone ? 'Completed' : 'In Progress'
+    };
+
+    const targetId = goal._id || goal.id;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/performance/goals/${targetId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addToast('info', 'Goal progress updated by +10%');
+        fetchGoalsAndPips();
+      }
+    } catch (err) {
+      console.error('Failed to update goal progress:', err);
+    }
   };
 
   /* Appraisal Review submission */
-  const handleReviewSubmit = (e) => {
+  const handleReviewSubmit = async (e) => {
     e.preventDefault();
     if (!reviewForm.employeeName.trim() || !reviewForm.notes.trim()) {
       addToast('danger', 'Please select an employee and provide appraisal review notes.');
       return;
     }
 
-    const newRevId = `REV-${String(reviews.length + 1).padStart(3, '0')}`;
-    const newReview = {
-      ...reviewForm,
-      id: newRevId,
-      reviewer: userRole === 'Super Admin' ? 'Super Admin' : 'Aarav Sharma',
-      date: new Date().toISOString().split('T')[0]
-    };
+    try {
+      await addAppraisalReview({
+        employeeName: reviewForm.employeeName,
+        type: reviewForm.type,
+        period: reviewForm.period,
+        rating: reviewForm.rating,
+        notes: reviewForm.notes,
+        feedback: reviewForm.feedback,
+        recommendations: reviewForm.recommendations
+      });
 
-    setReviews(prev => [newReview, ...prev]);
+      // Mappings rating to numeric quality score
+      let mappedQuality = 80;
+      if (reviewForm.rating === 'Outstanding') mappedQuality = 100;
+      else if (reviewForm.rating === 'Excellent') mappedQuality = 92;
+      else if (reviewForm.rating === 'Good') mappedQuality = 84;
+      else if (reviewForm.rating === 'Average') mappedQuality = 72;
+      else if (reviewForm.rating === 'Needs Improvement') mappedQuality = 55;
 
-    // Map appraisal rating to numeric quality score
-    let mappedQuality = 80;
-    if (reviewForm.rating === 'Outstanding') mappedQuality = 100;
-    else if (reviewForm.rating === 'Excellent') mappedQuality = 92;
-    else if (reviewForm.rating === 'Good') mappedQuality = 84;
-    else if (reviewForm.rating === 'Average') mappedQuality = 72;
-    else if (reviewForm.rating === 'Needs Improvement') mappedQuality = 55;
+      // Update selected employee quality and final score
+      const emp = employees.find(e => e.name === reviewForm.employeeName);
+      if (emp && updateEmployee) {
+        await updateEmployee(emp.id, {
+          quality: mappedQuality,
+          lastReviewDate: new Date().toISOString().split('T')[0]
+        });
+      }
 
-    // Update selected employee quality and final score
-    setEmployees(prev =>
-      prev.map(emp => {
-        if (emp.name === reviewForm.employeeName) {
-          const updatedEmp = {
-            ...emp,
-            quality: mappedQuality,
-            lastReviewDate: newReview.date
-          };
-          updatedEmp.kpiScore = calculateFinalScore(updatedEmp, weights);
-          return updatedEmp;
-        }
-        return emp;
-      })
-    );
+      // Reset Review form
+      setReviewForm({
+        employeeName: '', type: 'Quarterly', period: 'Q2 2026', rating: 'Excellent',
+        notes: '', feedback: '', recommendations: ''
+      });
 
-    addAuditLog('Submit Appraisal Review', newRevId, 'None', `Rating: ${reviewForm.rating}`);
-    pushAlert(`Performance Appraisal submitted for ${reviewForm.employeeName}: ${reviewForm.rating}`, 'Review Completed');
-    addToast('success', `Appraisal review for ${reviewForm.employeeName} submitted.`);
-
-    // Reset Review form
-    setReviewForm({
-      employeeName: '', type: 'Quarterly', period: 'Q2 2026', rating: 'Excellent',
-      notes: '', feedback: '', recommendations: ''
-    });
-
-    // Close detail drawer if active
-    setSelectedEmp(null);
+      // Close detail drawer if active
+      setSelectedEmp(null);
+    } catch (err) {
+      console.error('Failed to submit appraisal review:', err);
+    }
   };
 
   /* PIP Resolution actions */
-  const resolvePip = (pipId, name) => {
-    setPips(prev => prev.filter(p => p.id !== pipId));
-    setEmployees(prev =>
-      prev.map(emp => {
-        if (emp.name === name) {
-          const updated = {
-            ...emp,
+  const resolvePip = async (pipId, name) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/performance/pips/${pipId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const emp = employees.find(e => e.name === name);
+        if (emp && updateEmployee) {
+          await updateEmployee(emp.id, {
             status: 'Active',
             productivity: Math.min(100, emp.productivity + 20),
             quality: Math.min(100, emp.quality + 15)
-          };
-          updated.kpiScore = calculateFinalScore(updated, weights);
-          return updated;
+          });
         }
-        return emp;
-      })
-    );
-    addAuditLog('Resolve PIP', pipId, 'Active PIP', 'Resolved (Active Status Restored)');
-    pushAlert(`PIP Plan resolved for ${name}. Employee status restored to Active.`, 'PIP Completed');
-    addToast('success', `Performance Improvement Plan resolved. ${name} is now restored to Active status.`);
+        addToast('success', `Performance Improvement Plan resolved. ${name} is now restored to Active status.`);
+        fetchGoalsAndPips();
+      }
+    } catch (err) {
+      console.error('Failed to resolve PIP:', err);
+    }
   };
 
   /* PIP Escalation logic */
-  const escalatePip = (pipId, name) => {
-    setPips(prev =>
-      prev.map(p => {
-        if (p.id === pipId) {
-          return { ...p, status: 'Escalated' };
-        }
-        return p;
-      })
-    );
-    addAuditLog('Escalate PIP', pipId, 'Active PIP', 'Escalated to Executive Board');
-    pushAlert(`PIP alert escalated to HR Director: ${name} goals not met.`, 'PIP Escalation');
-    addToast('warning', `PIP for ${name} escalated to HR Board.`);
+  const escalatePip = async (pipId, name) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/performance/pips/${pipId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'Escalated' })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addToast('warning', `PIP for ${name} escalated to HR Board.`);
+        fetchGoalsAndPips();
+      }
+    } catch (err) {
+      console.error('Failed to escalate PIP:', err);
+    }
   };
 
   /* Create new PIP submission */
-  const handlePipSubmit = (e) => {
+  const handlePipSubmit = async (e) => {
     e.preventDefault();
     if (!pipForm.employeeName.trim() || !pipForm.issuesIdentified.trim()) {
       addToast('danger', 'Please select an employee and describe performance issues.');
       return;
     }
 
-    const newPipId = `PIP-${String(pips.length + 1).padStart(3, '0')}`;
-    const newPip = {
-      ...pipForm,
-      id: newPipId,
+    const payload = {
+      employeeName: pipForm.employeeName,
+      issuesIdentified: pipForm.issuesIdentified,
+      improvementTargets: pipForm.improvementTargets,
+      reviewPeriod: pipForm.reviewPeriod,
+      actionPlan: pipForm.actionPlan,
       status: 'Active',
       reviewer: userRole === 'Super Admin' ? 'Super Admin' : 'Aarav Sharma',
       dateCreated: new Date().toISOString().split('T')[0]
     };
 
-    setPips(prev => [newPip, ...prev]);
-
-    // Change employee status in table to PIP
-    setEmployees(prev =>
-      prev.map(emp => {
-        if (emp.name === pipForm.employeeName) {
-          return { ...emp, status: 'PIP' };
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/performance/pips', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addToast('warning', `PIP successfully issued to ${pipForm.employeeName}. Status changed to PIP.`);
+        
+        // Change employee status in table to PIP
+        const emp = employees.find(e => e.name === pipForm.employeeName);
+        if (emp && updateEmployee) {
+          await updateEmployee(emp.id, { status: 'PIP' });
         }
-        return emp;
-      })
-    );
-
-    addAuditLog('Create PIP', newPipId, 'None', `Employee: ${pipForm.employeeName}`);
-    pushAlert(`Performance Improvement Plan (PIP) issued for ${pipForm.employeeName}`, 'PIP Opened');
-    addToast('warning', `PIP successfully issued to ${pipForm.employeeName}. Status changed to PIP.`);
+        
+        fetchGoalsAndPips();
+      }
+    } catch (err) {
+      console.error('Failed to create PIP:', err);
+    }
 
     // Reset PIP Form
     setPipForm({
@@ -890,11 +988,7 @@ const Performance = () => {
         {[
           { id: 'dashboard', label: 'Executive Dashboard', icon: <BarChart3 size={15} />, visible: true },
           { id: 'directory', label: 'Rankings Directory', icon: <Users size={15} />, visible: true },
-          { id: 'framework', label: 'KPI Framework Weights', icon: <Settings size={15} />, visible: userRole !== 'Employee' },
-          { id: 'goals', label: 'Goals & OKRs', icon: <Target size={15} />, visible: true },
-          { id: 'reviews', label: 'Appraisal Reviews', icon: <Star size={15} />, visible: true },
-          { id: 'pips', label: 'PIP (Improvement Plans)', icon: <AlertCircle size={15} />, visible: userRole !== 'Employee' },
-          { id: 'audits', label: 'Alerts & Security Audits', icon: <ShieldAlert size={15} />, visible: true }
+          { id: 'reviews', label: 'Appraisal Reviews', icon: <Star size={15} />, visible: true }
         ].filter(t => t.visible).map(t => (
           <button
             key={t.id}
@@ -1128,12 +1222,11 @@ const Performance = () => {
                     className="reports-select-filter"
                   >
                     <option value="All">All Departments</option>
-                    <option>Operations</option>
-                    <option>IT</option>
-                    <option>Engineering</option>
-                    <option>HR</option>
-                    <option>Sales</option>
-                    <option>Marketing</option>
+                    {(departments && departments.length > 0 ? departments : [
+                      { name: 'Operations' }, { name: 'IT' }, { name: 'Engineering' }, { name: 'HR' }, { name: 'Sales' }, { name: 'Marketing' }
+                    ]).map(d => (
+                      <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                    ))}
                   </select>
 
                   <select
@@ -1142,9 +1235,11 @@ const Performance = () => {
                     className="reports-select-filter"
                   >
                     <option value="All">All Branches</option>
-                    <option>Jaipur HQ</option>
-                    <option>Delhi Office</option>
-                    <option>Branch Office</option>
+                    {(branches && branches.length > 0 ? branches : [
+                      { name: 'Jaipur HQ' }, { name: 'Delhi Office' }, { name: 'Branch Office' }
+                    ]).map(b => (
+                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                    ))}
                   </select>
 
                   <select
