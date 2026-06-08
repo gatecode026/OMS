@@ -21,18 +21,37 @@ import {
   Target, Layers, BookOpen, Briefcase, Building, Monitor
 } from 'lucide-react';
 
+const getLocalDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeWorkMode = (mode) => {
+  if (!mode) return 'WFO';
+  const m = mode.trim().toUpperCase();
+  if (m === 'WFH' || m.includes('HOME')) return 'WFH';
+  if (m === 'HYBRID') return 'Hybrid';
+  return 'WFO';
+};
+
 const Attendance = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
   const {
     attendance,
     employees,
+    branches,
     updateAttendanceRecord,
     addAttendanceRecord,
     updateEmployee,
     addToast,
     currentUser,
-    currentUserRole
+    currentUserRole,
+    fetchAttendance,
+    fetchEmployees
   } = useApp();
 
   const scopedEmployees = useMemo(() => {
@@ -54,7 +73,7 @@ const Attendance = () => {
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [dateFilter, setDateFilter] = useState(getLocalDateString());
   const [deptFilter, setDeptFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [shiftFilter, setShiftFilter] = useState('');
@@ -73,7 +92,8 @@ const Attendance = () => {
     punchOut: '',
     totalHours: 0,
     status: 'Present',
-    source: 'Biometric'
+    source: 'Biometric',
+    workMode: 'WFO'
   });
 
   // Mark Attendance state
@@ -83,8 +103,8 @@ const Attendance = () => {
     employeeName: '',
     department: '',
     branch: '',
-    workMode: '',
-    date: new Date().toISOString().split('T')[0],
+    workMode: 'WFO',
+    date: getLocalDateString(),
     punchIn: '',
     punchOut: '',
     breakTime: '45 mins',
@@ -112,6 +132,46 @@ const Attendance = () => {
     employeeId: '',
     shift: 'Morning (09:00 AM - 06:00 PM)'
   });
+
+  // Manage Break state
+  const [breakModalOpen, setBreakModalOpen] = useState(false);
+  const [modalBreaks, setModalBreaks] = useState([]);
+  const [newBreakName, setNewBreakName] = useState('');
+  const [newBreakDuration, setNewBreakDuration] = useState('');
+
+  const globalBreaks = useMemo(() => {
+    // 1. Search for a record on the current dateFilter that has a non-empty breaks array (ignoring settings doc)
+    let recordWithBreaks = (attendance || []).find(
+      a => a.date === dateFilter && a.breaks && a.breaks.length > 0 && a.id !== 'SETTINGS-BREAKS'
+    );
+    // 2. If not found, look up any previous record in history with a non-empty breaks array
+    if (!recordWithBreaks) {
+      recordWithBreaks = (attendance || []).find(
+        a => a.breaks && a.breaks.length > 0 && a.id !== 'SETTINGS-BREAKS'
+      );
+    }
+    // 3. Fallback
+    if (recordWithBreaks) {
+      return recordWithBreaks.breaks;
+    }
+    return [
+      { breakType: 'Lunch Break', duration: 40 },
+      { breakType: 'Snacks Break', duration: 15 }
+    ];
+  }, [attendance, dateFilter]);
+
+  const totalBreakMinutes = useMemo(() => {
+    return globalBreaks.reduce((sum, b) => sum + (b.duration || 0), 0);
+  }, [globalBreaks]);
+
+  useEffect(() => {
+    if (breakModalOpen) {
+      setModalBreaks(globalBreaks.map(b => ({ ...b })));
+      setNewBreakName('');
+      setNewBreakDuration('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [breakModalOpen]);
 
   // Automation Rules State (with localStorage persistence)
   const [automationRules, setAutomationRules] = useState(() => {
@@ -159,45 +219,79 @@ const Attendance = () => {
     addToast('success', `${rule?.name} ${rule?.active ? 'disabled' : 'enabled'} successfully.`);
   };
 
-  // Get work mode counts (responds to filters)
-  const workModeStats = useMemo(() => {
-    const filteredEmployees = scopedEmployees.filter(e => {
-      const matchesSearch = searchQuery
-        ? e.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          e.id?.toLowerCase().includes(searchQuery.toLowerCase())
-        : true;
-      const matchesDept = deptFilter ? e.department === deptFilter : true;
-      const matchesBranch = branchFilter ? e.branch === branchFilter : true;
-      const matchesShift = shiftFilter ? e.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
-      return matchesSearch && matchesDept && matchesBranch && matchesShift;
-    });
-
-    const office = filteredEmployees.filter(e => e.workMode === 'Work From Office' || e.workMode === 'Office').length;
-    const wfh = filteredEmployees.filter(e => e.workMode === 'Work From Home' || e.workMode === 'WFH').length;
-    const hybrid = filteredEmployees.filter(e => e.workMode === 'Hybrid').length;
-    return { office, wfh, hybrid, total: filteredEmployees.length };
-  }, [scopedEmployees, searchQuery, deptFilter, branchFilter, shiftFilter]);
 
 
   // Modals Actions
   const handleOpenEdit = (record) => {
     setSelectedRecord(record);
     setEditFormData({
-      date: record.date || '',
-      punchIn: record.punchIn || '',
-      punchOut: record.punchOut || '',
+      date: record.date || getLocalDateString(),
+      punchIn: record.punchIn === '--:--' ? '' : (record.punchIn || ''),
+      punchOut: record.punchOut === '--:--' ? '' : (record.punchOut || ''),
       totalHours: record.totalHours || 0,
       status: record.status || 'Present',
-      source: record.source || 'Biometric'
+      source: record.source || 'Biometric',
+      workMode: record.workMode || 'WFO'
     });
     setEditModalOpen(true);
   };
 
   const handleEditSubmit = () => {
     if (!selectedRecord) return;
-    updateAttendanceRecord(selectedRecord.id, editFormData);
+    
+    const isNoPunch = editFormData.status === 'Absent' || editFormData.status === 'On Leave';
+    if (!isNoPunch && !editFormData.punchIn) {
+      addToast('error', 'Please enter Punch In time.');
+      return;
+    }
+    
+    const recordPayload = {
+      employeeId: selectedRecord.employeeId,
+      employeeName: selectedRecord.employeeName,
+      department: selectedRecord.department,
+      branch: selectedRecord.branch,
+      date: editFormData.date || selectedRecord.date,
+      punchIn: isNoPunch ? '--:--' : (editFormData.punchIn || '--:--'),
+      punchOut: isNoPunch ? '--:--' : (editFormData.punchOut || '--:--'),
+      breakTime: '45 mins',
+      totalHours: isNoPunch ? 0 : (parseFloat(editFormData.totalHours) || 0),
+      status: editFormData.status,
+      source: isNoPunch ? 'System' : editFormData.source,
+      workMode: isNoPunch ? '' : normalizeWorkMode(editFormData.workMode),
+      overtime: !isNoPunch && editFormData.totalHours > 8 ? `${(editFormData.totalHours - 8).toFixed(1)} hrs` : '0 hrs'
+    };
+
+    if (selectedRecord.isVirtual) {
+      addAttendanceRecord(recordPayload);
+    } else {
+      updateAttendanceRecord(selectedRecord.id, recordPayload);
+    }
+    
     setEditModalOpen(false);
     addToast('success', 'Attendance record updated successfully.');
+  };
+
+  const handleEditAutoPunchIn = () => {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    setEditFormData(prev => ({ ...prev, punchIn: timeString }));
+    addToast('info', `Punch In time set to ${timeString}`);
+  };
+
+  const handleEditAutoPunchOut = () => {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    
+    if (editFormData.punchIn) {
+      const punchInTime = new Date(`2000/01/01 ${editFormData.punchIn}`);
+      const punchOutTime = new Date(`2000/01/01 ${timeString}`);
+      const diffHours = (punchOutTime - punchInTime) / (1000 * 60 * 60);
+      const totalHours = Math.round(diffHours * 10) / 10;
+      setEditFormData(prev => ({ ...prev, punchOut: timeString, totalHours: totalHours > 0 ? totalHours : 0 }));
+    } else {
+      setEditFormData(prev => ({ ...prev, punchOut: timeString }));
+    }
+    addToast('info', `Punch Out time set to ${timeString}`);
   };
 
   // Auto-set current time for punch in
@@ -232,7 +326,8 @@ const Attendance = () => {
       return;
     }
     
-    if (!markFormData.punchIn) {
+    const isNoPunch = markFormData.status === 'Absent' || markFormData.status === 'On Leave';
+    if (!isNoPunch && !markFormData.punchIn) {
       addToast('error', 'Please enter Punch In time.');
       return;
     }
@@ -244,11 +339,12 @@ const Attendance = () => {
       employeeName: markFormData.employeeName,
       department: markFormData.department || empData?.department || 'Engineering',
       branch: markFormData.branch || empData?.branch || 'Jaipur',
-      workMode: markFormData.workMode || empData?.workMode || 'Work From Office',
+      workMode: normalizeWorkMode(markFormData.workMode || empData?.workMode || 'WFO'),
       date: markFormData.date,
       punchIn: markFormData.punchIn,
       punchOut: markFormData.punchOut || '--:--',
-      breakTime: markFormData.breakTime,
+      breakTime: `${totalBreakMinutes} mins`,
+      breaks: globalBreaks,
       totalHours: parseFloat(markFormData.totalHours) || 0,
       status: markFormData.status,
       source: markFormData.source,
@@ -261,8 +357,8 @@ const Attendance = () => {
       employeeName: '',
       department: '',
       branch: '',
-      workMode: '',
-      date: new Date().toISOString().split('T')[0],
+      workMode: 'WFO',
+      date: getLocalDateString(),
       punchIn: '',
       punchOut: '',
       breakTime: '45 mins',
@@ -280,9 +376,85 @@ const Attendance = () => {
     }
     const empData = employees.find(e => e.id === shiftFormData.employeeId);
     if (!empData) return;
-    updateEmployee(shiftFormData.employeeId, { shift: shiftFormData.shift });
-    addToast('success', `Assigned ${shiftFormData.shift} to ${empData.name}`);
+
+    // Find if a real attendance record exists for this employee on this date
+    const existingRecord = (attendance || []).find(
+      a => a.employeeId === shiftFormData.employeeId && a.date === dateFilter
+    );
+
+    if (existingRecord) {
+      updateAttendanceRecord(existingRecord.id, {
+        ...existingRecord,
+        shift: shiftFormData.shift
+      });
+    } else {
+      const newRecord = {
+        id: `ATT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        employeeId: shiftFormData.employeeId,
+        employeeName: empData.name,
+        department: empData.department || 'Engineering',
+        branch: empData.branch || 'Jaipur',
+        workMode: empData.workMode || 'WFO',
+        date: dateFilter,
+        punchIn: '--:--',
+        punchOut: '--:--',
+        breakTime: `${totalBreakMinutes} mins`,
+        breaks: globalBreaks,
+        totalHours: 0,
+        status: 'Absent',
+        source: 'System',
+        shift: shiftFormData.shift,
+        overtime: '0 hrs'
+      };
+      addAttendanceRecord(newRecord);
+    }
+
+    addToast('success', `Assigned temporary shift ${shiftFormData.shift} to ${empData.name} for ${dateFilter}`);
     setShiftModalOpen(false);
+  };
+
+  const handleAddNewBreakToList = () => {
+    if (!newBreakName.trim()) {
+      addToast('error', 'Please enter a break name.');
+      return;
+    }
+    const duration = parseInt(newBreakDuration) || 0;
+    if (duration <= 0) {
+      addToast('error', 'Please enter a valid duration greater than 0.');
+      return;
+    }
+    setModalBreaks(prev => [...prev, { breakType: newBreakName.trim(), duration }]);
+    setNewBreakName('');
+    setNewBreakDuration('');
+    addToast('success', `Added ${newBreakName.trim()} to local list.`);
+  };
+
+  const handleSaveBreaksConfig = async () => {
+    const totalMins = modalBreaks.reduce((sum, b) => sum + (b.duration || 0), 0);
+    const todayRecords = (attendance || []).filter(
+      a => a.date === dateFilter && a.id !== 'SETTINGS-BREAKS'
+    );
+
+    try {
+      if (todayRecords.length > 0) {
+        await Promise.all(
+          todayRecords.map(record =>
+            updateAttendanceRecord(record.id, {
+              ...record,
+              breaks: modalBreaks,
+              breakTime: `${totalMins} mins`
+            })
+          )
+        );
+        addToast('success', `Updated breaks configuration for all ${todayRecords.length} active employee logs.`);
+      } else {
+        addToast('info', 'No active attendance logs found for today. New logs created today will use this configuration.');
+      }
+      setBreakModalOpen(false);
+    } catch (err) {
+      console.error('Failed to save breaks config:', err);
+      addToast('error', 'Failed to save configuration.');
+    }
   };
 
   const handleRequestAttendance = () => {
@@ -315,9 +487,12 @@ const Attendance = () => {
 
   // Process and Filter Attendance Ledger
   const ledgerData = useMemo(() => {
-    const scopedAttendance = attendance.filter(item => {
+    if (!dateFilter) return [];
+    
+    // 1. Filter attendance records by role
+    const scopedAttendance = (attendance || []).filter(item => {
       if (!currentUserRole || currentUserRole === 'super_admin') return true;
-      const emp = employees.find(e => e.id === item.employeeId || e.name === item.employeeName);
+      const emp = (employees || []).find(e => e.id === item.employeeId || e.name === item.employeeName);
       if (currentUserRole === 'branch_admin') {
         return emp?.branch === currentUser?.branch;
       }
@@ -330,8 +505,12 @@ const Attendance = () => {
       return true;
     });
 
-    return scopedAttendance.map(item => {
-      const empDetails = employees.find(e => e.id === item.employeeId || e.name === item.employeeName);
+    // 2. Filter local scoped attendance by selected date
+    const dayRecords = scopedAttendance.filter(item => item.date === dateFilter);
+    
+    // 3. Map actual records to include employee details
+    const records = dayRecords.map(item => {
+      const empDetails = (scopedEmployees || []).find(e => e.id === item.employeeId || e.name === item.employeeName);
       let status = item.status;
       if ((status === 'On Leave' || status === 'Leave') && empDetails && empDetails.leaveHistory) {
         const foundLeave = empDetails.leaveHistory.find(l => 
@@ -348,14 +527,101 @@ const Attendance = () => {
         ...item,
         status,
         employeeId: item.employeeId || empDetails?.id || 'EMP-2026-999',
-        shift: empDetails?.shift || 'Flexible (09:00 AM - 06:00 PM)',
+        shift: item.shift || empDetails?.shift || 'Flexible (09:00 AM - 06:00 PM)',
         source: item.source || 'Biometric',
         breakTime: item.breakTime || '45 mins',
-        workMode: item.workMode || empDetails?.workMode || 'Work From Office',
+        workMode: item.workMode || empDetails?.workMode || 'WFO',
         overtime: item.overtime || (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
       };
     });
-  }, [attendance, employees, currentUserRole, currentUser]);
+    
+    // 4. For any employee in scopedEmployees who doesn't have a record on this date, create a virtual 'Absent' record
+    const markedEmpIds = new Set(records.map(r => r.employeeId));
+    
+    (scopedEmployees || []).forEach(emp => {
+      if (!emp || markedEmpIds.has(emp.id)) return;
+      
+      records.push({
+        id: `ABS-${emp.id}-${dateFilter}`,
+        employeeId: emp.id,
+        employeeName: emp.name,
+        department: emp.department || 'Engineering',
+        branch: emp.branch || 'Jaipur',
+        date: dateFilter,
+        punchIn: '--:--',
+        punchOut: '--:--',
+        totalHours: 0,
+        status: 'Absent',
+        source: 'System',
+        breakTime: '45 mins',
+        workMode: emp.workMode || 'WFO',
+        shift: emp.shift || 'Flexible (09:00 AM - 06:00 PM)',
+        overtime: '0 hrs',
+        isVirtual: true
+      });
+    });
+    
+    return records;
+  }, [attendance, employees, scopedEmployees, currentUserRole, currentUser, dateFilter]);
+
+  // Filtered attendance for KPIs (ignores statusFilter and workModeFilter so counts don't zero out on card selection)
+  const kpiFilteredAttendance = useMemo(() => {
+    return ledgerData.filter(a => {
+      const matchesSearch = searchQuery
+        ? a.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          a.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
+        : true;
+      const matchesDate = dateFilter ? a.date === dateFilter : true;
+      const matchesDept = deptFilter ? a.department === deptFilter : true;
+      const matchesBranch = branchFilter ? a.branch === branchFilter : true;
+      const matchesShift = shiftFilter ? a.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
+      const matchesSource = sourceFilter ? a.source?.toLowerCase() === sourceFilter.toLowerCase() : true;
+
+      return matchesSearch && matchesDate && matchesDept && matchesBranch && matchesShift && matchesSource;
+    });
+  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, sourceFilter]);
+
+  // Get work mode counts (responds to filters and updates in real-time)
+  const workModeStats = useMemo(() => {
+    const filteredEmployees = (scopedEmployees || []).filter(e => {
+      if (!e) return false;
+      const matchesSearch = searchQuery
+        ? e.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          e.id?.toLowerCase().includes(searchQuery.toLowerCase())
+        : true;
+      const matchesDept = deptFilter ? e.department === deptFilter : true;
+      const matchesBranch = branchFilter ? e.branch === branchFilter : true;
+      const matchesShift = shiftFilter ? e.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
+      return matchesSearch && matchesDept && matchesBranch && matchesShift;
+    });
+
+    let office = 0;
+    let wfh = 0;
+    let hybrid = 0;
+
+    filteredEmployees.forEach(e => {
+      if (!e) return;
+      const todayRecord = (kpiFilteredAttendance || []).find(a => a?.employeeId === e.id);
+      
+      // Only count if they have a real attendance record and are not absent or on leave
+      if (!todayRecord || todayRecord.isVirtual) return;
+      
+      const status = todayRecord.status ? todayRecord.status.toLowerCase() : '';
+      if (status === 'absent' || status.includes('leave')) return;
+
+      const activeMode = todayRecord.workMode || e.workMode || 'WFO';
+      const normMode = normalizeWorkMode(activeMode);
+      if (normMode === 'WFH') {
+        wfh++;
+      } else if (normMode === 'Hybrid') {
+        hybrid++;
+      } else {
+        office++;
+      }
+    });
+
+    return { office, wfh, hybrid, total: office + wfh + hybrid };
+  }, [scopedEmployees, kpiFilteredAttendance, searchQuery, deptFilter, branchFilter, shiftFilter]);
 
   // Filter Predicates
   const filteredAttendance = useMemo(() => {
@@ -375,28 +641,14 @@ const Attendance = () => {
           )
         : true;
       const matchesSource = sourceFilter ? a.source?.toLowerCase() === sourceFilter.toLowerCase() : true;
-      const matchesWorkMode = workModeFilter ? a.workMode === workModeFilter : true;
+      const matchesWorkMode = workModeFilter
+        ? normalizeWorkMode(a.workMode) === normalizeWorkMode(workModeFilter)
+        : true;
 
       return matchesSearch && matchesDate && matchesDept && matchesBranch && matchesShift && matchesStatus && matchesSource && matchesWorkMode;
     });
   }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, statusFilter, sourceFilter, workModeFilter]);
 
-  // Filtered attendance for KPIs (ignores statusFilter and workModeFilter so counts don't zero out on card selection)
-  const kpiFilteredAttendance = useMemo(() => {
-    return ledgerData.filter(a => {
-      const matchesSearch = searchQuery
-        ? a.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          a.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
-        : true;
-      const matchesDate = dateFilter ? a.date === dateFilter : true;
-      const matchesDept = deptFilter ? a.department === deptFilter : true;
-      const matchesBranch = branchFilter ? a.branch === branchFilter : true;
-      const matchesShift = shiftFilter ? a.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
-      const matchesSource = sourceFilter ? a.source?.toLowerCase() === sourceFilter.toLowerCase() : true;
-
-      return matchesSearch && matchesDate && matchesDept && matchesBranch && matchesShift && matchesSource;
-    });
-  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, sourceFilter]);
 
   // Calculations for Summary Statistics based on active filters
   const filteredEmployeesCount = useMemo(() => {
@@ -457,11 +709,12 @@ const Attendance = () => {
 
   // Work mode badge helper
   const getWorkModeBadge = (workMode) => {
-    if (workMode === 'Work From Office' || workMode === 'Office') {
-      return <Badge variant="primary">🏢 Office</Badge>;
-    } else if (workMode === 'Work From Home' || workMode === 'WFH') {
+    const mode = normalizeWorkMode(workMode);
+    if (mode === 'WFO') {
+      return <Badge variant="primary">🏢 WFO</Badge>;
+    } else if (mode === 'WFH') {
       return <Badge variant="info">🏠 WFH</Badge>;
-    } else if (workMode === 'Hybrid') {
+    } else if (mode === 'Hybrid') {
       return <Badge variant="warning">🔄 Hybrid</Badge>;
     }
     return <Badge variant="neutral">—</Badge>;
@@ -518,7 +771,12 @@ const Attendance = () => {
       { key: 'shift', header: FIELD_LABELS.shiftTiming, sortable: true },
       { key: 'punchIn', header: FIELD_LABELS.punchInTime, sortable: true },
       { key: 'punchOut', header: FIELD_LABELS.punchOutTime, sortable: true },
-      { key: 'breakTime', header: 'Break', sortable: true },
+      {
+        key: 'breakTime',
+        header: 'Break',
+        sortable: true,
+        render: (row) => <span>{totalBreakMinutes} mins</span>
+      },
       {
         key: 'totalHours',
         header: FIELD_LABELS.workingHours,
@@ -570,21 +828,53 @@ const Attendance = () => {
 
   // Branch data for Branch Management
   const branchData = useMemo(() => {
-    const branches = ['Jaipur', 'Delhi', 'Mumbai', 'Bangalore'];
-    return branches.map(branch => {
-      const branchEmployees = scopedEmployees.filter(e => e.branch === branch);
-      const activeToday = filteredAttendance.filter(a => a.branch === branch && ['Present', 'Overtime'].includes(a.status)).length;
+    const dbBranches = branches && branches.length > 0 
+      ? branches.map(b => b?.name).filter(Boolean) 
+      : Array.from(new Set((scopedEmployees || []).map(e => e?.branch).filter(Boolean)));
+    
+    const finalBranches = dbBranches.length > 0 ? dbBranches : ['Jaipur Branch'];
+
+    return finalBranches.map(branchName => {
+      const branchEmployees = (scopedEmployees || []).filter(e => e?.branch === branchName);
+      let officeCount = 0;
+      let wfhCount = 0;
+      let hybridCount = 0;
+      let activeToday = 0;
+
+      branchEmployees.forEach(e => {
+        if (!e) return;
+        const todayRecord = (kpiFilteredAttendance || []).find(a => a?.employeeId === e.id);
+        
+        // Only count if they have a real attendance record and are not absent or on leave
+        if (!todayRecord || todayRecord.isVirtual) return;
+        
+        const status = todayRecord.status ? todayRecord.status.toLowerCase() : '';
+        if (status === 'absent' || status.includes('leave')) return;
+
+        activeToday++;
+
+        const activeMode = todayRecord.workMode || e.workMode || 'WFO';
+        const normMode = normalizeWorkMode(activeMode);
+        if (normMode === 'WFH') {
+          wfhCount++;
+        } else if (normMode === 'Hybrid') {
+          hybridCount++;
+        } else {
+          officeCount++;
+        }
+      });
+
       return {
-        name: branch,
+        name: branchName,
         total: branchEmployees.length,
         active: activeToday,
-        office: branchEmployees.filter(e => e.workMode === 'Work From Office' || e.workMode === 'Office').length,
-        wfh: branchEmployees.filter(e => e.workMode === 'Work From Home' || e.workMode === 'WFH').length,
-        hybrid: branchEmployees.filter(e => e.workMode === 'Hybrid').length,
+        office: officeCount,
+        wfh: wfhCount,
+        hybrid: hybridCount,
         rate: branchEmployees.length > 0 ? Math.round((activeToday / branchEmployees.length) * 100) : 0
       };
     });
-  }, [scopedEmployees, filteredAttendance]);
+  }, [branches, scopedEmployees, kpiFilteredAttendance]);
 
   // Live punch feed data with real employees
   const livePunchFeed = useMemo(() => {
@@ -630,13 +920,20 @@ const Attendance = () => {
           </div>
         </div>
         <div className="att-header-actions">
-          <Button variant="secondary" onClick={() => addToast('info', 'Refreshing live data...')} icon={RefreshCw} size="sm">
+          <Button variant="secondary" onClick={async () => {
+            addToast('info', 'Refreshing live data...');
+            await Promise.all([fetchAttendance(), fetchEmployees()]);
+            addToast('success', 'Data refreshed successfully.');
+          }} icon={RefreshCw} size="sm">
             Refresh
           </Button>
           {currentUserRole !== 'employee' && (
             <>
               <Button variant="secondary" onClick={() => setShiftModalOpen(true)} icon={Clock} size="sm">
                 Assign Shift
+              </Button>
+              <Button variant="secondary" onClick={() => setBreakModalOpen(true)} icon={Coffee} size="sm">
+                Manage Breaks
               </Button>
               <Button variant="secondary" onClick={handleApproveAll} icon={ShieldCheck} size="sm">
                 Approve All
@@ -649,22 +946,31 @@ const Attendance = () => {
         </div>
       </div>
 
-      {/* ═══ Work Mode Cards (Office/WFH/Hybrid) - CLICKABLE ═══ */}
+      {/* ═══ Work Mode Cards (Total/WFH/WFO/Hybrid) - CLICKABLE ═══ */}
       <div className="att-workmode-strip">
-        <div className="att-workmode-card att-workmode-office" onClick={() => navigateToRecordsWithFilter('workMode', 'Work From Office')}>
-          <div className="att-workmode-icon"><Building size={24} /></div>
+        <div className="att-workmode-card att-workmode-total" onClick={() => navigateToRecordsWithFilter('workMode', '')}>
+          <div className="att-workmode-icon"><Users size={24} /></div>
           <div className="att-workmode-info">
-            <span className="att-workmode-label">OFFICE</span>
-            <span className="att-workmode-count">{workModeStats.office}</span>
+            <span className="att-workmode-label">Total Attendance</span>
+            <span className="att-workmode-count">{workModeStats.total}</span>
             <span className="att-workmode-sub">Employees today</span>
           </div>
           <ChevronRight size={16} className="att-workmode-arrow" />
         </div>
-        <div className="att-workmode-card att-workmode-wfh" onClick={() => navigateToRecordsWithFilter('workMode', 'Work From Home')}>
+        <div className="att-workmode-card att-workmode-wfh" onClick={() => navigateToRecordsWithFilter('workMode', 'WFH')}>
           <div className="att-workmode-icon"><Home size={24} /></div>
           <div className="att-workmode-info">
-            <span className="att-workmode-label">WORK FROM HOME</span>
+            <span className="att-workmode-label">WFH</span>
             <span className="att-workmode-count">{workModeStats.wfh}</span>
+            <span className="att-workmode-sub">Employees today</span>
+          </div>
+          <ChevronRight size={16} className="att-workmode-arrow" />
+        </div>
+        <div className="att-workmode-card att-workmode-office" onClick={() => navigateToRecordsWithFilter('workMode', 'WFO')}>
+          <div className="att-workmode-icon"><Building size={24} /></div>
+          <div className="att-workmode-info">
+            <span className="att-workmode-label">WFO</span>
+            <span className="att-workmode-count">{workModeStats.office}</span>
             <span className="att-workmode-sub">Employees today</span>
           </div>
           <ChevronRight size={16} className="att-workmode-arrow" />
@@ -672,7 +978,7 @@ const Attendance = () => {
         <div className="att-workmode-card att-workmode-hybrid" onClick={() => navigateToRecordsWithFilter('workMode', 'Hybrid')}>
           <div className="att-workmode-icon"><RefreshCw size={24} /></div>
           <div className="att-workmode-info">
-            <span className="att-workmode-label">HYBRID</span>
+            <span className="att-workmode-label">Hybrid</span>
             <span className="att-workmode-count">{workModeStats.hybrid}</span>
             <span className="att-workmode-sub">Employees today</span>
           </div>
@@ -879,26 +1185,26 @@ const Attendance = () => {
             {/* Work Mode Distribution */}
             <div className="att-dept-breakdown">
               <div className="att-section-mini-title">Work Mode Distribution</div>
-              <div className="att-dept-row" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('workMode', 'Work From Office')}>
-                <span className="att-dept-name">🏢 Office</span>
+              <div className="att-dept-row" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('workMode', 'WFO')}>
+                <span className="att-dept-name">🏢 WFO</span>
                 <div className="att-dept-bar-wrap">
-                  <div className="att-dept-bar-fill" style={{ width: `${(workModeStats.office / totalEmployees) * 100}%`, background: '#3b82f6' }} />
+                  <div className="att-dept-bar-fill" style={{ width: `${workModeStats.total > 0 ? (workModeStats.office / workModeStats.total) * 100 : 0}%`, background: '#3b82f6' }} />
                 </div>
-                <span className="att-dept-count">{workModeStats.office}/{totalEmployees}</span>
+                <span className="att-dept-count">{workModeStats.office}/{workModeStats.total}</span>
               </div>
-              <div className="att-dept-row" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('workMode', 'Work From Home')}>
-                <span className="att-dept-name">🏠 Work From Home</span>
+              <div className="att-dept-row" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('workMode', 'WFH')}>
+                <span className="att-dept-name">🏠 WFH</span>
                 <div className="att-dept-bar-wrap">
-                  <div className="att-dept-bar-fill" style={{ width: `${(workModeStats.wfh / totalEmployees) * 100}%`, background: '#10b981' }} />
+                  <div className="att-dept-bar-fill" style={{ width: `${workModeStats.total > 0 ? (workModeStats.wfh / workModeStats.total) * 100 : 0}%`, background: '#10b981' }} />
                 </div>
-                <span className="att-dept-count">{workModeStats.wfh}/{totalEmployees}</span>
+                <span className="att-dept-count">{workModeStats.wfh}/{workModeStats.total}</span>
               </div>
               <div className="att-dept-row" style={{ cursor: 'pointer' }} onClick={() => navigateToRecordsWithFilter('workMode', 'Hybrid')}>
                 <span className="att-dept-name">🔄 Hybrid</span>
                 <div className="att-dept-bar-wrap">
-                  <div className="att-dept-bar-fill" style={{ width: `${(workModeStats.hybrid / totalEmployees) * 100}%`, background: '#f59e0b' }} />
+                  <div className="att-dept-bar-fill" style={{ width: `${workModeStats.total > 0 ? (workModeStats.hybrid / workModeStats.total) * 100 : 0}%`, background: '#f59e0b' }} />
                 </div>
-                <span className="att-dept-count">{workModeStats.hybrid}/{totalEmployees}</span>
+                <span className="att-dept-count">{workModeStats.hybrid}/{workModeStats.total}</span>
               </div>
             </div>
           </div>
@@ -1022,10 +1328,9 @@ const Attendance = () => {
               </select>
               <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
                 <option value="">All Branches</option>
-                <option value="Jaipur">Jaipur</option>
-                <option value="Delhi">Delhi</option>
-                <option value="Mumbai">Mumbai</option>
-                <option value="Bangalore">Bangalore</option>
+                {(branches && branches.length > 0 ? branches.map(b => b.name) : Array.from(new Set(employees.map(e => e.branch).filter(Boolean)))).map(branchName => (
+                  <option key={branchName} value={branchName}>{branchName}</option>
+                ))}
               </select>
               <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}>
                 <option value="">All Shifts</option>
@@ -1035,17 +1340,22 @@ const Attendance = () => {
                 <option value="Flexible">Flexible</option>
               </select>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">All Statuses</option>
+                <option value="">Select</option>
                 <option value="Present">Present</option>
                 <option value="Late">Late</option>
                 <option value="Absent">Absent</option>
                 <option value="Half Day">Half Day</option>
-                <option value="Work From Home">WFH</option>
                 <option value="On Leave">On Leave</option>
                 <option value="Overtime">Overtime</option>
               </select>
+              <select value={workModeFilter} onChange={(e) => setWorkModeFilter(e.target.value)}>
+                <option value="">Select</option>
+                <option value="WFO">WFO</option>
+                <option value="WFH">WFH</option>
+                <option value="Hybrid">Hybrid</option>
+              </select>
               <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
-                <option value="">All Sources</option>
+                <option value="">Select</option>
                 <option value="Biometric">Biometric</option>
                 <option value="GPS">GPS</option>
                 <option value="RFID">RFID</option>
@@ -1219,39 +1529,39 @@ const Attendance = () => {
             </div>
             <div className="att-branches-list">
               {branchData.map((branch, i) => (
-                <div key={i} className="att-branch-item" onClick={() => navigateToRecordsWithFilter('branch', branch.name)} style={{ cursor: 'pointer' }}>
+                <div key={i} className="att-branch-item" onClick={() => navigateToRecordsWithFilter('branch', branch?.name)} style={{ cursor: 'pointer' }}>
                   <div className="att-branch-icon">
-                    {branch.name === 'Jaipur' ? '🕌' : branch.name === 'Delhi' ? '🏛️' : branch.name === 'Mumbai' ? '🌊' : '🏙️'}
+                    {(branch?.name || '').toLowerCase().includes('jaipur') ? '🕌' : (branch?.name || '').toLowerCase().includes('delhi') ? '🏛️' : (branch?.name || '').toLowerCase().includes('mumbai') ? '🌊' : '🏙️'}
                   </div>
                   <div className="att-branch-info">
-                    <strong>{branch.name}</strong>
+                    <strong>{branch?.name || 'Unknown Branch'}</strong>
                     <span className="att-branch-address">
-                      {branch.name === 'Jaipur' ? 'Malviya Nagar' : 
-                       branch.name === 'Delhi' ? 'Connaught Place' : 
-                       branch.name === 'Mumbai' ? 'BKC' : 'MG Road'}
+                      {(branch?.name || '').toLowerCase().includes('jaipur') ? 'Malviya Nagar' : 
+                       (branch?.name || '').toLowerCase().includes('delhi') ? 'Connaught Place' : 
+                       (branch?.name || '').toLowerCase().includes('mumbai') ? 'BKC' : 'MG Road'}
                     </span>
                   </div>
                   <div className="att-branch-stats">
                     <div className="att-branch-stat">
-                      <span>{branch.total}</span>
+                      <span>{branch?.total || 0}</span>
                       <span>Total</span>
                     </div>
                     <div className="att-branch-stat">
-                      <span style={{ color: '#4ade80' }}>{branch.active}</span>
+                      <span style={{ color: '#4ade80' }}>{branch?.active || 0}</span>
                       <span>Active</span>
                     </div>
                     <div className="att-branch-stat">
-                      <span style={{ color: '#f87171' }}>{branch.total - branch.active}</span>
+                      <span style={{ color: '#f87171' }}>{(branch?.total || 0) - (branch?.active || 0)}</span>
                       <span>Absent</span>
                     </div>
                   </div>
                   <div className="att-branch-bar-wrap">
-                    <div className="att-branch-bar-fill" style={{ width: `${branch.rate}%` }} />
+                    <div className="att-branch-bar-fill" style={{ width: `${branch?.rate || 0}%` }} />
                   </div>
                   <div className="att-branch-workmode">
-                    <span title="Office">🏢 {branch.office}</span>
-                    <span title="WFH">🏠 {branch.wfh}</span>
-                    <span title="Hybrid">🔄 {branch.hybrid}</span>
+                    <span title="Office">🏢 {branch?.office || 0}</span>
+                    <span title="WFH">🏠 {branch?.wfh || 0}</span>
+                    <span title="Hybrid">🔄 {branch?.hybrid || 0}</span>
                   </div>
                 </div>
               ))}
@@ -1270,11 +1580,11 @@ const Attendance = () => {
               <div className="att-branch-summary">
                 {branchData.map((branch, i) => (
                   <div key={i} className="att-branch-summary-row">
-                    <div className="att-branch-summary-name">{branch.name}</div>
+                    <div className="att-branch-summary-name">{branch?.name || 'Unknown'}</div>
                     <div className="att-branch-summary-bar">
-                      <div className="att-branch-summary-fill" style={{ width: `${branch.rate}%`, background: branch.rate > 80 ? '#4ade80' : branch.rate > 60 ? '#fbbf24' : '#f87171' }} />
+                      <div className="att-branch-summary-fill" style={{ width: `${branch?.rate || 0}%`, background: (branch?.rate || 0) > 80 ? '#4ade80' : (branch?.rate || 0) > 60 ? '#fbbf24' : '#f87171' }} />
                     </div>
-                    <div className="att-branch-summary-rate">{branch.rate}%</div>
+                    <div className="att-branch-summary-rate">{branch?.rate || 0}%</div>
                   </div>
                 ))}
               </div>
@@ -1291,11 +1601,11 @@ const Attendance = () => {
               <div className="att-branch-workmode-list">
                 {branchData.map((branch, i) => (
                   <div key={i} className="att-branch-wm-row">
-                    <strong>{branch.name}</strong>
+                    <strong>{branch?.name || 'Unknown'}</strong>
                     <div className="att-branch-wm-stats">
-                      <span className="att-wm-office">🏢 {branch.office}</span>
-                      <span className="att-wm-wfh">🏠 {branch.wfh}</span>
-                      <span className="att-wm-hybrid">🔄 {branch.hybrid}</span>
+                      <span className="att-wm-office">🏢 {branch?.office || 0}</span>
+                      <span className="att-wm-wfh">🏠 {branch?.wfh || 0}</span>
+                      <span className="att-wm-hybrid">🔄 {branch?.hybrid || 0}</span>
                     </div>
                   </div>
                 ))}
@@ -1391,7 +1701,7 @@ const Attendance = () => {
                       key={range} 
                       className="att-range-btn"
                       onClick={() => {
-                        if (range === 'Today') setDateFilter(new Date().toISOString().split('T')[0]);
+                        if (range === 'Today') setDateFilter(getLocalDateString());
                         addToast('info', `${range} report selected`);
                       }}
                     >
@@ -1455,59 +1765,103 @@ const Attendance = () => {
             <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
               <div>
                 <label>Employee Name</label>
-                <input type="text" value={selectedRecord.employeeName} disabled style={{ opacity: 0.7, cursor: 'not-allowed', background: 'rgba(255,255,255,0.02)' }} />
+                <input type="text" value={selectedRecord.employeeName} disabled style={{ opacity: 0.7, cursor: 'not-allowed', background: 'rgba(255,255,255,0.02)', width: '100%', height: '38px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
               </div>
               <div>
                 <label>Branch / Office</label>
-                <input type="text" value={selectedRecord.branch} disabled style={{ opacity: 0.7, cursor: 'not-allowed', background: 'rgba(255,255,255,0.02)' }} />
+                <input type="text" value={selectedRecord.branch} disabled style={{ opacity: 0.7, cursor: 'not-allowed', background: 'rgba(255,255,255,0.02)', width: '100%', height: '38px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
               </div>
             </div>
-            <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-              <div>
-                <label>Punch In Time</label>
-                <input type="text" placeholder="e.g. 09:00 AM" value={editFormData.punchIn}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, punchIn: e.target.value }))} />
-              </div>
-              <div>
-                <label>Punch Out Time</label>
-                <input type="text" placeholder="e.g. 06:00 PM" value={editFormData.punchOut}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, punchOut: e.target.value }))} />
-              </div>
-            </div>
-            <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-              <div>
-                <label>Total Hours</label>
-                <input type="number" step="0.01" placeholder="e.g. 8.5" value={editFormData.totalHours}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, totalHours: parseFloat(e.target.value) || 0 }))} />
-              </div>
-              <div>
-                <label>Source Device</label>
-                <select value={editFormData.source}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, source: e.target.value }))}
-                  style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
-                  <option value="Biometric">Biometric</option>
-                  <option value="GPS">GPS</option>
-                  <option value="RFID">RFID</option>
-                  <option value="Web Portal">Web Portal</option>
-                  <option value="Mobile App">Mobile App</option>
-                </select>
-              </div>
-            </div>
+
             <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
               <div>
                 <label>Status</label>
                 <select value={editFormData.status}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, status: e.target.value }))}
                   style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                  <option value="">Select</option>
                   <option value="Present">Present</option>
                   <option value="Late">Late</option>
                   <option value="Absent">Absent</option>
                   <option value="Half Day">Half Day</option>
-                  <option value="Work From Home">Work From Home</option>
                   <option value="On Leave">On Leave</option>
                   <option value="Overtime">Overtime</option>
                 </select>
               </div>
+              {(() => {
+                const isNoPunch = editFormData.status === 'Absent' || editFormData.status === 'On Leave';
+                return (
+                  <div style={{ opacity: isNoPunch ? 0.4 : 1, pointerEvents: isNoPunch ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
+                    <label>Mode</label>
+                    <select value={editFormData.workMode}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, workMode: e.target.value }))}
+                      disabled={isNoPunch}
+                      style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                      <option value="">Select</option>
+                      <option value="WFO">WFO</option>
+                      <option value="WFH">WFH</option>
+                      <option value="Hybrid">Hybrid</option>
+                    </select>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {(() => {
+              const isNoPunch = editFormData.status === 'Absent' || editFormData.status === 'On Leave';
+              return (
+                <>
+                  <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', opacity: isNoPunch ? 0.4 : 1, pointerEvents: isNoPunch ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
+                    <div>
+                      <label>Punch In Time {!isNoPunch && '*'}</label>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <input type="text" placeholder="e.g. 09:00 AM" value={editFormData.punchIn}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, punchIn: e.target.value }))}
+                          disabled={isNoPunch}
+                          style={{ flex: 1, height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
+                        <Button type="button" variant="secondary" onClick={handleEditAutoPunchIn} style={{ padding: '0 10px', minWidth: 'auto' }} title="Set Current Time" disabled={isNoPunch}>⏱️</Button>
+                      </div>
+                    </div>
+                    <div>
+                      <label>Punch Out Time</label>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <input type="text" placeholder="e.g. 06:00 PM" value={editFormData.punchOut}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, punchOut: e.target.value }))}
+                          disabled={isNoPunch}
+                          style={{ flex: 1, height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
+                        <Button type="button" variant="secondary" onClick={handleEditAutoPunchOut} style={{ padding: '0 10px', minWidth: 'auto' }} title="Set Current Time" disabled={isNoPunch || !editFormData.punchIn}>⏱️</Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', opacity: isNoPunch ? 0.4 : 1, pointerEvents: isNoPunch ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
+                    <div>
+                      <label>Total Hours</label>
+                      <input type="number" step="0.1" placeholder="e.g. 8.5" value={editFormData.totalHours}
+                        disabled={isNoPunch}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, totalHours: parseFloat(e.target.value) || 0 }))}
+                        style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
+                    </div>
+                    <div>
+                      <label>Source Device</label>
+                      <select value={editFormData.source}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, source: e.target.value }))}
+                        disabled={isNoPunch}
+                        style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                        <option value="">Select</option>
+                        <option value="Biometric">Biometric</option>
+                        <option value="GPS">GPS</option>
+                        <option value="RFID">RFID</option>
+                        <option value="Web Portal">Web Portal</option>
+                        <option value="Mobile App">Mobile App</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+
+            <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
               <div>
                 <label>Date</label>
                 <input type="date" value={editFormData.date}
@@ -1517,6 +1871,157 @@ const Attendance = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Mark Attendance Modal */}
+      <Modal
+        isOpen={markModalOpen}
+        onClose={() => setMarkModalOpen(false)}
+        title="Mark Attendance Log"
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setMarkModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleMarkSubmit}>Mark Attendance</Button>
+          </div>
+        }
+      >
+        <div className="create-task-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+          <div className="form-field">
+            <label>Select Employee *</label>
+            <select
+              value={markFormData.employeeId}
+              onChange={(e) => {
+                const found = employees.find(emp => emp.id === e.target.value);
+                setMarkFormData(prev => ({
+                  ...prev,
+                  employeeId: e.target.value,
+                  employeeName: found?.name || '',
+                  department: found?.department || '',
+                  branch: found?.branch || '',
+                  workMode: found?.workMode || ''
+                }));
+              }}
+              style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}
+            >
+              <option value="">Choose employee...</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.name} ({emp.id}) — {emp.department}</option>
+              ))}
+            </select>
+          </div>
+
+          {markFormData.employeeName && (
+            <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', background: 'rgba(255,255,255,0.01)', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)' }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Department:</span>
+                <strong style={{ marginLeft: '5px', fontSize: '0.8rem' }}>{markFormData.department}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Branch:</span>
+                <strong style={{ marginLeft: '5px', fontSize: '0.8rem' }}>{markFormData.branch}</strong>
+              </div>
+            </div>
+          )}
+
+          {/* ── Status & Mode (moved to top) ── */}
+          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
+            <div>
+              <label>Status</label>
+              <select value={markFormData.status}
+                onChange={(e) => setMarkFormData(prev => ({ ...prev, status: e.target.value }))}
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                <option value="">Select</option>
+                <option value="Present">Present</option>
+                <option value="Late">Late</option>
+                <option value="Absent">Absent</option>
+                <option value="Half Day">Half Day</option>
+                <option value="On Leave">On Leave</option>
+                <option value="Overtime">Overtime</option>
+              </select>
+            </div>
+            {(() => {
+              const isNoPunch = markFormData.status === 'Absent' || markFormData.status === 'On Leave';
+              return (
+                <div style={{ opacity: isNoPunch ? 0.4 : 1, pointerEvents: isNoPunch ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
+                  <label>Mode</label>
+                  <select value={markFormData.workMode}
+                    onChange={(e) => setMarkFormData(prev => ({ ...prev, workMode: e.target.value }))}
+                    disabled={isNoPunch}
+                    style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                    <option value="">Select</option>
+                    <option value="WFO">WFO</option>
+                    <option value="WFH">WFH</option>
+                    <option value="Hybrid">Hybrid</option>
+                  </select>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* ── Punch In / Punch Out (disabled for Absent / On Leave) ── */}
+          {(() => {
+            const isNoPunch = markFormData.status === 'Absent' || markFormData.status === 'On Leave';
+            return (
+              <>
+                <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', opacity: isNoPunch ? 0.4 : 1, pointerEvents: isNoPunch ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
+                  <div>
+                    <label>Punch In Time {!isNoPunch && '*'}</label>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <input type="text" placeholder="e.g. 09:00 AM" value={markFormData.punchIn}
+                        onChange={(e) => setMarkFormData(prev => ({ ...prev, punchIn: e.target.value }))}
+                        disabled={isNoPunch}
+                        style={{ flex: 1 }} />
+                      <Button type="button" variant="secondary" onClick={handleAutoPunchIn} style={{ padding: '0 10px', minWidth: 'auto' }} title="Set Current Time" disabled={isNoPunch}>⏱️</Button>
+                    </div>
+                  </div>
+                  <div>
+                    <label>Punch Out Time</label>
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                      <input type="text" placeholder="e.g. 06:00 PM" value={markFormData.punchOut}
+                        onChange={(e) => setMarkFormData(prev => ({ ...prev, punchOut: e.target.value }))}
+                        disabled={isNoPunch}
+                        style={{ flex: 1 }} />
+                      <Button type="button" variant="secondary" onClick={handleAutoPunchOut} style={{ padding: '0 10px', minWidth: 'auto' }} title="Set Current Time" disabled={isNoPunch || !markFormData.punchIn}>⏱️</Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', opacity: isNoPunch ? 0.4 : 1, pointerEvents: isNoPunch ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
+                  <div>
+                    <label>Total Hours</label>
+                    <input type="number" step="0.1" placeholder="e.g. 8.5" value={markFormData.totalHours}
+                      disabled={isNoPunch}
+                      onChange={(e) => setMarkFormData(prev => ({ ...prev, totalHours: parseFloat(e.target.value) || 0 }))} />
+                  </div>
+                  <div>
+                    <label>Source Device</label>
+                    <select value={markFormData.source}
+                      onChange={(e) => setMarkFormData(prev => ({ ...prev, source: e.target.value }))}
+                      disabled={isNoPunch}
+                      style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}>
+                      <option value="">Select</option>
+                      <option value="Biometric">Biometric</option>
+                      <option value="GPS">GPS</option>
+                      <option value="RFID">RFID</option>
+                      <option value="Web Portal">Web Portal</option>
+                      <option value="Mobile App">Mobile App</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+
+          <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
+            <div>
+              <label>Date</label>
+              <input type="date" value={markFormData.date}
+                onChange={(e) => setMarkFormData(prev => ({ ...prev, date: e.target.value }))}
+                style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
+            </div>
+          </div>
+        </div>
       </Modal>
 
       {/* Assign Shift Modal */}
@@ -1551,6 +2056,100 @@ const Attendance = () => {
               <option value="Flexible (09:00 AM - 06:00 PM)">Flexible (09:00 AM - 06:00 PM)</option>
             </select>
           </div>
+        </div>
+      </Modal>
+
+      {/* Manage Breaks Modal */}
+      <Modal isOpen={breakModalOpen} onClose={() => setBreakModalOpen(false)} title="Manage Global Breaks" size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setBreakModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleSaveBreaksConfig}>Save Configuration</Button>
+          </div>
+        }
+      >
+        <div className="create-task-form-body" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+          
+          {/* Active breaks list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <label style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-secondary)' }}>Configured Breaks</label>
+            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '15px', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {modalBreaks.length > 0 ? (
+                modalBreaks.map((b, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: 'var(--radius-md)' }}>
+                    <span style={{ flex: 1, fontWeight: 500, fontSize: '0.9rem' }}>☕ {b.breakType}</span>
+                    <input
+                      type="number"
+                      value={b.duration || 0}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        setModalBreaks(prev => prev.map((item, idx) => idx === i ? { ...item, duration: val } : item));
+                      }}
+                      style={{ width: '80px', height: '36px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 8px', color: 'var(--text-primary)', textAlign: 'center' }}
+                    />
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>mins</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setModalBreaks(prev => prev.filter((_, idx) => idx !== i));
+                      }}
+                      style={{ color: 'var(--color-danger)', padding: '4px 8px', minWidth: 'auto', height: '32px' }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>No breaks configured. Add a new break below.</div>
+              )}
+              
+              {modalBreaks.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Total Break Duration:</span>
+                  <strong style={{ color: 'var(--color-success)', fontSize: '1.1rem' }}>
+                    {modalBreaks.reduce((sum, b) => sum + (b.duration || 0), 0)} mins
+                  </strong>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Form to add custom breaks */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '15px', marginTop: '10px' }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '12px', color: 'var(--text-secondary)' }}>Add Custom Break</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '10px', alignItems: 'end' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Break Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Tea Break"
+                  value={newBreakName}
+                  onChange={(e) => setNewBreakName(e.target.value)}
+                  style={{ width: '100%', height: '36px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Duration (mins)</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 10"
+                  value={newBreakDuration}
+                  onChange={(e) => setNewBreakDuration(e.target.value)}
+                  style={{ width: '100%', height: '36px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleAddNewBreakToList}
+                style={{ height: '36px', display: 'flex', alignItems: 'center' }}
+              >
+                Add Break
+              </Button>
+            </div>
+          </div>
+
         </div>
       </Modal>
 
@@ -1653,6 +2252,8 @@ const Attendance = () => {
           </div>
         </div>
       </Modal>
+        </div>
+      </Modal>
 
       {/* Floating Bottom Quick Actions Bar */}
       <div className="att-floating-actions-bar">
@@ -1664,6 +2265,7 @@ const Attendance = () => {
           {[
             { label: 'Mark Attendance', icon: CheckSquare, color: '#4ade80', action: () => setMarkModalOpen(true) },
             { label: 'Assign Shift', icon: Clock, color: '#60a5fa', action: () => setShiftModalOpen(true), adminOnly: true },
+            { label: 'Manage Breaks', icon: Coffee, color: '#fb7185', action: () => setBreakModalOpen(true), adminOnly: true },
             { label: 'Request Check-In', icon: UserCheck, color: '#fbbf24', action: handleRequestAttendance, adminOnly: true },
             { label: 'Approve All', icon: ShieldCheck, color: '#a78bfa', action: handleApproveAll, adminOnly: true },
             { label: 'Schedule Report', icon: Calendar, color: '#f472b6', action: handleScheduleReport, adminOnly: true },

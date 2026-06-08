@@ -28,10 +28,21 @@ const LeaveManagement = () => {
     leaveRequests,
     approveLeaveRequest,
     rejectLeaveRequest,
+    addLeaveRequest,
+    updateLeaveRequest,
     showConfirm,
     addToast,
     currentUser,
-    currentUserRole
+    currentUserRole,
+    leavePolicyConfigs,
+    addLeavePolicy,
+    updateLeavePolicy,
+    deleteLeavePolicy,
+    resetLeavePolicies,
+    holidaysList,
+    addHoliday,
+    deleteHoliday,
+    updateEmployee
   } = useApp();
 
   // Primary Tab state: 'requests' | 'analytics' | 'balances' | 'holidays' | 'policies'
@@ -50,14 +61,11 @@ const LeaveManagement = () => {
   // Leave List state (includes user-added leaves locally)
   const [leavesList, setLeavesList] = useState([]);
 
-  // ==================== ADMIN LEAVE POLICY TABLE STATE ====================
-  const [leavePolicyConfigs, setLeavePolicyConfigs] = useState([
-    { id: 'POL-001', leaveCode: 'CL', leaveName: 'Casual Leave', defaultDays: 8, maxCarryForward: 5, isActive: true, genderRestriction: 'All', description: 'For personal urgent reasons or brief errands' },
-    { id: 'POL-002', leaveCode: 'SL', leaveName: 'Sick Leave', defaultDays: 10, maxCarryForward: 3, isActive: true, genderRestriction: 'All', description: 'For medical recovery or doctor consultations' },
-    { id: 'POL-003', leaveCode: 'PL', leaveName: 'Paid Leave', defaultDays: 15, maxCarryForward: 10, isActive: true, genderRestriction: 'All', description: 'Annual leave for vacation or relaxation' },
-    { id: 'POL-004', leaveCode: 'ML', leaveName: 'Maternity Leave', defaultDays: 180, maxCarryForward: 0, isActive: true, genderRestriction: 'Female', description: 'For expectant mothers around childbirth' },
-    { id: 'POL-010', leaveCode: 'UL', leaveName: 'Unpaid Leave', defaultDays: 30, maxCarryForward: 0, isActive: true, genderRestriction: 'All', description: 'Without pay when balances exhausted' }
-  ]);
+  useEffect(() => {
+    if (leaveRequests) {
+      setLeavesList(leaveRequests);
+    }
+  }, [leaveRequests]);
 
   const [editingPolicy, setEditingPolicy] = useState(null);
   const [policyEditForm, setPolicyEditForm] = useState({
@@ -87,20 +95,39 @@ const LeaveManagement = () => {
   // Balance Edit State
   const [balanceEditEmployee, setBalanceEditEmployee] = useState(null);
   const [balanceInput, setBalanceInput] = useState({ cl: 0, sl: 0, pl: 0, maternity: 0 });
-
-  // Policy configurations state
-  const [policies, setPolicies] = useState({
-    accrualRate: 'Monthly',
-    carryForwardLimit: 10,
-    halfDayPolicy: true,
-    holidayEncashment: true,
-    maternityDuration: 180,
-    restrictDoubleFilings: true,
-    useGlobalPolicyTable: true // New flag to use the global policy table
+  // Policy configurations state (persisted locally)
+  const [policies, setPolicies] = useState(() => {
+    const saved = localStorage.getItem('leave_policy_settings');
+    return saved ? JSON.parse(saved) : {
+      accrualRate: 'Monthly',
+      halfDayPolicy: true,
+      holidayEncashment: true,
+      restrictDoubleFilings: true,
+      useGlobalPolicyTable: true
+    };
   });
 
+  useEffect(() => {
+    localStorage.setItem('leave_policy_settings', JSON.stringify(policies));
+  }, [policies]);
+
+  // Dynamic policy rates for active policies
+  const [policyRates, setPolicyRates] = useState({});
+
+  useEffect(() => {
+    if (leavePolicyConfigs && leavePolicyConfigs.length > 0) {
+      const rates = {};
+      leavePolicyConfigs.forEach(p => {
+        rates[p.id] = {
+          defaultDays: p.defaultDays,
+          maxCarryForward: p.maxCarryForward
+        };
+      });
+      setPolicyRates(rates);
+    }
+  }, [leavePolicyConfigs]);
+
   // Modal open states
-  const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [showAddHolidayModal, setShowAddHolidayModal] = useState(false);
   const [newHolidayForm, setNewHolidayForm] = useState({
     date: '',
@@ -112,17 +139,99 @@ const LeaveManagement = () => {
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [approverNotesInput, setApproverNotesInput] = useState('');
   const [editingLeave, setEditingLeave] = useState(null);
-
-  // Form states for Applying Leave
+  const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [applyForm, setApplyForm] = useState({
     employeeId: '',
-    type: 'Casual Leave',
-    fromDate: '',
-    toDate: '',
-    reason: '',
-    documentType: 'Emergency Documents',
-    uploadedFileName: '',
-    uploadedFileFormat: ''
+    customLeaveType: 'CL',
+    startDate: '',
+    days: 1,
+    reason: ''
+  });
+
+  const handleEditLeaveClick = (leave) => {
+    setEditingLeave(leave);
+    setApplyForm({
+      employeeId: leave.employeeId,
+      customLeaveType: leave.type,
+      startDate: leave.fromDate,
+      days: leave.days,
+      reason: leave.reason
+    });
+    setApplyModalOpen(true);
+  };
+
+  const handleApplySubmit = (e) => {
+    if (e) e.preventDefault();
+    const empId = currentUser?.id || applyForm.employeeId;
+    const emp = employees.find(e => e.id === empId);
+    
+    if (!empId) {
+      addToast('warning', 'Employee ID is required.');
+      return;
+    }
+    if (!applyForm.customLeaveType || !applyForm.startDate || !applyForm.days) {
+      addToast('warning', 'Please fill in all required fields.');
+      return;
+    }
+
+    const start = new Date(applyForm.startDate);
+    const end = new Date(start);
+    end.setDate(start.getDate() + parseInt(applyForm.days) - 1);
+    const endDateStr = end.toISOString().split('T')[0];
+
+    if (editingLeave) {
+      const updatedRequest = {
+        ...editingLeave,
+        type: applyForm.customLeaveType,
+        fromDate: applyForm.startDate,
+        toDate: endDateStr,
+        days: parseInt(applyForm.days),
+        reason: applyForm.reason
+      };
+      updateLeaveRequest(editingLeave.id, updatedRequest);
+      addToast('success', 'Leave request updated successfully.');
+      setEditingLeave(null);
+    } else {
+      const newRequest = {
+        id: `LR-${Math.floor(100 + Math.random() * 900)}`,
+        employeeId: empId,
+        employeeName: emp?.name || currentUser?.name || 'Employee',
+        department: emp?.department || currentUser?.department || 'Engineering',
+        type: applyForm.customLeaveType,
+        fromDate: applyForm.startDate,
+        toDate: endDateStr,
+        days: parseInt(applyForm.days),
+        reason: applyForm.reason || '',
+        status: 'Pending',
+        appliedDate: new Date().toISOString().split('T')[0],
+        history: [
+          { date: new Date().toISOString().split('T')[0], status: 'Pending', comment: 'Applied by employee' }
+        ]
+      };
+      addLeaveRequest(newRequest);
+      addToast('success', 'Leave request submitted successfully.');
+    }
+
+    setApplyModalOpen(false);
+    setApplyForm({
+      employeeId: '',
+      customLeaveType: 'CL',
+      startDate: '',
+      days: 1,
+      reason: ''
+    });
+  };
+
+  // Leave Assignment states
+  const [showAssignLeaveModal, setShowAssignLeaveModal] = useState(false);
+  const [selectedAssignEmployee, setSelectedAssignEmployee] = useState(null);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+  const [showAssignEmployeeDropdown, setShowAssignEmployeeDropdown] = useState(false);
+  const [assignForm, setAssignForm] = useState({
+    customLeaveType: '',
+    startDate: '',
+    days: 1,
+    reason: ''
   });
 
   // Reports and Exports builder state
@@ -134,16 +243,6 @@ const LeaveManagement = () => {
   // Active Date selection in calendars
   const [calendarMonth, setCalendarMonth] = useState('June 2026');
 
-  // Mock static balance records
-  const [balancesList, setBalancesList] = useState([
-    { id: 'BAL-001', employeeId: 'EMP-2026-001', employeeName: 'Aarav Sharma', cl: 8, sl: 12, pl: 15, maternity: 0 },
-    { id: 'BAL-002', employeeId: 'EMP-2026-002', employeeName: 'Vikram Singh', cl: 6, sl: 8, pl: 10, maternity: 0 },
-    { id: 'BAL-003', employeeId: 'EMP-2026-003', employeeName: 'Ananya Gupta', cl: 5, sl: 10, pl: 18, maternity: 0 },
-    { id: 'BAL-004', employeeId: 'EMP-2026-004', employeeName: 'Rohit Sharma', cl: 7, sl: 6, pl: 12, maternity: 0 },
-    { id: 'BAL-005', employeeId: 'EMP-2026-005', employeeName: 'Priya Patel', cl: 4, sl: 7, pl: 14, maternity: 180 },
-    { id: 'BAL-006', employeeId: 'EMP-2026-006', employeeName: 'Arjun Mehta', cl: 9, sl: 11, pl: 20, maternity: 0 },
-    { id: 'BAL-007', employeeId: 'EMP-2026-007', employeeName: 'Neha Verma', cl: 3, sl: 9, pl: 8, maternity: 0 }
-  ]);
 
   useEffect(() => {
     if (leaveRequests) {
@@ -171,10 +270,9 @@ const LeaveManagement = () => {
     }
   }, [applyModalOpen, currentUserRole, currentUser]);
 
-  const scopedBalancesList = useMemo(() => {
-    return balancesList.filter(bal => {
+  const scopedEmployees = useMemo(() => {
+    return employees.filter(emp => {
       if (!currentUserRole || currentUserRole === 'super_admin') return true;
-      const emp = employees.find(e => e.id === bal.employeeId);
       if (currentUserRole === 'branch_admin') {
         return emp?.branch === currentUser?.branch;
       }
@@ -182,25 +280,11 @@ const LeaveManagement = () => {
         return emp?.department === currentUser?.department;
       }
       if (currentUserRole === 'employee') {
-        return bal.employeeId === currentUser?.id;
+        return emp?.id === currentUser?.id;
       }
       return true;
     });
-  }, [balancesList, currentUser, currentUserRole, employees]);
-
-  // Mock static Holiday lists
-  const [holidaysList, setHolidaysList] = useState([
-    { id: 'HOL-01', name: 'New Year\'s Day', date: '2026-01-01', type: 'National', description: 'Global celebration of the first day of the year.' },
-    { id: 'HOL-02', name: 'Republic Day', date: '2026-01-26', type: 'National', description: 'Honors the constitution initialization date.' },
-    { id: 'HOL-03', name: 'Holi Festival', date: '2026-03-04', type: 'Regional', description: 'Spring festival of colors.' },
-    { id: 'HOL-04', name: 'Good Friday', date: '2026-04-03', type: 'Company', description: 'Friday before Easter Sunday.' },
-    { id: 'HOL-05', name: 'Eid al-Fitr', date: '2026-04-20', type: 'National', description: 'Islamic festival ending Ramadan.' },
-    { id: 'HOL-06', name: 'Independence Day', date: '2026-08-15', type: 'National', description: 'Commemorating freedom from UK rule.' },
-    { id: 'HOL-07', name: 'Gandhi Jayanti', date: '2026-10-02', type: 'National', description: 'Mahatma Gandhi\'s birth anniversary.' },
-    { id: 'HOL-08', name: 'Diwali', date: '2026-11-09', type: 'National', description: 'Festival of lights.' },
-    { id: 'HOL-09', name: 'Karnataka Rajyotsava', date: '2026-11-01', type: 'Optional', description: 'State formation holiday.' },
-    { id: 'HOL-10', name: 'Christmas Day', date: '2026-12-25', type: 'National', description: 'Annual birthday celebration of Jesus Christ.' }
-  ]);
+  }, [employees, currentUser, currentUserRole]);
 
   // Mock department metrics
   const departmentAnalyticsData = [
@@ -247,7 +331,7 @@ const LeaveManagement = () => {
     code: config.leaveCode,
     name: config.leaveName,
     desc: config.description,
-    quota: `${config.defaultDays} days/year`,
+    quota: `${config.defaultDays} days/month`,
     maxCarry: config.maxCarryForward,
     genderRestriction: config.genderRestriction,
     active: config.isActive
@@ -338,57 +422,57 @@ const LeaveManagement = () => {
     });
   };
 
-  const handleUpdatePolicy = () => {
-    setLeavePolicyConfigs(prev => 
-      prev.map(p => 
-        p.id === editingPolicy.id 
-          ? { ...p, ...policyEditForm }
-          : p
-      )
-    );
-    addToast('success', `${policyEditForm.leaveName} policy updated successfully!`);
-    setEditingPolicy(null);
-    
-    // Add alert for policy change
-    setAlertsFeed(prev => [
-      {
-        id: `AL-${Math.random().toString(36).substring(2, 9)}`,
-        type: 'success',
-        message: `Leave policy "${policyEditForm.leaveName}" updated by Admin.`,
-        timestamp: 'Just now',
-        read: false
-      },
-      ...prev
-    ]);
+  const handleUpdatePolicy = async () => {
+    const success = await updateLeavePolicy(editingPolicy.id, policyEditForm);
+    if (success) {
+      setEditingPolicy(null);
+      // Add alert for policy change
+      setAlertsFeed(prev => [
+        {
+          id: `AL-${Math.random().toString(36).substring(2, 9)}`,
+          type: 'success',
+          message: `Leave policy "${policyEditForm.leaveName}" updated by Admin.`,
+          timestamp: 'Just now',
+          read: false
+        },
+        ...prev
+      ]);
+    }
   };
 
-  const handleAddPolicy = () => {
-    if (!newPolicyForm.leaveCode || !newPolicyForm.leaveName) {
+  const handleAddPolicy = async () => {
+    if (!newPolicyForm.leaveCode || !newPolicyForm.newPolicyName && !newPolicyForm.leaveName) {
       addToast('warning', 'Please fill all required fields.');
       return;
     }
     
-    const newId = `POL-${String(leavePolicyConfigs.length + 1).padStart(3, '0')}`;
+    // Generate next POL-xxx ID
+    const nextNum = leavePolicyConfigs.length > 0 
+      ? Math.max(...leavePolicyConfigs.map(p => parseInt(p.id.split('-')[1]) || 0)) + 1 
+      : 1;
+    const newId = `POL-${String(nextNum).padStart(3, '0')}`;
     const newPolicy = { id: newId, ...newPolicyForm };
-    setLeavePolicyConfigs(prev => [...prev, newPolicy]);
-    addToast('success', `${newPolicyForm.leaveName} policy added successfully!`);
-    setShowAddPolicyModal(false);
-    setNewPolicyForm({
-      leaveCode: '',
-      leaveName: '',
-      defaultDays: 0,
-      maxCarryForward: 0,
-      isActive: true,
-      genderRestriction: 'All',
-      description: ''
-    });
+    const success = await addLeavePolicy(newPolicy);
+    if (success) {
+      setShowAddPolicyModal(false);
+      setNewPolicyForm({
+        leaveCode: '',
+        leaveName: '',
+        defaultDays: 0,
+        maxCarryForward: 0,
+        isActive: true,
+        genderRestriction: 'All',
+        description: ''
+      });
+    }
   };
 
   const handleDeletePolicy = (policy) => {
-    const action = () => {
-      setLeavePolicyConfigs(prev => prev.filter(p => p.id !== policy.id));
-      addToast('warning', `${policy.leaveName} policy has been deleted.`);
-      setShowDeletePolicyConfirm(null);
+    const action = async () => {
+      const success = await deleteLeavePolicy(policy.id);
+      if (success) {
+        setShowDeletePolicyConfirm(null);
+      }
     };
     
     showConfirm(
@@ -399,28 +483,19 @@ const LeaveManagement = () => {
     );
   };
 
-  const handleTogglePolicyStatus = (policyId, currentStatus) => {
-    setLeavePolicyConfigs(prev => 
-      prev.map(p => 
-        p.id === policyId 
-          ? { ...p, isActive: !currentStatus }
-          : p
-      )
-    );
-    addToast('info', `Policy ${!currentStatus ? 'activated' : 'deactivated'} successfully.`);
+  const handleTogglePolicyStatus = async (policyId, currentStatus) => {
+    const policy = leavePolicyConfigs.find(p => p.id === policyId);
+    if (!policy) return;
+    const success = await updateLeavePolicy(policyId, { ...policy, isActive: !currentStatus });
+    if (success) {
+      addToast('info', `Policy ${!currentStatus ? 'activated' : 'deactivated'} successfully.`);
+    }
   };
 
   // Reset all policies to default
   const handleResetAllPolicies = () => {
-    const action = () => {
-      setLeavePolicyConfigs([
-        { id: 'POL-001', leaveCode: 'CL', leaveName: 'Casual Leave', defaultDays: 8, maxCarryForward: 5, isActive: true, genderRestriction: 'All', description: 'For personal urgent reasons or brief errands' },
-        { id: 'POL-002', leaveCode: 'SL', leaveName: 'Sick Leave', defaultDays: 10, maxCarryForward: 3, isActive: true, genderRestriction: 'All', description: 'For medical recovery or doctor consultations' },
-        { id: 'POL-003', leaveCode: 'PL', leaveName: 'Paid Leave', defaultDays: 15, maxCarryForward: 10, isActive: true, genderRestriction: 'All', description: 'Annual leave for vacation or relaxation' },
-        { id: 'POL-004', leaveCode: 'ML', leaveName: 'Maternity Leave', defaultDays: 180, maxCarryForward: 0, isActive: true, genderRestriction: 'Female', description: 'For expectant mothers around childbirth' },
-        { id: 'POL-010', leaveCode: 'UL', leaveName: 'Unpaid Leave', defaultDays: 30, maxCarryForward: 0, isActive: true, genderRestriction: 'All', description: 'Without pay when balances exhausted' }
-      ]);
-      addToast('success', 'All policies have been reset to default values.');
+    const action = async () => {
+      await resetLeavePolicies();
     };
     
     showConfirm(
@@ -429,6 +504,48 @@ const LeaveManagement = () => {
       action,
       'danger'
     );
+  };
+
+  const handleSavePolicyConfigs = async () => {
+    let successCount = 0;
+    let totalToUpdate = 0;
+
+    for (const policy of activePolicies) {
+      const updatedRates = policyRates[policy.id];
+      if (updatedRates) {
+        if (updatedRates.defaultDays !== policy.defaultDays || updatedRates.maxCarryForward !== policy.maxCarryForward) {
+          totalToUpdate++;
+          const success = await updateLeavePolicy(policy.id, {
+            ...policy,
+            defaultDays: updatedRates.defaultDays,
+            maxCarryForward: updatedRates.maxCarryForward
+          });
+          if (success) successCount++;
+        }
+      }
+    }
+
+    if (totalToUpdate === 0) {
+      addToast('info', 'No policy configurations were changed.');
+      return;
+    }
+
+    if (successCount === totalToUpdate) {
+      addToast('success', `${successCount} leave policy configuration(s) updated successfully!`);
+    } else {
+      addToast('warning', `Updated ${successCount} of ${totalToUpdate} leave policy configurations.`);
+    }
+
+    setAlertsFeed(prev => [
+      {
+        id: `AL-${Math.random().toString(36).substring(2, 9)}`,
+        type: 'success',
+        message: 'Super Admin updated global leave rules settings.',
+        timestamp: 'Just now',
+        read: false
+      },
+      ...prev
+    ]);
   };
 
   const handleRowClick = (leave) => {
@@ -440,11 +557,7 @@ const LeaveManagement = () => {
   const handleApprove = (id, name, isModal = false) => {
     const action = () => {
       approveLeaveRequest(id, isModal ? approverNotesInput : '');
-      setLeavesList(prev =>
-        prev.map(l => (l.id === id ? { ...l, status: 'Approved', approverNotes: isModal ? approverNotesInput : 'Approved' } : l))
-      );
       if (isModal) setDetailModalOpen(false);
-      addToast('success', `Leave request for ${name} has been approved.`);
     };
 
     showConfirm(
@@ -458,11 +571,7 @@ const LeaveManagement = () => {
   const handleReject = (id, name, isModal = false) => {
     const action = () => {
       rejectLeaveRequest(id, isModal ? approverNotesInput : '');
-      setLeavesList(prev =>
-        prev.map(l => (l.id === id ? { ...l, status: 'Rejected', approverNotes: isModal ? approverNotesInput : 'Rejected' } : l))
-      );
       if (isModal) setDetailModalOpen(false);
-      addToast('error', `Leave request for ${name} has been rejected.`);
     };
 
     showConfirm(
@@ -473,35 +582,7 @@ const LeaveManagement = () => {
     );
   };
 
-  const handleEditLeaveClick = (leave) => {
-    setEditingLeave(leave);
-    setApplyForm({
-      employeeId: leave.employeeId,
-      type: leave.type,
-      fromDate: leave.fromDate,
-      toDate: leave.toDate,
-      reason: leave.reason,
-      documentType: leave.documentType || 'Emergency Documents',
-      uploadedFileName: leave.fileName || '',
-      uploadedFileFormat: leave.fileFormat || ''
-    });
-    setApplyModalOpen(true);
-  };
 
-  const handleCloseApplyModal = () => {
-    setApplyModalOpen(false);
-    setEditingLeave(null);
-    setApplyForm({
-      employeeId: '',
-      type: 'Casual Leave',
-      fromDate: '',
-      toDate: '',
-      reason: '',
-      documentType: 'Emergency Documents',
-      uploadedFileName: '',
-      uploadedFileFormat: ''
-    });
-  };
 
   const scrollToTable = () => {
     setTimeout(() => {
@@ -512,128 +593,63 @@ const LeaveManagement = () => {
     }, 100);
   };
 
-  // Submit new leave locally or update existing
-  const handleApplySubmit = (e) => {
+  const filteredEmployees = employees.filter(emp => {
+    const term = employeeSearchQuery.toLowerCase();
+    return (
+      emp.name.toLowerCase().includes(term) ||
+      emp.id.toLowerCase().includes(term)
+    );
+  });
+
+  const handleAssignSubmit = (e) => {
     if (e) e.preventDefault();
-    if (!applyForm.employeeId || !applyForm.fromDate || !applyForm.toDate || !applyForm.reason) {
-      addToast('warning', 'Please fill all required leave application fields.');
+    if (!selectedAssignEmployee) {
+      addToast('warning', 'Please select an employee.');
+      return;
+    }
+    if (!assignForm.customLeaveType || !assignForm.startDate || !assignForm.days) {
+      addToast('warning', 'Please fill in all leave assignment fields.');
       return;
     }
 
-    const employeeSelected = employees.find(emp => emp.id === applyForm.employeeId);
+    const start = new Date(assignForm.startDate);
+    const end = new Date(start);
+    end.setDate(start.getDate() + parseInt(assignForm.days) - 1);
+    const endDateStr = end.toISOString().split('T')[0];
 
-    if (employeeSelected) {
-      const selectedPolicy = leavePolicyConfigs.find(p => p.leaveName === applyForm.type);
-      if (selectedPolicy) {
-        if (selectedPolicy.leaveName === 'Maternity Leave') {
-          if (employeeSelected.gender !== 'Female' || employeeSelected.maritalStatus !== 'Married') {
-            addToast('danger', 'Maternity Leave is only allowed for married female employees.');
-            return;
-          }
-        }
-        if (selectedPolicy.genderRestriction === 'Female' && employeeSelected.gender !== 'Female') {
-          addToast('danger', `${selectedPolicy.leaveName} is only allowed for female employees.`);
-          return;
-        }
-        if (selectedPolicy.genderRestriction === 'Male' && employeeSelected.gender !== 'Male') {
-          addToast('danger', `${selectedPolicy.leaveName} is only allowed for male employees.`);
-          return;
-        }
-      }
-    }
-
-    if (editingLeave) {
-      setLeavesList(prev =>
-        prev.map(l =>
-          l.id === editingLeave.id
-            ? {
-                ...l,
-                employeeId: applyForm.employeeId,
-                employeeName: employeeSelected ? employeeSelected.name : l.employeeName,
-                department: employeeSelected ? employeeSelected.department : l.department,
-                type: applyForm.type,
-                fromDate: applyForm.fromDate,
-                toDate: applyForm.toDate,
-                days: Math.max(1, Math.ceil((new Date(applyForm.toDate) - new Date(applyForm.fromDate)) / (1000 * 60 * 60 * 24)) + 1),
-                reason: applyForm.reason,
-                documentType: applyForm.documentType,
-                fileName: applyForm.uploadedFileName || null,
-                fileFormat: applyForm.uploadedFileFormat || null
-              }
-            : l
-        )
-      );
-
-      addToast('success', `Leave request ${editingLeave.id} has been updated.`);
-
-      setAlertsFeed(prev => [
-        {
-          id: `AL-${Math.random().toString(36).substring(2, 9)}`,
-          type: 'info',
-          message: `Leave request ${editingLeave.id} updated by Admin.`,
-          timestamp: 'Just now',
-          read: false
-        },
-        ...prev
-      ]);
-
-      handleCloseApplyModal();
-    } else {
-      const newLeaveId = `LR-${Math.floor(100 + Math.random() * 900)}`;
-
-      const newRequest = {
-        id: newLeaveId,
-        employeeId: applyForm.employeeId,
-        employeeName: employeeSelected ? employeeSelected.name : 'Unknown Employee',
-        department: employeeSelected ? employeeSelected.department : 'Engineering',
-        type: applyForm.type,
-        fromDate: applyForm.fromDate,
-        toDate: applyForm.toDate,
-        days: Math.max(1, Math.ceil((new Date(applyForm.toDate) - new Date(applyForm.fromDate)) / (1000 * 60 * 60 * 24)) + 1),
-        reason: applyForm.reason,
-        status: 'Pending',
-        appliedDate: new Date().toISOString().split('T')[0],
-        history: [
-          { date: new Date().toISOString().split('T')[0], status: 'Pending', comment: `Applied by ${employeeSelected ? employeeSelected.name : 'Employee'}` }
-        ],
-        documentType: applyForm.documentType,
-        fileName: applyForm.uploadedFileName || null,
-        fileFormat: applyForm.uploadedFileFormat || null,
-        approverNotes: ''
-      };
-
-      setLeavesList(prev => [newRequest, ...prev]);
-      handleCloseApplyModal();
-      addToast('success', 'Leave request submitted successfully for approval.');
-
-      setAlertsFeed(prev => [
-        {
-          id: `AL-${Math.random().toString(36).substring(2, 9)}`,
-          type: 'warning',
-          message: `New leave request from ${newRequest.employeeName} submitted.`,
-          timestamp: 'Just now',
-          read: false
-        },
-        ...prev
-      ]);
-    }
-  };
-
-  // Mock file attachment handler
-  const simulateFileUpload = (format) => {
-    const names = {
-      PNG: 'medical_report_signature.png',
-      JPG: 'accident_car_damage.jpg',
-      PDF: 'dental_surgery_certificate.pdf',
-      DOCX: 'flight_itinerary_visa.docx'
+    const newRequest = {
+      id: `LR-${Math.floor(100 + Math.random() * 900)}`,
+      employeeId: selectedAssignEmployee.id,
+      employeeName: selectedAssignEmployee.name,
+      department: selectedAssignEmployee.department || 'Engineering',
+      type: assignForm.customLeaveType,
+      fromDate: assignForm.startDate,
+      toDate: endDateStr,
+      days: parseInt(assignForm.days),
+      reason: assignForm.reason || 'Assigned by Administrator',
+      status: 'Approved',
+      appliedDate: new Date().toISOString().split('T')[0],
+      history: [
+        { date: new Date().toISOString().split('T')[0], status: 'Approved', comment: 'Leave assigned directly by Administrator' }
+      ],
+      approverNotes: 'Assigned by Administrator'
     };
-    setApplyForm(prev => ({
-      ...prev,
-      uploadedFileName: names[format],
-      uploadedFileFormat: format
-    }));
-    addToast('info', `${format} document mock-attached.`);
+
+    addLeaveRequest(newRequest);
+    
+    // Close modal and reset state
+    setShowAssignLeaveModal(false);
+    setSelectedAssignEmployee(null);
+    setEmployeeSearchQuery('');
+    setAssignForm({
+      customLeaveType: '',
+      startDate: '',
+      days: 1,
+      reason: ''
+    });
   };
+
+
 
   // Simulate Report Exporting
   const handleGenerateReport = (e) => {
@@ -656,7 +672,7 @@ const LeaveManagement = () => {
     }, 150);
   };
 
-  const handleAddHoliday = (e) => {
+  const handleAddHoliday = async (e) => {
     if (e) e.preventDefault();
     if (!newHolidayForm.date || !newHolidayForm.name) {
       addToast('warning', 'Please fill in the date and name.');
@@ -666,60 +682,108 @@ const LeaveManagement = () => {
       id: `HOL-${Date.now()}`,
       ...newHolidayForm
     };
-    setHolidaysList(prev => [...prev, newHol]);
-    addToast('success', `Holiday "${newHolidayForm.name}" added successfully!`);
+    const success = await addHoliday(newHol);
+    if (success) {
+      addToast('success', `Holiday "${newHolidayForm.name}" added successfully!`);
+      
+      setAlertsFeed(prev => [
+        {
+          id: `AL-${Math.random().toString(36).substring(2, 9)}`,
+          type: 'success',
+          message: `New holiday "${newHolidayForm.name}" scheduled.`,
+          timestamp: 'Just now',
+          read: false
+        },
+        ...prev
+      ]);
+      
+      setNewHolidayForm({
+        date: '',
+        name: '',
+        type: 'National',
+        description: ''
+      });
+      setShowAddHolidayModal(false);
+    }
+  };
+
+  const handleDeleteHolidayClick = (holiday) => {
+    const action = async () => {
+      await deleteHoliday(holiday.id);
+    };
     
-    setAlertsFeed(prev => [
-      {
-        id: `AL-${Math.random().toString(36).substring(2, 9)}`,
-        type: 'success',
-        message: `New holiday "${newHolidayForm.name}" scheduled.`,
-        timestamp: 'Just now',
-        read: false
-      },
-      ...prev
-    ]);
-    
-    setNewHolidayForm({
-      date: '',
-      name: '',
-      type: 'National',
-      description: ''
-    });
-    setShowAddHolidayModal(false);
+    showConfirm(
+      'Delete Scheduled Holiday',
+      `Are you sure you want to delete the holiday "${holiday.name}"? This action cannot be undone.`,
+      action,
+      'danger'
+    );
+  };
+
+  const activePolicies = leavePolicyConfigs.filter(p => p.isActive);
+
+  const getRemainingBalance = (employee, policy) => {
+    const code = policy.leaveCode;
+    // Always use the policy's defaultDays as the monthly quota (what admin assigned)
+    const initialQuota = policy.defaultDays;
+
+    // Only count actual employee-requested leaves (exclude auto-allocation records
+    // created when the policy was set up — those have reason starting with 'Automatic policy allocation:')
+    const approvedDaysTaken = leaveRequests
+      .filter(req => 
+        req.employeeId === employee.id && 
+        req.status === 'Approved' && 
+        (req.type === code || req.type === policy.leaveName) &&
+        !(req.reason && req.reason.startsWith('Automatic policy allocation:'))
+      )
+      .reduce((sum, req) => sum + (Number(req.days) || 0), 0);
+
+    return Math.max(0, initialQuota - approvedDaysTaken);
   };
 
   // Balance edit trigger
-  const handleEditBalanceClick = (balance) => {
-    setBalanceEditEmployee(balance);
-    setBalanceInput({
-      cl: balance.cl,
-      sl: balance.sl,
-      pl: balance.pl,
-      maternity: balance.maternity
+  const handleEditBalanceClick = (employee) => {
+    setBalanceEditEmployee(employee);
+    
+    const inputs = {};
+    activePolicies.forEach(policy => {
+      const code = policy.leaveCode;
+      let val = 0;
+      if (code === 'CL') val = employee.clBalance || policy.defaultDays;
+      else if (code === 'SL') val = employee.slBalance || policy.defaultDays;
+      else if (code === 'PL') val = employee.plBalance || policy.defaultDays;
+      else if (code === 'ML') val = employee.maternityBalance || policy.defaultDays;
+      else val = employee[code + 'Balance'] || policy.defaultDays;
+      inputs[code] = val;
     });
+    setBalanceInput(inputs);
   };
 
   // Save modified balance
-  const handleSaveBalance = () => {
+  const handleSaveBalance = async () => {
     if (!balanceEditEmployee) return;
 
-    setBalancesList(prev =>
-      prev.map(b =>
-        b.employeeId === balanceEditEmployee.employeeId
-          ? { ...b, ...balanceInput }
-          : b
-      )
-    );
+    const updates = {};
+    activePolicies.forEach(policy => {
+      const code = policy.leaveCode;
+      const val = balanceInput[code] || 0;
+      if (code === 'CL') updates.clBalance = val;
+      else if (code === 'SL') updates.slBalance = val;
+      else if (code === 'PL') updates.plBalance = val;
+      else if (code === 'ML') updates.maternityBalance = val;
+      else updates[code + 'Balance'] = val;
+    });
 
-    addToast('success', `Adjusted leave balances for ${balanceEditEmployee.employeeName}.`);
+    await updateEmployee(balanceEditEmployee.id, updates);
+
+    addToast('success', `Adjusted leave balances for ${balanceEditEmployee.name}.`);
     setBalanceEditEmployee(null);
 
     setAlertsFeed(prev => [
       {
         id: `AL-${Math.random().toString(36).substring(2, 9)}`,
         type: 'info',
-        message: `Balances manually overridden for ${balanceEditEmployee.employeeName}.`,
+        message: `Balances manually overridden for ${balanceEditEmployee.name}.`,
         timestamp: 'Just now',
         read: false
       },
@@ -1131,10 +1195,6 @@ const LeaveManagement = () => {
               <div className="quick-actions-bar mt-4 pt-4 border-top">
                 <h5>Quick System Actions</h5>
                 <div className="actions-button-grid">
-                  <button className="quick-act-btn" onClick={() => setApplyModalOpen(true)}>
-                    <Plus size={14} />
-                    <span>Apply Leave</span>
-                  </button>
                   <button className="quick-act-btn" onClick={() => { setActiveTab('balances'); addToast('info', 'Adjust employee quotas below.'); }}>
                     <Edit size={14} />
                     <span>Adjust Balance</span>
@@ -1358,27 +1418,67 @@ const LeaveManagement = () => {
                     <tr>
                       <th>Employee ID</th>
                       <th>Employee Name</th>
-                      <th>CL Balance</th>
-                      <th>SL Balance</th>
-                      <th>PL Balance</th>
-                      <th>Maternity</th>
+                      {activePolicies.map(policy => (
+                        <th key={policy.id}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span>{policy.leaveName}</span>
+                            <span style={{ fontSize: '10px', opacity: 0.6, fontWeight: 400 }}>
+                              Allocated: {policy.defaultDays} days/month
+                            </span>
+                          </div>
+                        </th>
+                      ))}
                       <th>Actions</th>
                     </tr>
                   </thead>
-                   <tbody>
-                    {scopedBalancesList.map((bal) => (
-                      <tr key={bal.id}>
-                        <td><strong className="text-xs font-mono">{bal.employeeId}</strong></td>
-                        <td>{bal.employeeName}</td>
-                        <td><span className="balance-badge cl-badge">{bal.cl} days</span></td>
-                        <td><span className="balance-badge sl-badge">{bal.sl} days</span></td>
-                        <td><span className="balance-badge pl-badge">{bal.pl} days</span></td>
-                        <td>{bal.maternity} days</td>
+                  <tbody>
+                    {scopedEmployees.map((emp) => (
+                      <tr key={emp.id}>
+                        <td><strong className="text-xs font-mono">{emp.id}</strong></td>
+                        <td>{emp.name}</td>
+                        {activePolicies.map(policy => {
+                          const remaining = getRemainingBalance(emp, policy);
+                          const total = policy.defaultDays;
+                          const used = total - remaining;
+                          const pct = total > 0 ? Math.round((remaining / total) * 100) : 0;
+                          const badgeClass = 
+                            remaining === 0 ? 'danger-badge' :
+                            remaining < total * 0.5 ? 'warning-badge' :
+                            policy.leaveCode === 'CL' ? 'cl-badge' :
+                            policy.leaveCode === 'SL' ? 'sl-badge' :
+                            policy.leaveCode === 'PL' ? 'pl-badge' : 'neutral-badge';
+                          return (
+                            <td key={policy.id}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span className={`balance-badge ${badgeClass}`}>{remaining} days</span>
+                                  <span style={{ fontSize: '10px', opacity: 0.55 }}>/ {total}</span>
+                                </div>
+                                <div style={{ 
+                                  height: '3px', 
+                                  background: 'var(--border-color)', 
+                                  borderRadius: '2px',
+                                  overflow: 'hidden'
+                                }}>
+                                  <div style={{ 
+                                    height: '100%', 
+                                    width: `${pct}%`,
+                                    background: remaining === 0 ? 'var(--accent-pink-solid)' : 
+                                               remaining < total * 0.5 ? 'var(--accent-orange, #f59e0b)' : 
+                                               'var(--accent-green-solid)',
+                                    borderRadius: '2px',
+                                    transition: 'width 0.3s ease'
+                                  }} />
+                                </div>
+                              </div>
+                            </td>
+                          );
+                        })}
                         <td>
                           {currentUserRole !== 'employee' && (
                             <button
                               className="action-btn-mini edit-btn"
-                              onClick={() => handleEditBalanceClick(bal)}
+                              onClick={() => handleEditBalanceClick(emp)}
                               title="Edit Quotas"
                             >
                               <Edit size={14} />
@@ -1438,22 +1538,59 @@ const LeaveManagement = () => {
                 </select>
               </div>
 
-              <div className="policy-form-field">
-                <label>Carry Forward Limit (PL max days)</label>
-                <input 
-                  type="number"
-                  value={policies.carryForwardLimit}
-                  onChange={(e) => setPolicies({ ...policies, carryForwardLimit: parseInt(e.target.value) || 0 })}
-                />
-              </div>
+              {/* Dynamic Active Policy Rates */}
+              <div className="active-policies-quick-settings flex-column gap-3">
+                <h5 className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">
+                  Active Policy Parameters
+                </h5>
+                {activePolicies.map(policy => {
+                  const rates = policyRates[policy.id] || {
+                    defaultDays: policy.defaultDays,
+                    maxCarryForward: policy.maxCarryForward
+                  };
+                  return (
+                    <div key={policy.id} className="active-policy-item-box p-3 border rounded" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-color)' }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-bold text-xs" style={{ color: 'var(--accent-blue-solid)' }}>
+                          {policy.leaveName} ({policy.leaveCode})
+                        </span>
+                        <Badge variant="success">Active</Badge>
+                      </div>
+                      
+                      <div className="policy-form-field mb-2">
+                        <label style={{ fontSize: '11px', opacity: 0.85 }}>Monthly Quota (Days)</label>
+                        <input 
+                          type="number"
+                          min="0"
+                          value={rates.defaultDays}
+                          onChange={(e) => setPolicyRates(prev => ({
+                            ...prev,
+                            [policy.id]: {
+                              ...(prev[policy.id] || { maxCarryForward: policy.maxCarryForward }),
+                              defaultDays: parseInt(e.target.value) || 0
+                            }
+                          }))}
+                        />
+                      </div>
 
-              <div className="policy-form-field">
-                <label>Maternity Leave Entitlement (Days)</label>
-                <input 
-                  type="number"
-                  value={policies.maternityDuration}
-                  onChange={(e) => setPolicies({ ...policies, maternityDuration: parseInt(e.target.value) || 0 })}
-                />
+                      <div className="policy-form-field">
+                        <label style={{ fontSize: '11px', opacity: 0.85 }}>Carry Forward Limit (Max Days)</label>
+                        <input 
+                          type="number"
+                          min="0"
+                          value={rates.maxCarryForward}
+                          onChange={(e) => setPolicyRates(prev => ({
+                            ...prev,
+                            [policy.id]: {
+                              ...(prev[policy.id] || { defaultDays: policy.defaultDays }),
+                              maxCarryForward: parseInt(e.target.value) || 0
+                            }
+                          }))}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="policy-checkbox-toggles flex-column gap-3 mt-2">
@@ -1509,23 +1646,12 @@ const LeaveManagement = () => {
               <div className="mt-4 pt-4 border-top">
                 <Button 
                   variant="primary" 
-                  onClick={() => {
-                    addToast('success', 'Leave policies configurations saved successfully!');
-                    setAlertsFeed(prev => [
-                      {
-                        id: `AL-${Math.random().toString(36).substring(2, 9)}`,
-                        type: 'success',
-                        message: 'Super Admin updated global leave rules settings.',
-                        timestamp: 'Just now',
-                        read: false
-                      },
-                      ...prev
-                    ]);
-                  }}
+                  onClick={handleSavePolicyConfigs}
                   className="w-full"
                 >
                   Save Policy Configs
                 </Button>
+
               </div>
 
               <div className="mt-2">
@@ -1572,6 +1698,7 @@ const LeaveManagement = () => {
                       <th>Holiday Description</th>
                       <th>Category</th>
                       <th>Detailed Summary</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1589,6 +1716,17 @@ const LeaveManagement = () => {
                           </Badge>
                         </td>
                         <td className="text-secondary text-xs">{hol.description}</td>
+                        <td>
+                          <div className="table-actions-cell" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              className="action-btn-mini danger-btn"
+                              onClick={() => handleDeleteHolidayClick(hol)}
+                              title="Delete Holiday"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1686,6 +1824,9 @@ const LeaveManagement = () => {
                 <h4>Global Leave Policy Configuration Table</h4>
               </div>
               <div className="flex-center gap-2">
+                <Button variant="primary" icon={Plus} onClick={() => setShowAssignLeaveModal(true)} disabled={true}>
+                  Leave assign
+                </Button>
                 <Button variant="danger" icon={RefreshCw} onClick={handleResetAllPolicies}>
                   Reset to Default
                 </Button>
@@ -2071,7 +2212,7 @@ const LeaveManagement = () => {
       <Modal
         isOpen={balanceEditEmployee !== null}
         onClose={() => setBalanceEditEmployee(null)}
-        title={`Adjust Quotas: ${balanceEditEmployee?.employeeName}`}
+        title={`Adjust Quotas: ${balanceEditEmployee?.name}`}
         size="sm"
         footer={
           <div className="modal-actions-wrapper">
@@ -2088,224 +2229,22 @@ const LeaveManagement = () => {
           <div className="balance-editor-form flex-column gap-3 animate-fade-in">
             <p className="text-xs text-muted mb-2">Adjust manual leave day quotas. Changes take effect immediately in reporting fields.</p>
             <div className="editor-fields-grid">
-              <div className="policy-form-field">
-                <label>Casual Leave (CL)</label>
-                <input 
-                  type="number" 
-                  value={balanceInput.cl} 
-                  onChange={(e) => setBalanceInput({ ...balanceInput, cl: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="policy-form-field">
-                <label>Sick Leave (SL)</label>
-                <input 
-                  type="number" 
-                  value={balanceInput.sl} 
-                  onChange={(e) => setBalanceInput({ ...balanceInput, sl: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="policy-form-field">
-                <label>Paid Leave (PL)</label>
-                <input 
-                  type="number" 
-                  value={balanceInput.pl} 
-                  onChange={(e) => setBalanceInput({ ...balanceInput, pl: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="policy-form-field">
-                <label>Maternity Leave</label>
-                <input 
-                  type="number" 
-                  value={balanceInput.maternity} 
-                  onChange={(e) => setBalanceInput({ ...balanceInput, maternity: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-
+              {activePolicies.map(policy => (
+                <div key={policy.id} className="policy-form-field">
+                  <label>{policy.leaveName} ({policy.leaveCode})</label>
+                  <input 
+                    type="number" 
+                    value={balanceInput[policy.leaveCode] || 0} 
+                    onChange={(e) => setBalanceInput({ ...balanceInput, [policy.leaveCode]: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         )}
       </Modal>
 
-      {/* ==================== MODAL: APPLY LEAVE ==================== */}
-      <Modal
-        isOpen={applyModalOpen}
-        onClose={handleCloseApplyModal}
-        title={editingLeave ? `Edit Leave Request: ${editingLeave.id}` : "Apply Leave Absence Request"}
-        size="md"
-        footer={
-          <div className="modal-actions-wrapper">
-            <Button variant="secondary" onClick={handleCloseApplyModal}>
-              {editingLeave ? "Cancel Edit" : "Cancel Request"}
-            </Button>
-            <Button variant="primary" onClick={handleApplySubmit} icon={editingLeave ? Check : Plus}>
-              {editingLeave ? "Save Changes" : "Submit Application"}
-            </Button>
-          </div>
-        }
-      >
-        <form onSubmit={handleApplySubmit} className="apply-leave-modal-body animate-fade-in flex-column gap-4">
-          <div className="modal-form-section-title flex-center gap-2 justify-start mb-1">
-            <Users size={16} className="text-primary" />
-            <h5>Employee Information</h5>
-          </div>
 
-          <div className="apply-fields-grid-2">
-            <div className="policy-form-field">
-              <label>Select Filing Employee *</label>
-              <select
-                value={applyForm.employeeId}
-                onChange={(e) => {
-                  const empId = e.target.value;
-                  const emp = employees.find(x => x.id === empId);
-                  let leaveType = applyForm.type;
-                  if (emp) {
-                    const selectedPolicy = leavePolicyConfigs.find(p => p.leaveName === leaveType);
-                    if (selectedPolicy) {
-                      if (selectedPolicy.leaveName === 'Maternity Leave' && (emp.gender !== 'Female' || emp.maritalStatus !== 'Married')) {
-                        leaveType = 'Casual Leave';
-                      }
-                      if (selectedPolicy.genderRestriction === 'Female' && emp.gender !== 'Female') {
-                        leaveType = 'Casual Leave';
-                      }
-                      if (selectedPolicy.genderRestriction === 'Male' && emp.gender !== 'Male') {
-                        leaveType = 'Casual Leave';
-                      }
-                    }
-                  }
-                  setApplyForm({ ...applyForm, employeeId: empId, type: leaveType });
-                }}
-                required
-              >
-                <option value="">-- Choose Employee --</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="policy-form-field">
-              <label>Leave Category / Code *</label>
-              <select
-                value={applyForm.type}
-                onChange={(e) => setApplyForm({ ...applyForm, type: e.target.value })}
-              >
-                {leavePolicyConfigs
-                  .filter(p => p.isActive)
-                  .filter(p => {
-                    const emp = employees.find(x => x.id === applyForm.employeeId);
-                    if (!emp) return true;
-                    if (p.leaveName === 'Maternity Leave' && (emp.gender !== 'Female' || emp.maritalStatus !== 'Married')) {
-                      return false;
-                    }
-                    if (p.genderRestriction === 'Female' && emp.gender !== 'Female') {
-                      return false;
-                    }
-                    if (p.genderRestriction === 'Male' && emp.gender !== 'Male') {
-                      return false;
-                    }
-                    return true;
-                  })
-                  .map(policy => (
-                    <option key={policy.leaveCode} value={policy.leaveName}>
-                      {policy.leaveName} ({policy.leaveCode}) - {policy.defaultDays} days/year
-                    </option>
-                  ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="modal-form-section-title flex-center gap-2 justify-start mb-1 mt-2">
-            <CalendarDays size={16} className="text-primary" />
-            <h5>Duration & Reasoning</h5>
-          </div>
-
-          <div className="apply-fields-grid-2">
-            <div className="policy-form-field">
-              <label>Start Date *</label>
-              <input
-                type="date"
-                value={applyForm.fromDate}
-                onChange={(e) => setApplyForm({ ...applyForm, fromDate: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="policy-form-field">
-              <label>End Date *</label>
-              <input
-                type="date"
-                value={applyForm.toDate}
-                onChange={(e) => setApplyForm({ ...applyForm, toDate: e.target.value })}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="policy-form-field">
-            <label>Detailed Reason for Absence *</label>
-            <textarea
-              placeholder="Please provide explicit reason details (e.g. Travel tickets, doctor prescriptions etc)..."
-              value={applyForm.reason}
-              onChange={(e) => setApplyForm({ ...applyForm, reason: e.target.value })}
-              rows={3}
-              required
-            />
-          </div>
-
-          <div className="modal-form-section-title flex-center gap-2 justify-start mb-1 mt-2">
-            <FileText size={16} className="text-primary" />
-            <h5>Method & Supporting Documents</h5>
-          </div>
-
-          <div className="apply-fields-grid-2">
-            <div className="policy-form-field">
-              <label>Document Category</label>
-              <select
-                value={applyForm.documentType}
-                onChange={(e) => setApplyForm({ ...applyForm, documentType: e.target.value })}
-              >
-                <option value="Medical Certificate">Medical Certificate</option>
-                <option value="Emergency Documents">Emergency Documents</option>
-                <option value="Travel Documents">Travel Documents</option>
-                <option value="Approved Work Documents">Approved Work Documents</option>
-              </select>
-            </div>
-
-            <div className="policy-form-field flex-column">
-              <label>Attached Document Preview</label>
-              {applyForm.uploadedFileName ? (
-                <div className="file-preview-pill flex-row justify-between items-center">
-                  <div className="flex-center gap-2">
-                    <FileText size={14} className="text-primary" />
-                    <span className="file-name-txt">{applyForm.uploadedFileName}</span>
-                  </div>
-                  <button 
-                    type="button" 
-                    className="clear-file-btn"
-                    onClick={() => setApplyForm(prev => ({ ...prev, uploadedFileName: '', uploadedFileFormat: '' }))}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ) : (
-                <span className="text-muted text-xs italic mt-2">No document attached. Choose below.</span>
-              )}
-            </div>
-          </div>
-
-          <div className="document-uploader-mock-zone flex-column items-center justify-center">
-            <FileUp size={28} className="text-muted mb-2" />
-            <p className="uploader-main-txt">Drag and drop files here to upload supporting certificates</p>
-            <p className="uploader-sub-txt">Supported Formats: PNG, JPG, PDF, DOCX (Max size 5MB)</p>
-            
-            <div className="simulated-upload-buttons-row mt-3 flex-row gap-2">
-              <button type="button" className="mock-upload-btn" onClick={() => simulateFileUpload('PDF')}>Mock Upload PDF</button>
-              <button type="button" className="mock-upload-btn" onClick={() => simulateFileUpload('PNG')}>Mock Upload PNG</button>
-              <button type="button" className="mock-upload-btn" onClick={() => simulateFileUpload('DOCX')}>Mock Upload DOCX</button>
-            </div>
-          </div>
-        </form>
-      </Modal>
 
       {/* ==================== MODAL: LEAVE DETAILS ==================== */}
       <Modal
@@ -2574,6 +2513,186 @@ const LeaveManagement = () => {
               onChange={(e) => setNewHolidayForm({ ...newHolidayForm, description: e.target.value })}
               rows={3}
               placeholder="Provide a brief summary or historical context..."
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* ==================== MODAL: LEAVE ASSIGN ==================== */}
+      <Modal
+        isOpen={showAssignLeaveModal}
+        onClose={() => {
+          setShowAssignLeaveModal(false);
+          setSelectedAssignEmployee(null);
+          setEmployeeSearchQuery('');
+        }}
+        title="Assign Leave directly"
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => {
+              setShowAssignLeaveModal(false);
+              setSelectedAssignEmployee(null);
+              setEmployeeSearchQuery('');
+            }}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleAssignSubmit} icon={Plus}>
+              Assign Leave
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleAssignSubmit} className="apply-leave-modal-body animate-fade-in flex-column gap-4">
+          <div className="modal-form-section-title flex-center gap-2 justify-start mb-1">
+            <Users size={16} className="text-primary" />
+            <h5>Select Employee</h5>
+          </div>
+
+          <div className="policy-form-field position-relative">
+            <label>Search and select employee *</label>
+            <div className="searchable-dropdown-wrapper">
+              <input
+                type="text"
+                placeholder="Type name or ID to search employee..."
+                value={employeeSearchQuery}
+                onChange={(e) => {
+                  setEmployeeSearchQuery(e.target.value);
+                  setShowAssignEmployeeDropdown(true);
+                  if (selectedAssignEmployee) {
+                    setSelectedAssignEmployee(null);
+                  }
+                }}
+                onFocus={() => setShowAssignEmployeeDropdown(true)}
+                className="w-full"
+                required
+              />
+              {showAssignEmployeeDropdown && filteredEmployees.length > 0 && (
+                <div className="searchable-dropdown-options">
+                  {filteredEmployees.map(emp => (
+                    <div
+                      key={emp.id}
+                      className="searchable-option"
+                      onClick={() => {
+                        setSelectedAssignEmployee(emp);
+                        setEmployeeSearchQuery(`${emp.name} (${emp.id})`);
+                        setShowAssignEmployeeDropdown(false);
+                      }}
+                    >
+                      <strong>{emp.name}</strong> ({emp.id}) - {emp.department}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="modal-form-section-title flex-center gap-2 justify-start mb-1 mt-2">
+            <CalendarDays size={16} className="text-primary" />
+            <h5>Duration & Custom Leave Type</h5>
+          </div>
+
+          <div className="apply-fields-grid-2">
+            <div className="policy-form-field">
+              <label>Leave Type (Custom) *</label>
+              <input
+                type="text"
+                placeholder="e.g. Sick Leave, Study Leave..."
+                value={assignForm.customLeaveType}
+                onChange={(e) => setAssignForm({ ...assignForm, customLeaveType: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="policy-form-field">
+              <label>Days *</label>
+              <input
+                type="number"
+                min="1"
+                value={assignForm.days}
+                onChange={(e) => setAssignForm({ ...assignForm, days: parseInt(e.target.value) || 1 })}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="apply-fields-grid-2">
+            <div className="policy-form-field">
+              <label>Start Date *</label>
+              <input
+                type="date"
+                value={assignForm.startDate}
+                onChange={(e) => setAssignForm({ ...assignForm, startDate: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="policy-form-field">
+              <label>Reason / Notes</label>
+              <textarea
+                placeholder="Reason details..."
+                value={assignForm.reason}
+                onChange={(e) => setAssignForm({ ...assignForm, reason: e.target.value })}
+                rows={1}
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Apply Leave Modal */}
+      <Modal isOpen={applyModalOpen} onClose={() => setApplyModalOpen(false)} title={editingLeave ? "Edit Leave Request" : "Apply for Leave"} size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setApplyModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleApplySubmit}>{editingLeave ? "Update Request" : "Submit Request"}</Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleApplySubmit} className="apply-leave-modal-body animate-fade-in flex-column gap-4">
+          <div className="policy-form-field">
+            <label>Leave Type *</label>
+            <select
+              value={applyForm.customLeaveType}
+              onChange={(e) => setApplyForm({ ...applyForm, customLeaveType: e.target.value })}
+              required
+            >
+              {activePolicies.map(p => (
+                <option key={p.id} value={p.leaveCode}>{p.leaveName} ({p.leaveCode})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="apply-fields-grid-2">
+            <div className="policy-form-field">
+              <label>Start Date *</label>
+              <input
+                type="date"
+                value={applyForm.startDate}
+                onChange={(e) => setApplyForm({ ...applyForm, startDate: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="policy-form-field">
+              <label>Days *</label>
+              <input
+                type="number"
+                min="1"
+                value={applyForm.days}
+                onChange={(e) => setApplyForm({ ...applyForm, days: parseInt(e.target.value) || 1 })}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="policy-form-field">
+            <label>Reason / Description</label>
+            <textarea
+              placeholder="Provide details for leave request..."
+              value={applyForm.reason}
+              onChange={(e) => setApplyForm({ ...applyForm, reason: e.target.value })}
+              rows={3}
             />
           </div>
         </form>

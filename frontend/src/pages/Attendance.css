@@ -1061,7 +1061,7 @@
    ============================================ */
 .att-workmode-strip {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing-4);
   margin-bottom: var(--spacing-4);
 }
@@ -1086,6 +1086,11 @@
 .att-workmode-card:hover .att-workmode-arrow {
   transform: translateX(4px);
   opacity: 1;
+}
+
+.att-workmode-total {
+  background: linear-gradient(135deg, #4c1d95 0%, #8b5cf6 100%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .att-workmode-office {
@@ -1763,6 +1768,7 @@
 .att-workmode-card:nth-child(1) { animation-delay: 0.05s; }
 .att-workmode-card:nth-child(2) { animation-delay: 0.1s; }
 .att-workmode-card:nth-child(3) { animation-delay: 0.15s; }
+.att-workmode-card:nth-child(4) { animation-delay: 0.2s; }
 
 /* Web portal form focus states */
 .att-webportal-employee-select select:focus,

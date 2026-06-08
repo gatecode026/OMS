@@ -47,17 +47,8 @@ const menuStructure = [
     title: 'People',
     items: [
       { name: 'Employee Management', icon: Users, path: '/employees' },
-      {
-        name: 'Attendance Management',
-        icon: Clock,
-        subItems: [
-          { name: 'Punch In Out Reports', path: '/attendance' },
-          { name: 'Web Portal Punch', path: '/attendance/webportal' }
-        ]
-      },
-      { name: 'Leave Management', icon: CalendarDays, path: '/leaves' },
-      { name: 'Department Management', icon: GitMerge, path: '/departments' },
       { name: 'Agency Branch Management', icon: Network, path: '/branches' },
+      { name: 'Department Management', icon: GitMerge, path: '/departments' },
       {
         name: 'Team Management',
         icon: Award,
@@ -66,14 +57,23 @@ const menuStructure = [
           { name: 'Managers', path: '/managers' },
           { name: 'Team Leaders', path: '/teams/leaders' }
         ]
-      }
+      },
+      {
+        name: 'Attendance Management',
+        icon: Clock,
+        subItems: [
+          { name: 'Punch In Out Reports', path: '/attendance' },
+          { name: 'Web Portal Punch', path: '/attendance/webportal' }
+        ]
+      },
+      { name: 'Leave Management', icon: CalendarDays, path: '/leaves' }
     ]
   },
   {
     title: 'Operations',
     items: [
       { name: 'Project Management', icon: Briefcase, path: '/projects' },
-      { name: 'Workflow Management', icon: GitFork, path: '/workflows' },
+      { name: 'Workflow Management', icon: GitFork, path: '/workflows', disabled: true },
       { name: 'Task Monitoring', icon: KanbanSquare, path: '/tasks' },
       { name: 'Daily Work Reports', icon: FileText, path: '/work-reports' },
       { name: 'Performance Analytics', icon: BarChart3, path: '/performance' },
@@ -193,6 +193,26 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
   const renderItem = (item) => {
     const Icon = item.icon;
+
+    if (item.disabled) {
+      return (
+        <div
+          key={item.name}
+          className="menu-link menu-link-disabled"
+          title={`${item.name} (Temporarily Disabled)`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <div className="menu-item-content">
+            <Icon size={18} className="menu-icon" />
+            {!effectiveCollapsed && <span className="menu-label-text">{item.name}</span>}
+          </div>
+          {effectiveCollapsed && <div className="collapsed-tooltip">{item.name} (Disabled)</div>}
+        </div>
+      );
+    }
     const isSub = !!item.subItems;
     const isExpanded = expandedMenus[item.name];
     const isCurrentActive = isActive(item.path);

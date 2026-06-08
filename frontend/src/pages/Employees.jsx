@@ -346,7 +346,7 @@ const Employees = () => {
     teamLeader: '', projectManager: '',
     companyName: '',
     branchAddress: '',
-    workLocation: '', workMode: 'Work From Office',
+    workLocation: '', workMode: 'WFO',
     experience: '',
     permissions: {
       dashboard: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
@@ -435,7 +435,7 @@ const Employees = () => {
   const invalidUsername = formData.username && formData.username.trim().length < 3;
   const invalidOfficialEmail = formData.officialEmail && !isValidEmail(formData.officialEmail);
 
-  const invalidShiftTiming = !formData.workMode.includes('Home') && formData.shiftType !== 'Flexible Shift' && formData.shiftTiming && !/^\d{2}:\d{2}\s*(?:AM|PM)\s*-\s*\d{2}:\d{2}\s*(?:AM|PM)$/i.test(formData.shiftTiming.trim());
+  const invalidShiftTiming = formData.workMode !== 'WFH' && formData.shiftType !== 'Flexible Shift' && formData.shiftTiming && !/^\d{2}:\d{2}\s*(?:AM|PM)\s*-\s*\d{2}:\d{2}\s*(?:AM|PM)$/i.test(formData.shiftTiming.trim());
 
   const invalidPanVal = formData.panNumber && !isValidPan(formData.panNumber);
   const invalidAadhaarVal = formData.aadhaarNumber && !isValidAadhaar(formData.aadhaarNumber);
@@ -467,7 +467,7 @@ const Employees = () => {
       teamLeader: '', projectManager: '',
       companyName: '',
       branchAddress: '',
-      workLocation: '', workMode: 'Work From Office',
+      workLocation: '', workMode: 'WFO',
       experience: '',
       permissions: {
         dashboard: { view: true, create: false, edit: false, delete: false, approve: false, export: false },
@@ -870,7 +870,7 @@ const Employees = () => {
       return hasUsername;
     }
     if (step === 4) {
-      const isWfh = formData.workMode === 'Work From Home';
+      const isWfh = formData.workMode === 'WFH';
       if (isWfh || formData.shiftType === 'Flexible Shift') return true;
       return !!(formData.shiftTiming && /^\d{2}:\d{2}\s*(?:AM|PM)\s*-\s*\d{2}:\d{2}\s*(?:AM|PM)$/i.test(formData.shiftTiming.trim()));
     }
@@ -902,7 +902,7 @@ const Employees = () => {
 
   const handleWorkModeChange = (mode) => {
     setFormData(p => {
-      if (mode === 'Work From Home') {
+      if (mode === 'WFH') {
         return {
           ...p,
           workMode: mode,
@@ -2064,9 +2064,8 @@ const Employees = () => {
               </div>
             )}
 
-            {/* Step 2: Professional Details */}
             {wizardStep === 2 && (() => {
-              const isWfh = formData.workMode === 'Work From Home';
+              const isWfh = formData.workMode === 'WFH';
               const isFullTime = formData.employeeType === 'Full Time';
               return (
                 <div className="wizard-step-form">
@@ -2183,10 +2182,10 @@ const Employees = () => {
                         <>
                           <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-4)' }}>Work Mode</h4>
                           <div className="work-mode-selector">
-                            {['Work From Office', 'Work From Home', 'Hybrid'].map(mode => (
+                            {['WFO', 'WFH', 'Hybrid'].map(mode => (
                               <label key={mode} className={`work-mode-option ${formData.workMode === mode ? 'selected' : ''}`}>
                                 <input type="radio" name="workMode" value={mode} checked={formData.workMode === mode} onChange={() => handleWorkModeChange(mode)} hidden />
-                                <span className="work-mode-icon">{mode === 'Work From Office' ? '🏢' : mode === 'Work From Home' ? '🏠' : '🔄'}</span><span>{mode}</span>
+                                <span className="work-mode-icon">{mode === 'WFO' ? '🏢' : mode === 'WFH' ? '🏠' : '🔄'}</span><span>{mode}</span>
                               </label>
                             ))}
                           </div>
@@ -2342,7 +2341,7 @@ const Employees = () => {
 
             {/* Step 4: Shift Setup */}
             {wizardStep === 4 && (() => {
-              const isWfh = formData.workMode === 'Work From Home';
+              const isWfh = formData.workMode === 'WFH';
               return (
                 <div className="wizard-step-form">
                   {isWfh && (

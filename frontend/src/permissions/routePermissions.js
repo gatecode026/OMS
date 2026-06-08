@@ -36,7 +36,6 @@ export const ROUTE_PERMISSIONS = {
   // Employee and above (General Access)
   '/employee-dashboard': ROLES.EMPLOYEE,
   '/': ROLES.EMPLOYEE,
-  '/overview': ROLES.EMPLOYEE,
   '/announcements': ROLES.EMPLOYEE,
   '/notifications': ROLES.EMPLOYEE,
   '/documents': ROLES.EMPLOYEE,

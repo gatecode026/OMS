@@ -150,6 +150,12 @@ export const normalizeEmployee = (emp) => {
   normalized.officialMobile = normalized.officialMobile || normalized.phone || '';
   normalized.teamName = normalized.teamName || normalized.team || 'Operations Core';
 
+  // 12. Individual Leave Balances
+  normalized.clBalance = typeof normalized.clBalance === 'number' ? normalized.clBalance : 8;
+  normalized.slBalance = typeof normalized.slBalance === 'number' ? normalized.slBalance : 12;
+  normalized.plBalance = typeof normalized.plBalance === 'number' ? normalized.plBalance : 15;
+  normalized.maternityBalance = typeof normalized.maternityBalance === 'number' ? normalized.maternityBalance : (normalized.gender === 'Female' ? 180 : 0);
+
   return normalized;
 };
 
@@ -157,10 +163,48 @@ export const AppProvider = ({ children }) => {
   const [employees, setEmployees] = useState([]);
   const [branches, setBranches] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [token, setToken] = useState(() => localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token') || '');
-  const [attendance, setAttendance] = useState(mockAttendance);
-  const [leaveRequests, setLeaveRequests] = useState(mockLeaveRequests);
-  const [tasks, setTasks] = useState(mockTasks);
+  const [attendance, setAttendance] = useState([]);
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [leavePolicyConfigs, setLeavePolicyConfigs] = useState([]);
+  const [holidaysList, setHolidaysList] = useState([]);
+  const [projectsList, setProjectsList] = useState([]);
+  const tasks = React.useMemo(() => {
+    if (!projectsList) return [];
+    const aggregatedTasks = [];
+    projectsList.forEach(proj => {
+      if (proj.tasks) {
+        proj.tasks.forEach(t => {
+          aggregatedTasks.push({
+            ...t,
+            project: proj.name,
+            projectId: proj.id,
+            projectName: proj.name,
+            department: proj.department || 'Engineering',
+            assigneeId: t.assigneeId || 'EMP-2026-003',
+            assigneeName: t.assigneeName || proj.leader || 'Unassigned',
+            description: t.description || '',
+            estimatedHours: t.estimatedHours || 20,
+            status: t.status || (t.completed ? 'Done' : 'To Do'),
+            progress: t.progress !== undefined ? t.progress : (t.completed ? 100 : 0),
+            comments: t.comments || [],
+            attachments: t.attachments || [],
+            approvals: t.approvals && t.approvals.length > 0 ? t.approvals : [
+              { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
+              { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
+              { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
+              { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
+            ],
+            activityLog: t.activityLog || [
+              { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
+            ]
+          });
+        });
+      }
+    });
+    return aggregatedTasks;
+  }, [projectsList]);
   const [payroll, setPayroll] = useState(mockPayroll);
   const [notifications, setNotifications] = useState(mockNotifications);
   const [activityLogs, setActivityLogs] = useState(mockActivityLogs);
@@ -473,34 +517,34 @@ export const AppProvider = ({ children }) => {
     setToken('');
   };
 
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      if (!token) {
-        setEmployees([]);
+  const fetchEmployees = async () => {
+    if (!token) {
+      setEmployees([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/employees', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.status === 401) {
+        logout();
         return;
       }
-      try {
-        const response = await fetch('http://localhost:5000/api/v1/employees', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (response.status === 401) {
-          logout();
-          return;
-        }
 
-        const result = await response.json();
-        if (result.status === 'success') {
-          setEmployees((result.data || []).map(normalizeEmployee));
-        }
-      } catch (err) {
-        console.error('Failed to fetch employees from backend:', err);
-        setEmployees([]);
+      const result = await response.json();
+      if (result.status === 'success') {
+        setEmployees((result.data || []).map(normalizeEmployee));
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch employees from backend:', err);
+      setEmployees([]);
+    }
+  };
 
+  useEffect(() => {
     fetchEmployees();
   }, [token]);
 
@@ -552,6 +596,160 @@ export const AppProvider = ({ children }) => {
 
   useEffect(() => {
     fetchDepartments();
+  }, [token]);
+
+  const fetchTeams = async () => {
+    if (!token) {
+      setTeams([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/teams', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setTeams(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch teams from backend:', err);
+      setTeams([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchTeams();
+  }, [token]);
+
+  const fetchProjects = async () => {
+    if (!token) {
+      setProjectsList([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setProjectsList(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch projects from backend:', err);
+      setProjectsList([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, [token]);
+
+  const fetchAttendance = async () => {
+    if (!token) {
+      setAttendance([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/attendance', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setAttendance(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch attendance from backend:', err);
+      setAttendance([]);
+    }
+  };
+
+  const fetchLeaves = async () => {
+    if (!token) {
+      setLeaveRequests([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/leaves', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeaveRequests(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch leaves from backend:', err);
+      setLeaveRequests([]);
+    }
+  };
+
+  const fetchLeavePolicies = async () => {
+    if (!token) {
+      setLeavePolicyConfigs([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/leaves/policies', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeavePolicyConfigs(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch leave policies from backend:', err);
+      setLeavePolicyConfigs([]);
+    }
+  };
+
+  const fetchHolidays = async () => {
+    if (!token) {
+      setHolidaysList([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/holidays', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setHolidaysList(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch holidays from backend:', err);
+      setHolidaysList([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendance();
+    fetchLeaves();
+    fetchLeavePolicies();
+    fetchHolidays();
+  }, [token]);
+
+  // Real-time polling for attendance logs and employee statuses every 5 seconds
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      fetchAttendance();
+      fetchEmployees();
+      fetchLeaves();
+      fetchHolidays();
+      fetchProjects();
+    }, 5000);
+    return () => clearInterval(interval);
   }, [token]);
 
   // Toast Handler
@@ -950,177 +1148,385 @@ export const AppProvider = ({ children }) => {
   };
 
   // Leave Requests Handlers
-  const approveLeaveRequest = (id, notes = '') => {
+  const approveLeaveRequest = async (id, notes = '') => {
     const leave = leaveRequests.find(l => l.id === id);
     if (!leave) return;
 
-    setLeaveRequests(prev =>
-      prev.map(l =>
-        l.id === id
-          ? {
-              ...l,
-              status: 'Approved',
-              approverNotes: notes || 'Approved by Manager',
-              history: [
-                ...l.history,
-                { date: '2026-05-29', status: 'Approved', comment: `Approved by ${currentUser?.name}` }
-              ]
-            }
-          : l
-      )
-    );
+    try {
+      const updatedHistory = [
+        ...(leave.history || []),
+        { date: new Date().toISOString().split('T')[0], status: 'Approved', comment: `Approved by ${currentUser?.name || 'Manager'}` }
+      ];
+      
+      const payload = {
+        status: 'Approved',
+        approverNotes: notes || 'Approved by Manager',
+        history: updatedHistory
+      };
 
-    // Update Employee Status if leave is active now
-    setEmployees(prev =>
-      prev.map(e => (e.id === leave.employeeId ? { ...e, status: 'On Leave' } : e))
-    );
+      const response = await fetch(`http://localhost:5000/api/v1/leaves/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
 
-    addActivityLog(`Approved leave request for ${leave.employeeName}`, 'Leaves', 'success');
-    addToast('success', `Leave request for ${leave.employeeName} approved.`);
-    
-    // Add Notification
-    setNotifications(prev => [
-      {
-        id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
-        type: 'success',
-        message: `Your leave request from ${leave.fromDate} has been Approved.`,
-        timestamp: 'Just now',
-        read: false
-      },
-      ...prev
-    ]);
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeaveRequests(prev =>
+          prev.map(l => (l.id === id ? result.data : l))
+        );
+
+        // Update Employee Status in DB
+        await fetch(`http://localhost:5000/api/v1/employees/${leave.employeeId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'On Leave' })
+        });
+        
+        fetchEmployees();
+
+        addActivityLog(`Approved leave request for ${leave.employeeName}`, 'Leaves', 'success');
+        addToast('success', `Leave request for ${leave.employeeName} approved.`);
+        
+        // Add Notification
+        setNotifications(prev => [
+          {
+            id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
+            type: 'success',
+            message: `Your leave request from ${leave.fromDate} has been Approved.`,
+            timestamp: 'Just now',
+            read: false
+          },
+          ...prev
+        ]);
+      } else {
+        addToast('error', result.message || 'Failed to approve leave request');
+      }
+    } catch (err) {
+      console.error('Error approving leave:', err);
+      addToast('error', 'Network error while approving leave');
+    }
   };
 
-  const rejectLeaveRequest = (id, notes = '') => {
+  const rejectLeaveRequest = async (id, notes = '') => {
     const leave = leaveRequests.find(l => l.id === id);
     if (!leave) return;
 
-    setLeaveRequests(prev =>
-      prev.map(l =>
-        l.id === id
-          ? {
-              ...l,
-              status: 'Rejected',
-              approverNotes: notes || 'Rejected by Manager',
-              history: [
-                ...l.history,
-                { date: '2026-05-29', status: 'Rejected', comment: `Rejected by ${currentUser?.name}: ${notes}` }
-              ]
+    try {
+      const updatedHistory = [
+        ...(leave.history || []),
+        { date: new Date().toISOString().split('T')[0], status: 'Rejected', comment: `Rejected by ${currentUser?.name || 'Manager'}: ${notes}` }
+      ];
+      
+      const payload = {
+        status: 'Rejected',
+        approverNotes: notes || 'Rejected by Manager',
+        history: updatedHistory
+      };
+
+      const response = await fetch(`http://localhost:5000/api/v1/leaves/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeaveRequests(prev =>
+          prev.map(l => (l.id === id ? result.data : l))
+        );
+
+        addActivityLog(`Rejected leave request for ${leave.employeeName}`, 'Leaves', 'danger');
+        addToast('error', `Leave request for ${leave.employeeName} rejected.`);
+      } else {
+        addToast('error', result.message || 'Failed to reject leave request');
+      }
+    } catch (err) {
+      console.error('Error rejecting leave:', err);
+      addToast('error', 'Network error while rejecting leave');
+    }
+  };
+
+  const applyLeave = async (leaveData) => {
+    return await addLeaveRequest(leaveData);
+  };
+
+  const addLeaveRequest = async (newLeave) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/leaves', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newLeave)
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeaveRequests(prev => [result.data, ...prev]);
+
+        // If the leave is pre-approved (assigned directly by Admin), update employee status to 'On Leave'
+        if (result.data.status === 'Approved') {
+          try {
+            await fetch(`http://localhost:5000/api/v1/employees/${result.data.employeeId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ status: 'On Leave' })
+            });
+            fetchEmployees();
+          } catch (empErr) {
+            console.error('Failed to update employee status on leave assignment:', empErr);
+          }
+        }
+
+        addActivityLog(`Submitted leave request for ${result.data.employeeName}`, 'Leaves', 'success');
+        addToast('success', result.data.status === 'Approved' ? `Leave assigned successfully for ${result.data.employeeName}.` : 'Leave request submitted successfully for approval.');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to submit leave request');
+      }
+    } catch (err) {
+      console.error('Error adding leave request:', err);
+      addToast('error', 'Network error while submitting leave request');
+    }
+  };
+
+  const updateLeaveRequest = async (id, updatedLeave) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/leaves/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedLeave)
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeaveRequests(prev =>
+          prev.map(l => (l.id === id ? result.data : l))
+        );
+        addActivityLog(`Updated leave request ${id}`, 'Leaves', 'success');
+        addToast('success', `Leave request ${id} updated successfully.`);
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to update leave request');
+      }
+    } catch (err) {
+      console.error('Error updating leave request:', err);
+      addToast('error', 'Network error while updating leave request');
+    }
+  };
+
+  const addLeavePolicy = async (newPolicy) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/leaves/policies', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newPolicy)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeavePolicyConfigs(prev => [...prev, result.data]);
+        addToast('success', `${newPolicy.leaveName} policy added successfully!`);
+        return true;
+      } else {
+        addToast('error', result.message || 'Failed to add leave policy');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error adding policy:', err);
+      addToast('error', 'Network error while adding policy');
+      return false;
+    }
+  };
+
+  const updateTaskProgress = async (id, status, progress, remarks) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === id));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === id) {
+        const completed = status === 'Done' || status === 'done' || status === 'completed' || Number(progress) === 100;
+        return {
+          ...t,
+          status: status,
+          progress: Number(progress),
+          completed,
+          remarks: remarks || t.remarks,
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'progress_updated',
+              details: `Progress set to ${progress}% (Status: ${status})`,
+              timestamp: 'Just now',
+              userName: currentUser?.name || 'System'
             }
-          : l
-      )
-    );
+          ]
+        };
+      }
+      return t;
+    });
+
+    const tasksDone = updatedTasks.filter(t => t.completed).length;
+    const progressTotal = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
+
+    const success = await updateProject(project.id, {
+      tasks: updatedTasks,
+      tasksDone,
+      progress: progressTotal,
+      status: progressTotal === 100 ? 'Completed' : project.status
+    });
+
+    if (success) {
+      addActivityLog(`Updated task status to ${status} (${progress}%)`, 'Tasks', 'success');
+      addToast('success', `Task updated successfully.`);
+    }
   };
 
-  const applyLeave = (leaveData) => {
-    const newId = `LR-${String(leaveRequests.length + 1).padStart(3, '0')}`;
-    const newRequest = {
-      ...leaveData,
-      id: newId,
-      status: 'Pending',
-      appliedDate: new Date().toISOString().split('T')[0],
-      history: [{ date: new Date().toISOString().split('T')[0], status: 'Pending', comment: `Applied by ${leaveData.employeeName}` }],
-      approverNotes: ''
-    };
-    setLeaveRequests(prev => [newRequest, ...prev]);
-    addActivityLog(`Applied for ${leaveData.type} from ${leaveData.fromDate} to ${leaveData.toDate}`, 'Leaves', 'warning');
-    addToast('success', `Leave request ${newId} submitted successfully.`);
+  const updateLeavePolicy = async (id, updatedPolicy) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/leaves/policies/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedPolicy)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeavePolicyConfigs(prev =>
+          prev.map(p => (p.id === id ? result.data : p))
+        );
+        return true;
+      } else {
+        addToast('error', result.message || 'Failed to update leave policy');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error updating policy:', err);
+      addToast('error', 'Network error while updating policy');
+      return false;
+    }
   };
 
-  const addAttendanceRecord = (newRecord) => {
-    setAttendance(prev => [newRecord, ...prev]);
-    addActivityLog(`Logged attendance record for ${newRecord.employeeName}`, 'Attendance', 'success');
-    addToast('success', 'Attendance record logged successfully.');
+  const deleteLeavePolicy = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/leaves/policies/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeavePolicyConfigs(prev => prev.filter(p => p.id !== id));
+        addToast('success', 'Leave policy deleted successfully.');
+        return true;
+      } else {
+        addToast('error', result.message || 'Failed to delete leave policy');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error deleting policy:', err);
+      addToast('error', 'Network error while deleting policy');
+      return false;
+    }
   };
 
-  const updateAttendanceRecord = (id, updatedData) => {
-    setAttendance(prev =>
-      prev.map(a => (a.id === id ? { ...a, ...updatedData } : a))
-    );
-    addActivityLog(`Updated attendance record for ${updatedData.employeeName}`, 'Attendance', 'success');
-    addToast('success', 'Attendance record updated successfully.');
+  const resetLeavePolicies = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/leaves/policies/reset', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setLeavePolicyConfigs(result.data || []);
+        addToast('success', 'All policies have been reset to default values.');
+        return true;
+      } else {
+        addToast('error', result.message || 'Failed to reset leave policies');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error resetting policies:', err);
+      addToast('error', 'Network error while resetting policies');
+      return false;
+    }
   };
 
-  // Tasks Handlers
-  const updateTaskStatus = (id, newStatus) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-
-    setTasks(prev =>
-      prev.map(t => (t.id === id ? { ...t, status: newStatus, progress: newStatus === 'Done' ? 100 : t.progress } : t))
-    );
-    addActivityLog(`Moved task "${task.title}" to ${newStatus}`, 'Tasks', 'success');
-    addToast('success', `Task moved to ${newStatus}.`);
+  const addHoliday = async (newHoliday) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/holidays', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newHoliday)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setHolidaysList(prev => [...prev, result.data]);
+        return true;
+      } else {
+        addToast('error', result.message || 'Failed to add holiday');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error adding holiday:', err);
+      addToast('error', 'Network error while adding holiday');
+      return false;
+    }
   };
 
-  const updateTaskProgress = (id, status, progress, remarks) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-
-    setTasks(prev =>
-      prev.map(t => (t.id === id ? {
-        ...t,
-        status: status,
-        progress: Number(progress),
-        remarks: remarks || t.remarks
-      } : t))
-    );
-    addActivityLog(`Updated task "${task.title}" status to ${status} (${progress}%)`, 'Tasks', 'success');
-    addToast('success', `Task "${task.title}" updated successfully.`);
+  const deleteHoliday = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/holidays/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setHolidaysList(prev => prev.filter(h => h.id !== id));
+        addToast('success', 'Holiday deleted successfully.');
+        return true;
+      } else {
+        addToast('error', result.message || 'Failed to delete holiday');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error deleting holiday:', err);
+      addToast('error', 'Network error while deleting holiday');
+      return false;
+    }
   };
 
-  const addTask = (taskData) => {
-    const id = `TSK-${Math.floor(100 + Math.random() * 900)}`;
-    const assignee = employees.find(e => e.id === taskData.assigneeId);
-    
-    const entry = {
-      id,
-      title: taskData.title,
-      project: taskData.project || 'SaaS Platform v2.0',
-      projectId: taskData.project === 'Q2 Sales Campaign' ? 'PRJ-002' : taskData.project === 'Security Audits' ? 'PRJ-003' : 'PRJ-001',
-      projectName: taskData.project || 'SaaS Platform v2.0',
-      description: taskData.description || '',
-      department: assignee ? assignee.department : 'Engineering',
-      assigneeId: taskData.assigneeId,
-      assigneeName: assignee ? assignee.name : 'Unassigned',
-      teamLeader: assignee ? assignee.teamLeader || '' : '',
-      teamLeaderName: assignee ? assignee.teamLeader || 'Unassigned' : 'Unassigned',
-      projectManager: assignee ? assignee.projectManager || '' : '',
-      projectManagerName: assignee ? assignee.projectManager || 'Unassigned' : 'Unassigned',
-      priority: taskData.priority || 'Medium',
-      status: 'To Do',
-      startDate: new Date().toISOString().split('T')[0],
-      dueDate: taskData.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      estimatedHours: Number(taskData.estimatedHours) || 20,
-      progress: 0,
-      comments: [],
-      attachments: [],
-      approvals: [
-        { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 2, role: 'Team Leader Approval', approver: assignee ? assignee.teamLeader || 'Team Leader' : 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 3, role: 'Project Manager Approval', approver: assignee ? assignee.projectManager || 'Project Manager' : 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' }
-      ],
-      activityLog: [
-        { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created by ${currentUser?.name || 'System'}`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    setTasks(prev => [...prev, entry]);
-    addActivityLog(`Created task: "${entry.title}"`, 'Tasks', 'success');
-    addToast('success', 'Task created successfully.');
-  };
-
-  const deleteTask = (id) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    setTasks(prev => prev.filter(t => t.id !== id));
-    addActivityLog(`Deleted task "${task.title}"`, 'Tasks', 'danger');
-    addToast('warning', `Task "${task.title}" deleted.`);
-  };
-
+  // Branch CRUD Handlers
   const addBranch = async (newBranchData) => {
     try {
       const response = await fetch('http://localhost:5000/api/v1/branches', {
@@ -1192,6 +1598,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Department CRUD Handlers
   const addDepartment = async (newDeptData) => {
     try {
       const response = await fetch('http://localhost:5000/api/v1/departments', {
@@ -1263,110 +1670,607 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const reassignTask = (taskId, assigneeId, assigneeName) => {
+  // Team CRUD Handlers
+  const addTeam = async (newTeamData) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/teams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newTeamData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setTeams(prev => [...prev, result.data]);
+        addToast('success', `Team "${result.data.name}" added successfully!`);
+        addActivityLog(`Added new team: ${result.data.name}`, 'Teams', 'success');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to add team');
+      }
+    } catch (err) {
+      console.error('Error adding team:', err);
+      addToast('error', 'Network error while adding team');
+    }
+  };
+
+  const updateTeam = async (id, updatedFields) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/teams/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedFields)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setTeams(prev => prev.map(t => t.id === id ? result.data : t));
+        addActivityLog(`Updated team ID: ${id}`, 'Teams', 'success');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to update team');
+      }
+    } catch (err) {
+      console.error('Error updating team:', err);
+      addToast('error', 'Network error while updating team');
+    }
+  };
+
+  const deleteTeam = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/teams/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setTeams(prev => prev.filter(t => t.id !== id));
+        addToast('warning', `Team removed successfully.`);
+        addActivityLog(`Deleted team ID: ${id}`, 'Teams', 'danger');
+      } else {
+        addToast('error', result.message || 'Failed to delete team');
+      }
+    } catch (err) {
+      console.error('Error deleting team:', err);
+      addToast('error', 'Network error while deleting team');
+    }
+  };
+
+  // Project CRUD Handlers
+  const addProject = async (newProjData) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newProjData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setProjectsList(prev => [...prev, result.data]);
+        addToast('success', `Project "${result.data.name}" created successfully!`);
+        addActivityLog(`Created project: ${result.data.name}`, 'Projects', 'success');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to create project');
+      }
+    } catch (err) {
+      console.error('Error creating project:', err);
+      addToast('error', 'Network error while creating project');
+    }
+  };
+
+  const updateProject = async (id, updatedFields) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/projects/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedFields)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setProjectsList(prev => prev.map(p => p.id === id ? result.data : p));
+        addActivityLog(`Updated project ID: ${id}`, 'Projects', 'success');
+        return result.data;
+      } else {
+        addToast('error', result.message || 'Failed to update project');
+        return null;
+      }
+    } catch (err) {
+      console.error('Error updating project:', err);
+      addToast('error', 'Network error while updating project');
+      return null;
+    }
+  };
+
+  const deleteProject = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/projects/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setProjectsList(prev => prev.filter(p => p.id !== id));
+        addToast('warning', `Project removed successfully.`);
+        addActivityLog(`Deleted project ID: ${id}`, 'Projects', 'danger');
+      } else {
+        addToast('error', result.message || 'Failed to delete project');
+      }
+    } catch (err) {
+      console.error('Error deleting project:', err);
+      addToast('error', 'Network error while deleting project');
+    }
+  };
+
+  const addAttendanceRecord = async (newRecord) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/attendance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newRecord)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setAttendance(prev => [result.data, ...prev]);
+        addActivityLog(`Logged attendance record for ${result.data.employeeName}`, 'Attendance', 'success');
+        addToast('success', 'Attendance record logged successfully.');
+      } else {
+        addToast('error', result.message || 'Failed to log attendance to database');
+      }
+    } catch (err) {
+      console.error('Error logging attendance:', err);
+      addToast('error', 'Network error while logging attendance');
+    }
+  };
+
+  const updateAttendanceRecord = async (id, updatedData) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/attendance/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updatedData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setAttendance(prev =>
+          prev.map(a => (a.id === id ? result.data : a))
+        );
+        addActivityLog(`Updated attendance record for ${result.data.employeeName}`, 'Attendance', 'success');
+        addToast('success', 'Attendance record updated successfully.');
+      } else {
+        addToast('error', result.message || 'Failed to update attendance in database');
+      }
+    } catch (err) {
+      console.error('Error updating attendance:', err);
+      addToast('error', 'Network error while updating attendance');
+    }
+  };
+
+  // Tasks Handlers
+  const updateTaskStatus = async (id, newStatus) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === id));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === id) {
+        const completed = newStatus === 'Done' || newStatus === 'done' || newStatus === 'completed';
+        return {
+          ...t,
+          status: newStatus,
+          completed,
+          progress: completed ? 100 : t.progress,
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'status_updated',
+              details: `Status set to ${newStatus}`,
+              timestamp: 'Just now',
+              userName: currentUser?.name || 'System'
+            }
+          ]
+        };
+      }
+      return t;
+    });
+
+    const tasksDone = updatedTasks.filter(t => t.completed).length;
+    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
+
+    const success = await updateProject(project.id, {
+      tasks: updatedTasks,
+      tasksDone,
+      progress,
+      status: progress === 100 ? 'Completed' : project.status
+    });
+
+    if (success) {
+      addActivityLog(`Moved task to ${newStatus}`, 'Tasks', 'success');
+      addToast('success', `Task moved to ${newStatus}.`);
+    }
+  };
+
+  const addTask = async (taskData) => {
+    let projectId = taskData.projectId;
+    let project = projectsList.find(p => p.id === projectId);
+    
+    // If not found by ID, try finding by name (since Managers.jsx passes project name as taskData.project)
+    if (!project && taskData.project) {
+      project = projectsList.find(p => p.name === taskData.project);
+    }
+    
+    // Fallback to first project if still not found
+    if (!project) {
+      project = projectsList[0];
+    }
+    
+    if (!project) {
+      addToast('error', 'Project not found');
+      return;
+    }
+    
+    projectId = project.id;
+    const nextTaskId = `t-${projectId}-${project.tasks.length + 1}`;
+    
+    const assignee = employees.find(e => e.id === taskData.assigneeId);
+    
+    const newTask = {
+      id: nextTaskId,
+      title: taskData.title.trim(),
+      completed: false,
+      dueDate: taskData.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      priority: taskData.priority || 'Medium',
+      status: 'To Do',
+      overdue: false,
+      assigneeId: taskData.assigneeId || '',
+      assigneeName: assignee ? assignee.name : 'Unassigned',
+      description: taskData.description || '',
+      estimatedHours: Number(taskData.estimatedHours) || 20,
+      progress: 0,
+      comments: [],
+      attachments: [],
+      approvals: [
+        { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' }
+      ],
+      activityLog: [
+        { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
+      ]
+    };
+    
+    const newTasks = [...project.tasks, newTask];
+    const tasksTotal = project.tasksTotal + 1;
+    const progress = Math.round((project.tasksDone / tasksTotal) * 100);
+    
+    const success = await updateProject(projectId, {
+      tasks: newTasks,
+      tasksTotal,
+      progress
+    });
+    
+    if (success) {
+      addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
+      addToast('success', 'Task created successfully.');
+    }
+  };
+
+  const deleteTask = async (id) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === id));
+    if (!project) return;
+
+    const newTasks = project.tasks.filter(t => t.id !== id);
+    const tasksTotal = Math.max(0, project.tasksTotal - 1);
+    const tasksDone = newTasks.filter(t => t.completed).length;
+    const progress = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0;
+
+    const success = await updateProject(project.id, {
+      tasks: newTasks,
+      tasksTotal,
+      tasksDone,
+      progress,
+      status: progress === 100 ? 'Completed' : project.status
+    });
+
+    if (success) {
+      addActivityLog(`Deleted task "${id}"`, 'Tasks', 'danger');
+      addToast('warning', `Task deleted.`);
+    }
+  };
+
+  const reassignTask = async (taskId, assigneeId, assigneeName) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
     const assignee = employees.find(e => e.id === assigneeId);
-    setTasks(prev =>
-      prev.map(t => (t.id === taskId ? {
-        ...t,
-        assigneeId,
-        assigneeName,
-        teamLeader: assignee ? assignee.teamLeader || '' : t.teamLeader,
-        teamLeaderName: assignee ? assignee.teamLeader || 'Unassigned' : t.teamLeaderName,
-        projectManager: assignee ? assignee.projectManager || '' : t.projectManager,
-        projectManagerName: assignee ? assignee.projectManager || 'Unassigned' : t.projectManagerName
-      } : t))
-    );
-    addActivityLog(`Reassigned task ${taskId} to ${assigneeName}`, 'Tasks', 'info');
-    addToast('info', `Task reassigned to ${assigneeName}`);
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          assigneeId,
+          assigneeName,
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'reassigned',
+              details: `Reassigned to ${assigneeName}`,
+              timestamp: 'Just now',
+              userName: currentUser?.name || 'System'
+            }
+          ]
+        };
+      }
+      return t;
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addActivityLog(`Reassigned task ${taskId} to ${assigneeName}`, 'Tasks', 'info');
+      addToast('info', `Task reassigned to ${assigneeName}`);
+    }
   };
 
-  const extendTaskDeadline = (taskId, newDate) => {
-    setTasks(prev =>
-      prev.map(t => (t.id === taskId ? { ...t, dueDate: newDate } : t))
-    );
-    addActivityLog(`Extended deadline for task ${taskId} to ${newDate}`, 'Tasks', 'warning');
-    addToast('success', `Extended deadline to ${newDate}`);
+  const extendTaskDeadline = async (taskId, newDate) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          dueDate: newDate,
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'deadline_extended',
+              details: `Deadline extended to ${newDate}`,
+              timestamp: 'Just now',
+              userName: currentUser?.name || 'System'
+            }
+          ]
+        };
+      }
+      return t;
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addActivityLog(`Extended deadline for task ${taskId} to ${newDate}`, 'Tasks', 'warning');
+      addToast('success', `Extended deadline to ${newDate}`);
+    }
   };
 
-  const escalateTask = (taskId) => {
-    setTasks(prev =>
-      prev.map(t => (t.id === taskId ? { ...t, priority: 'Critical' } : t))
-    );
-    addActivityLog(`Escalated task ${taskId} to Critical priority`, 'Tasks', 'danger');
-    addToast('error', `Task ${taskId} escalated to Critical!`);
+  const escalateTask = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          priority: 'Critical',
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'escalated',
+              details: `Task escalated to Critical priority`,
+              timestamp: 'Just now',
+              userName: currentUser?.name || 'System'
+            }
+          ]
+        };
+      }
+      return t;
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addActivityLog(`Escalated task ${taskId} to Critical priority`, 'Tasks', 'danger');
+      addToast('error', `Task ${taskId} escalated to Critical!`);
+    }
   };
 
-  const addTaskRemarks = (taskId, remarks) => {
-    setTasks(prev =>
-      prev.map(t => (t.id === taskId ? { ...t, remarks } : t))
-    );
-    addToast('success', 'Remarks added to task.');
+  const addTaskRemarks = async (taskId, remarks) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          remarks,
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'remarks_added',
+              details: `Remarks added: ${remarks}`,
+              timestamp: 'Just now',
+              userName: currentUser?.name || 'System'
+            }
+          ]
+        };
+      }
+      return t;
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addToast('success', 'Remarks added to task.');
+    }
   };
 
-  const addTaskComment = (taskId, text, senderName, senderRole) => {
+  const addTaskComment = async (taskId, text, senderName, senderRole) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
     const newComment = {
       id: `c-${Math.random().toString(36).substring(2, 9)}`,
       sender: senderName,
       role: senderRole,
       text,
-      time: 'Just now',
-      attachments: []
+      time: 'Just now'
     };
-    setTasks(prev =>
-      prev.map(t => (t.id === taskId ? { ...t, comments: [...(t.comments || []), newComment] } : t))
-    );
-    addToast('success', 'Comment posted.');
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          comments: [...(t.comments || []), newComment],
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'comment_added',
+              details: `Comment added by ${senderName}`,
+              timestamp: 'Just now',
+              userName: senderName
+            }
+          ]
+        };
+      }
+      return t;
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addToast('success', 'Comment posted.');
+    }
   };
 
-  const approveTaskLevel = (taskId, level, remarks, approverName) => {
-    setTasks(prev =>
-      prev.map(t => {
-        if (t.id !== taskId) return t;
-        const updatedApprovals = (t.approvals || []).map(app => {
-          if (app.level === level) {
-            return {
-              ...app,
-              status: 'Approved',
-              timestamp: 'Just now',
-              remarks: remarks || 'Approved'
-            };
-          }
-          return app;
-        });
+  const approveTaskLevel = async (taskId, level, remarks, approverName) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
 
-        let finalStatus = t.status;
-        const allCompleted = updatedApprovals.every(app => app.status === 'Approved');
-        if (allCompleted) {
-          finalStatus = 'Done';
-        } else if (level === 2) {
-          finalStatus = 'In Review';
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      const updatedApprovals = (t.approvals || []).map(app => {
+        if (app.level === level) {
+          return {
+            ...app,
+            status: 'Approved',
+            timestamp: 'Just now',
+            remarks: remarks || 'Approved'
+          };
         }
+        return app;
+      });
 
-        return { ...t, approvals: updatedApprovals, status: finalStatus, progress: allCompleted ? 100 : t.progress };
-      })
-    );
-    addToast('success', `Level ${level} Approval submitted.`);
+      let finalStatus = t.status || 'To Do';
+      const allCompleted = updatedApprovals.every(app => app.status === 'Approved');
+      if (allCompleted) {
+        finalStatus = 'Done';
+      } else if (level === 2) {
+        finalStatus = 'In Review';
+      }
+
+      return {
+        ...t,
+        approvals: updatedApprovals,
+        status: finalStatus,
+        completed: allCompleted,
+        progress: allCompleted ? 100 : t.progress,
+        activityLog: [
+          ...(t.activityLog || []),
+          {
+            id: `act-${Math.random().toString(36).substring(2, 9)}`,
+            action: 'approval_approved',
+            details: `Level ${level} approved by ${approverName || 'Approver'}`,
+            timestamp: 'Just now',
+            userName: approverName || 'Approver'
+          }
+        ]
+      };
+    });
+
+    const tasksDone = updatedTasks.filter(t => t.completed).length;
+    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
+
+    const success = await updateProject(project.id, {
+      tasks: updatedTasks,
+      tasksDone,
+      progress,
+      status: progress === 100 ? 'Completed' : project.status
+    });
+
+    if (success) {
+      addToast('success', `Level ${level} Approval submitted.`);
+    }
   };
 
-  const rejectTaskLevel = (taskId, level, remarks, approverName) => {
-    setTasks(prev =>
-      prev.map(t => {
-        if (t.id !== taskId) return t;
-        const updatedApprovals = (t.approvals || []).map(app => {
-          if (app.level === level) {
-            return {
-              ...app,
-              status: 'Rejected',
-              timestamp: 'Just now',
-              remarks: remarks || 'Rejected'
-            };
+  const rejectTaskLevel = async (taskId, level, remarks, approverName) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      const updatedApprovals = (t.approvals || []).map(app => {
+        if (app.level === level) {
+          return {
+            ...app,
+            status: 'Rejected',
+            timestamp: 'Just now',
+            remarks: remarks || 'Rejected'
+          };
+        }
+        return app;
+      });
+
+      return {
+        ...t,
+        approvals: updatedApprovals,
+        status: 'To Do',
+        completed: false,
+        activityLog: [
+          ...(t.activityLog || []),
+          {
+            id: `act-${Math.random().toString(36).substring(2, 9)}`,
+            action: 'approval_rejected',
+            details: `Level ${level} rejected by ${approverName || 'Approver'}`,
+            timestamp: 'Just now',
+            userName: approverName || 'Approver'
           }
-          return app;
-        });
-        return { ...t, approvals: updatedApprovals, status: 'To Do' };
-      })
-    );
-    addToast('error', `Approval rejected at Level ${level}.`);
+        ]
+      };
+    });
+
+    const tasksDone = updatedTasks.filter(t => t.completed).length;
+    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
+
+    const success = await updateProject(project.id, {
+      tasks: updatedTasks,
+      tasksDone,
+      progress,
+      status: progress === 100 ? 'Completed' : project.status
+    });
+
+    if (success) {
+      addToast('error', `Approval rejected at Level ${level}.`);
+    }
   };
 
   const getTaskStats = () => {
@@ -1374,7 +2278,7 @@ export const AppProvider = ({ children }) => {
     const active = tasks.filter(t => t.status === 'In Progress' || t.status === 'in_progress').length;
     const completed = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
     const pending = tasks.filter(t => t.status === 'To Do' || t.status === 'todo').length;
-    const todayStr = '2026-06-03';
+    const todayStr = new Date().toISOString().split('T')[0];
     const overdue = tasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, active, completed, pending, overdue, completionRate };
@@ -1385,7 +2289,7 @@ export const AppProvider = ({ children }) => {
     const assigned = empTasks.length;
     const completed = empTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
     const pending = empTasks.filter(t => t.status !== 'Done' && t.status !== 'done').length;
-    const todayStr = '2026-06-03';
+    const todayStr = new Date().toISOString().split('T')[0];
     const overdue = empTasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
     const productivity = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
     return { assigned, completed, pending, overdue, productivity };
@@ -1567,6 +2471,14 @@ export const AppProvider = ({ children }) => {
         addDepartment,
         updateDepartment,
         deleteDepartment,
+        teams,
+        addTeam,
+        updateTeam,
+        deleteTeam,
+        projectsList,
+        addProject,
+        updateProject,
+        deleteProject,
         attendance,
         leaveRequests,
         tasks,
@@ -1602,6 +2514,17 @@ export const AppProvider = ({ children }) => {
         approveLeaveRequest,
         rejectLeaveRequest,
         applyLeave,
+        addLeaveRequest,
+        updateLeaveRequest,
+        fetchLeaves,
+        leavePolicyConfigs,
+        addLeavePolicy,
+        updateLeavePolicy,
+        deleteLeavePolicy,
+        resetLeavePolicies,
+        holidaysList,
+        addHoliday,
+        deleteHoliday,
         updateTaskStatus,
         updateTaskProgress,
         addTask,
@@ -1645,7 +2568,12 @@ export const AppProvider = ({ children }) => {
         markMessageRead,
         markAllMessagesRead,
         login,
-        logout
+        logout,
+        fetchAttendance,
+        fetchEmployees,
+        fetchBranches,
+        fetchDepartments,
+        fetchTeams
       }}
     >
       {children}

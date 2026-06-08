@@ -12,7 +12,6 @@ import Login from './pages/Login';
 
 // ─── Lazy Loaded Admin & Feature Pages ─────────────────────────────────────────
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Overview = lazy(() => import('./pages/Overview'));
 const Employees = lazy(() => import('./pages/Employees'));
 const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'));
 const Attendance = lazy(() => import('./pages/Attendance'));
@@ -43,6 +42,7 @@ const SecurityAudit = lazy(() => import('./pages/SecurityAudit'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 const Managers = lazy(() => import('./pages/Managers'));
 const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
+const Overview = lazy(() => import('./pages/Overview'));
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
