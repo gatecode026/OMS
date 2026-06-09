@@ -255,6 +255,7 @@
 
 .overview-filters-card .filters-grid {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: var(--space-3);
   align-items: center;
@@ -276,6 +277,7 @@
 }
 
 .overview-filters-card .filter-search-field {
+  width: 100%;
   padding: 8px 12px 8px 36px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-color);

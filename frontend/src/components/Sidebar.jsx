@@ -398,7 +398,16 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
               </div>
             </div>
           ) : (
-            filterMenuByRole(menuStructure, currentUserRole, hasPermission).map((section) => (
+            filterMenuByRole(
+              menuStructure.map(sec => ({
+                ...sec,
+                items: sec.items.filter(item => 
+                  currentUserRole !== 'super_admin' || item.name !== 'Employee Dashboard'
+                )
+              })), 
+              currentUserRole, 
+              hasPermission
+            ).map((section) => (
               <div key={section.title} className="sidebar-section">
                 {!effectiveCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
                 <div className="sidebar-section-items">
