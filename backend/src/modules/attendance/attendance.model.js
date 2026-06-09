@@ -65,6 +65,10 @@ const attendanceSchema = new mongoose.Schema({
   workMode: {
     type: String
   },
+  notes: {
+    type: String,
+    default: ''
+  },
   overtime: {
     type: String,
     default: '0 hrs'

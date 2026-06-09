@@ -430,10 +430,35 @@ export const AppProvider = ({ children }) => {
         setCurrentUser(match);
         return;
       }
+
+      // Check if we have the logged in user stored in localStorage (useful for Super Admin not returned by employees API)
+      const savedUserStr = localStorage.getItem('saas_user');
+      if (savedUserStr) {
+        try {
+          const savedUser = JSON.parse(savedUserStr);
+          if (savedUser && savedUser.id === currentUserId && savedUser.roleId === currentUserRole) {
+            setCurrentUser(savedUser);
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to parse saved user:', e);
+        }
+      }
     }
     // Sync current user when role changes to demonstrate RBAC
+    const savedUserStr = localStorage.getItem('saas_user');
+    let savedSuperAdmin = null;
+    if (savedUserStr) {
+      try {
+        const u = JSON.parse(savedUserStr);
+        if (u && u.roleId === 'super_admin') {
+          savedSuperAdmin = u;
+        }
+      } catch (e) {}
+    }
+
     const userMap = {
-      super_admin: employees.find(e => e.roleId === 'super_admin') || employees[0],
+      super_admin: savedSuperAdmin || employees.find(e => e.roleId === 'super_admin') || employees[0],
       dept_admin: employees.find(e => e.roleId === 'dept_admin'),
       branch_admin: employees.find(e => e.roleId === 'branch_admin'),
       manager: employees.find(e => e.roleId === 'manager'),
@@ -490,6 +515,7 @@ export const AppProvider = ({ children }) => {
       sessionStorage.setItem('saas_token', token);
       localStorage.setItem('saas_role', user.roleId);
       localStorage.setItem('saas_user_id', user.id);
+      localStorage.setItem('saas_user', JSON.stringify(user));
 
       setToken(token);
 
@@ -521,6 +547,7 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('saas_token');
     localStorage.removeItem('saas_role');
     localStorage.removeItem('saas_user_id');
+    localStorage.removeItem('saas_user');
     sessionStorage.removeItem('saas_token');
 
     setCurrentUserRole('super_admin');
@@ -1625,6 +1652,7 @@ export const AppProvider = ({ children }) => {
       ...newEmp,
       id: newEmp.id || generatedId,
       status: newEmp.status || 'Active',
+      email: newEmp.officialEmail || newEmp.email,
       workEmail: newEmp.workEmail || newEmp.officialEmail || defaultWorkEmail,
       designation: newEmp.designation || newEmp.role || 'Employee',
       attendanceStatus: newEmp.attendanceStatus || 'Present',
@@ -1706,6 +1734,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const updateEmployee = async (id, updatedData) => {
+    const dataToSend = {
+      ...updatedData,
+      email: updatedData.officialEmail || updatedData.email
+    };
     try {
       const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
         method: 'PUT',
@@ -1713,7 +1745,7 @@ export const AppProvider = ({ children }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(updatedData)
+        body: JSON.stringify(dataToSend)
       });
       const result = await response.json();
       if (result.status === 'success') {
@@ -3757,9 +3789,63 @@ export const AppProvider = ({ children }) => {
     }
 
     // 2. Fallback to Role-based default permissions
+    const DEFAULT_ROLE_PERMISSIONS = {
+      super_admin: {
+        dashboard: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        employees: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        attendance: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        leaves: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        tasks: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        payroll: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        permissions: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        settings: { read: true, create: true, update: true, delete: true, approve: true, export: true }
+      },
+      branch_admin: {
+        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employees: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        attendance: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        leaves: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        tasks: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        payroll: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        permissions: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        settings: { read: true, create: true, update: true, delete: true, approve: true, export: true }
+      },
+      manager: {
+        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employees: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        attendance: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        leaves: { read: true, create: true, update: true, delete: false, approve: true, export: false },
+        tasks: { read: true, create: true, update: true, delete: true, approve: true, export: false },
+        payroll: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        permissions: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
+      },
+      team_leader: {
+        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employees: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        attendance: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        leaves: { read: true, create: true, update: true, delete: false, approve: true, export: false },
+        tasks: { read: true, create: true, update: true, delete: true, approve: true, export: false },
+        payroll: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        permissions: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
+      },
+      employee: {
+        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employees: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        attendance: { read: true, create: true, update: false, delete: false, approve: false, export: false },
+        leaves: { read: true, create: true, update: false, delete: false, approve: false, export: false },
+        tasks: { read: true, create: false, update: true, delete: false, approve: false, export: false },
+        payroll: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        permissions: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
+      }
+    };
+
     const roleObj = roles.find(r => r.id === currentUserRole);
-    if (!roleObj || !roleObj.permissions) return false;
-    return !!roleObj.permissions[module]?.[action];
+    const permissions = roleObj?.permissions || DEFAULT_ROLE_PERMISSIONS[currentUserRole];
+    if (!permissions) return false;
+    return !!permissions[module]?.[action];
   };
 
   return (
