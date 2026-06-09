@@ -61,7 +61,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     // Sort alphabetically by name to match the dashboard's display order
     const sortedPayload = [...payload].sort((a, b) => a.name.localeCompare(b.name));
-
+    
     return (
       <div
         className="custom-tooltip"
@@ -109,12 +109,12 @@ const OrgNode = ({ name, role, subItems }) => {
   const hasChildren = subItems && subItems.length > 0;
   return (
     <div className="org-tree-branch" style={{ marginLeft: '24px', borderLeft: '1px dashed rgba(255,255,255,0.08)', paddingLeft: '16px', marginTop: '10px', position: 'relative' }}>
-      <div
-        onClick={() => hasChildren && setExpanded(!expanded)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
+      <div 
+        onClick={() => hasChildren && setExpanded(!expanded)} 
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '10px', 
           cursor: hasChildren ? 'pointer' : 'default',
           padding: '8px 12px',
           background: 'var(--bg-elevated)',
@@ -225,7 +225,7 @@ const Dashboard = () => {
   // Org Chart Hierarchy Data dynamically computed
   const orgChartData = React.useMemo(() => {
     const ceo = (employees || []).find(e => e.roleId === 'super_admin' || e.designation?.toLowerCase().includes('ceo') || e.designation?.toLowerCase().includes('chief')) || employees[0];
-    if (!ceo) return { name: 'Super Admin', role: 'Chief Executive Officer', subItems: [] };
+    if (!ceo) return { name: 'Balram Suman', role: 'Chief Executive Officer', subItems: [] };
 
     const buildTree = (managerName) => {
       const reports = (employees || []).filter(e => e.teamLeader === managerName && e.name !== managerName);
@@ -244,26 +244,102 @@ const Dashboard = () => {
   }, [employees]);
 
   // Stats Calculations
-  const totalEmployeesCount = employees.length || 8;
-  const activeProjectsCount = (projectsList || []).length || 4;
-
+  const totalEmployeesCount = employees.length || 0;
+  const activeProjectsCount = (projectsList || []).length || 0;
+  
   const todayStr = '2026-06-03';
-  const presentToday = attendance.filter(a => a.date === todayStr && (a.status === 'Present' || a.status === 'Late' || a.status === 'Work From Home')).length || 7;
-  const attendanceRate = Math.round((presentToday / totalEmployeesCount) * 100);
+  const presentToday = attendance.filter(a => a.date === todayStr && (a.status === 'Present' || a.status === 'Late' || a.status === 'Work From Home' || a.status === 'WFH' || a.status === 'present' || a.status === 'late' || a.status === 'wfh')).length;
+  const attendanceRate = totalEmployeesCount > 0 ? Math.round((presentToday / totalEmployeesCount) * 100) : 0;
 
   const todoTasks = tasks.filter(t => t.status === 'To Do' || t.status === 'To Do').length;
   const progressTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'in progress').length;
   const doneTasks = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
 
-  const totalDepts = [...new Set(employees.map(e => e.department))].length || 4;
-  const totalTeams = [...new Set(employees.map(e => e.team).filter(Boolean))].length || 6;
+  const totalDepts = [...new Set(employees.map(e => e.department).filter(Boolean))].length || 0;
+  const totalTeams = [...new Set(employees.map(e => e.team).filter(Boolean))].length || 0;
   const probationCount = employees.filter(e => e.employmentStatus === 'Probation').length || 0;
   const contractExpiringCount = employees.filter(e => e.employeeType === 'Contract').length || 0;
   const missingDocsCount = employees.filter(e => !e.documents || e.documents.length < 3).length || 0;
   const notMarkedAttendanceCount = Math.max(0, employees.length - presentToday);
-  const avgTenure = "2.4 Years";
-  const turnoverRate = "4.8%";
-  const satisfactionScore = "88%";
+
+  const avgTenure = React.useMemo(() => {
+    const joined = employees.filter(e => e.joinDate);
+    if (joined.length === 0) return '—';
+    const now = new Date('2026-06-03');
+    const totalMs = joined.reduce((sum, e) => sum + (now - new Date(e.joinDate)), 0);
+    const avgYrs = totalMs / (365.25 * 24 * 60 * 60 * 1000) / joined.length;
+    return `${avgYrs.toFixed(1)} Years`;
+  }, [employees]);
+
+  const turnoverRate = React.useMemo(() => {
+    if (employees.length === 0) return '0%';
+    const inactive = employees.filter(e => e.status === 'Inactive').length;
+    return `${((inactive / employees.length) * 100).toFixed(1)}%`;
+  }, [employees]);
+
+  const satisfactionScore = React.useMemo(() => {
+    const scores = employees.map(e => e.productivityScore || (e.performanceScore?.overall) || 75);
+    if (scores.length === 0) return '—';
+    const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+    return `${Math.round(avg)}%`;
+  }, [employees]);
+
+  const newThisMonth = React.useMemo(() => {
+    const thirtyDaysAgo = new Date('2026-06-03');
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return employees.filter(e => e.joinDate && new Date(e.joinDate) >= thirtyDaysAgo).length;
+  }, [employees]);
+
+  const lateToday = React.useMemo(() => {
+    return attendance.filter(a => a.date === todayStr && (a.status === 'Late' || a.status === 'late')).length;
+  }, [attendance, todayStr]);
+
+  const leaveToday = React.useMemo(() => {
+    return attendance.filter(a => a.date === todayStr && (a.status === 'On Leave' || a.status === 'Leave' || a.status === 'Half Day' || a.status === 'leave' || a.status === 'on leave')).length;
+  }, [attendance, todayStr]);
+
+  const absentToday = React.useMemo(() => {
+    return attendance.filter(a => a.date === todayStr && (a.status === 'Absent' || a.status === 'absent')).length;
+  }, [attendance, todayStr]);
+
+  const runningProjects = React.useMemo(() => {
+    return (projectsList || []).filter(p => p.status === 'In Progress' || p.status === 'Running' || p.status === 'Active' || p.status === 'active').length;
+  }, [projectsList]);
+
+  const completedProjects = React.useMemo(() => {
+    return (projectsList || []).filter(p => p.status === 'Completed' || p.status === 'completed').length;
+  }, [projectsList]);
+
+  const delayedProjects = React.useMemo(() => {
+    return (projectsList || []).filter(p => p.status === 'Delayed' || p.status === 'delayed').length;
+  }, [projectsList]);
+
+  const withDeadlines = React.useMemo(() => {
+    return (projectsList || []).filter(p => p.deadline || p.dueDate).length;
+  }, [projectsList]);
+
+  const submittedReports = React.useMemo(() => {
+    return (dailyReports || []).filter(r => r.status === 'Submitted' || r.status === 'submitted').length;
+  }, [dailyReports]);
+
+  const pendingReports = React.useMemo(() => {
+    return (dailyReports || []).filter(r => r.status === 'Pending' || r.status === 'pending').length;
+  }, [dailyReports]);
+
+  const approvedReports = React.useMemo(() => {
+    return (dailyReports || []).filter(r => r.status === 'Approved' || r.status === 'approved' || r.status === 'Reviewed' || r.status === 'reviewed').length;
+  }, [dailyReports]);
+
+  const overdueTasks = React.useMemo(() => {
+    const today = new Date(todayStr);
+    return tasks.filter(t => t.status !== 'Done' && t.status !== 'done' && t.dueDate && new Date(t.dueDate) < today).length;
+  }, [tasks, todayStr]);
+
+  const avgBranchPerf = React.useMemo(() => {
+    if (branches.length === 0) return '0%';
+    const avg = branches.reduce((sum, b) => sum + (b.productivity || 85), 0) / branches.length;
+    return `${Math.round(avg)}%`;
+  }, [branches]);
 
   // Dynamic Chart Data
   const attendanceChartData = React.useMemo(() => {
@@ -322,7 +398,7 @@ const Dashboard = () => {
       const deptEmployees = employees.filter(e => e.department === d.name);
       const deptTasks = tasks.filter(t => t.department === d.name);
       const colors = ['var(--color-primary)', '#f59e0b', '#10b981', '#8b5cf6', '#d946ef'];
-
+      
       const totalProd = deptEmployees.reduce((sum, e) => sum + (e.productivityScore || 75), 0);
       const avgProd = deptEmployees.length > 0 ? Math.round(totalProd / deptEmployees.length) : 85;
 
@@ -396,22 +472,22 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-page grid-gap">
-
+      
       {/* 1. Stat Cards Row (incorporating all requested top metrics with sub-details) */}
       <div className="stats-row">
         <StatCard
           label="Total Employees"
           value={totalEmployeesCount}
-          trendVal="+3"
+          trendVal={`+${newThisMonth}`}
           trendType="up"
           trendLabel="Joined this month"
           icon={Users}
           colorVariant="primary"
-          sparklineData={[6, 7, 7, 8, 8, 8, 9]}
+          sparklineData={[6, 7, 7, 8, 8, 8, totalEmployeesCount]}
           onClick={() => navigate('/employees')}
           subMetrics={[
             { label: 'Active', value: `+ ${employees.filter(e => e.status !== 'Inactive').length}`, icon: UserCheck },
-            { label: 'New', value: '+ 3', icon: UserPlus }
+            { label: 'New', value: `+ ${newThisMonth}`, icon: UserPlus }
           ]}
           variant="employees"
         />
@@ -423,13 +499,13 @@ const Dashboard = () => {
           trendLabel="Daily presence score"
           icon={Clock}
           colorVariant="success"
-          sparklineData={[80, 85, 82, 88, 84, 86, 88]}
+          sparklineData={[80, 85, 82, 88, 84, 86, attendanceRate]}
           onClick={() => navigate('/attendance')}
           subMetrics={[
             { label: 'Present', value: presentToday, icon: Check },
-            { label: 'Absent', value: totalEmployeesCount - presentToday - 1, icon: X },
-            { label: 'Late', value: 1, icon: Clock },
-            { label: 'Leave', value: 1, icon: Briefcase }
+            { label: 'Absent', value: absentToday, icon: X },
+            { label: 'Late', value: lateToday, icon: Clock },
+            { label: 'Leave', value: leaveToday, icon: Briefcase }
           ]}
           variant="attendance"
           sparklinePoints={true}
@@ -437,52 +513,52 @@ const Dashboard = () => {
         <StatCard
           label="Active Projects"
           value={activeProjectsCount}
-          trendVal="+1"
+          trendVal="Active"
           trendType="up"
-          trendLabel="Initiated this quarter"
+          trendLabel="Current projects"
           icon={Briefcase}
           colorVariant="purple"
-          sparklineData={[2, 2, 3, 3, 4, 4, 4]}
+          sparklineData={[2, 2, 3, 3, 4, 4, activeProjectsCount]}
           onClick={() => navigate('/projects')}
           subMetrics={[
-            { label: 'Running', value: 3, icon: Settings },
-            { label: 'Completed', value: 1, icon: Trophy },
-            { label: 'Delayed', value: 0, icon: AlarmClock },
-            { label: 'Deadlines', value: 2, icon: Calendar }
+            { label: 'Running', value: runningProjects, icon: Settings },
+            { label: 'Completed', value: completedProjects, icon: Trophy },
+            { label: 'Delayed', value: delayedProjects, icon: AlarmClock },
+            { label: 'Deadlines', value: withDeadlines, icon: Calendar }
           ]}
           variant="projects"
         />
         <StatCard
           label="Work Reports"
           value={reports.length}
-          trendVal="92%"
+          trendVal={`${reports.length > 0 ? Math.round((approvedReports / reports.length) * 100) : 0}%`}
           trendType="up"
           trendLabel="Submission Compliance"
           icon={FileText}
           colorVariant="primary"
-          sparklineData={[5, 6, 5, 7, 6, 8, 8]}
+          sparklineData={[5, 6, 5, 7, 6, 8, reports.length]}
           onClick={() => navigate('/work-reports')}
           subMetrics={[
-            { label: 'Submitted', value: 4, icon: Mail },
-            { label: 'Pending', value: 1, icon: Hourglass },
-            { label: 'Reviewed', value: 3, icon: Search }
+            { label: 'Submitted', value: submittedReports, icon: Mail },
+            { label: 'Pending', value: pendingReports, icon: Hourglass },
+            { label: 'Reviewed', value: approvedReports, icon: Search }
           ]}
           variant="reports"
         />
         <StatCard
           label="Task Management Summary"
           value={todoTasks + progressTasks + doneTasks}
-          trendVal="-3"
-          trendType="down"
+          trendVal={`${doneTasks}`}
+          trendType="up"
           trendLabel="Tasks marked Done"
           icon={CheckCircle}
           colorVariant="warning"
-          sparklineData={[4, 5, 4, 6, 5, 7, 7]}
+          sparklineData={[4, 5, 4, 6, 5, 7, todoTasks + progressTasks + doneTasks]}
           onClick={() => navigate('/tasks')}
           subMetrics={[
             { label: 'Pending', value: todoTasks + progressTasks, icon: RefreshCw },
             { label: 'Completed', value: doneTasks, icon: Check },
-            { label: 'Overdue', value: 2, icon: Calendar }
+            { label: 'Overdue', value: overdueTasks, icon: Calendar }
           ]}
           variant="tasks"
         />
@@ -498,18 +574,18 @@ const Dashboard = () => {
           onClick={() => navigate('/branches')}
           subMetrics={[
             { label: 'Active', value: `+ ${branches.length}`, icon: Globe },
-            { label: 'Avg Perf', value: '91%', icon: TrendingUp },
-            { label: 'HQ Headcount', value: employees.filter(e => e.branch === 'Jaipur HQ' || e.workLocation === 'Jaipur HQ').length || 3, icon: Building2 }
+            { label: 'Avg Perf', value: avgBranchPerf, icon: TrendingUp },
+            { label: 'HQ Headcount', value: employees.filter(e => e.branch === 'Jaipur HQ' || e.workLocation === 'Jaipur HQ' || e.branch === 'Jaipur Main').length, icon: Building2 }
           ]}
           variant="branches"
         />
       </div>
-
+      
       {/* Toggle button for Extended Metrics */}
       <div style={{ display: 'flex', justifyContent: 'center', margin: '0' }}>
-        <Button
-          variant="secondary"
-          size="sm"
+        <Button 
+          variant="secondary" 
+          size="sm" 
           onClick={() => setShowExtendedStats(!showExtendedStats)}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', justifyContent: 'center', background: 'var(--bg-elevated)', border: '1px dashed var(--border-color)' }}
         >
@@ -603,20 +679,20 @@ const Dashboard = () => {
               <AreaChart data={attendanceChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="colorAbsent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="colorLate" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="colorLeave" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -662,7 +738,7 @@ const Dashboard = () => {
 
       {/* 3. Third Row Splits: Department Statistics & Top Leaderboards (Toggled) */}
       <div className="dashboard-splits animate-slide-up">
-
+        
         {/* Department employee statistics table */}
         <div className="card split-panel flex-1">
           <div className="panel-header-simple">
@@ -672,7 +748,7 @@ const Dashboard = () => {
             </div>
             <Badge variant="neutral">Active</Badge>
           </div>
-
+          
           <div className="panel-table-wrap">
             <table className="dash-mini-table">
               <thead>
@@ -722,7 +798,7 @@ const Dashboard = () => {
               <h3 className="card-title">Top Performance Standings</h3>
               <span className="chart-subtitle">Q2 leaderboard rankings</span>
             </div>
-
+            
             {/* Tab switch buttons */}
             <div className="tab-btn-group">
               <button
@@ -749,7 +825,7 @@ const Dashboard = () => {
                   <div className="item-text-info flex-1">
                     <span className="item-primary-name">{user.name}</span>
                     <span className="item-sub-dept">{user.dept}</span>
-
+                    
                     <div className="leader-score-bar-wrapper">
                       <div
                         className="leader-score-bar-fill"
@@ -772,9 +848,9 @@ const Dashboard = () => {
 
       </div>
 
-      {/* Org Hierarchy Chart Splits Row */}
-      <div className="dashboard-splits animate-slide-up" style={{ marginTop: '0', gridTemplateColumns: '1fr' }}>
-
+      {/* Org Hierarchy Chart & Communication Center Splits Row */}
+      <div className="dashboard-splits animate-slide-up" style={{ marginTop: '0' }}>
+        
         {/* Organization Hierarchy Chart Card */}
         <div className="card split-panel flex-1" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
           <div className="panel-header-simple">
@@ -837,7 +913,7 @@ const Dashboard = () => {
                   <td>
                     <Badge variant={
                       report.status === 'Approved' ? 'success' :
-                        report.status === 'Flagged' ? 'danger' : 'warning'
+                      report.status === 'Flagged' ? 'danger' : 'warning'
                     }>
                       {report.status}
                     </Badge>
@@ -883,7 +959,7 @@ const Dashboard = () => {
       <footer className="dashboard-footer card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-4)', padding: 'var(--spacing-5) var(--spacing-6) !important', marginTop: 'var(--spacing-6)' }}>
         <div className="dashboard-footer-info" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
           <ShieldCheck size={16} className="text-success" />
-          <span>Operator: <strong>{currentUser?.name || 'Super Admin'}</strong> (Super Admin)</span>
+          <span>Operator: <strong>{currentUser?.name || 'Balram Suman'}</strong> (Super Admin)</span>
         </div>
         <div>
           <span>Active Sessions: <strong style={{ color: 'var(--color-primary)' }}>12 Operator nodes</strong></span>
@@ -908,8 +984,8 @@ const Dashboard = () => {
         onClose={() => setCommModal(null)}
         title={
           commModal === 'announcement' ? 'Broadcast General Announcement' :
-            commModal === 'notification' ? 'Dispatch Dashboard Notification' :
-              'Send Direct Mail Integration'
+          commModal === 'notification' ? 'Dispatch Dashboard Notification' :
+          'Send Direct Mail Integration'
         }
         size="md"
         footer={
@@ -1033,7 +1109,7 @@ const Dashboard = () => {
               </div>
               <Badge variant={
                 selectedReport.status === 'Approved' ? 'success' :
-                  selectedReport.status === 'Flagged' ? 'danger' : 'warning'
+                selectedReport.status === 'Flagged' ? 'danger' : 'warning'
               }>
                 {selectedReport.status}
               </Badge>

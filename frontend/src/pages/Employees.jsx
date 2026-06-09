@@ -1097,21 +1097,20 @@ const Employees = () => {
 
   const avgMonthlyScore = useMemo(() => monthlyReviews.length > 0
     ? Math.round(monthlyReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / monthlyReviews.length)
-    : 88, [monthlyReviews]);
+    : 0, [monthlyReviews]);
 
   const avgQuarterlyScore = useMemo(() => quarterlyReviews.length > 0
     ? Math.round(quarterlyReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / quarterlyReviews.length)
-    : 92, [quarterlyReviews]);
+    : 0, [quarterlyReviews]);
 
   const avgAnnualScore = useMemo(() => annualReviews.length > 0
     ? Math.round(annualReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / annualReviews.length)
-    : 90, [annualReviews]);
+    : 0, [annualReviews]);
 
   const globalRatingLabel = useMemo(() => {
     const allReviews = appraisalReviews || [];
-    const avgOverallScore = allReviews.length > 0
-      ? Math.round(allReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / allReviews.length)
-      : 90;
+    if (allReviews.length === 0) return '—';
+    const avgOverallScore = Math.round(allReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / allReviews.length);
     if (avgOverallScore >= 90) return 'Outstanding';
     if (avgOverallScore >= 80) return 'Excellent';
     if (avgOverallScore >= 70) return 'Good';
@@ -1120,9 +1119,9 @@ const Employees = () => {
   }, [appraisalReviews]);
 
   const latestReview = useMemo(() => (appraisalReviews && appraisalReviews.length > 0) ? appraisalReviews[0] : null, [appraisalReviews]);
-  const managerFeedback = useMemo(() => latestReview ? (latestReview.notes || latestReview.notes) : "Exceptional execution", [latestReview]);
-  const peerFeedback = useMemo(() => latestReview ? (latestReview.feedback || latestReview.notes) : "Great collaborator", [latestReview]);
-  const selfFeedback = useMemo(() => latestReview ? (latestReview.recommendations || latestReview.notes) : "Aiming to scale infra", [latestReview]);
+  const managerFeedback = useMemo(() => latestReview ? (latestReview.notes || latestReview.notes) : "—", [latestReview]);
+  const peerFeedback = useMemo(() => latestReview ? (latestReview.feedback || latestReview.notes) : "—", [latestReview]);
+  const selfFeedback = useMemo(() => latestReview ? (latestReview.recommendations || latestReview.notes) : "—", [latestReview]);
 
   // Leave Management Summary Calculations
   const pendingApprovalsCount = (leaveRequests || []).filter(r => r.status === 'Pending').length;
@@ -1237,10 +1236,10 @@ const Employees = () => {
     return attB - attA;
   });
 
-  const empOfMonth = sortedByOverallPerf[0] || { name: 'Ananya Gupta' };
-  const bestPerformer = sortedByOverallPerf.find(e => e.id !== empOfMonth.id) || sortedByOverallPerf[0] || { name: 'N/A' };
-  const attendanceChamp = sortedByAttendance.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id) || sortedByAttendance[0] || { name: 'Suresh Kumar' };
-  const mostProductive = sortedByProductivity.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id && e.id !== attendanceChamp.id) || sortedByProductivity[0] || { name: 'Kavita Singh' };
+  const empOfMonth = sortedByOverallPerf[0] || { name: '—' };
+  const bestPerformer = sortedByOverallPerf.find(e => e.id !== empOfMonth.id) || sortedByOverallPerf[0] || { name: '—' };
+  const attendanceChamp = sortedByAttendance.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id) || sortedByAttendance[0] || { name: '—' };
+  const mostProductive = sortedByProductivity.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id && e.id !== attendanceChamp.id) || sortedByProductivity[0] || { name: '—' };
 
   return (
     <div className="employees-page flex-column grid-gap">

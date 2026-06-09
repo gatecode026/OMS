@@ -71,7 +71,7 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#d
 
 const Notifications = () => {
   const isLoading = usePageLoading(600);
-  const { currentUser, currentUserRole, showConfirm, notifications, addNotification, updateNotification, deleteNotification } = useApp();
+  const { currentUserRole, showConfirm, notifications, addNotification, updateNotification, deleteNotification } = useApp();
 
   // Selected Month/Year
   const [month, setMonth] = useState('June');
@@ -1476,7 +1476,7 @@ const Notifications = () => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td style={{ padding: '6px 12px' }}>{currentUser?.name || 'Super Admin'} ({currentUser?.id || 'EMP-2026-001'})</td>
+                      <td style={{ padding: '6px 12px' }}>Balram Suman (EMP-2026-001)</td>
                       <td style={{ padding: '6px 12px' }}>Email + Push</td>
                       <td style={{ padding: '6px 12px' }}><Badge variant="success">Delivered</Badge></td>
                       <td style={{ padding: '6px 12px' }}>Read (10m ago)</td>

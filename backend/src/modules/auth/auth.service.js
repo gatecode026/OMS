@@ -25,6 +25,18 @@ const FALLBACK_EMPLOYEES = [
     team: 'Administration'
   },
   {
+    id: 'EMP-2026-001',
+    name: 'Balram Suman',
+    email: 'aarav.sharma@saas.com',
+    role: 'Super Admin',
+    roleId: 'super_admin',
+    status: 'Active',
+    designation: 'Chief Operations Officer',
+    department: 'Operations',
+    branch: 'Jaipur',
+    team: 'Operations Core'
+  },
+  {
     id: 'EMP-2026-002',
     name: 'Vikram Singh',
     email: 'vikram.singh@saas.com',
@@ -211,8 +223,11 @@ export const login = async (email, password) => {
     throw err;
   }
 
-  // Normalize inputs
+  // Normalize inputs and map default pre-filled admin email
   let resolvedEmail = email.toLowerCase().trim();
+  if (resolvedEmail === 'admin@saas.com') {
+    resolvedEmail = 'aarav.sharma@saas.com';
+  }
 
   console.log(`[DEBUG login] Email received: "${email}" | Password length: ${password ? password.length : 0} | Resolved Email: "${resolvedEmail}"`);
 

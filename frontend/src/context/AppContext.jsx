@@ -75,76 +75,68 @@ export const normalizeEmployee = (emp) => {
     const parts = normalized.currentAddress.split(', ');
     normalized.currentAddress = {
       line1: parts[0] || normalized.currentAddress,
-      city: parts[1] || 'Jaipur',
-      state: parts[2] ? parts[2].split(' - ')[0] : 'Rajasthan',
-      country: 'India',
-      pincode: parts[2] ? parts[2].split(' - ')[1] : '302015'
+      city: parts[1] || '',
+      state: parts[2] ? parts[2].split(' - ')[0] : '',
+      country: '',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : ''
     };
   } else if (!normalized.currentAddress) {
-    normalized.currentAddress = { line1: '12 Lal Kothi', city: 'Jaipur', state: 'Rajasthan', country: 'India', pincode: '302015' };
+    normalized.currentAddress = { line1: '', city: '', state: '', country: '', pincode: '' };
   }
 
   if (typeof normalized.permanentAddress === 'string') {
     const parts = normalized.permanentAddress.split(', ');
     normalized.permanentAddress = {
       line1: parts[0] || normalized.permanentAddress,
-      city: parts[1] || 'Jaipur',
-      state: parts[2] ? parts[2].split(' - ')[0] : 'Rajasthan',
-      country: 'India',
-      pincode: parts[2] ? parts[2].split(' - ')[1] : '302015'
+      city: parts[1] || '',
+      state: parts[2] ? parts[2].split(' - ')[0] : '',
+      country: '',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : ''
     };
   } else if (!normalized.permanentAddress) {
-    normalized.permanentAddress = { line1: '12 Lal Kothi', city: 'Jaipur', state: 'Rajasthan', country: 'India', pincode: '302015' };
+    normalized.permanentAddress = { line1: '', city: '', state: '', country: '', pincode: '' };
   }
 
   // Emergency Contact
-  normalized.emergencyName = normalized.emergencyContactName || normalized.emergencyName || 'Priya Sharma';
-  normalized.emergencyRelation = normalized.emergencyRelation || 'Spouse';
-  normalized.emergencyMobile = normalized.emergencyContactPhone || normalized.emergencyMobile || '+91 98001 00001';
+  normalized.emergencyName = normalized.emergencyContactName || normalized.emergencyName || '';
+  normalized.emergencyRelation = normalized.emergencyRelation || '';
+  normalized.emergencyMobile = normalized.emergencyContactPhone || normalized.emergencyMobile || '';
 
   // Banking
   normalized.bank = normalized.bank || {
-    accountName: normalized.name,
-    bankName: normalized.bankName || 'HDFC Bank',
-    branch: normalized.bankBranch || 'Jaipur Main',
-    accountNumber: normalized.bankAccountNumber || '1234567890',
-    ifsc: normalized.bankIfscCode || 'HDFC0001234',
+    accountName: normalized.name || '',
+    bankName: normalized.bankName || '',
+    branch: normalized.bankBranch || '',
+    accountNumber: normalized.bankAccountNumber || '',
+    ifsc: normalized.bankIfscCode || '',
     upiId: normalized.bankUpiId || '',
-    verified: true
+    verified: false
   };
 
   // Documents
-  normalized.documents = normalized.documents || [
-    { id: 'doc1', type: 'aadhaar', name: 'Aadhaar Card', status: 'verified', uploadedAt: '2025-02-01' },
-    { id: 'doc2', type: 'pan', name: 'PAN Card', status: 'verified', uploadedAt: '2025-02-01' },
-    { id: 'doc3', type: 'offer_letter', name: 'Offer Letter', status: 'available', uploadedAt: '2025-01-15' }
-  ];
+  normalized.documents = normalized.documents || [];
 
   // Activities
-  normalized.activities = normalized.activities || [
-    { id: 'act1', date: '2026-06-05', action: 'Photo Updated', details: 'Profile photo changed' },
-    { id: 'act2', date: '2026-06-04', action: 'Bank Verified', details: 'Bank account verified by admin' },
-    { id: 'act3', date: '2026-06-02', action: 'Password Changed', details: 'Security update' }
-  ];
+  normalized.activities = normalized.activities || [];
 
   // MFA
-  normalized.mfaEnabled = normalized.mfaEnabled || { email: true, mobile: true, authenticator: false };
+  normalized.mfaEnabled = normalized.mfaEnabled || { email: false, mobile: false, authenticator: false };
 
   // General fields
   normalized.photoUrl = normalized.photoUrl || normalized.avatar || null;
-  normalized.dob = normalized.dob || '1995-03-15';
-  normalized.maritalStatus = normalized.maritalStatus || 'Married';
-  normalized.bloodGroup = normalized.bloodGroup || 'O+';
-  normalized.nationality = normalized.nationality || 'Indian';
+  normalized.dob = normalized.dob || '';
+  normalized.maritalStatus = normalized.maritalStatus || '';
+  normalized.bloodGroup = normalized.bloodGroup || '';
+  normalized.nationality = normalized.nationality || '';
   normalized.officialEmail = normalized.officialEmail || normalized.email || '';
   normalized.officialMobile = normalized.officialMobile || normalized.phone || '';
-  normalized.teamName = normalized.teamName || normalized.team || 'Operations Core';
+  normalized.teamName = normalized.teamName || normalized.team || '';
 
   // 12. Individual Leave Balances
-  normalized.clBalance = typeof normalized.clBalance === 'number' ? normalized.clBalance : 8;
-  normalized.slBalance = typeof normalized.slBalance === 'number' ? normalized.slBalance : 12;
-  normalized.plBalance = typeof normalized.plBalance === 'number' ? normalized.plBalance : 15;
-  normalized.maternityBalance = typeof normalized.maternityBalance === 'number' ? normalized.maternityBalance : (normalized.gender === 'Female' ? 180 : 0);
+  normalized.clBalance = typeof normalized.clBalance === 'number' ? normalized.clBalance : 0;
+  normalized.slBalance = typeof normalized.slBalance === 'number' ? normalized.slBalance : 0;
+  normalized.plBalance = typeof normalized.plBalance === 'number' ? normalized.plBalance : 0;
+  normalized.maternityBalance = typeof normalized.maternityBalance === 'number' ? normalized.maternityBalance : 0;
 
   return normalized;
 };
@@ -184,7 +176,7 @@ export const AppProvider = ({ children }) => {
               { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
               { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
               { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 4, role: 'Super Admin Approval', approver: 'Super Admin', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
+              { level: 4, role: 'Super Admin Approval', approver: 'Balram Suman', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
             ],
             activityLog: t.activityLog || [
               { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
@@ -407,7 +399,7 @@ export const AppProvider = ({ children }) => {
 
   // Messages states
   const [messages, setMessages] = useState([
-    { id: 'msg-1', sender: 'Ananya Gupta', text: 'Hey, the frontend lazy route changes are live in production. Please check.', time: '10m ago', unread: true },
+    { id: 'msg-1', sender: 'Ananya Gupta', text: 'Hey Balram, the frontend lazy route changes are live in production. Please check.', time: '10m ago', unread: true },
     { id: 'msg-2', sender: 'Vikram Singh', text: 'Can you review the leave request I submitted yesterday? Need to travel next week.', time: '1h ago', unread: true },
     { id: 'msg-3', sender: 'Neha Verma', text: 'Draft payroll calculations for May are ready in the dashboard.', time: '5h ago', unread: false }
   ]);
@@ -2790,7 +2782,7 @@ export const AppProvider = ({ children }) => {
         { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
         { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
         { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 4, role: 'Super Admin Approval', approver: 'Super Admin', status: 'Pending', timestamp: '', remarks: '' }
+        { level: 4, role: 'Super Admin Approval', approver: 'Balram Suman', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }

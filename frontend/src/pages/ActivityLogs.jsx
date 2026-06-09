@@ -77,7 +77,7 @@ const ActivityLogs = () => {
   // --- Seed data extensions for interactive states ---
   // Active User Sessions
   const [activeSessions, setActiveSessions] = useState([
-    { id: 'SES-9421', employeeName: 'Balram', ipAddress: '103.45.201.8', location: 'Delhi, India', device: 'desktop', browser: 'Chrome', loginTime: '2026-06-04 10:15', mfa: 'Verified', status: 'active' },
+    { id: 'SES-9421', employeeName: 'Balram Suman', ipAddress: '103.45.201.8', location: 'Delhi, India', device: 'desktop', browser: 'Chrome', loginTime: '2026-06-04 10:15', mfa: 'Verified', status: 'active' },
     { id: 'SES-8310', employeeName: 'Vikram Singh', ipAddress: '172.16.89.4', location: 'Noida, India', device: 'desktop', browser: 'Firefox', loginTime: '2026-06-04 11:30', mfa: 'Verified', status: 'active' },
     { id: 'SES-7120', employeeName: 'Ananya Gupta', ipAddress: '192.168.2.14', location: 'Bangalore, India', device: 'laptop', browser: 'Safari', loginTime: '2026-06-04 12:45', mfa: 'Verified', status: 'active' },
     { id: 'SES-6015', employeeName: 'Rohit Sharma', ipAddress: '103.45.201.21', location: 'Mumbai, India', device: 'mobile', browser: 'Chrome Mobile', loginTime: '2026-06-04 14:10', mfa: 'Bypassed (IP)', status: 'active' },
@@ -93,17 +93,17 @@ const ActivityLogs = () => {
 
   // Settings & Configuration Changes Log
   const [configChanges, setConfigChanges] = useState([
-    { id: 'CCN-001', operator: 'Balram', key: 'central_mfa_policy', prev: 'MFA_OPTIONAL', next: 'MFA_MANDATORY_ALL', scope: 'Security', timestamp: '2026-06-03 14:20' },
+    { id: 'CCN-001', operator: 'Balram Suman', key: 'central_mfa_policy', prev: 'MFA_OPTIONAL', next: 'MFA_MANDATORY_ALL', scope: 'Security', timestamp: '2026-06-03 14:20' },
     { id: 'CCN-002', operator: 'Neha Verma', key: 'payroll_disbursement_day', prev: '28th', next: '30th', scope: 'Payroll', timestamp: '2026-06-02 09:15' },
-    { id: 'CCN-003', operator: 'Balram', key: 'max_daily_login_attempts', prev: '5 Attempts', next: '3 Attempts', scope: 'Security', timestamp: '2026-05-30 17:50' },
+    { id: 'CCN-003', operator: 'Balram Suman', key: 'max_daily_login_attempts', prev: '5 Attempts', next: '3 Attempts', scope: 'Security', timestamp: '2026-05-30 17:50' },
     { id: 'CCN-004', operator: 'Suresh Kumar', key: 'cron_payroll_sync_interval', prev: '0 0 * * *', next: '0 0/12 * * *', scope: 'System', timestamp: '2026-05-28 11:10' }
   ]);
 
   // Admin High-Privilege Operations Log
   const [adminOps, setAdminOps] = useState([
-    { id: 'AOP-001', operator: 'Balram', action: 'Trigger Production DB Backup', target: 'Postgres DB Cluster', managerSig: 'Verified', auditorSig: 'Verified', status: 'Executed', timestamp: '2026-06-04 03:00' },
+    { id: 'AOP-001', operator: 'Balram Suman', action: 'Trigger Production DB Backup', target: 'Postgres DB Cluster', managerSig: 'Verified', auditorSig: 'Verified', status: 'Executed', timestamp: '2026-06-04 03:00' },
     { id: 'AOP-002', operator: 'Neha Verma', action: 'Promoted Vikram Singh to Admin', target: 'User Roles & Permissions', managerSig: 'Verified', auditorSig: 'Pending', status: 'Pending Verification', timestamp: '2026-06-04 13:40' },
-    { id: 'AOP-003', operator: 'Balram', action: 'Purged 180-Day System Logs', target: 'Syslog Indexes', managerSig: 'Verified', auditorSig: 'Verified', status: 'Executed', timestamp: '2026-06-01 10:00' },
+    { id: 'AOP-003', operator: 'Balram Suman', action: 'Purged 180-Day System Logs', target: 'Syslog Indexes', managerSig: 'Verified', auditorSig: 'Verified', status: 'Executed', timestamp: '2026-06-01 10:00' },
     { id: 'AOP-004', operator: 'Suresh Kumar', action: 'Exported Financial Budget Sheet', target: 'Billing Core API', managerSig: 'Pending', auditorSig: 'Pending', status: 'Awaiting Authorization', timestamp: '2026-06-04 15:30' }
   ]);
 
@@ -125,7 +125,7 @@ const ActivityLogs = () => {
     const defaultBrowsers = ['Chrome', 'Firefox', 'Safari', 'Edge'];
     const defaultMacs = ['00:1A:2B:3C:4D:5E', '3C:5A:B1:D2:C3:E4', 'FF:AA:88:99:33:EE', '12:34:56:78:9A:BC'];
     const defaultRoles = {
-      'Balram': 'Super Admin',
+      'Balram Suman': 'Super Admin',
       'Vikram Singh': 'Engineering Manager',
       'Ananya Gupta': 'Senior Developer',
       'Rohit Sharma': 'Sales Representative',

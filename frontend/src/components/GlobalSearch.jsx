@@ -14,11 +14,11 @@ const DEPARTMENTS = [
   { id: 'D-2', name: 'Sales', headCount: 4, head: 'Rohit Sharma', branch: 'Delhi', color: '#f59e0b' },
   { id: 'D-3', name: 'Marketing', headCount: 3, head: 'Priya Patel', branch: 'Mumbai', color: '#ec4899' },
   { id: 'D-4', name: 'Human Resources', headCount: 3, head: 'Raj Mehta', branch: 'Jaipur', color: '#10b981' },
-  { id: 'D-5', name: 'Operations', headCount: 4, head: 'Kabir Mehta', branch: 'Jaipur', color: '#3b82f6' },
+  { id: 'D-5', name: 'Operations', headCount: 4, head: 'Balram Suman', branch: 'Jaipur', color: '#3b82f6' },
 ];
 
 const BRANCHES = [
-  { id: 'BR-001', name: 'Jaipur HQ', country: 'India', flag: '🇮🇳', manager: 'Kabir Mehta', employeeCount: 3 },
+  { id: 'BR-001', name: 'Jaipur HQ', country: 'India', flag: '🇮🇳', manager: 'Balram Suman', employeeCount: 3 },
   { id: 'BR-002', name: 'Delhi Office', country: 'India', flag: '🇮🇳', manager: 'Vikram Singh', employeeCount: 12 },
   { id: 'BR-003', name: 'Mumbai Office', country: 'India', flag: '🇮🇳', manager: 'Priya Patel', employeeCount: 4 },
   { id: 'BR-004', name: 'Bangalore Office', country: 'India', flag: '🇮🇳', manager: 'Arjun Mehta', employeeCount: 3 },
@@ -36,7 +36,7 @@ const TEAMS = [
   { id: 'T-9', name: 'UK Sales', dept: 'Sales', leader: 'Naveen Saxena', count: 1 },
   { id: 'T-10', name: 'Digital Marketing', dept: 'Marketing', leader: 'Priya Patel', count: 2 },
   { id: 'T-11', name: 'HR Operations', dept: 'Human Resources', leader: 'Raj Mehta', count: 2 },
-  { id: 'T-12', name: 'Operations Core', dept: 'Operations', leader: 'Kabir Mehta', count: 2 },
+  { id: 'T-12', name: 'Operations Core', dept: 'Operations', leader: 'Balram Suman', count: 2 },
 ];
 
 const PAGES = [

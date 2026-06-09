@@ -246,7 +246,7 @@ const SystemSettings = () => {
   const [branches, setBranches] = useState(() => {
     const savedData = localStorage.getItem('saas_branches_config');
     return savedData ? JSON.parse(savedData) : [
-      { code: 'BR-DEL', name: 'Delhi Head Office', manager: 'Balram', status: 'Active' },
+      { code: 'BR-DEL', name: 'Delhi Head Office', manager: 'Balram Suman', status: 'Active' },
       { code: 'BR-MUM', name: 'Mumbai Branch', manager: 'Priya Patel', status: 'Active' },
       { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: 'Vikram Singh', status: 'Active' },
       { code: 'BR-JPR', name: 'Jaipur Operations', manager: 'Kabir Mehta', status: 'Active' }
@@ -261,7 +261,7 @@ const SystemSettings = () => {
       { id: '1', name: 'Engineering', head: 'Vikram Singh', capacity: 150 },
       { id: '2', name: 'Human Resources', head: 'Neha Verma', capacity: 30 },
       { id: '3', name: 'Sales & Marketing', head: 'Rohit Sharma', capacity: 80 },
-      { id: '4', name: 'Operations', head: 'Balram', capacity: 120 },
+      { id: '4', name: 'Operations', head: 'Balram Suman', capacity: 120 },
       { id: '5', name: 'Finance', head: 'Suresh Kumar', capacity: 25 }
     ];
   });
@@ -466,7 +466,7 @@ const SystemSettings = () => {
         postalCode: '122008'
       });
       setBranches([
-        { code: 'BR-DEL', name: 'Delhi Head Office', manager: 'Balram', status: 'Active' },
+        { code: 'BR-DEL', name: 'Delhi Head Office', manager: 'Balram Suman', status: 'Active' },
         { code: 'BR-MUM', name: 'Mumbai Branch', manager: 'Priya Patel', status: 'Active' },
         { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: 'Vikram Singh', status: 'Active' },
         { code: 'BR-JPR', name: 'Jaipur Operations', manager: 'Kabir Mehta', status: 'Active' }
@@ -475,7 +475,7 @@ const SystemSettings = () => {
         { id: '1', name: 'Engineering', head: 'Vikram Singh', capacity: 150 },
         { id: '2', name: 'Human Resources', head: 'Neha Verma', capacity: 30 },
         { id: '3', name: 'Sales & Marketing', head: 'Rohit Sharma', capacity: 80 },
-        { id: '4', name: 'Operations', head: 'Balram', capacity: 120 },
+        { id: '4', name: 'Operations', head: 'Balram Suman', capacity: 120 },
         { id: '5', name: 'Finance', head: 'Suresh Kumar', capacity: 25 }
       ]);
       
@@ -2106,11 +2106,11 @@ const SystemSettings = () => {
                   </thead>
                   <tbody>
                     {[
-                      { time: 'Today, 10:30 AM', user: currentUser?.name || 'Super Admin', action: 'Modified Overtime Multiplier to 1.5x', scope: 'Payroll Settings', status: 'Success' },
-                      { time: 'Today, 09:15 AM', user: currentUser?.name || 'Super Admin', action: 'Authorized Twilio SMS Gateway URL', scope: 'SMS Config', status: 'Success' },
+                      { time: 'Today, 10:30 AM', user: 'Balram Suman', action: 'Modified Overtime Multiplier to 1.5x', scope: 'Payroll Settings', status: 'Success' },
+                      { time: 'Today, 09:15 AM', user: 'Balram Suman', action: 'Authorized Twilio SMS Gateway URL', scope: 'SMS Config', status: 'Success' },
                       { time: 'Yesterday, 04:22 PM', user: 'Neha Verma', action: 'Updated Leaves Quota Balances', scope: 'Leave Policies', status: 'Success' },
                       { time: 'Yesterday, 02:00 AM', user: 'SYSTEM Scheduler', action: 'Database Auto-Backup completed', scope: 'System Backup', status: 'Success' },
-                      { time: '03-Jun-2026, 11:00 AM', user: currentUser?.name || 'Super Admin', action: 'Added New Branch (Jaipur Operations)', scope: 'Branch Config', status: 'Success' }
+                      { time: '03-Jun-2026, 11:00 AM', user: 'Balram Suman', action: 'Added New Branch (Jaipur Operations)', scope: 'Branch Config', status: 'Success' }
                     ].map((row, idx) => (
                       <tr key={idx}>
                         <td><span className="text-muted font-mono">{row.time}</span></td>

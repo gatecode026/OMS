@@ -207,7 +207,7 @@ const EmployeeDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee, currentUser } = useApp();
+  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee } = useApp();
 
   const emp = useMemo(() => employees.find(e => e.id === id), [employees, id]);
 
@@ -251,7 +251,7 @@ const EmployeeDetail = () => {
   const handleApproveLeave = (leaveId) => {
     const updatedHistory = leaveHistory.map(l => {
       if (l.id === leaveId) {
-        return { ...l, status: 'Approved', approvedBy: currentUser?.name ? `${currentUser.name} (${currentUser.role || 'Manager'})` : 'System Admin', approvedDate: new Date().toISOString().split('T')[0] };
+        return { ...l, status: 'Approved', approvedBy: 'Balram Suman (Manager)', approvedDate: new Date().toISOString().split('T')[0] };
       }
       return l;
     });
@@ -262,7 +262,7 @@ const EmployeeDetail = () => {
   const handleRejectLeave = (leaveId) => {
     const updatedHistory = leaveHistory.map(l => {
       if (l.id === leaveId) {
-        return { ...l, status: 'Rejected', approvedBy: currentUser?.name ? `${currentUser.name} (${currentUser.role || 'Manager'})` : 'System Admin', approvedDate: new Date().toISOString().split('T')[0] };
+        return { ...l, status: 'Rejected', approvedBy: 'Balram Suman (Manager)', approvedDate: new Date().toISOString().split('T')[0] };
       }
       return l;
     });
