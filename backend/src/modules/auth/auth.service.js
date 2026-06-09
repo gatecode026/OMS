@@ -13,6 +13,18 @@ import { isDatabaseConnected } from '../../config/database.js';
 // Base mock employee list for offline in-memory fallback verification
 const FALLBACK_EMPLOYEES = [
   {
+    id: 'EMP-2026-000',
+    name: 'Balram',
+    email: 'superadmin@saas.com',
+    role: 'Super Admin',
+    roleId: 'super_admin',
+    status: 'Active',
+    designation: 'Super Administrator',
+    department: 'Executive',
+    branch: 'Jaipur',
+    team: 'Administration'
+  },
+  {
     id: 'EMP-2026-001',
     name: 'Aarav Sharma',
     email: 'aarav.sharma@saas.com',

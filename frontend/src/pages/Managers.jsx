@@ -130,13 +130,13 @@ function reducer(state, action) {
   switch(action.type) {
     case 'SYNC_DATA': {
       const pmList = action.employees
-        .filter(e => e.roleId === 'manager' || e.designation?.toLowerCase().includes('manager'))
+        .filter(e => (e.roleId === 'manager' || e.designation?.toLowerCase().includes('manager')) && e.status !== 'Inactive')
         .map(emp => {
           const managedProjects = action.projectsList.filter(p => p.manager === emp.name || p.managerId === emp.id);
           const projectIds = managedProjects.map(p => p.id);
           const managedTeams = action.teams.filter(t => managedProjects.some(p => p.leader === t.leader || p.id === t.projectId) || t.department === emp.department);
           const teamLeaderNames = managedTeams.map(t => t.leader);
-          const teamLeadersUnderManager = action.employees.filter(e => e.roleId === 'team_leader' && teamLeaderNames.includes(e.name));
+          const teamLeadersUnderManager = action.employees.filter(e => e.roleId === 'team_leader' && teamLeaderNames.includes(e.name) && e.status !== 'Inactive');
           const teamLeaderIds = teamLeadersUnderManager.map(e => e.id);
           const teamMembersCount = new Set(managedTeams.flatMap(t => (t.membersList || []).map(m => m.id))).size;
           
@@ -180,7 +180,7 @@ function reducer(state, action) {
       });
 
       const teamLeaders = action.employees
-        .filter(e => e.roleId === 'team_leader' || e.designation?.toLowerCase().includes('team leader'))
+        .filter(e => (e.roleId === 'team_leader' || e.designation?.toLowerCase().includes('team leader')) && e.status !== 'Inactive')
         .map(emp => {
           const ledTeam = action.teams.find(t => t.leader === emp.name);
           return {
@@ -544,8 +544,9 @@ const Managers = () => {
   const teamMembersList = useMemo(() => {
     if (!selectedTL) return [];
     const deptEmployees = employees.filter(e => 
-      e.department?.toLowerCase() === selectedTL.department?.toLowerCase() ||
-      e.team?.toLowerCase() === selectedTL.teamName?.toLowerCase()
+      (e.department?.toLowerCase() === selectedTL.department?.toLowerCase() ||
+      e.team?.toLowerCase() === selectedTL.teamName?.toLowerCase()) &&
+      e.status !== 'Inactive'
     );
     if (deptEmployees.length > 0) {
       return deptEmployees.slice(0, selectedTL.teamMembers || 5);
@@ -640,7 +641,7 @@ const Managers = () => {
 
   const deletePM = pm => showConfirm(`Delete "${pm.name}"?`,'This will permanently remove this PM from the panel.', async ()=>{
     await deactivateEmployee(pm.empId || pm.id);
-    addToast('warning',`${pm.name} deactivated.`);
+    dispatch({ type: 'DELETE_PM', id: pm.id });
   },'danger');
   const approve  = item=>{ dispatch({type:'APPROVE',id:item.id,item}); addToast('success','Request approved.'); };
   const rejectSubmit=()=>{ if(!rejectRemarks.trim()){addToast('danger','Enter rejection remarks.');return;} dispatch({type:'REJECT',id:rejectingItem.id,item:rejectingItem,remarks:rejectRemarks}); addToast('warning','Request rejected.'); setRejectingItem(null); setRejectRemarks(''); };
@@ -1047,32 +1048,7 @@ const Managers = () => {
             </div>
           </div>
 
-          {/* ── RANKING TABLE ── */}
-          <div className="pm-dir-card" style={{flexShrink: 0}}>
-            <div className="pm-dir-toolbar">
-              <span className="pm-dir-title">Manager Ranking</span>
-              <Badge variant="info">{ranking.length} Managers</Badge>
-            </div>
-            <div className="pm-ranking-table-wrap">
-              <table className="pm-dir-table">
-                <thead><tr><th>Rank</th><th>Manager</th><th>Projects</th><th>Success Rate</th><th>Performance</th></tr></thead>
-                <tbody>
-                  {ranking.map((pm,idx)=>(
-                    <tr key={pm.id} onClick={()=>dispatch({type:'SELECT_PM',pm})} style={{cursor:'pointer'}}>
-                      <td><div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <div className={`pm-rank-num${idx===0?' pm-rank-gold':idx===1?' pm-rank-silver':idx===2?' pm-rank-bronze':''}`}>{idx+1}</div>
-                        {idx===0?'🏆':idx===1?'🥈':idx===2?'🥉':''}
-                      </div></td>
-                      <td><div className="pm-name-cell"><Avatar name={pm.name} size="sm"/><span className="pm-name-text">{pm.name}</span></div></td>
-                      <td>{pm.activeProjects}</td>
-                      <td><Badge variant={getPerfBadge(pm.successRate)}>{pm.successRate}%</Badge></td>
-                      <td><Badge variant={getPerfBadge(pm.productivity)}>{pm.productivity}%</Badge></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+
 
           {/* ── FILTERS ── */}
           <div className="pm-filters-card" style={{flexShrink: 0}}>

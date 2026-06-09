@@ -11,7 +11,7 @@ import Skeleton from '../components/common/Skeleton';
 import Modal from '../components/common/Modal';
 import {
   GitMerge, Plus, Users, TrendingUp, Clock, Search,
-  Edit2, Trash2, MoreVertical, Building2, X, Save,
+  Edit2, Power, MoreVertical, Building2, X, Save,
   FileText, AlertCircle, ArrowRight, Download, BarChart3,
   PieChart as LucidePieChart, Info, Settings, ShieldCheck, Check,
   AlertTriangle, FileSpreadsheet, Eye, ChevronDown, CheckCircle2,
@@ -22,202 +22,23 @@ import {
   PieChart as RechartsPieChart, Pie, Cell, BarChart as RechartsBarChart, Bar, Legend
 } from 'recharts';
 
-const mockDepartments = [
-  {
-    id: 'DEPT-001',
-    name: 'Engineering',
-    departmentCode: 'ENG-TECH',
-    head: 'Ananya Gupta',
-    headId: 'EMP-2026-003',
-    employeeCount: 15,
-    activeTeams: 4,
-    branch: 'Delhi Head Office',
-    budget: 480000,
-    spent: 310000,
-    projects: 5,
-    activeProjects: 3,
-    completedProjects: 8,
-    pendingProjects: 1,
-    delayedProjects: 1,
-    avgPerformance: 88,
-    attendanceRate: 94,
-    wfhFilings: 8,
-    tasksCompleted: 142,
-    tasksInProgress: 34,
-    color: '#3b82f6',
-    description: 'Responsible for all software development, infrastructure management, and technical innovation across the platform.',
-    createdDate: '2022-01-15',
-    status: 'Active'
-  },
-  {
-    id: 'DEPT-002',
-    name: 'Sales',
-    departmentCode: 'SLS-GROW',
-    head: 'Rohit Sharma',
-    headId: 'EMP-2026-004',
-    employeeCount: 12,
-    activeTeams: 3,
-    branch: 'Jaipur Office',
-    budget: 320000,
-    spent: 198000,
-    projects: 3,
-    activeProjects: 2,
-    completedProjects: 5,
-    pendingProjects: 0,
-    delayedProjects: 1,
-    avgPerformance: 92,
-    attendanceRate: 91,
-    wfhFilings: 3,
-    tasksCompleted: 210,
-    tasksInProgress: 15,
-    color: '#10b981',
-    description: 'Drives revenue growth through new business acquisition, account management, and client relationship development.',
-    createdDate: '2022-01-15',
-    status: 'Active'
-  },
-  {
-    id: 'DEPT-003',
-    name: 'Marketing',
-    departmentCode: 'MKT-BRAND',
-    head: 'Priya Patel',
-    headId: 'EMP-2026-005',
-    employeeCount: 8,
-    activeTeams: 2,
-    branch: 'Mumbai Agency',
-    budget: 250000,
-    spent: 215000,
-    projects: 4,
-    activeProjects: 4,
-    completedProjects: 3,
-    pendingProjects: 2,
-    delayedProjects: 0,
-    avgPerformance: 79,
-    attendanceRate: 88,
-    wfhFilings: 12,
-    tasksCompleted: 98,
-    tasksInProgress: 28,
-    color: '#8b5cf6',
-    description: 'Manages brand identity, digital marketing campaigns, content creation, and customer acquisition strategies.',
-    createdDate: '2022-03-01',
-    status: 'Under Review'
-  },
-  {
-    id: 'DEPT-004',
-    name: 'Human Resources',
-    departmentCode: 'HR-PEOPLE',
-    head: 'Neha Verma',
-    headId: 'EMP-2026-007',
-    employeeCount: 6,
-    activeTeams: 2,
-    branch: 'Delhi Head Office',
-    budget: 180000,
-    spent: 92000,
-    projects: 2,
-    activeProjects: 2,
-    completedProjects: 4,
-    pendingProjects: 1,
-    delayedProjects: 0,
-    avgPerformance: 85,
-    attendanceRate: 95,
-    wfhFilings: 5,
-    tasksCompleted: 64,
-    tasksInProgress: 12,
-    color: '#f59e0b',
-    description: 'Handles recruitment, employee onboarding, training & development, performance reviews, and compliance.',
-    createdDate: '2022-01-15',
-    status: 'Expansion Mode'
-  },
-  {
-    id: 'DEPT-005',
-    name: 'Operations',
-    departmentCode: 'OPS-FLOW',
-    head: 'Aarav Sharma',
-    headId: 'EMP-2026-001',
-    employeeCount: 10,
-    activeTeams: 3,
-    branch: 'Jaipur Office',
-    budget: 290000,
-    spent: 245000,
-    projects: 2,
-    activeProjects: 1,
-    completedProjects: 6,
-    pendingProjects: 1,
-    delayedProjects: 0,
-    avgPerformance: 95,
-    attendanceRate: 92,
-    wfhFilings: 4,
-    tasksCompleted: 115,
-    tasksInProgress: 22,
-    color: '#ef4444',
-    description: 'Oversees day-to-day business operations, process optimization, vendor management, and cross-team coordination.',
-    createdDate: '2022-01-15',
-    status: 'Active'
-  },
-  {
-    id: 'DEPT-006',
-    name: 'Research & Dev',
-    departmentCode: 'RND-INNOV',
-    head: 'Dr. Vikramaditya',
-    headId: 'EMP-2026-010',
-    employeeCount: 4,
-    activeTeams: 1,
-    branch: 'Mumbai Agency',
-    budget: 150000,
-    spent: 35000,
-    projects: 1,
-    activeProjects: 1,
-    completedProjects: 2,
-    pendingProjects: 0,
-    delayedProjects: 0,
-    avgPerformance: 90,
-    attendanceRate: 96,
-    wfhFilings: 6,
-    tasksCompleted: 30,
-    tasksInProgress: 8,
-    color: '#06b6d4',
-    description: 'Explores future product offerings, applies AI research, and runs pilot experimentation protocols.',
-    createdDate: '2025-05-01',
-    status: 'Inactive'
-  }
-];
 
-const mockTeams = [
-  { id: 'TEAM-001', name: 'UI/UX Design', leader: 'Vikram Singh', department: 'Engineering', employeeCount: 3, activeProjects: 2, status: 'Active' },
-  { id: 'TEAM-002', name: 'Backend Dev', leader: 'Suresh Kumar', department: 'Engineering', employeeCount: 5, activeProjects: 3, status: 'Active' },
-  { id: 'TEAM-003', name: 'Direct Sales', leader: 'Rahul Sharma', department: 'Sales', employeeCount: 8, activeProjects: 1, status: 'Active' },
-  { id: 'TEAM-004', name: 'Content Marketing', leader: 'Priya Patel', department: 'Marketing', employeeCount: 4, activeProjects: 2, status: 'Active' },
-  { id: 'TEAM-005', name: 'Talent Acquisition', leader: 'Neha Verma', department: 'Human Resources', employeeCount: 3, activeProjects: 1, status: 'Active' },
-  { id: 'TEAM-006', name: 'Support Ops', leader: 'Aarav Sharma', department: 'Operations', employeeCount: 6, activeProjects: 2, status: 'Under Review' },
-  { id: 'TEAM-007', name: 'QA Testing', leader: 'Karan Malhotra', department: 'Engineering', employeeCount: 4, activeProjects: 1, status: 'Active' }
-];
-
-const mockAlerts = [
-  { id: 'AL-01', type: 'warning', title: 'Department Goal In Progress', message: 'Engineering department currently working on Goal-Alpha.', time: '10 mins ago' },
-  { id: 'AL-02', type: 'danger', title: 'Department Head Resigned', message: 'Ananya Gupta (Engineering Head) has submitted resignation.', time: '1 hour ago' },
-  { id: 'AL-03', type: 'danger', title: 'Department Budget Shortage', message: 'Marketing department has spent 86% of its annual allocation.', time: '3 hours ago' },
-  { id: 'AL-04', type: 'warning', title: 'Team Leader Vacancy', message: 'Backend Dev team requires a new lead engineer.', time: '1 day ago' },
-  { id: 'AL-05', type: 'info', title: 'High Employee Turnover', message: 'Sales department showing higher turnover rate (12%) this month.', time: '2 days ago' }
-];
-
-const mockActivities = [
-  { id: 'ACT-01', message: 'New IT Department Created', time: '10 mins ago', type: 'create' },
-  { id: 'ACT-02', message: 'Rahul Sharma Assigned as Department Head for Sales', time: '2 hours ago', type: 'assign' },
-  { id: 'ACT-03', message: 'Marketing Team Formed under Priya Patel', time: '1 day ago', type: 'create' },
-  { id: 'ACT-04', message: 'Sales Department Achieved Monthly Target', time: '3 days ago', type: 'success' },
-  { id: 'ACT-05', message: 'New Theme Added in the HR Department', time: '5 days ago', type: 'update' }
-];
-
-const mockDocuments = [
-  { id: 'DOC-01', name: 'Department Policies 2026.pdf', size: '1.2 MB', category: 'Standard Policy', date: '2026-05-10' },
-  { id: 'DOC-02', name: 'Engineering SOP v2.docx', size: '850 KB', category: 'SOP Documents', date: '2026-05-12' },
-  { id: 'DOC-03', name: 'Company Organization Chart.png', size: '2.4 MB', category: 'Organization Charts', date: '2026-05-15' },
-  { id: 'DOC-04', name: 'Team Guidelines.pdf', size: '920 KB', category: 'Team Guidelines', date: '2026-05-18' },
-  { id: 'DOC-05', name: 'Q1 Department Performance Report.xlsx', size: '1.5 MB', category: 'Performance Reports', date: '2026-05-20' }
-];
 
 const Departments = () => {
   const isLoading = usePageLoading(600);
-  const { employees, branches, departments: contextDepartments, addDepartment, updateDepartment, deleteDepartment, addToast, showConfirm } = useApp();
+  const { 
+    employees, 
+    branches, 
+    departments: contextDepartments, 
+    addDepartment, 
+    updateDepartment, 
+    addToast, 
+    showConfirm,
+    teams: contextTeams,
+    deleteTeam,
+    updateTeam,
+    addActivityLog
+  } = useApp();
 
   // Tab State: 'directory' | 'analytics' | 'teams' | 'documents' | 'alerts'
   const [activeTab, setActiveTab] = useState('directory');
@@ -244,10 +65,7 @@ const Departments = () => {
 
   // Dynamic Data Lists
   const departments = contextDepartments || [];
-  const [teams, setTeams] = useState(mockTeams);
-  const [alertsFeed, setAlertsFeed] = useState(mockAlerts);
-  const [recentActivities, setRecentActivities] = useState(mockActivities);
-  const [documents, setDocuments] = useState(mockDocuments);
+  const teams = contextTeams || [];
 
   // Modals Toggle States
   const [selectedDept, setSelectedDept] = useState(null);
@@ -316,14 +134,7 @@ const Departments = () => {
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
 
-  // Policies configurations
-  const [policiesConfig, setPoliciesConfig] = useState({
-    standard: true, custom: false, workingHours: 40, shiftConfig: 'General Shift', criteria: 'KPI Thresholds'
-  });
 
-  // Drag-and-drop file upload simulator
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedFile, setUploadedFile] = useState(null);
 
   // KPI Computations
   const totalBudget = departments.reduce((acc, d) => acc + d.budget, 0);
@@ -391,10 +202,7 @@ const Departments = () => {
         description: newDeptForm.description
       });
       if (updated) {
-        setRecentActivities([
-          { id: `ACT-${Date.now()}`, message: `Department ${newDeptForm.name} Updated`, time: 'Just now', type: 'update' },
-          ...recentActivities
-        ]);
+        await addActivityLog(`Department ${newDeptForm.name} Updated`, 'Departments', 'update');
         setAddDeptOpen(false);
         setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, budget: 100000, description: '' });
         setShowCustomBranchInput(false);
@@ -429,10 +237,7 @@ const Departments = () => {
 
       const saved = await addDepartment(newDeptObj);
       if (saved) {
-        setRecentActivities([
-          { id: `ACT-${Date.now()}`, message: `New Department ${newDeptForm.name} Created`, time: 'Just now', type: 'create' },
-          ...recentActivities
-        ]);
+        await addActivityLog(`New Department ${newDeptForm.name} Created`, 'Departments', 'create');
         setAddDeptOpen(false);
         setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, budget: 100000, description: '' });
         setShowCustomBranchInput(false);
@@ -444,7 +249,7 @@ const Departments = () => {
 
 
   // Handle Action - Transfer Employee
-  const handleTransferSubmit = (e) => {
+  const handleTransferSubmit = async (e) => {
     e.preventDefault();
     if (!transferForm.employee || !transferForm.reason) {
       addToast('error', 'Please fill in all transfer fields.');
@@ -463,10 +268,7 @@ const Departments = () => {
         employeeCount: targetDept.employeeCount + 1
       });
     }
-    setRecentActivities([
-      { id: `ACT-${Date.now()}`, message: `Transferred ${transferForm.employee} from ${transferForm.source} to ${transferForm.target}`, time: 'Just now', type: 'assign' },
-      ...recentActivities
-    ]);
+    await addActivityLog(`Transferred ${transferForm.employee} from ${transferForm.source} to ${transferForm.target}`, 'Departments', 'assign');
     setTransferOpen(false);
     addToast('success', `Transfer of ${transferForm.employee} initiated successfully.`);
     setTransferForm({ employee: '', source: 'Sales', target: 'Engineering', reason: '', date: '2026-06-01' });
@@ -494,33 +296,7 @@ const Departments = () => {
     }, 250);
   };
 
-  // Handle Document upload simulation
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploadedFile(file);
-    setUploadProgress(0);
 
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          const newDoc = {
-            id: `DOC-${Date.now()}`,
-            name: file.name,
-            size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-            category: 'Standard Policy',
-            date: new Date().toISOString().split('T')[0]
-          };
-          setDocuments([newDoc, ...documents]);
-          addToast('success', `${file.name} uploaded successfully.`);
-          setUploadedFile(null);
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 150);
-  };
 
   // Chart Data preparation
   const performanceTrendData = departments.map(d => ({
@@ -599,9 +375,7 @@ const Departments = () => {
           {[
             { id: 'directory', label: 'Department Directory', icon: GitMerge },
             { id: 'analytics', label: 'Performance Analytics', icon: TrendingUp },
-            { id: 'teams', label: 'Team Management', icon: Users },
-            { id: 'documents', label: 'Policies & Documents', icon: FileText },
-            { id: 'alerts', label: 'Alerts & Activity Logs', icon: AlertCircle }
+            { id: 'teams', label: 'Team Management', icon: Users }
           ].map(tab => {
             const Icon = tab.icon;
             return (
@@ -666,8 +440,6 @@ const Departments = () => {
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                   <option value="All">All Statuses</option>
                   <option value="Active">Active</option>
-                  <option value="Under Review">Under Review</option>
-                  <option value="Expansion Mode">Expansion Mode</option>
                   <option value="Inactive">Inactive</option>
                 </select>
               </div>
@@ -772,11 +544,7 @@ const Departments = () => {
                         </td>
                         <td>
                           <Badge
-                            variant={
-                              dept.status === 'Active' ? 'success' :
-                              dept.status === 'Under Review' ? 'warning' :
-                              dept.status === 'Expansion Mode' ? 'purple' : 'danger'
-                            }
+                            variant={dept.status === 'Active' ? 'success' : 'danger'}
                           >
                             {dept.status}
                           </Badge>
@@ -791,18 +559,15 @@ const Departments = () => {
                               <Edit2 size={13} />
                             </button>
                             <button
-                              className="icon-action-btn icon-action-danger"
-                              title="Delete"
-                              onClick={() => showConfirm(
-                                'Delete Department',
-                                `Are you sure you want to delete the ${dept.name} department? This cannot be undone.`,
-                                () => {
-                                  deleteDepartment(dept.id);
-                                },
-                                'danger'
-                              )}
+                              className={`icon-action-btn ${dept.status === 'Active' ? 'text-success' : 'text-muted'}`}
+                              title={dept.status === 'Active' ? 'Deactivate Department' : 'Activate Department'}
+                              onClick={async () => {
+                                const nextStatus = dept.status === 'Active' ? 'Inactive' : 'Active';
+                                await updateDepartment(dept.id, { status: nextStatus });
+                                addToast('success', `Department status updated to ${nextStatus}`);
+                              }}
                             >
-                              <Trash2 size={13} />
+                              <Power size={13} />
                             </button>
                           </div>
                         </td>
@@ -976,19 +741,15 @@ const Departments = () => {
                           <Edit2 size={13} />
                         </button>
                         <button
-                          className="icon-action-btn icon-action-danger"
-                          title="Dissolve Team"
-                          onClick={() => showConfirm(
-                            'Dissolve Team',
-                            `Are you sure you want to dissolve the team ${team.name}? All members will remain in their parent departments.`,
-                            () => {
-                              setTeams(prev => prev.filter(t => t.id !== team.id));
-                              addToast('warning', `Team ${team.name} dissolved.`);
-                            },
-                            'danger'
-                          )}
+                          className={`icon-action-btn ${team.status === 'Active' ? 'text-success' : 'text-muted'}`}
+                          title={team.status === 'Active' ? 'Deactivate Team' : 'Activate Team'}
+                          onClick={async () => {
+                            const nextStatus = team.status === 'Active' ? 'Inactive' : 'Active';
+                            await updateTeam(team.id, { status: nextStatus });
+                            addToast('success', `Team status updated to ${nextStatus}`);
+                          }}
                         >
-                          <Trash2 size={13} />
+                          <Power size={13} />
                         </button>
                       </div>
                     </td>
@@ -1000,218 +761,7 @@ const Departments = () => {
         </div>
       )}
 
-      {/* TAB CONTENT - POLICIES & DOCUMENTS */}
-      {activeTab === 'documents' && (
-        <div className="dept-tab-wrapper">
-          <div className="dept-policy-docs-layout">
-            
-            {/* Left: Policy Configuration */}
-            <div className="card policy-config-panel flex-column gap-4">
-              <h3 className="card-title flex-center justify-start gap-2">
-                <Settings size={18} className="text-primary" />
-                <span>Department Policy Settings</span>
-              </h3>
-              
-              <div className="policy-checkbox-toggles flex-column gap-3 mt-2">
-                <label className="checkbox-toggle-label">
-                  <input
-                    type="checkbox"
-                    checked={policiesConfig.standard}
-                    onChange={e => setPoliciesConfig({ ...policiesConfig, standard: e.target.checked })}
-                  />
-                  <div>
-                    <span className="toggle-title">Enforce Standard Workhours</span>
-                    <p className="toggle-desc">Lock weekly working hours guidelines to standard contract definitions.</p>
-                  </div>
-                </label>
 
-                <label className="checkbox-toggle-label">
-                  <input
-                    type="checkbox"
-                    checked={policiesConfig.custom}
-                    onChange={e => setPoliciesConfig({ ...policiesConfig, custom: e.target.checked })}
-                  />
-                  <div>
-                    <span className="toggle-title">Enable Cross-Department Allocation</span>
-                    <p className="toggle-desc">Allows managers to assign employees to projects in external departments.</p>
-                  </div>
-                </label>
-              </div>
-
-              <div className="form-group flex-column gap-1">
-                <label>Weekly Working Hours Cap</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  value={policiesConfig.workingHours}
-                  onChange={e => setPoliciesConfig({ ...policiesConfig, workingHours: Number(e.target.value) })}
-                />
-              </div>
-
-              <div className="form-group flex-column gap-1">
-                <label>Default Shift Schedule</label>
-                <select
-                  className="form-control"
-                  value={policiesConfig.shiftConfig}
-                  onChange={e => setPoliciesConfig({ ...policiesConfig, shiftConfig: e.target.value })}
-                >
-                  <option value="General Shift">General Shift (9AM - 6PM)</option>
-                  <option value="Night Shift">Night Shift (9PM - 6AM)</option>
-                  <option value="Rotational Shift">Rotational Shift</option>
-                  <option value="Flexible Shift">Flexible Hours</option>
-                </select>
-              </div>
-
-              <div className="form-group flex-column gap-1">
-                <label>Performance Auditing Thresholds</label>
-                <select
-                  className="form-control"
-                  value={policiesConfig.criteria}
-                  onChange={e => setPoliciesConfig({ ...policiesConfig, criteria: e.target.value })}
-                >
-                  <option value="KPI Thresholds">KPI Target Completion Percentage</option>
-                  <option value="Workflow Output">Workflow Activity Output Rate</option>
-                  <option value="Subjective Score">Peer Reviews and Manager Ratings</option>
-                </select>
-              </div>
-
-              <Button variant="primary" icon={Check} onClick={() => addToast('success', 'Policy configurations saved successfully.')}>
-                Save Policy Configurations
-              </Button>
-            </div>
-
-            {/* Right: Document Management */}
-            <div className="card document-manager-panel flex-column gap-4">
-              <h3 className="card-title">Department Document Management</h3>
-              
-              {/* Drag and Drop Upload zone simulator */}
-              <div className="document-uploader-mock-zone flex-column items-center justify-center">
-                <FileText size={32} className="uploader-icon text-muted mb-2" />
-                <p className="uploader-text">Drag and drop file here, or click to upload</p>
-                <span className="uploader-subtext text-xs text-muted">Supports PDF, DOCX, XLSX, JPG, PNG (Max 10MB)</span>
-                
-                <input
-                  type="file"
-                  id="doc-uploader"
-                  className="uploader-input-real"
-                  onChange={handleFileUpload}
-                  style={{ display: 'none' }}
-                />
-                <Button variant="secondary" onClick={() => document.getElementById('doc-uploader').click()} className="mt-3">
-                  Select File
-                </Button>
-
-                {uploadProgress > 0 && uploadProgress < 100 && (
-                  <div className="progress-bar-wrapper mt-3 flex-column gap-1" style={{ width: '80%' }}>
-                    <div className="flex-center justify-between text-xs">
-                      <span>Uploading...</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    <div className="dept-budget-bar-bg" style={{ height: '4px' }}>
-                      <div className="dept-budget-bar-fill" style={{ width: `${uploadProgress}%`, background: 'var(--color-primary)' }} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Document List */}
-              <div className="uploaded-docs-list flex-column gap-3">
-                <span className="section-small-title uppercase tracking-wider text-xs text-muted">Available Files</span>
-                {documents.map(doc => (
-                  <div key={doc.id} className="uploaded-doc-item flex-center justify-between">
-                    <div className="flex-center gap-3">
-                      <div className="doc-icon-avatar">
-                        <FileText size={18} className="text-primary" />
-                      </div>
-                      <div className="doc-meta-info flex-column">
-                        <span className="doc-name bold-text text-sm">{doc.name}</span>
-                        <span className="doc-details-text text-xs text-muted">{doc.size} • {doc.category} • Uploaded {doc.date}</span>
-                      </div>
-                    </div>
-                    <div className="doc-item-actions flex-center gap-2">
-                      <button className="icon-action-btn" title="Download Document" onClick={() => addToast('success', `Downloading ${doc.name}...`)}>
-                        <Download size={13} />
-                      </button>
-                      <button
-                        className="icon-action-btn icon-action-danger"
-                        title="Remove Document"
-                        onClick={() => showConfirm(
-                          'Remove Document',
-                          `Are you sure you want to remove the document "${doc.name}"?`,
-                          () => {
-                            setDocuments(prev => prev.filter(d => d.id !== doc.id));
-                            addToast('warning', `Document "${doc.name}" removed.`);
-                          },
-                          'danger'
-                        )}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT - ALERTS & TIMELINE */}
-      {activeTab === 'alerts' && (
-        <div className="dept-tab-wrapper">
-          <div className="dept-policy-docs-layout">
-            
-            {/* Left: Alerts & Notifications */}
-            <div className="card policy-config-panel flex-column gap-4">
-              <h3 className="card-title flex-center justify-start gap-2">
-                <AlertCircle size={18} className="text-danger" />
-                <span>Department Notifications & Alerts</span>
-              </h3>
-              <div className="alerts-feed-wrapper flex-column gap-3 mt-2">
-                {alertsFeed.map(alert => (
-                  <div key={alert.id} className={`alert-feed-item alert-border-${alert.type} flex-center gap-3`}>
-                    <div className={`alert-avatar alert-bg-${alert.type}`}>
-                      {alert.type === 'danger' ? <AlertTriangle size={16} /> : <Info size={16} />}
-                    </div>
-                    <div className="alert-content flex-column flex-1">
-                      <span className="alert-title bold-text text-sm">{alert.title}</span>
-                      <p className="alert-text text-xs text-secondary mt-1">{alert.message}</p>
-                      <span className="alert-time text-xxs text-muted mt-1">{alert.time}</span>
-                    </div>
-                    <button
-                      className="alert-dismiss-btn"
-                      onClick={() => setAlertsFeed(prev => prev.filter(a => a.id !== alert.id))}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right: Activity Log Timeline */}
-            <div className="card document-manager-panel flex-column gap-4">
-              <h3 className="card-title">Recent Activity Logs</h3>
-              <div className="activity-timeline-wrapper flex-column">
-                {recentActivities.map((act, idx) => (
-                  <div key={act.id} className="timeline-item-container flex-center justify-start gap-4">
-                    <div className="timeline-left-connector">
-                      <div className={`timeline-node timeline-node-${act.type}`} />
-                      {idx < recentActivities.length - 1 && <div className="timeline-connector-line" />}
-                    </div>
-                    <div className="timeline-content-details flex-column pb-6">
-                      <span className="timeline-message text-sm text-secondary">{act.message}</span>
-                      <span className="timeline-time text-xs text-muted">{act.time}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
 
       {/* FOOTER NOTICE */}
       <div className="card dept-footer-section flex-center justify-between text-xs text-muted">
@@ -1491,7 +1041,7 @@ const Departments = () => {
               <div className="flex-1">
                 <div className="flex-between">
                   <h3 className="dept-modal-name">{selectedDept.name}</h3>
-                  <Badge variant={selectedDept.status === 'Active' ? 'success' : 'warning'}>{selectedDept.status}</Badge>
+                  <Badge variant={selectedDept.status === 'Active' ? 'success' : 'danger'}>{selectedDept.status}</Badge>
                 </div>
                 <p className="dept-modal-branch">Code: <code>{selectedDept.departmentCode}</code> • Branch Location: {selectedDept.branch} • Founded: {selectedDept.createdDate}</p>
               </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './Employees.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
@@ -253,7 +253,7 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: dbDepartments, teams } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: dbDepartments, teams, appraisalReviews } = useApp();
   const location = useLocation();
 
 
@@ -1079,6 +1079,51 @@ const Employees = () => {
   const avgTaskCompletion = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.taskCompletion || 70), 0) / Math.max(employees.length, 1));
   const avgRating = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.overall || 70), 0) / Math.max(employees.length, 1));
 
+  const ratingToScore = (rating) => {
+    switch(rating?.toLowerCase()) {
+      case 'outstanding': return 95;
+      case 'excellent': return 85;
+      case 'good': return 75;
+      case 'average': return 65;
+      case 'satisfactory': return 70;
+      case 'needs improvement': return 55;
+      default: return 75;
+    }
+  };
+
+  const monthlyReviews = useMemo(() => (appraisalReviews || []).filter(r => r.type?.toLowerCase() === 'monthly'), [appraisalReviews]);
+  const quarterlyReviews = useMemo(() => (appraisalReviews || []).filter(r => r.type?.toLowerCase() === 'quarterly'), [appraisalReviews]);
+  const annualReviews = useMemo(() => (appraisalReviews || []).filter(r => r.type?.toLowerCase() === 'annual'), [appraisalReviews]);
+
+  const avgMonthlyScore = useMemo(() => monthlyReviews.length > 0
+    ? Math.round(monthlyReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / monthlyReviews.length)
+    : 88, [monthlyReviews]);
+
+  const avgQuarterlyScore = useMemo(() => quarterlyReviews.length > 0
+    ? Math.round(quarterlyReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / quarterlyReviews.length)
+    : 92, [quarterlyReviews]);
+
+  const avgAnnualScore = useMemo(() => annualReviews.length > 0
+    ? Math.round(annualReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / annualReviews.length)
+    : 90, [annualReviews]);
+
+  const globalRatingLabel = useMemo(() => {
+    const allReviews = appraisalReviews || [];
+    const avgOverallScore = allReviews.length > 0
+      ? Math.round(allReviews.reduce((sum, r) => sum + ratingToScore(r.rating), 0) / allReviews.length)
+      : 90;
+    if (avgOverallScore >= 90) return 'Outstanding';
+    if (avgOverallScore >= 80) return 'Excellent';
+    if (avgOverallScore >= 70) return 'Good';
+    if (avgOverallScore >= 60) return 'Satisfactory';
+    return 'Needs Improvement';
+  }, [appraisalReviews]);
+
+  const latestReview = useMemo(() => (appraisalReviews && appraisalReviews.length > 0) ? appraisalReviews[0] : null, [appraisalReviews]);
+  const managerFeedback = useMemo(() => latestReview ? (latestReview.notes || latestReview.notes) : "Exceptional execution", [latestReview]);
+  const peerFeedback = useMemo(() => latestReview ? (latestReview.feedback || latestReview.notes) : "Great collaborator", [latestReview]);
+  const selfFeedback = useMemo(() => latestReview ? (latestReview.recommendations || latestReview.notes) : "Aiming to scale infra", [latestReview]);
+
   // Leave Management Summary Calculations
   const pendingApprovalsCount = (leaveRequests || []).filter(r => r.status === 'Pending').length;
 
@@ -1180,6 +1225,22 @@ const Employees = () => {
       addToast('info', 'All documents cleared');
     }
   };
+  const sortedByProductivity = [...employees].sort((a, b) => (b.productivityScore || 0) - (a.productivityScore || 0));
+  const sortedByOverallPerf = [...employees].sort((a, b) => {
+    const scoreA = a.performanceScore?.overall || a.productivityScore || 0;
+    const scoreB = b.performanceScore?.overall || b.productivityScore || 0;
+    return scoreB - scoreA;
+  });
+  const sortedByAttendance = [...employees].sort((a, b) => {
+    const attA = a.performanceScore?.attendance || (a.attendanceStatus === 'Present' ? 95 : 80);
+    const attB = b.performanceScore?.attendance || (b.attendanceStatus === 'Present' ? 95 : 80);
+    return attB - attA;
+  });
+
+  const empOfMonth = sortedByOverallPerf[0] || { name: 'Ananya Gupta' };
+  const bestPerformer = sortedByOverallPerf.find(e => e.id !== empOfMonth.id) || sortedByOverallPerf[0] || { name: 'Aarav Sharma' };
+  const attendanceChamp = sortedByAttendance.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id) || sortedByAttendance[0] || { name: 'Suresh Kumar' };
+  const mostProductive = sortedByProductivity.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id && e.id !== attendanceChamp.id) || sortedByProductivity[0] || { name: 'Kavita Singh' };
 
   return (
     <div className="employees-page flex-column grid-gap">
@@ -1389,28 +1450,28 @@ const Employees = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' }}>
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
                   <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Monthly</span>
-                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>88/100</strong>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{avgMonthlyScore}/100</strong>
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
                   <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Quarterly</span>
-                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>92/100</strong>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{avgQuarterlyScore}/100</strong>
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '6px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
                   <span style={{ display: 'block', fontSize: '0.65rem', color: 'var(--text-muted)' }}>Annual</span>
-                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>90/100</strong>
+                  <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{avgAnnualScore}/100</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.78rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Global Rating</span>
-                  <Badge variant="success">Outstanding</Badge>
+                  <Badge variant={globalRatingLabel === 'Outstanding' || globalRatingLabel === 'Excellent' ? 'success' : 'warning'}>{globalRatingLabel}</Badge>
                 </div>
                 <div style={{ marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '6px' }}>
                   <span style={{ fontWeight: 600, fontSize: '0.75rem', color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>Feedback Summary</span>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', fontSize: '0.6875rem' }}>
-                    <div style={{ color: 'var(--text-secondary)' }}><strong>Manager:</strong> "Exceptional execution"</div>
-                    <div style={{ color: 'var(--text-secondary)' }}><strong>Peer:</strong> "Great collaborator"</div>
-                    <div style={{ color: 'var(--text-secondary)' }}><strong>Self:</strong> "Aiming to scale infra"</div>
+                    <div style={{ color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={managerFeedback}><strong>Manager:</strong> "{managerFeedback}"</div>
+                    <div style={{ color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={peerFeedback}><strong>Peer:</strong> "{peerFeedback}"</div>
+                    <div style={{ color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={selfFeedback}><strong>Self:</strong> "{selfFeedback}"</div>
                   </div>
                 </div>
               </div>
@@ -1424,31 +1485,31 @@ const Employees = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(245, 158, 11, 0.04)', border: '1px solid rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                <Avatar name="Ananya Gupta" size="sm" />
+                <Avatar name={empOfMonth.name} size="sm" />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Employee of Month</span>
-                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Ananya Gupta</strong>
+                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{empOfMonth.name}</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                <Avatar name="Aarav Sharma" size="sm" />
+                <Avatar name={bestPerformer.name} size="sm" />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Best Performer</span>
-                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Aarav Sharma</strong>
+                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{bestPerformer.name}</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                <Avatar name="Suresh Kumar" size="sm" />
+                <Avatar name={attendanceChamp.name} size="sm" />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Attendance Champ</span>
-                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Suresh Kumar</strong>
+                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{attendanceChamp.name}</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(168, 85, 247, 0.04)', border: '1px solid rgba(168, 85, 247, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                <Avatar name="Kavita Singh" size="sm" />
+                <Avatar name={mostProductive.name} size="sm" />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Most Productive</span>
-                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>Kavita Singh</strong>
+                  <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{mostProductive.name}</strong>
                 </div>
               </div>
             </div>
@@ -1460,11 +1521,11 @@ const Employees = () => {
           <div className="snapshot-left">
             <span className="snapshot-title">Today's Attendance Snapshot:</span>
             <div className="snapshot-metrics">
-              <span className="snapshot-metric"><span className="emoji">✅</span> Punched In: <strong>{(1000 + employees.filter(e => ['Present', 'Late', 'Work From Home', 'Overtime'].includes(e.attendanceStatus)).length).toLocaleString()}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">⚠️</span> Not Yet: <strong>{150 + employees.filter(e => e.attendanceStatus === 'Absent').length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🕐</span> Late: <strong>{40 + employees.filter(e => e.attendanceStatus === 'Late').length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🏠</span> WFH: <strong>{30 + employees.filter(e => e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH').length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🌴</span> On Leave: <strong>{65 + employees.filter(e => e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave').length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">✅</span> Punched In: <strong>{employees.filter(e => ['Present', 'Late', 'Work From Home', 'Overtime'].includes(e.attendanceStatus)).length.toLocaleString()}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">⚠️</span> Not Yet: <strong>{employees.filter(e => e.attendanceStatus === 'Absent' || !e.attendanceStatus).length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🕐</span> Late: <strong>{employees.filter(e => e.attendanceStatus === 'Late').length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🏠</span> WFH: <strong>{employees.filter(e => e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH').length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🌴</span> On Leave: <strong>{employees.filter(e => e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave').length}</strong></span>
             </div>
           </div>
           <button className="snapshot-link-btn" onClick={() => navigate('/attendance')}>

@@ -30,315 +30,8 @@ const CHART_TT = {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   SEED DATA FOR ENTERPRISE PERFORMANCE MANAGEMENT
+   ENTERPRISE PERFORMANCE MANAGEMENT
    ═══════════════════════════════════════════════════════════ */
-const INITIAL_EMPLOYEES = [
-  {
-    id: 'EMP-2026-001',
-    name: 'Aarav Sharma',
-    department: 'Operations',
-    team: 'Core Ops Team',
-    designation: 'Chief Operations Officer',
-    attendancePct: 98,
-    tasksAssigned: 45,
-    tasksCompleted: 44,
-    productivity: 98,
-    attendance: 98,
-    efficiency: 95,
-    quality: 98,
-    status: 'Active',
-    branch: 'Jaipur HQ',
-    kpiScore: 98,
-    overdueTasks: 0,
-    lastReviewDate: '2026-05-15'
-  },
-  {
-    id: 'EMP-2026-002',
-    name: 'Vikram Singh',
-    department: 'Engineering',
-    team: 'UI/UX Design',
-    designation: 'Engineering Manager',
-    attendancePct: 92,
-    tasksAssigned: 35,
-    tasksCompleted: 31,
-    productivity: 88,
-    attendance: 92,
-    efficiency: 89,
-    quality: 90,
-    status: 'Active',
-    branch: 'Delhi Office',
-    kpiScore: 90,
-    overdueTasks: 1,
-    lastReviewDate: '2026-04-12'
-  },
-  {
-    id: 'EMP-2026-102',
-    name: 'Divya Singh',
-    department: 'IT',
-    team: 'Dev Team Alpha',
-    designation: 'Tech Lead',
-    attendancePct: 96,
-    tasksAssigned: 40,
-    tasksCompleted: 38,
-    productivity: 95,
-    attendance: 96,
-    efficiency: 92,
-    quality: 94,
-    status: 'Active',
-    branch: 'Jaipur HQ',
-    kpiScore: 94,
-    overdueTasks: 0,
-    lastReviewDate: '2026-05-20'
-  },
-  {
-    id: 'EMP-2026-108',
-    name: 'Rajesh Kumar',
-    department: 'Marketing',
-    team: 'Brand Design',
-    designation: 'Brand Designer',
-    attendancePct: 91,
-    tasksAssigned: 28,
-    tasksCompleted: 26,
-    productivity: 93,
-    attendance: 91,
-    efficiency: 88,
-    quality: 89,
-    status: 'Active',
-    branch: 'Branch Office',
-    kpiScore: 90,
-    overdueTasks: 0,
-    lastReviewDate: '2026-05-28'
-  },
-  {
-    id: 'EMP-2026-115',
-    name: 'Meena Sharma',
-    department: 'Sales',
-    team: 'Corporate Outreach',
-    designation: 'Sales Representative',
-    attendancePct: 89,
-    tasksAssigned: 32,
-    tasksCompleted: 24,
-    productivity: 75,
-    attendance: 89,
-    efficiency: 80,
-    quality: 82,
-    status: 'Active',
-    branch: 'Delhi Office',
-    kpiScore: 81,
-    overdueTasks: 2,
-    lastReviewDate: '2026-05-10'
-  },
-  {
-    id: 'EMP-2026-121',
-    name: 'Prakash Patel',
-    department: 'Operations',
-    team: 'Systems Integration',
-    designation: 'IT Ops Specialist',
-    attendancePct: 95,
-    tasksAssigned: 38,
-    tasksCompleted: 35,
-    productivity: 92,
-    attendance: 95,
-    efficiency: 91,
-    quality: 90,
-    status: 'Active',
-    branch: 'Jaipur HQ',
-    kpiScore: 92,
-    overdueTasks: 0,
-    lastReviewDate: '2026-04-18'
-  },
-  {
-    id: 'EMP-2026-130',
-    name: 'Sunita Rao',
-    department: 'HR',
-    team: 'Talent Acquisition',
-    designation: 'HR Coordinator',
-    attendancePct: 94,
-    tasksAssigned: 22,
-    tasksCompleted: 20,
-    productivity: 91,
-    attendance: 94,
-    efficiency: 89,
-    quality: 92,
-    status: 'Active',
-    branch: 'Branch Office',
-    kpiScore: 91,
-    overdueTasks: 0,
-    lastReviewDate: '2026-05-02'
-  },
-  {
-    id: 'EMP-2026-112',
-    name: 'Kiran Mehta',
-    department: 'IT',
-    team: 'Infra Ops',
-    designation: 'Systems Engineer',
-    attendancePct: 84,
-    tasksAssigned: 25,
-    tasksCompleted: 15,
-    productivity: 60,
-    attendance: 84,
-    efficiency: 65,
-    quality: 70,
-    status: 'On Leave',
-    branch: 'Delhi Office',
-    kpiScore: 70,
-    overdueTasks: 3,
-    lastReviewDate: '2026-03-15'
-  },
-  {
-    id: 'EMP-2026-118',
-    name: 'Amit Bose',
-    department: 'Sales',
-    team: 'Direct Sales',
-    designation: 'Outreach Manager',
-    attendancePct: 76,
-    tasksAssigned: 30,
-    tasksCompleted: 16,
-    productivity: 53,
-    attendance: 76,
-    efficiency: 60,
-    quality: 55,
-    status: 'PIP',
-    branch: 'Delhi Office',
-    kpiScore: 59,
-    overdueTasks: 5,
-    lastReviewDate: '2026-05-01'
-  }
-];
-
-const SEED_GOALS = [
-  {
-    id: 'GOAL-001',
-    title: 'Optimize Core Recharts Gradients',
-    description: 'Improve chart rendering performance and refactor linear-gradient layouts.',
-    type: 'Project',
-    startDate: '2026-05-20',
-    dueDate: '2026-06-15',
-    targetValue: 100,
-    currentProgress: 85,
-    status: 'In Progress',
-    assignee: 'Vikram Singh',
-    department: 'Engineering'
-  },
-  {
-    id: 'GOAL-002',
-    title: 'Reduce Server Latency by 20%',
-    description: 'Optimize indexing schemes and configure query caching profiles.',
-    type: 'Department',
-    startDate: '2026-05-01',
-    dueDate: '2026-06-30',
-    targetValue: 100,
-    currentProgress: 60,
-    status: 'In Progress',
-    assignee: 'Divya Singh',
-    department: 'IT'
-  },
-  {
-    id: 'GOAL-003',
-    title: 'Publish Brand Guidelines v2',
-    description: 'Export structured CSS variables, font families and high quality dark mode icons.',
-    type: 'Team',
-    startDate: '2026-04-10',
-    dueDate: '2026-05-31',
-    targetValue: 100,
-    currentProgress: 100,
-    status: 'Completed',
-    assignee: 'Rajesh Kumar',
-    department: 'Marketing'
-  },
-  {
-    id: 'GOAL-004',
-    title: 'Onboard 5 Senior Software Engineers',
-    description: 'Source, screen, and interview candidates for the core engineering division.',
-    type: 'Individual',
-    startDate: '2026-05-15',
-    dueDate: '2026-06-25',
-    targetValue: 5,
-    currentProgress: 2,
-    status: 'In Progress',
-    assignee: 'Sunita Rao',
-    department: 'HR'
-  },
-  {
-    id: 'GOAL-005',
-    title: 'Increase Corporate Conversions',
-    description: 'Scale outreach campaigns and increase leads response rates by 15%.',
-    type: 'Team',
-    startDate: '2026-05-01',
-    dueDate: '2026-06-10',
-    targetValue: 100,
-    currentProgress: 45,
-    status: 'In Progress',
-    assignee: 'Meena Sharma',
-    department: 'Sales'
-  }
-];
-
-const SEED_REVIEWS = [
-  {
-    id: 'REV-001',
-    employeeName: 'Divya Singh',
-    reviewer: 'Aarav Sharma',
-    type: 'Quarterly',
-    period: 'Q1 2026',
-    rating: 'Outstanding',
-    notes: 'Exceeded all performance targets. Maintained near-perfect attendance and delivered robust RBAC authentication modules on-time.',
-    feedback: 'Keep up the exemplary focus on software security schemas.',
-    recommendations: 'Recommended for promotion to Technical Director.',
-    date: '2026-04-15'
-  },
-  {
-    id: 'REV-002',
-    employeeName: 'Rajesh Kumar',
-    reviewer: 'Aarav Sharma',
-    type: 'Monthly',
-    period: 'May 2026',
-    rating: 'Excellent',
-    notes: 'Designed brand guideline packs, showing high efficiency and quality. Sourcing deliverables was seamless.',
-    feedback: 'Improve coordination timelines with development teams.',
-    recommendations: 'Encourage leading cross-functional design sprints.',
-    date: '2026-05-28'
-  },
-  {
-    id: 'REV-003',
-    employeeName: 'Vikram Singh',
-    reviewer: 'Aarav Sharma',
-    type: 'Quarterly',
-    period: 'Q1 2026',
-    rating: 'Good',
-    notes: 'Solid project management and team alignment. Minor scope shifts on Recharts optimization goals.',
-    feedback: 'Focus on stabilizing project sprint estimates.',
-    recommendations: 'Provide standard scrum master certifications support.',
-    date: '2026-04-12'
-  }
-];
-
-const SEED_PIPS = [
-  {
-    id: 'PIP-001',
-    employeeName: 'Amit Bose',
-    issuesIdentified: 'Low productivity score (53%), high task backlog, and delayed milestones on outreach plans.',
-    improvementTargets: 'Close at least 25 client tickets weekly and maintain a productivity score above 75%.',
-    reviewPeriod: '30 Days (Jun 1 - Jun 30)',
-    actionPlan: 'Daily standup check-ins with sales leader and weekly review syncs with department head.',
-    status: 'Active',
-    reviewer: 'Aarav Sharma',
-    dateCreated: '2026-06-01'
-  }
-];
-
-const SEED_ALERTS = [
-  { id: 'ALT-001', message: 'Low productivity alert: Amit Bose performance rating dropped below threshold (59%).', type: 'Performance Decline', read: false, date: '2 hours ago' },
-  { id: 'ALT-002', message: 'Performance Review Due: Kiran Mehta Q2 appraisal review needs setup.', type: 'Review Due', read: false, date: '1 day ago' },
-  { id: 'ALT-003', message: 'Goal Deadline Near: "Optimize Core Recharts Gradients" due in 11 days.', type: 'Goal Deadline Near', read: false, date: '1 day ago' },
-  { id: 'ALT-004', message: 'Goal Achieved: Rajesh Kumar completed "Publish Brand Guidelines v2" successfully.', type: 'Goal Achieved', read: true, date: '3 days ago' }
-];
-
-const SEED_AUDITS = [
-  { id: 'AUD-001', user: 'Aarav Sharma', action: 'Weight Configuration Update', target: 'Org KPI System', timestamp: '2026-06-04 10:00:00', oldVal: 'Prod: 25%, Att: 25%', newVal: 'Prod: 30%, Att: 20%' },
-  { id: 'AUD-002', user: 'Super Admin', action: 'Create PIP Log', target: 'Amit Bose', timestamp: '2026-06-01 09:15:00', oldVal: 'None', newVal: 'Active PIP-001' },
-  { id: 'AUD-003', user: 'Aarav Sharma', action: 'Submit Performance Review', target: 'Rajesh Kumar', timestamp: '2026-05-28 17:45:00', oldVal: 'None', newVal: 'Excellent Appraisal' }
-];
 
 /* ── Charts Mock Data ────────────────────────────────────────── */
 const MONTHLY_TREND = [
@@ -347,37 +40,6 @@ const MONTHLY_TREND = [
   { month: 'Mar', overall: 82, Operations: 85, Engineering: 83, Sales: 76, IT: 87 },
   { month: 'Apr', overall: 85, Operations: 88, Engineering: 86, Sales: 80, IT: 90 },
   { month: 'May', overall: 88, Operations: 90, Engineering: 88, Sales: 81, IT: 92 }
-];
-
-const COMPETENCY_RADAR = [
-  { subject: 'Productivity', score: 92, fullMark: 100 },
-  { subject: 'Attendance', score: 90, fullMark: 100 },
-  { subject: 'Efficiency', score: 86, fullMark: 100 },
-  { subject: 'Quality', score: 89, fullMark: 100 },
-  { subject: 'Goal Achieved', score: 82, fullMark: 100 },
-  { subject: 'Collaboration', score: 85, fullMark: 100 }
-];
-
-const DEPT_PERF_DATA = [
-  { name: 'Operations', score: 95, color: 'var(--color-primary)' },
-  { name: 'IT', score: 92, color: 'var(--accent-blue-solid)' },
-  { name: 'Engineering', score: 88, color: 'var(--color-success)' },
-  { name: 'HR', score: 85, color: '#a855f7' },
-  { name: 'Sales', score: 72, color: 'var(--color-warning)' },
-  { name: 'Marketing', score: 70, color: 'var(--color-danger)' }
-];
-
-const BRANCH_RANKINGS = [
-  { name: 'Jaipur HQ', score: 95, successRate: 97, color: 'var(--color-primary)' },
-  { name: 'Delhi Office', score: 88, successRate: 91, color: 'var(--accent-blue-solid)' },
-  { name: 'Branch Office', score: 82, successRate: 85, color: 'var(--color-success)' }
-];
-
-const PROJECT_RANKINGS = [
-  { name: 'SaaS Platform v3.0', manager: 'Rahul Sharma', progress: 85, score: 94, budget: '78%' },
-  { name: 'Sales Funnel Automation', manager: 'Priya Verma', progress: 65, score: 90, budget: '90%' },
-  { name: 'HR Digitization System', manager: 'Priya Verma', progress: 95, score: 88, budget: '65%' },
-  { name: 'Employee Wellness Portal', manager: 'Sunita Rao', progress: 40, score: 85, budget: '50%' }
 ];
 
 const Performance = () => {
@@ -389,7 +51,12 @@ const Performance = () => {
     departments,
     branches,
     appraisalReviews,
-    addAppraisalReview
+    addAppraisalReview,
+    notifications,
+    activityLogs,
+    projectsList,
+    addNotification,
+    markAllNotificationsRead
   } = useApp();
   const isLoading = usePageLoading(800);
 
@@ -404,8 +71,6 @@ const Performance = () => {
   const [goals, setGoals] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [pips, setPips] = useState([]);
-  const [alerts, setAlerts] = useState(SEED_ALERTS);
-  const [auditLogs, setAuditLogs] = useState(SEED_AUDITS);
 
   // Sync employees from context
   React.useEffect(() => {
@@ -420,6 +85,87 @@ const Performance = () => {
       setReviews(appraisalReviews);
     }
   }, [appraisalReviews]);
+
+  const alerts = useMemo(() => {
+    return (notifications || []).map(n => ({
+      id: n.id || n._id,
+      message: n.message || n.title || '',
+      type: n.type || 'Performance',
+      read: n.read || false,
+      date: n.time || 'Just now'
+    }));
+  }, [notifications]);
+
+  const auditLogs = useMemo(() => {
+    return (activityLogs || []).map(log => ({
+      id: log.id,
+      timestamp: log.timestamp || 'Just now',
+      user: log.actor || 'System User',
+      action: log.actionType || 'Action Logged',
+      target: log.fieldChanged || '—',
+      oldVal: log.oldValue || '—',
+      newVal: log.newValue || '—'
+    }));
+  }, [activityLogs]);
+
+  // Derived Performance Charts / Rankings Datasets
+  const DEPT_PERF_DATA = useMemo(() => {
+    return (departments || []).map(d => ({
+      name: d.name,
+      score: d.avgPerformance || d.productivity || 90,
+      color: d.color || 'var(--color-primary)'
+    }));
+  }, [departments]);
+
+  const BRANCH_RANKINGS = useMemo(() => {
+    return (branches || []).map(b => ({
+      name: b.name,
+      score: b.productivity || b.avgPerformance || 90,
+      successRate: b.attendance || b.attendanceRate || 95,
+      color: b.color || 'var(--color-primary)'
+    }));
+  }, [branches]);
+
+  const PROJECT_RANKINGS = useMemo(() => {
+    return (projectsList || []).map(p => ({
+      name: p.name,
+      manager: p.leader || p.manager || 'Unassigned',
+      progress: p.progress || 0,
+      score: p.productivity || p.kpiScore || 85,
+      budget: p.budgetSpentPct ? `${p.budgetSpentPct}%` : '0%'
+    }));
+  }, [projectsList]);
+
+  const COMPETENCY_RADAR = useMemo(() => {
+    if (!employees || employees.length === 0) {
+      return [
+        { subject: 'Productivity', score: 0, fullMark: 100 },
+        { subject: 'Attendance', score: 0, fullMark: 100 },
+        { subject: 'Efficiency', score: 0, fullMark: 100 },
+        { subject: 'Quality', score: 0, fullMark: 100 },
+        { subject: 'Goal Achieved', score: 0, fullMark: 100 },
+        { subject: 'Collaboration', score: 0, fullMark: 100 }
+      ];
+    }
+    const count = employees.length;
+    const avgProd = Math.round(employees.reduce((s, e) => s + (e.productivity || 0), 0) / count);
+    const avgAtt = Math.round(employees.reduce((s, e) => s + (e.attendance || e.attendancePct || 0), 0) / count);
+    const avgEff = Math.round(employees.reduce((s, e) => s + (e.efficiency || 0), 0) / count);
+    const avgQual = Math.round(employees.reduce((s, e) => s + (e.quality || 0), 0) / count);
+    
+    const avgGoalProgress = goals.length > 0
+      ? Math.round(goals.reduce((s, g) => s + Math.min(100, Math.round((g.currentProgress / g.targetValue) * 100)), 0) / goals.length)
+      : 80;
+      
+    return [
+      { subject: 'Productivity', score: avgProd, fullMark: 100 },
+      { subject: 'Attendance', score: avgAtt, fullMark: 100 },
+      { subject: 'Efficiency', score: avgEff, fullMark: 100 },
+      { subject: 'Quality', score: avgQual, fullMark: 100 },
+      { subject: 'Goal Achieved', score: avgGoalProgress, fullMark: 100 },
+      { subject: 'Collaboration', score: 85, fullMark: 100 }
+    ];
+  }, [employees, goals]);
 
   // Fetch goals and pips from API
   const fetchGoalsAndPips = async () => {
@@ -499,28 +245,21 @@ const Performance = () => {
   const [exporting, setExporting] = useState(false);
 
   /* ── State Helpers ────────────────────────────────────────── */
-  const addAuditLog = (action, target, oldVal, newVal) => {
-    const newLog = {
-      id: `AUD-${Math.floor(100 + Math.random() * 900)}`,
-      user: userRole === 'Employee' ? 'Aarav Sharma' : userRole === 'Team Leader' ? 'Ananya Gupta' : 'Super Admin',
-      action,
-      target,
-      timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      oldVal,
-      newVal
-    };
-    setAuditLogs(prev => [newLog, ...prev]);
+  const addAuditLog = async (action, target, oldVal, newVal) => {
+    if (addActivityLog) {
+      await addActivityLog(action, target, 'success', newVal, oldVal);
+    }
   };
 
-  const pushAlert = (message, type) => {
-    const newAlert = {
-      id: `ALT-${Math.floor(100 + Math.random() * 900)}`,
-      message,
-      type,
-      read: false,
-      date: 'Just now'
-    };
-    setAlerts(prev => [newAlert, ...prev]);
+  const pushAlert = async (message, type) => {
+    if (addNotification) {
+      await addNotification({
+        title: type,
+        message,
+        type: 'info',
+        iconName: 'Settings'
+      });
+    }
   };
 
   /* Recalculate employee KPI scores based on weights config */
@@ -2069,8 +1808,10 @@ const Performance = () => {
               <button
                 type="button"
                 className="view-link-btn"
-                onClick={() => {
-                  setAlerts(prev => prev.map(a => ({ ...n, read: true })));
+                onClick={async () => {
+                  if (markAllNotificationsRead) {
+                    await markAllNotificationsRead();
+                  }
                   addToast('success', 'All notifications marked as read.');
                 }}
               >

@@ -20,85 +20,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 
-// ─── MASTER MOCK DATASETS ───────────────────────────────────────────────────
-
-const mockBranchesList = [
-  { id: 'BR-01', name: 'Jaipur HQ', country: 'India', manager: 'Aarav Sharma', employeesCount: 320, activeProjects: 12, timezone: 'IST (UTC+5:30)', status: 'Optimal', lat: '26.9124° N', lng: '75.7873° E', address: 'Malviya Nagar, Jaipur, Rajasthan 302017, India', productivity: 94, attendance: 96, type: 'branch' },
-  { id: 'BR-02', name: 'Delhi Office', country: 'India', manager: 'Rajesh Kumar', employeesCount: 220, activeProjects: 8, timezone: 'IST (UTC+5:30)', status: 'Optimal', lat: '28.6139° N', lng: '77.2090° E', address: 'Connaught Place, New Delhi - 110001', productivity: 91, attendance: 93, type: 'branch' },
-  { id: 'BR-03', name: 'Mumbai Office', country: 'India', manager: 'Sanjay Gupta', employeesCount: 180, activeProjects: 6, timezone: 'IST (UTC+5:30)', status: 'High Load', lat: '19.0760° N', lng: '72.8777° E', address: 'Bandra Kurla Complex, Mumbai - 400051', productivity: 89, attendance: 90, type: 'branch' },
-  { id: 'BR-04', name: 'Kolkata Office', country: 'India', manager: 'Shweta Joshi', employeesCount: 120, activeProjects: 5, timezone: 'IST (UTC+5:30)', status: 'Optimal', lat: '22.5726° N', lng: '88.3639° E', address: 'Salt Lake City, Kolkata - 700091', productivity: 83, attendance: 92, type: 'branch' },
-  { id: 'BR-05', name: 'Chennai Office', country: 'India', manager: 'Harish Verma', employeesCount: 95, activeProjects: 4, timezone: 'IST (UTC+5:30)', status: 'Critical', lat: '13.0827° N', lng: '80.2707° E', address: 'OMR Road, Chennai - 600096', productivity: 68, attendance: 85, type: 'branch' }
-];
-
-const mockDeptsList = [
-  { name: 'IT', iconName: 'Layers', count: 450, manager: 'Ananya Gupta', activeProjects: 18, productivity: 92, attendance: 94, color: 'var(--color-primary)', type: 'department' },
-  { name: 'HR', iconName: 'Users', count: 120, manager: 'Neha Verma', activeProjects: 4, productivity: 88, attendance: 95, color: '#f59e0b', type: 'department' },
-  { name: 'Sales', iconName: 'DollarSign', count: 310, manager: 'Rohit Sharma', activeProjects: 8, productivity: 95, attendance: 91, color: '#10b981', type: 'department' },
-  { name: 'Marketing', iconName: 'Megaphone', count: 180, manager: 'Priya Patel', activeProjects: 6, productivity: 90, attendance: 92, color: '#8b5cf6', type: 'department' },
-  { name: 'Finance', iconName: 'Building2', count: 90, manager: 'Manoj Tiwari', activeProjects: 3, productivity: 87, attendance: 96, color: '#06b6d4', type: 'department' },
-  { name: 'Operations', iconName: 'Network', count: 100, manager: 'Aarav Sharma', activeProjects: 5, productivity: 93, attendance: 93, color: '#ec4899', type: 'department' }
-];
-
-const mockWorkflowsList = [
-  { id: 'WF-01', name: 'CI/CD Automated Deployment', progress: 85, status: 'Running', department: 'IT', branch: 'Jaipur HQ', date: '2026-05-29' },
-  { id: 'WF-02', name: 'Quarterly Payroll Disbursal', progress: 100, status: 'Completed', department: 'Finance', branch: 'Delhi Office', date: '2026-05-28' },
-  { id: 'WF-03', name: 'Candidate Onboarding Sync', progress: 45, status: 'Running', department: 'HR', branch: 'Mumbai Office', date: '2026-05-29' },
-  { id: 'WF-04', name: 'Sales Lead Nurturing Campaign', progress: 20, status: 'Paused', department: 'Sales', branch: 'Jaipur HQ', date: '2026-05-25' },
-  { id: 'WF-05', name: 'Social Media Ad Placement', progress: 95, status: 'Delayed', department: 'Marketing', branch: 'Kolkata Office', date: '2026-05-22' },
-  { id: 'WF-06', name: 'Office Asset Audit', progress: 60, status: 'Running', department: 'Operations', branch: 'Chennai Office', date: '2026-05-27' },
-  { id: 'WF-07', name: 'Database Security Hardening', progress: 10, status: 'Paused', department: 'IT', branch: 'Delhi Office', date: '2026-05-24' }
-];
-
-const mockProjectsList = [
-  { id: 'PRJ-01', name: 'SaaS Platform v2.0', status: 'In Progress', progress: 78, department: 'IT', branch: 'Jaipur HQ', date: '2026-05-29', productivity: 92 },
-  { id: 'PRJ-02', name: 'Employee Engagement System', status: 'Completed', progress: 100, department: 'HR', branch: 'Delhi Office', date: '2026-05-15', productivity: 94 },
-  { id: 'PRJ-03', name: 'Q2 Domestic Sales Boost', status: 'In Progress', progress: 60, department: 'Sales', branch: 'Mumbai Office', date: '2026-05-28', productivity: 88 },
-  { id: 'PRJ-04', name: 'APAC Marketing Rebrand', status: 'Delayed', progress: 35, department: 'Marketing', branch: 'Kolkata Office', date: '2026-05-10', productivity: 70 },
-  { id: 'PRJ-05', name: 'Audit & Compliance Prep', status: 'Pending', progress: 10, department: 'Finance', branch: 'Delhi Office', date: '2026-05-26', productivity: 85 },
-  { id: 'PRJ-06', name: 'Chennai Facility Setup', status: 'Delayed', progress: 40, department: 'Operations', branch: 'Chennai Office', date: '2026-05-05', productivity: 65 }
-];
-
-const mockTasksList = [
-  { id: 'TSK-01', name: 'Resolve SSL Cert Latency', assignee: 'Ananya Gupta', priority: 'Critical', dueDate: '2026-05-30', status: 'Delayed', department: 'IT', branch: 'Jaipur HQ' },
-  { id: 'TSK-02', name: 'Submit Q2 Tax Audit Report', assignee: 'Manoj Tiwari', priority: 'High', dueDate: '2026-06-05', status: 'Pending', department: 'Finance', branch: 'Delhi Office' },
-  { id: 'TSK-03', name: 'Finalize Offer Letters Batch', assignee: 'Neha Verma', priority: 'Medium', dueDate: '2026-06-02', status: 'Pending', department: 'HR', branch: 'Jaipur HQ' },
-  { id: 'TSK-04', name: 'Optimize Recharts Rendering', assignee: 'Vikram Singh', priority: 'High', dueDate: '2026-05-29', status: 'Delayed', department: 'IT', branch: 'Delhi Office' },
-  { id: 'TSK-05', name: 'Verify Biometric Punches', assignee: 'Aarav Sharma', priority: 'Low', dueDate: '2026-06-01', status: 'Pending', department: 'Operations', branch: 'Jaipur HQ' },
-  { id: 'TSK-06', name: 'Setup Chennai IP Whitelist', assignee: 'Harish Verma', priority: 'Critical', dueDate: '2026-05-25', status: 'Delayed', department: 'IT', branch: 'Chennai Office' }
-];
-
-const mockAnnouncementsList = [
-  { id: 'ANN-01', date: '2026-05-29', category: 'Events', title: 'CEO Townhall Meeting', desc: 'Annual company townhall scheduled for next Monday at 3 PM IST to align on Q3 goals.', department: 'Operations', branch: 'Jaipur HQ' },
-  { id: 'ANN-02', date: '2026-05-28', category: 'Policies', title: 'New HR Policy Update', desc: 'Revised guidelines on medical allowances and remote leaves uploaded to the Document Vault.', department: 'HR', branch: 'Delhi Office' },
-  { id: 'ANN-03', date: '2026-05-26', category: 'Milestones', title: 'Q1 Sales Target Achieved', desc: 'The marketing and sales team successfully achieved and exceeded our Q1 revenue goal by 12%!', department: 'Sales', branch: 'Mumbai Office' },
-  { id: 'ANN-04', date: '2026-05-24', category: 'Operations', title: 'New Branch in Ahmedabad', desc: 'We are expanding! Our new office in Ahmedabad, Gujarat, is officially operational.', department: 'Operations', branch: 'Jaipur HQ' }
-];
-
-const mockActivitiesList = [
-  { id: 'ACT-01', time: '10 mins ago', type: 'success', title: 'New employees joined', details: '15 new employees joined this month across engineering and sales divisions.', department: 'HR', branch: 'Jaipur HQ', iconName: 'UserPlus', date: '2026-05-30' },
-  { id: 'ACT-02', time: '1 hour ago', type: 'primary', title: 'Project completed successfully', details: 'Project Alpha v2.0 completed milestone testing and deployed to production.', department: 'IT', branch: 'Delhi Office', iconName: 'CheckCircle', date: '2026-05-30' },
-  { id: 'ACT-03', time: '3 hours ago', type: 'success', title: 'Attendance milestone reached', details: 'Attendance reached 96% today company-wide, setting a new weekly record.', department: 'Operations', branch: 'Jaipur HQ', iconName: 'TrendingUp', date: '2026-05-30' },
-  { id: 'ACT-04', time: '5 hours ago', type: 'purple', title: 'New branch added', details: 'Added new regional operations node in Connaught Place, Delhi Branch.', department: 'Operations', branch: 'Delhi Office', iconName: 'Building2', date: '2026-05-30' },
-  { id: 'ACT-05', time: '1 day ago', type: 'warning', title: 'Latency threshold breach', details: 'Staging web server latency increased above 500ms; routing auto-scaled.', department: 'IT', branch: 'Mumbai Office', iconName: 'AlertTriangle', date: '2026-05-29' },
-  { id: 'ACT-06', time: '2 days ago', type: 'danger', title: 'Delayed project flagged', details: 'APAC Marketing Rebrand flagged as delayed due to content reviews.', department: 'Marketing', branch: 'Kolkata Office', iconName: 'Clock', date: '2026-05-28' }
-];
-
-const mockAlertsList = [
-  { id: 'AL-01', type: 'danger', title: 'Delayed Projects', message: 'Project "APAC Marketing Rebrand" is delayed by 18 days.', timestamp: 'Just now', department: 'Marketing', branch: 'Kolkata Office', iconName: 'AlertCircle' },
-  { id: 'AL-02', type: 'danger', title: 'Low Productivity', message: 'Chennai Office productivity dropped to 68% (threshold 75%).', timestamp: '12 mins ago', department: 'Operations', branch: 'Chennai Office', iconName: 'AlertTriangle' },
-  { id: 'AL-03', type: 'warning', title: 'Attendance Warnings', message: '5 late punch-ins flagged at Mumbai Office today.', timestamp: '1 hour ago', department: 'Operations', branch: 'Mumbai Office', iconName: 'Clock' },
-  { id: 'AL-04', type: 'warning', title: 'Pending Approvals', message: '3 engineering leave requests awaiting review.', timestamp: '3 hours ago', department: 'HR', branch: 'Delhi Office', iconName: 'CheckCircle' },
-  { id: 'AL-05', type: 'purple', title: 'Security Alerts', message: 'Multiple login attempts detected from unauthorized IP at Chennai node.', timestamp: '5 hours ago', department: 'IT', branch: 'Chennai Office', iconName: 'Shield' }
-];
-
-const mockGrowthData = [
-  { month: 'Jan', employees: 850, projects: 28, productivity: 82, departments: 18 },
-  { month: 'Feb', employees: 920, projects: 30, productivity: 84, departments: 20 },
-  { month: 'Mar', employees: 1040, projects: 32, productivity: 86, departments: 22 },
-  { month: 'Apr', employees: 1150, projects: 36, productivity: 89, departments: 24 },
-  { month: 'May', employees: 1220, projects: 39, productivity: 91, departments: 24 },
-  { month: 'Jun', employees: 1250, projects: 42, productivity: 94, departments: 24 }
-];
+// ─── MASTER DATASETS FROM CONTEXT ───────────────────────────────────────────
 
 const iconMap = {
   Layers: Layers,
@@ -113,7 +35,10 @@ const iconMap = {
   AlertTriangle: AlertTriangle,
   Clock: Clock,
   AlertCircle: AlertCircle,
-  Shield: Shield
+  Shield: Shield,
+  Calendar: Calendar,
+  Trash2: Trash2,
+  Info: Info
 };
 
 const RenderIcon = ({ name, ...props }) => {
@@ -154,9 +79,133 @@ const MiniDonut = ({ percentage, color }) => {
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 const Overview = () => {
-  const { addToast, branches, departments } = useApp();
+  const {
+    addToast,
+    branches: contextBranches,
+    departments: contextDepartments,
+    projectsList,
+    tasks,
+    notifications,
+    activityLogs,
+    announcementsList,
+    createAnnouncement,
+    deleteNotification,
+    employees,
+    attendance
+  } = useApp();
   const navigate = useNavigate();
   const loading = usePageLoading(600);
+
+  const branches = contextBranches || [];
+  const departments = contextDepartments || [];
+  const alerts = notifications || [];
+  const announcements = announcementsList || [];
+
+  const branchesMapped = useMemo(() => {
+    return branches.map(b => {
+      const branchEmployees = employees.filter(emp => 
+        (emp.branch || '').trim().toLowerCase() === (b.name || '').trim().toLowerCase()
+      );
+      const count = branchEmployees.length > 0 ? branchEmployees.length : (b.employeeCount || b.employeesCount || b.headcount || 0);
+      return {
+        ...b,
+        type: 'branch',
+        employeesCount: count,
+        productivity: b.productivity || 92,
+        attendance: b.attendance || 95,
+        country: b.country || 'India',
+        status: b.status || 'Optimal'
+      };
+    });
+  }, [branches, employees]);
+
+  const departmentsMapped = useMemo(() => {
+    return departments.map(d => {
+      const deptEmployees = employees.filter(emp => 
+        (emp.department || '').trim().toLowerCase() === (d.name || '').trim().toLowerCase()
+      );
+      const count = deptEmployees.length > 0 ? deptEmployees.length : (d.employeeCount || 0);
+      return {
+        ...d,
+        type: 'department',
+        count: count,
+        productivity: d.avgPerformance || 90,
+        attendance: d.attendanceRate || 95
+      };
+    });
+  }, [departments, employees]);
+
+  const projectsMapped = useMemo(() => {
+    return (projectsList || []).map(p => ({
+      ...p,
+      productivity: p.productivity || 88,
+      date: p.date || p.startDate || '2026-05-30'
+    }));
+  }, [projectsList]);
+
+  const tasksMapped = useMemo(() => {
+    return (tasks || []).map(t => ({
+      ...t,
+      name: t.title,
+      assignee: t.assigneeName,
+      date: t.dueDate
+    }));
+  }, [tasks]);
+
+  const announcementsMapped = useMemo(() => {
+    return (announcements || []).map(ann => ({
+      ...ann,
+      date: ann.date || ann.createdAt?.split('T')[0] || '2026-05-30'
+    }));
+  }, [announcements]);
+
+  const activitiesMapped = useMemo(() => {
+    return (activityLogs || []).map(log => {
+      let iconName = 'Clock';
+      let typeClass = 'primary';
+      const actionLower = (log.actionType || '').toLowerCase();
+      if (actionLower.includes('punch') || actionLower.includes('attendance')) {
+        iconName = 'Clock';
+        typeClass = 'success';
+      } else if (actionLower.includes('leave')) {
+        iconName = 'Calendar';
+        typeClass = 'warning';
+      } else if (actionLower.includes('task')) {
+        iconName = 'CheckCircle';
+        typeClass = 'primary';
+      } else if (actionLower.includes('employee') || actionLower.includes('user')) {
+        iconName = 'UserPlus';
+        typeClass = 'purple';
+      } else if (actionLower.includes('role') || actionLower.includes('permission')) {
+        iconName = 'Shield';
+        typeClass = 'danger';
+      } else if (actionLower.includes('delete') || actionLower.includes('remove')) {
+        iconName = 'Trash2';
+        typeClass = 'danger';
+      }
+
+      return {
+        id: log.id,
+        time: log.timestamp || 'Just now',
+        type: typeClass,
+        title: log.actionType || 'Activity Logged',
+        details: `${log.actor || 'System'}: ${log.actionType} (${log.fieldChanged || ''})`,
+        date: log.timestamp?.split(' ')[0] || '2026-05-30',
+        iconName: iconName
+      };
+    });
+  }, [activityLogs]);
+
+  const alertsMapped = useMemo(() => {
+    return (notifications || []).map(n => ({
+      id: n.id,
+      type: n.type || 'info',
+      title: n.title || 'Notification',
+      message: n.message || '',
+      timestamp: n.time || 'Just now',
+      iconName: n.iconName || (n.type === 'danger' ? 'AlertCircle' : 'AlertTriangle')
+    }));
+  }, [notifications]);
 
   // ── Search & Filter State ──
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,7 +215,16 @@ const Overview = () => {
   const [performanceFilter, setPerformanceFilter] = useState('All');
 
   // ── Interactive UI States ──
-  const [selectedBranch, setSelectedBranch] = useState(mockBranchesList[0]);
+  const [selectedBranch, setSelectedBranch] = useState(null);
+  
+  useEffect(() => {
+    if (branchesMapped && branchesMapped.length > 0) {
+      if (!selectedBranch || !branchesMapped.some(b => b.id === selectedBranch.id)) {
+        setSelectedBranch(branchesMapped[0]);
+      }
+    }
+  }, [branchesMapped, selectedBranch]);
+
   const [visibleLines, setVisibleLines] = useState({
     employees: true,
     projects: true,
@@ -179,8 +237,6 @@ const Overview = () => {
   const [reportConfig, setReportConfig] = useState({ type: 'Company Performance', format: 'PDF', fromDate: '', toDate: '', dept: 'All', branch: 'All' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', category: 'General', desc: '' });
   const [activitiesLimit, setActivitiesLimit] = useState(4);
-  const [announcements, setAnnouncements] = useState(mockAnnouncementsList);
-  const [alerts, setAlerts] = useState(mockAlertsList);
   const [branchSortKey, setBranchSortKey] = useState('name');
   const [branchSortDir, setBranchSortDir] = useState('asc');
 
@@ -255,14 +311,24 @@ const Overview = () => {
   };
 
   // ── Filtered Datasets ──
-  const filteredBranches = useMemo(() => mockBranchesList.filter(matchesFilters), [searchQuery, branchFilter, deptFilter, performanceFilter]);
-  const filteredDepts = useMemo(() => mockDeptsList.filter(matchesFilters), [searchQuery, branchFilter, deptFilter, performanceFilter]);
-  const filteredWorkflows = useMemo(() => mockWorkflowsList.filter(matchesFilters), [searchQuery, branchFilter, deptFilter, dateFilter]);
-  const filteredProjects = useMemo(() => mockProjectsList.filter(matchesFilters), [searchQuery, branchFilter, deptFilter, dateFilter, performanceFilter]);
-  const filteredTasks = useMemo(() => mockTasksList.filter(matchesFilters), [searchQuery, branchFilter, deptFilter]);
-  const filteredAnnouncements = useMemo(() => announcements.filter(matchesFilters), [announcements, searchQuery, branchFilter, deptFilter, dateFilter]);
-  const filteredActivities = useMemo(() => mockActivitiesList.filter(matchesFilters), [searchQuery, branchFilter, deptFilter]);
-  const filteredAlerts = useMemo(() => alerts.filter(matchesFilters), [alerts, searchQuery, branchFilter, deptFilter]);
+  const filteredBranches = useMemo(() => branchesMapped.filter(matchesFilters), [branchesMapped, searchQuery, branchFilter, deptFilter, performanceFilter]);
+  const filteredDepts = useMemo(() => departmentsMapped.filter(matchesFilters), [departmentsMapped, searchQuery, branchFilter, deptFilter, performanceFilter]);
+  const filteredProjects = useMemo(() => projectsMapped.filter(matchesFilters), [projectsMapped, searchQuery, branchFilter, deptFilter, dateFilter, performanceFilter]);
+  const filteredWorkflows = useMemo(() => {
+    return filteredProjects.map(p => ({
+      id: p.id.replace('PRJ', 'WF'),
+      name: `${p.name} Release Pipeline`,
+      progress: p.progress,
+      status: p.status === 'Completed' ? 'Completed' : 'Running',
+      department: p.department || 'Engineering',
+      branch: p.branch || 'Head Office',
+      date: p.date
+    }));
+  }, [filteredProjects]);
+  const filteredTasks = useMemo(() => tasksMapped.filter(matchesFilters), [tasksMapped, searchQuery, branchFilter, deptFilter]);
+  const filteredAnnouncements = useMemo(() => announcementsMapped.filter(matchesFilters), [announcementsMapped, searchQuery, branchFilter, deptFilter, dateFilter]);
+  const filteredActivities = useMemo(() => activitiesMapped.filter(matchesFilters), [activitiesMapped, searchQuery, branchFilter, deptFilter]);
+  const filteredAlerts = useMemo(() => alertsMapped.filter(matchesFilters), [alertsMapped, searchQuery, branchFilter, deptFilter]);
 
   // ── KPI Recalculations ──
   const totalEmployees = useMemo(() => filteredBranches.reduce((acc, b) => acc + b.employeesCount, 0), [filteredBranches]);
@@ -311,28 +377,27 @@ const Overview = () => {
     addToast('success', `Generating & Downloading ${reportConfig.type} in ${reportConfig.format} format...`);
   };
 
-  const handleCreateAnnouncement = () => {
+  const handleCreateAnnouncement = async () => {
     if (!announcementForm.title || !announcementForm.desc) {
       addToast('warning', 'Please fill in all announcement fields.');
       return;
     }
+    const finalBranch = branchFilter === 'All' ? (branches[0]?.name || 'Jaipur HQ') : branchFilter;
     const newAnn = {
-      id: `ANN-${Date.now()}`,
-      date: '2026-05-30',
       category: announcementForm.category,
       title: announcementForm.title,
       desc: announcementForm.desc,
       department: deptFilter === 'All' ? 'Operations' : deptFilter,
-      branch: branchFilter === 'All' ? 'Jaipur HQ' : branchFilter
+      branch: finalBranch,
+      date: new Date().toISOString().split('T')[0]
     };
-    setAnnouncements(prev => [newAnn, ...prev]);
+    await createAnnouncement(newAnn);
     setAnnouncementForm({ title: '', category: 'General', desc: '' });
     setShowAnnounceModal(false);
-    addToast('success', 'Company announcement posted successfully.');
   };
 
-  const handleDismissAlert = (id) => {
-    setAlerts(prev => prev.filter(al => al.id !== id));
+  const handleDismissAlert = async (id) => {
+    await deleteNotification(id);
     addToast('info', 'Alert dismissed.');
   };
 
@@ -360,18 +425,57 @@ const Overview = () => {
 
   // Synchronize Global Office Explorer selected branch if it gets filtered out
   useEffect(() => {
-    if (filteredBranches.length > 0 && !filteredBranches.some(b => b.id === selectedBranch.id)) {
+    if (filteredBranches.length > 0 && (!selectedBranch || !filteredBranches.some(b => b.id === selectedBranch.id))) {
       setSelectedBranch(filteredBranches[0]);
     }
   }, [filteredBranches, selectedBranch]);
 
   // ── Workforce Analytics Data Calculations ──
-  const workforceDonutData = [
-    { name: 'Active', value: Math.round(totalEmployees * 0.82), color: '#10b981' },
-    { name: 'New Joiners', value: Math.round(totalEmployees * 0.05), color: '#3b82f6' },
-    { name: 'On Leave', value: Math.round(totalEmployees * 0.04), color: '#ef4444' },
-    { name: 'Remote', value: Math.round(totalEmployees * 0.09), color: '#8b5cf6' }
-  ];
+  const workforceDonutData = useMemo(() => {
+    let active = 0;
+    let newJoiners = 0;
+    let onLeave = 0;
+    let remote = 0;
+
+    employees.forEach(emp => {
+      const status = (emp.attendanceStatus || emp.status || '').toLowerCase();
+      const workMode = (emp.workMode || '').toLowerCase();
+      
+      if (status.includes('leave')) {
+        onLeave++;
+      } else if (workMode.includes('remote') || workMode.includes('home') || status.includes('wfh')) {
+        remote++;
+      } else if (status.includes('present') || status.includes('active')) {
+        active++;
+      } else {
+        active++;
+      }
+
+      if (emp.joinDate) {
+        const join = new Date(emp.joinDate);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        if (join >= thirtyDaysAgo) {
+          newJoiners++;
+        }
+      }
+    });
+
+    // Fallback if DB is not populated yet
+    if (active === 0 && onLeave === 0 && remote === 0) {
+      active = Math.round(totalEmployees * 0.82);
+      newJoiners = Math.round(totalEmployees * 0.05);
+      onLeave = Math.round(totalEmployees * 0.04);
+      remote = Math.round(totalEmployees * 0.09);
+    }
+
+    return [
+      { name: 'Active', value: active, color: '#10b981' },
+      { name: 'New Joiners', value: newJoiners, color: '#3b82f6' },
+      { name: 'On Leave', value: onLeave, color: '#ef4444' },
+      { name: 'Remote', value: remote, color: '#8b5cf6' }
+    ];
+  }, [employees, totalEmployees]);
 
   const deptBarData = filteredDepts.map(d => ({
     name: d.name,
@@ -380,32 +484,142 @@ const Overview = () => {
   }));
 
   // ── Today Attendance Summary Metrics ──
-  const attendanceMetrics = {
-    present: Math.round(totalEmployees * 0.94),
-    late: Math.round(totalEmployees * 0.03),
-    absent: Math.round(totalEmployees * 0.02),
-    onLeave: Math.round(totalEmployees * 0.01),
-    overtime: Math.round(totalEmployees * 0.12)
-  };
+  const attendanceMetrics = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const todayAttendance = (attendance || []).filter(a => a.date === today);
+    
+    let presentCount = todayAttendance.filter(a => a.status === 'Present').length;
+    let lateCount = todayAttendance.filter(a => a.status === 'Late').length;
+    let absentCount = todayAttendance.filter(a => a.status === 'Absent').length;
+    let leaveCount = todayAttendance.filter(a => a.status === 'On Leave' || a.status === 'Leave').length;
+    let overtimeCount = todayAttendance.filter(a => a.status === 'Overtime').length;
 
-  const weeklyAttendanceTrend = [
-    { name: 'Mon', Attendance: 91 },
-    { name: 'Tue', Attendance: 93 },
-    { name: 'Wed', Attendance: 92 },
-    { name: 'Thu', Attendance: 95 },
-    { name: 'Fri', Attendance: 94 },
-    { name: 'Sat', Attendance: 88 },
-    { name: 'Sun', Attendance: 85 }
-  ];
+    if (todayAttendance.length === 0 && employees.length > 0) {
+      employees.forEach(emp => {
+        const status = emp.attendanceStatus || emp.status;
+        if (status === 'Present') presentCount++;
+        else if (status === 'Late') lateCount++;
+        else if (status === 'Absent') absentCount++;
+        else if (status === 'On Leave' || status === 'Leave' || status === 'On-Leave') leaveCount++;
+        else if (status === 'Overtime') overtimeCount++;
+        else presentCount++;
+      });
+    }
 
-  const shiftData = [
-    { shift: 'Morning', count: Math.round(totalEmployees * 0.65) },
-    { shift: 'Evening', count: Math.round(totalEmployees * 0.25) },
-    { shift: 'Night', count: Math.round(totalEmployees * 0.10) }
-  ];
+    if (presentCount === 0 && lateCount === 0 && absentCount === 0) {
+      presentCount = Math.round(totalEmployees * 0.94);
+      lateCount = Math.round(totalEmployees * 0.03);
+      absentCount = Math.round(totalEmployees * 0.02);
+      leaveCount = Math.round(totalEmployees * 0.01);
+      overtimeCount = Math.round(totalEmployees * 0.12);
+    }
+
+    return {
+      present: presentCount,
+      late: lateCount,
+      absent: absentCount,
+      onLeave: leaveCount,
+      overtime: overtimeCount
+    };
+  }, [attendance, employees, totalEmployees]);
+
+  const weeklyAttendanceTrend = useMemo(() => {
+    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const counts = { Mon: { present: 0, total: 0 }, Tue: { present: 0, total: 0 }, Wed: { present: 0, total: 0 }, Thu: { present: 0, total: 0 }, Fri: { present: 0, total: 0 }, Sat: { present: 0, total: 0 }, Sun: { present: 0, total: 0 } };
+    
+    (attendance || []).forEach(attRecord => {
+      if (attRecord.date) {
+        const dayName = weekdays[new Date(attRecord.date).getDay()];
+        if (counts[dayName]) {
+          counts[dayName].total++;
+          if (attRecord.status === 'Present' || attRecord.status === 'Late' || attRecord.status === 'WFH') {
+            counts[dayName].present++;
+          }
+        }
+      }
+    });
+
+    const avg = averageAttendance || 95;
+    return Object.keys(counts).map(day => {
+      const data = counts[day];
+      const rate = data.total > 0 ? Math.round((data.present / data.total) * 100) : Math.max(0, Math.min(100, Math.round(avg + (Math.random() * 6 - 3))));
+      return {
+        name: day,
+        Attendance: rate
+      };
+    });
+  }, [attendance, averageAttendance]);
+
+  const growthData = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const currentYear = 2026;
+    
+    const employeesByMonth = months.map((month, idx) => {
+      let count = 0;
+      employees.forEach(emp => {
+        if (!emp.joinDate) {
+          count++;
+          return;
+        }
+        const join = new Date(emp.joinDate);
+        const joinYear = join.getFullYear();
+        const joinMonth = join.getMonth();
+        
+        if (joinYear < currentYear || (joinYear === currentYear && joinMonth <= idx)) {
+          count++;
+        }
+      });
+      return count;
+    });
+
+    const currentProjects = totalProjectsCount || 0;
+    const currentProductivity = averageProductivity || 0;
+    const currentDepts = filteredDepts.length || 0;
+
+    return months.map((month, idx) => {
+      const monthEmployees = employeesByMonth[idx] || Math.round(totalEmployees * (0.7 + idx * 0.05));
+      const scaleFactor = (idx + 1) / months.length;
+      return {
+        month,
+        employees: monthEmployees,
+        projects: Math.round(currentProjects * scaleFactor) || 1,
+        productivity: Math.max(0, Math.round(currentProductivity - (10 * (1 - scaleFactor)))),
+        departments: Math.max(1, Math.round(currentDepts * scaleFactor))
+      };
+    });
+  }, [employees, totalEmployees, totalProjectsCount, averageProductivity, filteredDepts.length]);
+
+  const shiftData = useMemo(() => {
+    let morning = 0;
+    let evening = 0;
+    let night = 0;
+    employees.forEach(emp => {
+      const shift = (emp.shiftTiming || emp.shift || '').toLowerCase();
+      if (shift.includes('evening') || shift.includes('2:00 pm') || shift.includes('14:00')) evening++;
+      else if (shift.includes('night') || shift.includes('10:00 pm') || shift.includes('22:00')) night++;
+      else morning++;
+    });
+
+    if (morning === 0 && evening === 0 && night === 0) {
+      morning = Math.round(totalEmployees * 0.65);
+      evening = Math.round(totalEmployees * 0.25);
+      night = Math.round(totalEmployees * 0.10);
+    }
+
+    return [
+      { shift: 'Morning', count: morning },
+      { shift: 'Evening', count: evening },
+      { shift: 'Night', count: night }
+    ];
+  }, [employees, totalEmployees]);
 
   // ── Real-Time Strip Data ──
-  const onlineEmployeesCount = Math.round(totalEmployees * 0.72);
+  const onlineEmployeesCount = useMemo(() => {
+    if (!employees || employees.length === 0) return 0;
+    const count = employees.filter(emp => emp.status === 'Present' || emp.attendanceStatus === 'Present' || emp.status === 'Active').length;
+    return count > 0 ? count : Math.round(totalEmployees * 0.72);
+  }, [employees, totalEmployees]);
+
   const runningWorkflowsCount = filteredWorkflows.filter(w => w.status === 'Running').length;
   const activeMeetingsCount = Math.max(2, Math.round(filteredBranches.length * 1.5));
   const systemActivityLog = filteredActivities.slice(0, 3).map(act => act.details);
@@ -455,14 +669,14 @@ const Overview = () => {
           
           <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
             <option value="All">All Branches</option>
-            {(branches && branches.length > 0 ? branches : mockBranchesList).map(b => (
+            {branchesMapped.map(b => (
               <option key={b.id || b.name} value={b.name}>{b.name}</option>
             ))}
           </select>
           
           <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
             <option value="All">All Departments</option>
-            {(departments && departments.length > 0 ? departments : mockDeptsList).map(d => (
+            {departmentsMapped.map(d => (
               <option key={d.id || d.name} value={d.name}>{d.name}</option>
             ))}
           </select>
@@ -632,7 +846,7 @@ const Overview = () => {
                 {/* Branches Quick Select List */}
                 <div className="branches-list-selector">
                   {filteredBranches.map((b) => {
-                    const isSelected = selectedBranch.id === b.id;
+                    const isSelected = selectedBranch && selectedBranch.id === b.id;
                     return (
                       <button
                         key={b.id}
@@ -652,68 +866,75 @@ const Overview = () => {
                 </div>
 
                 {/* Selected Branch Detail Panel */}
-                <div className="branch-detail-panel">
-                  <div className="branch-detail-header">
-                    <div className="branch-title-wrap">
-                      <Globe2 size={24} className="globe-icon" />
-                      <div>
-                        <h4>{selectedBranch.name}</h4>
-                        <span className="country-sub">{selectedBranch.country}</span>
+                {selectedBranch ? (
+                  <div className="branch-detail-panel">
+                    <div className="branch-detail-header">
+                      <div className="branch-title-wrap">
+                        <Globe2 size={24} className="globe-icon" />
+                        <div>
+                          <h4>{selectedBranch.name}</h4>
+                          <span className="country-sub">{selectedBranch.country || 'India'}</span>
+                        </div>
+                      </div>
+                      <Badge variant={selectedBranch.status === 'Optimal' ? 'success' : selectedBranch.status === 'High Load' ? 'warning' : 'danger'}>
+                        {selectedBranch.status}
+                      </Badge>
+                    </div>
+
+                    <div className="branch-meta-grid">
+                      <div className="branch-meta-item">
+                        <span className="meta-label">Branch Manager</span>
+                        <span className="meta-val">{selectedBranch.manager}</span>
+                      </div>
+                      <div className="branch-meta-item">
+                        <span className="meta-label">Local Timezone</span>
+                        <span className="meta-val flex-center gap-1 justify-start">
+                          <Clock size={12} /> {selectedBranch.timezone}
+                        </span>
+                      </div>
+                      <div className="branch-meta-item">
+                        <span className="meta-label">Active Headcount</span>
+                        <span className="meta-val">{selectedBranch.employeesCount || selectedBranch.headcount || 0} Employees</span>
+                      </div>
+                      <div className="branch-meta-item">
+                        <span className="meta-label">Running Projects</span>
+                        <span className="meta-val">{selectedBranch.activeProjects || 0} Projects</span>
+                      </div>
+                      <div className="branch-meta-item">
+                        <span className="meta-label">Productivity Index</span>
+                        <span className="meta-val text-success">{selectedBranch.productivity || 92}%</span>
+                      </div>
+                      <div className="branch-meta-item">
+                        <span className="meta-label">Attendance Index</span>
+                        <span className="meta-val text-info">{selectedBranch.attendance || 95}%</span>
+                      </div>
+                      <div className="branch-meta-item span-all">
+                        <span className="meta-label">Coordinates</span>
+                        <span className="meta-val code-val">
+                          {selectedBranch.lat || '26.9124° N'}, {selectedBranch.lng || '75.7873° E'}
+                        </span>
+                      </div>
+                      <div className="branch-meta-item span-all">
+                        <span className="meta-label">Physical Address</span>
+                        <span className="meta-val address-val">
+                          {selectedBranch.address}
+                        </span>
                       </div>
                     </div>
-                    <Badge variant={selectedBranch.status === 'Optimal' ? 'success' : selectedBranch.status === 'High Load' ? 'warning' : 'danger'}>
-                      {selectedBranch.status}
-                    </Badge>
-                  </div>
 
-                  <div className="branch-meta-grid">
-                    <div className="branch-meta-item">
-                      <span className="meta-label">Branch Manager</span>
-                      <span className="meta-val">{selectedBranch.manager}</span>
-                    </div>
-                    <div className="branch-meta-item">
-                      <span className="meta-label">Local Timezone</span>
-                      <span className="meta-val flex-center gap-1 justify-start">
-                        <Clock size={12} /> {selectedBranch.timezone}
-                      </span>
-                    </div>
-                    <div className="branch-meta-item">
-                      <span className="meta-label">Active Headcount</span>
-                      <span className="meta-val">{selectedBranch.employeesCount} Employees</span>
-                    </div>
-                    <div className="branch-meta-item">
-                      <span className="meta-label">Running Projects</span>
-                      <span className="meta-val">{selectedBranch.activeProjects} Projects</span>
-                    </div>
-                    <div className="branch-meta-item">
-                      <span className="meta-label">Productivity Index</span>
-                      <span className="meta-val text-success">{selectedBranch.productivity}%</span>
-                    </div>
-                    <div className="branch-meta-item">
-                      <span className="meta-label">Attendance Index</span>
-                      <span className="meta-val text-info">{selectedBranch.attendance}%</span>
-                    </div>
-                    <div className="branch-meta-item span-all">
-                      <span className="meta-label">Coordinates</span>
-                      <span className="meta-val code-val">
-                        {selectedBranch.lat}, {selectedBranch.lng}
-                      </span>
-                    </div>
-                    <div className="branch-meta-item span-all">
-                      <span className="meta-label">Physical Address</span>
-                      <span className="meta-val address-val">
-                        {selectedBranch.address}
-                      </span>
+                    <div className="branch-status-box">
+                      <CheckCircle size={16} className="status-box-icon" />
+                      <p>
+                        Branch is operational with high connectivity. Automated payroll, leave sync, and timesheet reports are fully integrated.
+                      </p>
                     </div>
                   </div>
-
-                  <div className="branch-status-box">
-                    <CheckCircle size={16} className="status-box-icon" />
-                    <p>
-                      Branch is operational with high connectivity. Automated payroll, leave sync, and timesheet reports are fully integrated.
-                    </p>
+                ) : (
+                  <div className="branch-detail-panel flex-center flex-column" style={{ padding: 'var(--space-12) 0', gap: 'var(--space-2)' }}>
+                    <MapPin size={32} className="text-muted mb-2" />
+                    <span className="text-muted">No branch selected</span>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -847,38 +1068,45 @@ const Overview = () => {
               </div>
               
               <div className="workforce-charts-wrapper">
-                <div className="donut-chart-container relative-pie-container">
-                  <ResponsiveContainer width="100%" height={170}>
-                    <PieChart>
-                      <Pie
-                        data={workforceDonutData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={70}
-                        paddingAngle={3}
-                        dataKey="value"
-                      >
-                        {workforceDonutData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pie-center-label">
-                    <span className="pie-center-number">{totalEmployees}</span>
-                    <span className="pie-center-text">Employees</span>
+                {totalEmployees > 0 ? (
+                  <div className="donut-chart-container relative-pie-container">
+                    <ResponsiveContainer width="100%" height={170}>
+                      <PieChart>
+                        <Pie
+                          data={workforceDonutData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={70}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {workforceDonutData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="pie-center-label">
+                      <span className="pie-center-number">{totalEmployees}</span>
+                      <span className="pie-center-text">Employees</span>
+                    </div>
+                    <div className="pie-custom-legend" style={{ gridTemplateColumns: '1fr 1fr', display: 'grid', marginTop: '10px' }}>
+                      {workforceDonutData.map((item, idx) => (
+                        <div key={idx} className="legend-item">
+                          <span className="legend-dot" style={{ backgroundColor: item.color }} />
+                          <span className="legend-name">{item.name} ({item.value})</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="pie-custom-legend" style={{ gridTemplateColumns: '1fr 1fr', display: 'grid', marginTop: '10px' }}>
-                    {workforceDonutData.map((item, idx) => (
-                      <div key={idx} className="legend-item">
-                        <span className="legend-dot" style={{ backgroundColor: item.color }} />
-                        <span className="legend-name">{item.name} ({item.value})</span>
-                      </div>
-                    ))}
+                ) : (
+                  <div className="flex-center flex-column" style={{ height: '170px', margin: 'auto' }}>
+                    <Users size={32} className="text-muted mb-2" />
+                    <span className="text-muted">No employees registered</span>
                   </div>
-                </div>
+                )}
 
                 <div className="bar-chart-container" style={{ minHeight: '190px' }}>
                   <ResponsiveContainer width="100%" height={180}>
@@ -1127,7 +1355,7 @@ const Overview = () => {
 
             <div className="growth-chart-body">
               <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={mockGrowthData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <LineChart data={growthData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
                   <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} />
@@ -1247,9 +1475,13 @@ const Overview = () => {
 
         <div className="sidebar-panel-body">
           {filteredAlerts.length > 0 ? (
-            ['Delayed Projects', 'Low Productivity', 'Attendance Warnings', 'Pending Approvals', 'Security Alerts'].map((groupTitle) => {
+            ['Delayed Projects', 'Low Productivity', 'Attendance Warnings', 'Pending Approvals', 'Security Alerts', 'General Alerts'].map((groupTitle) => {
               const groupAlerts = filteredAlerts.filter(al => {
-                if (groupTitle === 'Security Alerts') return al.title === 'Security Alerts' || al.title === 'Security';
+                if (groupTitle === 'Security Alerts') return al.type === 'security' || al.title === 'Security Alerts' || al.title === 'Security';
+                if (groupTitle === 'General Alerts') {
+                  const otherCategories = ['Delayed Projects', 'Low Productivity', 'Attendance Warnings', 'Pending Approvals', 'Security Alerts'];
+                  return !otherCategories.some(cat => al.title.toLowerCase().includes(cat.substring(0, 10).toLowerCase())) && al.type !== 'security';
+                }
                 return al.title.toLowerCase().includes(groupTitle.substring(0, 10).toLowerCase());
               });
               if (groupAlerts.length === 0) return null;
@@ -1322,9 +1554,7 @@ const Overview = () => {
               <label>Branch Target</label>
               <select value={reportConfig.branch} onChange={(e) => setReportConfig(prev => ({ ...prev, branch: e.target.value }))}>
                 <option value="All">All Offices</option>
-                {(branches && branches.length > 0 ? branches : [
-                  { name: 'Jaipur HQ' }, { name: 'Delhi Office' }, { name: 'Mumbai Office' }, { name: 'Kolkata Office' }, { name: 'Chennai Office' }
-                ]).map(b => (
+                {branchesMapped.map(b => (
                   <option key={b.id || b.name} value={b.name}>{b.name}</option>
                 ))}
               </select>
@@ -1333,9 +1563,7 @@ const Overview = () => {
               <label>Department Target</label>
               <select value={reportConfig.dept} onChange={(e) => setReportConfig(prev => ({ ...prev, dept: e.target.value }))}>
                 <option value="All">All Divisions</option>
-                {(departments && departments.length > 0 ? departments : [
-                  { name: 'IT' }, { name: 'HR' }, { name: 'Sales' }, { name: 'Marketing' }, { name: 'Finance' }, { name: 'Operations' }
-                ]).map(d => (
+                {departmentsMapped.map(d => (
                   <option key={d.id || d.name} value={d.name}>{d.name}</option>
                 ))}
               </select>
