@@ -47,6 +47,7 @@ const ApplyLeaveModal = ({
       toDate: endDate,
       days: days,
       reason: reason,
+      appliedDate: new Date().toISOString().split('T')[0],
       attachments: document ? [document.name] : []
     };
 

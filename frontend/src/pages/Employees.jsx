@@ -253,7 +253,7 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: dbDepartments } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: dbDepartments, teams } = useApp();
   const location = useLocation();
 
 
@@ -845,7 +845,7 @@ const Employees = () => {
 
       return !!(
         (formData.roleId === 'manager' || (formData.designation && formData.designation.trim().length >= 2)) &&
-        formData.department &&
+        (formData.roleId === 'manager' || formData.department) &&
         formData.branch &&
         formData.joinDate &&
         !isIdDuplicate &&
@@ -924,6 +924,23 @@ const Employees = () => {
           punchOutTime: p.punchOutTime === 'Not Applicable' ? '06:00 PM' : p.punchOutTime
         };
       }
+    });
+  };
+
+  const handleTeamChange = (teamName) => {
+    const selectedTeam = teams && teams.find(t => t.name === teamName);
+    setFormData(p => {
+      const updated = {
+        ...p,
+        teamName: teamName,
+        team: teamName
+      };
+      if (selectedTeam) {
+        if (selectedTeam.department) updated.department = selectedTeam.department;
+        if (selectedTeam.leader) updated.teamLeader = selectedTeam.leader;
+        if (selectedTeam.branch) updated.branch = selectedTeam.branch;
+      }
+      return updated;
     });
   };
 
@@ -1999,7 +2016,24 @@ const Employees = () => {
                   <div className="form-field"><label>{FIELD_LABELS.bloodGroup}</label><select value={formData.bloodGroup || ''} onChange={e => setFormData(p => ({ ...p, bloodGroup: e.target.value }))}><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
                   <div className="form-field"><label>{FIELD_LABELS.maritalStatus}</label><select value={formData.maritalStatus || ''} onChange={e => setFormData(p => ({ ...p, maritalStatus: e.target.value }))}><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
                   <div className="form-field"><label>{FIELD_LABELS.experience}</label><input type="text" placeholder="e.g. 5 years" value={formData.experience} onChange={e => setFormData(p => ({ ...p, experience: e.target.value }))} /></div>
-                  <div className="form-field"><label>{FIELD_LABELS.roleId} *</label><select value={formData.roleId || 'employee'} onChange={e => setFormData(p => ({ ...p, roleId: e.target.value }))}><option value="manager"> Manager</option><option value="team_leader">Team Leader</option><option value="employee">Employee</option></select></div>
+                  <div className="form-field">
+                    <label>{FIELD_LABELS.roleId} *</label>
+                    <select
+                      value={formData.roleId || 'employee'}
+                      onChange={e => {
+                        const nextRole = e.target.value;
+                        setFormData(p => ({
+                          ...p,
+                          roleId: nextRole,
+                          department: nextRole === 'manager' ? 'Management' : (p.department === 'Management' ? '' : p.department)
+                        }));
+                      }}
+                    >
+                      <option value="manager">Manager</option>
+                      <option value="team_leader">Team Leader</option>
+                      <option value="employee">Employee</option>
+                    </select>
+                  </div>
                 </div>
                 <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-5)' }}>Address Details</h4>
                 <div className="form-section-grid">
@@ -2138,33 +2172,35 @@ const Employees = () => {
                         )}
                       </select>
                     </div>
-                    <div className="form-field">
-                      <label>{FIELD_LABELS.department} *</label>
-                      <select
-                        value={formData.department}
-                        onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}
-                        required
-                      >
-                        <option value="">Select Department</option>
-                        {dbDepartments && dbDepartments.length > 0 ? (
-                          dbDepartments
-                            .filter(
-                              d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase()
-                            )
-                            .map(d => (
-                              <option key={d.id || d._id} value={d.name}>
-                                {d.name}
+                    {formData.roleId !== 'manager' && (
+                      <div className="form-field">
+                        <label>{FIELD_LABELS.department} *</label>
+                        <select
+                          value={formData.department}
+                          onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}
+                          required={formData.roleId !== 'manager'}
+                        >
+                          <option value="">Select Department</option>
+                          {dbDepartments && dbDepartments.length > 0 ? (
+                            dbDepartments
+                              .filter(
+                                d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase()
+                              )
+                              .map(d => (
+                                <option key={d.id || d._id} value={d.name}>
+                                  {d.name}
+                                </option>
+                              ))
+                          ) : (
+                            depts.map(dName => (
+                              <option key={dName} value={dName}>
+                                {dName}
                               </option>
                             ))
-                        ) : (
-                          depts.map(dName => (
-                            <option key={dName} value={dName}>
-                              {dName}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
+                          )}
+                        </select>
+                      </div>
+                    )}
                     {formData.roleId !== 'manager' && (
                       <>
                         {formData.roleId !== 'team_leader' && (
@@ -2196,7 +2232,7 @@ const Employees = () => {
                       <div className="form-quick-assign-card">
                         <p className="quick-assign-desc">Auto-fill related fields by selecting a team preset.</p>
                         <div className="form-section-grid">
-                          <div className="form-field"><label>Team Assignment</label><select value={formData.teamName || ''} onChange={e => setFormData(p => ({ ...p, teamName: e.target.value }))}><option value="">Select Team</option>{['Alpha Squad', 'Beta Unit', 'Gamma Force', 'Delta Team', 'Product Core', 'Dev Ops'].map(t => <option key={t}>{t}</option>)}</select></div>
+                          <div className="form-field"><label>Team Assignment</label><select value={formData.teamName || ''} onChange={e => handleTeamChange(e.target.value)}><option value="">Select Team</option>{teams && teams.length > 0 ? teams.map(t => <option key={t.id || t._id || t.name} value={t.name}>{t.name}</option>) : ['Alpha Squad', 'Beta Unit', 'Gamma Force', 'Delta Team', 'Product Core', 'Dev Ops'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                         </div>
                       </div>
 

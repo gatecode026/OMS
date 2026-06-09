@@ -74,7 +74,9 @@ const MarkAttendanceModal = ({
         punchOut: null,
         totalHours: 0,
         overtime: 0,
-        status: parseTimeToMinutes(formattedTimeStr) > parseTimeToMinutes('09:15 AM') ? 'Late' : 'Present'
+        status: parseTimeToMinutes(formattedTimeStr) > parseTimeToMinutes('09:15 AM') ? 'Late' : 'Present',
+        workMode: location,
+        notes: notes
       };
 
       addAttendanceRecord(newRecord);
@@ -101,7 +103,9 @@ const MarkAttendanceModal = ({
         punchOut: formattedTimeStr,
         totalHours: diffHrs,
         overtime: overtime,
-        status: diffHrs >= 8 ? 'Present' : 'Half Day'
+        status: diffHrs >= 8 ? 'Present' : 'Half Day',
+        workMode: location,
+        notes: notes
       });
       addToast('success', `Punched out successfully at ${formattedTimeStr}. Total working hours: ${diffHrs}`);
     } else {
