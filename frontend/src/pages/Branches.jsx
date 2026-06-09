@@ -264,19 +264,103 @@ const mockBranches = [
   }
 ];
 
-// Branch Ranking Table Data
-const branchRanking = [
-  { rank: 1, name: 'Jaipur HQ', employees: 320, attendance: 96, productivity: 94 },
-  { rank: 2, name: 'Delhi Branch', employees: 220, attendance: 95, productivity: 92 },
-  { rank: 3, name: 'Bangalore Tech Hub', employees: 195, attendance: 94, productivity: 93 },
-  { rank: 4, name: 'Mumbai Branch', employees: 180, attendance: 93, productivity: 91 },
-  { rank: 5, name: 'Ahmedabad Agency', employees: 140, attendance: 92, productivity: 89 },
-];
-
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
   const { addToast, showConfirm, employees, branches, departments, addBranch, updateBranch, deleteBranch } = useApp();
+
+  const branchRanking = useMemo(() => {
+    if (!branches || branches.length === 0) return [];
+    return [...branches]
+      .sort((a, b) => (b.productivity || 0) - (a.productivity || 0))
+      .map((b, index) => ({
+        rank: index + 1,
+        id: b.id,
+        name: b.name,
+        employees: b.employeeCount || 0,
+        attendance: b.attendance || 0,
+        productivity: b.productivity || 0
+      }));
+  }, [branches]);
+
+  const dynamicAlerts = useMemo(() => {
+    if (!branches || branches.length === 0) return [];
+    const generatedAlerts = [];
+    
+    branches.forEach(b => {
+      // 1. Manager check
+      if (!b.manager || b.manager === 'Not Assigned' || b.manager.toLowerCase().trim() === 'not assigned') {
+        generatedAlerts.push({
+          id: `alert-mgr-${b.id}`,
+          type: 'warning',
+          text: `Branch Manager Not Assigned: ${b.name}`,
+          icon: 'warning'
+        });
+      } else {
+        generatedAlerts.push({
+          id: `alert-mgr-assigned-${b.id}`,
+          type: 'success',
+          text: `Manager Assigned: ${b.manager} → ${b.name}`,
+          icon: 'success'
+        });
+      }
+
+      // 2. Productivity check
+      if (b.productivity < 80) {
+        generatedAlerts.push({
+          id: `alert-prod-${b.id}`,
+          type: 'danger',
+          text: `Low Productivity Branch: ${b.name} (${b.productivity}%)`,
+          icon: 'danger'
+        });
+      }
+
+      // 3. Staffing Shortage
+      if (b.employeeCount < 110) {
+        generatedAlerts.push({
+          id: `alert-staff-${b.id}`,
+          type: 'warning',
+          text: `Staffing Shortage: ${b.name}`,
+          icon: 'warning'
+        });
+      }
+
+      // 4. Attendance check
+      if (b.attendance < 90) {
+        generatedAlerts.push({
+          id: `alert-att-${b.id}`,
+          type: 'warning',
+          text: `Attendance Below Target: ${b.name} (${b.attendance}%)`,
+          icon: 'warning'
+        });
+      }
+
+      // 5. Document Check / Document Expiry (Jaipur HQ License)
+      if (b.documents && b.documents.length > 0) {
+        const licenseDoc = b.documents.find(doc => doc.toLowerCase().includes('license'));
+        if (licenseDoc) {
+          generatedAlerts.push({
+            id: `alert-doc-${b.id}`,
+            type: 'info',
+            text: `Compliance Document Expiry: ${b.name} ${licenseDoc.replace('.pdf', '')}`,
+            icon: 'info'
+          });
+        }
+      }
+
+      // 6. New Branch check
+      if (b.statusType === 'new' || b.status === 'New Branch') {
+        generatedAlerts.push({
+          id: `alert-new-${b.id}`,
+          type: 'success',
+          text: `New Branch Created: ${b.name}`,
+          icon: 'success'
+        });
+      }
+    });
+
+    return generatedAlerts;
+  }, [branches]);
 
   const getBranchDepartments = (b) => {
     if (!b) return [];
@@ -303,6 +387,8 @@ const Branches = () => {
 
   const [activeTab, setActiveTab] = useState('overview');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editBranch, setEditBranch] = useState(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showWfhModal, setShowWfhModal] = useState(false);
   const [showManagerModal, setShowManagerModal] = useState(false);
@@ -396,9 +482,14 @@ const Branches = () => {
       }));
   }, [employees]);
 
-  const [availableDepts, setAvailableDepts] = useState([
-    'Operations', 'Sales', 'Marketing', 'IT', 'HR', 'Finance', 'Legal', 'R&D', 'Engineering', 'Support', 'Product', 'QA', 'DevOps', 'Customer Service'
-  ]);
+  const [availableDepts, setAvailableDepts] = useState([]);
+
+  useEffect(() => {
+    if (departments && departments.length > 0) {
+      const names = departments.map(d => d.name);
+      setAvailableDepts([...new Set(names)].sort());
+    }
+  }, [departments]);
 
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [newDeptInput, setNewDeptInput] = useState('');
@@ -432,7 +523,11 @@ const Branches = () => {
 
   const handleAddressChange = (e) => {
     const val = e.target.value;
-    setNewBranch(prev => ({ ...prev, address: val }));
+    if (showEditModal) {
+      setEditBranch(prev => ({ ...prev, address: val }));
+    } else {
+      setNewBranch(prev => ({ ...prev, address: val }));
+    }
 
     if (addressDebounceTimeoutRef.current) {
       clearTimeout(addressDebounceTimeoutRef.current);
@@ -477,12 +572,21 @@ const Branches = () => {
 
     const stateVal = addr.state || addr.state_district || '';
 
-    setNewBranch(prev => ({
-      ...prev,
-      address: suggestion.display_name,
-      city: cityVal,
-      state: stateVal
-    }));
+    if (showEditModal) {
+      setEditBranch(prev => ({
+        ...prev,
+        address: suggestion.display_name,
+        city: cityVal,
+        state: stateVal
+      }));
+    } else {
+      setNewBranch(prev => ({
+        ...prev,
+        address: suggestion.display_name,
+        city: cityVal,
+        state: stateVal
+      }));
+    }
 
     setShowAddressSuggestions(false);
     setAddressSuggestions([]);
@@ -549,6 +653,54 @@ const Branches = () => {
         ...prev
       ]);
       setShowAddModal(false);
+    }
+  };
+
+  const handleEditBranchSubmit = async (e) => {
+    e.preventDefault();
+    if (!editBranch || !editBranch.id) return;
+
+    let managerName = editBranch.manager;
+    if (!editBranch.name || !editBranch.code || !managerName) {
+      addToast('warning', 'Please fill in Name, Code, and select a valid Manager');
+      return;
+    }
+
+    const empMatch = (employees || []).find(e => e.name.toLowerCase() === managerName.toLowerCase());
+    const managerId = empMatch ? empMatch.id : editBranch.managerId;
+    const managerPhone = empMatch ? empMatch.phone : editBranch.managerPhone;
+    const managerEmail = empMatch ? empMatch.email : editBranch.managerEmail;
+
+    const updatedFields = {
+      name: editBranch.name,
+      code: editBranch.code,
+      established: editBranch.established,
+      address: editBranch.address,
+      city: editBranch.city,
+      state: editBranch.state,
+      zipCode: editBranch.zipCode || '',
+      phone: editBranch.phone || '',
+      email: editBranch.email || '',
+      timezone: editBranch.timezone || 'IST (UTC+5:30)',
+      manager: managerName,
+      managerId: managerId,
+      managerPhone: managerPhone || '',
+      managerEmail: managerEmail || '',
+      status: editBranch.status,
+      statusType: editBranch.statusType,
+      employeeCount: parseInt(editBranch.employeeCount) || 0,
+      departments: editBranch.departments || []
+    };
+
+    const result = await updateBranch(editBranch.id, updatedFields);
+    if (result) {
+      setActivities(prev => [
+        { id: Date.now(), text: `Branch Updated: ${editBranch.name} (${editBranch.code})`, time: 'Just now', type: 'success' },
+        ...prev
+      ]);
+      addToast('success', `Branch "${editBranch.name}" updated successfully!`);
+      setShowEditModal(false);
+      setEditBranch(null);
     }
   };
 
@@ -897,10 +1049,196 @@ const Branches = () => {
                     <label>Headcount (initial)</label>
                     <input type="number" value={newBranch.employeeCount} onChange={e => setNewBranch({...newBranch, employeeCount: parseInt(e.target.value) || 0})} />
                   </div>
+
+                  <div className="form-group">
+                    <label>Departments Selection</label>
+                    <div className="departments-select-grid">
+                      {availableDepts.map(d => {
+                        const isChecked = (newBranch.departments || []).includes(d);
+                        return (
+                          <label key={d} className="dept-select-item">
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked} 
+                              onChange={() => {
+                                const nextDepts = isChecked 
+                                  ? newBranch.departments.filter(x => x !== d)
+                                  : [...newBranch.departments, d];
+                                setNewBranch({...newBranch, departments: nextDepts});
+                              }}
+                            />
+                            <span>{d}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
                 <div className="modal-footer">
                   <Button variant="outline" size="sm" type="button" onClick={() => setShowAddModal(false)}>Cancel</Button>
                   <Button variant="primary" size="sm" type="submit">Submit Branch</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Branch Modal */}
+        {showEditModal && editBranch && (
+          <div className="modal-overlay animate-fade-in">
+            <div className="modal-box card animate-scale-up" style={{ maxWidth: '600px', width: '90%' }}>
+              <div className="modal-header">
+                <h3><Edit2 size={16} /> Edit Office / Branch Details</h3>
+                <button className="modal-close-btn" onClick={() => { setShowEditModal(false); setEditBranch(null); }} type="button"><X size={16} /></button>
+              </div>
+              <form onSubmit={handleEditBranchSubmit}>
+                <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Branch Name *</label>
+                      <input type="text" required value={editBranch.name} onChange={e => setEditBranch({...editBranch, name: e.target.value})} placeholder="e.g. Hyderabad Branch" />
+                    </div>
+                    <div className="form-group">
+                      <label>Branch Code *</label>
+                      <input type="text" required value={editBranch.code} onChange={e => setEditBranch({...editBranch, code: e.target.value})} placeholder="e.g. HYD-BR" />
+                    </div>
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Established Date</label>
+                      <input type="date" value={editBranch.established} onChange={e => setEditBranch({...editBranch, established: e.target.value})} />
+                    </div>
+                    <div className="form-group">
+                      <label>Timezone</label>
+                      <input type="text" value={editBranch.timezone} onChange={e => setEditBranch({...editBranch, timezone: e.target.value})} placeholder="e.g. IST (UTC+5:30)" />
+                    </div>
+                  </div>
+
+                  <div className="form-group address-autocomplete-container" ref={autocompleteContainerRef}>
+                    <label>Full Physical Address *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editBranch.address}
+                      onChange={handleAddressChange}
+                      placeholder="Full location coordinates..."
+                      autoComplete="off"
+                    />
+                    {showAddressSuggestions && isLoadingAddressSuggestions && (
+                      <div className="address-suggestions-loading">Searching address suggestions...</div>
+                    )}
+                    {showAddressSuggestions && !isLoadingAddressSuggestions && addressSuggestions.length > 0 && (
+                      <ul className="address-suggestions-list">
+                        {addressSuggestions.map((suggestion) => (
+                          <li
+                            key={suggestion.place_id}
+                            className="address-suggestion-item"
+                            onClick={() => handleSelectAddressSuggestion(suggestion)}
+                          >
+                            {suggestion.display_name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>City *</label>
+                      <input type="text" required value={editBranch.city} onChange={e => setEditBranch({...editBranch, city: e.target.value})} placeholder="e.g. Hyderabad" />
+                    </div>
+                    <div className="form-group">
+                      <label>State *</label>
+                      <input type="text" required value={editBranch.state} onChange={e => setEditBranch({...editBranch, state: e.target.value})} placeholder="e.g. Telangana" />
+                    </div>
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>ZIP / Postal Code</label>
+                      <input type="text" value={editBranch.zipCode || ''} onChange={e => setEditBranch({...editBranch, zipCode: e.target.value})} placeholder="e.g. 500001" />
+                    </div>
+                    <div className="form-group">
+                      <label>Official Phone</label>
+                      <input type="text" value={editBranch.phone || ''} onChange={e => setEditBranch({...editBranch, phone: e.target.value})} placeholder="e.g. +91 40 1234 5678" />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Official Email</label>
+                    <input type="email" value={editBranch.email || ''} onChange={e => setEditBranch({...editBranch, email: e.target.value})} placeholder="e.g. hyderabad@company.com" />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Manager Name *</label>
+                    <select
+                      value={editBranch.manager}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const m = combinedAvailableManagers.find(x => x.name === val);
+                        setEditBranch(prev => ({
+                          ...prev,
+                          manager: val,
+                          managerEmail: m ? m.email : '',
+                          managerPhone: m ? m.phone : ''
+                        }));
+                      }}
+                      required
+                    >
+                      <option value="">Select Manager</option>
+                      {combinedAvailableManagers.map(m => (
+                        <option key={m.name} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Status Type</label>
+                    <select value={editBranch.statusType} onChange={e => {
+                      const val = e.target.value;
+                      const labelMap = { active: 'Active', expansion: 'Under Expansion', new: 'New Branch', inactive: 'Inactive' };
+                      setEditBranch({...editBranch, statusType: val, status: labelMap[val] || 'Active'});
+                    }}>
+                      <option value="active">Active</option>
+                      <option value="expansion">Under Expansion</option>
+                      <option value="new">New Branch</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Headcount</label>
+                    <input type="number" value={editBranch.employeeCount} onChange={e => setEditBranch({...editBranch, employeeCount: parseInt(e.target.value) || 0})} />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Departments Selection</label>
+                    <div className="departments-select-grid">
+                      {availableDepts.map(d => {
+                        const isChecked = (editBranch.departments || []).includes(d);
+                        return (
+                          <label key={d} className="dept-select-item">
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked} 
+                              onChange={() => {
+                                const nextDepts = isChecked 
+                                  ? editBranch.departments.filter(x => x !== d)
+                                  : [...editBranch.departments, d];
+                                setEditBranch({...editBranch, departments: nextDepts});
+                              }}
+                            />
+                            <span>{d}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <Button variant="outline" size="sm" type="button" onClick={() => { setShowEditModal(false); setEditBranch(null); }}>Cancel</Button>
+                  <Button variant="primary" size="sm" type="submit">Save Changes</Button>
                 </div>
               </form>
             </div>
@@ -1535,15 +1873,10 @@ const Branches = () => {
                       className="icon-action-btn"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setManagerUpdate({
-                          branchId: branch.id,
-                          name: branch.manager,
-                          phone: branch.managerPhone || '',
-                          email: branch.managerEmail || ''
-                        });
-                        setShowManagerModal(true);
+                        setEditBranch({ ...branch });
+                        setShowEditModal(true);
                       }}
-                      title="Quick Assign Manager"
+                      title="Edit Branch"
                     >
                       <Edit2 size={13} />
                     </button>
@@ -1641,24 +1974,6 @@ const Branches = () => {
               }}>
                 <Users size={14} /> Transfer Staff
               </button>
-              <button className="quick-action-btn-item" onClick={() => {
-                if (selectedBranch) {
-                  setManagerUpdate({
-                    branchId: selectedBranch.id,
-                    name: selectedBranch.manager,
-                    phone: selectedBranch.managerPhone || '',
-                    email: selectedBranch.managerEmail || ''
-                  });
-                  setShowManagerModal(true);
-                } else {
-                  addToast('warning', 'Please select a branch first');
-                }
-              }}>
-                <Edit2 size={14} /> Assign Manager
-              </button>
-              <button className="quick-action-btn-item" onClick={() => setShowWfhModal(true)}>
-                <Clock size={14} /> WFH Approvals <span className="wfh-badge">{wfhRequests.filter(r => r.status === 'Pending').length}</span>
-              </button>
               <button className="quick-action-btn-item" onClick={handleExportCSV}>
                 <Download size={14} /> Export CSV Data
               </button>
@@ -1670,7 +1985,17 @@ const Branches = () => {
             <div className="card branch-detail-card">
               <div className="detail-card-header">
                 <h3 className="panel-title"><Eye size={16} /> Selected Branch Details</h3>
-                <span className="detail-branch-code">{selectedBranch.code}</span>
+                <select
+                  className="detail-branch-dropdown"
+                  value={selectedBranchId}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.code}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="detail-tabs">
@@ -1991,13 +2316,18 @@ const Branches = () => {
           <div className="card alerts-card">
             <h3 className="panel-title"><AlertCircle size={16} /> Notifications & Alerts</h3>
             <div className="alerts-list">
-              <div className="alert-item warning"><AlertCircle size={14} /> Branch Manager Not Assigned: Chennai Franchise</div>
-              <div className="alert-item danger"><AlertCircle size={14} /> Low Productivity Branch: Chennai (72%)</div>
-              <div className="alert-item warning"><AlertCircle size={14} /> Staffing Shortage: Kolkata Branch</div>
-              <div className="alert-item warning"><AlertCircle size={14} /> Attendance Below Target: Chennai (85%)</div>
-              <div className="alert-item info"><AlertCircle size={14} /> Compliance Document Expiry: Jaipur HQ License</div>
-              <div className="alert-item success"><CheckCircle size={14} /> New Branch Created: Kolkata</div>
-              <div className="alert-item success"><CheckCircle size={14} /> Manager Assigned: Sanjay Das → Kolkata</div>
+              {dynamicAlerts.length > 0 ? (
+                dynamicAlerts.map(alert => (
+                  <div key={alert.id} className={`alert-item ${alert.type}`}>
+                    {alert.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                    {alert.text}
+                  </div>
+                ))
+              ) : (
+                <div className="alert-item info" style={{ justifyContent: 'center' }}>
+                  <CheckCircle size={14} /> All branches operational, no pending alerts.
+                </div>
+              )}
             </div>
           </div>
         </div>

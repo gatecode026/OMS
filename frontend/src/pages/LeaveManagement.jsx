@@ -890,9 +890,6 @@ const LeaveManagement = () => {
           <p className="page-desc-text">Oversee balances, request approvals, policy overrides, and company calendars</p>
         </div>
         <div className="flex align-center gap-3">
-          <Button variant="primary" icon={Plus} onClick={() => setApplyModalOpen(true)}>
-            Add New Leave
-          </Button>
           {currentUserRole !== 'employee' && (
             <>
               <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('policies'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
