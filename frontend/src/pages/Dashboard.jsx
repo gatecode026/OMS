@@ -61,7 +61,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     // Sort alphabetically by name to match the dashboard's display order
     const sortedPayload = [...payload].sort((a, b) => a.name.localeCompare(b.name));
-    
+
     return (
       <div
         className="custom-tooltip"
@@ -109,12 +109,12 @@ const OrgNode = ({ name, role, subItems }) => {
   const hasChildren = subItems && subItems.length > 0;
   return (
     <div className="org-tree-branch" style={{ marginLeft: '24px', borderLeft: '1px dashed rgba(255,255,255,0.08)', paddingLeft: '16px', marginTop: '10px', position: 'relative' }}>
-      <div 
-        onClick={() => hasChildren && setExpanded(!expanded)} 
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '10px', 
+      <div
+        onClick={() => hasChildren && setExpanded(!expanded)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
           cursor: hasChildren ? 'pointer' : 'default',
           padding: '8px 12px',
           background: 'var(--bg-elevated)',
@@ -246,7 +246,7 @@ const Dashboard = () => {
   // Stats Calculations
   const totalEmployeesCount = employees.length || 8;
   const activeProjectsCount = (projectsList || []).length || 4;
-  
+
   const todayStr = '2026-06-03';
   const presentToday = attendance.filter(a => a.date === todayStr && (a.status === 'Present' || a.status === 'Late' || a.status === 'Work From Home')).length || 7;
   const attendanceRate = Math.round((presentToday / totalEmployeesCount) * 100);
@@ -322,7 +322,7 @@ const Dashboard = () => {
       const deptEmployees = employees.filter(e => e.department === d.name);
       const deptTasks = tasks.filter(t => t.department === d.name);
       const colors = ['var(--color-primary)', '#f59e0b', '#10b981', '#8b5cf6', '#d946ef'];
-      
+
       const totalProd = deptEmployees.reduce((sum, e) => sum + (e.productivityScore || 75), 0);
       const avgProd = deptEmployees.length > 0 ? Math.round(totalProd / deptEmployees.length) : 85;
 
@@ -396,7 +396,7 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-page grid-gap">
-      
+
       {/* 1. Stat Cards Row (incorporating all requested top metrics with sub-details) */}
       <div className="stats-row">
         <StatCard
@@ -504,12 +504,12 @@ const Dashboard = () => {
           variant="branches"
         />
       </div>
-      
+
       {/* Toggle button for Extended Metrics */}
       <div style={{ display: 'flex', justifyContent: 'center', margin: '0' }}>
-        <Button 
-          variant="secondary" 
-          size="sm" 
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => setShowExtendedStats(!showExtendedStats)}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', justifyContent: 'center', background: 'var(--bg-elevated)', border: '1px dashed var(--border-color)' }}
         >
@@ -603,20 +603,20 @@ const Dashboard = () => {
               <AreaChart data={attendanceChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorAbsent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorLate" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorLeave" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -662,7 +662,7 @@ const Dashboard = () => {
 
       {/* 3. Third Row Splits: Department Statistics & Top Leaderboards (Toggled) */}
       <div className="dashboard-splits animate-slide-up">
-        
+
         {/* Department employee statistics table */}
         <div className="card split-panel flex-1">
           <div className="panel-header-simple">
@@ -672,7 +672,7 @@ const Dashboard = () => {
             </div>
             <Badge variant="neutral">Active</Badge>
           </div>
-          
+
           <div className="panel-table-wrap">
             <table className="dash-mini-table">
               <thead>
@@ -722,7 +722,7 @@ const Dashboard = () => {
               <h3 className="card-title">Top Performance Standings</h3>
               <span className="chart-subtitle">Q2 leaderboard rankings</span>
             </div>
-            
+
             {/* Tab switch buttons */}
             <div className="tab-btn-group">
               <button
@@ -749,7 +749,7 @@ const Dashboard = () => {
                   <div className="item-text-info flex-1">
                     <span className="item-primary-name">{user.name}</span>
                     <span className="item-sub-dept">{user.dept}</span>
-                    
+
                     <div className="leader-score-bar-wrapper">
                       <div
                         className="leader-score-bar-fill"
@@ -774,7 +774,7 @@ const Dashboard = () => {
 
       {/* Org Hierarchy Chart Splits Row */}
       <div className="dashboard-splits animate-slide-up" style={{ marginTop: '0', gridTemplateColumns: '1fr' }}>
-        
+
         {/* Organization Hierarchy Chart Card */}
         <div className="card split-panel flex-1" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
           <div className="panel-header-simple">
@@ -837,7 +837,7 @@ const Dashboard = () => {
                   <td>
                     <Badge variant={
                       report.status === 'Approved' ? 'success' :
-                      report.status === 'Flagged' ? 'danger' : 'warning'
+                        report.status === 'Flagged' ? 'danger' : 'warning'
                     }>
                       {report.status}
                     </Badge>
@@ -908,8 +908,8 @@ const Dashboard = () => {
         onClose={() => setCommModal(null)}
         title={
           commModal === 'announcement' ? 'Broadcast General Announcement' :
-          commModal === 'notification' ? 'Dispatch Dashboard Notification' :
-          'Send Direct Mail Integration'
+            commModal === 'notification' ? 'Dispatch Dashboard Notification' :
+              'Send Direct Mail Integration'
         }
         size="md"
         footer={
@@ -1033,7 +1033,7 @@ const Dashboard = () => {
               </div>
               <Badge variant={
                 selectedReport.status === 'Approved' ? 'success' :
-                selectedReport.status === 'Flagged' ? 'danger' : 'warning'
+                  selectedReport.status === 'Flagged' ? 'danger' : 'warning'
               }>
                 {selectedReport.status}
               </Badge>
