@@ -16,74 +16,11 @@ import {
   XCircle
 } from 'lucide-react';
 
-const mockAuditLogs = [
-  {
-    id: 'AUD-901',
-    user: 'Divya Singh',
-    role: 'Super Admin',
-    action: 'Modified system permissions for Role: Branch Admin',
-    module: 'Permissions',
-    ip: '192.168.1.120',
-    severity: 'Warning',
-    timestamp: '2026-05-29 08:14:02'
-  },
-  {
-    id: 'AUD-902',
-    user: 'Divya Singh',
-    role: 'Super Admin',
-    action: 'Added new IP Whitelist range: 10.0.0.0/8',
-    module: 'Security',
-    ip: '192.168.1.120',
-    severity: 'Info',
-    timestamp: '2026-05-29 07:55:18'
-  },
-  {
-    id: 'AUD-903',
-    user: 'Sanjay Gupta',
-    role: 'Branch Admin',
-    action: 'Disbursed Monthly Payroll Batch (May 2026)',
-    module: 'Payroll',
-    ip: '139.65.0.3',
-    severity: 'Success',
-    timestamp: '2026-05-28 17:30:11'
-  },
-  {
-    id: 'AUD-904',
-    user: 'Rajesh Kumar',
-    role: 'Branch Admin',
-    action: 'Failed authentication attempt (invalid password)',
-    module: 'Auth',
-    ip: '172.56.21.90',
-    severity: 'Critical',
-    timestamp: '2026-05-28 14:22:50'
-  },
-  {
-    id: 'AUD-905',
-    user: 'Divya Singh',
-    role: 'Super Admin',
-    action: 'Deactivated Employee profile: Meena Sharma',
-    module: 'Employees',
-    ip: '192.168.1.120',
-    severity: 'Warning',
-    timestamp: '2026-05-28 11:05:44'
-  },
-  {
-    id: 'AUD-906',
-    user: 'Shweta Joshi',
-    role: 'Team Leader',
-    action: 'Approved Annual Leave request for Ravi Yadav',
-    module: 'Leaves',
-    ip: '151.20.9.3',
-    severity: 'Success',
-    timestamp: '2026-05-27 09:41:23'
-  }
-];
-
 const AuditLogs = () => {
   const { addToast } = useApp();
   const loading = usePageLoading();
 
-  const [logs, setLogs] = useState(mockAuditLogs);
+  const [logs, setLogs] = useState([]);
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState('All');
   const [moduleFilter, setModuleFilter] = useState('All');

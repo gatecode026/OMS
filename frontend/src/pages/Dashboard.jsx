@@ -225,7 +225,7 @@ const Dashboard = () => {
   // Org Chart Hierarchy Data dynamically computed
   const orgChartData = React.useMemo(() => {
     const ceo = (employees || []).find(e => e.roleId === 'super_admin' || e.designation?.toLowerCase().includes('ceo') || e.designation?.toLowerCase().includes('chief')) || employees[0];
-    if (!ceo) return { name: 'Aarav Sharma', role: 'Chief Executive Officer', subItems: [] };
+    if (!ceo) return { name: 'Super Admin', role: 'Chief Executive Officer', subItems: [] };
 
     const buildTree = (managerName) => {
       const reports = (employees || []).filter(e => e.teamLeader === managerName && e.name !== managerName);
@@ -772,8 +772,8 @@ const Dashboard = () => {
 
       </div>
 
-      {/* Org Hierarchy Chart & Communication Center Splits Row */}
-      <div className="dashboard-splits animate-slide-up" style={{ marginTop: '0' }}>
+      {/* Org Hierarchy Chart Splits Row */}
+      <div className="dashboard-splits animate-slide-up" style={{ marginTop: '0', gridTemplateColumns: '1fr' }}>
         
         {/* Organization Hierarchy Chart Card */}
         <div className="card split-panel flex-1" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
@@ -883,7 +883,7 @@ const Dashboard = () => {
       <footer className="dashboard-footer card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-4)', padding: 'var(--spacing-5) var(--spacing-6) !important', marginTop: 'var(--spacing-6)' }}>
         <div className="dashboard-footer-info" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
           <ShieldCheck size={16} className="text-success" />
-          <span>Operator: <strong>{currentUser?.name || 'Aarav Sharma'}</strong> (Super Admin)</span>
+          <span>Operator: <strong>{currentUser?.name || 'Super Admin'}</strong> (Super Admin)</span>
         </div>
         <div>
           <span>Active Sessions: <strong style={{ color: 'var(--color-primary)' }}>12 Operator nodes</strong></span>

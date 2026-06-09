@@ -184,7 +184,7 @@ export const AppProvider = ({ children }) => {
               { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
               { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
               { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
+              { level: 4, role: 'Super Admin Approval', approver: 'Super Admin', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
             ],
             activityLog: t.activityLog || [
               { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
@@ -407,7 +407,7 @@ export const AppProvider = ({ children }) => {
 
   // Messages states
   const [messages, setMessages] = useState([
-    { id: 'msg-1', sender: 'Ananya Gupta', text: 'Hey Aarav, the frontend lazy route changes are live in production. Please check.', time: '10m ago', unread: true },
+    { id: 'msg-1', sender: 'Ananya Gupta', text: 'Hey, the frontend lazy route changes are live in production. Please check.', time: '10m ago', unread: true },
     { id: 'msg-2', sender: 'Vikram Singh', text: 'Can you review the leave request I submitted yesterday? Need to travel next week.', time: '1h ago', unread: true },
     { id: 'msg-3', sender: 'Neha Verma', text: 'Draft payroll calculations for May are ready in the dashboard.', time: '5h ago', unread: false }
   ]);
@@ -2790,7 +2790,7 @@ export const AppProvider = ({ children }) => {
         { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
         { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
         { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 4, role: 'Super Admin Approval', approver: 'Aarav Sharma', status: 'Pending', timestamp: '', remarks: '' }
+        { level: 4, role: 'Super Admin Approval', approver: 'Super Admin', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }

@@ -56,7 +56,8 @@ const Performance = () => {
     activityLogs,
     projectsList,
     addNotification,
-    markAllNotificationsRead
+    markAllNotificationsRead,
+    currentUser
   } = useApp();
   const isLoading = usePageLoading(800);
 
@@ -501,7 +502,7 @@ const Performance = () => {
       reviewPeriod: pipForm.reviewPeriod,
       actionPlan: pipForm.actionPlan,
       status: 'Active',
-      reviewer: userRole === 'Super Admin' ? 'Super Admin' : 'Aarav Sharma',
+      reviewer: currentUser?.name || userRole || 'Super Admin',
       dateCreated: new Date().toISOString().split('T')[0]
     };
 
@@ -552,7 +553,7 @@ const Performance = () => {
   const stats = useMemo(() => {
     // Filter to role view
     const visibleEmployees = employees.filter(e => {
-      if (userRole === 'Employee') return e.name === 'Aarav Sharma';
+      if (userRole === 'Employee') return e.id === currentUser?.id;
       return true;
     });
 
@@ -588,7 +589,7 @@ const Performance = () => {
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       // Perspective lockdown
-      if (userRole === 'Employee' && emp.name !== 'Aarav Sharma') return false;
+      if (userRole === 'Employee' && emp.id !== currentUser?.id) return false;
 
       // Search Query match
       const query = searchQuery.toLowerCase();
@@ -1273,7 +1274,7 @@ const Performance = () => {
               </div>
 
               <div className="formula-simulation-preview" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, marginTop: 5 }}>
-                <span className="reports-form-lbl" style={{ fontWeight: 600 }}>Simulated recalculation for Aarav Sharma:</span>
+                <span className="reports-form-lbl" style={{ fontWeight: 600 }}>Simulated recalculation for {currentUser?.name || 'Administrator'}:</span>
                 <div className="flex-row justify-between text-secondary-sm" style={{ marginTop: 6 }}>
                   <span>Productivity: 98 * {editWeights.productivity}%</span>
                   <span>= {parseFloat((98 * editWeights.productivity / 100).toFixed(1))}</span>

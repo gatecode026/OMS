@@ -81,7 +81,7 @@ const Documents = () => {
       type: uploadForm.type,
       category: uploadForm.category,
       size: uploadForm.size,
-      uploadedBy: currentUser?.name || 'Aarav Sharma',
+      uploadedBy: currentUser?.name || 'Administrator',
       uploadDate: new Date().toISOString().split('T')[0],
       downloads: 0
     };
