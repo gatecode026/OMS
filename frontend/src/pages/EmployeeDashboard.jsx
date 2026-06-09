@@ -95,10 +95,10 @@ const EmployeeDashboard = () => {
   // ─── Personal Data Isolation (Filtered strictly by currentUser) ───
   const myAttendance = attendance.filter(a => a.employeeId === currentUser.id);
   const myTasks = tasks.filter(t => t.assigneeId === currentUser.id);
-  
+
   // Projects: Dynamically map projects containing user's tasks or matches user's department
-  const myProjects = (projectsList || []).filter(p => 
-    p.department === currentUser.department || 
+  const myProjects = (projectsList || []).filter(p =>
+    p.department === currentUser.department ||
     myTasks.some(t => t.project === p.name || t.projectName === p.name)
   );
 
