@@ -1812,3 +1812,63 @@
 .att-wp-recent-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* ── Employee Attendance Filter Styles ── */
+.employee-filter-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.employee-filter-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.employee-filter-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  padding: 4px;
+  border-radius: var(--radius-lg);
+}
+
+.employee-filter-btn {
+  padding: 8px 18px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.employee-filter-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.employee-filter-btn.active {
+  color: var(--text-primary);
+  background: rgba(217, 70, 239, 0.12);
+  border-color: rgba(217, 70, 239, 0.25);
+  box-shadow: 0 2px 8px rgba(217, 70, 239, 0.15);
+}
+
+.light-theme .employee-filter-tabs {
+  background: var(--bg-card, #ffffff);
+}
+
+.light-theme .employee-filter-btn.active {
+  background: rgba(217, 70, 239, 0.08);
+}
+

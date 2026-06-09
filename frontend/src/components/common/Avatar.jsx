@@ -1,5 +1,6 @@
 import React from 'react';
 import './Avatar.css';
+import { useApp } from '../../context/AppContext';
 
 export const getInitials = (name = '') => {
   const parts = name.trim().split(/\s+/);
@@ -18,17 +19,41 @@ export const getAvatarColor = (name = '') => {
   return `hsl(${h}, 60%, 50%)`;
 };
 
-const Avatar = ({ name = '', size = 'md', className = '' }) => {
+const Avatar = ({ name = '', size = 'md', className = '', src = '' }) => {
+  let appState = {};
+  try {
+    appState = useApp() || {};
+  } catch (e) {
+    // Context might not be available
+  }
+  const { currentUser, employees } = appState;
+
   const initials = getInitials(name);
   const bgColor = getAvatarColor(name);
+
+  // Look up matching employee/user to see if they have uploaded a profile photo
+  const emp = employees?.find(e => e.name === name) || (currentUser?.name === name ? currentUser : null);
+  const imageUrl = src || emp?.photoUrl || emp?.avatar;
 
   return (
     <div
       className={`avatar-circle avatar-${size} ${className}`}
-      style={{ backgroundColor: bgColor }}
+      style={{ 
+        backgroundColor: imageUrl ? 'transparent' : bgColor,
+        overflow: 'hidden'
+      }}
       title={name}
     >
-      <span className="avatar-text">{initials}</span>
+      {imageUrl ? (
+        <img 
+          src={imageUrl} 
+          alt={name} 
+          className="avatar-img"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+        />
+      ) : (
+        <span className="avatar-text">{initials}</span>
+      )}
     </div>
   );
 };

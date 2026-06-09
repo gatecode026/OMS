@@ -99,6 +99,8 @@ const WorkReports = () => {
     setUserRole(initialUserRole);
   }, [initialUserRole]);
 
+  const isEmployee = currentUserRole === 'employee' || userRole === 'Employee';
+
   /* Page Tabs Controller */
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, directory, submit, calendar, analytics, leaderboards, logs
 
@@ -106,16 +108,18 @@ const WorkReports = () => {
 
   const reports = useMemo(() => {
     let filtered = rawReports;
-    if (currentUserRole && currentUserRole !== 'super_admin') {
+    const activeRole = isEmployee ? 'employee' : currentUserRole;
+
+    if (activeRole && activeRole !== 'super_admin') {
       filtered = rawReports.filter(r => {
         const emp = employees.find(e => e.id === r.employeeId || e.name === r.employeeName);
-        if (currentUserRole === 'branch_admin') {
+        if (activeRole === 'branch_admin') {
           return emp?.branch === currentUser?.branch;
         }
-        if (currentUserRole === 'dept_admin') {
+        if (activeRole === 'dept_admin') {
           return r.department === currentUser?.department || emp?.department === currentUser?.department;
         }
-        if (currentUserRole === 'employee') {
+        if (activeRole === 'employee') {
           return r.employeeId === currentUser?.id || emp?.id === currentUser?.id;
         }
         return true;
@@ -152,7 +156,7 @@ const WorkReports = () => {
       }
       return true;
     });
-  }, [rawReports, employees, currentUser, currentUserRole, timeFilter]);
+  }, [rawReports, employees, currentUser, currentUserRole, isEmployee, timeFilter]);
 
   const isWithinTimeRange = (ts, filterValue) => {
     if (!ts || filterValue === 'AllTime') return true;
@@ -602,7 +606,10 @@ const WorkReports = () => {
         document.body.removeChild(link);
 
         setExporting(false);
-        addToast('success', `Work Reports exported successfully in ${format} format.`);
+        const msg = isEmployee
+          ? `My Work Reports exported successfully in ${format} format.`
+          : `Daily Work Reports exported successfully in ${format} format.`;
+        addToast('success', msg);
       } catch (err) {
         console.error('Failed to export reports:', err);
         setExporting(false);
@@ -698,7 +705,7 @@ const WorkReports = () => {
       setProjectFilter('All');
     } else if (viewName === 'my') {
       setStatusFilter('All');
-      setSearch('Rahul Sharma'); // employee view
+      setSearch(isEmployee ? '' : (currentUser?.name || '')); // employee view
     }
     addToast('info', `Applied filter view: ${viewName.toUpperCase()}`);
   };
@@ -825,7 +832,7 @@ const WorkReports = () => {
           </div>
           
           <Button variant="ghost" size="sm" icon={Download} onClick={() => handleExportSystem('CSV')}>
-            {exporting ? 'Exporting...' : 'Export Directory'}
+            {exporting ? 'Exporting...' : (isEmployee ? 'Export My Reports' : 'Export Directory')}
           </Button>
         </div>
       </div>
@@ -836,7 +843,7 @@ const WorkReports = () => {
           { id: 'dashboard', label: 'Dashboard Overview', icon: <BarChart3 size={15} /> },
           { id: 'directory', label: 'Reports Directory', icon: <FileText size={15} /> },
           { id: 'calendar', label: 'Calendar Grid', icon: <Calendar size={15} /> },
-          { id: 'analytics', label: 'Analytics & Heatmap', icon: <TrendingUp size={15} /> },
+          currentUserRole !== 'employee' && { id: 'analytics', label: 'Analytics & Heatmap', icon: <TrendingUp size={15} /> },
           currentUserRole !== 'employee' && { id: 'leaderboards', label: 'Leaderboard & Reminders', icon: <Award size={15} /> },
           currentUserRole !== 'employee' && { id: 'logs', label: 'Notifications & Audits', icon: <ShieldAlert size={15} /> }
         ].filter(Boolean).map(t => (
@@ -976,7 +983,7 @@ const WorkReports = () => {
                 <Search size={15} />
                 <input
                   type="text"
-                  placeholder="Search name, ID, project..."
+                  placeholder={isEmployee ? "Search project, ID, summary..." : "Search name, ID, project..."}
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 />
@@ -1081,13 +1088,15 @@ const WorkReports = () => {
             <table className="reports-data-table">
               <thead>
                 <tr>
-                  <th style={{ width: 40 }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.length === pagedList.length && pagedList.length > 0}
-                      onChange={(e) => toggleSelectAll(e.target.checked)}
-                    />
-                  </th>
+                  {!isEmployee && (
+                    <th style={{ width: 40 }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.length === pagedList.length && pagedList.length > 0}
+                        onChange={(e) => toggleSelectAll(e.target.checked)}
+                      />
+                    </th>
+                  )}
                   <th>ID</th>
                   <th>Employee</th>
                   <th>Dept/Team</th>
@@ -1104,13 +1113,15 @@ const WorkReports = () => {
               <tbody>
                 {pagedList.length > 0 ? pagedList.map(report => (
                   <tr key={report.id} className={selectedIds.includes(report.id) ? 'row-selected' : ''}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(report.id)}
-                        onChange={(e) => toggleSelectOne(report.id, e.target.checked)}
-                      />
-                    </td>
+                    {!isEmployee && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(report.id)}
+                          onChange={(e) => toggleSelectOne(report.id, e.target.checked)}
+                        />
+                      </td>
+                    )}
                     <td style={{ fontFamily: 'monospace', fontWeight: 600 }}>{report.id}</td>
                     <td>
                       <div className="flex-center gap-2 justify-start">
@@ -1150,13 +1161,13 @@ const WorkReports = () => {
                           setEvaluationFeedback(report.feedback || '');
                         }}
                       >
-                        Audit / Review
+                        {isEmployee ? 'View Details' : 'Audit / Review'}
                       </Button>
                     </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={12} className="reports-table-empty">
+                    <td colSpan={isEmployee ? 11 : 12} className="reports-table-empty">
                       <FileText size={32} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 8 }} />
                       <p>No work reports found matching the selected filters.</p>
                     </td>
@@ -1219,11 +1230,11 @@ const WorkReports = () => {
           </div>
 
           {/* Calendar legends */}
-          <div className="calendar-legends-strip flex-row justify-start gap-4" style={{ margin: '12px 0 6px 0' }}>
-            <span className="legend-indicator"><span className="legend-dot status-approved" /> Approved</span>
-            <span className="legend-indicator"><span className="legend-dot status-submitted" /> Submitted</span>
-            <span className="legend-indicator"><span className="legend-dot status-flagged" /> Action Needed</span>
-            <span className="legend-indicator"><span className="legend-dot status-missing" /> Missing / Unsubmitted</span>
+          <div className="calendar-legends-strip flex-row justify-start gap-4 flex-wrap" style={{ margin: '12px 0 6px 0' }}>
+            <span className="reports-legend-indicator"><span className="legend-dot status-approved" /> Approved</span>
+            <span className="reports-legend-indicator"><span className="legend-dot status-submitted" /> Submitted</span>
+            <span className="reports-legend-indicator"><span className="legend-dot status-flagged" /> Action Needed</span>
+            <span className="reports-legend-indicator"><span className="legend-dot status-missing" /> Missing / Unsubmitted</span>
           </div>
 
           <div className="calendar-grid-wrapper">
@@ -1326,11 +1337,11 @@ const WorkReports = () => {
               ))}
             </div>
             
-            <div className="heatmap-legends-row">
+            <div className="heatmap-legends-row flex-wrap">
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Workload Index:</span>
-              <span className="legend-indicator"><span className="legend-box heat-overloaded" /> Overloaded (&gt;8.5h)</span>
-              <span className="legend-indicator"><span className="legend-box heat-optimal" /> Optimal (7.5h - 8.5h)</span>
-              <span className="legend-indicator"><span className="legend-box heat-under" /> Under-utilized (&lt;7.5h)</span>
+              <span className="reports-legend-indicator"><span className="legend-box heat-overloaded" /> Overloaded (&gt;8.5h)</span>
+              <span className="reports-legend-indicator"><span className="legend-box heat-optimal" /> Optimal (7.5h - 8.5h)</span>
+              <span className="reports-legend-indicator"><span className="legend-box heat-under" /> Under-utilized (&lt;7.5h)</span>
             </div>
           </div>
 
@@ -1549,7 +1560,7 @@ const WorkReports = () => {
         <SlideOver
           isOpen={!!selectedReport}
           onClose={() => setSelectedReport(null)}
-          title={`Audit Daily Report — ${selectedReport.id}`}
+          title={isEmployee ? `Daily Report Details — ${selectedReport.id}` : `Audit Daily Report — ${selectedReport.id}`}
         >
           <div className="report-detail-wrapper animate-slide-up">
             

@@ -18,7 +18,7 @@ import ActivityFeed from '../../components/projects/ActivityFeed';
 
 
 const Projects = () => {
-  const { addToast, employees, departments, projectsList, addProject, updateProject, deleteProject } = useApp();
+  const { addToast, employees, departments, projectsList, addProject, updateProject, deleteProject, currentUserRole } = useApp();
 
   // State Management
   const [projects, setProjects] = useState([]);
@@ -579,13 +579,13 @@ const Projects = () => {
       </div>
 
       {/* Top Banner Alert Bar */}
-      <div className={styles.alertsBanner} style={{ borderLeft: '4px solid var(--color-danger)', backgroundColor: 'var(--bg-card)' }}>
-        <div className={styles.alertsHeader} style={{ color: 'var(--text-primary)' }}>
-          <span className={styles.alertsTitle} style={{ color: 'var(--color-danger)' }}>
+      <div className={styles.alertsBanner}>
+        <div className={styles.alertsHeader}>
+          <span className={styles.alertsTitle}>
             <Bell size={16} /> Important Dashboard System Alerts
           </span>
         </div>
-        <div className={styles.alertList} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-2)' }}>
+        <div className={styles.alertList}>
           <div className={styles.alertItem}>
             <span className={styles.alertDot} />
             <span>Upcoming Deadlines: <strong>{stats.upcoming}</strong> projects need delivery this month.</span>
@@ -603,21 +603,25 @@ const Projects = () => {
 
       {/* Section G - Quick Action Buttons Bar */}
       <div className={styles.quickActionsRow}>
-        <button className={`${styles.pageBtn} ${styles.primaryAction}`} onClick={() => { setSelectedProject(null); setActiveModal('create'); }}>
-          <Plus size={14} /> Create New Project
-        </button>
-        <button className={styles.pageBtn} onClick={() => setActiveModal('assign')}>
-          <Users size={14} /> Assign Team
-        </button>
-        <button className={styles.pageBtn} onClick={() => setActiveModal('task')}>
-          <CheckSquare size={14} /> Add Tasks
-        </button>
-        <button className={styles.pageBtn} onClick={() => setActiveModal('document')}>
-          <FileText size={14} /> Upload Documents
-        </button>
-        <button className={styles.pageBtn} onClick={() => setActiveModal('report')}>
-          <BarChart2 size={14} /> Generate Reports
-        </button>
+        {currentUserRole !== 'employee' && (
+          <>
+            <button className={`${styles.pageBtn} ${styles.primaryAction}`} onClick={() => { setSelectedProject(null); setActiveModal('create'); }}>
+              <Plus size={14} /> Create New Project
+            </button>
+            <button className={styles.pageBtn} onClick={() => setActiveModal('assign')}>
+              <Users size={14} /> Assign Team
+            </button>
+            <button className={styles.pageBtn} onClick={() => setActiveModal('task')}>
+              <CheckSquare size={14} /> Add Tasks
+            </button>
+            <button className={styles.pageBtn} onClick={() => setActiveModal('document')}>
+              <FileText size={14} /> Upload Documents
+            </button>
+            <button className={styles.pageBtn} onClick={() => setActiveModal('report')}>
+              <BarChart2 size={14} /> Generate Reports
+            </button>
+          </>
+        )}
         <button className={styles.pageBtn} onClick={handleExportCSV}>
           <Download size={14} /> Export Data (CSV)
         </button>

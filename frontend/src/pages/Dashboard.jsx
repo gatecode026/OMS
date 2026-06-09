@@ -155,6 +155,7 @@ const Dashboard = () => {
     attendance,
     tasks,
     currentUser,
+    currentUserRole,
     addToast,
     showConfirm,
     branches,
@@ -169,6 +170,12 @@ const Dashboard = () => {
   } = useApp();
 
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (currentUserRole === 'employee') {
+      navigate('/employee-dashboard', { replace: true });
+    }
+  }, [currentUserRole, navigate]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);

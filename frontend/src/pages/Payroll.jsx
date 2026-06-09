@@ -94,14 +94,15 @@ const Payroll = () => {
   // Role Perspective override (defaults to currentUserRole, but can be switched)
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
 
+  // Active navigation tab
+  const [activeTab, setActiveTab] = useState(currentUserRole === 'employee' ? 'processing' : 'dashboard');
+
   React.useEffect(() => {
     if (currentUserRole === 'employee') {
       setPerspective('employee');
+      setActiveTab('processing');
     }
   }, [currentUserRole]);
-
-  // Active navigation tab
-  const [activeTab, setActiveTab] = useState('dashboard');
 
   // --- Search & Filters ---
   const [searchQuery, setSearchQuery] = useState('');
@@ -755,12 +756,14 @@ BANK PAYMENT & COMPLIANCE DETAIL:
       {/* Primary Navigation Tabs */}
       <div className="card tab-bar-card overflow-x-auto">
         <div className="payroll-tabs-list">
-          <button onClick={() => setActiveTab('dashboard')} className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}><TrendingUp size={16} />Dashboard & Analytics</button>
-          <button onClick={() => setActiveTab('processing')} className={`tab-btn ${activeTab === 'processing' ? 'active' : ''}`}><Sliders size={16} />Processing Center</button>
+          {perspective !== 'employee' && <button onClick={() => setActiveTab('dashboard')} className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}><TrendingUp size={16} />Dashboard & Analytics</button>}
+          <button onClick={() => setActiveTab('processing')} className={`tab-btn ${activeTab === 'processing' ? 'active' : ''}`}><Sliders size={16} />{perspective === 'employee' ? 'My Payslips' : 'Processing Center'}</button>
+          <button onClick={() => setActiveTab('attendance')} className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`}><Clock size={16} />{perspective === 'employee' ? 'My Attendance Summary' : 'Attendance Link'}</button>
           {perspective !== 'employee' && <button onClick={() => setActiveTab('structures')} className={`tab-btn ${activeTab === 'structures' ? 'active' : ''}`}><Settings size={16} />Salary Structures</button>}
-          <button onClick={() => setActiveTab('bonuses')} className={`tab-btn ${activeTab === 'bonuses' ? 'active' : ''}`}><Award size={16} />Bonuses & Incentives</button>
-          <button onClick={() => setActiveTab('loans')} className={`tab-btn ${activeTab === 'loans' ? 'active' : ''}`}><Scale size={16} />Loans & Advances</button>
-          <button onClick={() => setActiveTab('taxes')} className={`tab-btn ${activeTab === 'taxes' ? 'active' : ''}`}><FileText size={16} />Tax Vault</button>
+          <button onClick={() => setActiveTab('bonuses')} className={`tab-btn ${activeTab === 'bonuses' ? 'active' : ''}`}><Award size={16} />{perspective === 'employee' ? 'My Bonuses & Incentives' : 'Bonuses & Incentives'}</button>
+          <button onClick={() => setActiveTab('reimbursements')} className={`tab-btn ${activeTab === 'reimbursements' ? 'active' : ''}`}><Receipt size={16} />{perspective === 'employee' ? 'My Reimbursements' : 'Reimbursements'}</button>
+          <button onClick={() => setActiveTab('loans')} className={`tab-btn ${activeTab === 'loans' ? 'active' : ''}`}><Scale size={16} />{perspective === 'employee' ? 'My Loans & Advances' : 'Loans & Advances'}</button>
+          <button onClick={() => setActiveTab('taxes')} className={`tab-btn ${activeTab === 'taxes' ? 'active' : ''}`}><FileText size={16} />{perspective === 'employee' ? 'My Tax Profile' : 'Tax Vault'}</button>
           <button onClick={() => setActiveTab('calendar')} className={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`}><Calendar size={16} />Payroll Calendar</button>
           {perspective !== 'employee' && <button onClick={() => setActiveTab('audit')} className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}><Database size={16} />Audit Trails & Reports</button>}
         </div>

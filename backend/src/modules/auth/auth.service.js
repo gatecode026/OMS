@@ -143,6 +143,54 @@ const FALLBACK_EMPLOYEES = [
     department: 'Engineering',
     branch: 'Delhi',
     team: 'Backend Core'
+  },
+  {
+    id: 'EMP-2026-100',
+    name: 'animesh jain',
+    email: 'animeshj72@gmail.com',
+    role: 'Manager',
+    roleId: 'manager',
+    status: 'Active',
+    designation: 'Software Manager',
+    department: 'Engineering',
+    branch: 'Jaipur',
+    team: 'Engineering Core'
+  },
+  {
+    id: 'EMP-2026-101',
+    name: 'uttam Rajpurohit',
+    email: 'uttam@gmail.com',
+    role: 'Employee',
+    roleId: 'employee',
+    status: 'Active',
+    designation: 'Software Engineer',
+    department: 'Engineering',
+    branch: 'Jaipur',
+    team: 'Engineering Core'
+  },
+  {
+    id: 'EMP-2026-102',
+    name: 'pawan singh bisht',
+    email: 'bishtpawan333@gmail.com',
+    role: 'Employee',
+    roleId: 'employee',
+    status: 'Active',
+    designation: 'Software Engineer',
+    department: 'Engineering',
+    branch: 'Jaipur',
+    team: 'Engineering Core'
+  },
+  {
+    id: 'EMP-2026-103',
+    name: 'rahul kumawat',
+    email: 'rahulkumawat1408@gmail.com',
+    role: 'Team Leader',
+    roleId: 'team_leader',
+    status: 'Active',
+    designation: 'Team Leader',
+    department: 'Engineering',
+    branch: 'Jaipur',
+    team: 'Engineering Core'
   }
 ];
 
