@@ -15,17 +15,17 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState('profile');
 
   const [form, setForm] = useState({
-    name: currentUser?.name || 'Aarav Sharma',
-    email: currentUser?.email || 'aarav.sharma@saas.com',
+    name: currentUser?.name || 'Super Admin',
+    email: currentUser?.email || 'admin@saas.com',
     phone: currentUser?.phone || '+91 98765 43210',
-    department: currentUser?.department || 'Operations',
+    department: currentUser?.department || 'Executive',
     branch: currentUser?.branch || 'Jaipur',
     role: currentUser?.role || 'Super Admin',
-    dob: currentUser?.dob || '1985-11-10',
-    joinDate: currentUser?.joinDate || '2022-03-15',
-    bio: 'Senior administrator overseeing enterprise operations, workforce management, and cross-branch strategic alignment. Certified PMP with 12+ years of leadership experience.',
-    linkedin: 'linkedin.com/in/aaravsharma',
-    location: 'Jaipur, India'
+    dob: currentUser?.dob || '1990-01-01',
+    joinDate: currentUser?.joinDate || '2026-01-01',
+    bio: currentUser?.bio || 'Senior administrator overseeing enterprise operations, workforce management, and cross-branch strategic alignment.',
+    linkedin: currentUser?.linkedin || 'linkedin.com/in/admin',
+    location: currentUser?.location || 'Jaipur, India'
   });
 
   const [passwords, setPasswords] = useState({

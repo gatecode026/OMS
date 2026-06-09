@@ -138,6 +138,10 @@ const LeaveManagement = () => {
   });
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
+  const selectedEmp = useMemo(() => {
+    if (!selectedLeave) return null;
+    return employees.find(e => e.id === selectedLeave.employeeId || e.name === selectedLeave.employeeName);
+  }, [selectedLeave, employees]);
   const [approverNotesInput, setApproverNotesInput] = useState('');
   const [editingLeave, setEditingLeave] = useState(null);
   const [applyModalOpen, setApplyModalOpen] = useState(false);
@@ -299,7 +303,7 @@ const LeaveManagement = () => {
   const [alertsFeed, setAlertsFeed] = useState([
     { id: 'AL-001', type: 'warning', message: 'New leave request from Arjun Mehta requires approval.', timestamp: '5 mins ago', read: false },
     { id: 'AL-002', type: 'info', message: 'Karnataka Rajyotsava optional holiday added to calendar.', timestamp: '1 hour ago', read: false },
-    { id: 'AL-003', type: 'success', message: 'Leave policy adjustment updated successfully by Aarav.', timestamp: '2 hours ago', read: true },
+    { id: 'AL-003', type: 'success', message: 'Leave policy adjustment updated successfully.', timestamp: '2 hours ago', read: true },
     { id: 'AL-004', type: 'danger', message: 'Maternity leave document verification failed for EMP-005.', timestamp: '1 day ago', read: true }
   ]);
 
@@ -2305,7 +2309,7 @@ const LeaveManagement = () => {
             <div className="manager-assignments-strip card flex-row justify-between flex-wrap gap-3">
               <div className="assignment-box">
                 <span className="block-label">Team Leader</span>
-                <strong>Aarav Sharma</strong>
+                <strong>{selectedEmp?.teamLeader || 'System Team Leader'}</strong>
               </div>
               <div className="assignment-box">
                 <span className="block-label">Project Manager</span>
@@ -2426,7 +2430,7 @@ const LeaveManagement = () => {
                   </div>
                   <div className="step-info">
                     <span className="step-role">Team Leader Approval</span>
-                    <span className="step-status-sub">Aarav Sharma — {selectedLeave.status !== 'Pending' ? 'Reviewed' : 'Awaiting Review'}</span>
+                    <span className="step-status-sub">{selectedEmp?.teamLeader || 'Team Leader'} — {selectedLeave.status !== 'Pending' ? 'Reviewed' : 'Awaiting Review'}</span>
                   </div>
                 </div>
 
