@@ -33,6 +33,8 @@ export const save = async (data) => {
   return Employee.create(data);
 };
 
+import bcrypt from 'bcryptjs';
+
 /**
  * Update an existing employee record
  * @param {String} id - Employee business ID
@@ -40,7 +42,15 @@ export const save = async (data) => {
  */
 export const update = async (id, data) => {
   logger.info(`EmployeesRepository::update updating employee with ID: ${id}`);
-  return Employee.findOneAndUpdate({ id }, data, { new: true, runValidators: true });
+  const updateData = { ...data };
+  if (updateData.password === '••••••••' || !updateData.password) {
+    delete updateData.password;
+  } else {
+    // If it's a new password, hash it!
+    const salt = await bcrypt.genSalt(10);
+    updateData.password = await bcrypt.hash(updateData.password, salt);
+  }
+  return Employee.findOneAndUpdate({ id }, updateData, { new: true, runValidators: true });
 };
 
 /**

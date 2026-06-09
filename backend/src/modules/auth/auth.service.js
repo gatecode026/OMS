@@ -217,15 +217,35 @@ export const login = async (email, password) => {
     resolvedEmail = 'aarav.sharma@saas.com';
   }
 
+  console.log(`[DEBUG login] Email received: "${email}" | Password length: ${password ? password.length : 0} | Resolved Email: "${resolvedEmail}"`);
+
   // ─── CASE A: LIVE DATABASE MODE ─────────────────────────────────────────────
   if (isDatabaseConnected) {
     logger.info(`AuthService::login [Database Mode] Verifying admin credentials for: ${resolvedEmail}`);
 
+    const prefix = resolvedEmail.split('@')[0];
+
     // Fetch account from the dedicated Super Admin collection or Employee collection
-    let user = await Admin.findOne({ email: resolvedEmail }).select('+password');
+    let user = await Admin.findOne({
+      $or: [
+        { email: resolvedEmail },
+        { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
+        { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
+      ]
+    }).select('+password');
+
     let isEmployee = false;
     if (!user) {
       user = await Employee.findOne({ email: resolvedEmail }).select('+password');
+      if (!user) {
+        user = await Employee.findOne({
+          $or: [
+            { username: prefix },
+            { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
+            { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
+          ]
+        }).select('+password');
+      }
       if (user) {
         isEmployee = true;
       }
@@ -276,7 +296,16 @@ export const login = async (email, password) => {
   // ─── CASE B: OFFLINE SANDBOX MODE ───────────────────────────────────────────
   logger.info(`AuthService::login [Offline Mode] Verifying credentials for: ${resolvedEmail}`);
 
-  const user = FALLBACK_EMPLOYEES.find(e => e.email.toLowerCase() === resolvedEmail.toLowerCase());
+  let user = FALLBACK_EMPLOYEES.find(e => e.email.toLowerCase() === resolvedEmail.toLowerCase());
+  
+  if (!user) {
+    const prefix = resolvedEmail.split('@')[0].toLowerCase();
+    user = FALLBACK_EMPLOYEES.find(e => 
+      (e.username && e.username.toLowerCase() === prefix) ||
+      e.email.toLowerCase().startsWith(prefix) ||
+      e.name.toLowerCase().startsWith(prefix)
+    );
+  }
   
   if (!user) {
     logger.warn(`AuthService::login (offline) user record not found for: ${resolvedEmail}`);

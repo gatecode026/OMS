@@ -7,6 +7,7 @@ import repository from './leaves.repository.js';
 import logger from '../../config/logger.js';
 import Employee from '../employees/employees.model.js';
 import Leave from './leaves.model.js';
+import Notification from '../notifications/notification.model.js';
 
 export const findAll = async (query) => {
   logger.info('Executing LeavesService::findAll query');
@@ -20,12 +21,63 @@ export const findById = async (id) => {
 
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing LeavesService::createRecord by user: ' + currentUser?.id);
-  return repository.save(data);
+  if (!data.appliedDate) {
+    data.appliedDate = new Date().toISOString().split('T')[0];
+  }
+  const record = await repository.save(data);
+  if (record) {
+    try {
+      const notifId = `NTF-${Math.floor(100000 + Math.random() * 900000)}`;
+      await Notification.create({
+        id: notifId,
+        type: 'leave',
+        title: 'New Leave Request',
+        message: `${record.employeeName} (${record.department}) has applied for ${record.type} from ${record.fromDate} to ${record.toDate} (${record.days} days). Reason: ${record.reason}`,
+        time: 'Just now',
+        category: 'Leave',
+        priority: 'High',
+        recipientType: 'super_admin',
+        sentBy: record.employeeName || 'System',
+        sentDate: new Date().toISOString().split('T')[0],
+        deliveryStatus: 'Delivered',
+        readStatus: 'Unread',
+        recipients: 1
+      });
+      logger.info(`Notification generated successfully for new leave request: ${notifId}`);
+    } catch (err) {
+      logger.error('Error generating notification for leave creation: ' + err.message);
+    }
+  }
+  return record;
 };
 
 export const updateRecord = async (id, data, currentUser) => {
   logger.info('Executing LeavesService::updateRecord for: ' + id + ' by user: ' + currentUser?.id);
-  return repository.update(id, data);
+  const record = await repository.update(id, data);
+  if (record) {
+    try {
+      const notifId = `NTF-${Math.floor(100000 + Math.random() * 900000)}`;
+      await Notification.create({
+        id: notifId,
+        type: 'leave',
+        title: `Leave Request ${record.status}`,
+        message: `Your leave request for ${record.type} (${record.fromDate} to ${record.toDate}) has been ${record.status.toLowerCase()}${record.approverNotes ? ' - Note: ' + record.approverNotes : ''}.`,
+        time: 'Just now',
+        category: 'Leave',
+        priority: 'Normal',
+        recipientType: 'employee',
+        sentBy: currentUser?.name || 'Admin',
+        sentDate: new Date().toISOString().split('T')[0],
+        deliveryStatus: 'Delivered',
+        readStatus: 'Unread',
+        recipients: 1
+      });
+      logger.info(`Notification generated successfully for leave update: ${notifId}`);
+    } catch (err) {
+      logger.error('Error generating notification for leave update: ' + err.message);
+    }
+  }
+  return record;
 };
 
 export const deleteRecord = async (id, currentUser) => {
