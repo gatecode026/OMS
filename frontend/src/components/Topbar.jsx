@@ -18,7 +18,8 @@ import {
   Check,
   CheckCheck,
   Search,
-  Settings
+  Settings,
+  Calendar
 } from 'lucide-react';
 
 const Topbar = ({ onMenuToggle }) => {
@@ -46,10 +47,12 @@ const Topbar = ({ onMenuToggle }) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [msgOpen, setMsgOpen] = useState(false);
+  const [meetingsOpen, setMeetingsOpen] = useState(false);
   
   const notifRef = useRef(null);
   const profileRef = useRef(null);
   const msgRef = useRef(null);
+  const meetingsRef = useRef(null);
   const location = useLocation();
 
   const handleLogout = (e) => {
@@ -59,8 +62,21 @@ const Topbar = ({ onMenuToggle }) => {
     navigate('/login');
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const recentNotifications = notifications.slice(0, 5);
+  const employeeNotifications = [
+    { id: 'en-1', message: 'New Task Assigned', timestamp: '10 min ago', type: 'info', read: false },
+    { id: 'en-2', message: 'Project Deadline Updated', timestamp: '1 hour ago', type: 'warning', read: false },
+    { id: 'en-3', message: 'Leave Request Approved', timestamp: '3 hours ago', type: 'success', read: false },
+    { id: 'en-4', message: 'Payroll Generated', timestamp: '1 day ago', type: 'success', read: true },
+    { id: 'en-5', message: 'Company Announcement Published', timestamp: '2 days ago', type: 'info', read: true }
+  ];
+
+  const unreadCount = currentUserRole === 'employee' 
+    ? employeeNotifications.filter(n => !n.read).length 
+    : notifications.filter(n => !n.read).length;
+    
+  const recentNotifications = currentUserRole === 'employee' 
+    ? employeeNotifications 
+    : notifications.slice(0, 5);
 
   const unreadMsgCount = messages.filter(m => m.unread).length;
 
@@ -75,6 +91,9 @@ const Topbar = ({ onMenuToggle }) => {
       }
       if (msgRef.current && !msgRef.current.contains(e.target)) {
         setMsgOpen(false);
+      }
+      if (meetingsRef.current && !meetingsRef.current.contains(e.target)) {
+        setMeetingsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -260,6 +279,55 @@ const Topbar = ({ onMenuToggle }) => {
           )}
         </div>
 
+        {/* Meetings & Calendar Dropdown */}
+        <div className="topbar-dropdown-wrapper" ref={meetingsRef}>
+          <button 
+            className="topbar-icon-btn"
+            onClick={() => setMeetingsOpen(!meetingsOpen)}
+            title="Meetings & Calendar"
+          >
+            <Calendar size={20} />
+          </button>
+
+          {meetingsOpen && (
+            <div className="topbar-dropdown-panel meetings-panel animate-slide-up" style={{ right: 0, width: '280px' }}>
+              <div className="panel-header">
+                <span className="panel-title" style={{ fontWeight: 600 }}>Meetings & Calendar</span>
+              </div>
+              <div className="panel-body" style={{ padding: '12px' }}>
+                <div className="meetings-section">
+                  <span className="meetings-section-title" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Upcoming Meetings</span>
+                  <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                    <div className="meeting-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px' }}>
+                      <span className="meeting-time" style={{ color: 'var(--color-primary-light)', fontWeight: 600 }}>10:00 AM</span>
+                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Design Team Meeting</span>
+                    </div>
+                    <div className="meeting-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px' }}>
+                      <span className="meeting-time" style={{ color: 'var(--color-primary-light)', fontWeight: 600 }}>03:00 PM</span>
+                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Project Review Meeting</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="meetings-section" style={{ marginTop: '14px' }}>
+                  <span className="meetings-section-title" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Upcoming Events</span>
+                  <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                    <div className="meeting-item event-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px', borderLeft: '3px solid var(--color-success)' }}>
+                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Monthly Town Hall</span>
+                    </div>
+                    <div className="meeting-item event-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px', borderLeft: '3px solid var(--color-warning)' }}>
+                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Team Building Session</span>
+                    </div>
+                    <div className="meeting-item event-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px', borderLeft: '3px solid var(--color-primary)' }}>
+                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Product Launch Meeting</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* User Profile Swapper - Dynamic for demoing RBAC */}
         <div className="topbar-dropdown-wrapper" ref={profileRef}>
           <button className="topbar-profile-btn" onClick={() => setProfileOpen(!profileOpen)}>
@@ -291,26 +359,7 @@ const Topbar = ({ onMenuToggle }) => {
                   <span>Profile Settings</span>
                 </Link>
               </div>
-              
-              <div className="role-switcher-section">
-                <span className="switcher-label">Switch Role (Demo RBAC)</span>
-                <div className="role-buttons">
-                  {roles.map(r => (
-                    <button
-                      key={r.id}
-                      onClick={() => {
-                        setCurrentUserRole(r.id);
-                        setProfileOpen(false);
-                      }}
-                      className={`role-switcher-btn ${currentUserRole === r.id ? 'active' : ''}`}
-                    >
-                      <span className="role-indicator-dot" style={{ backgroundColor: r.accentColor }}></span>
-                      <span className="role-switcher-name">{r.name}</span>
-                      {currentUserRole === r.id && <Check size={14} className="role-check" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
+
 
               <div className="profile-panel-footer">
                 <button onClick={handleLogout} className="profile-logout-btn" style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}>

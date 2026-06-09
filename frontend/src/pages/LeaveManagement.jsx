@@ -843,7 +843,8 @@ const LeaveManagement = () => {
           <button
             className="action-btn-mini edit-btn"
             onClick={() => handleEditLeaveClick(row)}
-            title="Edit Leave Request"
+            title={row.status === 'Pending' ? "Edit Leave Request" : "Cannot edit approved/rejected requests"}
+            disabled={row.status !== 'Pending'}
           >
             <Edit size={14} />
           </button>
@@ -888,7 +889,7 @@ const LeaveManagement = () => {
           <h2>Leave Management Control</h2>
           <p className="page-desc-text">Oversee balances, request approvals, policy overrides, and company calendars</p>
         </div>
-        <div className="flex-center gap-3">
+        <div className="flex align-center gap-3">
           <Button variant="primary" icon={Plus} onClick={() => setApplyModalOpen(true)}>
             Add New Leave
           </Button>
@@ -1684,11 +1685,13 @@ const LeaveManagement = () => {
                   <h4>Company Holiday Calendar</h4>
                   <p className="text-muted text-xs">Approved scheduled holidays for the current fiscal calendar year</p>
                 </div>
-                <div className="flex-center gap-2">
-                  <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
-                    Add Holiday
-                  </Button>
-                </div>
+                {currentUserRole !== 'employee' && (
+                  <div className="flex-center gap-2">
+                    <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
+                      Add Holiday
+                    </Button>
+                  </div>
+                )}
               </div>
 
               <div className="holidays-table-view">
@@ -1699,7 +1702,7 @@ const LeaveManagement = () => {
                       <th>Holiday Description</th>
                       <th>Category</th>
                       <th>Detailed Summary</th>
-                      <th>Actions</th>
+                      {currentUserRole !== 'employee' && <th>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1717,17 +1720,19 @@ const LeaveManagement = () => {
                           </Badge>
                         </td>
                         <td className="text-secondary text-xs">{hol.description}</td>
-                        <td>
-                          <div className="table-actions-cell" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              className="action-btn-mini danger-btn"
-                              onClick={() => handleDeleteHolidayClick(hol)}
-                              title="Delete Holiday"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
+                        {currentUserRole !== 'employee' && (
+                          <td>
+                            <div className="table-actions-cell" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                className="action-btn-mini danger-btn"
+                                onClick={() => handleDeleteHolidayClick(hol)}
+                                title="Delete Holiday"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

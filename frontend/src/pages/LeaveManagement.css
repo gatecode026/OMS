@@ -7,6 +7,15 @@
   width: 100%;
 }
 
+.page-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+  width: 100%;
+}
+
 .leaves-tab-layout {
   width: 100%;
   transition: var(--transition-all);
@@ -393,6 +402,12 @@
   cursor: pointer;
   transition: var(--transition-all);
   border: 1px solid transparent;
+}
+
+.action-btn-mini:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .success-btn {

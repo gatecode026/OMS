@@ -17,7 +17,7 @@ export const ROUTE_PERMISSIONS = {
   '/employees': ROLES.BRANCH_ADMIN,
   '/employees/add': ROLES.BRANCH_ADMIN,
   '/employees/:id': ROLES.BRANCH_ADMIN,
-  '/attendance': ROLES.BRANCH_ADMIN,
+  '/attendance': ROLES.EMPLOYEE,
   '/departments': ROLES.BRANCH_ADMIN,
   '/branches': ROLES.BRANCH_ADMIN,
   '/teams': ROLES.BRANCH_ADMIN,
@@ -26,12 +26,13 @@ export const ROUTE_PERMISSIONS = {
   '/payroll': ROLES.EMPLOYEE,
 
   // Team Leader and above
-  '/leaves': ROLES.TEAM_LEADER,
-  '/projects': ROLES.TEAM_LEADER,
+  '/leaves': ROLES.EMPLOYEE,
+  '/projects': ROLES.EMPLOYEE,
   '/workflows': ROLES.TEAM_LEADER,
-  '/tasks': ROLES.TEAM_LEADER,
-  '/work-reports': ROLES.TEAM_LEADER,
+  '/tasks': ROLES.EMPLOYEE,
+  '/work-reports': ROLES.EMPLOYEE,
   '/performance': ROLES.TEAM_LEADER,
+  '/calendar': ROLES.EMPLOYEE,
 
   // Employee and above (General Access)
   '/employee-dashboard': ROLES.EMPLOYEE,

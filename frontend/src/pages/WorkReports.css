@@ -335,8 +335,22 @@ select.reports-select-filter {
   width: 100%;
 }
 
+.reports-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.reports-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--color-slate-700);
+  border-radius: var(--radius-full);
+}
+
+.reports-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--color-slate-600);
+}
+
 .reports-data-table {
   width: 100%;
+  min-width: 1100px;
   border-collapse: collapse;
   text-align: left;
   font-size: 0.82rem;
@@ -620,12 +634,14 @@ select.reports-select-filter {
   flex-wrap: wrap;
 }
 
-.legend-indicator {
+.reports-legend-indicator {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   font-size: 0.78rem;
   color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .legend-dot {
