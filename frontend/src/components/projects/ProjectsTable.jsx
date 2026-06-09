@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import styles from '../../styles/projects.module.css';
 import { ArrowUp, ArrowDown, Eye, Edit2, Users } from 'lucide-react';
 import Avatar from '../common/Avatar';
+import { useApp } from '../../context/AppContext';
 
 const ProjectsTable = ({ projects, onView, onEdit, onAssignTeam }) => {
+  const { currentUserRole } = useApp();
   // Sort state: { key: string, direction: 'asc' | 'desc' }
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
@@ -217,20 +219,24 @@ const ProjectsTable = ({ projects, onView, onEdit, onAssignTeam }) => {
                         >
                           <Eye size={13} />
                         </button>
-                        <button
-                          className={`${styles.actionBtn} ${styles.actionBtnEdit}`}
-                          onClick={() => onEdit(p)}
-                          title="Edit Project"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button
-                          className={`${styles.actionBtn} ${styles.actionBtnAssign}`}
-                          onClick={() => onAssignTeam(p)}
-                          title="Assign Team"
-                        >
-                          <Users size={13} />
-                        </button>
+                        {currentUserRole !== 'employee' && (
+                          <>
+                            <button
+                              className={`${styles.actionBtn} ${styles.actionBtnEdit}`}
+                              onClick={() => onEdit(p)}
+                              title="Edit Project"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button
+                              className={`${styles.actionBtn} ${styles.actionBtnAssign}`}
+                              onClick={() => onAssignTeam(p)}
+                              title="Assign Team"
+                            >
+                              <Users size={13} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import './Sidebar.css';
 import { useApp } from '../context/AppContext';
+import Avatar from './common/Avatar';
 import { filterMenuByRole } from '../permissions/permissions';
 import {
   ChevronDown,
@@ -118,7 +119,7 @@ const menuStructure = [
 
 const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   const navigate = useNavigate();
-  const { sidebarCollapsed, setSidebarCollapsed, notifications, currentUserRole, logout, sidebarDense, generalSettings, hasPermission } = useApp();
+  const { sidebarCollapsed, setSidebarCollapsed, notifications, currentUserRole, logout, sidebarDense, generalSettings, hasPermission, currentUser } = useApp();
   const location = useLocation();
   const [expandedMenus, setExpandedMenus] = useState({});
   const [isHovered, setIsHovered] = useState(false);
@@ -129,6 +130,24 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   const companyName = generalSettings?.companyName || 'SaaS Admin';
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const getPerfScore = () => {
+    if (!currentUser?.performanceScore) return '92%';
+    if (typeof currentUser.performanceScore === 'object') {
+      return `${currentUser.performanceScore.score || currentUser.performanceScore.value || 92}%`;
+    }
+    return `${currentUser.performanceScore}%`;
+  };
+
+  const getUserInitials = () => {
+    if (!currentUser?.name) return 'UR';
+    return currentUser.name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
 
   const toggleSubmenu = (menuName) => {
     if (effectiveCollapsed) {
@@ -361,16 +380,79 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
         {/* Scrollable menu items */}
         <div className="sidebar-menu-container sidebar-scroll">
-          {filterMenuByRole(menuStructure, currentUserRole, hasPermission).map((section) => (
-            <div key={section.title} className="sidebar-section">
-              {!effectiveCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
+          {currentUserRole === 'employee' ? (
+            <div className="sidebar-section">
+              {!effectiveCollapsed && <h5 className="sidebar-section-title">Workplace</h5>}
               <div className="sidebar-section-items">
-                {section.items.map((item) => renderItem(item))}
+                {[
+                  { name: 'Dashboard', icon: LayoutDashboard, path: '/employee-dashboard' },
+                  { name: 'Attendance', icon: Clock, path: '/attendance' },
+                  { name: 'Leave Management', icon: CalendarDays, path: '/leaves' },
+                  { name: 'My Tasks', icon: KanbanSquare, path: '/tasks' },
+                  { name: 'My Projects', icon: Briefcase, path: '/projects' },
+                  { name: 'Daily Work Reports', icon: FileText, path: '/work-reports' },
+                  { name: 'Payroll', icon: DollarSign, path: '/payroll' },
+                  { name: 'Documents', icon: FolderClosed, path: '/documents' },
+                  { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }
+                ].map(item => renderItem(item))}
               </div>
             </div>
-          ))}
+          ) : (
+            filterMenuByRole(menuStructure, currentUserRole, hasPermission).map((section) => (
+              <div key={section.title} className="sidebar-section">
+                {!effectiveCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
+                <div className="sidebar-section-items">
+                  {section.items.map((item) => renderItem(item))}
+                </div>
+              </div>
+            ))
+          )}
+
+          {/* Quick Actions (Employee only) */}
+          {currentUserRole === 'employee' && !effectiveCollapsed && (
+            <div className="sidebar-quick-actions">
+              <span className="quick-actions-title">Quick Actions</span>
+              <div className="quick-actions-grid-layout">
+                <Link to="/employee-dashboard" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                  <Clock size={14} className="tile-icon text-primary-c" />
+                  <span className="tile-label">Punch In/Out</span>
+                </Link>
+                <Link to="/attendance" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                  <Clock size={14} className="tile-icon text-info" />
+                  <span className="tile-label">History</span>
+                </Link>
+                <Link to="/tasks" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                  <KanbanSquare size={14} className="tile-icon text-warning" />
+                  <span className="tile-label">Tasks</span>
+                </Link>
+                <Link to="/work-reports" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                  <FileText size={14} className="tile-icon text-success" />
+                  <span className="tile-label">Submit DWR</span>
+                </Link>
+                <Link to="/leaves" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                  <CalendarDays size={14} className="tile-icon text-danger" />
+                  <span className="tile-label">Apply Leave</span>
+                </Link>
+                <Link to="/documents" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                  <FolderClosed size={14} className="tile-icon text-primary-c" />
+                  <span className="tile-label">Documents</span>
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
+        {currentUserRole === 'employee' && !effectiveCollapsed && (
+          <div className="sidebar-employee-footer-row">
+            <Link to="/my-profile" className="sidebar-footer-avatar-wrapper" title="View Profile">
+              <Avatar name={currentUser?.name} className="emp-footer-avatar" size="md" />
+            </Link>
+            <button className="sidebar-footer-logout-btn" onClick={handleLogout} title="Logout">
+              <LogOut size={16} />
+              <span>Logout</span>
+            </button>
+          </div>
+        )}
       </aside>
     </>
   );

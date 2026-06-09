@@ -10,8 +10,6 @@ import {
   Download, Trash2, Eye, FolderOpen, Clock, User
 } from 'lucide-react';
 
-const categories = ['All', 'HR Policies', 'Payroll', 'Marketing', 'Engineering', 'Reports', 'Compliance'];
-
 const typeColorMap = {
   PDF: '#ef4444', XLSX: '#10b981', PNG: '#8b5cf6',
   ZIP: '#f59e0b', DOCX: '#3b82f6', PPTX: '#f97316'
@@ -26,14 +24,31 @@ const getIconForType = (type) => {
 
 const Documents = () => {
   const isLoading = usePageLoading(500);
-  const { addToast, showConfirm, documentsList, addDocument, deleteDocument, currentUser } = useApp();
+  const { addToast, showConfirm, documentsList, addDocument, deleteDocument, currentUser, currentUserRole } = useApp();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadForm, setUploadForm] = useState({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
 
-  const filtered = documentsList.filter(d => {
+  const isEmployee = currentUserRole === 'employee';
+
+  const visibleDocs = React.useMemo(() => {
+    if (isEmployee) {
+      return documentsList.filter(d => d.category === 'Project' || d.category === 'Reports');
+    }
+    return documentsList;
+  }, [documentsList, isEmployee]);
+
+  const categories = React.useMemo(() => {
+    const allCats = ['All', 'HR Policies', 'Payroll', 'Marketing', 'Engineering', 'Reports', 'Compliance'];
+    if (isEmployee) {
+      return allCats.filter(c => c === 'All' || c === 'Project' || c === 'Reports');
+    }
+    return allCats;
+  }, [isEmployee]);
+
+  const filtered = visibleDocs.filter(d => {
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) ||
       d.uploadedBy.toLowerCase().includes(search.toLowerCase());
     const matchCat = category === 'All' || d.category === category;
@@ -53,7 +68,7 @@ const Documents = () => {
     });
     return sum.toFixed(1) + ' MB';
   };
-  const totalSize = computeTotalSize(documentsList);
+  const totalSize = computeTotalSize(visibleDocs);
 
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
@@ -100,7 +115,7 @@ const Documents = () => {
           </div>
           <div>
             <h2 className="ann-page-title">Document Vault</h2>
-            <p className="ann-page-sub">{documentsList.length} documents • {totalSize} total</p>
+            <p className="ann-page-sub">{visibleDocs.length} documents • {totalSize} total</p>
           </div>
         </div>
         <Button variant="primary" icon={Upload} onClick={() => setShowUploadModal(true)}>

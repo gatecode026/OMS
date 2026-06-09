@@ -34,6 +34,7 @@ const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 const MyProfile = lazy(() => import('./pages/MyProfile'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Placeholder = lazy(() => import('./pages/Placeholder'));
+const Calendar = lazy(() => import('./pages/Calendar'));
 
 // New completed modules
 const Workflows = lazy(() => import('./pages/Workflows'));
@@ -81,6 +82,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/work-reports" element={<WorkReports />} />
                 <Route path="/performance" element={<Performance />} />
                 <Route path="/payroll" element={<Payroll />} />
+                <Route path="/calendar" element={<Calendar />} />
 
                 {/* ── Communication ── */}
                 <Route path="/announcements" element={<Announcements />} />

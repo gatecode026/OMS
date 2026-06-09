@@ -29,6 +29,34 @@ const getLocalDateString = () => {
   return `${year}-${month}-${day}`;
 };
 
+const getDatesRange = (rangeType) => {
+  const dates = [];
+  const today = new Date();
+  
+  if (rangeType === 'today') {
+    dates.push(getLocalDateString());
+  } else if (rangeType === '7days') {
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      dates.push(`${year}-${month}-${day}`);
+    }
+  } else if (rangeType === 'month') {
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const currentDay = today.getDate();
+    for (let i = currentDay; i >= 1; i--) {
+      const dayStr = String(i).padStart(2, '0');
+      const monthStr = String(month).padStart(2, '0');
+      dates.push(`${year}-${monthStr}-${dayStr}`);
+    }
+  }
+  return dates;
+};
+
 const normalizeWorkMode = (mode) => {
   if (!mode) return 'WFO';
   const m = mode.trim().toUpperCase();
@@ -70,7 +98,7 @@ const Attendance = () => {
   }, [employees, currentUser, currentUserRole]);
 
   // Active view tab state
-  const [activeSection, setActiveSection] = useState('overview');
+  const [activeSection, setActiveSection] = useState(currentUserRole === 'employee' ? 'records' : 'overview');
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,6 +109,7 @@ const Attendance = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [workModeFilter, setWorkModeFilter] = useState('');
+  const [timeRangeFilter, setTimeRangeFilter] = useState('today'); // today, 7days, month
 
 
 
@@ -126,6 +155,12 @@ const Attendance = () => {
       }));
     }
   }, [currentUser, currentUserRole]);
+
+  useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setActiveSection('records');
+    }
+  }, [currentUserRole]);
 
   // Assign Shift state
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
@@ -488,9 +523,75 @@ const Attendance = () => {
 
   // Process and Filter Attendance Ledger
   const ledgerData = useMemo(() => {
+    if (currentUserRole === 'employee') {
+      const dates = getDatesRange(timeRangeFilter);
+      const records = [];
+      
+      dates.forEach(date => {
+        // 1. Find actual records for the logged-in employee on this date
+        const empRecords = (attendance || []).filter(item => {
+          const isUser = item.employeeId === currentUser?.id || item.employeeName === currentUser?.name;
+          return isUser && item.date === date;
+        });
+        
+        if (empRecords.length > 0) {
+          empRecords.forEach(item => {
+            const empDetails = currentUser;
+            let status = item.status;
+            if ((status === 'On Leave' || status === 'Leave') && empDetails && empDetails.leaveHistory) {
+              const foundLeave = empDetails.leaveHistory.find(l => 
+                l.status === 'Approved' && 
+                item.date >= l.fromDate && 
+                item.date <= l.toDate
+              );
+              if (foundLeave) {
+                status = foundLeave.type;
+              }
+            }
+            const totalHours = item.totalHours || 0;
+            records.push({
+              ...item,
+              status,
+              employeeId: item.employeeId || empDetails?.id || 'EMP-2026-101',
+              employeeName: item.employeeName || empDetails?.name || 'uttam Rajpurohit',
+              department: item.department || empDetails?.department || 'IT Department',
+              branch: item.branch || empDetails?.branch || 'Jaipur Branch',
+              shift: item.shift || empDetails?.shift || 'Flexible (09:00 AM - 06:00 PM)',
+              source: item.source || 'Biometric',
+              breakTime: item.breakTime || '45 mins',
+              workMode: item.workMode || empDetails?.workMode || 'WFO',
+              overtime: item.overtime || (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
+            });
+          });
+        } else {
+          // Virtual Absent record
+          const emp = currentUser;
+          records.push({
+            id: `ABS-${emp?.id || 'emp'}-${date}`,
+            employeeId: emp?.id || 'EMP-2026-101',
+            employeeName: emp?.name || 'uttam Rajpurohit',
+            department: emp?.department || 'IT Department',
+            branch: emp?.branch || 'Jaipur Branch',
+            date: date,
+            status: 'Absent',
+            punchIn: '--:--',
+            punchOut: '--:--',
+            totalHours: 0,
+            shift: emp?.shift || 'Flexible (09:00 AM - 06:00 PM)',
+            source: 'System',
+            workMode: emp?.workMode || 'WFO',
+            breakTime: '45 mins',
+            overtime: '0.5 hrs', // Mock overtime logic or 0 hrs
+            isVirtual: true
+          });
+        }
+      });
+      return records;
+    }
+
     if (!dateFilter) return [];
     
-    // 1. Filter attendance records by role
+    // 1. Filter attendance records by role (for admins)
     const scopedAttendance = (attendance || []).filter(item => {
       if (!currentUserRole || currentUserRole === 'super_admin') return true;
       const emp = (employees || []).find(e => e.id === item.employeeId || e.name === item.employeeName);
@@ -499,9 +600,6 @@ const Attendance = () => {
       }
       if (currentUserRole === 'dept_admin') {
         return item.department === currentUser?.department || emp?.department === currentUser?.department;
-      }
-      if (currentUserRole === 'employee') {
-        return item.employeeId === currentUser?.id || emp?.id === currentUser?.id;
       }
       return true;
     });
@@ -563,7 +661,7 @@ const Attendance = () => {
     });
     
     return records;
-  }, [attendance, employees, scopedEmployees, currentUserRole, currentUser, dateFilter]);
+  }, [attendance, employees, scopedEmployees, currentUserRole, currentUser, dateFilter, timeRangeFilter]);
 
   // Filtered attendance for KPIs (ignores statusFilter and workModeFilter so counts don't zero out on card selection)
   const kpiFilteredAttendance = useMemo(() => {
@@ -572,7 +670,7 @@ const Attendance = () => {
         ? a.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           a.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
-      const matchesDate = dateFilter ? a.date === dateFilter : true;
+      const matchesDate = (currentUserRole === 'employee' || !dateFilter) ? true : a.date === dateFilter;
       const matchesDept = deptFilter ? a.department === deptFilter : true;
       const matchesBranch = branchFilter ? a.branch === branchFilter : true;
       const matchesShift = shiftFilter ? a.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
@@ -580,7 +678,7 @@ const Attendance = () => {
 
       return matchesSearch && matchesDate && matchesDept && matchesBranch && matchesShift && matchesSource;
     });
-  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, sourceFilter]);
+  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, sourceFilter, currentUserRole]);
 
   // Get work mode counts (responds to filters and updates in real-time)
   const workModeStats = useMemo(() => {
@@ -631,7 +729,7 @@ const Attendance = () => {
         ? a.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           a.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
-      const matchesDate = dateFilter ? a.date === dateFilter : true;
+      const matchesDate = (currentUserRole === 'employee' || !dateFilter) ? true : a.date === dateFilter;
       const matchesDept = deptFilter ? a.department === deptFilter : true;
       const matchesBranch = branchFilter ? a.branch === branchFilter : true;
       const matchesShift = shiftFilter ? a.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
@@ -648,7 +746,7 @@ const Attendance = () => {
 
       return matchesSearch && matchesDate && matchesDept && matchesBranch && matchesShift && matchesStatus && matchesSource && matchesWorkMode;
     });
-  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, statusFilter, sourceFilter, workModeFilter]);
+  }, [ledgerData, searchQuery, dateFilter, deptFilter, branchFilter, shiftFilter, statusFilter, sourceFilter, workModeFilter, currentUserRole]);
 
 
   // Calculations for Summary Statistics based on active filters
@@ -941,156 +1039,162 @@ const Attendance = () => {
               </Button>
             </>
           )}
-          <Button variant="primary" onClick={() => setMarkModalOpen(true)} icon={Plus}>
-            Mark Attendance
-          </Button>
+          {currentUserRole !== 'employee' && (
+            <Button variant="primary" onClick={() => setMarkModalOpen(true)} icon={Plus}>
+              Mark Attendance
+            </Button>
+          )}
         </div>
       </div>
 
       {/* ═══ Work Mode Cards (Total/WFH/WFO/Hybrid) - CLICKABLE ═══ */}
-      <div className="att-workmode-strip">
-        <div className="att-workmode-card att-workmode-total" onClick={() => navigateToRecordsWithFilter('workMode', '')}>
-          <div className="att-workmode-icon"><Users size={24} /></div>
-          <div className="att-workmode-info">
-            <span className="att-workmode-label">Total Attendance</span>
-            <span className="att-workmode-count">{workModeStats.total}</span>
-            <span className="att-workmode-sub">Employees today</span>
+      {currentUserRole !== 'employee' && (
+        <div className="att-workmode-strip">
+          <div className="att-workmode-card att-workmode-total" onClick={() => navigateToRecordsWithFilter('workMode', '')}>
+            <div className="att-workmode-icon"><Users size={24} /></div>
+            <div className="att-workmode-info">
+              <span className="att-workmode-label">Total Attendance</span>
+              <span className="att-workmode-count">{workModeStats.total}</span>
+              <span className="att-workmode-sub">Employees today</span>
+            </div>
+            <ChevronRight size={16} className="att-workmode-arrow" />
           </div>
-          <ChevronRight size={16} className="att-workmode-arrow" />
-        </div>
-        <div className="att-workmode-card att-workmode-wfh" onClick={() => navigateToRecordsWithFilter('workMode', 'WFH')}>
-          <div className="att-workmode-icon"><Home size={24} /></div>
-          <div className="att-workmode-info">
-            <span className="att-workmode-label">WFH</span>
-            <span className="att-workmode-count">{workModeStats.wfh}</span>
-            <span className="att-workmode-sub">Employees today</span>
+          <div className="att-workmode-card att-workmode-wfh" onClick={() => navigateToRecordsWithFilter('workMode', 'WFH')}>
+            <div className="att-workmode-icon"><Home size={24} /></div>
+            <div className="att-workmode-info">
+              <span className="att-workmode-label">WFH</span>
+              <span className="att-workmode-count">{workModeStats.wfh}</span>
+              <span className="att-workmode-sub">Employees today</span>
+            </div>
+            <ChevronRight size={16} className="att-workmode-arrow" />
           </div>
-          <ChevronRight size={16} className="att-workmode-arrow" />
-        </div>
-        <div className="att-workmode-card att-workmode-office" onClick={() => navigateToRecordsWithFilter('workMode', 'WFO')}>
-          <div className="att-workmode-icon"><Building size={24} /></div>
-          <div className="att-workmode-info">
-            <span className="att-workmode-label">WFO</span>
-            <span className="att-workmode-count">{workModeStats.office}</span>
-            <span className="att-workmode-sub">Employees today</span>
+          <div className="att-workmode-card att-workmode-office" onClick={() => navigateToRecordsWithFilter('workMode', 'WFO')}>
+            <div className="att-workmode-icon"><Building size={24} /></div>
+            <div className="att-workmode-info">
+              <span className="att-workmode-label">WFO</span>
+              <span className="att-workmode-count">{workModeStats.office}</span>
+              <span className="att-workmode-sub">Employees today</span>
+            </div>
+            <ChevronRight size={16} className="att-workmode-arrow" />
           </div>
-          <ChevronRight size={16} className="att-workmode-arrow" />
-        </div>
-        <div className="att-workmode-card att-workmode-hybrid" onClick={() => navigateToRecordsWithFilter('workMode', 'Hybrid')}>
-          <div className="att-workmode-icon"><RefreshCw size={24} /></div>
-          <div className="att-workmode-info">
-            <span className="att-workmode-label">Hybrid</span>
-            <span className="att-workmode-count">{workModeStats.hybrid}</span>
-            <span className="att-workmode-sub">Employees today</span>
+          <div className="att-workmode-card att-workmode-hybrid" onClick={() => navigateToRecordsWithFilter('workMode', 'Hybrid')}>
+            <div className="att-workmode-icon"><RefreshCw size={24} /></div>
+            <div className="att-workmode-info">
+              <span className="att-workmode-label">Hybrid</span>
+              <span className="att-workmode-count">{workModeStats.hybrid}</span>
+              <span className="att-workmode-sub">Employees today</span>
+            </div>
+            <ChevronRight size={16} className="att-workmode-arrow" />
           </div>
-          <ChevronRight size={16} className="att-workmode-arrow" />
         </div>
-      </div>
+      )}
 
       {/* ═══ Top Summary KPI Cards - CLICKABLE ═══ */}
-      <div className="att-kpi-strip">
-        <div className="att-kpi-card att-kpi-blue" onClick={() => navigateToRecordsWithFilter('status', '')} style={{ cursor: 'pointer' }}>
-          <div className="att-kpi-header">
-            <span className="att-kpi-label">Total Employees</span>
-            <div className="att-kpi-icon-box att-kpi-icon-blue"><Users size={16} /></div>
+      {currentUserRole !== 'employee' && (
+        <div className="att-kpi-strip">
+          <div className="att-kpi-card att-kpi-blue" onClick={() => navigateToRecordsWithFilter('status', '')} style={{ cursor: 'pointer' }}>
+            <div className="att-kpi-header">
+              <span className="att-kpi-label">Total Employees</span>
+              <div className="att-kpi-icon-box att-kpi-icon-blue"><Users size={16} /></div>
+            </div>
+            <div className="att-kpi-value">{totalEmployees.toLocaleString()}</div>
+            <div className="att-kpi-sub">
+              <TrendingUp size={11} />
+              <span>+12 this month</span>
+            </div>
           </div>
-          <div className="att-kpi-value">{totalEmployees.toLocaleString()}</div>
-          <div className="att-kpi-sub">
-            <TrendingUp size={11} />
-            <span>+12 this month</span>
-          </div>
-        </div>
 
-        <div className="att-kpi-card att-kpi-green" onClick={() => navigateToRecordsWithFilter('status', 'Present')} style={{ cursor: 'pointer' }}>
-          <div className="att-kpi-header">
-            <span className="att-kpi-label">Present Today</span>
-            <div className="att-kpi-icon-box att-kpi-icon-green"><CheckCircle2 size={16} /></div>
+          <div className="att-kpi-card att-kpi-green" onClick={() => navigateToRecordsWithFilter('status', 'Present')} style={{ cursor: 'pointer' }}>
+            <div className="att-kpi-header">
+              <span className="att-kpi-label">Present Today</span>
+              <div className="att-kpi-icon-box att-kpi-icon-green"><CheckCircle2 size={16} /></div>
+            </div>
+            <div className="att-kpi-value">{statusCounts.present}</div>
+            <div className="att-kpi-sub">
+              <span className="att-kpi-sub-tag">{totalHalfDay} Half-Day</span>
+              <span>{totalWFH} WFH</span>
+            </div>
           </div>
-          <div className="att-kpi-value">{statusCounts.present}</div>
-          <div className="att-kpi-sub">
-            <span className="att-kpi-sub-tag">{totalHalfDay} Half-Day</span>
-            <span>{totalWFH} WFH</span>
-          </div>
-        </div>
 
-        <div className="att-kpi-card att-kpi-red" onClick={() => navigateToRecordsWithFilter('status', 'Absent')} style={{ cursor: 'pointer' }}>
-          <div className="att-kpi-header">
-            <span className="att-kpi-label">Absent Today</span>
-            <div className="att-kpi-icon-box att-kpi-icon-red"><UserMinus size={16} /></div>
+          <div className="att-kpi-card att-kpi-red" onClick={() => navigateToRecordsWithFilter('status', 'Absent')} style={{ cursor: 'pointer' }}>
+            <div className="att-kpi-header">
+              <span className="att-kpi-label">Absent Today</span>
+              <div className="att-kpi-icon-box att-kpi-icon-red"><UserMinus size={16} /></div>
+            </div>
+            <div className="att-kpi-value">{statusCounts.absent}</div>
+            <div className="att-kpi-sub">
+              <TrendingDown size={11} />
+              <span>Unexcused absence</span>
+            </div>
           </div>
-          <div className="att-kpi-value">{statusCounts.absent}</div>
-          <div className="att-kpi-sub">
-            <TrendingDown size={11} />
-            <span>Unexcused absence</span>
-          </div>
-        </div>
 
-        <div className="att-kpi-card att-kpi-amber" onClick={() => navigateToRecordsWithFilter('status', 'On Leave')} style={{ cursor: 'pointer' }}>
-          <div className="att-kpi-header">
-            <span className="att-kpi-label">Employees on Leave</span>
-            <div className="att-kpi-icon-box att-kpi-icon-amber"><BookOpen size={16} /></div>
+          <div className="att-kpi-card att-kpi-amber" onClick={() => navigateToRecordsWithFilter('status', 'On Leave')} style={{ cursor: 'pointer' }}>
+            <div className="att-kpi-header">
+              <span className="att-kpi-label">Employees on Leave</span>
+              <div className="att-kpi-icon-box att-kpi-icon-amber"><BookOpen size={16} /></div>
+            </div>
+            <div className="att-kpi-value">{statusCounts.leave}</div>
+            <div className="att-kpi-sub">
+              <span>Approved holidays</span>
+            </div>
           </div>
-          <div className="att-kpi-value">{statusCounts.leave}</div>
-          <div className="att-kpi-sub">
-            <span>Approved holidays</span>
-          </div>
-        </div>
 
-        <div className="att-kpi-card att-kpi-purple" onClick={() => navigateToRecordsWithFilter('status', 'Late')} style={{ cursor: 'pointer' }}>
-          <div className="att-kpi-header">
-            <span className="att-kpi-label">Late Arrivals</span>
-            <div className="att-kpi-icon-box att-kpi-icon-purple"><AlertCircle size={16} /></div>
+          <div className="att-kpi-card att-kpi-purple" onClick={() => navigateToRecordsWithFilter('status', 'Late')} style={{ cursor: 'pointer' }}>
+            <div className="att-kpi-header">
+              <span className="att-kpi-label">Late Arrivals</span>
+              <div className="att-kpi-icon-box att-kpi-icon-purple"><AlertCircle size={16} /></div>
+            </div>
+            <div className="att-kpi-value">{statusCounts.late}</div>
+            <div className="att-kpi-sub">
+              <span>After 09:15 AM</span>
+            </div>
           </div>
-          <div className="att-kpi-value">{statusCounts.late}</div>
-          <div className="att-kpi-sub">
-            <span>After 09:15 AM</span>
-          </div>
-        </div>
 
-        <div className="att-kpi-card att-kpi-cyan" onClick={() => navigateToRecordsWithFilter('status', 'Work From Home')} style={{ cursor: 'pointer' }}>
-          <div className="att-kpi-header">
-            <span className="att-kpi-label">Work From Home</span>
-            <div className="att-kpi-icon-box att-kpi-icon-cyan"><Home size={16} /></div>
+          <div className="att-kpi-card att-kpi-cyan" onClick={() => navigateToRecordsWithFilter('status', 'Work From Home')} style={{ cursor: 'pointer' }}>
+            <div className="att-kpi-header">
+              <span className="att-kpi-label">Work From Home</span>
+              <div className="att-kpi-icon-box att-kpi-icon-cyan"><Home size={16} /></div>
+            </div>
+            <div className="att-kpi-value">{statusCounts.wfh}</div>
+            <div className="att-kpi-sub">
+              <span>Active WFH logs</span>
+            </div>
           </div>
-          <div className="att-kpi-value">{statusCounts.wfh}</div>
-          <div className="att-kpi-sub">
-            <span>Active WFH logs</span>
-          </div>
-        </div>
 
-        <div className="att-kpi-card att-kpi-indigo" onClick={() => navigateToRecordsWithFilter('status', 'Half Day')} style={{ cursor: 'pointer' }}>
-          <div className="att-kpi-header">
-            <span className="att-kpi-label">Half Day</span>
-            <div className="att-kpi-icon-box att-kpi-icon-indigo"><Clock size={16} /></div>
+          <div className="att-kpi-card att-kpi-indigo" onClick={() => navigateToRecordsWithFilter('status', 'Half Day')} style={{ cursor: 'pointer' }}>
+            <div className="att-kpi-header">
+              <span className="att-kpi-label">Half Day</span>
+              <div className="att-kpi-icon-box att-kpi-icon-indigo"><Clock size={16} /></div>
+            </div>
+            <div className="att-kpi-value">{statusCounts.halfDay}</div>
+            <div className="att-kpi-sub">
+              <span>Partial attendance</span>
+            </div>
           </div>
-          <div className="att-kpi-value">{statusCounts.halfDay}</div>
-          <div className="att-kpi-sub">
-            <span>Partial attendance</span>
-          </div>
-        </div>
 
-        <div className="att-kpi-card att-kpi-rose">
-          <div className="att-kpi-header">
-            <span className="att-kpi-label">Attendance Rate</span>
-            <div className="att-kpi-icon-box att-kpi-icon-rose"><BarChart2 size={16} /></div>
-          </div>
-          <div className="att-kpi-value">{attendanceRate}%</div>
-          <div className="att-kpi-sub">
-            <TrendingUp size={11} />
-            <span>+2.1% vs last week</span>
+          <div className="att-kpi-card att-kpi-rose">
+            <div className="att-kpi-header">
+              <span className="att-kpi-label">Attendance Rate</span>
+              <div className="att-kpi-icon-box att-kpi-icon-rose"><BarChart2 size={16} /></div>
+            </div>
+            <div className="att-kpi-value">{attendanceRate}%</div>
+            <div className="att-kpi-sub">
+              <TrendingUp size={11} />
+              <span>+2.1% vs last week</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ═══ Section Navigation Tabs ═══ */}
       <div className="att-section-tabs">
         {[
-          { id: 'overview', label: 'Overview & Analytics', icon: BarChart2 },
+          currentUserRole !== 'employee' && { id: 'overview', label: 'Overview & Analytics', icon: BarChart2 },
           { id: 'records', label: 'Attendance Records', icon: FileText },
-          { id: 'monitor', label: 'Live Punch Monitor', icon: Activity },
-          { id: 'branches', label: 'Branch Management', icon: Building },
-          { id: 'reports', label: 'Reports & Export', icon: Download },
-        ].map(tab => {
+          currentUserRole !== 'employee' && { id: 'monitor', label: 'Live Punch Monitor', icon: Activity },
+          currentUserRole !== 'employee' && { id: 'branches', label: 'Branch Management', icon: Building },
+          currentUserRole !== 'employee' && { id: 'reports', label: 'Reports & Export', icon: Download },
+        ].filter(Boolean).map(tab => {
           const Icon = tab.icon;
           return (
             <button
@@ -1301,77 +1405,106 @@ const Attendance = () => {
         <div className="att-records-section">
           {/* Filters Panel */}
           <div className="card att-filters-panel">
-            <div className="att-filters-row">
-              <div className="att-search-box">
-                <Search size={15} className="att-search-icon" />
-                <input
-                  type="text"
-                  placeholder="Search by Employee name or ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+            {currentUserRole === 'employee' ? (
+              <div className="employee-filter-container">
+                <span className="employee-filter-label">
+                  <Calendar size={16} style={{ color: 'var(--color-primary)' }} />
+                  Filter Records:
+                </span>
+                <div className="employee-filter-tabs">
+                  <button
+                    className={`employee-filter-btn ${timeRangeFilter === 'today' ? 'active' : ''}`}
+                    onClick={() => setTimeRangeFilter('today')}
+                  >
+                    Today
+                  </button>
+                  <button
+                    className={`employee-filter-btn ${timeRangeFilter === '7days' ? 'active' : ''}`}
+                    onClick={() => setTimeRangeFilter('7days')}
+                  >
+                    Last 7 Days
+                  </button>
+                  <button
+                    className={`employee-filter-btn ${timeRangeFilter === 'month' ? 'active' : ''}`}
+                    onClick={() => setTimeRangeFilter('month')}
+                  >
+                    This Month
+                  </button>
+                </div>
               </div>
-              <div className="att-date-box">
-                <Calendar size={14} className="att-date-icon" />
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                />
+            ) : (
+              <div className="att-filters-row">
+                <div className="att-search-box">
+                  <Search size={15} className="att-search-icon" />
+                  <input
+                    type="text"
+                    placeholder="Search by Employee name or ID..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="att-date-box">
+                  <Calendar size={14} className="att-date-icon" />
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                  />
+                </div>
+                <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+                  <option value="">All Departments</option>
+                  {(departments || []).map(dept => (
+                    <option key={dept.id || dept.name} value={dept.name}>{dept.name}</option>
+                  ))}
+                </select>
+                <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
+                  <option value="">All Branches</option>
+                  {(branches && branches.length > 0 ? branches.map(b => b.name) : Array.from(new Set(employees.map(e => e.branch).filter(Boolean)))).map(branchName => (
+                    <option key={branchName} value={branchName}>{branchName}</option>
+                  ))}
+                </select>
+                <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}>
+                  <option value="">All Shifts</option>
+                  <option value="Morning">Morning Shift</option>
+                  <option value="Evening">Evening Shift</option>
+                  <option value="Night">Night Shift</option>
+                  <option value="Flexible">Flexible</option>
+                </select>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="">Select</option>
+                  <option value="Present">Present</option>
+                  <option value="Late">Late</option>
+                  <option value="Absent">Absent</option>
+                  <option value="Half Day">Half Day</option>
+                  <option value="On Leave">On Leave</option>
+                  <option value="Overtime">Overtime</option>
+                </select>
+                <select value={workModeFilter} onChange={(e) => setWorkModeFilter(e.target.value)}>
+                  <option value="">Select</option>
+                  <option value="WFO">WFO</option>
+                  <option value="WFH">WFH</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+                <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+                  <option value="">Select</option>
+                  <option value="Biometric">Biometric</option>
+                  <option value="GPS">GPS</option>
+                  <option value="RFID">RFID</option>
+                  <option value="Web Portal">Web Portal</option>
+                  <option value="Mobile App">Mobile App</option>
+                </select>
+                <Button variant="ghost" onClick={() => {
+                  setSearchQuery('');
+                  setDeptFilter('');
+                  setBranchFilter('');
+                  setShiftFilter('');
+                  setStatusFilter('');
+                  setSourceFilter('');
+                  setWorkModeFilter('');
+                  addToast('info', 'All filters cleared');
+                }}>Clear</Button>
               </div>
-              <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
-                <option value="">All Departments</option>
-                {(departments || []).map(dept => (
-                  <option key={dept.id || dept.name} value={dept.name}>{dept.name}</option>
-                ))}
-              </select>
-              <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
-                <option value="">All Branches</option>
-                {(branches && branches.length > 0 ? branches.map(b => b.name) : Array.from(new Set(employees.map(e => e.branch).filter(Boolean)))).map(branchName => (
-                  <option key={branchName} value={branchName}>{branchName}</option>
-                ))}
-              </select>
-              <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}>
-                <option value="">All Shifts</option>
-                <option value="Morning">Morning Shift</option>
-                <option value="Evening">Evening Shift</option>
-                <option value="Night">Night Shift</option>
-                <option value="Flexible">Flexible</option>
-              </select>
-              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">Select</option>
-                <option value="Present">Present</option>
-                <option value="Late">Late</option>
-                <option value="Absent">Absent</option>
-                <option value="Half Day">Half Day</option>
-                <option value="On Leave">On Leave</option>
-                <option value="Overtime">Overtime</option>
-              </select>
-              <select value={workModeFilter} onChange={(e) => setWorkModeFilter(e.target.value)}>
-                <option value="">Select</option>
-                <option value="WFO">WFO</option>
-                <option value="WFH">WFH</option>
-                <option value="Hybrid">Hybrid</option>
-              </select>
-              <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
-                <option value="">Select</option>
-                <option value="Biometric">Biometric</option>
-                <option value="GPS">GPS</option>
-                <option value="RFID">RFID</option>
-                <option value="Web Portal">Web Portal</option>
-                <option value="Mobile App">Mobile App</option>
-              </select>
-              <Button variant="ghost" onClick={() => {
-                setSearchQuery('');
-                setDeptFilter('');
-                setBranchFilter('');
-                setShiftFilter('');
-                setStatusFilter('');
-                setSourceFilter('');
-                setWorkModeFilter('');
-                addToast('info', 'All filters cleared');
-              }}>Clear</Button>
-            </div>
+            )}
           </div>
 
           {/* Main Table */}
@@ -2178,7 +2311,7 @@ const Attendance = () => {
         </div>
         <div className="att-fab-buttons">
           {[
-            { label: 'Mark Attendance', icon: CheckSquare, color: '#4ade80', action: () => setMarkModalOpen(true) },
+            { label: 'Mark Attendance', icon: CheckSquare, color: '#4ade80', action: () => setMarkModalOpen(true), adminOnly: true },
             { label: 'Assign Shift', icon: Clock, color: '#60a5fa', action: () => setShiftModalOpen(true), adminOnly: true },
             { label: 'Manage Breaks', icon: Coffee, color: '#fb7185', action: () => setBreakModalOpen(true), adminOnly: true },
             { label: 'Request Check-In', icon: UserCheck, color: '#fbbf24', action: handleRequestAttendance, adminOnly: true },
