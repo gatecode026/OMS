@@ -1238,7 +1238,7 @@ const Employees = () => {
   });
 
   const empOfMonth = sortedByOverallPerf[0] || { name: 'Ananya Gupta' };
-  const bestPerformer = sortedByOverallPerf.find(e => e.id !== empOfMonth.id) || sortedByOverallPerf[0] || { name: 'Aarav Sharma' };
+  const bestPerformer = sortedByOverallPerf.find(e => e.id !== empOfMonth.id) || sortedByOverallPerf[0] || { name: 'N/A' };
   const attendanceChamp = sortedByAttendance.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id) || sortedByAttendance[0] || { name: 'Suresh Kumar' };
   const mostProductive = sortedByProductivity.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id && e.id !== attendanceChamp.id) || sortedByProductivity[0] || { name: 'Kavita Singh' };
 

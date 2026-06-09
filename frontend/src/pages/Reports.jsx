@@ -26,14 +26,14 @@ import {
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1'];
 
 const recentReports = [
-  { id: 1, name: 'Monthly Attendance Report', type: 'Attendance', generatedBy: 'Aarav Sharma', time: '2 mins ago', format: 'PDF', size: '2.4 MB' },
+  { id: 1, name: 'Monthly Attendance Report', type: 'Attendance', generatedBy: 'Balram', time: '2 mins ago', format: 'PDF', size: '2.4 MB' },
   { id: 2, name: 'Payroll Summary Report', type: 'Payroll', generatedBy: 'Neha Verma', time: '15 mins ago', format: 'Excel', size: '1.8 MB' },
   { id: 3, name: 'Project Performance Report', type: 'Projects', generatedBy: 'Priya Patel', time: '1 hour ago', format: 'PDF', size: '3.1 MB' },
   { id: 4, name: 'Branch Productivity Report', type: 'Branch', generatedBy: 'Rahul Kumar', time: '3 hours ago', format: 'Excel', size: '1.2 MB' },
   { id: 5, name: 'Employee Performance Analytics', type: 'Employee', generatedBy: 'Admin', time: 'Yesterday', format: 'PDF', size: '4.5 MB' },
   { id: 6, name: 'Leave Balance Summary', type: 'Leave', generatedBy: 'HR Manager', time: 'Yesterday', format: 'CSV', size: '0.8 MB' },
   { id: 7, name: 'TDS Compliance Report', type: 'Payroll', generatedBy: 'Finance', time: '2 days ago', format: 'PDF', size: '1.5 MB' },
-  { id: 8, name: 'Task Completion Analytics', type: 'Projects', generatedBy: 'Aarav Sharma', time: '2 days ago', format: 'Excel', size: '2.1 MB' },
+  { id: 8, name: 'Task Completion Analytics', type: 'Projects', generatedBy: 'Balram', time: '2 days ago', format: 'Excel', size: '2.1 MB' },
 ];
 
 const scheduledReports = [
