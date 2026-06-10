@@ -46,7 +46,10 @@ const employeeSchema = new mongoose.Schema({
   city: String,
   state: String,
   zipCode: String,
-  country: String,
+  country: {
+    type: String,
+    default: 'India'
+  },
 
   // Emergency contact details
   emergencyContactName: String,
