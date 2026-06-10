@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './LeaveManagement.css';
 import { useApp } from '../context/AppContext';
+import { useLocation } from 'react-router-dom';
 import { FIELD_LABELS } from '../utils/fieldLabels';
 import usePageLoading from '../hooks/usePageLoading';
 import DataTable from '../components/common/DataTable';
@@ -43,14 +44,26 @@ const LeaveManagement = () => {
     addHoliday,
     deleteHoliday,
     updateEmployee,
-    departments
+    departments: rawDepartments
   } = useApp();
+  const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // Primary Tab state: 'requests' | 'analytics' | 'balances' | 'holidays' | 'policies'
   const [activeTab, setActiveTab] = useState('requests');
 
   // Requests Sub-tab status filter: 'Pending' | 'Approved' | 'Rejected' | 'All'
   const [statusTab, setStatusTab] = useState('Pending');
+
+  // Auto-focus pending tab when redirected from a notification
+  const location = useLocation();
+  useEffect(() => {
+    if (location.state?.openPending) {
+      setActiveTab('requests');
+      setStatusTab('Pending');
+      // Clear state so back-navigation doesn't re-trigger
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,7 +210,7 @@ const LeaveManagement = () => {
         id: `LR-${Math.floor(100 + Math.random() * 900)}`,
         employeeId: empId,
         employeeName: emp?.name || currentUser?.name || 'Employee',
-        department: emp?.department || currentUser?.department || 'Engineering',
+        department: emp?.department || currentUser?.department || '',
         type: applyForm.customLeaveType,
         fromDate: applyForm.startDate,
         toDate: endDateStr,
@@ -295,7 +308,7 @@ const LeaveManagement = () => {
     });
     
     leavesList.forEach(l => {
-      const dept = l.department || 'Engineering';
+      const dept = l.department || '';
       if (!data[dept]) {
         data[dept] = { department: dept, totalLeaves: 0, leaveRequests: 0, approved: 0, pending: 0 };
       }
@@ -686,7 +699,7 @@ const LeaveManagement = () => {
       id: `LR-${Math.floor(100 + Math.random() * 900)}`,
       employeeId: selectedAssignEmployee.id,
       employeeName: selectedAssignEmployee.name,
-      department: selectedAssignEmployee.department || 'Engineering',
+      department: selectedAssignEmployee.department || '',
       type: assignForm.customLeaveType,
       fromDate: assignForm.startDate,
       toDate: endDateStr,
@@ -1141,9 +1154,7 @@ const LeaveManagement = () => {
                   <label>Department</label>
                   <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
                     <option value="All">All Departments</option>
-                    {(departments && departments.length > 0 ? departments : [
-                      { name: 'Engineering' }, { name: 'Human Resources' }, { name: 'Sales' }, { name: 'Marketing' }, { name: 'Operations' }
-                    ]).map(d => (
+                    {(departments || []).map(d => (
                       <option key={d.id || d.name} value={d.name}>{d.name}</option>
                     ))}
                   </select>
@@ -2344,7 +2355,9 @@ const LeaveManagement = () => {
           )
         }
       >
-        {selectedLeave && (
+        {selectedLeave && (() => {
+          const selectedEmp = employees.find(e => e.id === selectedLeave.employeeId);
+          return (
           <div className="leave-modal-detail-body animate-fade-in">
             
             {/* 1. Profile information */}
@@ -2357,7 +2370,7 @@ const LeaveManagement = () => {
                   <span className="profile-tag-divider">•</span>
                   <span className="profile-tag-detail">Dept: {selectedLeave.department || 'Engineering'}</span>
                   <span className="profile-tag-divider">•</span>
-                  <span className="profile-tag-detail">Role: Senior Developer</span>
+                  <span className="profile-tag-detail">Role: {selectedEmp?.designation || 'Staff'}</span>
                 </div>
               </div>
               <Badge variant={selectedLeave.status === 'Approved' ? 'success' : selectedLeave.status === 'Pending' ? 'warning' : 'danger'}>
@@ -2369,11 +2382,11 @@ const LeaveManagement = () => {
             <div className="manager-assignments-strip card flex-row justify-between flex-wrap gap-3">
               <div className="assignment-box">
                 <span className="block-label">Team Leader</span>
-                <strong>Balram Suman</strong>
+                <strong>{selectedEmp?.teamLeader || 'Not Assigned'}</strong>
               </div>
               <div className="assignment-box">
                 <span className="block-label">Project Manager</span>
-                <strong>Rohit Sharma</strong>
+                <strong>{selectedEmp?.projectManager || 'Not Assigned'}</strong>
               </div>
               <div className="assignment-box">
                 <span className="block-label">Filing Date</span>
@@ -2490,7 +2503,7 @@ const LeaveManagement = () => {
                   </div>
                   <div className="step-info">
                     <span className="step-role">Team Leader Approval</span>
-                    <span className="step-status-sub">Balram Suman — {selectedLeave.status !== 'Pending' ? 'Reviewed' : 'Awaiting Review'}</span>
+                    <span className="step-status-sub">{selectedEmp?.teamLeader || 'Team Leader'} — {selectedLeave.status !== 'Pending' ? 'Reviewed' : 'Awaiting Review'}</span>
                   </div>
                 </div>
 
@@ -2500,7 +2513,7 @@ const LeaveManagement = () => {
                   </div>
                   <div className="step-info">
                     <span className="step-role">Project Manager Approval</span>
-                    <span className="step-status-sub">{selectedEmp?.manager || 'Project Manager'} — {selectedLeave.status === 'Approved' ? 'Approved' : selectedLeave.status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
+                    <span className="step-status-sub">{selectedEmp?.projectManager || 'Project Manager'} — {selectedLeave.status === 'Approved' ? 'Approved' : selectedLeave.status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
                   </div>
                 </div>
 
@@ -2517,7 +2530,8 @@ const LeaveManagement = () => {
             </div>
 
           </div>
-        )}
+          );
+        })()}
       </Modal>
 
       {/* ==================== MODAL: ADD HOLIDAY ==================== */}

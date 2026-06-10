@@ -71,7 +71,7 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#d
 
 const Notifications = () => {
   const isLoading = usePageLoading(600);
-  const { currentUserRole, showConfirm, notifications, addNotification, updateNotification, deleteNotification } = useApp();
+  const { currentUserRole, currentUser, showConfirm, notifications, addNotification, updateNotification, deleteNotification } = useApp();
 
   // Selected Month/Year
   const [month, setMonth] = useState('June');
@@ -810,28 +810,71 @@ const Notifications = () => {
               </div>
 
               <div className="today-feed-list">
-                {notifications.slice(0, 5).map((feed, idx) => (
-                  <div key={feed.id} className={`feed-item border-left-${feed.priority.toLowerCase()}`} onClick={() => handleViewDetails(feed)}>
-                    <div className="feed-avatar" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}>
-                      {feed.category[0]}
-                    </div>
-                    <div className="feed-content">
-                      <div className="flex-center justify-between">
-                        <strong className="feed-title">{feed.title}</strong>
-                        <Badge variant={feed.deliveryStatus === 'Delivered' ? 'success' : 'danger'} style={{ fontSize: '0.68rem' }}>{feed.deliveryStatus}</Badge>
+                {(() => {
+                  const isAdminRole = ['super_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
+                  const myNotifications = notifications.filter(n => {
+                    const recipientId   = n.recipientId || n.targetUserId || n.forUserId;
+                    const recipientRole = (n.recipientRole || n.targetRole || '').toLowerCase();
+                    const msg = (n.message || n.title || '').toLowerCase();
+
+                    // Rule 1: specific user
+                    if (recipientId) return recipientId === currentUser?.id;
+
+                    // Rule 2: employee-only
+                    if (recipientRole === 'employee') return currentUserRole === 'employee';
+
+                    // Rule 3: admin-only
+                    if (recipientRole === 'admin') return isAdminRole;
+
+                    // Rule 4: legacy — check message content
+                    const isPersonalEmployeeMsg =
+                      msg.startsWith('your ') ||
+                      msg.includes('your leave') ||
+                      msg.includes('your request') ||
+                      msg.includes('your attendance') ||
+                      msg.includes('has been approved') ||
+                      msg.includes('has been rejected') ||
+                      msg.includes('note: approved') ||
+                      msg.includes('note: rejected');
+
+                    if (isPersonalEmployeeMsg) return false;
+
+                    // Broadcast → admins only
+                    return isAdminRole;
+                  }).slice(0, 5);
+
+
+                  return myNotifications.length > 0 ? myNotifications.map((feed, idx) => (
+                    <div key={feed.id} className={`feed-item border-left-${(feed.priority || 'normal').toLowerCase()}`} onClick={() => handleViewDetails(feed)}>
+                      <div className="feed-avatar" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}>
+                        {(feed.category || feed.type || 'N')[0].toUpperCase()}
                       </div>
-                      <p className="feed-msg">{feed.message}</p>
-                      <div className="feed-meta">
-                        <span className="flex-center gap-1"><Clock size={11} /> {feed.sentDate}</span>
-                        <span>•</span>
-                        <span>Priority: <span style={{ color: getPriorityStyle(feed.priority), fontWeight: 700 }}>{feed.priority}</span></span>
-                        <span>•</span>
-                        <span>Recipients: <strong>{feed.recipients}</strong></span>
+                      <div className="feed-content">
+                        <div className="flex-center justify-between">
+                          <strong className="feed-title">{feed.title || feed.message?.slice(0, 40)}</strong>
+                          <Badge variant={feed.deliveryStatus === 'Delivered' || !feed.deliveryStatus ? 'success' : 'danger'} style={{ fontSize: '0.68rem' }}>
+                            {feed.deliveryStatus || 'Delivered'}
+                          </Badge>
+                        </div>
+                        <p className="feed-msg">{feed.message}</p>
+                        <div className="feed-meta">
+                          <span className="flex-center gap-1"><Clock size={11} /> {feed.sentDate || feed.timestamp || 'Just now'}</span>
+                          <span>•</span>
+                          <span>Priority: <span style={{ color: getPriorityStyle(feed.priority || 'Normal'), fontWeight: 700 }}>{feed.priority || 'Normal'}</span></span>
+                          <span>•</span>
+                          <span>Recipients: <strong>{feed.recipients || 1}</strong></span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )) : (
+                    <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-muted)' }}>
+                      <Bell size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
+                      <p style={{ margin: 0, fontSize: '0.85rem' }}>No notifications for you today</p>
+                    </div>
+                  );
+                })()}
               </div>
+
             </div>
           </div>
         </div>

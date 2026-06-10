@@ -679,12 +679,7 @@ const Workflows = () => {
       };
     });
 
-    return result.length > 0 ? result : [
-      { department: 'IT', active: 0, completed: 0, delayed: 0, efficiency: 100 },
-      { department: 'Marketing', active: 0, completed: 0, delayed: 0, efficiency: 100 },
-      { department: 'Sales', active: 0, completed: 0, delayed: 0, efficiency: 100 },
-      { department: 'HR', active: 0, completed: 0, delayed: 0, efficiency: 100 }
-    ];
+    return result.length > 0 ? result : [];
   }, [workflows]);
 
   const MONTHLY_DATA = useMemo(() => {
@@ -739,12 +734,7 @@ const Workflows = () => {
       efficiency: depts[dept].total > 0 ? Math.round((depts[dept].completed / depts[dept].total) * 100) : 100
     }));
     
-    return result.length > 0 ? result : [
-      { name: 'IT', efficiency: 100 },
-      { name: 'Marketing', efficiency: 100 },
-      { name: 'Sales', efficiency: 100 },
-      { name: 'HR', efficiency: 100 }
-    ];
+    return result.length > 0 ? result : [];
   }, [workflows]);
 
   const PRODUCTIVITY_DATA = useMemo(() => {
@@ -776,11 +766,21 @@ const Workflows = () => {
   const [showAnalytics, setShowAnalytics] = useState(true);
 
   const [createForm, setCreateForm] = useState({
-    name: '', code: '', category: 'HR', department: 'IT', description: '',
+    name: '', code: '', category: '', department: '', description: '',
     owner: '', deptHead: '', manager: '', leader: '',
     assignedEmployees: [], startDate: '', dueDate: '', priority: 'Medium',
     approvalReqs: [], notifRules: []
   });
+
+  useEffect(() => {
+    if (departments && departments.length > 0 && !createForm.editId) {
+      setCreateForm(p => ({
+        ...p,
+        category: p.category || departments[0].name,
+        department: p.department || departments[0].name
+      }));
+    }
+  }, [departments, createForm.editId]);
 
   const PER_PAGE = 10;
 
@@ -877,7 +877,7 @@ const Workflows = () => {
       addToast && addToast('success', `Workflow "${newWf.name}" created!`);
     }
     setActiveModal(null);
-    setCreateForm({ name: '', code: '', category: 'HR', department: 'IT', description: '', owner: '', deptHead: '', manager: '', leader: '', assignedEmployees: [], startDate: '', dueDate: '', priority: 'Medium', approvalReqs: [], notifRules: [] });
+    setCreateForm({ name: '', code: '', category: departments?.[0]?.name || '', department: departments?.[0]?.name || '', description: '', owner: '', deptHead: '', manager: '', leader: '', assignedEmployees: [], startDate: '', dueDate: '', priority: 'Medium', approvalReqs: [], notifRules: [] });
   };
 
   const toggleChip = (arr, val, setter, field) => {
@@ -1093,7 +1093,7 @@ const Workflows = () => {
         {[
           ['status', 'Status', ['', 'Active', 'In Progress', 'Pending Approval', 'Under Review', 'Delayed', 'Cancelled', 'Completed']],
           ['priority', 'Priority', ['', 'Low', 'Medium', 'High', 'Critical']],
-          ['department', 'Department', ['', 'IT', 'HR', 'Sales', 'Marketing', 'Finance']],
+          ['department', 'Department', ['', ...Array.from(new Set((departments || []).map(d => d.name)))]],
           ['dateRange', 'Date Range', ['', 'Today', 'Weekly', 'Monthly', 'Quarterly']]
         ].map(([key, label, opts]) => (
           <select key={key} style={{ ...inp, width: 'auto', flex: '0 1 150px' }} value={filters[key]} onChange={e => { setFilters(p => ({ ...p, [key]: e.target.value })); setCurrentPage(1); }}>
@@ -1255,12 +1255,12 @@ const Workflows = () => {
                     <div><label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Workflow Code</label><input style={inp} value={createForm.code} onChange={e => setCreateForm(p => ({ ...p, code: e.target.value }))} placeholder={`WF-${String(workflows.length + 1).padStart(3, '0')}`} /></div>
                     <div><label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Category</label>
                       <select style={inp} value={createForm.category} onChange={e => setCreateForm(p => ({ ...p, category: e.target.value }))}>
-                        {['HR', 'IT', 'Finance', 'Operations', 'Marketing', 'Sales'].map(c => <option key={c}>{c}</option>)}
+                        {(departments || []).map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
                       </select>
                     </div>
                     <div><label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Department</label>
                       <select style={inp} value={createForm.department} onChange={e => setCreateForm(p => ({ ...p, department: e.target.value }))}>
-                        {['IT', 'HR', 'Sales', 'Marketing', 'Finance'].map(d => <option key={d}>{d}</option>)}
+                        {(departments || []).map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
                       </select>
                     </div>
                     <div style={{ gridColumn: '1/-1' }}><label style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Description</label><textarea style={{ ...inp, minHeight: 70, resize: 'vertical' }} value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} placeholder="Describe the workflow purpose and process..." /></div>

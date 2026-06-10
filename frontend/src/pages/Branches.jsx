@@ -20,7 +20,35 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches, departments, addBranch, updateBranch, deleteBranch } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, addBranch, updateBranch, deleteBranch, projectsList } = useApp();
+
+  const getBranchDepartments = (b) => {
+    if (!b) return [];
+    return (departments || []).filter(d => d.branch === b.name && d.status === 'Active').map(d => d.name);
+  };
+
+  const branches = useMemo(() => {
+    if (!originalBranches) return [];
+    return originalBranches.map(branch => {
+      const branchDepts = getBranchDepartments(branch).map(d => d.toLowerCase());
+      const branchProjects = (projectsList || []).filter(p => p.department && branchDepts.includes(p.department.toLowerCase()));
+      
+      const completed = branchProjects.filter(p => p.status === 'Completed').length;
+      const active = branchProjects.filter(p => p.status === 'In Progress' || p.status === 'Active').length;
+      const pending = branchProjects.filter(p => p.status === 'Pending' || p.status === 'Planning' || p.status === 'On Hold').length;
+      const delayed = branchProjects.filter(p => p.status === 'Delayed').length;
+
+      return {
+        ...branch,
+        projects: {
+          completed,
+          active,
+          pending,
+          delayed
+        }
+      };
+    });
+  }, [originalBranches, projectsList, departments]);
 
   const branchRanking = useMemo(() => {
     if (!branches || branches.length === 0) return [];
@@ -115,12 +143,6 @@ const Branches = () => {
     return generatedAlerts;
   }, [branches]);
 
-  const getBranchDepartments = (b) => {
-    if (!b) return [];
-    const dbDepts = (departments || []).filter(d => d.branch === b.name).map(d => d.name);
-    if (dbDepts.length > 0) return dbDepts;
-    return b.departments || [];
-  };
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -188,7 +210,7 @@ const Branches = () => {
     manager: '', managerPhone: '',
     address: '', city: '', state: '', zipCode: '', phone: '', email: '',
     status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
-    revenue: 500000, departments: ['Sales', 'Marketing'],
+    revenue: 500000, departments: [],
     attendance: 95, productivity: 90,
     employeeCount: 50,
   });
@@ -1506,7 +1528,7 @@ const Branches = () => {
               manager: '', managerPhone: '',
               address: '', city: '', state: '', zipCode: '', phone: '', email: '',
               status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
-              revenue: 500000, departments: ['Sales', 'Marketing'],
+              revenue: 500000, departments: [],
               attendance: 95, productivity: 90,
               employeeCount: 50,
             });
@@ -1700,7 +1722,7 @@ const Branches = () => {
                   manager: '', managerPhone: '',
                   address: '', city: '', state: '', zipCode: '', phone: '', email: '',
                   status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
-                  revenue: 500000, departments: ['Sales', 'Marketing'],
+                  revenue: 500000, departments: [],
                   attendance: 95, productivity: 90,
                   employeeCount: 50,
                 });

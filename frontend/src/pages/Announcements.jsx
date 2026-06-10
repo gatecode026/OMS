@@ -62,6 +62,7 @@ const Announcements = () => {
   const isLoading = usePageLoading(600);
   const {
     employees,
+    departments,
     showConfirm,
     currentUserRole,
     currentUserId,
@@ -296,16 +297,7 @@ const Announcements = () => {
   }, [announcements, employees, trackingLogs]);
 
   const deptEngagementData = useMemo(() => {
-    const depts = [...new Set(employees.map(e => e.department).filter(Boolean))];
-    if (depts.length === 0) {
-      return [
-        { name: 'IT', read: 92, ack: 88 },
-        { name: 'Engineering', read: 90, ack: 84 },
-        { name: 'HR', read: 95, ack: 92 },
-        { name: 'Operations', read: 84, ack: 72 },
-        { name: 'Sales', read: 78, ack: 60 }
-      ];
-    }
+    const depts = (departments || []).map(d => d.name);
     return depts.map(dept => {
       const deptEmps = employees.filter(e => e.department === dept).map(e => e.id);
       const deptLogs = trackingLogs.filter(t => deptEmps.includes(t.employeeId));
@@ -314,11 +306,11 @@ const Announcements = () => {
       const ack = total ? Math.round((deptLogs.filter(t => t.ackStatus === 'Acknowledged').length / total) * 100) : 0;
       return {
         name: dept,
-        read: read || 80,
-        ack: ack || 70
+        read: read || 0,
+        ack: ack || 0
       };
     });
-  }, [employees, trackingLogs]);
+  }, [departments, employees, trackingLogs]);
 
   const branchReachData = useMemo(() => {
     const branches = [...new Set(employees.map(e => e.branch).filter(Boolean))];

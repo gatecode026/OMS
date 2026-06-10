@@ -264,7 +264,7 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: dbDepartments, teams, appraisalReviews } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews } = useApp();
   const location = useLocation();
 
 
@@ -393,6 +393,10 @@ const Employees = () => {
     probationEndDate: '',
     contractEndDate: ''
   });
+
+  const dbDepartments = useMemo(() => {
+    return (rawDbDepartments || []).filter(d => d.status === 'Active' || d.name === formData.department);
+  }, [rawDbDepartments, formData.department]);
 
   const [uploadedDocs, setUploadedDocs] = useState({
     aadhaar: null, pan: null, resume: null,

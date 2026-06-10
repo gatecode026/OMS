@@ -155,11 +155,13 @@ const WebPortalAttendance = () => {
     attendance,
     employees,
     branches,
+    departments: rawDepartments,
     updateAttendanceRecord,
     addAttendanceRecord,
     deleteAttendanceRecord,
     addToast
   } = useApp();
+  const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // ── Form/View State ──
   const [formMode, setFormMode] = useState('single');
@@ -500,7 +502,7 @@ const WebPortalAttendance = () => {
     const record = {
       employeeId: empId,
       employeeName: empData.name,
-      department: empData.department || 'Engineering',
+      department: empData.department || '',
       branch: empData.branch || 'Jaipur',
       workMode: row.workMode || empData.workMode || 'WFO',
       date: dateFilter,
@@ -643,7 +645,7 @@ const WebPortalAttendance = () => {
         const empDetails = employees.find(e => e.id === item.employeeId);
         return {
           ...item,
-          department: item.department || empDetails?.department || 'Engineering',
+          department: item.department || empDetails?.department || '',
           branch: item.branch || empDetails?.branch || 'Jaipur',
           employeeName: item.employeeName || empDetails?.name || 'Unknown'
         };
@@ -799,11 +801,9 @@ const WebPortalAttendance = () => {
 
               <select value={wpDept} onChange={e => setWpDept(e.target.value)} className="wp-filter-select">
                 <option value="">Department</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Sales">Sales</option>
-                <option value="Operations">Operations</option>
-                <option value="Human Resources">HR</option>
+                {(departments || []).map(d => (
+                  <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                ))}
               </select>
 
               <select value={wpBranch} onChange={e => setWpBranch(e.target.value)} className="wp-filter-select">

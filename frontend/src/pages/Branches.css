@@ -140,6 +140,8 @@
 
 .dept-search-icon {
   color: var(--text-muted);
+  position: static !important;
+  transform: none !important;
 }
 
 .dept-search-input {
