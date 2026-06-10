@@ -1,1 +1,1 @@
-// Temporary check script completed and cleaned up.
+// Temporary inspect script completed and cleaned up.

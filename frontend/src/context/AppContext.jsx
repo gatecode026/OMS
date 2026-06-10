@@ -59,16 +59,20 @@ export const normalizeEmployee = (emp) => {
   normalized.todayWorkingHours = hrs;
   normalized.totalHours = hrs;
 
-  // 10. Attendance Status / attendanceStatus / todayPunchStatus / status
-  const att = normalized.attendanceStatus || normalized.status || normalized.todayPunchStatus;
+  // 10. Attendance Status / attendanceStatus / todayPunchStatus
+  const att = (normalized.attendanceStatus && normalized.attendanceStatus !== 'Active' && normalized.attendanceStatus !== 'Disabled' && normalized.attendanceStatus !== 'Suspended') 
+    ? normalized.attendanceStatus 
+    : (normalized.todayPunchStatus || 'Present');
   normalized.attendanceStatus = att;
-  normalized.status = att;
   normalized.todayPunchStatus = att;
 
-  // 11. Employment Status / accountStatus / employmentStatus
-  const est = normalized.employmentStatus || normalized.accountStatus;
-  normalized.employmentStatus = est;
+  // 11. Employment Status / accountStatus / employmentStatus / status
+  const est = (normalized.status === 'Active' || normalized.status === 'Disabled' || normalized.status === 'Suspended')
+    ? normalized.status
+    : (normalized.accountStatus || normalized.employmentStatus || 'Active');
+  normalized.status = est;
   normalized.accountStatus = est;
+  normalized.employmentStatus = est;
 
   // Address Parsing
   if (typeof normalized.currentAddress === 'string') {

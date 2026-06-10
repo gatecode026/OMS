@@ -958,7 +958,10 @@ const Employees = () => {
   };
 
   const handleFormSubmit = async () => {
-    const matchingRole = roles.find(r => r.id === formData.roleId) || roles[3];
+    const matchingRole = roles.find(r => r.id === formData.roleId) || {
+      id: formData.roleId || 'employee',
+      name: formData.roleId === 'manager' ? 'Manager' : (formData.roleId === 'team_leader' ? 'Team Leader' : (formData.roleId === 'branch_admin' ? 'Branch Admin' : 'Employee'))
+    };
     
     // Convert documents to base64
     const docsToSave = [];
