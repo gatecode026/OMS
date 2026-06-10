@@ -43,6 +43,55 @@ const adminSchema = new mongoose.Schema({
     default: 'Active',
     enum: ['Active', 'Suspended', 'Disabled']
   },
+  avatar: {
+    type: String,
+    default: ''
+  },
+  photoUrl: {
+    type: String,
+    default: ''
+  },
+  dob: String,
+  gender: String,
+  alternatePhone: String,
+  personalEmail: String,
+  workEmail: String,
+  bloodGroup: String,
+  maritalStatus: String,
+  experience: String,
+  nationality: String,
+  username: String,
+
+  // Address details
+  currentAddress: String,
+  permanentAddress: String,
+  city: String,
+  state: String,
+  zipCode: String,
+  country: String,
+
+  // Emergency contact details
+  emergencyContactName: String,
+  emergencyContactPhone: String,
+  emergencyContactPhoneAlt: String,
+  emergencyContactRelation: String,
+
+  // Bank details
+  bankName: String,
+  bankAccountNumber: String,
+  bankIfscCode: String,
+  bankUpiId: String,
+
+  // Identity documents
+  panNumber: String,
+  aadhaarNumber: String,
+  documents: [{
+    category: String,
+    fileName: String,
+    uploadDate: String,
+    fileType: String,
+    downloadUrl: String
+  }],
   password: {
     type: String,
     required: true,

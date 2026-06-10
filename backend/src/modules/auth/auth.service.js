@@ -24,186 +24,6 @@ const FALLBACK_EMPLOYEES = [
     branch: 'Jaipur',
     team: 'Administration'
   },
-  {
-    id: 'EMP-2026-001',
-    name: 'Balram Suman',
-    email: 'aarav.sharma@saas.com',
-    role: 'Super Admin',
-    roleId: 'super_admin',
-    status: 'Active',
-    designation: 'Chief Operations Officer',
-    department: 'Operations',
-    branch: 'Jaipur',
-    team: 'Operations Core'
-  },
-  {
-    id: 'EMP-2026-002',
-    name: 'Vikram Singh',
-    email: 'vikram.singh@saas.com',
-    role: 'Branch Admin',
-    roleId: 'branch_admin',
-    status: 'Active',
-    designation: 'Engineering Manager',
-    department: 'Engineering',
-    branch: 'Delhi',
-    team: 'Frontend Devs'
-  },
-  {
-    id: 'EMP-2026-003',
-    name: 'Ananya Gupta',
-    email: 'ananya.gupta@saas.com',
-    role: 'Team Leader',
-    roleId: 'team_leader',
-    status: 'Active',
-    designation: 'Senior Frontend Engineer',
-    department: 'Engineering',
-    branch: 'Delhi',
-    team: 'Frontend Devs'
-  },
-  {
-    id: 'EMP-2026-004',
-    name: 'Rohit Sharma',
-    email: 'rohit.sharma@saas.com',
-    role: 'Team Leader',
-    roleId: 'team_leader',
-    status: 'Active',
-    designation: 'Regional Sales Manager',
-    department: 'Sales',
-    branch: 'Delhi',
-    team: 'Domestic Sales'
-  },
-  {
-    id: 'EMP-2026-005',
-    name: 'Priya Patel',
-    email: 'priya.patel@saas.com',
-    role: 'Branch Admin',
-    roleId: 'branch_admin',
-    status: 'Active',
-    designation: 'Marketing Director APAC',
-    department: 'Marketing',
-    branch: 'Mumbai',
-    team: 'Digital Marketing'
-  },
-  {
-    id: 'EMP-2026-006',
-    name: 'Arjun Mehta',
-    email: 'arjun.mehta@saas.com',
-    role: 'Employee',
-    roleId: 'employee',
-    status: 'Active',
-    designation: 'Data Engineer',
-    department: 'Engineering',
-    branch: 'Bangalore',
-    team: 'Data Services'
-  },
-  {
-    id: 'EMP-2026-007',
-    name: 'Neha Verma',
-    email: 'neha.verma@saas.com',
-    role: 'Employee',
-    roleId: 'employee',
-    status: 'On Leave',
-    designation: 'HR Business Partner',
-    department: 'Human Resources',
-    branch: 'Delhi',
-    team: 'HR Operations'
-  },
-  {
-    id: 'EMP-2026-008',
-    name: 'Deepak Joshi',
-    email: 'deepak.joshi@saas.com',
-    role: 'Employee',
-    roleId: 'employee',
-    status: 'Active',
-    designation: 'Account Executive',
-    department: 'Sales',
-    branch: 'Delhi',
-    team: 'Domestic Sales'
-  },
-  {
-    id: 'EMP-2026-009',
-    name: 'Suresh Kumar',
-    email: 'suresh.kumar@saas.com',
-    role: 'Employee',
-    roleId: 'employee',
-    status: 'Active',
-    designation: 'Frontend Developer',
-    department: 'Engineering',
-    branch: 'Delhi',
-    team: 'Frontend Devs'
-  },
-  {
-    id: 'EMP-2026-010',
-    name: 'Priya Sharma',
-    email: 'priya.sharma@enterprise.com',
-    role: 'Employee',
-    roleId: 'employee',
-    status: 'Active',
-    designation: 'Campaign Analyst',
-    department: 'Marketing',
-    branch: 'Delhi',
-    team: 'Global Campaigns'
-  },
-  {
-    id: 'EMP-2026-011',
-    name: 'Kabir Mehta',
-    email: 'kabir.mehta@saas.com',
-    role: 'Manager',
-    roleId: 'manager',
-    status: 'Active',
-    designation: 'Manager',
-    department: 'Engineering',
-    branch: 'Delhi',
-    team: 'Backend Core'
-  },
-  {
-    id: 'EMP-2026-100',
-    name: 'animesh jain',
-    email: 'animeshj72@gmail.com',
-    role: 'Manager',
-    roleId: 'manager',
-    status: 'Active',
-    designation: 'Software Manager',
-    department: 'Engineering',
-    branch: 'Jaipur',
-    team: 'Engineering Core'
-  },
-  {
-    id: 'EMP-2026-101',
-    name: 'uttam Rajpurohit',
-    email: 'uttam@gmail.com',
-    role: 'Employee',
-    roleId: 'employee',
-    status: 'Active',
-    designation: 'Software Engineer',
-    department: 'Engineering',
-    branch: 'Jaipur',
-    team: 'Engineering Core'
-  },
-  {
-    id: 'EMP-2026-102',
-    name: 'pawan singh bisht',
-    email: 'bishtpawan333@gmail.com',
-    role: 'Employee',
-    roleId: 'employee',
-    status: 'Active',
-    designation: 'Software Engineer',
-    department: 'Engineering',
-    branch: 'Jaipur',
-    team: 'Engineering Core'
-  },
-  {
-    id: 'EMP-2026-103',
-    name: 'rahul kumawat',
-    email: 'rahulkumawat1408@gmail.com',
-    role: 'Team Leader',
-    roleId: 'team_leader',
-    status: 'Active',
-    designation: 'Team Leader',
-    department: 'Engineering',
-    branch: 'Jaipur',
-    team: 'Engineering Core'
-  }
 ];
 
 /**
@@ -262,7 +82,7 @@ export const login = async (email, password) => {
         isEmployee = true;
       }
     }
-    
+
     if (!user) {
       logger.warn(`AuthService::login record not found for: ${resolvedEmail}`);
       const err = new Error('Invalid email or password');
@@ -309,16 +129,16 @@ export const login = async (email, password) => {
   logger.info(`AuthService::login [Offline Mode] Verifying credentials for: ${resolvedEmail}`);
 
   let user = FALLBACK_EMPLOYEES.find(e => e.email.toLowerCase() === resolvedEmail.toLowerCase());
-  
+
   if (!user) {
     const prefix = resolvedEmail.split('@')[0].toLowerCase();
-    user = FALLBACK_EMPLOYEES.find(e => 
+    user = FALLBACK_EMPLOYEES.find(e =>
       (e.username && e.username.toLowerCase() === prefix) ||
       e.email.toLowerCase().startsWith(prefix) ||
       e.name.toLowerCase().startsWith(prefix)
     );
   }
-  
+
   if (!user) {
     logger.warn(`AuthService::login (offline) user record not found for: ${resolvedEmail}`);
     const err = new Error('Invalid email or password');

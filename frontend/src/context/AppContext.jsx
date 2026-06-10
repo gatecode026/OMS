@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 
 
 const AppContext = createContext(undefined);
@@ -104,7 +104,7 @@ export const normalizeEmployee = (emp) => {
 
   // Banking
   normalized.bank = normalized.bank || {
-    accountName: normalized.name || '',
+    accountName: normalized.name,
     bankName: normalized.bankName || '',
     branch: normalized.bankBranch || '',
     accountNumber: normalized.bankAccountNumber || '',
@@ -398,11 +398,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Messages states
-  const [messages, setMessages] = useState([
-    { id: 'msg-1', sender: 'Ananya Gupta', text: 'Hey Balram, the frontend lazy route changes are live in production. Please check.', time: '10m ago', unread: true },
-    { id: 'msg-2', sender: 'Vikram Singh', text: 'Can you review the leave request I submitted yesterday? Need to travel next week.', time: '1h ago', unread: true },
-    { id: 'msg-3', sender: 'Neha Verma', text: 'Draft payroll calculations for May are ready in the dashboard.', time: '5h ago', unread: false }
-  ]);
+  const [messages, setMessages] = useState([]);
 
   const markMessageRead = (id) => {
     setMessages(prev => prev.map(m => (m.id === id ? { ...m, unread: false } : m)));
@@ -620,10 +616,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchPayrollData();
-  }, [token]);
+  // fetchEmployees and fetchPayrollData are called in the main data-loading useEffect below
 
   const fetchBranches = async () => {
     if (!token) {
@@ -1511,6 +1504,7 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    fetchEmployees();
     fetchAttendance();
     fetchLeaves();
     fetchLeavePolicies();
@@ -1529,30 +1523,8 @@ export const AppProvider = ({ children }) => {
     fetchUserOverrides();
   }, [token]);
 
-  // Real-time polling for attendance logs and employee statuses every 5 seconds
-  useEffect(() => {
-    if (!token) return;
-    const interval = setInterval(() => {
-      fetchAttendance();
-      fetchEmployees();
-      fetchLeaves();
-      fetchHolidays();
-      fetchProjects();
-      fetchDailyReports();
-      fetchAppraisalReviews();
-      fetchPayrollData();
-      fetchAnnouncements();
-      fetchEmergencyAlert();
-      fetchAnnouncementTracking();
-      fetchAnnouncementAudits();
-      fetchNotifications();
-      fetchDocuments();
-      fetchActivityLogs();
-      fetchRoles();
-      fetchUserOverrides();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [token]);
+  // Background polling disabled to prevent terminal log flooding (Option B)
+
 
   // Toast Handler
   const addToast = (type, message) => {
@@ -1666,7 +1638,7 @@ export const AppProvider = ({ children }) => {
       leaveHistory: [],
       taskHistory: [],
       performanceScore: { overall: 0, attendance: 0, taskCompletion: 0, reportSubmission: 0, leaveDiscipline: 0, monthly: [0, 0, 0, 0, 0, 0] },
-      documents: [],
+      documents: newEmp.documents || [],
       activityLog: [],
       
       // New default properties
@@ -1745,6 +1717,11 @@ export const AppProvider = ({ children }) => {
         setEmployees(prev =>
           prev.map(e => (e.id === id ? savedEmp : e))
         );
+        // If the updated user is the currently logged in user, sync local storage & currentUser state!
+        if (currentUser && (currentUser.id === id || currentUser.employeeId === id)) {
+          setCurrentUser(savedEmp);
+          localStorage.setItem('saas_user', JSON.stringify(savedEmp));
+        }
         // Sync manager info in branches dynamically in real-time
         setBranches(prev =>
           prev.map(b => b.managerId === id ? {
@@ -3840,10 +3817,14 @@ export const AppProvider = ({ children }) => {
     return !!permissions[module]?.[action];
   };
 
+  // Memoize the normalized employees array to prevent creating a new reference
+  // on every render, which would cause all context consumers to re-render infinitely.
+  const memoizedEmployees = useMemo(() => employees.map(normalizeEmployee), [employees]);
+
   return (
     <AppContext.Provider
       value={{
-        employees: employees.map(normalizeEmployee),
+        employees: memoizedEmployees,
         branches,
         addBranch,
         updateBranch,

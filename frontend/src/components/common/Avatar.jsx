@@ -19,7 +19,7 @@ export const getAvatarColor = (name = '') => {
   return `hsl(${h}, 60%, 50%)`;
 };
 
-const Avatar = ({ name = '', size = 'md', className = '', src = '' }) => {
+const Avatar = ({ name = '', size = 'md', className = '', src = undefined }) => {
   let appState = {};
   try {
     appState = useApp() || {};
@@ -33,7 +33,7 @@ const Avatar = ({ name = '', size = 'md', className = '', src = '' }) => {
 
   // Look up matching employee/user to see if they have uploaded a profile photo
   const emp = employees?.find(e => e.name === name) || (currentUser?.name === name ? currentUser : null);
-  const imageUrl = src || emp?.photoUrl || emp?.avatar;
+  const imageUrl = (src !== undefined && src !== null) ? src : (emp?.photoUrl || emp?.avatar || '');
 
   return (
     <div

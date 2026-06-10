@@ -4,6 +4,7 @@
  */
 
 import Employee from './employees.model.js';
+import Admin from '../admin/admin.model.js';
 import logger from '../../config/logger.js';
 
 /**
@@ -21,7 +22,12 @@ export const find = async (query = {}) => {
  */
 export const findOne = async (id) => {
   logger.info(`EmployeesRepository::findOne querying employee with ID: ${id}`);
-  return Employee.findOne({ id });
+  let user = await Employee.findOne({ id });
+  if (!user) {
+    logger.info(`EmployeesRepository::findOne employee not found, querying admin with ID: ${id}`);
+    user = await Admin.findOne({ id });
+  }
+  return user;
 };
 
 /**
@@ -50,7 +56,13 @@ export const update = async (id, data) => {
     const salt = await bcrypt.genSalt(10);
     updateData.password = await bcrypt.hash(updateData.password, salt);
   }
-  return Employee.findOneAndUpdate({ id }, updateData, { new: true, runValidators: true });
+  
+  let updated = await Employee.findOneAndUpdate({ id }, updateData, { new: true, runValidators: true });
+  if (!updated) {
+    logger.info(`EmployeesRepository::update employee not found, trying admin update for ID: ${id}`);
+    updated = await Admin.findOneAndUpdate({ id }, updateData, { new: true, runValidators: true });
+  }
+  return updated;
 };
 
 /**

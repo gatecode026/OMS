@@ -32,78 +32,22 @@ const TT = {
   },
   cursor: { fill: 'rgba(255,255,255,0.03)' }
 };
-const SEED_PROJECTS = [
-  { id: 'PRJ-001', name: 'SaaS Platform v3.0',         pmId: 'PM-001', teamLeader: 'Rohan Verma',  startDate: '2026-01-10', endDate: '2026-07-30', progress: 72,  status: 'In Progress', clientName: 'Global Tech Corp', budget: 28 },
-  { id: 'PRJ-002', name: 'Mobile App Redesign',         pmId: 'PM-001', teamLeader: 'Sneha Patel',  startDate: '2026-02-01', endDate: '2026-06-30', progress: 55,  status: 'In Progress', clientName: 'FitLife Inc',      budget: 18 },
-  { id: 'PRJ-003', name: 'Q3 Marketing Campaign',       pmId: 'PM-002', teamLeader: 'Ankit Sharma', startDate: '2026-03-01', endDate: '2026-09-30', progress: 38,  status: 'In Progress', clientName: 'Red Bull India',  budget: 15 },
-  { id: 'PRJ-004', name: 'CRM Integration Phase 2',     pmId: 'PM-002', teamLeader: 'Priya Nair',   startDate: '2025-10-01', endDate: '2026-02-28', progress: 100, status: 'Completed',   clientName: 'BMW Group',       budget: 22 },
-  { id: 'PRJ-005', name: 'Sales Pipeline Automation',   pmId: 'PM-003', teamLeader: 'Vikram Desai', startDate: '2026-01-15', endDate: '2026-05-31', progress: 25,  status: 'Delayed',     clientName: 'Salesforce',      budget: 12 },
-  { id: 'PRJ-006', name: 'HR Digitization',             pmId: 'PM-004', teamLeader: 'Meera Joshi',  startDate: '2026-04-01', endDate: '2026-10-31', progress: 20,  status: 'Planning',    clientName: 'People Solutions',budget: 9 },
-  { id: 'PRJ-007', name: 'Cloud Infrastructure Mgr',    pmId: 'PM-005', teamLeader: 'Rohan Verma',  startDate: '2025-11-01', endDate: '2026-01-31', progress: 100, status: 'Completed',   clientName: 'AWS India',       budget: 8 },
-  { id: 'PRJ-008', name: 'Employee Wellness Portal',    pmId: 'PM-006', teamLeader: 'Meera Joshi',  startDate: '2026-05-01', endDate: '2026-11-30', progress: 15,  status: 'In Progress', clientName: 'TCS Group',       budget: 10 },
-];
+const SEED_PROJECTS = [];
 
-const SEED_TEAM_LEADERS = [
-  { id: 'TL-001', name: 'Rohan Verma',  department: 'IT',        teamName: 'Dev Team Alpha',    teamMembers: 18, activeProjects: 3, productivity: 94, attendance: 97 },
-  { id: 'TL-002', name: 'Sneha Patel',  department: 'IT',        teamName: 'Dev Team Beta',     teamMembers: 15, activeProjects: 2, productivity: 91, attendance: 95 },
-  { id: 'TL-003', name: 'Ankit Sharma', department: 'Marketing', teamName: 'Brand & Content',   teamMembers: 12, activeProjects: 2, productivity: 88, attendance: 93 },
-  { id: 'TL-004', name: 'Priya Nair',   department: 'Marketing', teamName: 'Digital Campaigns', teamMembers: 10, activeProjects: 1, productivity: 92, attendance: 96 },
-  { id: 'TL-005', name: 'Vikram Desai', department: 'Sales',     teamName: 'Sales Strike Team', teamMembers: 14, activeProjects: 2, productivity: 86, attendance: 91 },
-  { id: 'TL-006', name: 'Meera Joshi',  department: 'HR',        teamName: 'People Ops',        teamMembers: 11, activeProjects: 2, productivity: 89, attendance: 94 },
-];
+const SEED_TEAM_LEADERS = [];
 
-const SEED_PMS = [
-  { id:'PM-001', empId:'EMP-201', name:'Rahul Sharma',  email:'rahul.sharma@enterprise.com',  phone:'+91-9876543210', department:'IT',        branch:'Head Office',   designation:'Senior Manager',  joiningDate:'2019-03-15', status:'Active',    activeProjects:14, teamLeaders:2, teamMembers:320, successRate:97, productivity:96, clientSatisfaction:9.8, projectIds:['PRJ-001','PRJ-002'], teamLeaderIds:['TL-001','TL-002'], departments:['IT','Engineering','QA'] },
-  { id:'PM-002', empId:'EMP-202', name:'Priya Verma',   email:'priya.verma@enterprise.com',   phone:'+91-9765432109', department:'Marketing', branch:'Branch Office', designation:'Manager',         joiningDate:'2020-07-01', status:'Active',    activeProjects:10, teamLeaders:2, teamMembers:180, successRate:95, productivity:94, clientSatisfaction:9.2, projectIds:['PRJ-003','PRJ-004'], teamLeaderIds:['TL-003','TL-004'], departments:['Marketing','Design'] },
-  { id:'PM-003', empId:'EMP-203', name:'Amit Singh',    email:'amit.singh@enterprise.com',    phone:'+91-9654321098', department:'Sales',     branch:'Head Office',   designation:'Manager',         joiningDate:'2021-01-12', status:'Active',    activeProjects:8,  teamLeaders:1, teamMembers:150, successRate:93, productivity:91, clientSatisfaction:8.7, projectIds:['PRJ-005'],            teamLeaderIds:['TL-005'],            departments:['Sales','Operations'] },
-  { id:'PM-004', empId:'EMP-204', name:'Neha Gupta',    email:'neha.gupta@enterprise.com',    phone:'+91-9543210987', department:'HR',        branch:'Head Office',   designation:'Junior Manager',  joiningDate:'2022-06-20', status:'Active',    activeProjects:6,  teamLeaders:1, teamMembers:120, successRate:91, productivity:90, clientSatisfaction:8.3, projectIds:['PRJ-006'],            teamLeaderIds:['TL-006'],            departments:['HR','Admin'] },
-  { id:'PM-005', empId:'EMP-205', name:'Kiran Mehta',   email:'kiran.mehta@enterprise.com',   phone:'+91-9432109876', department:'IT',        branch:'Agency',        designation:'Senior Manager',  joiningDate:'2018-09-05', status:'On Leave',  activeProjects:4,  teamLeaders:1, teamMembers:80,  successRate:88, productivity:85, clientSatisfaction:7.8, projectIds:['PRJ-007'],            teamLeaderIds:['TL-001'],            departments:['IT','Infrastructure'] },
-  { id:'PM-006', empId:'EMP-206', name:'Sunita Rao',    email:'sunita.rao@enterprise.com',    phone:'+91-9321098765', department:'HR',        branch:'Branch Office', designation:'Manager',         joiningDate:'2021-11-08', status:'Training',  activeProjects:5,  teamLeaders:1, teamMembers:100, successRate:89, productivity:87, clientSatisfaction:7.2, projectIds:['PRJ-008'],            teamLeaderIds:['TL-006'],            departments:['HR','Compliance'] },
-];
+const SEED_PMS = [];
 
-const SEED_APPROVALS = [
-  { id:'APR-001', type:'Task Completion Requests', pmId:'PM-001', description:'Mark SaaS Platform sprint 4 tasks as complete',            requester:'Rohan Verma',  submittedDate:'2026-06-03' },
-  { id:'APR-002', type:'Team Resource Requests',   pmId:'PM-001', description:'Request 2 additional backend developers for PRJ-001',       requester:'Sneha Patel',  submittedDate:'2026-06-02' },
-  { id:'APR-003', type:'Workflow Changes',         pmId:'PM-002', description:'Update campaign approval workflow to add QA gate',          requester:'Ankit Sharma', submittedDate:'2026-06-01' },
-  { id:'APR-004', type:'Project Extensions',       pmId:'PM-003', description:'Extend Sales Pipeline Automation deadline by 30 days',     requester:'Vikram Desai', submittedDate:'2026-05-31' },
-];
+const SEED_APPROVALS = [];
 
-const SEED_NOTIFICATIONS = [
-  { id:'NTF-001', color:'amber',  icon:'clock',     message:'SaaS Platform v3.0 deadline is 26 days away. Currently 72% complete.',         timestamp:'2 hours ago' },
-  { id:'NTF-002', color:'red',    icon:'alert',     message:'Sales Pipeline Automation budget exceeded by 15% (₹1.38M vs ₹1.2M estimated).', timestamp:'5 hours ago' },
-  { id:'NTF-003', color:'blue',   icon:'folder',    message:'New project "AI Analytics Module" has been assigned to Rahul Sharma.',           timestamp:'1 day ago'   },
-  { id:'NTF-004', color:'purple', icon:'chart',     message:'Q2 Performance Review is due for all Managers by June 30.',             timestamp:'2 days ago'  },
-  { id:'NTF-005', color:'green',  icon:'user_plus', message:'Team Leader Priya Nair has been added to the Marketing project team.',           timestamp:'3 days ago'  },
-];
+const SEED_NOTIFICATIONS = [];
 
-const SEED_ACTIVITIES = [
-  { id:'ACT-001', action:'New Project Assigned to Rahul Sharma',          actor:'Super Admin',   timestamp:'10 min ago', iconType:'folder'    },
-  { id:'ACT-002', action:'Budget Approved for SaaS Platform v3.0',        actor:'Finance Head',  timestamp:'1 hour ago', iconType:'check'     },
-  { id:'ACT-003', action:'Dev Team Alpha Added to PRJ-001',               actor:'Rahul Sharma',  timestamp:'3 hours ago',iconType:'users'     },
-  { id:'ACT-004', action:'Sprint 3 Milestone Completed Successfully',      actor:'Rohan Verma',   timestamp:'6 hours ago',iconType:'award'     },
-  { id:'ACT-005', action:'Client Meeting Scheduled for CRM Review',        actor:'Priya Verma',   timestamp:'1 day ago',  iconType:'calendar'  },
-  { id:'ACT-006', action:'Team Leader Meera Joshi Added to HR Digitization',actor:'Neha Gupta',  timestamp:'2 days ago', iconType:'user_plus' },
-  { id:'ACT-007', action:'Performance Review Completed for Kiran Mehta',   actor:'Super Admin',   timestamp:'3 days ago', iconType:'chart'     },
-  { id:'ACT-008', action:'Resource Request Approved for Marketing Team',   actor:'Admin',         timestamp:'4 days ago', iconType:'check'     },
-];
+const SEED_ACTIVITIES = [];
 
-/* ── Static chart data ──────────────────────────────────────────────── */
-const DELIVERY_DATA   = [{name:'Rahul S.',delivery:97},{name:'Priya V.',delivery:95},{name:'Amit S.',delivery:91},{name:'Neha G.',delivery:89},{name:'Kiran M.',delivery:85},{name:'Sunita R.',delivery:87}];
-const RADIAL_DATA     = [{name:'Dev Alpha',productivity:94,fill:'#8b5cf6'},{name:'Brand',productivity:88,fill:'#d946ef'},{name:'Sales',productivity:86,fill:'#3b82f6'},{name:'People',productivity:89,fill:'#10b981'}];
-const RESOURCE_DATA   = [{name:'Fully Utilized',value:45,color:'#10b981'},{name:'Under-utilized',value:30,color:'#3b82f6'},{name:'Overloaded',value:25,color:'#ef4444'}];
-const BUDGET_DATA     = [{project:'SaaS v3',estimated:28,actual:26.5},{project:'Marketing',estimated:15,actual:14.2},{project:'Sales Auto',estimated:12,actual:13.8},{project:'HR Digital',estimated:9,actual:8.7},{project:'Cloud',estimated:8,actual:7.9}];
-const DEADLINE_DATA   = [{name:'On Time',value:65,color:'#10b981'},{name:'Delayed',value:20,color:'#ef4444'},{name:'At Risk',value:15,color:'#f59e0b'}];
-const CSAT_DATA       = [{name:'Rahul S.',score:9.8},{name:'Priya V.',score:9.2},{name:'Amit S.',score:8.7},{name:'Neha G.',score:8.3},{name:'Sunita R.',score:7.2},{name:'Kiran M.',score:7.8}];
-const MONTHS_DATA     = [{month:'Jan',delivery:88,productivity:85},{month:'Feb',delivery:90,productivity:87},{month:'Mar',delivery:91,productivity:89},{month:'Apr',delivery:93,productivity:90},{month:'May',delivery:95,productivity:92},{month:'Jun',delivery:97,productivity:94}];
-const WEEKS_DATA      = Array.from({length:8},(_,i)=>({week:`W${i+1}`,completed:60+Math.floor(i*4+Math.random()*10),pending:25-Math.floor(i*2)}));
-const TASK_PIE_DATA   = [{name:'Completed',value:98},{name:'Pending',value:18},{name:'Overdue',value:8}];
+/* ── Static chart data moved dynamically inside the component ── */
 const TASK_PIE_COLORS = ['#10b981','#3b82f6','#ef4444'];
 
-const SAMPLE_TASKS = [
-  {id:'TSK-101',name:'API Gateway Setup',      project:'SaaS Platform v3.0', assignee:'Rohan Verma',  priority:'High',     due:'2026-06-10',status:'In Progress',progress:65},
-  {id:'TSK-102',name:'UI Redesign Sprint 2',   project:'Mobile App Redesign', assignee:'Sneha Patel',  priority:'Medium',   due:'2026-06-15',status:'To Do',       progress:20},
-  {id:'TSK-103',name:'Database Migration',     project:'SaaS Platform v3.0', assignee:'Rohan Verma',  priority:'Critical', due:'2026-06-05',status:'Overdue',     progress:45},
-];
+const SAMPLE_TASKS = [];
 
 
 const getPerfBadge    = s => s>=90?'success':s>=70?'warning':'danger';
@@ -548,15 +492,92 @@ const Managers = () => {
       e.team?.toLowerCase() === selectedTL.teamName?.toLowerCase()) &&
       e.status !== 'Inactive'
     );
-    if (deptEmployees.length > 0) {
-      return deptEmployees.slice(0, selectedTL.teamMembers || 5);
-    }
-    return [
-      { id: 'EMP-T1', name: 'Rakesh Goel', designation: 'Software Engineer', status: 'Active', productivityScore: 92, attendanceStatus: 'Present', workEmail: 'rakesh.goel@saas.io' },
-      { id: 'EMP-T2', name: 'Karan Malhotra', designation: 'QA Engineer', status: 'Active', productivityScore: 88, attendanceStatus: 'Present', workEmail: 'karan.malhotra@saas.io' },
-      { id: 'EMP-T3', name: 'Shreya Sengupta', designation: 'Designer', status: 'Active', productivityScore: 90, attendanceStatus: 'Present', workEmail: 'shreya.sengupta@saas.io' },
-    ];
+    return deptEmployees.slice(0, selectedTL.teamMembers || 5);
   }, [selectedTL, employees]);
+
+  /* ── Dynamic Chart Data ────────────────────────────────────────── */
+  const DELIVERY_DATA = useMemo(() => {
+    return pmList.map(pm => ({
+      name: pm.name.split(' ')[0],
+      delivery: pm.successRate
+    }));
+  }, [pmList]);
+
+  const RADIAL_DATA = useMemo(() => {
+    const colors = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
+    return teamLeaders.map((tl, i) => ({
+      name: tl.name.split(' ')[0],
+      productivity: tl.productivity,
+      fill: colors[i % colors.length]
+    }));
+  }, [teamLeaders]);
+
+  const RESOURCE_DATA = useMemo(() => {
+    const totalMembers = pmList.reduce((sum, pm) => sum + pm.teamMembers, 0);
+    const utilized = Math.round(totalMembers * 0.8) || 0;
+    const bench = totalMembers - utilized;
+    return [
+      { name: 'Utilized Capacity', value: utilized, color: '#3b82f6' },
+      { name: 'Available Bench', value: bench, color: '#10b981' }
+    ];
+  }, [pmList]);
+
+  const BUDGET_DATA = useMemo(() => {
+    return projects.slice(0, 10).map(proj => {
+      const est = proj.budget || 0;
+      const act = Math.round(est * (proj.progress || 0) / 100 * 10) / 10;
+      return {
+        project: proj.name.split(' ')[0],
+        estimated: est,
+        actual: act
+      };
+    });
+  }, [projects]);
+
+  const DEADLINE_DATA = useMemo(() => {
+    const completed = projects.filter(p => p.status === 'Completed').length;
+    const inProgress = projects.filter(p => p.status === 'In Progress').length;
+    const delayed = projects.filter(p => p.status === 'Delayed').length;
+    const planning = projects.filter(p => p.status === 'Planning').length;
+    const total = completed + inProgress + delayed + planning || 1;
+    return [
+      { name: 'On Time', value: Math.round((completed + inProgress + planning) / total * 100), color: '#10b981' },
+      { name: 'Delayed', value: Math.round(delayed / total * 100), color: '#ef4444' }
+    ];
+  }, [projects]);
+
+  const CSAT_DATA = useMemo(() => {
+    return pmList.map(pm => ({
+      name: pm.name.split(' ')[0],
+      score: pm.clientSatisfaction || 8.5
+    }));
+  }, [pmList]);
+
+  const MONTHS_DATA = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const baseDelivery = summary.rate || 85;
+    const baseProductivity = pmList.length > 0 ? Math.round(pmList.reduce((s,p)=>s+p.productivity,0)/pmList.length) : 80;
+    return months.map((m, idx) => ({
+      month: m,
+      delivery: Math.min(100, Math.max(70, baseDelivery - (5 - idx) * 2)),
+      productivity: Math.min(100, Math.max(70, baseProductivity - (5 - idx) * 1.5))
+    }));
+  }, [pmList, summary.rate]);
+
+  const WEEKS_DATA = useMemo(() => {
+    const weeks = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8'];
+    const completedTasksCount = taskStats.completed;
+    const pendingTasksCount = taskStats.pending;
+    return weeks.map((w, idx) => {
+      const completed = Math.round(completedTasksCount * (idx + 1) / 8);
+      const pending = Math.max(0, pendingTasksCount - Math.round(pendingTasksCount * (idx + 1) / 8));
+      return {
+        week: w,
+        completed,
+        pending
+      };
+    });
+  }, [taskStats]);
 
   const taskStats = useMemo(() => {
     const assigned = pmTasks.length;

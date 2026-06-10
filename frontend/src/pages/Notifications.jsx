@@ -195,12 +195,7 @@ const Notifications = () => {
   });
 
   // Audited Logs
-  const [logs, setLogs] = useState([
-    { id: 'LOG-001', timestamp: '2026-06-04 15:10', trigger: 'Manual Create Notification', recipient: 'All Employees', channel: 'Email + SMS', status: 'Success', response: 'SMTP OK, Nexmo Gateway Deliver' },
-    { id: 'LOG-002', timestamp: '2026-06-04 14:05', trigger: 'Database CPU Warning Rule', recipient: 'Sysadmin Group', channel: 'Push + Email', status: 'Success', response: 'GCM OK, SMTP OK' },
-    { id: 'LOG-003', timestamp: '2026-06-04 12:30', trigger: 'Task Overdue Alert Rule', recipient: 'Rahul Sharma', channel: 'Email', status: 'Success', response: 'SMTP OK' },
-    { id: 'LOG-004', timestamp: '2026-06-04 09:15', trigger: 'Nexmo API Authentication Sync', recipient: 'Integrations Team', channel: 'SMS', status: 'Failed', response: 'HTTP 401 Unauthorized API Key' }
-  ]);
+  const [logs, setLogs] = useState([]);
 
   // Computed / Filtered Notifications
   const filteredNotifications = useMemo(() => {
@@ -433,42 +428,109 @@ const Notifications = () => {
     }, 1200);
   };
 
-  // --- Recharts Mock Analytics Data ---
-  const trendsData = [
-    { name: 'Jan', sent: 85000, delivered: 84800, failed: 200 },
-    { name: 'Feb', sent: 92000, delivered: 91700, failed: 300 },
-    { name: 'Mar', sent: 110000, delivered: 109400, failed: 600 },
-    { name: 'Apr', sent: 105000, delivered: 104500, failed: 500 },
-    { name: 'May', sent: 121000, delivered: 120200, failed: 800 },
-    { name: 'Jun', sent: 125480, delivered: 124210, failed: 1270 }
-  ];
+  // --- Recharts Analytics Data ---
+  const trendsData = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonthIdx = new Date().getMonth();
+    const data = months.slice(0, currentMonthIdx + 1).map(m => ({ name: m, sent: 0, delivered: 0, failed: 0 }));
+    
+    notifications.forEach(n => {
+      if (!n.sentDate) return;
+      const date = new Date(n.sentDate);
+      const mIdx = date.getMonth();
+      if (mIdx <= currentMonthIdx) {
+        data[mIdx].sent += n.recipients || 1;
+        data[mIdx].delivered += n.delivered || 1;
+        data[mIdx].failed += n.failed || 0;
+      }
+    });
+    
+    const sumSent = data.reduce((sum, d) => sum + d.sent, 0);
+    if (sumSent === 0) {
+      return [
+        { name: 'Jan', sent: 10, delivered: 10, failed: 0 },
+        { name: 'Feb', sent: 20, delivered: 20, failed: 0 },
+        { name: 'Mar', sent: 30, delivered: 30, failed: 0 },
+        { name: 'Apr', sent: 40, delivered: 40, failed: 0 },
+        { name: 'May', sent: 50, delivered: 50, failed: 0 },
+        { name: 'Jun', sent: 60, delivered: 60, failed: 0 }
+      ];
+    }
+    return data;
+  }, [notifications]);
 
-  const deptData = [
-    { name: 'Engineering', count: 480 },
-    { name: 'Marketing', count: 320 },
-    { name: 'HR', count: 240 },
-    { name: 'Sales', count: 180 },
-    { name: 'Operations', count: 150 }
-  ];
+  const deptData = useMemo(() => {
+    const counts = {};
+    notifications.forEach(n => {
+      const dept = n.department || 'All';
+      counts[dept] = (counts[dept] || 0) + 1;
+    });
+    const results = Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    return results.length > 0 ? results : [
+      { name: 'Engineering', count: 5 },
+      { name: 'HR', count: 3 },
+      { name: 'Sales', count: 2 }
+    ];
+  }, [notifications]);
 
-  const branchData = [
-    { name: 'Head Office', count: 720 },
-    { name: 'Delhi Branch', count: 310 },
-    { name: 'Mumbai Agency', count: 180 },
-    { name: 'Jaipur Office', count: 120 }
-  ];
+  const branchData = useMemo(() => {
+    const counts = {};
+    notifications.forEach(n => {
+      const b = n.branch || 'Head Office';
+      counts[b] = (counts[b] || 0) + 1;
+    });
+    const results = Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    return results.length > 0 ? results : [
+      { name: 'Head Office', count: 8 },
+      { name: 'Branch Office', count: 2 }
+    ];
+  }, [notifications]);
 
-  const pieStatusData = [
-    { name: 'Delivered', value: 124210, fill: '#10b981' },
-    { name: 'Failed', value: 1228, fill: '#ef4444' },
-    { name: 'Scheduled', value: 42, fill: '#3b82f6' }
-  ];
+  const pieStatusData = useMemo(() => {
+    let delivered = 0;
+    let failed = 0;
+    let scheduled = 0;
+    
+    notifications.forEach(n => {
+      delivered += n.delivered || 0;
+      failed += n.failed || 0;
+      if (n.deliveryStatus === 'Scheduled') {
+        scheduled += n.recipients || 1;
+      }
+    });
+    
+    if (delivered === 0 && failed === 0 && scheduled === 0) {
+      return [
+        { name: 'Delivered', value: 1, fill: '#10b981' },
+        { name: 'Failed', value: 0, fill: '#ef4444' },
+        { name: 'Scheduled', value: 0, fill: '#3b82f6' }
+      ];
+    }
+    return [
+      { name: 'Delivered', value: delivered, fill: '#10b981' },
+      { name: 'Failed', value: failed, fill: '#ef4444' },
+      { name: 'Scheduled', value: scheduled, fill: '#3b82f6' }
+    ].filter(d => d.value > 0);
+  }, [notifications]);
 
-  // Gauge data showing 99.2% rate
-  const gaugeData = [
-    { name: 'Success Rate', value: 99.2, fill: '#10b981' },
-    { name: 'Failure Margin', value: 0.8, fill: '#ef4444' }
-  ];
+  const gaugeData = useMemo(() => {
+    let delivered = 0;
+    let failed = 0;
+    
+    notifications.forEach(n => {
+      delivered += n.delivered || 0;
+      failed += n.failed || 0;
+    });
+    
+    const total = delivered + failed;
+    const rate = total > 0 ? parseFloat(((delivered / total) * 100).toFixed(1)) : 100;
+    const margin = total > 0 ? parseFloat(((failed / total) * 100).toFixed(1)) : 0;
+    
+    return [
+      { name: 'Success Rate', value: rate, fill: '#10b981' },
+      { name: 'Failure Margin', value: margin, fill: '#ef4444' }
+    ];
+  }, [notifications]);
 
   const getPriorityStyle = (priority) => {
     switch (priority) {

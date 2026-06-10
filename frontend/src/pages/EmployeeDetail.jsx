@@ -296,7 +296,7 @@ const EmployeeDetail = () => {
 
       <div className="card ed-profile-card">
         <div className="ed-profile-left">
-          <Avatar name={emp.name} size="xl" />
+          <Avatar name={emp.name} size="xl" src={emp.avatar || emp.photoUrl} />
           <div className="ed-profile-info">
             <h1 className="ed-name">{emp.name}</h1>
             <p className="ed-designation">{emp.designation || emp.role}</p>
@@ -380,11 +380,11 @@ const EmployeeDetail = () => {
               ))}
               <div className="ed-field-card ed-field-full">
                 <span className="ed-field-label">Current Address</span>
-                <span className="ed-field-value">{emp.currentAddress || emp.homeAddress || '—'}</span>
+                <span className="ed-field-value">{typeof emp.currentAddress === 'object' && emp.currentAddress ? [emp.currentAddress.line1, emp.currentAddress.city, emp.currentAddress.state].filter(Boolean).join(', ') + (emp.currentAddress.pincode ? ` - ${emp.currentAddress.pincode}` : '') : (emp.currentAddress || emp.homeAddress || '—')}</span>
               </div>
               <div className="ed-field-card ed-field-full">
                 <span className="ed-field-label">Permanent Address</span>
-                <span className="ed-field-value">{emp.permanentAddress || emp.homeAddress || '—'}</span>
+                <span className="ed-field-value">{typeof emp.permanentAddress === 'object' && emp.permanentAddress ? [emp.permanentAddress.line1, emp.permanentAddress.city, emp.permanentAddress.state].filter(Boolean).join(', ') + (emp.permanentAddress.pincode ? ` - ${emp.permanentAddress.pincode}` : '') : (emp.permanentAddress || emp.homeAddress || '—')}</span>
               </div>
             </div>
 
@@ -890,7 +890,7 @@ const EmployeeDetail = () => {
                   <div className="id-card-company-title">{emp.companyName || 'OM ENTERPRISE'}</div>
                   <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Office Management'}</div>
                 </div>
-                <div className="id-card-photo-wrap"><Avatar name={emp.name} size="xl" className="id-card-photo-img" /></div>
+                <div className="id-card-photo-wrap"><Avatar name={emp.name} size="xl" className="id-card-photo-img" src={emp.avatar || emp.photoUrl} /></div>
                 <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(emp.name)}</h2><p className="id-card-emp-role">{emp.designation || emp.role}</p></div>
                 <div className="id-card-details-grid">
                   <div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.id}</div>

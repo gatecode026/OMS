@@ -9,35 +9,6 @@ import {
   Hash, ArrowUp, ArrowDown, CornerDownLeft
 } from 'lucide-react';
 
-const DEPARTMENTS = [
-  { id: 'D-1', name: 'Engineering', headCount: 8, head: 'Vikram Singh', branch: 'Delhi', color: '#6366f1' },
-  { id: 'D-2', name: 'Sales', headCount: 4, head: 'Rohit Sharma', branch: 'Delhi', color: '#f59e0b' },
-  { id: 'D-3', name: 'Marketing', headCount: 3, head: 'Priya Patel', branch: 'Mumbai', color: '#ec4899' },
-  { id: 'D-4', name: 'Human Resources', headCount: 3, head: 'Raj Mehta', branch: 'Jaipur', color: '#10b981' },
-  { id: 'D-5', name: 'Operations', headCount: 4, head: 'Balram Suman', branch: 'Jaipur', color: '#3b82f6' },
-];
-
-const BRANCHES = [
-  { id: 'BR-001', name: 'Jaipur HQ', country: 'India', flag: '🇮🇳', manager: 'Balram Suman', employeeCount: 3 },
-  { id: 'BR-002', name: 'Delhi Office', country: 'India', flag: '🇮🇳', manager: 'Vikram Singh', employeeCount: 12 },
-  { id: 'BR-003', name: 'Mumbai Office', country: 'India', flag: '🇮🇳', manager: 'Priya Patel', employeeCount: 4 },
-  { id: 'BR-004', name: 'Bangalore Office', country: 'India', flag: '🇮🇳', manager: 'Arjun Mehta', employeeCount: 3 },
-];
-
-const TEAMS = [
-  { id: 'T-1', name: 'Frontend Devs', dept: 'Engineering', leader: 'Ananya Gupta', count: 3 },
-  { id: 'T-2', name: 'Backend Core', dept: 'Engineering', leader: 'Sunita Rao', count: 2 },
-  { id: 'T-3', name: 'Data Services', dept: 'Engineering', leader: 'Arjun Mehta', count: 2 },
-  { id: 'T-4', name: 'Mobile Dev', dept: 'Engineering', leader: 'Rahul Jain', count: 2 },
-  { id: 'T-5', name: 'Cloud Infra', dept: 'Engineering', leader: 'Amit Bose', count: 1 },
-  { id: 'T-6', name: 'QA Team', dept: 'Engineering', leader: 'Kavita Singh', count: 1 },
-  { id: 'T-7', name: 'Domestic Sales', dept: 'Sales', leader: 'Rohit Sharma', count: 3 },
-  { id: 'T-8', name: 'Enterprise Sales', dept: 'Sales', leader: 'Rohit Sharma', count: 1 },
-  { id: 'T-9', name: 'UK Sales', dept: 'Sales', leader: 'Naveen Saxena', count: 1 },
-  { id: 'T-10', name: 'Digital Marketing', dept: 'Marketing', leader: 'Priya Patel', count: 2 },
-  { id: 'T-11', name: 'HR Operations', dept: 'Human Resources', leader: 'Raj Mehta', count: 2 },
-  { id: 'T-12', name: 'Operations Core', dept: 'Operations', leader: 'Balram Suman', count: 2 },
-];
 
 const PAGES = [
   { name: 'Dashboard', path: '/', icon: 'hash', desc: 'Analytics & KPI overview' },
@@ -68,7 +39,7 @@ const CATEGORY_META = {
 
 const GlobalSearch = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { employees, tasks, leaveRequests, roles } = useApp();
+  const { employees, departments, branches, teams, tasks, leaveRequests, roles } = useApp();
 
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -109,16 +80,16 @@ const GlobalSearch = ({ isOpen, onClose }) => {
         match(e.role) || match(e.team)
       ).slice(0, 6),
 
-      departments: DEPARTMENTS.filter(d =>
+      departments: departments.filter(d =>
         match(d.name) || match(d.head) || match(d.branch)
       ).slice(0, 4),
 
-      branches: BRANCHES.filter(b =>
+      branches: branches.filter(b =>
         match(b.name) || match(b.country) || match(b.manager)
       ).slice(0, 4),
 
-      teams: TEAMS.filter(t =>
-        match(t.name) || match(t.dept) || match(t.leader)
+      teams: teams.filter(t =>
+        match(t.name) || match(t.dept || t.department) || match(t.leader || t.teamLeader)
       ).slice(0, 4),
 
       tasks: tasks.filter(t =>
@@ -212,7 +183,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
       case 'employees':
         return (
           <div key={item.id} className={base} data-idx={globalIdx} onClick={() => handleSelect(cat, item)}>
-            <Avatar name={item.name} size="sm" />
+            <Avatar name={item.name} size="sm" src={item.avatar || item.photoUrl} />
             <div className="gs-item-info">
               <span className="gs-item-primary">{item.name}</span>
               <span className="gs-item-secondary">{item.designation} · {item.department} · {item.branch}</span>

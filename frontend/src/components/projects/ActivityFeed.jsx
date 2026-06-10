@@ -107,71 +107,11 @@ const ActivityFeed = () => {
       });
     }
 
-    // Add mock activities as fallbacks to keep feed rich
-    const mockFeed = [
-      {
-        id: 'act-1',
-        description: 'SaaS Platform v2.0 updated to 75%',
-        timestamp: '10 minutes ago',
-        department: 'IT',
-        type: 'progress',
-        dateObj: new Date(Date.now() - 600000)
-      },
-      {
-        id: 'act-2',
-        description: 'Marketing Campaign milestone completed',
-        timestamp: '1 hour ago',
-        department: 'Marketing',
-        type: 'milestone',
-        dateObj: new Date(Date.now() - 3600000)
-      },
-      {
-        id: 'act-3',
-        description: 'New task assigned to Rahul Sharma',
-        timestamp: '3 hours ago',
-        department: 'HR',
-        type: 'task',
-        dateObj: new Date(Date.now() - 10800000)
-      },
-      {
-        id: 'act-4',
-        description: 'Project Alpha deadline updated',
-        timestamp: '5 hours ago',
-        department: 'Sales',
-        type: 'date',
-        dateObj: new Date(Date.now() - 18000000)
-      },
-      {
-        id: 'act-5',
-        description: 'Budget adjustments approved by Admin',
-        timestamp: '1 day ago',
-        department: 'Sales',
-        type: 'budget',
-        dateObj: new Date(Date.now() - 86400000)
-      },
-      {
-        id: 'act-6',
-        description: 'Critical issue reported on Database Core',
-        timestamp: '2 days ago',
-        department: 'IT',
-        type: 'warning',
-        dateObj: new Date(Date.now() - 172800000)
-      }
-    ];
-
-    // Combine lists, filtering duplicates by description
-    const merged = [...list];
-    mockFeed.forEach(mockAct => {
-      if (!merged.some(item => item.description === mockAct.description)) {
-        merged.push(mockAct);
-      }
-    });
-
     // Sort by dateObj descending
-    merged.sort((a, b) => b.dateObj - a.dateObj);
+    list.sort((a, b) => b.dateObj - a.dateObj);
 
     // Limit to top 8 items
-    return merged.slice(0, 8);
+    return list.slice(0, 8);
   }, [projectsList]);
 
   const getActivityIcon = (type) => {

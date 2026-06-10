@@ -246,10 +246,10 @@ const SystemSettings = () => {
   const [branches, setBranches] = useState(() => {
     const savedData = localStorage.getItem('saas_branches_config');
     return savedData ? JSON.parse(savedData) : [
-      { code: 'BR-DEL', name: 'Delhi Head Office', manager: 'Balram Suman', status: 'Active' },
-      { code: 'BR-MUM', name: 'Mumbai Branch', manager: 'Priya Patel', status: 'Active' },
-      { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: 'Vikram Singh', status: 'Active' },
-      { code: 'BR-JPR', name: 'Jaipur Operations', manager: 'Kabir Mehta', status: 'Active' }
+      { code: 'BR-DEL', name: 'Delhi Head Office', manager: '', status: 'Active' },
+      { code: 'BR-MUM', name: 'Mumbai Branch', manager: '', status: 'Active' },
+      { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: '', status: 'Active' },
+      { code: 'BR-JPR', name: 'Jaipur Operations', manager: '', status: 'Active' }
     ];
   });
   const [newBranch, setNewBranch] = useState({ code: '', name: '', manager: '', status: 'Active' });
@@ -258,11 +258,11 @@ const SystemSettings = () => {
   const [departments, setDepartments] = useState(() => {
     const savedData = localStorage.getItem('saas_depts_config');
     return savedData ? JSON.parse(savedData) : [
-      { id: '1', name: 'Engineering', head: 'Vikram Singh', capacity: 150 },
-      { id: '2', name: 'Human Resources', head: 'Neha Verma', capacity: 30 },
-      { id: '3', name: 'Sales & Marketing', head: 'Rohit Sharma', capacity: 80 },
-      { id: '4', name: 'Operations', head: 'Balram Suman', capacity: 120 },
-      { id: '5', name: 'Finance', head: 'Suresh Kumar', capacity: 25 }
+      { id: '1', name: 'Engineering', head: '', capacity: 150 },
+      { id: '2', name: 'Human Resources', head: '', capacity: 30 },
+      { id: '3', name: 'Sales & Marketing', head: '', capacity: 80 },
+      { id: '4', name: 'Operations', head: '', capacity: 120 },
+      { id: '5', name: 'Finance', head: '', capacity: 25 }
     ];
   });
   const [newDept, setNewDept] = useState({ name: '', head: '', capacity: 50 });
@@ -466,17 +466,17 @@ const SystemSettings = () => {
         postalCode: '122008'
       });
       setBranches([
-        { code: 'BR-DEL', name: 'Delhi Head Office', manager: 'Balram Suman', status: 'Active' },
-        { code: 'BR-MUM', name: 'Mumbai Branch', manager: 'Priya Patel', status: 'Active' },
-        { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: 'Vikram Singh', status: 'Active' },
-        { code: 'BR-JPR', name: 'Jaipur Operations', manager: 'Kabir Mehta', status: 'Active' }
+        { code: 'BR-DEL', name: 'Delhi Head Office', manager: '', status: 'Active' },
+        { code: 'BR-MUM', name: 'Mumbai Branch', manager: '', status: 'Active' },
+        { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: '', status: 'Active' },
+        { code: 'BR-JPR', name: 'Jaipur Operations', manager: '', status: 'Active' }
       ]);
       setDepartments([
-        { id: '1', name: 'Engineering', head: 'Vikram Singh', capacity: 150 },
-        { id: '2', name: 'Human Resources', head: 'Neha Verma', capacity: 30 },
-        { id: '3', name: 'Sales & Marketing', head: 'Rohit Sharma', capacity: 80 },
-        { id: '4', name: 'Operations', head: 'Balram Suman', capacity: 120 },
-        { id: '5', name: 'Finance', head: 'Suresh Kumar', capacity: 25 }
+        { id: '1', name: 'Engineering', head: '', capacity: 150 },
+        { id: '2', name: 'Human Resources', head: '', capacity: 30 },
+        { id: '3', name: 'Sales & Marketing', head: '', capacity: 80 },
+        { id: '4', name: 'Operations', head: '', capacity: 120 },
+        { id: '5', name: 'Finance', head: '', capacity: 25 }
       ]);
       
       const defaultGeneral = {

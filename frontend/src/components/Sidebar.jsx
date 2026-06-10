@@ -454,7 +454,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
         {currentUserRole === 'employee' && !effectiveCollapsed && (
           <div className="sidebar-employee-footer-row">
             <Link to="/my-profile" className="sidebar-footer-avatar-wrapper" title="View Profile">
-              <Avatar name={currentUser?.name} className="emp-footer-avatar" size="md" />
+              <Avatar name={currentUser?.name} className="emp-footer-avatar" size="md" src={currentUser?.avatar || currentUser?.photoUrl} />
             </Link>
             <button className="sidebar-footer-logout-btn" onClick={handleLogout} title="Logout">
               <LogOut size={16} />
