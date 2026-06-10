@@ -1659,156 +1659,145 @@ const Employees = () => {
             </div>
           </div>
 
-          {paginated.length === 0 && !isLoading ? (
-            <div className="empty-state-wrapper">
-              <Users size={48} className="empty-icon" />
-              <p className="empty-title">No employees found</p>
-              <span className="empty-desc">Try clearing filters or search for another term.</span>
-              <Button variant="secondary" onClick={handleClearFilters} icon={RefreshCw} style={{ marginTop: 'var(--spacing-2)' }}>
-                Reset Filters
-              </Button>
-            </div>
-          ) : (
-            <div className="emp-table-scroll">
-              <table className="emp-table">
-                <thead>
+          <div className="emp-table-scroll">
+            <table className="emp-table">
+              <thead>
+                <tr>
+                  <th className="col-checkbox">
+                    <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+                  </th>
+                  {colVis.name && renderTH("name", FIELD_LABELS.name, true)}
+                  {colVis.id && renderTH("id", FIELD_LABELS.id, true)}
+                  {colVis.designation && renderTH("designation", FIELD_LABELS.designation, true)}
+                  {colVis.department && renderTH("department", FIELD_LABELS.department, true)}
+                  {colVis.branch && renderTH("branch", FIELD_LABELS.branch, true)}
+                  {colVis.teamLeader && renderTH("teamLeader", FIELD_LABELS.teamLeader, true)}
+                  {colVis.projectManager && renderTH("projectManager", FIELD_LABELS.projectManager, true)}
+                  {colVis.phone && renderTH("phone", FIELD_LABELS.phone, true)}
+                  {colVis.workEmail && renderTH("workEmail", FIELD_LABELS.officialEmail, true)}
+                  {colVis.joinDate && renderTH("joinDate", FIELD_LABELS.joinDate, true, { minWidth: 140 })}
+                  {colVis.employeeType && renderTH("employeeType", FIELD_LABELS.employeeType, true)}
+                  {colVis.shift && renderTH("shift", FIELD_LABELS.shiftTiming, true)}
+                  {colVis.experience && renderTH("experience", FIELD_LABELS.experience, true)}
+                  {colVis.lastLogin && <th>Last Login</th>}
+                  {colVis.currentProjects && renderTH("currentProjects", "Projects", true)}
+                  {colVis.leaveBalance && renderTH("leaveBalance", "Leave Bal", true)}
+                  {colVis.productivityScore && renderTH("productivityScore", "Productivity", true)}
+                  {colVis.performanceRating && renderTH("performanceRating", "Rating", true)}
+                  {colVis.todayPunchIn && renderTH("todayPunchIn", FIELD_LABELS.punchInTime, true)}
+                  {colVis.todayPunchOut && renderTH("todayPunchOut", FIELD_LABELS.punchOutTime, true)}
+                  {colVis.todayWorkingHours && renderTH("todayWorkingHours", FIELD_LABELS.workingHours, true)}
+                  {colVis.attendanceStatus && renderTH("attendanceStatus", FIELD_LABELS.attendanceStatus, true)}
+                  {colVis.lastSeen && renderTH("lastSeen", "Last Seen", true)}
+                  {colVis.workStatus && renderTH("workStatus", "Work Status", true)}
+                  {colVis.accountStatus && renderTH("accountStatus", FIELD_LABELS.employmentStatus, true)}
+                  <th className="col-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: 15 }).map((_, j) => (
+                        <td key={j}><Skeleton width="80%" height="14px" /></td>
+                      ))}
+                    </tr>
+                  ))
+                ) : paginated.length === 0 ? (
                   <tr>
-                    <th className="col-checkbox">
-                      <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
-                    </th>
-                    {colVis.name && renderTH("name", FIELD_LABELS.name, true)}
-                    {colVis.id && renderTH("id", FIELD_LABELS.id, true)}
-                    {colVis.designation && renderTH("designation", FIELD_LABELS.designation, true)}
-                    {colVis.department && renderTH("department", FIELD_LABELS.department, true)}
-                    {colVis.branch && renderTH("branch", FIELD_LABELS.branch, true)}
-                    {colVis.teamLeader && renderTH("teamLeader", FIELD_LABELS.teamLeader, true)}
-                    {colVis.projectManager && renderTH("projectManager", FIELD_LABELS.projectManager, true)}
-                    {colVis.phone && renderTH("phone", FIELD_LABELS.phone, true)}
-                    {colVis.workEmail && renderTH("workEmail", FIELD_LABELS.officialEmail, true)}
-                    {colVis.joinDate && renderTH("joinDate", FIELD_LABELS.joinDate, true, { minWidth: 140 })}
-                    {colVis.employeeType && renderTH("employeeType", FIELD_LABELS.employeeType, true)}
-                    {colVis.shift && renderTH("shift", FIELD_LABELS.shiftTiming, true)}
-                    {colVis.experience && renderTH("experience", FIELD_LABELS.experience, true)}
-                    {colVis.lastLogin && <th>Last Login</th>}
-                    {colVis.currentProjects && renderTH("currentProjects", "Projects", true)}
-                    {colVis.leaveBalance && renderTH("leaveBalance", "Leave Bal", true)}
-                    {colVis.productivityScore && renderTH("productivityScore", "Productivity", true)}
-                    {colVis.performanceRating && renderTH("performanceRating", "Rating", true)}
-                    {colVis.todayPunchIn && renderTH("todayPunchIn", FIELD_LABELS.punchInTime, true)}
-                    {colVis.todayPunchOut && renderTH("todayPunchOut", FIELD_LABELS.punchOutTime, true)}
-                    {colVis.todayWorkingHours && renderTH("todayWorkingHours", FIELD_LABELS.workingHours, true)}
-                    {colVis.attendanceStatus && renderTH("attendanceStatus", FIELD_LABELS.attendanceStatus, true)}
-                    {colVis.lastSeen && renderTH("lastSeen", "Last Seen", true)}
-                    {colVis.workStatus && renderTH("workStatus", "Work Status", true)}
-                    {colVis.accountStatus && renderTH("accountStatus", FIELD_LABELS.employmentStatus, true)}
-                    <th className="col-actions">Actions</th>
+                    <td colSpan={16} className="empty-table-cell">
+                      <div className="empty-table-msg">
+                        <Users size={36} className="empty-icon" />
+                        <p>No employees found</p>
+                        <span>Try clearing filters or search for another term.</span>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    Array.from({ length: 8 }).map((_, i) => (
-                      <tr key={i}>
-                        {Array.from({ length: 15 }).map((_, j) => (
-                          <td key={j}><Skeleton width="80%" height="14px" /></td>
-                        ))}
-                      </tr>
-                    ))
-                  ) : paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={16} className="empty-table-cell">
-                        <div className="empty-table-msg">
-                          <Users size={36} className="empty-icon" />
-                          <p>No employees found</p>
-                          <span>Try clearing filters or search for another term.</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : paginated.map(row => (
-                    <tr key={row.id}
-                      className={`emp-row${selectedIds.has(row.id) ? ' row-selected' : ''}${row.accountStatus === 'Suspended' ? ' row-suspended' : ''}`}>
-                      <td className="col-checkbox">
-                        <input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
-                      </td>
-                      {colVis.name && (
-                        <td>
-                          <div className="emp-name-cell">
-                            <span className="emp-avatar-trigger" onClick={e => openPreview(e, row)}>
-                              <Avatar name={row.name} size="sm" src={row.avatar || row.photoUrl || ''} />
+                ) : paginated.map(row => (
+                  <tr key={row.id}
+                    className={`emp-row${selectedIds.has(row.id) ? ' row-selected' : ''}${row.accountStatus === 'Suspended' ? ' row-suspended' : ''}`}>
+                    <td className="col-checkbox">
+                      <input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
+                    </td>
+                    {colVis.name && (
+                      <td>
+                        <div className="emp-name-cell">
+                          <span className="emp-avatar-trigger" onClick={e => openPreview(e, row)}>
+                            <Avatar name={row.name} size="sm" src={row.avatar || row.photoUrl} />
+                          </span>
+                          <div className="employee-info-cell">
+                            <span
+                              className="emp-name-bold emp-name-clickable"
+                              onClick={e => openPreview(e, row)}
+                              onMouseEnter={e => handleNameMouseEnter(e, row)}
+                              onMouseLeave={handleNameMouseLeave}
+                            >
+                              {row.name}
                             </span>
-                            <div className="employee-info-cell">
-                              <span
-                                className="emp-name-bold emp-name-clickable"
-                                onClick={e => openPreview(e, row)}
-                                onMouseEnter={e => handleNameMouseEnter(e, row)}
-                                onMouseLeave={handleNameMouseLeave}
-                              >
-                                {row.name}
-                              </span>
-                              <span className="emp-email-sub">{row.workEmail || row.email}</span>
-                            </div>
+                            <span className="emp-email-sub">{row.workEmail || row.email}</span>
                           </div>
-                        </td>
-                      )}
-                      {colVis.id && <td><span className="emp-id-mono">{row.id}</span></td>}
-                      {colVis.designation && <td><span className="text-secondary-sm">{row.designation || row.role}</span></td>}
-                      {colVis.department && <td><span className="dept-text">{row.department}</span></td>}
-                      {colVis.branch && <td><span className="text-secondary-sm">{row.branch}</span></td>}
-                      {colVis.teamLeader && <td><span className="text-secondary-sm">{row.teamLeader || '—'}</span></td>}
-                      {colVis.projectManager && <td><span className="text-secondary-sm">{row.projectManager || '—'}</span></td>}
-                      {colVis.phone && <td><CopyCell value={row.phone} icon={Phone} /></td>}
-                      {colVis.workEmail && <td><CopyCell value={row.workEmail || row.email} icon={Mail} truncate={22} underline /></td>}
-                      {colVis.joinDate && (
-                        <td>
-                          <div className="join-date-cell">
-                            <Calendar size={12} className="copy-cell-icon" />
-                            <span className="text-secondary-sm">{fmtJoinDate(row.joinDate)}</span>
-                            {isNewJoiner(row.joinDate) && <span className="new-joiner-badge">New</span>}
-                          </div>
-                        </td>
-                      )}
-                      {colVis.employeeType && <td><span className="text-secondary-sm">{row.employeeType || 'Full Time'}</span></td>}
-                      {colVis.shift && <td><span className="text-secondary-sm">{row.shift || '09:00 AM - 06:00 PM'}</span></td>}
-                      {colVis.experience && <td><span className="text-secondary-sm">{row.experience || '2.4 Yrs'}</span></td>}
-                      {colVis.lastLogin && <td><span className="text-secondary-sm" style={{ fontSize: '0.75rem' }}>{row.securityInfo?.lastLogin || '—'}</span></td>}
-                      {colVis.currentProjects && <td><span className="bold-text font-mono text-primary" style={{ paddingLeft: '8px' }}>{row.currentProjectsCount || 0}</span></td>}
-                      {colVis.leaveBalance && <td><span className="bold-text font-mono text-warning">{row.leaveBalance || 18} days</span></td>}
-                      {colVis.productivityScore && <td><span className="bold-text font-mono text-success" style={{ fontWeight: 600 }}>{row.productivityScore || 85}%</span></td>}
-                      {colVis.performanceRating && <td><Badge variant={(row.performanceRating || 90) >= 90 ? 'success' : (row.performanceRating || 90) >= 75 ? 'primary' : 'warning'}>{row.performanceRating || 90}</Badge></td>}
-                      {colVis.todayPunchIn && <td><span className="punch-time-mono">{row.todayPunchIn || '--:--'}</span></td>}
-                      {colVis.todayPunchOut && <td><span className="punch-time-mono">{row.todayPunchOut || '--:--'}</span></td>}
-                      {colVis.todayWorkingHours && <td><span className="bold-text font-mono text-secondary">{row.todayWorkingHours ? `${row.todayWorkingHours} hrs` : '0 hrs'}</span></td>}
-                      {colVis.attendanceStatus && <td><AttBadge status={row.attendanceStatus} /></td>}
-                      {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '—'}</span></td>}
-                      {colVis.workStatus && <td><WorkStatusDot status={row.workStatus} /></td>}
-                      {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
-                      <td className="col-actions">
-                        <div className="table-actions-cell">
-                          <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employees/${row.id}`); }} title="View Full Profile">
-                            <Eye size={16} />
-                          </button>
-                          <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`?edit=${row.id}`); }} title="Edit">
-                            <Edit2 size={16} />
-                          </button>
-                          <button className="table-action-icon-btn action-idcard-btn" onClick={(e) => { e.stopPropagation(); setIdCardEmployee(row); setShowIdCard(true); }} title="ID Card">
-                            <CreditCard size={16} />
-                          </button>
-                          {row.status === 'Inactive' ? (
-                            <button className="table-action-icon-btn action-activate-btn" onClick={(e) => { e.stopPropagation(); handleActivate(row.id, row.name); }} title="Activate">
-                              <CheckCircle size={16} />
-                            </button>
-                          ) : (
-                            <button className="table-action-icon-btn action-deactivate-btn" onClick={(e) => { e.stopPropagation(); handleDeactivate(row.id, row.name); }} title="Deactivate">
-                              <Trash2 size={16} />
-                            </button>
-                          )}
                         </div>
                       </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    )}
+                    {colVis.id && <td><span className="emp-id-mono">{row.id}</span></td>}
+                    {colVis.designation && <td><span className="text-secondary-sm">{row.designation || row.role}</span></td>}
+                    {colVis.department && <td><span className="dept-text">{row.department}</span></td>}
+                    {colVis.branch && <td><span className="text-secondary-sm">{row.branch}</span></td>}
+                    {colVis.teamLeader && <td><span className="text-secondary-sm">{row.teamLeader || '—'}</span></td>}
+                    {colVis.projectManager && <td><span className="text-secondary-sm">{row.projectManager || '—'}</span></td>}
+                    {colVis.phone && <td><CopyCell value={row.phone} icon={Phone} /></td>}
+                    {colVis.workEmail && <td><CopyCell value={row.workEmail || row.email} icon={Mail} truncate={22} underline /></td>}
+                    {colVis.joinDate && (
+                      <td>
+                        <div className="join-date-cell">
+                          <Calendar size={12} className="copy-cell-icon" />
+                          <span className="text-secondary-sm">{fmtJoinDate(row.joinDate)}</span>
+                          {isNewJoiner(row.joinDate) && <span className="new-joiner-badge">New</span>}
+                        </div>
+                      </td>
+                    )}
+                    {colVis.employeeType && <td><span className="text-secondary-sm">{row.employeeType || 'Full Time'}</span></td>}
+                    {colVis.shift && <td><span className="text-secondary-sm">{row.shift || '09:00 AM - 06:00 PM'}</span></td>}
+                    {colVis.experience && <td><span className="text-secondary-sm">{row.experience || '2.4 Yrs'}</span></td>}
+                    {colVis.lastLogin && <td><span className="text-secondary-sm" style={{ fontSize: '0.75rem' }}>{row.securityInfo?.lastLogin || '—'}</span></td>}
+                    {colVis.currentProjects && <td><span className="bold-text font-mono text-primary" style={{ paddingLeft: '8px' }}>{row.currentProjectsCount || 0}</span></td>}
+                    {colVis.leaveBalance && <td><span className="bold-text font-mono text-warning">{row.leaveBalance || 18} days</span></td>}
+                    {colVis.productivityScore && <td><span className="bold-text font-mono text-success" style={{ fontWeight: 600 }}>{row.productivityScore || 85}%</span></td>}
+                    {colVis.performanceRating && <td><Badge variant={(row.performanceRating || 90) >= 90 ? 'success' : (row.performanceRating || 90) >= 75 ? 'primary' : 'warning'}>{row.performanceRating || 90}</Badge></td>}
+                    {colVis.todayPunchIn && <td><span className="punch-time-mono">{row.todayPunchIn || '--:--'}</span></td>}
+                    {colVis.todayPunchOut && <td><span className="punch-time-mono">{row.todayPunchOut || '--:--'}</span></td>}
+                    {colVis.todayWorkingHours && <td><span className="bold-text font-mono text-secondary">{row.todayWorkingHours ? `${row.todayWorkingHours} hrs` : '0 hrs'}</span></td>}
+                    {colVis.attendanceStatus && <td><AttBadge status={row.attendanceStatus} /></td>}
+                    {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '—'}</span></td>}
+                    {colVis.workStatus && <td><WorkStatusDot status={row.workStatus} /></td>}
+                    {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
+                    <td className="col-actions">
+                      <div className="table-actions-cell">
+                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employees/${row.id}`); }} title="View Full Profile">
+                          <Eye size={16} />
+                        </button>
+                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`?edit=${row.id}`); }} title="Edit">
+                          <Edit2 size={16} />
+                        </button>
+                        <button className="table-action-icon-btn action-idcard-btn" onClick={(e) => { e.stopPropagation(); setIdCardEmployee(row); setShowIdCard(true); }} title="ID Card">
+                          <CreditCard size={16} />
+                        </button>
+                        {row.status === 'Inactive' ? (
+                          <button className="table-action-icon-btn action-activate-btn" onClick={(e) => { e.stopPropagation(); handleActivate(row.id, row.name); }} title="Activate">
+                            <CheckCircle size={16} />
+                          </button>
+                        ) : (
+                          <button className="table-action-icon-btn action-deactivate-btn" onClick={(e) => { e.stopPropagation(); handleDeactivate(row.id, row.name); }} title="Deactivate">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {!isLoading && filteredEmployees.length > pageSize && (
             <div className="emp-pagination">
