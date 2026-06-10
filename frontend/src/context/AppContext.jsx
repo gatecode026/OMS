@@ -176,7 +176,7 @@ export const AppProvider = ({ children }) => {
               { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
               { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
               { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 4, role: 'Super Admin Approval', approver: 'Super Admin', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
+              { level: 4, role: 'Super Admin Approval', approver: 'Balram Suman', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
             ],
             activityLog: t.activityLog || [
               { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
@@ -2759,7 +2759,7 @@ export const AppProvider = ({ children }) => {
         { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
         { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
         { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 4, role: 'Super Admin Approval', approver: 'Super Admin', status: 'Pending', timestamp: '', remarks: '' }
+        { level: 4, role: 'Super Admin Approval', approver: 'Balram Suman', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }

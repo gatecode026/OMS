@@ -2106,11 +2106,11 @@ const SystemSettings = () => {
                   </thead>
                   <tbody>
                     {[
-                      { time: 'Today, 10:30 AM', user: currentUser?.name || 'Super Admin', action: 'Modified Overtime Multiplier to 1.5x', scope: 'Payroll Settings', status: 'Success' },
-                      { time: 'Today, 09:15 AM', user: currentUser?.name || 'Super Admin', action: 'Authorized Twilio SMS Gateway URL', scope: 'SMS Config', status: 'Success' },
+                      { time: 'Today, 10:30 AM', user: 'Balram Suman', action: 'Modified Overtime Multiplier to 1.5x', scope: 'Payroll Settings', status: 'Success' },
+                      { time: 'Today, 09:15 AM', user: 'Balram Suman', action: 'Authorized Twilio SMS Gateway URL', scope: 'SMS Config', status: 'Success' },
                       { time: 'Yesterday, 04:22 PM', user: 'Neha Verma', action: 'Updated Leaves Quota Balances', scope: 'Leave Policies', status: 'Success' },
                       { time: 'Yesterday, 02:00 AM', user: 'SYSTEM Scheduler', action: 'Database Auto-Backup completed', scope: 'System Backup', status: 'Success' },
-                      { time: '03-Jun-2026, 11:00 AM', user: currentUser?.name || 'Super Admin', action: 'Added New Branch (Jaipur Operations)', scope: 'Branch Config', status: 'Success' }
+                      { time: '03-Jun-2026, 11:00 AM', user: 'Balram Suman', action: 'Added New Branch (Jaipur Operations)', scope: 'Branch Config', status: 'Success' }
                     ].map((row, idx) => (
                       <tr key={idx}>
                         <td><span className="text-muted font-mono">{row.time}</span></td>

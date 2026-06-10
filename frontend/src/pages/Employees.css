@@ -103,7 +103,7 @@
   gap: var(--spacing-4); flex-wrap: wrap;
 }
 .bulk-bar-visible {
-  max-height: 64px; opacity: 1;
+  max-height: 150px; opacity: 1;
   padding: var(--spacing-3) var(--spacing-4);
 }
 .bulk-bar-left  { display: flex; align-items: center; gap: 10px; }
