@@ -1530,11 +1530,13 @@ const Branches = () => {
           const Icon = s.icon;
           return (
             <div key={i} className="branches-sum-card card">
-              <div className="branches-sum-icon" style={{ background: `${s.color}20`, color: s.color }}>
-                <Icon size={20} />
-              </div>
-              <div>
+              <div className="branches-sum-card-header">
+                <div className="branches-sum-icon" style={{ background: `${s.color}20`, color: s.color }}>
+                  <Icon size={20} />
+                </div>
                 <p className="branches-sum-val">{s.value}</p>
+              </div>
+              <div className="branches-sum-card-body">
                 <p className="branches-sum-label">{s.label}</p>
                 <p className="branches-sum-sub">{s.sub}</p>
               </div>
