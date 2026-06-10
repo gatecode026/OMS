@@ -65,7 +65,7 @@ const TeamLeaders = () => {
           team: ledTeam ? ledTeam.name : (emp.team || 'Unassigned Team'),
           teamId: ledTeam ? ledTeam.id : null,
           dept: emp.department || 'IT',
-          exp: emp.experience || '6 years track',
+          exp: emp.experience || '—',
           score: emp.productivityScore || 90
         };
       });
@@ -418,7 +418,7 @@ const TeamLeaders = () => {
             <label className="leaders-filter-label">Leader Name *</label>
             <input
               type="text"
-              placeholder="e.g. Rahul Sharma"
+              placeholder="Enter team leader name"
               style={{ padding: '8px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', outline: 'none' }}
               value={newLeader.name}
               onChange={e => setNewLeader(prev => ({ ...prev, name: e.target.value }))}
@@ -429,7 +429,7 @@ const TeamLeaders = () => {
             <label className="leaders-filter-label">Assigned Team *</label>
             <input
               type="text"
-              placeholder="e.g. Sales Team B"
+              placeholder="Enter team name"
               style={{ padding: '8px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', outline: 'none' }}
               value={newLeader.team}
               onChange={e => setNewLeader(prev => ({ ...prev, team: e.target.value }))}
@@ -455,7 +455,7 @@ const TeamLeaders = () => {
             <label className="leaders-filter-label">Experience Track *</label>
             <input
               type="text"
-              placeholder="e.g. 5 years execution track"
+              placeholder="Enter experience details (e.g. 5 years)"
               style={{ padding: '8px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', outline: 'none' }}
               value={newLeader.exp}
               onChange={e => setNewLeader(prev => ({ ...prev, exp: e.target.value }))}

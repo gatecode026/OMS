@@ -21,67 +21,88 @@ import {
 // SECTION 2 - 8 initial sample rows
 const initialTeams = [];
 
-// Recharts Chart Mock Data
-const productivityChartData = [
-  { name: 'IT', productivity: 96 },
-  { name: 'Sales', productivity: 94 },
-  { name: 'Marketing', productivity: 92 },
-  { name: 'HR', productivity: 91 },
-  { name: 'Operations', productivity: 89 }
-];
-
-const statusChartData = [
-  { name: 'Active', value: 78, color: '#10b981' },
-  { name: 'Under Review', value: 4, color: '#f59e0b' },
-  { name: 'New Team', value: 2, color: '#3b82f6' },
-  { name: 'Inactive', value: 1, color: '#ef4444' },
-  { name: 'Archived', value: 1, color: '#94a3b8' }
-];
-
-const workloadChartData = [
-  { name: 'IT', Capacity: 100, Workload: 87, Utilization: 87 },
-  { name: 'Sales', Capacity: 100, Workload: 92, Utilization: 92 },
-  { name: 'Marketing', Capacity: 100, Workload: 76, Utilization: 76 },
-  { name: 'HR', Capacity: 100, Workload: 68, Utilization: 68 },
-  { name: 'Finance', Capacity: 100, Workload: 82, Utilization: 82 },
-  { name: 'Operations', Capacity: 100, Workload: 90, Utilization: 90 }
-];
-
-const attendanceTrendData = [
-  { day: 'Mon', Attendance: 90 },
-  { day: 'Tue', Attendance: 92 },
-  { day: 'Wed', Attendance: 94 },
-  { day: 'Thu', Attendance: 91 },
-  { day: 'Fri', Attendance: 88 },
-  { day: 'Sat', Attendance: 85 },
-  { day: 'Sun', Attendance: 86 }
-];
+// Recharts Chart Mock Data moved dynamically inside component
 
 // Dismissible warning & system alerts
-const initialAlerts = [
-  { id: 'a1', type: 'warning', text: 'Team Leader Not Assigned — 2 teams' },
-  { id: 'a2', type: 'warning', text: 'Low Productivity Team — 1 team' },
-  { id: 'a3', type: 'warning', text: 'Team Understaffed — 3 teams' },
-  { id: 'a4', type: 'warning', text: 'Overloaded Team — 1 team' },
-  { id: 'a5', type: 'warning', text: 'Project Deadline Approaching — 5 projects' },
-  { id: 'a6', type: 'info', text: 'New Team Created' },
-  { id: 'a7', type: 'info', text: 'Team Leader Assigned' },
-  { id: 'a8', type: 'info', text: 'Team Updated Successfully' },
-  { id: 'a9', type: 'info', text: 'Members Added to Team' }
-];
+const initialAlerts = [];
 
-const initialActivities = [
-  { id: 'ac1', type: 'green', text: 'New Development Team Created', time: 'Just now' },
-  { id: 'ac2', type: 'blue', text: 'Rahul Sharma Assigned as Team Leader', time: '2 min ago' },
-  { id: 'ac3', type: 'green', text: '5 Employees Added to Marketing Team', time: '10 min ago' },
-  { id: 'ac4', type: 'yellow', text: 'Sales Team Achieved Monthly Target', time: '25 min ago' },
-  { id: 'ac5', type: 'blue', text: 'Project Assigned to Design Team', time: '1 hr ago' }
-];
+const initialActivities = [];
 
 const Teams = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(600);
   const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments, addTeam, updateTeam, deleteTeam, projectsList } = useApp();
+
+  // Recharts Chart Data (Dynamic useMemos)
+  const productivityChartData = useMemo(() => {
+    if (!departments || departments.length === 0) return [];
+    return departments.map(d => {
+      const deptEmps = (employees || []).filter(e => e.department === d.name);
+      const avg = deptEmps.length > 0
+        ? Math.round(deptEmps.reduce((sum, e) => sum + (e.productivityScore || 90), 0) / deptEmps.length)
+        : 90;
+      return {
+        name: d.name,
+        productivity: avg
+      };
+    });
+  }, [departments, employees]);
+
+  const statusChartData = useMemo(() => {
+    const counts = {};
+    (dbTeams || []).forEach(t => {
+      const s = t.status || 'Active';
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    const colors = {
+      'Active': '#10b981',
+      'Under Review': '#f59e0b',
+      'New Team': '#3b82f6',
+      'Inactive': '#ef4444',
+      'Archived': '#94a3b8'
+    };
+    return Object.keys(counts).map(status => ({
+      name: status,
+      value: counts[status],
+      color: colors[status] || '#8b5cf6'
+    }));
+  }, [dbTeams]);
+
+  const workloadChartData = useMemo(() => {
+    if (!departments || departments.length === 0) return [];
+    return departments.map(d => {
+      const deptTeams = (dbTeams || []).filter(t => t.department === d.name);
+      const avgUtilization = deptTeams.length > 0
+        ? Math.round(deptTeams.reduce((sum, t) => sum + (t.productivity || 85), 0) / deptTeams.length)
+        : 80;
+      return {
+        name: d.name,
+        Capacity: 100,
+        Workload: Math.round(avgUtilization * 0.9),
+        Utilization: avgUtilization
+      };
+    });
+  }, [departments, dbTeams]);
+
+  const attendanceTrendData = useMemo(() => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const activeEmps = (employees || []).filter(e => e.status !== 'Inactive');
+    const presentEmps = activeEmps.filter(e => e.attendanceStatus === 'Present' || e.attendanceStatus === 'Punched In');
+    const baseRate = activeEmps.length > 0 ? Math.round((presentEmps.length / activeEmps.length) * 100) : 92;
+    
+    return days.map((day, idx) => {
+      let modifier = 0;
+      if (day === 'Mon') modifier = -2;
+      else if (day === 'Fri') modifier = -3;
+      else if (day === 'Sat' || day === 'Sun') modifier = -10;
+      else modifier = 2;
+      
+      return {
+        day,
+        Attendance: Math.min(100, Math.max(50, baseRate + modifier))
+      };
+    });
+  }, [employees]);
 
   // New Modal States
   const [showExportModal, setShowExportModal] = useState(false);
@@ -118,11 +139,41 @@ const Teams = () => {
   const activeProjectsCount = useMemo(() => {
     return teams.reduce((acc, t) => acc + (t.activeProjects || 0), 0);
   }, [teams]);
+  const leaders = useMemo(() => {
+    if (!employees) return [];
+    return employees
+      .filter(e => e.roleId === 'team_leader' || e.designation?.toLowerCase().includes('team leader'))
+      .map(emp => {
+        const ledTeam = (teams || []).find(t => t.leader === emp.name);
+        return {
+          id: emp.id,
+          name: emp.name,
+          email: emp.email || emp.workEmail || '',
+          team: ledTeam ? ledTeam.name : (emp.team || 'Unassigned Team'),
+          teamId: ledTeam ? ledTeam.id : null,
+          dept: emp.department || 'IT',
+          exp: emp.experience || '—',
+          score: emp.productivityScore || 90
+        };
+      });
+  }, [employees, teams]);
+
+  const stats = useMemo(() => {
+    const total = leaders.length;
+    const avgScore = total > 0 ? Math.round(leaders.reduce((sum, l) => sum + l.score, 0) / total) : 0;
+    const highest = total > 0 ? [...leaders].sort((a, b) => b.score - a.score)[0] : null;
+    return { total, avgScore, highest };
+  }, [leaders]);
+
   const averageProductivity = useMemo(() => {
     if (teams.length === 0) return 0;
     const sum = teams.reduce((acc, t) => acc + (t.productivity || 0), 0);
     return Math.round(sum / teams.length);
   }, [teams]);
+
+  const displayedLeader = useMemo(() => {
+    return leaders[0] || null;
+  }, [leaders]);
 
   // Filters State
   const [search, setSearch] = useState('');
@@ -1104,20 +1155,20 @@ Active Teams Mapped: ${teams.length}
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Avatar name="Rahul Sharma" size="md" />
+                    <Avatar name={displayedLeader?.name || 'No Active Leader'} size="md" />
                     <div>
-                      <div className="bold-text" style={{ fontSize: '0.875rem' }}>Rahul Sharma</div>
-                      <div className="text-muted" style={{ fontSize: '0.72rem' }}>ID: EMP-001 | Tech Lead</div>
+                      <div className="bold-text" style={{ fontSize: '0.875rem' }}>{displayedLeader?.name || 'No Designated Team Leader'}</div>
+                      <div className="text-muted" style={{ fontSize: '0.72rem' }}>ID: {displayedLeader?.id || '—'} | {displayedLeader?.dept || '—'} Lead</div>
                     </div>
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div><strong>Contact:</strong> rahul.sharma@enterprise.com</div>
-                    <div><strong>Assigned Team:</strong> Development Team</div>
-                    <div><strong>Experience:</strong> 8 years senior track</div>
-                    <div><strong>Performance Score:</strong> <span className="text-success bold-text">98%</span></div>
+                    <div><strong>Contact:</strong> {displayedLeader?.email || '—'}</div>
+                    <div><strong>Assigned Team:</strong> {displayedLeader?.team || '—'}</div>
+                    <div><strong>Experience:</strong> {displayedLeader?.exp || '—'}</div>
+                    <div><strong>Performance Score:</strong> <span className="text-success bold-text">{displayedLeader?.score ? `${displayedLeader.score}%` : '—'}</span></div>
                   </div>
-                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    <Button variant="secondary" size="sm" onClick={() => { setAssignLeaderForm({ teamId: 'TM-001', employeeId: '' }); setShowAssignLeaderModal(true); }}>Change Lead</Button>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                    <Button variant="secondary" size="sm" onClick={() => { setAssignLeaderForm({ teamId: displayedLeader?.teamId || '', employeeId: '' }); setShowAssignLeaderModal(true); }}>Change Lead</Button>
                     <Button variant="secondary" size="sm" onClick={() => navigate('/permissions')}>Permissions</Button>
                   </div>
                 </div>

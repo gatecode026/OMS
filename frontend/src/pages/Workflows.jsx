@@ -13,227 +13,14 @@ import {
 } from 'lucide-react';
 
 // ─── Seed Team ──────────────────────────────────────────────────────────────
-const TEAM = [
-  'Rahul Sharma', 'Priya Patel', 'Marcus Vance', 'Sara Khan', 'Carlos Mendez',
-  'Emily Zhang', 'Aditya Roy', 'Fatima Al-Hassan', 'James Okafor', 'Neha Gupta',
-  'Daniel Torres', 'Aisha Nwosu'
-];
+const TEAM = [];
 
 // ─── Seed Workflows ──────────────────────────────────────────────────────────
-const SEED_WORKFLOWS = [
-  {
-    id: 'WF-001', name: 'Employee Onboarding Workflow', type: 'Onboarding',
-    department: 'HR', branch: 'Head Office', createdBy: TEAM[0],
-    assignedTo: TEAM[2], stage: 'Background Verification', totalSteps: 6,
-    progress: 65, dueDate: '2026-07-15', status: 'Active', priority: 'High',
-    category: 'HR', description: 'End-to-end onboarding process for new hires covering documentation, training, and system access.',
-    approvalLevel: 2, client: 'Internal', estimatedDays: 14,
-    stages: [
-      { id: 's1', name: 'Document Collection', assignedTo: TEAM[3], startDate: '2026-06-01', dueDate: '2026-06-05', status: 'Completed', completion: 100 },
-      { id: 's2', name: 'Background Verification', assignedTo: TEAM[0], startDate: '2026-06-06', dueDate: '2026-06-12', status: 'In Progress', completion: 60 },
-      { id: 's3', name: 'IT Access Setup', assignedTo: TEAM[1], startDate: '2026-06-13', dueDate: '2026-06-17', status: 'Pending', completion: 0 },
-      { id: 's4', name: 'Orientation Training', assignedTo: TEAM[4], startDate: '2026-06-18', dueDate: '2026-06-22', status: 'Pending', completion: 0 },
-      { id: 's5', name: 'Manager Approval', assignedTo: TEAM[2], startDate: '2026-06-23', dueDate: '2026-06-25', status: 'Pending', completion: 0 },
-      { id: 's6', name: 'Completion Sign-off', assignedTo: TEAM[5], startDate: '2026-06-26', dueDate: '2026-07-15', status: 'Pending', completion: 0 }
-    ],
-    approvals: [
-      { level: 1, role: 'Team Leader Approval', approver: TEAM[4], status: 'Approved', date: '2026-06-08', remarks: 'Documents look good.' },
-      { level: 2, role: 'Project Manager Approval', approver: TEAM[2], status: 'Pending', date: '', remarks: '' },
-      { level: 3, role: 'Department Head Approval', approver: TEAM[7], status: 'Pending', date: '', remarks: '' },
-      { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Pending', date: '', remarks: '' }
-    ],
-    members: [TEAM[0], TEAM[1], TEAM[2], TEAM[3]],
-    documents: [
-      { id: 'd1', name: 'Onboarding_Checklist.pdf', category: 'SOPs', format: 'PDF', date: '2026-06-01', size: '1.2 MB' },
-      { id: 'd2', name: 'Employee_Agreement.docx', category: 'Contracts', format: 'DOCX', date: '2026-06-02', size: '0.8 MB' }
-    ]
-  },
-  {
-    id: 'WF-002', name: 'Annual Leave Approval Workflow', type: 'Leave Approval',
-    department: 'HR', branch: 'North Branch', createdBy: TEAM[3],
-    assignedTo: TEAM[4], stage: 'Manager Review', totalSteps: 4,
-    progress: 50, dueDate: '2026-06-20', status: 'Pending Approval', priority: 'Medium',
-    category: 'HR', description: 'Standard leave approval workflow covering team leader, project manager, and HR sign-off.',
-    approvalLevel: 2, client: 'Internal', estimatedDays: 5,
-    stages: [
-      { id: 's1', name: 'Leave Request Submitted', assignedTo: TEAM[3], startDate: '2026-06-10', dueDate: '2026-06-10', status: 'Completed', completion: 100 },
-      { id: 's2', name: 'Team Leader Review', assignedTo: TEAM[4], startDate: '2026-06-11', dueDate: '2026-06-12', status: 'Completed', completion: 100 },
-      { id: 's3', name: 'Manager Review', assignedTo: TEAM[2], startDate: '2026-06-13', dueDate: '2026-06-15', status: 'In Progress', completion: 40 },
-      { id: 's4', name: 'HR Final Approval', assignedTo: TEAM[9], startDate: '2026-06-16', dueDate: '2026-06-20', status: 'Pending', completion: 0 }
-    ],
-    approvals: [
-      { level: 1, role: 'Team Leader Approval', approver: TEAM[4], status: 'Approved', date: '2026-06-12', remarks: 'Approved.' },
-      { level: 2, role: 'Project Manager Approval', approver: TEAM[2], status: 'Pending', date: '', remarks: '' },
-      { level: 3, role: 'Department Head Approval', approver: TEAM[7], status: 'Pending', date: '', remarks: '' },
-      { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Pending', date: '', remarks: '' }
-    ],
-    members: [TEAM[3], TEAM[4], TEAM[2]],
-    documents: []
-  },
-  {
-    id: 'WF-003', name: 'Q2 Project Delivery Workflow', type: 'Project Delivery',
-    department: 'IT', branch: 'Tech Hub', createdBy: TEAM[2],
-    assignedTo: TEAM[5], stage: 'Testing & QA', totalSteps: 7,
-    progress: 42, dueDate: '2026-08-30', status: 'In Progress', priority: 'Critical',
-    category: 'IT', description: 'Full delivery pipeline for Q2 software project from planning to deployment.',
-    approvalLevel: 1, client: 'Acme Corp', estimatedDays: 90,
-    stages: [
-      { id: 's1', name: 'Requirements Gathering', assignedTo: TEAM[0], startDate: '2026-04-01', dueDate: '2026-04-15', status: 'Completed', completion: 100 },
-      { id: 's2', name: 'System Design', assignedTo: TEAM[5], startDate: '2026-04-16', dueDate: '2026-05-01', status: 'Completed', completion: 100 },
-      { id: 's3', name: 'Development Sprint 1', assignedTo: TEAM[1], startDate: '2026-05-02', dueDate: '2026-05-31', status: 'Completed', completion: 100 },
-      { id: 's4', name: 'Testing & QA', assignedTo: TEAM[6], startDate: '2026-06-01', dueDate: '2026-06-30', status: 'In Progress', completion: 55 },
-      { id: 's5', name: 'Client Review', assignedTo: TEAM[2], startDate: '2026-07-01', dueDate: '2026-07-15', status: 'Pending', completion: 0 },
-      { id: 's6', name: 'Deployment', assignedTo: TEAM[8], startDate: '2026-07-16', dueDate: '2026-08-15', status: 'Pending', completion: 0 },
-      { id: 's7', name: 'Post-Launch Review', assignedTo: TEAM[2], startDate: '2026-08-16', dueDate: '2026-08-30', status: 'Pending', completion: 0 }
-    ],
-    approvals: [
-      { level: 1, role: 'Team Leader Approval', approver: TEAM[4], status: 'Approved', date: '2026-04-14', remarks: 'Requirements approved.' },
-      { level: 2, role: 'Project Manager Approval', approver: TEAM[2], status: 'Approved', date: '2026-05-01', remarks: 'Design approved.' },
-      { level: 3, role: 'Department Head Approval', approver: TEAM[7], status: 'Pending', date: '', remarks: '' },
-      { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Pending', date: '', remarks: '' }
-    ],
-    members: [TEAM[0], TEAM[1], TEAM[2], TEAM[5], TEAM[6], TEAM[8]],
-    documents: [
-      { id: 'd1', name: 'SRS_Document_v2.pdf', category: 'Process Documents', format: 'PDF', date: '2026-04-10', size: '3.5 MB' },
-      { id: 'd2', name: 'Sprint_Report_May.xlsx', category: 'Reports', format: 'XLSX', date: '2026-05-31', size: '1.1 MB' },
-      { id: 'd3', name: 'Architecture_Diagram.pptx', category: 'Attachments', format: 'PPTX', date: '2026-04-20', size: '5.2 MB' }
-    ]
-  },
-  {
-    id: 'WF-004', name: 'Budget Approval Workflow', type: 'Budget Approval',
-    department: 'Finance', branch: 'Head Office', createdBy: TEAM[9],
-    assignedTo: TEAM[7], stage: 'Finance Review', totalSteps: 5,
-    progress: 20, dueDate: '2026-06-30', status: 'Delayed', priority: 'High',
-    category: 'Finance', description: 'Quarterly budget approval workflow for departmental resource allocation.',
-    approvalLevel: 1, client: 'Internal', estimatedDays: 21,
-    stages: [
-      { id: 's1', name: 'Budget Proposal Submitted', assignedTo: TEAM[9], startDate: '2026-05-15', dueDate: '2026-05-20', status: 'Completed', completion: 100 },
-      { id: 's2', name: 'Finance Review', assignedTo: TEAM[7], startDate: '2026-05-21', dueDate: '2026-05-31', status: 'In Progress', completion: 30 },
-      { id: 's3', name: 'CFO Approval', assignedTo: TEAM[11], startDate: '2026-06-01', dueDate: '2026-06-10', status: 'Pending', completion: 0 },
-      { id: 's4', name: 'Super Admin Sign-off', assignedTo: TEAM[9], startDate: '2026-06-11', dueDate: '2026-06-20', status: 'Pending', completion: 0 },
-      { id: 's5', name: 'Budget Released', assignedTo: TEAM[7], startDate: '2026-06-21', dueDate: '2026-06-30', status: 'Pending', completion: 0 }
-    ],
-    approvals: [
-      { level: 1, role: 'Team Leader Approval', approver: TEAM[4], status: 'Approved', date: '2026-05-19', remarks: 'OK.' },
-      { level: 2, role: 'Project Manager Approval', approver: TEAM[2], status: 'Rejected', date: '2026-05-25', remarks: 'Needs revision on IT budget line.' },
-      { level: 3, role: 'Department Head Approval', approver: TEAM[7], status: 'Pending', date: '', remarks: '' },
-      { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Pending', date: '', remarks: '' }
-    ],
-    members: [TEAM[7], TEAM[9], TEAM[11]],
-    documents: [
-      { id: 'd1', name: 'Budget_Proposal_Q2.xlsx', category: 'Reports', format: 'XLSX', date: '2026-05-15', size: '2.3 MB' }
-    ]
-  },
-  {
-    id: 'WF-005', name: 'Marketing Campaign Workflow', type: 'Campaign Management',
-    department: 'Marketing', branch: 'West Region', createdBy: TEAM[6],
-    assignedTo: TEAM[10], stage: 'Creative Review', totalSteps: 5,
-    progress: 80, dueDate: '2026-06-25', status: 'Under Review', priority: 'Medium',
-    category: 'Marketing', description: 'End-to-end workflow for Q3 marketing campaign from ideation to launch.',
-    approvalLevel: 3, client: 'External', estimatedDays: 30,
-    stages: [
-      { id: 's1', name: 'Campaign Brief', assignedTo: TEAM[6], startDate: '2026-05-01', dueDate: '2026-05-07', status: 'Completed', completion: 100 },
-      { id: 's2', name: 'Creative Development', assignedTo: TEAM[10], startDate: '2026-05-08', dueDate: '2026-05-25', status: 'Completed', completion: 100 },
-      { id: 's3', name: 'Creative Review', assignedTo: TEAM[3], startDate: '2026-05-26', dueDate: '2026-06-05', status: 'Completed', completion: 100 },
-      { id: 's4', name: 'Stakeholder Approval', assignedTo: TEAM[7], startDate: '2026-06-06', dueDate: '2026-06-15', status: 'In Progress', completion: 70 },
-      { id: 's5', name: 'Campaign Launch', assignedTo: TEAM[6], startDate: '2026-06-16', dueDate: '2026-06-25', status: 'Pending', completion: 0 }
-    ],
-    approvals: [
-      { level: 1, role: 'Team Leader Approval', approver: TEAM[4], status: 'Approved', date: '2026-05-10', remarks: 'Good to go.' },
-      { level: 2, role: 'Project Manager Approval', approver: TEAM[2], status: 'Approved', date: '2026-05-26', remarks: 'Approved creative direction.' },
-      { level: 3, role: 'Department Head Approval', approver: TEAM[7], status: 'Pending', date: '', remarks: '' },
-      { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Pending', date: '', remarks: '' }
-    ],
-    members: [TEAM[3], TEAM[6], TEAM[10]],
-    documents: []
-  },
-  {
-    id: 'WF-006', name: 'Asset Request Approval', type: 'Asset Request',
-    department: 'IT', branch: 'Tech Hub', createdBy: TEAM[1],
-    assignedTo: TEAM[0], stage: 'Procurement Review', totalSteps: 3,
-    progress: 33, dueDate: '2026-07-01', status: 'Active', priority: 'Low',
-    category: 'IT', description: 'Workflow for hardware/software asset request, approval, and procurement.',
-    approvalLevel: 1, client: 'Internal', estimatedDays: 10,
-    stages: [
-      { id: 's1', name: 'Request Submitted', assignedTo: TEAM[1], startDate: '2026-06-10', dueDate: '2026-06-11', status: 'Completed', completion: 100 },
-      { id: 's2', name: 'Procurement Review', assignedTo: TEAM[0], startDate: '2026-06-12', dueDate: '2026-06-18', status: 'In Progress', completion: 20 },
-      { id: 's3', name: 'Delivery & Sign-off', assignedTo: TEAM[1], startDate: '2026-06-19', dueDate: '2026-07-01', status: 'Pending', completion: 0 }
-    ],
-    approvals: [
-      { level: 1, role: 'Team Leader Approval', approver: TEAM[4], status: 'Approved', date: '2026-06-11', remarks: 'Approved.' },
-      { level: 2, role: 'Project Manager Approval', approver: TEAM[2], status: 'Pending', date: '', remarks: '' },
-      { level: 3, role: 'Department Head Approval', approver: TEAM[7], status: 'Pending', date: '', remarks: '' },
-      { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Pending', date: '', remarks: '' }
-    ],
-    members: [TEAM[0], TEAM[1]],
-    documents: []
-  },
-  {
-    id: 'WF-007', name: 'Document Review & Sign-off', type: 'Document Review',
-    department: 'Sales', branch: 'South Region', createdBy: TEAM[8],
-    assignedTo: TEAM[11], stage: 'Legal Review', totalSteps: 4,
-    progress: 100, dueDate: '2026-05-30', status: 'Completed', priority: 'High',
-    category: 'Sales', description: 'Document review and sign-off workflow for client contracts and proposals.',
-    approvalLevel: 4, client: 'TechBridge Inc.', estimatedDays: 7,
-    stages: [
-      { id: 's1', name: 'Draft Submitted', assignedTo: TEAM[8], startDate: '2026-05-20', dueDate: '2026-05-21', status: 'Completed', completion: 100 },
-      { id: 's2', name: 'Team Leader Review', assignedTo: TEAM[4], startDate: '2026-05-22', dueDate: '2026-05-23', status: 'Completed', completion: 100 },
-      { id: 's3', name: 'Legal Review', assignedTo: TEAM[11], startDate: '2026-05-24', dueDate: '2026-05-27', status: 'Completed', completion: 100 },
-      { id: 's4', name: 'Final Sign-off', assignedTo: TEAM[2], startDate: '2026-05-28', dueDate: '2026-05-30', status: 'Completed', completion: 100 }
-    ],
-    approvals: [
-      { level: 1, role: 'Team Leader Approval', approver: TEAM[4], status: 'Approved', date: '2026-05-23', remarks: 'Approved.' },
-      { level: 2, role: 'Project Manager Approval', approver: TEAM[2], status: 'Approved', date: '2026-05-24', remarks: 'Approved.' },
-      { level: 3, role: 'Department Head Approval', approver: TEAM[7], status: 'Approved', date: '2026-05-27', remarks: 'Approved.' },
-      { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Approved', date: '2026-05-30', remarks: 'Completed.' }
-    ],
-    members: [TEAM[8], TEAM[4], TEAM[11], TEAM[2]],
-    documents: [
-      { id: 'd1', name: 'Client_Contract_Final.pdf', category: 'Approval Documents', format: 'PDF', date: '2026-05-30', size: '2.1 MB' }
-    ]
-  },
-  {
-    id: 'WF-008', name: 'Performance Review Cycle', type: 'Performance Review',
-    department: 'HR', branch: 'Head Office', createdBy: TEAM[9],
-    assignedTo: TEAM[3], stage: 'Self Assessment', totalSteps: 5,
-    progress: 20, dueDate: '2026-07-30', status: 'Active', priority: 'Medium',
-    category: 'HR', description: 'Annual performance review workflow including self-assessment, peer review, and manager evaluation.',
-    approvalLevel: 1, client: 'Internal', estimatedDays: 45,
-    stages: [
-      { id: 's1', name: 'Self Assessment', assignedTo: TEAM[3], startDate: '2026-06-15', dueDate: '2026-06-22', status: 'In Progress', completion: 60 },
-      { id: 's2', name: 'Peer Review', assignedTo: TEAM[0], startDate: '2026-06-23', dueDate: '2026-06-30', status: 'Pending', completion: 0 },
-      { id: 's3', name: 'Manager Evaluation', assignedTo: TEAM[2], startDate: '2026-07-01', dueDate: '2026-07-10', status: 'Pending', completion: 0 },
-      { id: 's4', name: 'HR Review', assignedTo: TEAM[9], startDate: '2026-07-11', dueDate: '2026-07-20', status: 'Pending', completion: 0 },
-      { id: 's5', name: 'Final Rating & Feedback', assignedTo: TEAM[7], startDate: '2026-07-21', dueDate: '2026-07-30', status: 'Pending', completion: 0 }
-    ],
-    approvals: [
-      { level: 1, role: 'Team Leader Approval', approver: TEAM[4], status: 'Pending', date: '', remarks: '' },
-      { level: 2, role: 'Project Manager Approval', approver: TEAM[2], status: 'Pending', date: '', remarks: '' },
-      { level: 3, role: 'Department Head Approval', approver: TEAM[7], status: 'Pending', date: '', remarks: '' },
-      { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Pending', date: '', remarks: '' }
-    ],
-    members: [TEAM[3], TEAM[0], TEAM[2], TEAM[9]],
-    documents: []
-  }
-];
+const SEED_WORKFLOWS = [];
 
-const SEED_NOTIFICATIONS = [
-  { id: 'n1', type: 'danger', title: 'Budget Approval Delayed', msg: 'WF-004 is past its Finance Review deadline by 3 days.', ts: '2 hrs ago', wfId: 'WF-004' },
-  { id: 'n2', type: 'warning', title: 'Approval Pending', msg: 'WF-002 is awaiting Project Manager approval.', ts: '4 hrs ago', wfId: 'WF-002' },
-  { id: 'n3', type: 'success', title: 'Workflow Completed', msg: 'WF-007 Document Review & Sign-off is fully complete.', ts: '1 day ago', wfId: 'WF-007' },
-  { id: 'n4', type: 'warning', title: 'Workflow Escalated', msg: 'WF-004 Budget Approval has been escalated to Super Admin.', ts: '2 days ago', wfId: 'WF-004' }
-];
+const SEED_NOTIFICATIONS = [];
 
-const SEED_ACTIVITY = [
-  { id: 1, icon: '🔄', msg: 'Employee Onboarding Workflow created by Rahul Sharma', ts: '10 min ago' },
-  { id: 2, icon: '✅', msg: 'Stage "Team Leader Review" approved in WF-002', ts: '1 hr ago' },
-  { id: 3, icon: '📄', msg: 'Document "SRS_Document_v2.pdf" uploaded to WF-003', ts: '2 hrs ago' },
-  { id: 4, icon: '⚠️', msg: 'WF-004 Budget Approval Delayed — Finance Review overdue', ts: '3 hrs ago' },
-  { id: 5, icon: '👥', msg: 'Carlos Mendez assigned as Project Manager in WF-001', ts: '4 hrs ago' },
-  { id: 6, icon: '🎯', msg: 'WF-007 Document Review & Sign-off marked Completed', ts: '1 day ago' },
-  { id: 7, icon: '🔔', msg: 'Approval escalated to Super Admin for WF-004', ts: '2 days ago' },
-  { id: 8, icon: '🚀', msg: 'Marketing Campaign Workflow WF-005 moved to Under Review', ts: '2 days ago' }
-];
+const SEED_ACTIVITY = [];
 
 const AUTOMATION_RULES = [
   { id: 'ar1', name: 'Auto Task Assignment', enabled: true, desc: 'Automatically assigns tasks to the next stage assignee upon stage completion.' },
@@ -241,37 +28,6 @@ const AUTOMATION_RULES = [
   { id: 'ar3', name: 'Auto Approvals', enabled: false, desc: 'Auto-approves stages with no rejections within 48 hours.' },
   { id: 'ar4', name: 'Auto Escalations', enabled: true, desc: 'Escalates to Super Admin if approval is pending for more than 5 days.' },
   { id: 'ar5', name: 'Deadline Reminders', enabled: true, desc: 'Sends reminders 24 hours before each stage deadline.' }
-];
-
-const DEPT_ANALYTICS = [
-  { department: 'IT', active: 52, completed: 45, delayed: 2, efficiency: 96 },
-  { department: 'Marketing', active: 30, completed: 35, delayed: 3, efficiency: 94 },
-  { department: 'Sales', active: 28, completed: 24, delayed: 2, efficiency: 92 },
-  { department: 'HR', active: 20, completed: 18, delayed: 1, efficiency: 93 }
-];
-
-const MONTHLY_DATA = [
-  { month: 'Jan', created: 8, completed: 6 }, { month: 'Feb', created: 12, completed: 9 },
-  { month: 'Mar', created: 10, completed: 10 }, { month: 'Apr', created: 15, completed: 12 },
-  { month: 'May', created: 11, completed: 13 }, { month: 'Jun', created: 9, completed: 7 }
-];
-
-const PIE_DATA = [
-  { name: 'Approved', value: 38 }, { name: 'Pending', value: 22 },
-  { name: 'Rejected', value: 8 }, { name: 'Escalated', value: 4 }
-];
-
-const EFFICIENCY_DATA = [
-  { name: 'IT', efficiency: 96 }, { name: 'Marketing', efficiency: 94 },
-  { name: 'Sales', efficiency: 92 }, { name: 'HR', efficiency: 93 },
-  { name: 'Finance', efficiency: 88 }
-];
-
-const PRODUCTIVITY_DATA = [
-  { name: 'Team Productivity', value: 87, fill: '#d946ef' },
-  { name: 'Workflow Efficiency', value: 92, fill: '#10b981' },
-  { name: 'On-Time Delivery', value: 78, fill: '#3b82f6' },
-  { name: 'Approval Rate', value: 84, fill: '#f59e0b' }
 ];
 
 const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -343,6 +99,13 @@ const Sec = ({ title, icon: Icon, action, children }) => (
 // ──────────────────────────────────────────────────────────────────────────────
 const WorkflowDetailPage = ({ workflow: wfInit, onBack, onEdit, employees }) => {
   const [wf, setWf] = useState(wfInit);
+
+  const TEAM = useMemo(() => {
+    if (employees && employees.length > 0) {
+      return employees.map(e => e.name);
+    }
+    return [];
+  }, [employees]);
   const [commTab, setCommTab] = useState('discussions');
   const [comments, setComments] = useState([
     { id: 1, author: wfInit.createdBy, msg: 'Workflow has been created and stages assigned.', ts: '2 hrs ago' },
@@ -882,6 +645,124 @@ const Workflows = () => {
   const { addToast, employees } = useApp();
 
   const [workflows, setWorkflows] = useState(SEED_WORKFLOWS);
+
+  const TEAM = useMemo(() => {
+    if (employees && employees.length > 0) {
+      return employees.map(e => e.name);
+    }
+    return [];
+  }, [employees]);
+
+  // Recharts Chart Data (Dynamic useMemos based on workflows state)
+  const DEPT_ANALYTICS = useMemo(() => {
+    const depts = {};
+    workflows.forEach(w => {
+      const dept = w.department || 'IT';
+      if (!depts[dept]) {
+        depts[dept] = { department: dept, active: 0, completed: 0, delayed: 0, total: 0 };
+      }
+      depts[dept].total += 1;
+      if (w.status === 'Active' || w.status === 'In Progress') depts[dept].active += 1;
+      else if (w.status === 'Completed') depts[dept].completed += 1;
+      else if (w.status === 'Delayed') depts[dept].delayed += 1;
+    });
+    
+    const result = Object.keys(depts).map(dept => {
+      const d = depts[dept];
+      const efficiency = d.total > 0 ? Math.round((d.completed / d.total) * 100) : 100;
+      return {
+        department: d.department,
+        active: d.active,
+        completed: d.completed,
+        delayed: d.delayed,
+        efficiency
+      };
+    });
+
+    return result.length > 0 ? result : [
+      { department: 'IT', active: 0, completed: 0, delayed: 0, efficiency: 100 },
+      { department: 'Marketing', active: 0, completed: 0, delayed: 0, efficiency: 100 },
+      { department: 'Sales', active: 0, completed: 0, delayed: 0, efficiency: 100 },
+      { department: 'HR', active: 0, completed: 0, delayed: 0, efficiency: 100 }
+    ];
+  }, [workflows]);
+
+  const MONTHLY_DATA = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+    const total = workflows.length;
+    const completedCount = workflows.filter(w => w.status === 'Completed').length;
+    return months.map((m, idx) => {
+      const created = Math.round(total * (idx + 1) / 6);
+      const completed = Math.min(created, Math.round(completedCount * (idx + 1) / 6));
+      return {
+        month: m,
+        created,
+        completed
+      };
+    });
+  }, [workflows]);
+
+  const PIE_DATA = useMemo(() => {
+    const counts = { 'Approved': 0, 'Pending': 0, 'Rejected': 0, 'Escalated': 0 };
+    workflows.forEach(w => {
+      (w.approvals || []).forEach(a => {
+        if (counts[a.status] !== undefined) {
+          counts[a.status] += 1;
+        } else if (a.status === 'Pending Approval') {
+          counts['Pending'] += 1;
+        }
+      });
+    });
+    const result = Object.keys(counts).map(key => ({
+      name: key,
+      value: counts[key]
+    }));
+    return result.some(item => item.value > 0) ? result : [
+      { name: 'Approved', value: 0 }, { name: 'Pending', value: 0 },
+      { name: 'Rejected', value: 0 }, { name: 'Escalated', value: 0 }
+    ];
+  }, [workflows]);
+
+  const EFFICIENCY_DATA = useMemo(() => {
+    const depts = {};
+    workflows.forEach(w => {
+      const dept = w.department || 'IT';
+      if (!depts[dept]) {
+        depts[dept] = { total: 0, completed: 0 };
+      }
+      depts[dept].total += 1;
+      if (w.status === 'Completed') depts[dept].completed += 1;
+    });
+    
+    const result = Object.keys(depts).map(dept => ({
+      name: dept,
+      efficiency: depts[dept].total > 0 ? Math.round((depts[dept].completed / depts[dept].total) * 100) : 100
+    }));
+    
+    return result.length > 0 ? result : [
+      { name: 'IT', efficiency: 100 },
+      { name: 'Marketing', efficiency: 100 },
+      { name: 'Sales', efficiency: 100 },
+      { name: 'HR', efficiency: 100 }
+    ];
+  }, [workflows]);
+
+  const PRODUCTIVITY_DATA = useMemo(() => {
+    const total = workflows.length;
+    const completed = workflows.filter(w => w.status === 'Completed').length;
+    const delayed = workflows.filter(w => w.status === 'Delayed').length;
+    
+    const prod = total > 0 ? Math.round(((total - delayed) / total) * 100) : 100;
+    const eff = total > 0 ? Math.round((completed / total) * 100) : 100;
+    const onTime = total > 0 ? Math.round(((completed) / (completed + delayed || 1)) * 100) : 100;
+    
+    return [
+      { name: 'Team Productivity', value: prod, fill: '#d946ef' },
+      { name: 'Workflow Efficiency', value: eff, fill: '#10b981' },
+      { name: 'On-Time Delivery', value: onTime, fill: '#3b82f6' },
+      { name: 'Approval Rate', value: 100, fill: '#f59e0b' }
+    ];
+  }, [workflows]);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'detail'
   const [selectedWf, setSelectedWf] = useState(null);
   const [activeModal, setActiveModal] = useState(null); // 'create' | 'delete' | 'assignModal' | 'approvalConfig' | 'stage'
@@ -973,22 +854,22 @@ const Workflows = () => {
       const newId = `WF-${String(workflows.length + 1).padStart(3, '0')}`;
       const newWf = {
         id: newId, name: createForm.name, type: createForm.category, department: createForm.department,
-        branch: 'Head Office', createdBy: createForm.owner || TEAM[0], assignedTo: createForm.leader || TEAM[1],
+        branch: 'Head Office', createdBy: createForm.owner || TEAM[0] || '', assignedTo: createForm.leader || TEAM[1] || '',
         stage: 'Initial', totalSteps: 3, progress: 0, dueDate: createForm.dueDate,
         status: 'Active', priority: createForm.priority, category: createForm.category,
         description: createForm.description, approvalLevel: 1, client: 'Internal', estimatedDays: 14,
         stages: [
-          { id: 's1', name: 'Initial Stage', assignedTo: createForm.leader || TEAM[0], startDate: createForm.startDate, dueDate: createForm.dueDate, status: 'Pending', completion: 0 },
-          { id: 's2', name: 'Review Stage', assignedTo: createForm.manager || TEAM[1], startDate: '', dueDate: '', status: 'Pending', completion: 0 },
-          { id: 's3', name: 'Final Approval', assignedTo: createForm.deptHead || TEAM[2], startDate: '', dueDate: '', status: 'Pending', completion: 0 }
+          { id: 's1', name: 'Initial Stage', assignedTo: createForm.leader || TEAM[0] || '', startDate: createForm.startDate, dueDate: createForm.dueDate, status: 'Pending', completion: 0 },
+          { id: 's2', name: 'Review Stage', assignedTo: createForm.manager || TEAM[1] || '', startDate: '', dueDate: '', status: 'Pending', completion: 0 },
+          { id: 's3', name: 'Final Approval', assignedTo: createForm.deptHead || TEAM[2] || '', startDate: '', dueDate: '', status: 'Pending', completion: 0 }
         ],
         approvals: [
-          { level: 1, role: 'Team Leader Approval', approver: createForm.leader || TEAM[4], status: 'Pending', date: '', remarks: '' },
-          { level: 2, role: 'Project Manager Approval', approver: createForm.manager || TEAM[2], status: 'Pending', date: '', remarks: '' },
-          { level: 3, role: 'Department Head Approval', approver: createForm.deptHead || TEAM[7], status: 'Pending', date: '', remarks: '' },
-          { level: 4, role: 'Super Admin Approval', approver: TEAM[9], status: 'Pending', date: '', remarks: '' }
+          { level: 1, role: 'Team Leader Approval', approver: createForm.leader || TEAM[4] || '', status: 'Pending', date: '', remarks: '' },
+          { level: 2, role: 'Project Manager Approval', approver: createForm.manager || TEAM[2] || '', status: 'Pending', date: '', remarks: '' },
+          { level: 3, role: 'Department Head Approval', approver: createForm.deptHead || TEAM[7] || '', status: 'Pending', date: '', remarks: '' },
+          { level: 4, role: 'Super Admin Approval', approver: TEAM[9] || '', status: 'Pending', date: '', remarks: '' }
         ],
-        members: createForm.assignedEmployees.length ? createForm.assignedEmployees : [TEAM[0], TEAM[1]],
+        members: createForm.assignedEmployees.length ? createForm.assignedEmployees : [TEAM[0], TEAM[1]].filter(Boolean),
         documents: []
       };
       setWorkflows(prev => [...prev, newWf]);

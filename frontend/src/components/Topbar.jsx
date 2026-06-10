@@ -331,7 +331,7 @@ const Topbar = ({ onMenuToggle }) => {
         {/* User Profile Swapper - Dynamic for demoing RBAC */}
         <div className="topbar-dropdown-wrapper" ref={profileRef}>
           <button className="topbar-profile-btn" onClick={() => setProfileOpen(!profileOpen)}>
-            <Avatar name={currentUser?.name || 'User'} size="sm" />
+            <Avatar name={currentUser?.name || 'User'} size="sm" src={currentUser?.avatar || currentUser?.photoUrl} />
             <div className="profile-details-text">
               <span className="profile-name">{currentUser?.name || 'User'}</span>
               <span className="profile-role-sub">{currentUser?.role || 'Guest'}</span>
@@ -342,7 +342,7 @@ const Topbar = ({ onMenuToggle }) => {
           {profileOpen && (
             <div className="topbar-dropdown-panel profile-panel animate-slide-up">
               <div className="profile-panel-header">
-                <Avatar name={currentUser?.name} size="md" />
+                <Avatar name={currentUser?.name} size="md" src={currentUser?.avatar || currentUser?.photoUrl} />
                 <div className="profile-panel-info">
                   <h4 className="profile-panel-name">{currentUser?.name}</h4>
                   <p className="profile-panel-email">{currentUser?.email}</p>

@@ -291,45 +291,109 @@ const LeaveManagement = () => {
     });
   }, [employees, currentUser, currentUserRole]);
 
-  // Mock department metrics
-  const departmentAnalyticsData = [
-    { department: 'Engineering', totalLeaves: 120, leaveRequests: 25, approved: 20, pending: 5 },
-    { department: 'Human Resources', totalLeaves: 35, leaveRequests: 10, approved: 8, pending: 2 },
-    { department: 'Sales', totalLeaves: 85, leaveRequests: 15, approved: 12, pending: 3 },
-    { department: 'Marketing', totalLeaves: 60, leaveRequests: 12, approved: 10, pending: 2 }
-  ];
+  // Dynamic department metrics
+  const departmentAnalyticsData = useMemo(() => {
+    const data = {};
+    (departments || []).forEach(d => {
+      data[d.name] = { department: d.name, totalLeaves: 0, leaveRequests: 0, approved: 0, pending: 0 };
+    });
+    
+    leavesList.forEach(l => {
+      const dept = l.department || 'Engineering';
+      if (!data[dept]) {
+        data[dept] = { department: dept, totalLeaves: 0, leaveRequests: 0, approved: 0, pending: 0 };
+      }
+      data[dept].leaveRequests += 1;
+      if (l.status === 'Approved') {
+        data[dept].approved += 1;
+        data[dept].totalLeaves += Number(l.days) || 0;
+      } else if (l.status === 'Pending') {
+        data[dept].pending += 1;
+      }
+    });
+    return Object.values(data);
+  }, [leavesList, departments]);
 
-  // Mock notifications feed items
-  const [alertsFeed, setAlertsFeed] = useState([
-    { id: 'AL-001', type: 'warning', message: 'New leave request from Arjun Mehta requires approval.', timestamp: '5 mins ago', read: false },
-    { id: 'AL-002', type: 'info', message: 'Karnataka Rajyotsava optional holiday added to calendar.', timestamp: '1 hour ago', read: false },
-    { id: 'AL-003', type: 'success', message: 'Leave policy adjustment updated successfully.', timestamp: '2 hours ago', read: true },
-    { id: 'AL-004', type: 'danger', message: 'Maternity leave document verification failed for EMP-005.', timestamp: '1 day ago', read: true }
-  ]);
+  // Alerts feed items (starts empty)
+  const [alertsFeed, setAlertsFeed] = useState([]);
 
   // Chart data
-  const trendsData = [
-    { name: 'Jan', requests: 45, approved: 38 },
-    { name: 'Feb', requests: 55, approved: 48 },
-    { name: 'Mar', requests: 70, approved: 60 },
-    { name: 'Apr', requests: 62, approved: 54 },
-    { name: 'May', requests: 88, approved: 75 },
-    { name: 'Jun', requests: 95, approved: 82 }
-  ];
+  const trendsData = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonthIdx = new Date().getMonth();
+    const data = months.slice(0, currentMonthIdx + 1).map(m => ({ name: m, requests: 0, approved: 0 }));
+    
+    leavesList.forEach(l => {
+      if (!l.fromDate) return;
+      const date = new Date(l.fromDate);
+      const mIdx = date.getMonth();
+      if (mIdx <= currentMonthIdx) {
+        data[mIdx].requests += 1;
+        if (l.status === 'Approved') {
+          data[mIdx].approved += 1;
+        }
+      }
+    });
+    return data;
+  }, [leavesList]);
 
-  const typesDistributionData = [
-    { name: 'Casual Leave', value: 40, color: 'var(--accent-blue-solid)' },
-    { name: 'Sick Leave', value: 25, color: 'var(--accent-pink-solid)' },
-    { name: 'Paid Leave', value: 25, color: 'var(--accent-green-solid)' },
-    { name: 'Maternity Leave', value: 10, color: 'var(--accent-purple-solid)' }
-  ];
+  const typesDistributionData = useMemo(() => {
+    const typesMap = {};
+    leavesList.forEach(l => {
+      if (l.status === 'Approved') {
+        typesMap[l.type] = (typesMap[l.type] || 0) + 1;
+      }
+    });
+    const colorsMap = {
+      'CL': 'var(--accent-blue-solid)',
+      'Casual Leave': 'var(--accent-blue-solid)',
+      'SL': 'var(--accent-pink-solid)',
+      'Sick Leave': 'var(--accent-pink-solid)',
+      'PL': 'var(--accent-green-solid)',
+      'Paid Leave': 'var(--accent-green-solid)',
+      'Annual Leave': 'var(--accent-green-solid)',
+      'ML': 'var(--accent-purple-solid)',
+      'Maternity Leave': 'var(--accent-purple-solid)'
+    };
+    const results = Object.entries(typesMap).map(([name, value]) => ({
+      name,
+      value,
+      color: colorsMap[name] || 'var(--color-primary)'
+    }));
+    return results.length > 0 ? results : [
+      { name: 'Casual Leave', value: 1, color: 'var(--accent-blue-solid)' }
+    ];
+  }, [leavesList]);
 
-  const approvalRateData = [
-    { name: 'IT', Approved: 92, Rejected: 8 },
-    { name: 'HR', Approved: 88, Rejected: 12 },
-    { name: 'Sales', Approved: 85, Rejected: 15 },
-    { name: 'Marketing', Approved: 90, Rejected: 10 }
-  ];
+  const approvalRateData = useMemo(() => {
+    const data = {};
+    (departments || []).forEach(d => {
+      data[d.name] = { name: d.name, Approved: 0, Rejected: 0 };
+    });
+    
+    leavesList.forEach(l => {
+      const dept = l.department || 'Engineering';
+      if (!data[dept]) {
+        data[dept] = { name: dept, Approved: 0, Rejected: 0 };
+      }
+      if (l.status === 'Approved') {
+        data[dept].Approved += 1;
+      } else if (l.status === 'Rejected') {
+        data[dept].Rejected += 1;
+      }
+    });
+    
+    return Object.values(data).map(d => {
+      const total = d.Approved + d.Rejected;
+      const appRate = total > 0 ? Math.round((d.Approved / total) * 100) : 100;
+      const rejRate = total > 0 ? Math.round((d.Rejected / total) * 100) : 0;
+      return {
+        name: d.name,
+        Approved: appRate,
+        Rejected: rejRate
+      };
+    });
+  }, [leavesList, departments]);
 
   // Leave Types Descriptions (from policy configs)
   const leaveTypesList = leavePolicyConfigs.map(config => ({
@@ -2440,7 +2504,7 @@ const LeaveManagement = () => {
                   </div>
                   <div className="step-info">
                     <span className="step-role">Project Manager Approval</span>
-                    <span className="step-status-sub">Rohit Sharma — {selectedLeave.status === 'Approved' ? 'Approved' : selectedLeave.status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
+                    <span className="step-status-sub">{selectedEmp?.manager || 'Project Manager'} — {selectedLeave.status === 'Approved' ? 'Approved' : selectedLeave.status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
                   </div>
                 </div>
 
