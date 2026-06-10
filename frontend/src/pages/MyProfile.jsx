@@ -411,6 +411,20 @@ const MyProfile = () => {
     }
   };
 
+  const handleRemoveAvatar = () => {
+    if (currentUser?.id) {
+      updateEmployee(currentUser.id, { photoUrl: '', avatar: '' });
+      const newActivity = {
+        id: `act-${Date.now()}`,
+        date: new Date().toISOString().split('T')[0],
+        action: 'Photo Removed',
+        details: 'Profile avatar removed'
+      };
+      setLocalActivities(prev => [newActivity, ...prev]);
+      addToast('info', 'Profile photo removed successfully.');
+    }
+  };
+
   // Mock Simulated File Upload
   const simulateFileUpload = (type) => {
     setUploadDocForm(prev => ({
@@ -694,7 +708,7 @@ const MyProfile = () => {
               {currentUser.photoUrl ? (
                 <img src={currentUser.photoUrl} alt={currentUser.name} />
               ) : (
-                <Avatar name={currentUser.name} size="2xl" />
+                <Avatar name={currentUser.name} size="2xl" src={currentUser.avatar || currentUser.photoUrl} />
               )}
               <button className="avatar-edit-overlay" onClick={() => document.getElementById('avatar-photo-upload-input').click()}>
                 <Camera size={14} />
@@ -742,6 +756,11 @@ const MyProfile = () => {
                 <Button variant="secondary" size="sm" icon={Camera} onClick={() => document.getElementById('avatar-photo-upload-input').click()}>
                   Change Photo
                 </Button>
+                {(currentUser.photoUrl || currentUser.avatar) && (
+                  <Button variant="danger" size="sm" icon={Trash2} onClick={handleRemoveAvatar}>
+                    Remove
+                  </Button>
+                )}
                 <Button variant="secondary" size="sm" icon={Share2} onClick={handleShareProfile}>
                   Share URL
                 </Button>

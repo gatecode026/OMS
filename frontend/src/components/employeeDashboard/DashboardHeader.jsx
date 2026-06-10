@@ -16,7 +16,7 @@ const DashboardHeader = ({ currentUser }) => {
         </p>
       </div>
       <div className="flex-center gap-3">
-        <Avatar name={currentUser.name} size="md" />
+        <Avatar name={currentUser.name} size="md" src={currentUser.avatar || currentUser.photoUrl} />
         <div className="flex-column items-start">
           <span className="bold-text text-sm">Welcome back, {currentUser.name}!</span>
           <span className="text-xs text-muted mt-1">

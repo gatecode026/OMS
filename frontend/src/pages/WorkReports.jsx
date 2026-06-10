@@ -1051,7 +1051,7 @@ const WorkReports = () => {
                 </button>
                 {userRole === 'Employee' && (
                   <button 
-                    className={`view-link-btn ${search === 'Rahul Sharma' ? 'active' : ''}`} 
+                    className={`view-link-btn ${search === (currentUser?.name || '') ? 'active' : ''}`} 
                     onClick={() => applySavedView('my')}
                   >
                     My Submissions

@@ -12,93 +12,7 @@ import {
   CheckCircle, Clock, Users, MoreVertical, ExternalLink
 } from 'lucide-react';
 
-const mockProjects = [
-  {
-    id: 'PRJ-001',
-    name: 'SaaS Platform v2.0',
-    description: 'Full redesign and rebuild of the enterprise workforce management platform with new role-based architecture and modern UI.',
-    department: 'Engineering',
-    lead: 'Elena Rostova',
-    members: ['Elena Rostova', 'John Miller', 'Liam O\'Connor', 'David Kim'],
-    status: 'In Progress',
-    priority: 'Critical',
-    startDate: '2026-01-15',
-    deadline: '2026-07-30',
-    progress: 62,
-    tasksTotal: 48,
-    tasksDone: 30,
-    color: '#3b82f6',
-    tags: ['React', 'Vite', 'RBAC']
-  },
-  {
-    id: 'PRJ-002',
-    name: 'Q2 Sales Campaign',
-    description: 'Targeted outbound marketing campaign for enterprise clients. Includes email sequences, demo scheduling, and ROI tracking.',
-    department: 'Sales',
-    lead: 'Marcus Vance',
-    members: ['Marcus Vance', 'Carlos Mendez'],
-    status: 'In Progress',
-    priority: 'High',
-    startDate: '2026-04-01',
-    deadline: '2026-06-30',
-    progress: 78,
-    tasksTotal: 12,
-    tasksDone: 9,
-    color: '#10b981',
-    tags: ['Outbound', 'Enterprise', 'CRM']
-  },
-  {
-    id: 'PRJ-003',
-    name: 'Brand Identity Refresh',
-    description: 'Redesign of all brand assets including logo, style guide, website hero section, and social media templates.',
-    department: 'Marketing',
-    lead: 'Aiko Tanaka',
-    members: ['Aiko Tanaka', 'Priya Sharma'],
-    status: 'Planning',
-    priority: 'Medium',
-    startDate: '2026-06-01',
-    deadline: '2026-08-15',
-    progress: 10,
-    tasksTotal: 20,
-    tasksDone: 2,
-    color: '#8b5cf6',
-    tags: ['Branding', 'Design', 'Marketing']
-  },
-  {
-    id: 'PRJ-004',
-    name: 'HR Policy Compliance Audit',
-    description: 'Complete audit of HR policies, employment contracts, and GDPR data handling procedures across all branches.',
-    department: 'Human Resources',
-    lead: 'Sophia Laurent',
-    members: ['Sophia Laurent', 'Sarah Connor'],
-    status: 'Completed',
-    priority: 'Low',
-    startDate: '2026-03-01',
-    deadline: '2026-05-15',
-    progress: 100,
-    tasksTotal: 18,
-    tasksDone: 18,
-    color: '#f59e0b',
-    tags: ['Compliance', 'GDPR', 'Audit']
-  },
-  {
-    id: 'PRJ-005',
-    name: 'Legacy Migration Core',
-    description: 'Migration of database and legacy core APIs to the cloud platform. Delayed due to data mapping complexity.',
-    department: 'Engineering',
-    lead: 'David Kim',
-    members: ['David Kim', 'Liam O\'Connor'],
-    status: 'Delayed',
-    priority: 'High',
-    startDate: '2025-10-01',
-    deadline: '2025-12-01',
-    progress: 45,
-    tasksTotal: 30,
-    tasksDone: 12,
-    color: '#ef4444',
-    tags: ['Database', 'Cloud', 'Migration']
-  }
-];
+const mockProjects = [];
 
 const statusVariant = {
   'In Progress': 'primary',
@@ -117,7 +31,7 @@ const priorityVariant = {
 
 const Projects = () => {
   const isLoading = usePageLoading(500);
-  const { addToast } = useApp();
+  const { addToast, projectsList = [] } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const urlStatus = searchParams.get('status');
@@ -126,6 +40,26 @@ const Projects = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(urlStatus || 'All');
   const [deptFilter, setDeptFilter] = useState(urlDept || 'All');
+
+  const projects = React.useMemo(() => {
+    return projectsList.map(p => ({
+      id: p.id,
+      name: p.name || 'Unnamed Project',
+      description: p.description || '',
+      department: p.department || 'General',
+      lead: p.leader || p.lead || 'Unassigned',
+      members: p.membersList || p.members || [],
+      status: p.status || 'Planning',
+      priority: p.priority || 'Medium',
+      startDate: p.startDate || '',
+      deadline: p.deadline || '',
+      progress: p.progress || 0,
+      tasksTotal: p.tasks?.length || p.tasksTotal || 0,
+      tasksDone: p.tasks?.filter(t => t.completed || t.status === 'Done')?.length || p.tasksDone || 0,
+      color: p.color || '#3b82f6',
+      tags: p.tags || []
+    }));
+  }, [projectsList]);
 
   const handleStatusChange = (status) => {
     setStatusFilter(status);
@@ -145,7 +79,7 @@ const Projects = () => {
     setSearchParams(newParams);
   };
 
-  const filtered = mockProjects.filter(p => {
+  const filtered = projects.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.department.toLowerCase().includes(search.toLowerCase()) ||
       p.lead.toLowerCase().includes(search.toLowerCase());
@@ -154,8 +88,8 @@ const Projects = () => {
     return matchSearch && matchStatus && matchDept;
   });
 
-  const totalTasks = mockProjects.reduce((a, p) => a + p.tasksTotal, 0);
-  const doneTasks  = mockProjects.reduce((a, p) => a + p.tasksDone, 0);
+  const totalTasks = projects.reduce((a, p) => a + p.tasksTotal, 0);
+  const doneTasks  = projects.reduce((a, p) => a + p.tasksDone, 0);
 
   if (isLoading) {
     return (
@@ -171,9 +105,9 @@ const Projects = () => {
       {/* Stats Row */}
       <div className="projects-stats">
         {[
-          { label: 'Total Projects', value: mockProjects.length, color: '#3b82f6' },
-          { label: 'In Progress', value: mockProjects.filter(p => p.status === 'In Progress').length, color: '#f59e0b' },
-          { label: 'Completed', value: mockProjects.filter(p => p.status === 'Completed').length, color: '#10b981' },
+          { label: 'Total Projects', value: projects.length, color: '#3b82f6' },
+          { label: 'In Progress', value: projects.filter(p => p.status === 'In Progress').length, color: '#f59e0b' },
+          { label: 'Completed', value: projects.filter(p => p.status === 'Completed').length, color: '#10b981' },
           { label: 'Tasks Done', value: `${doneTasks}/${totalTasks}`, color: '#8b5cf6' }
         ].map((s, i) => (
           <div key={i} className="card prj-stat-card">

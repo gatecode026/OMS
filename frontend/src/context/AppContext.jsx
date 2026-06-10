@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 
 
 const AppContext = createContext(undefined);
@@ -75,76 +75,68 @@ export const normalizeEmployee = (emp) => {
     const parts = normalized.currentAddress.split(', ');
     normalized.currentAddress = {
       line1: parts[0] || normalized.currentAddress,
-      city: parts[1] || 'Jaipur',
-      state: parts[2] ? parts[2].split(' - ')[0] : 'Rajasthan',
-      country: 'India',
-      pincode: parts[2] ? parts[2].split(' - ')[1] : '302015'
+      city: parts[1] || '',
+      state: parts[2] ? parts[2].split(' - ')[0] : '',
+      country: '',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : ''
     };
   } else if (!normalized.currentAddress) {
-    normalized.currentAddress = { line1: '12 Lal Kothi', city: 'Jaipur', state: 'Rajasthan', country: 'India', pincode: '302015' };
+    normalized.currentAddress = { line1: '', city: '', state: '', country: '', pincode: '' };
   }
 
   if (typeof normalized.permanentAddress === 'string') {
     const parts = normalized.permanentAddress.split(', ');
     normalized.permanentAddress = {
       line1: parts[0] || normalized.permanentAddress,
-      city: parts[1] || 'Jaipur',
-      state: parts[2] ? parts[2].split(' - ')[0] : 'Rajasthan',
-      country: 'India',
-      pincode: parts[2] ? parts[2].split(' - ')[1] : '302015'
+      city: parts[1] || '',
+      state: parts[2] ? parts[2].split(' - ')[0] : '',
+      country: '',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : ''
     };
   } else if (!normalized.permanentAddress) {
-    normalized.permanentAddress = { line1: '12 Lal Kothi', city: 'Jaipur', state: 'Rajasthan', country: 'India', pincode: '302015' };
+    normalized.permanentAddress = { line1: '', city: '', state: '', country: '', pincode: '' };
   }
 
   // Emergency Contact
-  normalized.emergencyName = normalized.emergencyContactName || normalized.emergencyName || 'Priya Sharma';
-  normalized.emergencyRelation = normalized.emergencyRelation || 'Spouse';
-  normalized.emergencyMobile = normalized.emergencyContactPhone || normalized.emergencyMobile || '+91 98001 00001';
+  normalized.emergencyName = normalized.emergencyContactName || normalized.emergencyName || '';
+  normalized.emergencyRelation = normalized.emergencyRelation || '';
+  normalized.emergencyMobile = normalized.emergencyContactPhone || normalized.emergencyMobile || '';
 
   // Banking
   normalized.bank = normalized.bank || {
     accountName: normalized.name,
-    bankName: normalized.bankName || 'HDFC Bank',
-    branch: normalized.bankBranch || 'Jaipur Main',
-    accountNumber: normalized.bankAccountNumber || '1234567890',
-    ifsc: normalized.bankIfscCode || 'HDFC0001234',
+    bankName: normalized.bankName || '',
+    branch: normalized.bankBranch || '',
+    accountNumber: normalized.bankAccountNumber || '',
+    ifsc: normalized.bankIfscCode || '',
     upiId: normalized.bankUpiId || '',
-    verified: true
+    verified: false
   };
 
   // Documents
-  normalized.documents = normalized.documents || [
-    { id: 'doc1', type: 'aadhaar', name: 'Aadhaar Card', status: 'verified', uploadedAt: '2025-02-01' },
-    { id: 'doc2', type: 'pan', name: 'PAN Card', status: 'verified', uploadedAt: '2025-02-01' },
-    { id: 'doc3', type: 'offer_letter', name: 'Offer Letter', status: 'available', uploadedAt: '2025-01-15' }
-  ];
+  normalized.documents = normalized.documents || [];
 
   // Activities
-  normalized.activities = normalized.activities || [
-    { id: 'act1', date: '2026-06-05', action: 'Photo Updated', details: 'Profile photo changed' },
-    { id: 'act2', date: '2026-06-04', action: 'Bank Verified', details: 'Bank account verified by admin' },
-    { id: 'act3', date: '2026-06-02', action: 'Password Changed', details: 'Security update' }
-  ];
+  normalized.activities = normalized.activities || [];
 
   // MFA
-  normalized.mfaEnabled = normalized.mfaEnabled || { email: true, mobile: true, authenticator: false };
+  normalized.mfaEnabled = normalized.mfaEnabled || { email: false, mobile: false, authenticator: false };
 
   // General fields
   normalized.photoUrl = normalized.photoUrl || normalized.avatar || null;
-  normalized.dob = normalized.dob || '1995-03-15';
-  normalized.maritalStatus = normalized.maritalStatus || 'Married';
-  normalized.bloodGroup = normalized.bloodGroup || 'O+';
-  normalized.nationality = normalized.nationality || 'Indian';
+  normalized.dob = normalized.dob || '';
+  normalized.maritalStatus = normalized.maritalStatus || '';
+  normalized.bloodGroup = normalized.bloodGroup || '';
+  normalized.nationality = normalized.nationality || '';
   normalized.officialEmail = normalized.officialEmail || normalized.email || '';
   normalized.officialMobile = normalized.officialMobile || normalized.phone || '';
-  normalized.teamName = normalized.teamName || normalized.team || 'Operations Core';
+  normalized.teamName = normalized.teamName || normalized.team || '';
 
   // 12. Individual Leave Balances
-  normalized.clBalance = typeof normalized.clBalance === 'number' ? normalized.clBalance : 8;
-  normalized.slBalance = typeof normalized.slBalance === 'number' ? normalized.slBalance : 12;
-  normalized.plBalance = typeof normalized.plBalance === 'number' ? normalized.plBalance : 15;
-  normalized.maternityBalance = typeof normalized.maternityBalance === 'number' ? normalized.maternityBalance : (normalized.gender === 'Female' ? 180 : 0);
+  normalized.clBalance = typeof normalized.clBalance === 'number' ? normalized.clBalance : 0;
+  normalized.slBalance = typeof normalized.slBalance === 'number' ? normalized.slBalance : 0;
+  normalized.plBalance = typeof normalized.plBalance === 'number' ? normalized.plBalance : 0;
+  normalized.maternityBalance = typeof normalized.maternityBalance === 'number' ? normalized.maternityBalance : 0;
 
   return normalized;
 };
@@ -406,11 +398,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Messages states
-  const [messages, setMessages] = useState([
-    { id: 'msg-1', sender: 'Ananya Gupta', text: 'Hey, the frontend lazy route changes are live in production. Please check.', time: '10m ago', unread: true },
-    { id: 'msg-2', sender: 'Vikram Singh', text: 'Can you review the leave request I submitted yesterday? Need to travel next week.', time: '1h ago', unread: true },
-    { id: 'msg-3', sender: 'Neha Verma', text: 'Draft payroll calculations for May are ready in the dashboard.', time: '5h ago', unread: false }
-  ]);
+  const [messages, setMessages] = useState([]);
 
   const markMessageRead = (id) => {
     setMessages(prev => prev.map(m => (m.id === id ? { ...m, unread: false } : m)));
@@ -628,10 +616,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchPayrollData();
-  }, [token]);
+  // fetchEmployees and fetchPayrollData are called in the main data-loading useEffect below
 
   const fetchBranches = async () => {
     if (!token) {
@@ -1519,6 +1504,7 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    fetchEmployees();
     fetchAttendance();
     fetchLeaves();
     fetchLeavePolicies();
@@ -1537,30 +1523,8 @@ export const AppProvider = ({ children }) => {
     fetchUserOverrides();
   }, [token]);
 
-  // Real-time polling for attendance logs and employee statuses every 5 seconds
-  useEffect(() => {
-    if (!token) return;
-    const interval = setInterval(() => {
-      fetchAttendance();
-      fetchEmployees();
-      fetchLeaves();
-      fetchHolidays();
-      fetchProjects();
-      fetchDailyReports();
-      fetchAppraisalReviews();
-      fetchPayrollData();
-      fetchAnnouncements();
-      fetchEmergencyAlert();
-      fetchAnnouncementTracking();
-      fetchAnnouncementAudits();
-      fetchNotifications();
-      fetchDocuments();
-      fetchActivityLogs();
-      fetchRoles();
-      fetchUserOverrides();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [token]);
+  // Background polling disabled to prevent terminal log flooding (Option B)
+
 
   // Toast Handler
   const addToast = (type, message) => {
@@ -1674,7 +1638,7 @@ export const AppProvider = ({ children }) => {
       leaveHistory: [],
       taskHistory: [],
       performanceScore: { overall: 0, attendance: 0, taskCompletion: 0, reportSubmission: 0, leaveDiscipline: 0, monthly: [0, 0, 0, 0, 0, 0] },
-      documents: [],
+      documents: newEmp.documents || [],
       activityLog: [],
       
       // New default properties
@@ -1753,6 +1717,11 @@ export const AppProvider = ({ children }) => {
         setEmployees(prev =>
           prev.map(e => (e.id === id ? savedEmp : e))
         );
+        // If the updated user is the currently logged in user, sync local storage & currentUser state!
+        if (currentUser && (currentUser.id === id || currentUser.employeeId === id)) {
+          setCurrentUser(savedEmp);
+          localStorage.setItem('saas_user', JSON.stringify(savedEmp));
+        }
         // Sync manager info in branches dynamically in real-time
         setBranches(prev =>
           prev.map(b => b.managerId === id ? {
@@ -3848,10 +3817,14 @@ export const AppProvider = ({ children }) => {
     return !!permissions[module]?.[action];
   };
 
+  // Memoize the normalized employees array to prevent creating a new reference
+  // on every render, which would cause all context consumers to re-render infinitely.
+  const memoizedEmployees = useMemo(() => employees.map(normalizeEmployee), [employees]);
+
   return (
     <AppContext.Provider
       value={{
-        employees: employees.map(normalizeEmployee),
+        employees: memoizedEmployees,
         branches,
         addBranch,
         updateBranch,

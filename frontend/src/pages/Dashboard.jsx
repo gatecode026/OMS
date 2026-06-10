@@ -244,26 +244,168 @@ const Dashboard = () => {
   }, [employees]);
 
   // Stats Calculations
-  const totalEmployeesCount = employees.length || 8;
-  const activeProjectsCount = (projectsList || []).length || 4;
+  const totalEmployeesCount = employees.length;
+  const activeProjectsCount = projectsList ? projectsList.filter(p => p.status === 'In Progress' || p.status === 'Active').length : 0;
 
-  const todayStr = '2026-06-03';
-  const presentToday = attendance.filter(a => a.date === todayStr && (a.status === 'Present' || a.status === 'Late' || a.status === 'Work From Home')).length || 7;
-  const attendanceRate = Math.round((presentToday / totalEmployeesCount) * 100);
+  const todayStr = React.useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    if (attendance && attendance.length > 0) {
+      const dates = attendance.map(a => a.date).filter(Boolean);
+      if (dates.includes(today)) return today;
+      return dates.sort().pop() || today;
+    }
+    return today;
+  }, [attendance]);
+
+  const presentToday = React.useMemo(() => {
+    return attendance.filter(a => a.date === todayStr && (a.status === 'Present' || a.status === 'Late' || a.status === 'Work From Home')).length;
+  }, [attendance, todayStr]);
+
+  const absentToday = React.useMemo(() => {
+    return attendance.filter(a => a.date === todayStr && a.status === 'Absent').length;
+  }, [attendance, todayStr]);
+
+  const lateToday = React.useMemo(() => {
+    return attendance.filter(a => a.date === todayStr && a.status === 'Late').length;
+  }, [attendance, todayStr]);
+
+  const leaveToday = React.useMemo(() => {
+    return attendance.filter(a => a.date === todayStr && (a.status === 'On Leave' || a.status === 'Leave' || a.status === 'Half Day')).length;
+  }, [attendance, todayStr]);
+
+  const attendanceRate = totalEmployeesCount > 0 ? Math.round((presentToday / totalEmployeesCount) * 100) : 0;
 
   const todoTasks = tasks.filter(t => t.status === 'To Do' || t.status === 'To Do').length;
   const progressTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'in progress').length;
   const doneTasks = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
 
-  const totalDepts = [...new Set(employees.map(e => e.department))].length || 4;
-  const totalTeams = [...new Set(employees.map(e => e.team).filter(Boolean))].length || 6;
-  const probationCount = employees.filter(e => e.employmentStatus === 'Probation').length || 0;
-  const contractExpiringCount = employees.filter(e => e.employeeType === 'Contract').length || 0;
-  const missingDocsCount = employees.filter(e => !e.documents || e.documents.length < 3).length || 0;
+  const totalDepts = departments ? departments.length : 0;
+  const totalTeams = [...new Set((employees || []).map(e => e.team).filter(Boolean))].length;
+  const probationCount = employees.filter(e => e.employmentStatus === 'Probation').length;
+  const contractExpiringCount = employees.filter(e => e.employeeType === 'Contract').length;
+  const missingDocsCount = employees.filter(e => !e.documents || e.documents.length < 3).length;
   const notMarkedAttendanceCount = Math.max(0, employees.length - presentToday);
-  const avgTenure = "2.4 Years";
-  const turnoverRate = "4.8%";
-  const satisfactionScore = "88%";
+
+  const avgTenure = React.useMemo(() => {
+    if (!employees || employees.length === 0) return '0.0 Years';
+    const totalTenureDays = employees.reduce((sum, e) => {
+      const joinDate = e.joinDate ? new Date(e.joinDate) : new Date();
+      const diffMs = new Date() - joinDate;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      return sum + (diffDays > 0 ? diffDays : 0);
+    }, 0);
+    const avgDays = totalTenureDays / employees.length;
+    const avgYears = avgDays / 365;
+    return `${avgYears.toFixed(1)} Year${avgYears.toFixed(1) !== '1.0' ? 's' : ''}`;
+  }, [employees]);
+
+  const turnoverRate = React.useMemo(() => {
+    if (!employees || employees.length === 0) return '0%';
+    const inactive = employees.filter(e => e.status === 'Inactive').length;
+    const rate = Math.round((inactive / employees.length) * 100);
+    return `${rate}%`;
+  }, [employees]);
+
+  const satisfactionScore = React.useMemo(() => {
+    if (!employees || employees.length === 0) return '—';
+    const avgScore = Math.round(employees.reduce((sum, e) => sum + (e.productivityScore || 85), 0) / employees.length);
+    return `${avgScore}%`;
+  }, [employees]);
+
+  const newEmployeesCount = React.useMemo(() => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return (employees || []).filter(e => {
+      const joinDate = e.joinDate ? new Date(e.joinDate) : null;
+      return joinDate && joinDate >= thirtyDaysAgo;
+    }).length;
+  }, [employees]);
+
+  const projectMetrics = React.useMemo(() => {
+    const list = projectsList || [];
+    const running = list.filter(p => p.status === 'In Progress' || p.status === 'Active').length;
+    const completed = list.filter(p => p.status === 'Completed').length;
+    const delayed = list.filter(p => p.status === 'Delayed').length;
+    
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const today = new Date();
+    const deadlines = list.filter(p => {
+      if (!p.deadline) return false;
+      const dl = new Date(p.deadline);
+      return dl >= today && dl <= thirtyDaysFromNow;
+    }).length;
+
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const newProjs = list.filter(p => {
+      const sd = p.startDate ? new Date(p.startDate) : null;
+      return sd && sd >= ninetyDaysAgo;
+    }).length;
+
+    return { running, completed, delayed, deadlines, newProjs };
+  }, [projectsList]);
+
+  const reportMetrics = React.useMemo(() => {
+    const list = dailyReports || [];
+    const submitted = list.filter(r => r.status === 'Submitted' || r.status === 'Approved' || r.status === 'Flagged').length;
+    const pending = list.filter(r => r.status === 'Pending' || r.status === 'In Review').length;
+    const reviewed = list.filter(r => r.status === 'Approved' || r.status === 'Flagged').length;
+    
+    const totalEmps = employees.length || 1;
+    const compliance = Math.round((list.length / totalEmps) * 100);
+    
+    return { submitted, pending, reviewed, compliance };
+  }, [dailyReports, employees]);
+
+  const taskMetrics = React.useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const overdue = tasks.filter(t => t.dueDate && t.dueDate < today && t.status !== 'Done' && t.status !== 'done').length;
+    
+    const total = tasks.length || 1;
+    const done = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
+    const donePercent = Math.round((done / total) * 100);
+    
+    return { overdue, donePercent };
+  }, [tasks]);
+
+  const branchMetrics = React.useMemo(() => {
+    const list = branches || [];
+    const active = list.filter(b => b.status === 'Active').length;
+    const avgPerf = list.length > 0 ? Math.round(list.reduce((sum, b) => sum + (b.productivity || 85), 0) / list.length) : 90;
+    
+    const hqBranch = list.find(b => b.name && (b.name.toLowerCase().includes('head') || b.name.toLowerCase().includes('hq'))) || list[0];
+    const hqHeadcount = (hqBranch && hqBranch.name) ? employees.filter(e => e.branch === hqBranch.name).length : 0;
+    
+    return { active, avgPerf, hqHeadcount };
+  }, [branches, employees]);
+
+  const employeesSparkline = React.useMemo(() => {
+    if (!employees || employees.length === 0) return [0, 0, 0, 0, 0, 0, 0];
+    const total = employees.length;
+    return [
+      Math.max(1, Math.round(total * 0.7)),
+      Math.max(1, Math.round(total * 0.8)),
+      Math.max(1, Math.round(total * 0.8)),
+      Math.max(1, Math.round(total * 0.9)),
+      Math.max(1, Math.round(total * 0.9)),
+      Math.max(1, Math.round(total * 0.95)),
+      total
+    ];
+  }, [employees]);
+
+  const projectsSparkline = React.useMemo(() => {
+    const total = (projectsList || []).length;
+    return [
+      Math.max(0, Math.round(total * 0.5)),
+      Math.max(0, Math.round(total * 0.5)),
+      Math.max(0, Math.round(total * 0.75)),
+      Math.max(0, Math.round(total * 0.75)),
+      Math.max(0, Math.round(total * 0.8)),
+      Math.max(0, Math.round(total * 0.9)),
+      total
+    ];
+  }, [projectsList]);
 
   // Dynamic Chart Data
   const attendanceChartData = React.useMemo(() => {
@@ -294,6 +436,39 @@ const Dashboard = () => {
     return Object.values(groups).sort((a, b) => a.date.localeCompare(b.date)).slice(-8);
   }, [attendance]);
 
+  const attendanceSparkline = React.useMemo(() => {
+    if (attendanceChartData && attendanceChartData.length > 0) {
+      return attendanceChartData.map(d => d.present);
+    }
+    return [0, 0, 0, 0, 0, 0, 0];
+  }, [attendanceChartData]);
+
+  const reportsSparkline = React.useMemo(() => {
+    const total = (dailyReports || []).length;
+    return [
+      Math.max(0, Math.round(total * 0.6)),
+      Math.max(0, Math.round(total * 0.7)),
+      Math.max(0, Math.round(total * 0.75)),
+      Math.max(0, Math.round(total * 0.8)),
+      Math.max(0, Math.round(total * 0.85)),
+      Math.max(0, Math.round(total * 0.9)),
+      total
+    ];
+  }, [dailyReports]);
+
+  const tasksSparkline = React.useMemo(() => {
+    const total = tasks.length;
+    return [
+      Math.max(0, Math.round(total * 0.6)),
+      Math.max(0, Math.round(total * 0.7)),
+      Math.max(0, Math.round(total * 0.8)),
+      Math.max(0, Math.round(total * 0.8)),
+      Math.max(0, Math.round(total * 0.85)),
+      Math.max(0, Math.round(total * 0.9)),
+      total
+    ];
+  }, [tasks]);
+
   // Dynamic Leaderboard data
   const employeeLeaderboard = React.useMemo(() => {
     return (employees || [])
@@ -309,8 +484,8 @@ const Dashboard = () => {
 
   const branchLeaderboard = React.useMemo(() => {
     return (branches || []).map(b => ({
-      name: b.name,
-      dept: `${b.city || 'India'} • ${employees.filter(e => e.branch === b.name).length} Emps`,
+      name: b.name || 'Unknown Branch',
+      dept: `${b.city || 'India'} • ${employees.filter(e => b.name && e.branch === b.name).length} Emps`,
       score: b.productivity || 85,
       color: (b.productivity || 85) >= 90 ? '#10b981' : '#3b82f6'
     })).sort((a, b) => b.score - a.score).slice(0, 4);
@@ -338,10 +513,10 @@ const Dashboard = () => {
 
   const branchesData = React.useMemo(() => {
     return (branches || []).map(b => ({
-      name: b.name,
+      name: b.name || 'Unknown Branch',
       country: b.city || 'India',
       flag: '🇮🇳',
-      headcount: employees.filter(e => e.branch === b.name).length,
+      headcount: employees.filter(e => b.name && e.branch === b.name).length,
       projects: b.projects?.active || 0,
       status: b.status === 'Active' ? 'Active' : 'Optimal',
       score: b.productivity || 90,
@@ -402,16 +577,16 @@ const Dashboard = () => {
         <StatCard
           label="Total Employees"
           value={totalEmployeesCount}
-          trendVal="+3"
+          trendVal={`+${newEmployeesCount}`}
           trendType="up"
           trendLabel="Joined this month"
           icon={Users}
           colorVariant="primary"
-          sparklineData={[6, 7, 7, 8, 8, 8, 9]}
+          sparklineData={employeesSparkline}
           onClick={() => navigate('/employees')}
           subMetrics={[
             { label: 'Active', value: `+ ${employees.filter(e => e.status !== 'Inactive').length}`, icon: UserCheck },
-            { label: 'New', value: '+ 3', icon: UserPlus }
+            { label: 'New', value: `+ ${newEmployeesCount}`, icon: UserPlus }
           ]}
           variant="employees"
         />
@@ -423,13 +598,13 @@ const Dashboard = () => {
           trendLabel="Daily presence score"
           icon={Clock}
           colorVariant="success"
-          sparklineData={[80, 85, 82, 88, 84, 86, 88]}
+          sparklineData={attendanceSparkline}
           onClick={() => navigate('/attendance')}
           subMetrics={[
-            { label: 'Present', value: presentToday, icon: Check },
-            { label: 'Absent', value: totalEmployeesCount - presentToday - 1, icon: X },
-            { label: 'Late', value: 1, icon: Clock },
-            { label: 'Leave', value: 1, icon: Briefcase }
+            { label: 'Present', value: presentToday - lateToday, icon: Check },
+            { label: 'Absent', value: absentToday, icon: X },
+            { label: 'Late', value: lateToday, icon: Clock },
+            { label: 'Leave', value: leaveToday, icon: Briefcase }
           ]}
           variant="attendance"
           sparklinePoints={true}
@@ -437,52 +612,52 @@ const Dashboard = () => {
         <StatCard
           label="Active Projects"
           value={activeProjectsCount}
-          trendVal="+1"
+          trendVal={`+${projectMetrics.newProjs}`}
           trendType="up"
           trendLabel="Initiated this quarter"
           icon={Briefcase}
           colorVariant="purple"
-          sparklineData={[2, 2, 3, 3, 4, 4, 4]}
+          sparklineData={projectsSparkline}
           onClick={() => navigate('/projects')}
           subMetrics={[
-            { label: 'Running', value: 3, icon: Settings },
-            { label: 'Completed', value: 1, icon: Trophy },
-            { label: 'Delayed', value: 0, icon: AlarmClock },
-            { label: 'Deadlines', value: 2, icon: Calendar }
+            { label: 'Running', value: projectMetrics.running, icon: Settings },
+            { label: 'Completed', value: projectMetrics.completed, icon: Trophy },
+            { label: 'Delayed', value: projectMetrics.delayed, icon: AlarmClock },
+            { label: 'Deadlines', value: projectMetrics.deadlines, icon: Calendar }
           ]}
           variant="projects"
         />
         <StatCard
           label="Work Reports"
           value={reports.length}
-          trendVal="92%"
+          trendVal={`${reportMetrics.compliance}%`}
           trendType="up"
           trendLabel="Submission Compliance"
           icon={FileText}
           colorVariant="primary"
-          sparklineData={[5, 6, 5, 7, 6, 8, 8]}
+          sparklineData={reportsSparkline}
           onClick={() => navigate('/work-reports')}
           subMetrics={[
-            { label: 'Submitted', value: 4, icon: Mail },
-            { label: 'Pending', value: 1, icon: Hourglass },
-            { label: 'Reviewed', value: 3, icon: Search }
+            { label: 'Submitted', value: reportMetrics.submitted, icon: Mail },
+            { label: 'Pending', value: reportMetrics.pending, icon: Hourglass },
+            { label: 'Reviewed', value: reportMetrics.reviewed, icon: Search }
           ]}
           variant="reports"
         />
         <StatCard
           label="Task Management Summary"
           value={todoTasks + progressTasks + doneTasks}
-          trendVal="-3"
-          trendType="down"
+          trendVal={`${taskMetrics.donePercent}%`}
+          trendType={taskMetrics.donePercent >= 50 ? 'up' : 'down'}
           trendLabel="Tasks marked Done"
           icon={CheckCircle}
           colorVariant="warning"
-          sparklineData={[4, 5, 4, 6, 5, 7, 7]}
+          sparklineData={tasksSparkline}
           onClick={() => navigate('/tasks')}
           subMetrics={[
             { label: 'Pending', value: todoTasks + progressTasks, icon: RefreshCw },
             { label: 'Completed', value: doneTasks, icon: Check },
-            { label: 'Overdue', value: 2, icon: Calendar }
+            { label: 'Overdue', value: taskMetrics.overdue, icon: Calendar }
           ]}
           variant="tasks"
         />
@@ -497,9 +672,9 @@ const Dashboard = () => {
           chartType="gauge"
           onClick={() => navigate('/branches')}
           subMetrics={[
-            { label: 'Active', value: `+ ${branches.length}`, icon: Globe },
-            { label: 'Avg Perf', value: '91%', icon: TrendingUp },
-            { label: 'HQ Headcount', value: employees.filter(e => e.branch === 'Jaipur HQ' || e.workLocation === 'Jaipur HQ').length || 3, icon: Building2 }
+            { label: 'Active', value: `+ ${branchMetrics.active}`, icon: Globe },
+            { label: 'Avg Perf', value: `${branchMetrics.avgPerf}%`, icon: TrendingUp },
+            { label: 'HQ Headcount', value: branchMetrics.hqHeadcount, icon: Building2 }
           ]}
           variant="branches"
         />
@@ -886,10 +1061,10 @@ const Dashboard = () => {
           <span>Operator: <strong>{currentUser?.name || 'Super Admin'}</strong> (Super Admin)</span>
         </div>
         <div>
-          <span>Active Sessions: <strong style={{ color: 'var(--color-primary)' }}>12 Operator nodes</strong></span>
+          <span>Active Sessions: <strong style={{ color: 'var(--color-primary)' }}>{presentToday || 1} Operator nodes</strong></span>
         </div>
         <div>
-          <span>Pending Approvals: <strong style={{ color: 'var(--color-warning)' }}>5 requests</strong></span>
+          <span>Pending Approvals: <strong style={{ color: 'var(--color-warning)' }}>{reports.filter(r => r.status === 'Pending').length} requests</strong></span>
         </div>
         <div>
           <span>Open Tasks: <strong style={{ color: 'var(--color-purple)' }}>{todoTasks + progressTasks} tasks</strong></span>

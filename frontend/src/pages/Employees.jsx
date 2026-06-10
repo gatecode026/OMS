@@ -27,13 +27,13 @@ const fmtJoinDate = (dateStr) => {
 };
 
 const fmtDob = (dateStr) => {
-  if (!dateStr) return '15/08/1996';
+  if (!dateStr) return '—';
   const d = new Date(dateStr);
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
 const calculateExpiry = (dateStr) => {
-  if (!dateStr) return '31 Dec 2031';
+  if (!dateStr) return '—';
   const d = new Date(dateStr);
   d.setFullYear(d.getFullYear() + 5);
   return fmtJoinDate(d.toISOString());
@@ -145,6 +145,17 @@ const fileToBase64 = (file) => {
     reader.onload = () => resolve(reader.result);
     reader.onerror = (error) => reject(error);
   });
+};
+
+const addressToString = (addr) => {
+  if (!addr) return '';
+  if (typeof addr === 'string') return addr;
+  if (typeof addr === 'object') {
+    const parts = [addr.line1, addr.city, addr.state].filter(Boolean);
+    const base = parts.join(', ');
+    return addr.pincode ? `${base} - ${addr.pincode}` : base;
+  }
+  return String(addr);
 };
 
 
@@ -517,6 +528,8 @@ const Employees = () => {
 
     setFormData({
       ...emp,
+      currentAddress: addressToString(emp.currentAddress),
+      permanentAddress: addressToString(emp.permanentAddress),
       username: generatedUsername,
       officialEmail: generatedOfficialEmail,
       password: '••••••••',
@@ -552,10 +565,10 @@ const Employees = () => {
       });
     }
 
-    if (emp.avatar && emp.avatar.startsWith('data:')) {
-      const sizeBytes = Math.round(emp.avatar.length * 0.75);
+    if (emp.avatar) {
+      const sizeBytes = emp.avatar.startsWith('data:') ? Math.round(emp.avatar.length * 0.75) : 15000;
       docs.profilePhoto = {
-        name: 'Profile_Photo.jpg',
+        name: emp.avatar.startsWith('data:') ? 'Profile_Photo.jpg' : (emp.avatar.split('/').pop() || 'Profile_Photo.jpg'),
         size: sizeBytes,
         type: 'image/jpeg',
         downloadUrl: emp.avatar,
@@ -949,43 +962,44 @@ const Employees = () => {
     
     // Convert documents to base64
     const docsToSave = [];
-    let avatarBase64 = formData.avatar;
+    let avatarBase64 = '';
+    const profilePhoto = uploadedDocs.profilePhoto;
+    
+    if (profilePhoto) {
+      if (profilePhoto.isExisting) {
+        avatarBase64 = profilePhoto.downloadUrl;
+      } else if (profilePhoto instanceof File || profilePhoto instanceof Blob || (profilePhoto && typeof profilePhoto === 'object' && profilePhoto.name)) {
+        try {
+          avatarBase64 = await fileToBase64(profilePhoto);
+        } catch (err) {
+          console.error('Error converting profile photo:', err);
+        }
+      }
+    }
 
     for (const [key, file] of Object.entries(uploadedDocs)) {
-      if (!file) continue;
+      if (!file || key === 'profilePhoto') continue;
       
-      if (key === 'profilePhoto') {
-        if (file.isExisting) {
-          avatarBase64 = file.downloadUrl;
-        } else if (file instanceof File) {
-          try {
-            avatarBase64 = await fileToBase64(file);
-          } catch (err) {
-            console.error('Error converting profile photo:', err);
-          }
-        }
-      } else {
-        if (file.isExisting) {
+      if (file.isExisting) {
+        docsToSave.push({
+          category: key,
+          fileName: file.name,
+          uploadDate: file.uploadDate || new Date().toISOString().split('T')[0],
+          fileType: file.type,
+          downloadUrl: file.downloadUrl
+        });
+      } else if (file instanceof File || file instanceof Blob || (file && typeof file === 'object' && file.name)) {
+        try {
+          const base64 = await fileToBase64(file);
           docsToSave.push({
             category: key,
             fileName: file.name,
-            uploadDate: file.uploadDate || new Date().toISOString().split('T')[0],
+            uploadDate: new Date().toISOString().split('T')[0],
             fileType: file.type,
-            downloadUrl: file.downloadUrl
+            downloadUrl: base64
           });
-        } else if (file instanceof File) {
-          try {
-            const base64 = await fileToBase64(file);
-            docsToSave.push({
-              category: key,
-              fileName: file.name,
-              uploadDate: new Date().toISOString().split('T')[0],
-              fileType: file.type,
-              downloadUrl: base64
-            });
-          } catch (err) {
-            console.error(`Error converting document ${key}:`, err);
-          }
+        } catch (err) {
+          console.error(`Error converting document ${key}:`, err);
         }
       }
     }
@@ -997,7 +1011,9 @@ const Employees = () => {
       roleId: matchingRole.id,
       role: matchingRole.name,
       avatar: avatarBase64,
-      documents: docsToSave
+      documents: docsToSave,
+      currentAddress: addressToString(formData.currentAddress),
+      permanentAddress: addressToString(formData.permanentAddress)
     };
 
     if (formMode === 'add') {
@@ -1194,18 +1210,23 @@ const Employees = () => {
   const depts = [...new Set(employees.map(e => e.department))].sort();
   const branches = [...new Set(employees.map(e => e.branch))].sort();
   const leaders = employees.filter(e => e.roleId === 'team_leader' || e.roleId === 'manager' || e.roleId === 'branch_admin' || e.roleId === 'super_admin');
+  const managers = employees.filter(e => e.roleId === 'manager');
 
   const handleRemoveDocument = (key, label) => {
     setUploadedDocs(prev => ({ ...prev, [key]: null }));
     setFormData(prev => {
-      if (!prev.documents) return prev;
-      return {
-        ...prev,
-        documents: prev.documents.filter(d => {
+      const updated = { ...prev };
+      if (key === 'profilePhoto') {
+        updated.avatar = '';
+        updated.photoUrl = '';
+      }
+      if (updated.documents) {
+        updated.documents = updated.documents.filter(d => {
           const mappedKey = d.category.toLowerCase().replace(' card', '').replace(' / cv', '').replace(' photo', 'Photo').replace(' letter', 'Letter').replace(' proof', 'Proof').replace(' agreements', 'Agreements');
           return mappedKey !== key;
-        })
-      };
+        });
+      }
+      return updated;
     });
     addToast('info', `${label} removed`);
   };
@@ -1220,6 +1241,8 @@ const Employees = () => {
       });
       setFormData(prev => ({
         ...prev,
+        avatar: '',
+        photoUrl: '',
         documents: []
       }));
       addToast('info', 'All documents cleared');
@@ -1237,10 +1260,10 @@ const Employees = () => {
     return attB - attA;
   });
 
-  const empOfMonth = sortedByOverallPerf[0] || { name: 'Ananya Gupta' };
-  const bestPerformer = sortedByOverallPerf.find(e => e.id !== empOfMonth.id) || sortedByOverallPerf[0] || { name: 'N/A' };
-  const attendanceChamp = sortedByAttendance.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id) || sortedByAttendance[0] || { name: 'Suresh Kumar' };
-  const mostProductive = sortedByProductivity.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id && e.id !== attendanceChamp.id) || sortedByProductivity[0] || { name: 'Kavita Singh' };
+  const empOfMonth = sortedByOverallPerf[0] || { name: '—' };
+  const bestPerformer = sortedByOverallPerf.find(e => e.id !== empOfMonth.id) || sortedByOverallPerf[0] || { name: '—' };
+  const attendanceChamp = sortedByAttendance.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id) || sortedByAttendance[0] || { name: '—' };
+  const mostProductive = sortedByProductivity.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id && e.id !== attendanceChamp.id) || sortedByProductivity[0] || { name: '—' };
 
   return (
     <div className="employees-page flex-column grid-gap">
@@ -1485,28 +1508,28 @@ const Employees = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(245, 158, 11, 0.04)', border: '1px solid rgba(245, 158, 11, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                <Avatar name={empOfMonth.name} size="sm" />
+                <Avatar name={empOfMonth.name} size="sm" src={empOfMonth.avatar || empOfMonth.photoUrl} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Employee of Month</span>
                   <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{empOfMonth.name}</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(59, 130, 246, 0.04)', border: '1px solid rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                <Avatar name={bestPerformer.name} size="sm" />
+                <Avatar name={bestPerformer.name} size="sm" src={bestPerformer.avatar || bestPerformer.photoUrl} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Best Performer</span>
                   <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{bestPerformer.name}</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                <Avatar name={attendanceChamp.name} size="sm" />
+                <Avatar name={attendanceChamp.name} size="sm" src={attendanceChamp.avatar || attendanceChamp.photoUrl} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Attendance Champ</span>
                   <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{attendanceChamp.name}</strong>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', background: 'rgba(168, 85, 247, 0.04)', border: '1px solid rgba(168, 85, 247, 0.1)', borderRadius: 'var(--radius-md)' }}>
-                <Avatar name={mostProductive.name} size="sm" />
+                <Avatar name={mostProductive.name} size="sm" src={mostProductive.avatar || mostProductive.photoUrl} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Most Productive</span>
                   <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{mostProductive.name}</strong>
@@ -1685,7 +1708,7 @@ const Employees = () => {
                       <td>
                         <div className="emp-name-cell">
                           <span className="emp-avatar-trigger" onClick={e => openPreview(e, row)}>
-                            <Avatar name={row.name} size="sm" />
+                            <Avatar name={row.name} size="sm" src={row.avatar || row.photoUrl} />
                           </span>
                           <div className="employee-info-cell">
                             <span
@@ -1803,7 +1826,7 @@ const Employees = () => {
       {hoveredEmp && (
         <div className="emp-hover-quick-card glass animate-fade-in" style={{ position: 'absolute', top: hoverPos.top, left: hoverPos.left, zIndex: 1100 }}>
           <div className="hover-card-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <Avatar name={hoveredEmp.name} size="sm" />
+            <Avatar name={hoveredEmp.name} size="sm" src={hoveredEmp.avatar || hoveredEmp.photoUrl} />
             <div className="hover-card-meta" style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2' }}>
               <h5 className="hover-card-name" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{hoveredEmp.name}</h5>
               <span className="hover-card-dept" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{hoveredEmp.department}</span>
@@ -1831,7 +1854,7 @@ const Employees = () => {
         <div className="emp-preview-card animate-preview" ref={previewRef} style={{ top: previewPos.top, left: previewPos.left }}>
           <button className="preview-close-btn" onClick={() => setPreviewEmp(null)}><X size={14} /></button>
           <div className="preview-top">
-            <Avatar name={previewEmp.name} size="lg" />
+            <Avatar name={previewEmp.name} size="lg" src={previewEmp.avatar || previewEmp.photoUrl} />
             <div className="preview-name-block">
               <h4 className="preview-name">{previewEmp.name}</h4>
               <p className="preview-designation">{previewEmp.designation || previewEmp.role}</p>
@@ -2267,7 +2290,7 @@ const Employees = () => {
                         {formData.roleId !== 'team_leader' && (
                           <div className="form-field"><label>{FIELD_LABELS.teamLeader}</label><select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}><option value="">Select Team Leader</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
                         )}
-                        <div className="form-field"><label>{FIELD_LABELS.projectManager}</label><select value={formData.projectManager} onChange={e => setFormData(p => ({ ...p, projectManager: e.target.value }))}><option value="">Select Project Manager</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
+                        <div className="form-field"><label>{FIELD_LABELS.projectManager}</label><select value={formData.projectManager} onChange={e => setFormData(p => ({ ...p, projectManager: e.target.value }))}><option value="">Select Project Manager</option>{managers.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
                       </>
                     )}
                     <div className="form-field"><label>{FIELD_LABELS.joinDate} *</label><input type="date" value={formData.joinDate} onChange={e => setFormData(p => ({ ...p, joinDate: e.target.value }))} required /></div>
@@ -2293,7 +2316,7 @@ const Employees = () => {
                       <div className="form-quick-assign-card">
                         <p className="quick-assign-desc">Auto-fill related fields by selecting a team preset.</p>
                         <div className="form-section-grid">
-                          <div className="form-field"><label>Team Assignment</label><select value={formData.teamName || ''} onChange={e => handleTeamChange(e.target.value)}><option value="">Select Team</option>{teams && teams.length > 0 ? teams.map(t => <option key={t.id || t._id || t.name} value={t.name}>{t.name}</option>) : ['Alpha Squad', 'Beta Unit', 'Gamma Force', 'Delta Team', 'Product Core', 'Dev Ops'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                          <div className="form-field"><label>Team Assignment</label><select value={formData.teamName || ''} onChange={e => handleTeamChange(e.target.value)}><option value="">Select Team</option>{teams && teams.length > 0 && teams.map(t => <option key={t.id || t._id || t.name} value={t.name}>{t.name}</option>)}</select></div>
                         </div>
                       </div>
 
@@ -2573,9 +2596,9 @@ const Employees = () => {
                     const imgOnly = ['profilePhoto', 'passportPhoto'];
                     const validTypes = imgOnly.includes(key) ? ['image/jpeg', 'image/png', 'image/jpg'] : ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
                     const file = uploadedDocs[key];
-                    const isInvalid = file && !validTypes.includes(file.type);
-                    const isImage = file && file.type.startsWith('image/');
-                    const filePreview = isImage && file ? (file.downloadUrl || URL.createObjectURL(file)) : null;
+                    const isInvalid = file && !file.isExisting && !validTypes.includes(file.type);
+                    const isImage = file && (file.type ? file.type.startsWith('image/') : (file.downloadUrl && file.downloadUrl.startsWith('data:image')));
+                    const filePreview = isImage && file ? (file.downloadUrl || (file instanceof Blob ? URL.createObjectURL(file) : null)) : null;
 
                     return (
                       <div key={key} className={`form-doc-upload ${file ? 'has-file' : ''} ${isInvalid ? 'doc-invalid' : ''}`}>
@@ -2637,7 +2660,7 @@ const Employees = () => {
                   <div>
                     <h4 className="form-subsection-title" style={{ marginTop: 0 }}>Employee Preview</h4>
                     <div className="pre-save-preview-card">
-                      <div className="pre-save-avatar-row"><Avatar name={formData.name || 'New Employee'} size="lg" /><div className="pre-save-name-block"><h4>{formData.name || 'New Employee'}</h4><span>{formData.designation || 'Designation not set'}</span></div></div>
+                      <div className="pre-save-avatar-row"><Avatar name={formData.name || 'New Employee'} size="lg" src={uploadedDocs.profilePhoto ? (uploadedDocs.profilePhoto.downloadUrl || (uploadedDocs.profilePhoto instanceof Blob ? URL.createObjectURL(uploadedDocs.profilePhoto) : '')) : (formData.avatar || formData.photoUrl)} /><div className="pre-save-name-block"><h4>{formData.name || 'New Employee'}</h4><span>{formData.designation || 'Designation not set'}</span></div></div>
                       <div className="pre-save-id-badge">{formData.id || 'ID not generated'}</div>
                       <div className="pre-save-detail-list">
                         <div className="pre-save-detail-row"><span>Department</span><strong>{formData.department || '—'}</strong></div>
@@ -2697,7 +2720,7 @@ const Employees = () => {
       {/* ── View SlideOver ── */}
       <SlideOver isOpen={slideOverOpen} onClose={() => setSlideOverOpen(false)} title="Employee Profile Detail">
         <div className="employee-detail-view animate-fade-in">
-          <div className="detail-header-card"><Avatar name={formData.name} size="lg" /><h3 className="detail-name">{formData.name}</h3><Badge variant={formData.status === 'Active' ? 'success' : formData.status === 'On Leave' ? 'warning' : 'danger'}>{formData.status}</Badge></div>
+          <div className="detail-header-card"><Avatar name={formData.name} size="lg" src={uploadedDocs.profilePhoto ? (uploadedDocs.profilePhoto.downloadUrl || (uploadedDocs.profilePhoto instanceof Blob ? URL.createObjectURL(uploadedDocs.profilePhoto) : '')) : (formData.avatar || formData.photoUrl)} /><h3 className="detail-name">{formData.name}</h3><Badge variant={formData.status === 'Active' ? 'success' : formData.status === 'On Leave' ? 'warning' : 'danger'}>{formData.status}</Badge></div>
           <div className="detail-section-group"><h4 className="detail-group-title">Personal Information</h4><div className="detail-grid"><div className="detail-item"><label>Email Address</label><span>{formData.email}</span></div><div className="detail-item"><label>Phone Number</label><span>{formData.phone}</span></div><div className="detail-item"><label>Date of Birth</label><span>{formData.dob || 'Not set'}</span></div><div className="detail-item"><label>Gender</label><span>{formData.gender}</span></div></div></div>
           <div className="detail-section-group"><h4 className="detail-group-title">Work Information</h4><div className="detail-grid"><div className="detail-item"><label>Employee ID</label><span>{formData.id}</span></div><div className="detail-item"><label>Department</label><span>{formData.department}</span></div><div className="detail-item"><label>Branch Location</label><span>{formData.branch}</span></div><div className="detail-item"><label>Assigned Team</label><span>{formData.team || 'None'}</span></div><div className="detail-item"><label>Designation / Role</label><span>{formData.role}</span></div><div className="detail-item"><label>Joining Date</label><span>{fmtJoinDate(formData.joinDate)}</span></div></div></div>
         </div>
@@ -2713,7 +2736,7 @@ const Employees = () => {
                 <div className="id-card-front-header-bg"><div className="id-card-watermark"></div></div>
                 <div className="id-card-front-pink-bg"></div>
                 <div className="id-card-logo-area"><svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg><div className="id-card-company-title">{idCardEmployee.companyName || 'OM ENTERPRISE'}</div><div className="id-card-company-subtitle">{idCardEmployee.branch ? (idCardEmployee.branch.toLowerCase().includes('branch') ? idCardEmployee.branch : `${idCardEmployee.branch} Branch`) : 'Office Management'}</div></div>
-                <div className="id-card-photo-wrap"><Avatar name={idCardEmployee.name} size="xl" className="id-card-photo-img" /></div>
+                <div className="id-card-photo-wrap"><Avatar name={idCardEmployee.name} size="xl" className="id-card-photo-img" src={idCardEmployee.avatar || idCardEmployee.photoUrl} /></div>
                 <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(idCardEmployee.name)}</h2><p className="id-card-emp-role">{idCardEmployee.designation || idCardEmployee.role}</p></div>
                 <div className="id-card-details-grid"><div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.id}</div><div className="id-detail-label">Dept.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.department}</div><div className="id-detail-label">Deg.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.designation || idCardEmployee.role}</div><div className="id-detail-label">DOB</div><div className="id-detail-colon">:</div><div className="id-detail-value">{fmtDob(idCardEmployee.dob)}</div><div className="id-detail-label">Email</div><div className="id-detail-colon">:</div><div className="id-detail-value" title={idCardEmployee.workEmail || idCardEmployee.email}>{idCardEmployee.workEmail || idCardEmployee.email}</div></div>
               </div>

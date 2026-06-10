@@ -74,77 +74,42 @@ const ActivityLogs = () => {
     }, 4000);
   };
 
-  // --- Seed data extensions for interactive states ---
   // Active User Sessions
-  const [activeSessions, setActiveSessions] = useState([
-    { id: 'SES-9421', employeeName: 'Balram', ipAddress: '103.45.201.8', location: 'Delhi, India', device: 'desktop', browser: 'Chrome', loginTime: '2026-06-04 10:15', mfa: 'Verified', status: 'active' },
-    { id: 'SES-8310', employeeName: 'Vikram Singh', ipAddress: '172.16.89.4', location: 'Noida, India', device: 'desktop', browser: 'Firefox', loginTime: '2026-06-04 11:30', mfa: 'Verified', status: 'active' },
-    { id: 'SES-7120', employeeName: 'Ananya Gupta', ipAddress: '192.168.2.14', location: 'Bangalore, India', device: 'laptop', browser: 'Safari', loginTime: '2026-06-04 12:45', mfa: 'Verified', status: 'active' },
-    { id: 'SES-6015', employeeName: 'Rohit Sharma', ipAddress: '103.45.201.21', location: 'Mumbai, India', device: 'mobile', browser: 'Chrome Mobile', loginTime: '2026-06-04 14:10', mfa: 'Bypassed (IP)', status: 'active' },
-    { id: 'SES-5982', employeeName: 'Priya Patel', ipAddress: '10.0.0.122', location: 'Ahmedabad, India', device: 'tablet', browser: 'Safari Mobile', loginTime: '2026-06-04 15:05', mfa: 'Verified', status: 'active' }
-  ]);
+  const [activeSessions, setActiveSessions] = useState([]);
 
   // Whitelisted IPs
-  const [whitelistedIPs, setWhitelistedIPs] = useState([
-    { id: 'WIP-001', cidrBlock: '103.45.201.0/24', description: 'Delhi Corporate Office Gateway', scope: 'Global', addedBy: 'Super Admin', addedDate: '2026-01-15' },
-    { id: 'WIP-002', cidrBlock: '172.16.89.0/24', description: 'Noida Branch Office Server Room', scope: 'Internal', addedBy: 'Security Lead', addedDate: '2026-03-22' },
-    { id: 'WIP-003', cidrBlock: '192.168.2.0/24', description: 'Bangalore Office Production IP', scope: 'Global', addedBy: 'IT Auditor', addedDate: '2026-04-10' }
-  ]);
+  const [whitelistedIPs, setWhitelistedIPs] = useState([]);
 
   // Settings & Configuration Changes Log
-  const [configChanges, setConfigChanges] = useState([
-    { id: 'CCN-001', operator: 'Balram', key: 'central_mfa_policy', prev: 'MFA_OPTIONAL', next: 'MFA_MANDATORY_ALL', scope: 'Security', timestamp: '2026-06-03 14:20' },
-    { id: 'CCN-002', operator: 'Neha Verma', key: 'payroll_disbursement_day', prev: '28th', next: '30th', scope: 'Payroll', timestamp: '2026-06-02 09:15' },
-    { id: 'CCN-003', operator: 'Balram', key: 'max_daily_login_attempts', prev: '5 Attempts', next: '3 Attempts', scope: 'Security', timestamp: '2026-05-30 17:50' },
-    { id: 'CCN-004', operator: 'Suresh Kumar', key: 'cron_payroll_sync_interval', prev: '0 0 * * *', next: '0 0/12 * * *', scope: 'System', timestamp: '2026-05-28 11:10' }
-  ]);
+  const [configChanges, setConfigChanges] = useState([]);
 
   // Admin High-Privilege Operations Log
-  const [adminOps, setAdminOps] = useState([
-    { id: 'AOP-001', operator: 'Balram', action: 'Trigger Production DB Backup', target: 'Postgres DB Cluster', managerSig: 'Verified', auditorSig: 'Verified', status: 'Executed', timestamp: '2026-06-04 03:00' },
-    { id: 'AOP-002', operator: 'Neha Verma', action: 'Promoted Vikram Singh to Admin', target: 'User Roles & Permissions', managerSig: 'Verified', auditorSig: 'Pending', status: 'Pending Verification', timestamp: '2026-06-04 13:40' },
-    { id: 'AOP-003', operator: 'Balram', action: 'Purged 180-Day System Logs', target: 'Syslog Indexes', managerSig: 'Verified', auditorSig: 'Verified', status: 'Executed', timestamp: '2026-06-01 10:00' },
-    { id: 'AOP-004', operator: 'Suresh Kumar', action: 'Exported Financial Budget Sheet', target: 'Billing Core API', managerSig: 'Pending', auditorSig: 'Pending', status: 'Awaiting Authorization', timestamp: '2026-06-04 15:30' }
-  ]);
+  const [adminOps, setAdminOps] = useState([]);
 
   // System diagnostics connection stats
   const [diagnostics] = useState({
-    dbPoolActive: 14,
-    dbPoolMax: 50,
-    cpuUsage: 48,
-    ramUsage: 72,
-    diskUsage: 64,
-    queueUptime: '99.98%',
-    activeCronJobs: 8
+    dbPoolActive: 0,
+    dbPoolMax: 0,
+    cpuUsage: 0,
+    ramUsage: 0,
+    diskUsage: 0,
+    queueUptime: '—',
+    activeCronJobs: 0
   });
 
   // Dynamic enrichment of baseline activity logs
   const enrichedLogs = useMemo(() => {
-    const defaultIPs = ['103.45.201.8', '172.16.89.4', '192.168.2.14', '103.45.201.21', '10.0.0.122', '192.168.1.45', '103.45.201.1'];
-    const defaultDevices = ['desktop', 'mobile', 'tablet', 'laptop'];
-    const defaultBrowsers = ['Chrome', 'Firefox', 'Safari', 'Edge'];
-    const defaultMacs = ['00:1A:2B:3C:4D:5E', '3C:5A:B1:D2:C3:E4', 'FF:AA:88:99:33:EE', '12:34:56:78:9A:BC'];
-    const defaultRoles = {
-      'Balram': 'Super Admin',
-      'Vikram Singh': 'Engineering Manager',
-      'Ananya Gupta': 'Senior Developer',
-      'Rohit Sharma': 'Sales Representative',
-      'Priya Patel': 'Marketing Lead',
-      'Arjun Mehta': 'QA Associate',
-      'Neha Verma': 'HR Executive'
-    };
-
-    return activityLogs.map((log, idx) => ({
+    return activityLogs.map((log) => ({
       ...log,
-      role: defaultRoles[log.employeeName] || 'Employee',
-      ipAddress: log.ipAddress || defaultIPs[idx % defaultIPs.length],
-      deviceType: log.deviceType || defaultDevices[idx % defaultDevices.length],
-      browser: log.browser || defaultBrowsers[idx % defaultBrowsers.length],
-      macAddress: log.macAddress || defaultMacs[idx % defaultMacs.length],
-      details: log.details || `Low-level audit footprint for action: '${log.action}' on module: '${log.module}'. Target resource integrity verified.`,
+      role: log.role || 'Employee',
+      ipAddress: log.ipAddress || '—',
+      deviceType: log.deviceType || 'desktop',
+      browser: log.browser || '—',
+      macAddress: log.macAddress || '—',
+      details: log.details || `Audit footprint for action: '${log.action}' on module: '${log.module}'.`,
       payloadDiff: log.payloadDiff || {
-        previous: `{"status": "active", "updated_at": "2026-06-03", "operator": "${log.employeeName}"}`,
-        newVal: `{"status": "modified", "updated_at": "2026-06-04", "operator": "${log.employeeName}"}`
+        previous: `{"status": "active", "updated_at": "", "operator": "${log.employeeName}"}`,
+        newVal: `{"status": "modified", "updated_at": "", "operator": "${log.employeeName}"}`
       }
     }));
   }, [activityLogs]);
@@ -318,28 +283,44 @@ const ActivityLogs = () => {
   };
 
   // --- Analytics Charts Data ---
-  const trendsData = [
-    { name: '00:00', total: 1800, success: 1780, failures: 20 },
-    { name: '04:00', total: 950, success: 940, failures: 10 },
-    { name: '08:00', total: 4200, success: 4120, failures: 80 },
-    { name: '12:00', total: 8900, success: 8780, failures: 120 },
-    { name: '16:00', total: 6480, success: 6390, failures: 90 },
-    { name: '20:00', total: 3100, success: 3080, failures: 20 }
-  ];
+  const trendsData = useMemo(() => {
+    const groups = {};
+    enrichedLogs.forEach(log => {
+      const dateStr = log.timestamp ? log.timestamp.split(' ')[0] : 'Unknown';
+      if (!groups[dateStr]) {
+        groups[dateStr] = { name: dateStr, total: 0, failures: 0 };
+      }
+      groups[dateStr].total += 1;
+      if (log.status === 'danger' || log.status === 'warning') {
+        groups[dateStr].failures += 1;
+      }
+    });
+    return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name)).slice(-7);
+  }, [enrichedLogs]);
 
-  const moduleDistributionData = [
-    { name: 'Auth Core', count: 480, fill: '#3b82f6' },
-    { name: 'Payroll API', count: 320, fill: '#10b981' },
-    { name: 'Workflows', count: 240, fill: '#f59e0b' },
-    { name: 'Employees', count: 180, fill: '#ef4444' },
-    { name: 'System Settings', count: 120, fill: '#8b5cf6' }
-  ];
+  const moduleDistributionData = useMemo(() => {
+    const counts = {};
+    enrichedLogs.forEach(log => {
+      const mod = log.module || 'Other';
+      counts[mod] = (counts[mod] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, count], index) => ({
+      name,
+      count,
+      fill: CHART_COLORS[index % CHART_COLORS.length]
+    })).sort((a, b) => b.count - a.count).slice(0, 6);
+  }, [enrichedLogs]);
 
-  const statusDistributionData = [
-    { name: 'Success', value: 18240, fill: '#10b981' },
-    { name: 'Warning', value: 340, fill: '#f59e0b' },
-    { name: 'Danger', value: 85, fill: '#ef4444' }
-  ];
+  const statusDistributionData = useMemo(() => {
+    const successCount = enrichedLogs.filter(l => l.status === 'success').length;
+    const warningCount = enrichedLogs.filter(l => l.status === 'warning').length;
+    const dangerCount = enrichedLogs.filter(l => l.status === 'danger').length;
+    return [
+      { name: 'Success', value: successCount || (enrichedLogs.length === 0 ? 1 : 0), fill: '#10b981' },
+      { name: 'Warning', value: warningCount, fill: '#f59e0b' },
+      { name: 'Danger', value: dangerCount, fill: '#ef4444' }
+    ].filter(d => d.value > 0);
+  }, [enrichedLogs]);
 
   if (isLoading) {
     return (
