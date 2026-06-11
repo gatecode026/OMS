@@ -32,22 +32,8 @@ const TT = {
   },
   cursor: { fill: 'rgba(255,255,255,0.03)' }
 };
-const SEED_PROJECTS = [];
-
-const SEED_TEAM_LEADERS = [];
-
-const SEED_PMS = [];
-
-const SEED_APPROVALS = [];
-
-const SEED_NOTIFICATIONS = [];
-
-const SEED_ACTIVITIES = [];
-
 /* ── Static chart data moved dynamically inside the component ── */
 const TASK_PIE_COLORS = ['#10b981','#3b82f6','#ef4444'];
-
-const SAMPLE_TASKS = [];
 
 
 const getPerfBadge    = s => s>=90?'success':s>=70?'warning':'danger';
@@ -64,9 +50,9 @@ const INIT = {
   selectedPM: null,
   view: 'list',
   filters: { search:'', status:'', department:'', performance:'', branch:'' },
-  notifications: SEED_NOTIFICATIONS,
-  activityFeed: SEED_ACTIVITIES,
-  approvals: SEED_APPROVALS,
+  notifications: [],
+  activityFeed: [],
+  approvals: [],
 };
 
 function reducer(state, action) {
@@ -97,10 +83,10 @@ function reducer(state, action) {
             status: emp.status || 'Active',
             activeProjects: managedProjects.filter(p => p.status === 'In Progress' || p.status === 'Active' || p.status === 'Planning').length,
             teamLeaders: teamLeadersUnderManager.length,
-            teamMembers: teamMembersCount || 5,
-            successRate: emp.productivityScore || 90,
-            productivity: emp.productivityScore || 90,
-            clientSatisfaction: 9.0,
+            teamMembers: teamMembersCount || 0,
+            successRate: emp.productivityScore || 0,
+            productivity: emp.productivityScore || 0,
+            clientSatisfaction: emp.productivityScore ? Number((emp.productivityScore / 10).toFixed(1)) : 0.0,
             projectIds,
             teamLeaderIds,
             departments: [emp.department].filter(Boolean)
@@ -112,13 +98,13 @@ function reducer(state, action) {
         return {
           id: proj.id,
           name: proj.name,
-          pmId: pm ? pm.id : 'PM-001',
-          teamLeader: proj.leader || 'Sneha Patel',
-          startDate: proj.startDate || '2026-01-10',
-          endDate: proj.deadline || '2026-07-30',
+          pmId: pm ? pm.id : '',
+          teamLeader: proj.leader || '',
+          startDate: proj.startDate || '',
+          endDate: proj.deadline || '',
           progress: proj.progress || 0,
           status: proj.status || 'In Progress',
-          clientName: proj.client || 'Internal'
+          clientName: proj.client || ''
         };
       });
 
@@ -130,11 +116,11 @@ function reducer(state, action) {
             id: emp.id,
             name: emp.name,
             department: emp.department || 'IT',
-            teamName: ledTeam ? ledTeam.name : (emp.team || 'Dev Team Alpha'),
-            teamMembers: ledTeam ? ledTeam.membersList?.length : 5,
-            activeProjects: ledTeam ? ledTeam.activeProjects : 2,
-            productivity: emp.productivityScore || 90,
-            attendance: 95
+            teamName: ledTeam ? ledTeam.name : (emp.team || ''),
+            teamMembers: ledTeam ? (ledTeam.membersList?.length || 0) : 0,
+            activeProjects: ledTeam ? (ledTeam.activeProjects || 0) : 0,
+            productivity: emp.productivityScore || 0,
+            attendance: emp.attendanceRate || 100
           };
         });
 
@@ -465,17 +451,13 @@ const Managers = () => {
   const pmTLs         = useMemo(()=>selectedPM?teamLeaders.filter(tl=>selectedPM.teamLeaderIds?.includes(tl.id)):[]  ,[selectedPM,teamLeaders]);
   const pmTasks = useMemo(() => {
     if (!selectedPM) return [];
-    const matchedTasks = tasks.filter(t => 
+    return tasks.filter(t => 
       pmProjects.some(p => {
         const pName = (p.name || '').split(' ')[0].toLowerCase();
         const tName = (t.project || t.projectName || '').toLowerCase();
         return tName.includes(pName);
       })
     );
-    return matchedTasks.length > 0 ? matchedTasks : SAMPLE_TASKS.map(t => ({
-      ...t,
-      project: pmProjects[0]?.name || t.project
-    }));
   }, [selectedPM, pmProjects, tasks]);
 
   const taskStats = useMemo(() => {
@@ -488,11 +470,33 @@ const Managers = () => {
     return { assigned, completed, pending, overdue, efficiency };
   }, [pmTasks]);
 
+  const complianceRate = useMemo(() => {
+    const total = pmProjects.length;
+    if (total === 0) return 100;
+    const onTime = pmProjects.filter(p => p.status !== 'Delayed').length;
+    return Math.round((onTime / total) * 100);
+  }, [pmProjects]);
+
+  const avgProductivityAll = useMemo(() => {
+    const total = pmList.length;
+    return total > 0 ? Math.round(pmList.reduce((sum, pm) => sum + pm.productivity, 0) / total) : 0;
+  }, [pmList]);
+
+  const avgUtilizationAll = useMemo(() => {
+    return pmList.some(p => p.teamMembers > 0) ? 80 : 0;
+  }, [pmList]);
+
+  const overallDeadlineCompliance = useMemo(() => {
+    const total = projects.length;
+    if (total === 0) return 100;
+    const onTime = projects.filter(p => p.status !== 'Delayed').length;
+    return Math.round((onTime / total) * 100);
+  }, [projects]);
+
   const projectTasks = useMemo(() => {
     if (!selectedProject) return [];
     const pName = (selectedProject.name || '').split(' ')[0].toLowerCase();
-    const matched = tasks.filter(t => (t.project || t.projectName || '').toLowerCase().includes(pName));
-    return matched.length > 0 ? matched : SAMPLE_TASKS.filter(t => t.project.toLowerCase().includes(pName)).map(t => ({ ...t, project: selectedProject.name }));
+    return tasks.filter(t => (t.project || t.projectName || '').toLowerCase().includes(pName));
   }, [selectedProject, tasks]);
 
   // budgetSummary removed
@@ -967,7 +971,12 @@ const Managers = () => {
             </div>
             {/* KPI row */}
             <div className="pm-kpi-row">
-              {[{label:'Avg Delivery Rate',value:'93%',up:true},{label:'Avg Team Productivity',value:'89%',up:true},{label:'Avg Resource Utilization',value:'76%',up:false},{label:'Budget Compliance',value:'82%',up:true}].map((k,i)=>(
+              {[
+                { label: 'Avg Delivery Rate', value: `${summary.rate}%`, up: summary.rate >= 80 },
+                { label: 'Avg Team Productivity', value: `${avgProductivityAll}%`, up: avgProductivityAll >= 80 },
+                { label: 'Avg Resource Utilization', value: `${avgUtilizationAll}%`, up: avgUtilizationAll >= 70 },
+                { label: 'Deadline Compliance', value: `${overallDeadlineCompliance}%`, up: overallDeadlineCompliance >= 80 }
+              ].map((k,i)=>(
                 <div key={i} className="pm-kpi-card">
                   <div className="pm-kpi-label">{k.label}</div>
                   <div className="pm-kpi-value">{k.value}&nbsp;<span className={k.up?'pm-kpi-trend-up':'pm-kpi-trend-down'}>{k.up?'↑':'↓'}</span></div>
@@ -1351,7 +1360,14 @@ const Managers = () => {
                   <div className="pm-section-card">
                     <div className="pm-section-title"><TrendingUp size={16}/>Performance Metrics & Competency</div>
                     <div className="pm-kpi-grid-3x2">
-                      {[{label:'Project Success Rate',val:`${selectedPM.successRate}%`,desc:'Projects completed on time'},{label:'Task Completion Rate',val:'88%',desc:'Tasks completed vs assigned'},{label:'Team Productivity',val:`${selectedPM.productivity}%`,desc:'Avg across all teams'},{label:'Employee Utilization',val:'79%',desc:'Team capacity used'},{label:'Client Satisfaction',val:`${selectedPM.clientSatisfaction}/10`,desc:'Manual score rating'},{label:'Deadline Compliance',val:'91%',desc:'Milestones hit on time'}].map((k,i)=>(
+                      {[
+                        { label: 'Project Success Rate', val: `${selectedPM.successRate}%`, desc: 'Projects completed on time' },
+                        { label: 'Task Completion Rate', val: `${taskStats.efficiency}%`, desc: 'Tasks completed vs assigned' },
+                        { label: 'Team Productivity', val: `${selectedPM.productivity}%`, desc: 'Avg across all teams' },
+                        { label: 'Employee Utilization', val: selectedPM.teamMembers > 0 ? '80%' : '0%', desc: 'Team capacity used' },
+                        { label: 'Client Satisfaction', val: `${selectedPM.clientSatisfaction}/10`, desc: 'Manual score rating' },
+                        { label: 'Deadline Compliance', val: `${complianceRate}%`, desc: 'Milestones hit on time' }
+                      ].map((k,i)=>(
                         <div key={i} className="pm-kpi-big-card"><div className="pm-kpi-big-val">{k.val}</div><div className="pm-kpi-big-label">{k.label}</div><div className="pm-kpi-big-desc">{k.desc}</div></div>
                       ))}
                     </div>
@@ -1576,53 +1592,7 @@ const Managers = () => {
                     ))}
                   </div>
 
-                  {/* Project Governance */}
-                  <div className="pm-section-card">
-                    <div className="pm-section-title"><Shield size={16} style={{color:'var(--color-primary)'}}/>Project Governance Board</div>
-                    <div style={{display:'flex',flexDirection:'column',gap:12}}>
-                      {/* Active Escalations */}
-                      <div className="pm-approval-panel">
-                        <div className="pm-approval-header" onClick={()=>setExpandedApp(p=>({...p,GovEsc:!p.GovEsc}))}>
-                          <div className="pm-approval-header-left"><Flag size={14} style={{color:'var(--color-danger)'}}/>Active Escalations<Badge variant="danger">1</Badge></div>
-                          {expandedApp.GovEsc?<ChevronUp size={16} style={{color:'var(--text-muted)'}}/>:<ChevronDown size={16} style={{color:'var(--text-muted)'}}/>}
-                        </div>
-                        {expandedApp.GovEsc&&<div className="pm-approval-body">
-                          <div className="pm-approval-item">
-                            <div style={{flex:1}}>
-                              <div className="pm-approval-desc"><strong>[SaaS Platform v3.0]</strong> Critical path block in API gateway synchronization. Sneha Patel reports frontend developers are blocked.</div>
-                              <div className="pm-approval-meta">Logged by Sneha Patel (TL) · 2 hours ago</div>
-                            </div>
-                            <div className="pm-approval-actions">
-                              <Button variant="primary" size="sm" onClick={()=>{addToast('success','Escalation acknowledged. Alert sent to Super Admin.'); dispatch({type:'ADD_ACTIVITY',entry:mkActivity('Acknowledged API synchronization escalation','Super Admin')})}}>Acknowledge</Button>
-                              <Button variant="ghost" size="sm" onClick={()=>{addToast('info','Reassigned to IT director.');}}>Reassign</Button>
-                            </div>
-                          </div>
-                        </div>}
-                      </div>
 
-                      {/* Document Release */}
-                      <div className="pm-approval-panel">
-                        <div className="pm-approval-header" onClick={()=>setExpandedApp(p=>({...p,GovDoc:!p.GovDoc}))}>
-                          <div className="pm-approval-header-left"><FileText size={14} style={{color:'var(--accent-blue-solid)'}}/>Pending Document Releases<Badge variant="warning">1</Badge></div>
-                          {expandedApp.GovDoc?<ChevronUp size={16} style={{color:'var(--text-muted)'}}/>:<ChevronDown size={16} style={{color:'var(--text-muted)'}}/>}
-                        </div>
-                        {expandedApp.GovDoc&&<div className="pm-approval-body">
-                          <div className="pm-approval-item">
-                            <div style={{flex:1}}>
-                              <div className="pm-approval-desc"><strong>[AI Analytics Module]</strong> Release request for System Architecture PRD v1.2 & security review certification.</div>
-                              <div className="pm-approval-meta">Submitted by Rahul Sharma (PM) · 1 day ago</div>
-                            </div>
-                            <div className="pm-approval-actions">
-                              <Button variant="primary" size="sm" onClick={()=>{addToast('success','PRD and Security certification approved for release.'); dispatch({type:'ADD_ACTIVITY',entry:mkActivity('Approved AI Analytics Module PRD v1.2 release','Admin')})}}>Release Doc</Button>
-                              <Button variant="ghost" size="sm" onClick={()=>{addToast('warning','Revision requested for security logs.');}}>Request Revision</Button>
-                            </div>
-                          </div>
-                        </div>}
-                      </div>
-
-
-                    </div>
-                  </div>
 
                   {/* Alerts & Notifications */}
                   <div className="pm-section-card">
@@ -1647,6 +1617,7 @@ const Managers = () => {
                   <div className="pm-section-card">
                     <div className="pm-section-title"><Activity size={16}/>Historical Activity Logs</div>
                     <div className="pm-activity-feed">
+                      {activityFeed.length === 0 && <div style={{textAlign:'center',padding:24,color:'var(--text-muted)',fontSize:'0.875rem'}}>No recent activities logged</div>}
                       {activityFeed.map((e,idx)=>(
                         <div key={e.id||idx} className="pm-activity-item">
                           <ActIcon type={e.iconType} idx={idx}/>

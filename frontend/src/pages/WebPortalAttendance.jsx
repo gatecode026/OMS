@@ -386,7 +386,7 @@ const WebPortalAttendance = () => {
       const breakTime = record?.breakTime || '45 mins';
       const punchIn = record?.punchIn || '';
       const punchOut = record?.punchOut || '';
-      const totalHours = record ? (record.totalHours || 0) : helperCalculateHours(punchIn, punchOut, breakTime);
+      const totalHours = (record && record.totalHours) ? record.totalHours : helperCalculateHours(punchIn, punchOut, breakTime);
 
       initialState[emp.id] = {
         punchIn: punchIn,

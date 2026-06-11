@@ -72,6 +72,33 @@ const normalizeWorkMode = (mode) => {
   return 'WFO';
 };
 
+const calculateWorkingHours = (punchIn, punchOut) => {
+  if (!punchIn || !punchOut || punchIn === '--:--' || punchOut === '--:--') return 0;
+  try {
+    const parseTime = (timeStr) => {
+      let standardized = timeStr.trim().toUpperCase();
+      if (/^[0-9]{1,2}:[0-9]{2}[AP]M$/.test(standardized)) {
+        standardized = standardized.replace(/([AP]M)$/, ' $1');
+      }
+      const parsed = new Date(`2000/01/01 ${standardized}`);
+      return parsed;
+    };
+
+    const inTime = parseTime(punchIn);
+    const outTime = parseTime(punchOut);
+    if (isNaN(inTime.getTime()) || isNaN(outTime.getTime())) return 0;
+    
+    let diffMs = outTime - inTime;
+    if (diffMs < 0) {
+      diffMs += 24 * 60 * 60 * 1000;
+    }
+    const diffHours = diffMs / (1000 * 60 * 60);
+    return Math.round(diffHours * 100) / 100; // round to 2 decimal places
+  } catch (e) {
+    return 0;
+  }
+};
+
 const Attendance = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
@@ -251,51 +278,7 @@ const Attendance = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [breakModalOpen]);
 
-  // Automation Rules State (with localStorage persistence)
-  const [automationRules, setAutomationRules] = useState(() => {
-    const saved = localStorage.getItem('attendance_automation_rules');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.map(rule => {
-            let icon = Cpu;
-            if (rule.id === 1) icon = UserMinus;
-            else if (rule.id === 2) icon = Bell;
-            else if (rule.id === 3) icon = Clock;
-            else if (rule.id === 4) icon = FileText;
-            else if (rule.id === 5) icon = Target;
-            else if (rule.id === 6) icon = Smartphone;
-            return { ...rule, icon };
-          });
-        }
-      } catch (e) {
-        console.error("Error parsing automation rules from localStorage", e);
-      }
-    }
-    return [
-      { id: 1, name: 'Auto Mark Absent', desc: 'Mark absent if no punch by 11 AM', active: true, icon: UserMinus },
-      { id: 2, name: 'Late Alert Email', desc: 'Send email when employee is 30+ min late', active: true, icon: Bell },
-      { id: 3, name: 'OT Calculation', desc: 'Calculate overtime automatically post 8 hrs', active: true, icon: Clock },
-      { id: 4, name: 'Monthly Report', desc: 'Auto-send reports on 1st of each month', active: false, icon: FileText },
-      { id: 5, name: 'Leave Deduction', desc: 'Auto deduct from leave balance on absence', active: true, icon: Target },
-      { id: 6, name: 'SMS Notification', desc: 'Send SMS for consecutive 3-day absences', active: false, icon: Smartphone },
-    ];
-  });
 
-  // Save automation rules to localStorage when changed
-  useEffect(() => {
-    localStorage.setItem('attendance_automation_rules', JSON.stringify(automationRules));
-  }, [automationRules]);
-
-  // Toggle automation rule
-  const toggleAutomationRule = (ruleId) => {
-    setAutomationRules(prev => prev.map(rule => 
-      rule.id === ruleId ? { ...rule, active: !rule.active } : rule
-    ));
-    const rule = automationRules.find(r => r.id === ruleId);
-    addToast('success', `${rule?.name} ${rule?.active ? 'disabled' : 'enabled'} successfully.`);
-  };
 
 
 
@@ -590,7 +573,10 @@ const Attendance = () => {
                 status = foundLeave.type;
               }
             }
-            const totalHours = item.totalHours || 0;
+            let totalHours = item.totalHours || 0;
+            if (totalHours <= 0 && item.punchIn && item.punchOut && item.punchIn !== '--:--' && item.punchOut !== '--:--') {
+              totalHours = calculateWorkingHours(item.punchIn, item.punchOut);
+            }
             records.push({
               ...item,
               status,
@@ -602,7 +588,8 @@ const Attendance = () => {
               source: item.source || 'Biometric',
               breakTime: item.breakTime || '45 mins',
               workMode: item.workMode || empDetails?.workMode || 'WFO',
-              overtime: item.overtime || (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
+              totalHours,
+              overtime: (item.overtime && item.overtime !== '0 hrs') ? item.overtime : (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
             });
           });
         } else {
@@ -663,7 +650,10 @@ const Attendance = () => {
           status = foundLeave.type;
         }
       }
-      const totalHours = item.totalHours || 0;
+      let totalHours = item.totalHours || 0;
+      if (totalHours <= 0 && item.punchIn && item.punchOut && item.punchIn !== '--:--' && item.punchOut !== '--:--') {
+        totalHours = calculateWorkingHours(item.punchIn, item.punchOut);
+      }
       return {
         ...item,
         status,
@@ -672,7 +662,8 @@ const Attendance = () => {
         source: item.source || 'Biometric',
         breakTime: item.breakTime || '45 mins',
         workMode: item.workMode || empDetails?.workMode || 'WFO',
-        overtime: item.overtime || (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
+        totalHours,
+        overtime: (item.overtime && item.overtime !== '0 hrs') ? item.overtime : (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
       };
     });
     
@@ -1017,18 +1008,6 @@ const Attendance = () => {
     });
   }, [branches, scopedEmployees, kpiFilteredAttendance]);
 
-  // Live punch feed data with real employees
-  const livePunchFeed = useMemo(() => {
-    const recentAttendances = [...attendance].reverse().slice(0, 10);
-    return recentAttendances.map(att => ({
-      name: att.employeeName,
-      action: att.punchIn && !att.punchOut ? 'Punched In' : (att.punchOut ? 'Punched Out' : 'No Punch'),
-      time: att.punchIn || '--:--',
-      source: att.source || 'Biometric',
-      type: att.punchIn && !att.punchOut ? 'in' : (att.punchOut ? 'out' : 'absent'),
-      dept: att.department
-    }));
-  }, [attendance]);
 
   // ─── Helper: Export CSV ───
   const handleDownloadReport = () => {
@@ -1483,7 +1462,6 @@ const Attendance = () => {
         {[
           currentUserRole !== 'employee' && { id: 'overview', label: 'Overview & Analytics', icon: BarChart2 },
           { id: 'records', label: 'Attendance Records', icon: FileText },
-          currentUserRole !== 'employee' && { id: 'monitor', label: 'Live Punch Monitor', icon: Activity },
           currentUserRole !== 'employee' && { id: 'branches', label: 'Branch Management', icon: Building },
           currentUserRole !== 'employee' && { id: 'reports', label: 'Reports & Export', icon: Download },
         ].filter(Boolean).map(tab => {
@@ -1606,89 +1584,7 @@ const Attendance = () => {
             </div>
           </div>
 
-          {/* Punch In/Out Monitor Widget */}
-          <div className="card att-punch-monitor-card">
-            <div className="att-card-header">
-              <div className="att-card-title">
-                <Activity size={16} style={{ color: '#4ade80' }} />
-                <span>Live Punch Monitor</span>
-              </div>
-              <div className="att-live-badge">
-                <span className="att-live-dot" />
-                <span>LIVE</span>
-              </div>
-            </div>
-            <div className="att-punch-feed">
-              {livePunchFeed.length > 0 ? livePunchFeed.map((ev, i) => (
-                <div key={i} className="att-feed-item">
-                  <div className={`att-feed-dot att-feed-${ev.type}`} />
-                  <Avatar name={ev.name} size="xs" />
-                  <div className="att-feed-info">
-                    <strong>{ev.name}</strong>
-                    <span className="att-feed-action">{ev.action}</span>
-                    <span className="att-feed-meta">{ev.time} · {ev.source} · {ev.dept}</span>
-                  </div>
-                  <div className={`att-feed-type-tag att-type-${ev.type}`}>
-                    {ev.type === 'in' ? '↑ In' : ev.type === 'out' ? '↓ Out' : ev.type === 'late' ? '⚠ Late' : '❌'}
-                  </div>
-                </div>
-              )) : (
-                <div className="att-empty-feed">No recent punch activity</div>
-              )}
-            </div>
-            <div className="att-punch-footer">
-              <div className="att-punch-stat-row">
-                <div className="att-punch-mini-stat">
-                  <span>Today Punched In</span>
-                  <strong style={{ color: '#4ade80' }}>{statusCounts.present}</strong>
-                </div>
-                <div className="att-punch-mini-stat">
-                  <span>Punched Out</span>
-                  <strong style={{ color: '#60a5fa' }}>{Math.floor(statusCounts.present * 0.6)}</strong>
-                </div>
-                <div className="att-punch-mini-stat">
-                  <span>Still Working</span>
-                  <strong style={{ color: '#fbbf24' }}>{statusCounts.present - Math.floor(statusCounts.present * 0.6)}</strong>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {currentUserRole !== 'employee' && (
-            <div className="card att-automation-rules-card" style={{ gridColumn: 'span 2' }}>
-              <div className="att-card-header">
-                <div className="att-card-title">
-                  <Cpu size={16} style={{ color: 'var(--color-primary)' }} />
-                  <span>Attendance Automation & Alert Rules</span>
-                </div>
-                <Button variant="secondary" size="sm" onClick={handleScheduleReport}>
-                  Schedule Reports
-                </Button>
-              </div>
-              <div className="att-rules-list">
-                {automationRules.map(rule => {
-                  const RuleIcon = rule.icon || Cpu;
-                  return (
-                    <div key={rule.id} className="att-rule-row">
-                      <div className={`att-rule-icon-wrap ${rule.active ? 'att-rule-icon-on' : 'att-rule-icon-off'}`}>
-                        <RuleIcon size={16} />
-                      </div>
-                      <div className="att-rule-info">
-                        <strong>{rule.name}</strong>
-                        <span>{rule.desc}</span>
-                      </div>
-                      <button
-                        className={`att-rule-toggle ${rule.active ? 'att-rule-on' : 'att-rule-off'}`}
-                        onClick={() => toggleAutomationRule(rule.id)}
-                      >
-                        {rule.active ? 'Active' : 'Disabled'}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -1839,101 +1735,6 @@ const Attendance = () => {
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ LIVE PUNCH MONITOR ═══ */}
-      {activeSection === 'monitor' && (
-        <div className="att-monitor-grid">
-          <div className="card att-full-punch-card">
-            <div className="att-card-header">
-              <div className="att-card-title">
-                <Activity size={16} style={{ color: '#4ade80' }} />
-                <span>Real-Time Punch Feed</span>
-              </div>
-              <div className="att-live-badge">
-                <span className="att-live-dot" />
-                <span>LIVE</span>
-              </div>
-            </div>
-            <div className="att-monitor-feed-full">
-              {livePunchFeed.length > 0 ? livePunchFeed.map((ev, i) => (
-                <div key={i} className="att-monitor-feed-row">
-                  <div className={`att-feed-dot att-feed-${ev.type}`} style={{ flexShrink: 0 }} />
-                  <Avatar name={ev.name} size="sm" />
-                  <div className="att-monitor-info">
-                    <strong>{ev.name}</strong>
-                    <span>{ev.dept}</span>
-                  </div>
-                  <span className="att-monitor-action">{ev.action}</span>
-                  <span className="att-monitor-source">{ev.source}</span>
-                  <span className="att-monitor-time">{ev.time}</span>
-                </div>
-              )) : (
-                <div className="att-empty-feed-full">No recent punch activity. Mark attendance to see live feed.</div>
-              )}
-            </div>
-          </div>
-
-          <div className="att-monitor-right-col">
-            {/* Punch Out Monitoring */}
-            <div className="card att-punch-out-card">
-              <div className="att-card-header">
-                <div className="att-card-title">
-                  <Clock size={15} style={{ color: '#60a5fa' }} />
-                  <span>Punch Out Monitoring</span>
-                </div>
-              </div>
-              <div className="att-punch-out-list">
-                {filteredAttendance.filter(a => a.punchIn && !a.punchOut).slice(0, 5).map((emp, i) => (
-                  <div key={i} className="att-pout-row">
-                    <Avatar name={emp.employeeName} size="xs" />
-                    <div className="att-pout-info">
-                      <strong>{emp.employeeName}</strong>
-                      <span>{emp.department}</span>
-                    </div>
-                    <div className="att-pout-times">
-                      <span>In: {emp.punchIn}</span>
-                      <span>Expected: {emp.shift?.split('-')[1] || '06:00 PM'}</span>
-                    </div>
-                    <span className="att-pout-status att-warn">Still Working</span>
-                  </div>
-                ))}
-                {filteredAttendance.filter(a => a.punchIn && !a.punchOut).length === 0 && (
-                  <div className="att-empty-out">No active punches</div>
-                )}
-              </div>
-            </div>
-
-            {/* Source Breakdown */}
-            <div className="card att-source-card">
-              <div className="att-card-header">
-                <div className="att-card-title">
-                  <Fingerprint size={15} style={{ color: '#a78bfa' }} />
-                  <span>Punch Source Breakdown</span>
-                </div>
-              </div>
-              <div className="att-source-list">
-                {[
-                  { label: 'Biometric', count: filteredAttendance.filter(a => a.source === 'Biometric').length, pct: 57, icon: '⚙️', color: '#4ade80' },
-                  { label: 'GPS (Mobile)', count: filteredAttendance.filter(a => a.source === 'GPS').length, pct: 23, icon: '📍', color: '#60a5fa' },
-                  { label: 'RFID', count: filteredAttendance.filter(a => a.source === 'RFID').length, pct: 12, icon: '💳', color: '#fbbf24' },
-                  { label: 'Web Portal', count: filteredAttendance.filter(a => a.source === 'Web Portal').length, pct: 8, icon: '💻', color: '#a78bfa' },
-                ].map((src, i) => (
-                  <div key={i} className="att-src-item">
-                    <span className="att-src-icon">{src.icon}</span>
-                    <div className="att-src-info">
-                      <span className="att-src-name">{src.label}</span>
-                      <div className="att-src-bar">
-                        <div className="att-src-bar-fill" style={{ width: `${src.pct}%`, background: src.color }} />
-                      </div>
-                    </div>
-                    <span className="att-src-count">{src.count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       )}

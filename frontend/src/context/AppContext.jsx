@@ -3442,7 +3442,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const bulkUpdatePayrollStatus = async (month, year, actionType) => {
+  const bulkUpdatePayrollStatus = async (month, year, actionType, calculatedData = []) => {
     if (!token) return false;
     let nextStatus = 'Calculated';
     if (actionType === 'verify') nextStatus = 'HR Verified';
@@ -3451,6 +3451,25 @@ export const AppProvider = ({ children }) => {
     if (actionType === 'hold') nextStatus = 'Hold';
 
     try {
+      // 1. First ensure all draft records are created in the database
+      const promises = calculatedData.map(payment => {
+        return fetch('http://localhost:5000/api/v1/payroll/payments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            ...payment,
+            month,
+            year,
+            status: nextStatus
+          })
+        });
+      });
+      await Promise.all(promises);
+
+      // 2. Call the bulk status update to align everything
       const response = await fetch('http://localhost:5000/api/v1/payroll/payments/bulk-status', {
         method: 'POST',
         headers: {
@@ -3476,22 +3495,25 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const updateSinglePayrollStatus = async (empId, month, year, status) => {
+  const updateSinglePayrollStatus = async (paymentObj, status) => {
     if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/payroll/payments/${empId}`, {
-        method: 'PUT',
+      const response = await fetch('http://localhost:5000/api/v1/payroll/payments', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ month, year, status })
+        body: JSON.stringify({
+          ...paymentObj,
+          status
+        })
       });
       const result = await response.json();
       if (result.status === 'success') {
         await fetchPayrollData();
-        addActivityLog(`Updated payroll status for ${empId} to ${status}`, 'Payroll', 'success');
-        addToast('info', `Status of employee ${empId} set to: ${status}`);
+        addActivityLog(`Updated payroll status for ${paymentObj.employeeId} to ${status}`, 'Payroll', 'success');
+        addToast('info', `Status of employee ${paymentObj.employeeId} set to: ${status}`);
         return true;
       } else {
         addToast('danger', result.message || 'Failed to update employee payroll status.');
@@ -3543,7 +3565,9 @@ export const AppProvider = ({ children }) => {
 
   const savePayrollSalaryRevision = async (empId, newBasic) => {
     if (!token) return false;
-    const current = payrollConfigs.salaryStructures[empId] || { basic: 50000 };
+    const emp = employees.find(e => e.id === empId);
+    const empBasic = Number(emp?.salaryAmount) || 0;
+    const current = payrollConfigs.salaryStructures[empId] || { basic: empBasic };
     const updatedSalaryStructures = {
       ...payrollConfigs.salaryStructures,
       [empId]: {
