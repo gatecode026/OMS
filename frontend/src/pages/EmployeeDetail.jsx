@@ -8,7 +8,7 @@ import {
   ArrowLeft, Edit2, Trash2, User, Briefcase, Calendar, Shield,
   FileText, Activity, CheckSquare, BarChart2, Download, Upload,
   ChevronDown, ChevronUp, Clock, TrendingUp, CheckCircle,
-  Building2, Lock, X
+  Building2, Lock, X, Settings
 } from 'lucide-react';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -207,7 +207,7 @@ const EmployeeDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee, currentUser } = useApp();
+  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee } = useApp();
 
   const emp = useMemo(() => employees.find(e => e.id === id), [employees, id]);
 
@@ -251,7 +251,7 @@ const EmployeeDetail = () => {
   const handleApproveLeave = (leaveId) => {
     const updatedHistory = leaveHistory.map(l => {
       if (l.id === leaveId) {
-        return { ...l, status: 'Approved', approvedBy: currentUser?.name ? `${currentUser.name} (${currentUser.role || 'Manager'})` : 'System Admin', approvedDate: new Date().toISOString().split('T')[0] };
+        return { ...l, status: 'Approved', approvedBy: 'Balram Suman (Manager)', approvedDate: new Date().toISOString().split('T')[0] };
       }
       return l;
     });
@@ -262,7 +262,7 @@ const EmployeeDetail = () => {
   const handleRejectLeave = (leaveId) => {
     const updatedHistory = leaveHistory.map(l => {
       if (l.id === leaveId) {
-        return { ...l, status: 'Rejected', approvedBy: currentUser?.name ? `${currentUser.name} (${currentUser.role || 'Manager'})` : 'System Admin', approvedDate: new Date().toISOString().split('T')[0] };
+        return { ...l, status: 'Rejected', approvedBy: 'Balram Suman (Manager)', approvedDate: new Date().toISOString().split('T')[0] };
       }
       return l;
     });
@@ -296,7 +296,7 @@ const EmployeeDetail = () => {
 
       <div className="card ed-profile-card">
         <div className="ed-profile-left">
-          <Avatar name={emp.name} size="xl" src={emp.avatar || emp.photoUrl} />
+          <Avatar name={emp.name} size="xl" src={emp.avatar || emp.photoUrl || ''} />
           <div className="ed-profile-info">
             <h1 className="ed-name">{emp.name}</h1>
             <p className="ed-designation">{emp.designation || emp.role}</p>
@@ -311,6 +311,7 @@ const EmployeeDetail = () => {
         </div>
         <div className="ed-profile-actions">
           <Button variant="primary" icon={Edit2} onClick={() => navigate(`/employees?edit=${emp.id}`)}>Edit Profile</Button>
+          <Button variant="secondary" icon={Settings} onClick={() => navigate(`/employees?edit=${emp.id}&step=7`)}>Profile Settings</Button>
           <Button variant="secondary" icon={CheckSquare} onClick={() => navigate('/tasks')}>Assign Task</Button>
           <Button variant="secondary" icon={Download} onClick={() => setShowIdCard(true)}>ID Card</Button>
           <Button variant="secondary" icon={FileText} onClick={() => navigate('/work-reports')}>View Reports</Button>
@@ -368,10 +369,10 @@ const EmployeeDetail = () => {
             <div className="ed-section-title-row" style={{ marginTop: 'var(--spacing-4)' }}><h3>Address Details</h3></div>
             <div className="ed-fields-grid">
               {[
-                ['City', emp.city || '—'],
-                ['State', emp.state || '—'],
-                ['Country', emp.country || 'India'],
-                ['ZIP / Postal Code', emp.zipCode || '—'],
+                ['City', emp.city || (typeof emp.currentAddress === 'object' ? emp.currentAddress?.city : '') || '—'],
+                ['State', emp.state || (typeof emp.currentAddress === 'object' ? emp.currentAddress?.state : '') || '—'],
+                ['Country', emp.country || (typeof emp.currentAddress === 'object' ? emp.currentAddress?.country : '') || 'India'],
+                ['ZIP / Postal Code', emp.zipCode || (typeof emp.currentAddress === 'object' ? emp.currentAddress?.pincode : '') || '—'],
               ].map(([label, val]) => (
                 <div key={label} className="ed-field-card">
                   <span className="ed-field-label">{label}</span>
@@ -380,11 +381,11 @@ const EmployeeDetail = () => {
               ))}
               <div className="ed-field-card ed-field-full">
                 <span className="ed-field-label">Current Address</span>
-                <span className="ed-field-value">{typeof emp.currentAddress === 'object' && emp.currentAddress ? [emp.currentAddress.line1, emp.currentAddress.city, emp.currentAddress.state].filter(Boolean).join(', ') + (emp.currentAddress.pincode ? ` - ${emp.currentAddress.pincode}` : '') : (emp.currentAddress || emp.homeAddress || '—')}</span>
+                <span className="ed-field-value">{typeof emp.currentAddress === 'object' && emp.currentAddress ? [emp.currentAddress.line1, emp.currentAddress.city, emp.currentAddress.state, emp.currentAddress.country].filter(Boolean).join(', ') + (emp.currentAddress.pincode ? ` - ${emp.currentAddress.pincode}` : '') : (emp.currentAddress || emp.homeAddress || '—')}</span>
               </div>
               <div className="ed-field-card ed-field-full">
                 <span className="ed-field-label">Permanent Address</span>
-                <span className="ed-field-value">{typeof emp.permanentAddress === 'object' && emp.permanentAddress ? [emp.permanentAddress.line1, emp.permanentAddress.city, emp.permanentAddress.state].filter(Boolean).join(', ') + (emp.permanentAddress.pincode ? ` - ${emp.permanentAddress.pincode}` : '') : (emp.permanentAddress || emp.homeAddress || '—')}</span>
+                <span className="ed-field-value">{typeof emp.permanentAddress === 'object' && emp.permanentAddress ? [emp.permanentAddress.line1, emp.permanentAddress.city, emp.permanentAddress.state, emp.permanentAddress.country].filter(Boolean).join(', ') + (emp.permanentAddress.pincode ? ` - ${emp.permanentAddress.pincode}` : '') : (emp.permanentAddress || emp.homeAddress || '—')}</span>
               </div>
             </div>
 

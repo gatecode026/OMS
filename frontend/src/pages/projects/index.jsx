@@ -18,7 +18,8 @@ import ActivityFeed from '../../components/projects/ActivityFeed';
 
 
 const Projects = () => {
-  const { addToast, employees, departments, projectsList, addProject, updateProject, deleteProject, currentUserRole } = useApp();
+  const { addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole } = useApp();
+  const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // State Management
   const [projects, setProjects] = useState([]);
@@ -47,7 +48,7 @@ const Projects = () => {
   
   // Form States for Modals
   const [newProjectForm, setNewProjectForm] = useState({
-    name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', budget: '', priority: 'Medium', description: ''
+    name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
   });
   const [assignTeamForm, setAssignTeamForm] = useState({ projectId: '', memberName: '' });
   const [selectedMembers, setSelectedMembers] = useState([]);
@@ -143,9 +144,9 @@ const Projects = () => {
     }));
 
     // Department average progress
-    const depts = ['IT', 'HR', 'Marketing', 'Sales'];
+    const depts = Array.from(new Set((departments || []).map(d => d.name)));
     const deptPerformance = depts.map(d => {
-      const deptProjs = projects.filter(p => p.department.toLowerCase() === d.toLowerCase());
+      const deptProjs = projects.filter(p => p.department && p.department.toLowerCase() === d.toLowerCase());
       const avg = deptProjs.length > 0
         ? Math.round(deptProjs.reduce((acc, curr) => acc + curr.progress, 0) / deptProjs.length)
         : 0;
@@ -180,7 +181,6 @@ const Projects = () => {
       leader: proj.leader,
       startDate: proj.startDate,
       deadline: proj.deadline,
-      budget: proj.budget || 0,
       priority: proj.priority,
       description: proj.description || ''
     });
@@ -259,7 +259,6 @@ const Projects = () => {
         status: 'Pending',
         tasksTotal: 1,
         tasksDone: 0,
-        budget: Number(newProjectForm.budget) || 50000,
         workflowStage: 'Planning',
         pendingApprovals: 1,
         delayedActivities: 0,
@@ -275,7 +274,7 @@ const Projects = () => {
     }
     setActiveModal(null);
     setNewProjectForm({
-      name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', budget: '', priority: 'Medium', description: ''
+      name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
     });
   };
 
@@ -425,7 +424,6 @@ const Projects = () => {
         ['Deadline', targetProj.deadline],
         ['Progress', `${targetProj.progress}%`],
         ['Status', targetProj.status],
-        ['Budget', `$${targetProj.budget}`],
         ['Workflow Stage', targetProj.workflowStage || 'Planning'],
         ['Tasks Total', targetProj.tasksTotal],
         ['Tasks Done', targetProj.tasksDone],
@@ -468,7 +466,6 @@ const Projects = () => {
         `Deadline     : ${targetProj.deadline}`,
         `Progress     : ${targetProj.progress}%`,
         `Status       : ${targetProj.status}`,
-        `Budget       : $${targetProj.budget}`,
         `Workflow Stage: ${targetProj.workflowStage || 'Planning'}`,
         `Total Tasks  : ${targetProj.tasksTotal}`,
         `Tasks Done   : ${targetProj.tasksDone}`,
@@ -507,7 +504,7 @@ const Projects = () => {
   // CSV Data Exporter
   const handleExportCSV = () => {
     addToast('info', 'Preparing project data CSV...');
-    const headers = ['Project ID', 'Project Name', 'Client', 'Department', 'Manager', 'Leader', 'Priority', 'Start Date', 'Deadline', 'Completion %', 'Status', 'Budget'];
+    const headers = ['Project ID', 'Project Name', 'Client', 'Department', 'Manager', 'Leader', 'Priority', 'Start Date', 'Deadline', 'Completion %', 'Status'];
     const csvRows = [headers.join(',')];
 
     filteredProjects.forEach(p => {
@@ -522,8 +519,7 @@ const Projects = () => {
         p.startDate,
         p.deadline,
         `${p.progress}%`,
-        p.status,
-        p.budget
+        p.status
       ];
       csvRows.push(row.join(','));
     });
@@ -942,15 +938,6 @@ const Projects = () => {
                   </div>
                 </div>
                 <div className={styles.basicGrid}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Budget ($)</label>
-                    <input
-                      type="number"
-                      className={styles.textInput}
-                      value={newProjectForm.budget}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, budget: e.target.value })}
-                    />
-                  </div>
                   <div className={styles.formGroup}>
                     <label className={styles.formLabel}>Priority Level</label>
                     <select

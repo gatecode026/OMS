@@ -31,7 +31,8 @@ const initialActivities = [];
 const Teams = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(600);
-  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments, addTeam, updateTeam, deleteTeam, projectsList } = useApp();
+  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments: rawDepartments, addTeam, updateTeam, deleteTeam, projectsList } = useApp();
+  const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // Recharts Chart Data (Dynamic useMemos)
   const productivityChartData = useMemo(() => {
@@ -230,7 +231,36 @@ const Teams = () => {
 
   React.useEffect(() => {
     setSelectedMemberIds([]);
+    // Reset leader when branch or department changes
+    if (createModalOpen) {
+      setNewTeam(prev => ({ ...prev, leader: '' }));
+    }
   }, [createModalOpen, newTeam.branch, newTeam.department]);
+
+  // Auto-generate team code based on branch + department
+  React.useEffect(() => {
+    if (!newTeam.branch || !newTeam.department) return;
+    const cleanBranch = (newTeam.branch || '').replace(/branch|office|agency/gi, '').trim();
+    const branchAbbr = cleanBranch ? cleanBranch.slice(0, 3).toUpperCase() : 'BR';
+    const cleanDept = (newTeam.department || '').trim();
+    const deptAbbr = cleanDept ? cleanDept.slice(0, 3).toUpperCase() : 'DPT';
+    const prefix = `${branchAbbr}-${deptAbbr}-`;
+    const matchingCodes = (dbTeams || [])
+      .map(t => t.id || '')
+      .filter(code => code && code.startsWith(prefix));
+    let nextNum = 1;
+    if (matchingCodes.length > 0) {
+      const nums = matchingCodes.map(code => {
+        const part = code.slice(prefix.length);
+        const n = parseInt(part, 10);
+        return isNaN(n) ? 0 : n;
+      });
+      nextNum = Math.max(...nums) + 1;
+    }
+    const serial = String(nextNum).padStart(2, '0');
+    const generatedCode = `${prefix}${serial}`;
+    setNewTeam(prev => ({ ...prev, code: generatedCode }));
+  }, [newTeam.branch, newTeam.department, dbTeams]);
 
   // Filters calculation
   const filteredTeams = useMemo(() => {
@@ -980,13 +1010,29 @@ Active Teams Mapped: ${teams.length}
                 </div>
               </div>
 
-              {/* Performance Score Cards */}
+              {/* Performance Score Cards — real data */}
               <div className="teams-mini-score-grid">
                 {[
-                  { label: 'Team Productivity', value: '92%' },
-                  { label: 'Attendance Average', value: '88%' },
-                  { label: 'Task Completion', value: '94%' },
-                  { label: 'Employee Utilization', value: '87%' }
+                  {
+                    label: 'Team Productivity',
+                    value: teams.length > 0
+                      ? `${Math.round(teams.reduce((s, t) => s + (t.productivity || 0), 0) / teams.length)}%`
+                      : '—'
+                  },
+                  {
+                    label: 'Attendance Average',
+                    value: teams.length > 0
+                      ? `${Math.round(teams.reduce((s, t) => s + (t.attendance || 0), 0) / teams.length)}%`
+                      : '—'
+                  },
+                  {
+                    label: 'Total Tasks Done',
+                    value: teams.reduce((s, t) => s + (t.completedTasks || 0), 0)
+                  },
+                  {
+                    label: 'Active Projects',
+                    value: teams.reduce((s, t) => s + (t.activeProjects || 0), 0)
+                  }
                 ].map((score, i) => (
                   <div key={i} className="teams-mini-score-card">
                     <span className="teams-mini-score-val">{score.value}</span>
@@ -1007,31 +1053,32 @@ Active Teams Mapped: ${teams.length}
               </div>
 
               <div className="teams-rankings-workload">
-                {/* Rankings Table */}
+                {/* Rankings Table — sorted by real productivity */}
                 <div>
                   <div className="teams-filter-label" style={{ marginBottom: 12, display: 'block' }}>
-                    Leaderboard rankings
+                    Leaderboard rankings (by productivity)
                   </div>
-                  {[
-                    { rank: 1, name: 'Development Team', members: 25, productivity: '96%', completion: '95%', colorClass: 'teams-rank-gold' },
-                    { rank: 2, name: 'Sales Team A', members: 18, productivity: '94%', completion: '93%', colorClass: 'teams-rank-silver' },
-                    { rank: 3, name: 'Research Team', members: 10, productivity: '93%', completion: '88%', colorClass: 'teams-rank-bronze' },
-                    { rank: 4, name: 'Marketing Team', members: 15, productivity: '92%', completion: '91%', colorClass: '' }
-                  ].map((rankItem) => (
-                    <div key={rankItem.rank} className="teams-rank-row">
-                      <div className={`teams-rank-num ${rankItem.colorClass}`}>
-                        {rankItem.rank}
+                  {[...teams]
+                    .sort((a, b) => (b.productivity || 0) - (a.productivity || 0))
+                    .slice(0, 5)
+                    .map((t, idx) => {
+                      const rankColors = ['teams-rank-gold', 'teams-rank-silver', 'teams-rank-bronze', '', ''];
+                      return (
+                    <div key={t.id} className="teams-rank-row">
+                      <div className={`teams-rank-num ${rankColors[idx]}`}>
+                        {idx + 1}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div className="bold-text" style={{ fontSize: '0.875rem' }}>{rankItem.name}</div>
-                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>{rankItem.members} active members</div>
+                        <div className="bold-text" style={{ fontSize: '0.875rem' }}>{t.name}</div>
+                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>{(t.membersList || []).length} members • {t.department}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div className="bold-text text-success" style={{ fontSize: '0.875rem' }}>{rankItem.productivity}</div>
-                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>Tasks: {rankItem.completion}</div>
+                        <div className="bold-text text-success" style={{ fontSize: '0.875rem' }}>{t.productivity || 0}%</div>
+                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>Tasks done: {t.completedTasks || 0}</div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Workload Area Chart */}
@@ -1070,18 +1117,32 @@ Active Teams Mapped: ${teams.length}
                   <CheckSquare size={18} style={{ color: '#10b981' }} />
                   <span>Team Attendance Trends & Activity Analytics</span>
                 </h3>
-                <Badge variant="success">88% Avg Attendance</Badge>
+                <Badge variant="success">
+                  {teams.length > 0
+                    ? `${Math.round(teams.reduce((s, t) => s + (t.attendance || 0), 0) / teams.length)}% Avg Attendance`
+                    : '—'}
+                </Badge>
               </div>
 
               <div className="teams-rankings-workload">
-                {/* Stats overview cards */}
+                {/* Stats overview cards — real data */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  {[
-                    { title: 'Leave Statistics', value: '4.8%', desc: 'Avg monthly sick/casual leave' },
-                    { title: 'Late Arrivals', value: '12.4%', desc: 'Arrivals post grace period limit' },
-                    { title: 'Overtime Analysis', value: '184 hrs', desc: 'Total calculated overtime logs' },
-                    { title: 'Shift Coverage', value: '98.6%', desc: 'Assigned rosters covered daily' }
-                  ].map((stat, idx) => (
+                  {(() => {
+                    const activeEmps = (employees || []).filter(e => e.status !== 'Inactive');
+                    const onLeave = activeEmps.filter(e => e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave');
+                    const leavePct = activeEmps.length > 0 ? ((onLeave.length / activeEmps.length) * 100).toFixed(1) : 0;
+                    const lateEmps = activeEmps.filter(e => e.attendanceStatus === 'Late' || e.attendanceStatus === 'Late Arrival');
+                    const latePct = activeEmps.length > 0 ? ((lateEmps.length / activeEmps.length) * 100).toFixed(1) : 0;
+                    const totalOT = activeEmps.reduce((s, e) => s + (e.overtimeHours || 0), 0);
+                    const presentOrPunched = activeEmps.filter(e => e.attendanceStatus === 'Present' || e.attendanceStatus === 'Punched In' || e.attendanceStatus === 'Late');
+                    const shiftCov = activeEmps.length > 0 ? ((presentOrPunched.length / activeEmps.length) * 100).toFixed(1) : 0;
+                    return [
+                      { title: 'On Leave Today', value: `${leavePct}%`, desc: `${onLeave.length} employees currently on leave` },
+                      { title: 'Late Arrivals', value: `${latePct}%`, desc: `${lateEmps.length} employees arrived late` },
+                      { title: 'Overtime Hours', value: `${totalOT} hrs`, desc: 'Total logged overtime across all employees' },
+                      { title: 'Shift Coverage', value: `${shiftCov}%`, desc: `${presentOrPunched.length} of ${activeEmps.length} active employees present` }
+                    ];
+                  })().map((stat, idx) => (
                     <div key={idx} className="teams-mini-score-card" style={{ textAlign: 'left', padding: '16px' }}>
                       <span className="teams-mini-score-val" style={{ color: '#10b981', fontSize: '1.4rem' }}>{stat.value}</span>
                       <span className="teams-mini-score-label" style={{ fontSize: '0.72rem', color: 'var(--text-primary)', textTransform: 'none', margin: '4px 0 2px' }}>{stat.title}</span>
@@ -1299,19 +1360,23 @@ Active Teams Mapped: ${teams.length}
         <div className="teams-footer-pills">
           <div className="teams-footer-pill">
             <Users size={14} style={{ color: '#3b82f6' }} />
-            <span>Total Teams: 86</span>
+            <span>Total Teams: {totalTeamsCount}</span>
           </div>
           <div className="teams-footer-pill">
             <Users size={14} style={{ color: '#10b981' }} />
-            <span>Total Members: 1,250</span>
+            <span>Active Teams: {activeTeamsCount}</span>
           </div>
           <div className="teams-footer-pill">
-            <Calendar size={14} style={{ color: '#f59e0b' }} />
-            <span>Last Updated: Just Now</span>
+            <Users size={14} style={{ color: '#8b5cf6' }} />
+            <span>Total Members: {totalMembersCount.toLocaleString()}</span>
+          </div>
+          <div className="teams-footer-pill">
+            <Award size={14} style={{ color: '#f59e0b' }} />
+            <span>Avg Productivity: {averageProductivity}%</span>
           </div>
           <div className="teams-footer-pill">
             <CheckCircle2 size={14} style={{ color: '#10b981' }} />
-            <span>System Status: Active</span>
+            <span>Team Leaders: {teamLeadersCount}</span>
           </div>
         </div>
         <span className="text-muted text-xs">SaaS Enterprise Dashboard v2.0</span>
@@ -1419,25 +1484,53 @@ Active Teams Mapped: ${teams.length}
                 <div className="teams-form-grid">
                   <div className="teams-form-group">
                     <label>Team Leader*</label>
-                    <select
-                      className="teams-filter-select"
-                      value={newTeam.leader}
-                      onChange={e => setNewTeam(prev => ({ ...prev, leader: e.target.value }))}
-                      style={{ borderColor: formErrors.leader ? '#ef4444' : '' }}
-                      required
-                    >
-                      <option value="">Select Team Leader</option>
-                      {employees.filter(emp => {
-                        const role = (emp.role || '').toLowerCase();
-                        const roleId = (emp.roleId || '').toLowerCase();
-                        const designation = (emp.designation || '').toLowerCase();
-                        const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
-                        const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
-                        return !isManager && !isAdmin;
-                      }).map(emp => (
-                        <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
-                      ))}
-                    </select>
+                    {!newTeam.branch || !newTeam.department ? (
+                      <div className="text-muted text-xs" style={{ padding: '8px 0' }}>
+                        Please select a Branch and Department first.
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          className="teams-filter-select"
+                          value={newTeam.leader}
+                          onChange={e => setNewTeam(prev => ({ ...prev, leader: e.target.value }))}
+                          style={{ borderColor: formErrors.leader ? '#ef4444' : '' }}
+                          required
+                        >
+                          <option value="">Select Team Leader</option>
+                          {employees.filter(emp => {
+                            const role = (emp.role || '').toLowerCase();
+                            const roleId = (emp.roleId || '').toLowerCase();
+                            const designation = (emp.designation || '').toLowerCase();
+                            const isTL = role.includes('team leader') || role.includes('team lead') ||
+                                         roleId.includes('team_leader') || roleId.includes('team_lead') ||
+                                         designation.includes('team leader') || designation.includes('team lead') ||
+                                         roleId === 'tl';
+                            const matchesBranch = emp.branch?.trim().toLowerCase() === newTeam.branch?.trim().toLowerCase();
+                            const matchesDept = emp.department?.trim().toLowerCase() === newTeam.department?.trim().toLowerCase();
+                            return isTL && matchesBranch && matchesDept;
+                          }).map(emp => (
+                            <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Team Leader'} ({emp.id})</option>
+                          ))}
+                        </select>
+                        {employees.filter(emp => {
+                          const role = (emp.role || '').toLowerCase();
+                          const roleId = (emp.roleId || '').toLowerCase();
+                          const designation = (emp.designation || '').toLowerCase();
+                          const isTL = role.includes('team leader') || role.includes('team lead') ||
+                                       roleId.includes('team_leader') || roleId.includes('team_lead') ||
+                                       designation.includes('team leader') || designation.includes('team lead') ||
+                                       roleId === 'tl';
+                          const matchesBranch = emp.branch?.trim().toLowerCase() === newTeam.branch?.trim().toLowerCase();
+                          const matchesDept = emp.department?.trim().toLowerCase() === newTeam.department?.trim().toLowerCase();
+                          return isTL && matchesBranch && matchesDept;
+                        }).length === 0 && (
+                          <span className="text-muted text-xs" style={{ display: 'block', marginTop: 4 }}>
+                            No team leaders found in this branch &amp; department.
+                          </span>
+                        )}
+                      </>
+                    )}
                     {formErrors.leader && <span className="text-danger text-xs">{formErrors.leader}</span>}
                   </div>
                 </div>

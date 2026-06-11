@@ -289,6 +289,7 @@
   cursor: pointer;
   transition: border-color 0.2s;
   min-width: 130px;
+  width: auto;
 }
 .pm-filter-select:focus { border-color: var(--color-primary); }
 .pm-filter-count {

@@ -50,13 +50,28 @@
 
 .branches-sum-card {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--spacing-3);
   padding: var(--spacing-4);
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.branches-sum-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-5);
+  width: 100%;
+}
+
+.branches-sum-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
 }
 
 .branches-sum-card:hover {
@@ -80,6 +95,7 @@
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.1;
+  margin: 0;
 }
 
 .branches-sum-label {
@@ -93,6 +109,7 @@
 .branches-sum-sub {
   font-size: 0.65rem;
   color: var(--text-secondary);
+  margin: 0;
 }
 
 /* Filters & Search Toolbar */
@@ -123,6 +140,8 @@
 
 .dept-search-icon {
   color: var(--text-muted);
+  position: static !important;
+  transform: none !important;
 }
 
 .dept-search-input {

@@ -97,7 +97,7 @@ const Overview = () => {
   const loading = usePageLoading(600);
 
   const branches = contextBranches || [];
-  const departments = contextDepartments || [];
+  const departments = (contextDepartments || []).filter(d => d.status === 'Active');
   const alerts = notifications || [];
   const announcements = announcementsList || [];
 
@@ -463,10 +463,10 @@ const Overview = () => {
 
     // Fallback if DB is not populated yet
     if (active === 0 && onLeave === 0 && remote === 0) {
-      active = Math.round(totalEmployees * 0.82);
-      newJoiners = Math.round(totalEmployees * 0.05);
-      onLeave = Math.round(totalEmployees * 0.04);
-      remote = Math.round(totalEmployees * 0.09);
+      active = 0;
+      newJoiners = 0;
+      onLeave = 0;
+      remote = 0;
     }
 
     return [
@@ -502,16 +502,7 @@ const Overview = () => {
         else if (status === 'Absent') absentCount++;
         else if (status === 'On Leave' || status === 'Leave' || status === 'On-Leave') leaveCount++;
         else if (status === 'Overtime') overtimeCount++;
-        else presentCount++;
       });
-    }
-
-    if (presentCount === 0 && lateCount === 0 && absentCount === 0) {
-      presentCount = Math.round(totalEmployees * 0.94);
-      lateCount = Math.round(totalEmployees * 0.03);
-      absentCount = Math.round(totalEmployees * 0.02);
-      leaveCount = Math.round(totalEmployees * 0.01);
-      overtimeCount = Math.round(totalEmployees * 0.12);
     }
 
     return {
@@ -539,10 +530,10 @@ const Overview = () => {
       }
     });
 
-    const avg = averageAttendance || 95;
+    const avg = averageAttendance || 0;
     return Object.keys(counts).map(day => {
       const data = counts[day];
-      const rate = data.total > 0 ? Math.round((data.present / data.total) * 100) : Math.max(0, Math.min(100, Math.round(avg + (Math.random() * 6 - 3))));
+      const rate = data.total > 0 ? Math.round((data.present / data.total) * 100) : avg;
       return {
         name: day,
         Attendance: rate
@@ -577,14 +568,13 @@ const Overview = () => {
     const currentDepts = filteredDepts.length || 0;
 
     return months.map((month, idx) => {
-      const monthEmployees = employeesByMonth[idx] || Math.round(totalEmployees * (0.7 + idx * 0.05));
-      const scaleFactor = (idx + 1) / months.length;
+      const monthEmployees = employeesByMonth[idx] || 0;
       return {
         month,
         employees: monthEmployees,
-        projects: Math.round(currentProjects * scaleFactor) || 1,
-        productivity: Math.max(0, Math.round(currentProductivity - (10 * (1 - scaleFactor)))),
-        departments: Math.max(1, Math.round(currentDepts * scaleFactor))
+        projects: currentProjects,
+        productivity: currentProductivity,
+        departments: currentDepts
       };
     });
   }, [employees, totalEmployees, totalProjectsCount, averageProductivity, filteredDepts.length]);
@@ -600,12 +590,6 @@ const Overview = () => {
       else morning++;
     });
 
-    if (morning === 0 && evening === 0 && night === 0) {
-      morning = Math.round(totalEmployees * 0.65);
-      evening = Math.round(totalEmployees * 0.25);
-      night = Math.round(totalEmployees * 0.10);
-    }
-
     return [
       { shift: 'Morning', count: morning },
       { shift: 'Evening', count: evening },
@@ -616,12 +600,11 @@ const Overview = () => {
   // ── Real-Time Strip Data ──
   const onlineEmployeesCount = useMemo(() => {
     if (!employees || employees.length === 0) return 0;
-    const count = employees.filter(emp => emp.status === 'Present' || emp.attendanceStatus === 'Present' || emp.status === 'Active').length;
-    return count > 0 ? count : Math.round(totalEmployees * 0.72);
-  }, [employees, totalEmployees]);
+    return employees.filter(emp => emp.status === 'Present' || emp.attendanceStatus === 'Present' || emp.status === 'Active' || emp.attendanceStatus === 'Late' || emp.attendanceStatus === 'WFH').length;
+  }, [employees]);
 
   const runningWorkflowsCount = filteredWorkflows.filter(w => w.status === 'Running').length;
-  const activeMeetingsCount = Math.max(2, Math.round(filteredBranches.length * 1.5));
+  const activeMeetingsCount = 0;
   const systemActivityLog = filteredActivities.slice(0, 3).map(act => act.details);
 
   if (loading) {
@@ -807,7 +790,7 @@ const Overview = () => {
             <div className="overview-depts card">
               <div className="card-header">
                 <h3>Department Breakdown</h3>
-                <span className="card-subtitle">Headcount and annual budget allocation</span>
+                <span className="card-subtitle">Headcount breakdown</span>
               </div>
               <div className="depts-list">
                 {filteredDepts.map((dept) => {

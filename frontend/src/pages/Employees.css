@@ -103,7 +103,7 @@
   gap: var(--spacing-4); flex-wrap: wrap;
 }
 .bulk-bar-visible {
-  max-height: 64px; opacity: 1;
+  max-height: 150px; opacity: 1;
   padding: var(--spacing-3) var(--spacing-4);
 }
 .bulk-bar-left  { display: flex; align-items: center; gap: 10px; }
@@ -362,10 +362,26 @@
 .acc-suspended { color: #f87171; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.06); }
 
 /* ─── Empty State ────────────────────────────────────────────────────────── */
-.empty-table-cell { text-align: center !important; padding: 64px 24px !important; }
-.empty-table-msg { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.empty-table-msg p { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; }
-.empty-table-msg span { font-size: 0.8125rem; color: var(--text-muted); }
+.empty-state-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  gap: var(--spacing-3);
+  text-align: center;
+  width: 100%;
+}
+.empty-state-wrapper .empty-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+.empty-state-wrapper .empty-desc {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
 .empty-icon { color: var(--text-muted); opacity: 0.4; margin-bottom: 4px; }
 
 /* ─── Table Actions ──────────────────────────────────────────────────────── */

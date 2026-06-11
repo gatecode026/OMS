@@ -26,7 +26,8 @@ const mockPerformanceHistory = [
 
 const TeamLeaders = () => {
   const isLoading = usePageLoading(600);
-  const { addToast, employees, addEmployee, updateEmployee, teams, updateTeam } = useApp();
+  const { addToast, employees, addEmployee, updateEmployee, teams, updateTeam, departments: rawDepartments } = useApp();
+  const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -285,12 +286,9 @@ const TeamLeaders = () => {
               onChange={e => setDeptFilter(e.target.value)}
             >
               <option value="">All Departments</option>
-              <option value="IT">IT (Tech)</option>
-              <option value="HR">HR</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Sales">Sales</option>
-              <option value="Finance">Finance</option>
-              <option value="Operations">Operations</option>
+              {(departments || []).map(d => (
+                <option key={d.id || d._id} value={d.name}>{d.name}</option>
+              ))}
             </select>
           </div>
           
@@ -443,12 +441,9 @@ const TeamLeaders = () => {
               value={newLeader.dept}
               onChange={e => setNewLeader(prev => ({ ...prev, dept: e.target.value }))}
             >
-              <option value="IT">IT (Tech)</option>
-              <option value="HR">HR</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Sales">Sales</option>
-              <option value="Finance">Finance</option>
-              <option value="Operations">Operations</option>
+              {(departments || []).map(d => (
+                <option key={d.id || d._id} value={d.name}>{d.name}</option>
+              ))}
             </select>
           </div>
           <div className="leaders-filter-group">
@@ -533,16 +528,10 @@ const TeamLeaders = () => {
                 onChange={e => setTeamTarget(e.target.value)}
                 required
               >
-                <option value="Development Team">Development Team</option>
-                <option value="Sales Team A">Sales Team A</option>
-                <option value="Marketing Team">Marketing Team</option>
-                <option value="HR Operations">HR Operations</option>
-                <option value="Design Team">Design Team</option>
-                <option value="Finance Team">Finance Team</option>
-                <option value="Support Team">Support Team</option>
-                <option value="Research Team">Research Team</option>
-                <option value="Sales Team B">Sales Team B</option>
-                <option value="IT Infrastructure">IT Infrastructure</option>
+                <option value="">Select Team</option>
+                {(teams || []).map(t => (
+                  <option key={t.id || t._id} value={t.name}>{t.name}</option>
+                ))}
               </select>
             </div>
           </form>

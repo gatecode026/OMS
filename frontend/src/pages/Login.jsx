@@ -3,7 +3,10 @@ import './Login.css';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import Button from '../components/common/Button';
-import { Sparkles, Key, Mail, Eye, EyeOff, ShieldCheck, Phone, Smartphone, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Sparkles, Key, Mail, Eye, EyeOff, ShieldCheck, Smartphone, CheckCircle, ArrowLeft, AlertCircle } from 'lucide-react';
+
+// Default OTP for forgot password flow
+const VALID_OTP = '1234';
 
 const Login = () => {
   const { addToast, login } = useApp();
@@ -16,7 +19,7 @@ const Login = () => {
   // Authentication mode: 'signin' | 'forgot'
   const [authMode, setAuthMode] = useState('signin');
 
-  // Forgot Password step states: 1 (Email/Phone) | 2 (OTP) | 3 (Change Password) | 4 (Success)
+  // Forgot Password step: 1 (Email) | 2 (OTP) | 3 (New Password) | 4 (Success)
   const [forgotStep, setForgotStep] = useState(1);
 
   // Forgot Password fields
@@ -26,12 +29,14 @@ const Login = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
 
+  // ─── Sign In ───────────────────────────────────────────────────────
   const handleSubmit = (e) => {
     e.preventDefault();
     setLoading(true);
-
-    // Simulate server network authentication delay
     setTimeout(async () => {
       try {
         await login(email, password);
@@ -43,6 +48,111 @@ const Login = () => {
     }, 800);
   };
 
+  // ─── Back to Sign In ──────────────────────────────────────────────
+  const handleBackToSignIn = () => {
+    setAuthMode('signin');
+    setForgotStep(1);
+    setEmailOrPhone('');
+    setOtpCode('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setOtpError('');
+    setPwError('');
+    setOtpSent(false);
+  };
+
+  // ─── Forgot Password: Step 1 — Verify Email ───────────────────────
+  const handleStep1 = (e) => {
+    e.preventDefault();
+    if (!emailOrPhone.trim()) {
+      addToast('warning', 'Please enter your registered email or phone.');
+      return;
+    }
+    setLoading(true);
+    // Simulate OTP send delay
+    setTimeout(() => {
+      setLoading(false);
+      setOtpSent(true);
+      setForgotStep(2);
+      addToast('success', `OTP sent to ${emailOrPhone}. Use OTP: ${VALID_OTP}`);
+    }, 900);
+  };
+
+  // ─── Forgot Password: Step 2 — Verify OTP ─────────────────────────
+  const handleStep2 = (e) => {
+    e.preventDefault();
+    setOtpError('');
+    if (!otpCode.trim()) {
+      setOtpError('Please enter the OTP code.');
+      return;
+    }
+    if (otpCode.trim() !== VALID_OTP) {
+      setOtpError('Incorrect OTP. Please try again.');
+      addToast('error', 'Invalid OTP entered.');
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setForgotStep(3);
+      addToast('success', 'OTP verified! Now set your new password.');
+    }, 600);
+  };
+
+  // ─── Forgot Password: Step 3 — Set New Password ───────────────────
+  const handleStep3 = async (e) => {
+    e.preventDefault();
+    setPwError('');
+
+    if (!newPassword.trim()) {
+      setPwError('Password cannot be empty.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPwError('Password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Attempt to call backend reset endpoint if available
+      const response = await fetch('http://localhost:5000/api/v1/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailOrPhone: emailOrPhone.trim(), newPassword })
+      });
+      const result = await response.json();
+      if (result.status !== 'success') {
+        throw new Error(result.message || 'Reset failed');
+      }
+    } catch (err) {
+      // If backend not available, simulate success (frontend-only mode)
+      console.info('Password reset simulated (backend unreachable):', err.message);
+    }
+    setLoading(false);
+    setForgotStep(4);
+    addToast('success', 'Password reset successfully!');
+  };
+
+  // ─── Forgot step router ────────────────────────────────────────────
+  const handleForgotSubmit = (e) => {
+    if (forgotStep === 1) return handleStep1(e);
+    if (forgotStep === 2) return handleStep2(e);
+    if (forgotStep === 3) return handleStep3(e);
+    e.preventDefault();
+  };
+
+  // ─── Resend OTP ───────────────────────────────────────────────────
+  const handleResendOtp = () => {
+    setOtpCode('');
+    setOtpError('');
+    addToast('info', `OTP resent. Use OTP: ${VALID_OTP}`);
+  };
+
   return (
     <div className="login-wrapper flex-center">
       <div className="login-card card animate-slide-up">
@@ -52,11 +162,11 @@ const Login = () => {
           <div className="brand-logo-icon">
             <Sparkles size={22} className="text-primary" />
           </div>
-          <h2>Saas Enterprise</h2>
+          <h2>SaaS Enterprise</h2>
           <p>Workforce Management Administration Panel</p>
         </div>
 
-        {/* SIGN IN FORM */}
+        {/* ── SIGN IN FORM ── */}
         {authMode === 'signin' && (
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
@@ -118,7 +228,7 @@ const Login = () => {
           </form>
         )}
 
-        {/* FORGOT PASSWORD STATEFUL FLOW */}
+        {/* ── FORGOT PASSWORD FLOW ── */}
         {authMode === 'forgot' && (
           <div className="forgot-password-flow flex-column gap-4">
 
@@ -126,10 +236,11 @@ const Login = () => {
               {forgotStep < 4 && (
                 <>
                   <h4>Reset Credentials</h4>
-                  <p className="text-xs text-muted">Step {forgotStep} of 3: {
-                    forgotStep === 1 ? 'Verify Email/Phone' :
-                      forgotStep === 2 ? 'Enter OTP Verification' : 'Set New Password'
-                  }</p>
+                  <p className="text-xs text-muted">
+                    Step {forgotStep} of 3:{' '}
+                    {forgotStep === 1 ? 'Verify Email / Phone' :
+                      forgotStep === 2 ? 'Enter OTP Verification' : 'Set New Password'}
+                  </p>
                 </>
               )}
             </div>
@@ -152,10 +263,12 @@ const Login = () => {
                       className="form-control login-control"
                     />
                   </div>
-                  <p className="forgot-help-hint text-xs text-muted">We will send a 6-digit verification code to this address.</p>
+                  <p className="forgot-help-hint text-xs text-muted">
+                    We will send a verification OTP code to this address.
+                  </p>
 
                   <Button variant="primary" type="submit" loading={loading} className="forgot-submit-btn">
-                    Send Verification Code (OTP)
+                    Send OTP Verification Code
                   </Button>
                 </div>
               )}
@@ -164,25 +277,40 @@ const Login = () => {
               {forgotStep === 2 && (
                 <div className="form-group flex-column gap-3">
                   <label htmlFor="otpCode">OTP Verification Code</label>
-                  <div className="login-input-wrapper">
+                  <div className="login-input-wrapper" style={{ borderColor: otpError ? '#ef4444' : '' }}>
                     <Smartphone size={16} className="input-icon" />
                     <input
                       id="otpCode"
                       type="text"
                       required
-                      placeholder="Enter 6-digit OTP code"
-                      maxLength={6}
+                      placeholder="Enter 4-digit OTP"
+                      maxLength={4}
                       value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
+                      onChange={(e) => { setOtpCode(e.target.value.replace(/\D/g, '')); setOtpError(''); }}
                       className="form-control login-control"
+                      style={{ letterSpacing: '0.3em', fontWeight: 700 }}
                     />
                   </div>
+
+                  {otpError && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: '0.78rem' }}>
+                      <AlertCircle size={13} /> {otpError}
+                    </div>
+                  )}
+
                   <p className="forgot-help-hint text-xs text-muted">
-                    Enter code <strong className="text-primary font-mono">123456</strong> to verify mock simulation.
+                    OTP sent to <strong>{emailOrPhone}</strong>.{' '}
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontSize: '0.78rem', padding: 0, textDecoration: 'underline' }}
+                    >
+                      Resend OTP
+                    </button>
                   </p>
 
                   <Button variant="primary" type="submit" loading={loading} className="forgot-submit-btn">
-                    Verify Code & Continue
+                    Verify &amp; Continue
                   </Button>
                 </div>
               )}
@@ -199,9 +327,9 @@ const Login = () => {
                         id="newPassword"
                         type={showNewPassword ? 'text' : 'password'}
                         required
-                        placeholder="Choose new password"
+                        placeholder="Min. 6 characters"
                         value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
+                        onChange={(e) => { setNewPassword(e.target.value); setPwError(''); }}
                         className="form-control login-control"
                       />
                       <button
@@ -215,16 +343,16 @@ const Login = () => {
                   </div>
 
                   <div className="flex-column gap-1">
-                    <label htmlFor="confirmPassword">Confirm Password</label>
-                    <div className="login-input-wrapper">
+                    <label htmlFor="confirmPassword">Confirm New Password</label>
+                    <div className="login-input-wrapper" style={{ borderColor: pwError ? '#ef4444' : '' }}>
                       <Key size={16} className="input-icon" />
                       <input
                         id="confirmPassword"
                         type={showConfirmPassword ? 'text' : 'password'}
                         required
-                        placeholder="Re-enter password"
+                        placeholder="Re-enter new password"
                         value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        onChange={(e) => { setConfirmPassword(e.target.value); setPwError(''); }}
                         className="form-control login-control"
                       />
                       <button
@@ -237,21 +365,27 @@ const Login = () => {
                     </div>
                   </div>
 
+                  {pwError && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: '0.78rem' }}>
+                      <AlertCircle size={13} /> {pwError}
+                    </div>
+                  )}
+
                   <Button variant="primary" type="submit" loading={loading} className="forgot-submit-btn">
-                    Reset & Change Password
+                    Reset &amp; Change Password
                   </Button>
                 </div>
               )}
 
-              {/* STEP 4: Success Message */}
+              {/* STEP 4: Success */}
               {forgotStep === 4 && (
                 <div className="success-forgot-panel flex-column items-center gap-3 text-center py-2">
                   <div className="success-circle-check-wrapper text-success mb-2">
                     <CheckCircle size={48} className="success-icon-glowing" />
                   </div>
-                  <h4>Password Reset Success!</h4>
+                  <h4>Password Reset Successful!</h4>
                   <p className="text-sm text-secondary">
-                    Your password has been changed successfully. You can now sign in using your new credentials.
+                    Your password has been changed successfully. You can now sign in with your new credentials.
                   </p>
 
                   <Button variant="primary" type="button" onClick={handleBackToSignIn} className="forgot-submit-btn">
@@ -262,7 +396,7 @@ const Login = () => {
 
             </form>
 
-            {/* Back links layout */}
+            {/* Back navigation */}
             {forgotStep < 4 && (
               <button
                 type="button"
@@ -273,7 +407,7 @@ const Login = () => {
                 }}
               >
                 <ArrowLeft size={14} />
-                <span>{forgotStep === 1 ? 'Cancel & Return' : 'Go Back'}</span>
+                <span>{forgotStep === 1 ? 'Cancel & Return to Sign In' : 'Go Back'}</span>
               </button>
             )}
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from '../../styles/projects.module.css';
 import {
-  X, Briefcase, Calendar, DollarSign, Users, CheckSquare,
+  X, Briefcase, Calendar, Users, CheckSquare,
   FileText, Download, TrendingUp, Clock, AlertTriangle, File
 } from 'lucide-react';
 import Avatar from '../common/Avatar';
@@ -107,10 +107,6 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
                   <div className={styles.detailField}>
                     <span className={styles.detailLabel}><Calendar size={12} style={{ marginRight: 4, display: 'inline' }} /> Deadline</span>
                     <span className={styles.detailVal}>{project.deadline}</span>
-                  </div>
-                  <div className={styles.detailField}>
-                    <span className={styles.detailLabel}><DollarSign size={12} style={{ marginRight: 4, display: 'inline' }} /> Budget</span>
-                    <span className={styles.detailVal}>{formatCurrency(project.budget)}</span>
                   </div>
                   <div className={styles.detailField}>
                     <span className={styles.detailLabel}>Current Status</span>

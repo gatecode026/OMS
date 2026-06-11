@@ -48,7 +48,7 @@ const Performance = () => {
     employees: contextEmployees,
     updateEmployee,
     addToast,
-    departments,
+    departments: contextDepartments,
     branches,
     appraisalReviews,
     addAppraisalReview,
@@ -56,9 +56,9 @@ const Performance = () => {
     activityLogs,
     projectsList,
     addNotification,
-    markAllNotificationsRead,
-    currentUser
+    markAllNotificationsRead
   } = useApp();
+  const departments = useMemo(() => (contextDepartments || []).filter(d => d.status === 'Active'), [contextDepartments]);
   const isLoading = usePageLoading(800);
 
   /* Simulated view perspective */
@@ -132,8 +132,7 @@ const Performance = () => {
       name: p.name,
       manager: p.leader || p.manager || 'Unassigned',
       progress: p.progress || 0,
-      score: p.productivity || p.kpiScore || 85,
-      budget: p.budgetSpentPct ? `${p.budgetSpentPct}%` : '0%'
+      score: p.productivity || p.kpiScore || 85
     }));
   }, [projectsList]);
 
@@ -502,7 +501,7 @@ const Performance = () => {
       reviewPeriod: pipForm.reviewPeriod,
       actionPlan: pipForm.actionPlan,
       status: 'Active',
-      reviewer: currentUser?.name || userRole || 'Super Admin',
+      reviewer: userRole === 'Super Admin' ? 'Super Admin' : 'Balram Suman',
       dateCreated: new Date().toISOString().split('T')[0]
     };
 
@@ -553,7 +552,7 @@ const Performance = () => {
   const stats = useMemo(() => {
     // Filter to role view
     const visibleEmployees = employees.filter(e => {
-      if (userRole === 'Employee') return e.id === currentUser?.id;
+      if (userRole === 'Employee') return e.name === 'Balram Suman';
       return true;
     });
 
@@ -589,7 +588,7 @@ const Performance = () => {
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       // Perspective lockdown
-      if (userRole === 'Employee' && emp.id !== currentUser?.id) return false;
+      if (userRole === 'Employee' && emp.name !== 'Balram Suman') return false;
 
       // Search Query match
       const query = searchQuery.toLowerCase();
@@ -890,7 +889,7 @@ const Performance = () => {
           {/* Project performance scoreboard */}
           <div className="card padding-5">
             <span className="perf-chart-title">Key Projects Delivery Status & Performance</span>
-            <p className="subtitle" style={{ marginBottom: 10 }}>Track milestone progress, budget usage indexes, and overall team performance.</p>
+            <p className="subtitle" style={{ marginBottom: 10 }}>Track milestone progress and overall team performance.</p>
             <div className="reports-table-wrap">
               <table className="perf-data-table">
                 <thead>
@@ -898,7 +897,6 @@ const Performance = () => {
                     <th>Project Name</th>
                     <th>Manager Assigned</th>
                     <th>Progress</th>
-                    <th>Budget Used</th>
                     <th>Delivery KPI</th>
                     <th>Status Badge</th>
                   </tr>
@@ -916,7 +914,6 @@ const Performance = () => {
                           <span>{p.progress}%</span>
                         </div>
                       </td>
-                      <td>{p.budget}</td>
                       <td>
                         <span style={{ fontWeight: 700 }}>{p.score}%</span>
                       </td>
@@ -962,9 +959,7 @@ const Performance = () => {
                     className="reports-select-filter"
                   >
                     <option value="All">All Departments</option>
-                    {(departments && departments.length > 0 ? departments : [
-                      { name: 'Operations' }, { name: 'IT' }, { name: 'Engineering' }, { name: 'HR' }, { name: 'Sales' }, { name: 'Marketing' }
-                    ]).map(d => (
+                    {(departments || []).map(d => (
                       <option key={d.id || d.name} value={d.name}>{d.name}</option>
                     ))}
                   </select>
@@ -975,9 +970,7 @@ const Performance = () => {
                     className="reports-select-filter"
                   >
                     <option value="All">All Branches</option>
-                    {(branches && branches.length > 0 ? branches : [
-                      { name: 'Jaipur HQ' }, { name: 'Delhi Office' }, { name: 'Branch Office' }
-                    ]).map(b => (
+                    {(branches || []).map(b => (
                       <option key={b.id || b.name} value={b.name}>{b.name}</option>
                     ))}
                   </select>
@@ -1274,7 +1267,7 @@ const Performance = () => {
               </div>
 
               <div className="formula-simulation-preview" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, marginTop: 5 }}>
-                <span className="reports-form-lbl" style={{ fontWeight: 600 }}>Simulated recalculation for {currentUser?.name || 'Administrator'}:</span>
+                <span className="reports-form-lbl" style={{ fontWeight: 600 }}>Simulated recalculation for Balram Suman:</span>
                 <div className="flex-row justify-between text-secondary-sm" style={{ marginTop: 6 }}>
                   <span>Productivity: 98 * {editWeights.productivity}%</span>
                   <span>= {parseFloat((98 * editWeights.productivity / 100).toFixed(1))}</span>
@@ -1428,12 +1421,9 @@ const Performance = () => {
                         value={goalForm.department}
                         onChange={(e) => setGoalForm(prev => ({ ...prev, department: e.target.value }))}
                       >
-                        <option>Engineering</option>
-                        <option>IT</option>
-                        <option>Operations</option>
-                        <option>Sales</option>
-                        <option>Marketing</option>
-                        <option>HR</option>
+                        {(departments || []).map(d => (
+                          <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                        ))}
                       </select>
                     </div>
                   </div>

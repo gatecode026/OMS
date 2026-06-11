@@ -180,7 +180,7 @@ export const AppProvider = ({ children }) => {
               { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
               { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
               { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 4, role: 'Super Admin Approval', approver: 'Super Admin', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
+              { level: 4, role: 'Super Admin Approval', approver: 'Balram Suman', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
             ],
             activityLog: t.activityLog || [
               { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
@@ -2002,14 +2002,18 @@ export const AppProvider = ({ children }) => {
         addActivityLog(`Approved leave request for ${leave.employeeName}`, 'Leaves', 'success');
         addToast('success', `Leave request for ${leave.employeeName} approved.`);
         
-        // Add Notification
+        // Add Notification — targeted to the employee who requested leave
         setNotifications(prev => [
           {
             id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
             type: 'success',
-            message: `Your leave request from ${leave.fromDate} has been Approved.`,
+            message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Approved. Note: ${notes || 'Approved by Manager'}`,
             timestamp: 'Just now',
-            read: false
+            read: false,
+            recipientId: leave.employeeId,
+            recipientRole: 'employee',
+            category: 'leave',
+            referenceId: leave.id
           },
           ...prev
         ]);
@@ -2055,6 +2059,22 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Rejected leave request for ${leave.employeeName}`, 'Leaves', 'danger');
         addToast('error', `Leave request for ${leave.employeeName} rejected.`);
+
+        // Add Notification — targeted to the employee who requested leave
+        setNotifications(prev => [
+          {
+            id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
+            type: 'error',
+            message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Rejected. Note: ${notes || 'Rejected by Manager'}`,
+            timestamp: 'Just now',
+            read: false,
+            recipientId: leave.employeeId,
+            recipientRole: 'employee',
+            category: 'leave',
+            referenceId: leave.id
+          },
+          ...prev
+        ]);
       } else {
         addToast('error', result.message || 'Failed to reject leave request');
       }
@@ -2102,6 +2122,24 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Submitted leave request for ${result.data.employeeName}`, 'Leaves', 'success');
         addToast('success', result.data.status === 'Approved' ? `Leave assigned successfully for ${result.data.employeeName}.` : 'Leave request submitted successfully for approval.');
+        
+        // Notify admin/manager about the new leave application (only if status is Pending)
+        if (result.data.status === 'Pending') {
+          setNotifications(prev => [
+            {
+              id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
+              type: 'info',
+              message: `${result.data.employeeName} has applied for ${result.data.type || 'Leave'} from ${result.data.fromDate} to ${result.data.toDate || result.data.fromDate} (${result.data.days || 1} day(s)). Action required.`,
+              timestamp: 'Just now',
+              read: false,
+              recipientRole: 'admin',
+              category: 'leave',
+              referenceId: result.data.id
+            },
+            ...prev
+          ]);
+        }
+        
         return result.data;
       } else {
         addToast('error', result.message || 'Failed to submit leave request');
@@ -2763,7 +2801,7 @@ export const AppProvider = ({ children }) => {
         { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
         { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
         { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 4, role: 'Super Admin Approval', approver: 'Super Admin', status: 'Pending', timestamp: '', remarks: '' }
+        { level: 4, role: 'Super Admin Approval', approver: 'Balram Suman', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
@@ -3138,8 +3176,9 @@ export const AppProvider = ({ children }) => {
 
   const getDepartmentTaskAnalytics = () => {
     const deptMap = {};
+    const activeDeptNames = new Set((departments || []).filter(d => d.status === 'Active').map(d => d.name));
     employees.forEach(emp => {
-      if (!emp.department) return;
+      if (!emp.department || !activeDeptNames.has(emp.department)) return;
       if (!deptMap[emp.department]) {
         deptMap[emp.department] = {
           department: emp.department,

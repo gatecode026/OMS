@@ -24,7 +24,6 @@ const FALLBACK_EMPLOYEES = [
     branch: 'Jaipur',
     team: 'Administration'
   },
-
 ];
 
 /**
@@ -44,8 +43,11 @@ export const login = async (email, password) => {
     throw err;
   }
 
-  // Normalize inputs
+  // Normalize inputs and map default pre-filled admin email
   let resolvedEmail = email.toLowerCase().trim();
+  if (resolvedEmail === 'admin@saas.com') {
+    resolvedEmail = 'aarav.sharma@saas.com';
+  }
 
   console.log(`[DEBUG login] Email received: "${email}" | Password length: ${password ? password.length : 0} | Resolved Email: "${resolvedEmail}"`);
 

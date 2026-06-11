@@ -80,8 +80,9 @@ const WorkReports = () => {
     setNotifications: setGlobalNotifications,
     addActivityLog,
     markAllNotificationsRead,
-    departments
+    departments: rawDepartments
   } = useApp();
+  const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
   const loading = usePageLoading(800);
 
   const initialUserRole = useMemo(() => {
