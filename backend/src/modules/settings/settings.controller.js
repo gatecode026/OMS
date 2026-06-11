@@ -18,8 +18,9 @@ export const getById = asyncHandler(async (req, res) => {
 });
 
 export const create = asyncHandler(async (req, res) => {
-  const data = await service.createRecord(req.body, req.user);
-  return successResponse(res, data, 'Record created successfully', 201);
+  // Always upsert the single global settings document
+  const data = await service.updateRecord('global', req.body, req.user);
+  return successResponse(res, data, 'Settings saved successfully');
 });
 
 export const update = asyncHandler(async (req, res) => {

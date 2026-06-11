@@ -286,19 +286,25 @@ const Notifications = () => {
       return;
     }
 
+    let recipientRole = 'all';
+    if (createForm.recipientType === 'Employees') recipientRole = 'employee';
+    if (createForm.recipientType === 'Managers') recipientRole = 'manager';
+    if (createForm.recipientType === 'Admins') recipientRole = 'admin';
+
     const newNotif = {
       title: createForm.title,
       message: createForm.message,
       category: createForm.category,
       priority: createForm.priority,
       recipientType: createForm.recipientType,
+      recipientRole: recipientRole,
       sentBy: perspective === 'super_admin' ? 'Super Admin' : 'Branch Admin',
       sentDate: new Date().toISOString().split('T')[0],
       deliveryStatus: createForm.schedule === 'Immediate' ? 'Delivered' : 'Scheduled',
       readStatus: 'Unread',
       readTime: '—',
-      recipients: 320,
-      delivered: createForm.schedule === 'Immediate' ? 320 : 0,
+      recipients: createForm.recipientType === 'All Employees' ? 320 : createForm.recipientType === 'Employees' ? 240 : createForm.recipientType === 'Managers' ? 60 : 20,
+      delivered: createForm.schedule === 'Immediate' ? (createForm.recipientType === 'All Employees' ? 320 : createForm.recipientType === 'Employees' ? 240 : createForm.recipientType === 'Managers' ? 60 : 20) : 0,
       read: 0,
       failed: 0
     };
@@ -637,7 +643,6 @@ const Notifications = () => {
           <button className={`tab-btn ${activeTab === 'all-notifications' ? 'active' : ''}`} onClick={() => setActiveTab('all-notifications')}><Inbox size={16} /> Notification Logs</button>
           <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}><BarChart3 size={16} /> Analytics</button>
           <button className={`tab-btn ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}><Copy size={16} /> Templates</button>
-          <button className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}><Settings size={16} /> Preference Settings</button>
           <button className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`} onClick={() => setActiveTab('logs')}><FileText size={16} /> System Logs</button>
         </div>
       </div>
@@ -659,7 +664,7 @@ const Notifications = () => {
               </div>
             </div>
 
-            <div className="notifications-stat-card border-bottom-info" onClick={() => setActiveTab('settings')}>
+            <div className="notifications-stat-card border-bottom-info">
               <div className="stat-card-header">
                 <span className="stat-label">Automated Trigger Rules</span>
                 <div className="stat-icon-chip"><Zap size={18} /></div>
@@ -1207,107 +1212,6 @@ const Notifications = () => {
         </div>
       )}
 
-      {/* ==================== TAB CONTENT: PREFERENCES SETTINGS ==================== */}
-      {activeTab === 'settings' && (
-        <div className="flex-column gap-6 animate-fade-in">
-          <div>
-            <h3 className="card-sec-title" style={{ margin: 0 }}>Notification Preferences Settings</h3>
-            <p className="subtitle" style={{ marginTop: 2 }}>Configure central gateway channels, retry rules, and retention settings</p>
-          </div>
-
-          <div className="pref-grid">
-            {/* Global Dispatch Channels */}
-            <div className="pref-card">
-              <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Active Gateway Channels</strong>
-              <div className="pref-row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>SMTP Mail Server Gate</div>
-                  <div className="text-xs text-muted">Primary gateway for newsletters, daily notifications & digests</div>
-                </div>
-                <label className="switch-control">
-                  <input type="checkbox" checked={preferences.emailEnabled} disabled={perspective !== 'super_admin'} onChange={() => setPreferences(prev => ({ ...prev, emailEnabled: !prev.emailEnabled }))} />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
-
-              <div className="pref-row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>Nexmo SMS Provider Gate</div>
-                  <div className="text-xs text-muted">Secondary gateway for urgent OTPs and emergency shutdowns</div>
-                </div>
-                <label className="switch-control">
-                  <input type="checkbox" checked={preferences.smsEnabled} disabled={perspective !== 'super_admin'} onChange={() => setPreferences(prev => ({ ...prev, smsEnabled: !prev.smsEnabled }))} />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
-
-              <div className="pref-row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>Google GCM Push Service</div>
-                  <div className="text-xs text-muted">Web app native dashboard toaster and active pop-ups</div>
-                </div>
-                <label className="switch-control">
-                  <input type="checkbox" checked={preferences.pushEnabled} disabled={perspective !== 'super_admin'} onChange={() => setPreferences(prev => ({ ...prev, pushEnabled: !prev.pushEnabled }))} />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
-
-              <div className="pref-row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>Slack Webhooks API</div>
-                  <div className="text-xs text-muted">Instant team channels alert routing integrations</div>
-                </div>
-                <label className="switch-control">
-                  <input type="checkbox" checked={preferences.slackEnabled} disabled={perspective !== 'super_admin'} onChange={() => setPreferences(prev => ({ ...prev, slackEnabled: !prev.slackEnabled }))} />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
-            </div>
-
-            {/* Failover and Routing parameters */}
-            <div className="pref-card">
-              <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Failover & Rate Limiting Controls</strong>
-
-              <div className="pref-row">
-                <div>
-                  <div style={{ fontWeight: 600 }}>Auto-Retry Failed Dispatches</div>
-                  <div className="text-xs text-muted">Attempt redelivery 3 times if gateway times out</div>
-                </div>
-                <label className="switch-control">
-                  <input type="checkbox" checked={preferences.retryFailed} disabled={perspective !== 'super_admin'} onChange={() => setPreferences(prev => ({ ...prev, retryFailed: !prev.retryFailed }))} />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
-
-              <div className="flex-column gap-2" style={{ marginTop: 10 }}>
-                <label className="input-label">Throttle Rates (Limit per employee session)</label>
-                <select value={preferences.rateLimiting} disabled={perspective !== 'super_admin'} onChange={(e) => setPreferences(prev => ({ ...prev, rateLimiting: e.target.value }))} className="table-filter-select width-full p-2">
-                  <option value="5 / min">5 Notifications / minute</option>
-                  <option value="10 / min">10 Notifications / minute</option>
-                  <option value="30 / min">30 Notifications / minute</option>
-                  <option value="No limits">Unrestricted</option>
-                </select>
-              </div>
-
-              <div className="flex-column gap-2" style={{ marginTop: 10 }}>
-                <label className="input-label">Audit Logs Retention Period</label>
-                <select value={preferences.retentionDays} disabled={perspective !== 'super_admin'} onChange={(e) => setPreferences(prev => ({ ...prev, retentionDays: parseInt(e.target.value) || 90 }))} className="table-filter-select width-full p-2">
-                  <option value="30">30 Days</option>
-                  <option value="90">90 Days</option>
-                  <option value="180">180 Days</option>
-                  <option value="365">1 Year</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {perspective === 'super_admin' && (
-            <div className="flex justify-end mt-4">
-              <Button variant="primary" onClick={() => addPageToast('success', 'Central configuration rules saved.')}>Save Settings Configurations</Button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ==================== TAB CONTENT: AUDIT LOGS ==================== */}
       {activeTab === 'logs' && (
@@ -1425,13 +1329,17 @@ const Notifications = () => {
 
               <div>
                 <label className="input-label">Target Audience Group</label>
-                <input
-                  type="text"
+                <select
                   value={createForm.recipientType}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, recipientType: e.target.value }))}
-                  className="table-search-input width-full"
-                  placeholder="e.g. All Employees, Engineering, Jaipur Staff..."
-                />
+                  className="table-filter-select width-full"
+                  style={{ padding: '8px' }}
+                >
+                  <option value="All Employees">All Employees</option>
+                  <option value="Employees">Employees</option>
+                  <option value="Managers">Managers</option>
+                  <option value="Admins">Admins</option>
+                </select>
               </div>
 
               <div>

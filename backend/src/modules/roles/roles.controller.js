@@ -1,6 +1,6 @@
 /**
  * @file src/modules/roles/roles.controller.js
- * @description Controllers for Roles module.
+ * @description Controllers for Roles and Permission Modules.
  */
 
 import service from './roles.service.js';
@@ -51,6 +51,23 @@ export const getPublicData = asyncHandler(async (req, res) => {
   return successResponse(res, { status: 'mock_public_data' }, 'Public record fetched');
 });
 
+// --- Permission Modules ---
+
+export const getAllPermissionModules = asyncHandler(async (req, res) => {
+  const data = await service.findAllPermissionModules(req.query);
+  return successResponse(res, data, 'Permission modules fetched successfully');
+});
+
+export const createPermissionModule = asyncHandler(async (req, res) => {
+  const data = await service.createPermissionModule(req.body, req.user);
+  return successResponse(res, data, 'Permission module created successfully', 201);
+});
+
+export const deletePermissionModule = asyncHandler(async (req, res) => {
+  const data = await service.deletePermissionModule(req.params.key, req.user);
+  return successResponse(res, data, 'Permission module deleted successfully');
+});
+
 export default {
   getAll,
   getById,
@@ -60,5 +77,8 @@ export default {
   getAllOverrides,
   createOverride,
   deleteOverride,
-  getPublicData
+  getPublicData,
+  getAllPermissionModules,
+  createPermissionModule,
+  deletePermissionModule
 };
