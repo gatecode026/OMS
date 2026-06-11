@@ -1737,7 +1737,7 @@ const Employees = () => {
                         </div>
                       </td>
                     )}
-                    {colVis.id && <td><span className="emp-id-mono">{row.id}</span></td>}
+                    {colVis.id && <td><span className="emp-id-mono emp-id-link" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${row.id}`); }} title="Open Profile">{row.id}</span></td>}
                     {colVis.designation && <td><span className="text-secondary-sm">{row.designation || row.role}</span></td>}
                     {colVis.department && <td><span className="dept-text">{row.department}</span></td>}
                     {colVis.branch && <td><span className="text-secondary-sm">{row.branch}</span></td>}
@@ -1771,7 +1771,7 @@ const Employees = () => {
                     {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
                     <td className="col-actions">
                       <div className="table-actions-cell">
-                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employees/${row.id}`); }} title="View Full Profile">
+                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${row.id}`); }} title="View Full Profile">
                           <Eye size={16} />
                         </button>
                         <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`?edit=${row.id}`); }} title="Edit">
@@ -1903,7 +1903,7 @@ const Employees = () => {
           </div>
           <div className="preview-divider" />
           <div className="preview-actions-grid">
-            <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employees/${previewEmp.id}`); setPreviewEmp(null); }}>View Full Profile</button>
+            <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employee-profile/${previewEmp.id}`); setPreviewEmp(null); }}>View Full Profile</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate(`?edit=${previewEmp.id}`); setPreviewEmp(null); }}>Edit Profile</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate(`?edit=${previewEmp.id}&step=7`); setPreviewEmp(null); }}>Profile Settings</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/tasks'); setPreviewEmp(null); }}>Assign Task</button>

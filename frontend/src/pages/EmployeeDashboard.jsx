@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './EmployeeDashboard.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -30,9 +31,11 @@ import UpdateTaskStatusModal from '../components/employeeDashboard/modals/Update
 import UploadFileModal from '../components/employeeDashboard/modals/UploadFileModal';
 
 const EmployeeDashboard = () => {
+  const navigate = useNavigate();
   const isLoading = usePageLoading(600);
   const {
     currentUser,
+    currentUserRole,
     attendance,
     tasks,
     leaveRequests,
@@ -43,6 +46,12 @@ const EmployeeDashboard = () => {
     projectsList,
     addToast
   } = useApp();
+
+  useEffect(() => {
+    if (currentUserRole && currentUserRole !== 'employee') {
+      navigate('/', { replace: true });
+    }
+  }, [currentUserRole, navigate]);
 
   // Filters State
   const [timePeriod, setTimePeriodState] = useState('today'); // today, week, month
@@ -107,14 +116,38 @@ const EmployeeDashboard = () => {
   const myActivities = activityLogs.filter(a => a.employeeName === currentUser.name);
 
   // Today's attendance record
-  const todayStr = '2026-06-03'; // Sync with seed dates
+  const getLocalDateString = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  const todayStr = getLocalDateString();
   const todayAttendance = myAttendance.find(a => a.date === todayStr) || {};
 
   // Today's report status
   const todayReport = myReports.find(r => r.date === todayStr) || {};
 
-  // Available leave balance sum
-  const leaveBalance = 25; // Default overall leave balance sum (Casual 8 + Sick 5 + Earned 12)
+  // Available leave balance sum calculated dynamically from database fields and approved requests
+  const getUsedDays = (typeKeys) => {
+    return myLeaves
+      .filter(l => l.status === 'Approved' && typeKeys.includes(l.type))
+      .reduce((sum, l) => sum + (Number(l.days) || 0), 0);
+  };
+
+  const clUsed = getUsedDays(['Casual Leave', 'CL']);
+  const slUsed = getUsedDays(['Sick Leave', 'SL']);
+  const elUsed = getUsedDays(['Earned Leave', 'PL', 'Paid Leave', 'Annual Leave']);
+
+  const clAvailable = currentUser.clBalance !== undefined ? currentUser.clBalance : 8;
+  const slAvailable = currentUser.slBalance !== undefined ? currentUser.slBalance : 12;
+  const elAvailable = currentUser.plBalance !== undefined ? currentUser.plBalance : 15;
+
+  const clRemaining = Math.max(0, clAvailable - clUsed);
+  const slRemaining = Math.max(0, slAvailable - slUsed);
+  const elRemaining = Math.max(0, elAvailable - elUsed);
+
+  const leaveBalance = clRemaining + slRemaining + elRemaining;
 
   // Today's tasks (due today or overdue)
   const todayTasks = myTasks.filter(t => t.dueDate === todayStr || (t.dueDate < todayStr && t.status !== 'Done'));
@@ -166,6 +199,7 @@ const EmployeeDashboard = () => {
 
       {/* SECTION 1: Top Summary Cards (6 personal stats cards) */}
       <TopSummaryCards
+        currentUser={currentUser}
         attendanceData={todayAttendance}
         todayTasks={todayTasks}
         activeProjectsCount={myProjects.length}
@@ -180,6 +214,7 @@ const EmployeeDashboard = () => {
         <div className="left-column">
           {/* My Attendance Widget */}
           <MyAttendanceWidget
+            currentUser={currentUser}
             attendanceRecord={todayAttendance}
             attendanceHistory={myAttendance}
             onOpenPunchModal={() => setPunchOpen(true)}
@@ -211,6 +246,7 @@ const EmployeeDashboard = () => {
           {/* Leave Balance Widget */}
           <LeaveBalanceWidget
             myLeaves={myLeaves}
+            currentUser={currentUser}
             onOpenLeaveModal={() => setLeaveOpen(true)}
           />
 
@@ -314,6 +350,7 @@ const EmployeeDashboard = () => {
           currentUser={currentUser}
         />
       )}
+
     </div>
   );
 };

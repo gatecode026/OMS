@@ -3,11 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, CheckSquare, Calendar, DollarSign, Settings, Info, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
+const formatNotificationTime = (notif) => {
+  const dateObj = notif.createdAt 
+    ? new Date(notif.createdAt) 
+    : (notif.timestamp && notif.timestamp !== 'Just now' && notif.timestamp !== 'just now' ? new Date(notif.timestamp) : new Date());
+  
+  if (isNaN(dateObj.getTime())) {
+    return notif.timestamp || notif.time || 'Just now';
+  }
+
+  const formattedDate = dateObj.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+  
+  const formattedTime = dateObj.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+  
+  return `${formattedDate}  •  ${formattedTime}`;
+};
+
 const NotificationsCenter = ({
   notifications = []
 }) => {
   const navigate = useNavigate();
-  const { markAllNotificationsRead, markNotificationRead, addToast } = useApp();
+  const { markAllNotificationsRead, markNotificationRead, addToast, currentUser, currentUserRole } = useApp();
   const [activeCategory, setActiveCategory] = useState('All');
 
   const categories = ['All', 'Task', 'Attendance', 'Leave', 'Payroll', 'System'];
@@ -43,7 +67,50 @@ const NotificationsCenter = ({
     return true;
   };
 
-  const filteredNotifs = notifications.filter(n => matchesCategory(n, activeCategory));
+  const getFilteredNotifications = () => {
+    const isAdminRole = ['super_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
+    return notifications.filter(n => {
+      const recipientId   = n.recipientId || n.targetUserId || n.forUserId;
+      const recipientRole = (n.recipientRole || n.targetRole || n.recipientType || '').toLowerCase();
+      const msg = (n.message || n.title || '').toLowerCase();
+
+      // Rule 1: specific user
+      if (recipientId) return recipientId === currentUser?.id;
+
+      // Rule 2: employee-only
+      if (recipientRole === 'employee') return currentUserRole === 'employee';
+
+      // Rule 3: admin-only
+      if (recipientRole === 'admin' || recipientRole === 'super_admin' || recipientRole === 'manager' || recipientRole === 'team_leader') return isAdminRole;
+
+      // Rule 4: global / broadcast notification (recipientRole is 'all', 'everyone', or empty)
+      if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
+        // If it's an employee-personal message, only show it to employees
+        const isPersonalEmployeeMsg =
+          msg.startsWith('your ') ||
+          msg.includes('your leave') ||
+          msg.includes('your request') ||
+          msg.includes('your attendance') ||
+          msg.includes('has been approved') ||
+          msg.includes('has been rejected') ||
+          msg.includes('note: approved') ||
+          msg.includes('note: rejected');
+
+        if (isPersonalEmployeeMsg) {
+          return currentUserRole === 'employee';
+        }
+
+        // Broadcast / general notification → show to everyone
+        return true;
+      }
+
+      // Fallback: match specific role
+      return recipientRole === currentUserRole?.toLowerCase();
+    });
+  };
+
+  const myNotifications = getFilteredNotifications();
+  const filteredNotifs = myNotifications.filter(n => matchesCategory(n, activeCategory));
 
   return (
     <div className="dashboard-widget">
@@ -78,16 +145,16 @@ const NotificationsCenter = ({
               key={notif.id}
               onClick={() => markNotificationRead(notif.id)}
               className="flex-row align-start gap-3 py-3 border-b border-border cursor-pointer hover:bg-surface rounded px-2"
-              style={{ borderBottom: '1px solid var(--border-color)' }}
+              style={{ borderBottom: '1px solid var(--border-color)', padding: '12px 8px' }}
             >
               <div className="activity-icon-container" style={{ marginTop: '2px' }}>
                 {getNotificationIcon(notif.type, notif.message)}
               </div>
               <div className="flex-column flex-1">
-                <span className={`text-sm ${!notif.read ? 'bold-text' : 'text-text-muted'}`} style={{ color: 'var(--text-primary)' }}>
+                <span className={`text-sm ${!notif.read ? 'bold-text' : 'text-text-muted'}`} style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>
                   {notif.message}
                 </span>
-                <span className="text-xs text-text-muted mt-1">{notif.timestamp || 'Just now'}</span>
+                <span className="text-xs text-text-muted mt-2" style={{ display: 'block', marginTop: '6px' }}>{formatNotificationTime(notif)}</span>
               </div>
               {!notif.read && (
                 <span 

@@ -428,8 +428,10 @@ const WebPortalAttendance = () => {
     const todayRecords = attendance.filter(a => a.date === dateFilter);
     const webPortalToday = todayRecords.filter(a => a.source === 'Web Portal').length;
     const presentToday = todayRecords.filter(a => a.status === 'Present' || a.status === 'Overtime').length;
-    const totalEmployeesToday = wpFilteredEmployees.length;
-    const completionRate = totalEmployeesToday > 0 ? Math.round((webPortalToday / totalEmployeesToday) * 100) : 0;
+
+    // Use TOTAL employees (not filtered view) as the denominator for consistent percentages
+    const totalEmployees = employees.length;
+    const completionRate = totalEmployees > 0 ? Math.min(100, Math.round((webPortalToday / totalEmployees) * 100)) : 0;
 
     const onTimeCount = todayRecords.filter(a => {
       if (!a.punchIn) return false;
@@ -440,13 +442,13 @@ const WebPortalAttendance = () => {
     return {
       webPortalToday,
       presentToday,
-      totalEmployees: totalEmployeesToday,
+      totalEmployees: wpFilteredEmployees.length, // filtered count shown in table header
       completionRate,
-      pendingCount: totalEmployeesToday - webPortalToday,
+      pendingCount: Math.max(0, totalEmployees - webPortalToday), // never negative
       onTimeRate: presentToday > 0 ? Math.round((onTimeCount / presentToday) * 100) : 0,
       avgHours: presentToday > 0 ? Math.round(todayRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0) / presentToday * 10) / 10 : 0
     };
-  }, [attendance, dateFilter, wpFilteredEmployees]);
+  }, [attendance, dateFilter, wpFilteredEmployees, employees]);
 
   // ── Change handlers ──
   const handleWpChange = (empId, field, value) => {
