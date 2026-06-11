@@ -99,6 +99,88 @@ const calculateWorkingHours = (punchIn, punchOut) => {
   }
 };
 
+const convert12to24 = (time12) => {
+  if (!time12 || time12 === '--:--') return '';
+  const match = time12.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) {
+    if (/^\d{2}:\d{2}$/.test(time12.trim())) return time12.trim();
+    return '';
+  }
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'PM' && hours < 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, '0')}:${minutes}`;
+};
+
+const convert24to12 = (time24) => {
+  if (!time24) return '';
+  const parts = time24.split(':');
+  if (parts.length < 2) return '';
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+};
+
+const decimalToTimeStr = (decimalVal) => {
+  if (decimalVal === undefined || decimalVal === null || isNaN(decimalVal) || decimalVal <= 0) return '00:00';
+  const hrs = Math.floor(decimalVal);
+  const mins = Math.round((decimalVal - hrs) * 60);
+  let finalHrs = hrs;
+  let finalMins = mins;
+  if (finalMins === 60) {
+    finalHrs += 1;
+    finalMins = 0;
+  }
+  return `${String(finalHrs).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}`;
+};
+
+const timeStrToDecimal = (timeStr) => {
+  if (!timeStr) return 0;
+  if (typeof timeStr === 'number') return timeStr;
+  const str = String(timeStr).trim();
+  if (str.includes(':')) {
+    const parts = str.split(':');
+    const hrs = parseInt(parts[0], 10) || 0;
+    const mins = parseInt(parts[1], 10) || 0;
+    return parseFloat((hrs + mins / 60).toFixed(2));
+  }
+  return parseFloat(str) || 0;
+};
+
+const calculateWorkingHours60 = (punchIn, punchOut) => {
+  if (!punchIn || !punchOut || punchIn === '--:--' || punchOut === '--:--') return '00:00';
+  try {
+    const parseTime = (timeStr) => {
+      let standardized = timeStr.trim().toUpperCase();
+      if (/^[0-9]{1,2}:[0-9]{2}[AP]M$/.test(standardized)) {
+        standardized = standardized.replace(/([AP]M)$/, ' $1');
+      }
+      const parsed = new Date(`2000/01/01 ${standardized}`);
+      return parsed;
+    };
+
+    const inTime = parseTime(punchIn);
+    const outTime = parseTime(punchOut);
+    if (isNaN(inTime.getTime()) || isNaN(outTime.getTime())) return '00:00';
+    
+    let diffMs = outTime - inTime;
+    if (diffMs < 0) {
+      diffMs += 24 * 60 * 60 * 1000;
+    }
+    const diffMins = Math.round(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  } catch (e) {
+    return '00:00';
+  }
+};
+
 const Attendance = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
@@ -189,7 +271,7 @@ const Attendance = () => {
     date: '',
     punchIn: '',
     punchOut: '',
-    totalHours: 0,
+    totalHours: '00:00',
     status: 'Present',
     source: 'Biometric',
     workMode: 'WFO'
@@ -207,7 +289,7 @@ const Attendance = () => {
     punchIn: '',
     punchOut: '',
     breakTime: '45 mins',
-    totalHours: 0,
+    totalHours: '00:00',
     status: 'Present',
     source: 'Web Portal'
   });
@@ -230,6 +312,46 @@ const Attendance = () => {
       setActiveSection('records');
     }
   }, [currentUserRole]);
+
+  // Auto-calculate hours for Edit Modal
+  useEffect(() => {
+    if (editFormData.punchIn && editFormData.punchOut) {
+      const calculated = calculateWorkingHours60(editFormData.punchIn, editFormData.punchOut);
+      setEditFormData(prev => {
+        if (prev.totalHours !== calculated) {
+          return { ...prev, totalHours: calculated };
+        }
+        return prev;
+      });
+    } else {
+      setEditFormData(prev => {
+        if (prev.totalHours !== '00:00') {
+          return { ...prev, totalHours: '00:00' };
+        }
+        return prev;
+      });
+    }
+  }, [editFormData.punchIn, editFormData.punchOut]);
+
+  // Auto-calculate hours for Mark Modal
+  useEffect(() => {
+    if (markFormData.punchIn && markFormData.punchOut) {
+      const calculated = calculateWorkingHours60(markFormData.punchIn, markFormData.punchOut);
+      setMarkFormData(prev => {
+        if (prev.totalHours !== calculated) {
+          return { ...prev, totalHours: calculated };
+        }
+        return prev;
+      });
+    } else {
+      setMarkFormData(prev => {
+        if (prev.totalHours !== '00:00') {
+          return { ...prev, totalHours: '00:00' };
+        }
+        return prev;
+      });
+    }
+  }, [markFormData.punchIn, markFormData.punchOut]);
 
   // Assign Shift state
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
@@ -289,7 +411,7 @@ const Attendance = () => {
       date: record.date || getLocalDateString(),
       punchIn: record.punchIn === '--:--' ? '' : (record.punchIn || ''),
       punchOut: record.punchOut === '--:--' ? '' : (record.punchOut || ''),
-      totalHours: record.totalHours || 0,
+      totalHours: decimalToTimeStr(record.totalHours),
       status: record.status || 'Present',
       source: record.source || 'Biometric',
       workMode: record.workMode || 'WFO'
@@ -306,6 +428,7 @@ const Attendance = () => {
       return;
     }
     
+    const decimalHours = isNoPunch ? 0 : timeStrToDecimal(editFormData.totalHours);
     const recordPayload = {
       employeeId: selectedRecord.employeeId,
       employeeName: selectedRecord.employeeName,
@@ -315,11 +438,11 @@ const Attendance = () => {
       punchIn: isNoPunch ? '--:--' : (editFormData.punchIn || '--:--'),
       punchOut: isNoPunch ? '--:--' : (editFormData.punchOut || '--:--'),
       breakTime: '45 mins',
-      totalHours: isNoPunch ? 0 : (parseFloat(editFormData.totalHours) || 0),
+      totalHours: decimalHours,
       status: editFormData.status,
       source: isNoPunch ? 'System' : editFormData.source,
       workMode: isNoPunch ? '' : normalizeWorkMode(editFormData.workMode),
-      overtime: !isNoPunch && editFormData.totalHours > 8 ? `${(editFormData.totalHours - 8).toFixed(1)} hrs` : '0 hrs'
+      overtime: !isNoPunch && decimalHours > 8 ? `${(decimalHours - 8).toFixed(1)} hrs` : '0 hrs'
     };
 
     if (selectedRecord.isVirtual) {
@@ -334,31 +457,22 @@ const Attendance = () => {
 
   const handleEditAutoPunchIn = () => {
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     setEditFormData(prev => ({ ...prev, punchIn: timeString }));
     addToast('info', `Punch In time set to ${timeString}`);
   };
 
   const handleEditAutoPunchOut = () => {
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    
-    if (editFormData.punchIn) {
-      const punchInTime = new Date(`2000/01/01 ${editFormData.punchIn}`);
-      const punchOutTime = new Date(`2000/01/01 ${timeString}`);
-      const diffHours = (punchOutTime - punchInTime) / (1000 * 60 * 60);
-      const totalHours = Math.round(diffHours * 10) / 10;
-      setEditFormData(prev => ({ ...prev, punchOut: timeString, totalHours: totalHours > 0 ? totalHours : 0 }));
-    } else {
-      setEditFormData(prev => ({ ...prev, punchOut: timeString }));
-    }
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    setEditFormData(prev => ({ ...prev, punchOut: timeString }));
     addToast('info', `Punch Out time set to ${timeString}`);
   };
 
   // Auto-set current time for punch in
   const handleAutoPunchIn = () => {
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     setMarkFormData(prev => ({ ...prev, punchIn: timeString }));
     addToast('info', `Punch In time set to ${timeString}`);
   };
@@ -366,18 +480,8 @@ const Attendance = () => {
   // Auto-set current time for punch out and calculate hours
   const handleAutoPunchOut = () => {
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    
-    // Calculate hours if punch in exists
-    if (markFormData.punchIn) {
-      const punchInTime = new Date(`2000/01/01 ${markFormData.punchIn}`);
-      const punchOutTime = new Date(`2000/01/01 ${timeString}`);
-      const diffHours = (punchOutTime - punchInTime) / (1000 * 60 * 60);
-      const totalHours = Math.round(diffHours * 10) / 10;
-      setMarkFormData(prev => ({ ...prev, punchOut: timeString, totalHours: totalHours > 0 ? totalHours : 0 }));
-    } else {
-      setMarkFormData(prev => ({ ...prev, punchOut: timeString }));
-    }
+    const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    setMarkFormData(prev => ({ ...prev, punchOut: timeString }));
     addToast('info', `Punch Out time set to ${timeString}`);
   };
 
@@ -394,6 +498,7 @@ const Attendance = () => {
     }
 
     const empData = employees.find(e => e.id === markFormData.employeeId);
+    const decimalHours = isNoPunch ? 0 : timeStrToDecimal(markFormData.totalHours);
     const record = {
       id: `ATT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       employeeId: markFormData.employeeId,
@@ -406,10 +511,10 @@ const Attendance = () => {
       punchOut: markFormData.punchOut || '--:--',
       breakTime: `${totalBreakMinutes} mins`,
       breaks: globalBreaks,
-      totalHours: parseFloat(markFormData.totalHours) || 0,
+      totalHours: decimalHours,
       status: markFormData.status,
       source: markFormData.source,
-      overtime: markFormData.totalHours > 8 ? `${(markFormData.totalHours - 8).toFixed(1)} hrs` : '0 hrs'
+      overtime: decimalHours > 8 ? `${(decimalHours - 8).toFixed(1)} hrs` : '0 hrs'
     };
     addAttendanceRecord(record);
     setMarkModalOpen(false);
@@ -423,7 +528,7 @@ const Attendance = () => {
       punchIn: '',
       punchOut: '',
       breakTime: '45 mins',
-      totalHours: 0,
+      totalHours: '00:00',
       status: 'Present',
       source: 'Web Portal'
     });
@@ -522,8 +627,43 @@ const Attendance = () => {
     addToast('success', 'Attendance check-in reminder request broadcasted to all active employees.');
   };
 
-  const handleApproveAll = () => {
-    addToast('success', 'All pending attendance entries approved successfully.');
+  const handleApproveAll = async () => {
+    const recordsToApprove = (attendance || []).filter(item => {
+      const matchDate = item.date === dateFilter;
+      const hasPunchIn = item.punchIn && item.punchIn !== '--:--';
+      const noPunchOut = !item.punchOut || item.punchOut === '--:--';
+      const notVirtual = !item.isVirtual && !String(item.id).startsWith('ABS-');
+      return matchDate && hasPunchIn && noPunchOut && notVirtual;
+    });
+
+    if (recordsToApprove.length === 0) {
+      addToast('info', 'No active check-in logs requiring approval.');
+      return;
+    }
+
+    try {
+      addToast('info', `Approving check-ins for ${recordsToApprove.length} employee(s)...`);
+      await Promise.all(recordsToApprove.map(item => {
+        let outTime = '06:00 PM';
+        if (item.shift) {
+          const match = item.shift.match(/-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+          if (match) {
+            outTime = match[1];
+          }
+        }
+        const decimalHours = calculateWorkingHours(item.punchIn, outTime);
+        return updateAttendanceRecord(item.id, {
+          ...item,
+          punchOut: outTime,
+          totalHours: decimalHours,
+          overtime: decimalHours > 8 ? `${(decimalHours - 8).toFixed(1)} hrs` : '0 hrs'
+        });
+      }));
+      addToast('success', `Approved check-ins and set default punch-out times for ${recordsToApprove.length} employee(s).`);
+    } catch (err) {
+      console.error('Failed to approve check-ins:', err);
+      addToast('error', 'Failed to approve attendance entries.');
+    }
   };
 
   const handleScheduleReport = () => {
@@ -574,7 +714,7 @@ const Attendance = () => {
               }
             }
             let totalHours = item.totalHours || 0;
-            if (totalHours <= 0 && item.punchIn && item.punchOut && item.punchIn !== '--:--' && item.punchOut !== '--:--') {
+            if (item.punchIn && item.punchOut && item.punchIn !== '--:--' && item.punchOut !== '--:--') {
               totalHours = calculateWorkingHours(item.punchIn, item.punchOut);
             }
             records.push({
@@ -589,7 +729,7 @@ const Attendance = () => {
               breakTime: item.breakTime || '45 mins',
               workMode: item.workMode || empDetails?.workMode || 'WFO',
               totalHours,
-              overtime: (item.overtime && item.overtime !== '0 hrs') ? item.overtime : (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
+              overtime: totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs'
             });
           });
         } else {
@@ -651,7 +791,7 @@ const Attendance = () => {
         }
       }
       let totalHours = item.totalHours || 0;
-      if (totalHours <= 0 && item.punchIn && item.punchOut && item.punchIn !== '--:--' && item.punchOut !== '--:--') {
+      if (item.punchIn && item.punchOut && item.punchIn !== '--:--' && item.punchOut !== '--:--') {
         totalHours = calculateWorkingHours(item.punchIn, item.punchOut);
       }
       return {
@@ -663,7 +803,7 @@ const Attendance = () => {
         breakTime: item.breakTime || '45 mins',
         workMode: item.workMode || empDetails?.workMode || 'WFO',
         totalHours,
-        overtime: (item.overtime && item.overtime !== '0 hrs') ? item.overtime : (totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs')
+        overtime: totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs'
       };
     });
     
@@ -822,7 +962,65 @@ const Attendance = () => {
   }, [totalPresent, totalAbsent, totalLate, totalLeave, totalWFH, totalHalfDay]);
 
   const handleExport = (format = 'CSV') => {
-    addToast('success', `Export generated! attendance_report_${dateFilter || 'all'}.${format.toLowerCase()} downloaded successfully.`);
+    if (!filteredAttendance || filteredAttendance.length === 0) {
+      addToast('error', 'No records to export.');
+      return;
+    }
+
+    if (format === 'CSV' || format === 'Excel') {
+      const headers = [
+        'Employee ID',
+        'Employee Name',
+        'Department',
+        'Branch',
+        'Date',
+        'Shift',
+        'Punch In',
+        'Punch Out',
+        'Break Time',
+        'Work Hours',
+        'Overtime',
+        'Status',
+        'Source',
+        'Work Mode'
+      ];
+      
+      const rows = [headers];
+      filteredAttendance.forEach(r => {
+        rows.push([
+          `"${r.employeeId || ''}"`,
+          `"${r.employeeName || ''}"`,
+          `"${r.department || ''}"`,
+          `"${r.branch || ''}"`,
+          `"${r.date || ''}"`,
+          `"${r.shift || ''}"`,
+          `"${r.punchIn || '--:--'}"`,
+          `"${r.punchOut || '--:--'}"`,
+          `"${totalBreakMinutes} mins"`,
+          `"${r.totalHours > 0 ? decimalToTimeStr(r.totalHours) : '00:00'}"`,
+          `"${r.overtime || '0 hrs'}"`,
+          `"${r.status || ''}"`,
+          `"${r.source || ''}"`,
+          `"${r.workMode || ''}"`
+        ]);
+      });
+      
+      const csvContent = rows.map(e => e.join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      const filename = `attendance_report_${dateFilter || 'all'}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      addToast('success', `Export generated! ${filename} downloaded successfully.`);
+    } else if (format === 'PDF') {
+      addToast('info', 'Opening print dialog for PDF export...');
+      window.print();
+    }
   };
 
   // Status badge helper
@@ -913,7 +1111,7 @@ const Attendance = () => {
         key: 'totalHours',
         header: FIELD_LABELS.workingHours,
         sortable: true,
-        render: (row) => <span>{row.totalHours > 0 ? `${row.totalHours} hrs` : '--'}</span>
+        render: (row) => <span>{row.totalHours > 0 ? `${decimalToTimeStr(row.totalHours)} hrs` : '--'}</span>
       },
       {
         key: 'overtime',
@@ -2040,20 +2238,20 @@ const Attendance = () => {
                     <div>
                       <label>Punch In Time {!isNoPunch && '*'}</label>
                       <div style={{ display: 'flex', gap: '5px' }}>
-                        <input type="text" placeholder="e.g. 09:00 AM" value={editFormData.punchIn}
-                          onChange={(e) => setEditFormData(prev => ({ ...prev, punchIn: e.target.value }))}
+                        <input type="time" value={convert12to24(editFormData.punchIn)}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, punchIn: convert24to12(e.target.value) }))}
                           disabled={isNoPunch}
-                          style={{ flex: 1, height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
+                          style={{ flex: 1, height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)', colorScheme: 'dark' }} />
                         <Button type="button" variant="secondary" onClick={handleEditAutoPunchIn} style={{ padding: '0 10px', minWidth: 'auto' }} title="Set Current Time" disabled={isNoPunch}>⏱️</Button>
                       </div>
                     </div>
                     <div>
                       <label>Punch Out Time</label>
                       <div style={{ display: 'flex', gap: '5px' }}>
-                        <input type="text" placeholder="e.g. 06:00 PM" value={editFormData.punchOut}
-                          onChange={(e) => setEditFormData(prev => ({ ...prev, punchOut: e.target.value }))}
+                        <input type="time" value={convert12to24(editFormData.punchOut)}
+                          onChange={(e) => setEditFormData(prev => ({ ...prev, punchOut: convert24to12(e.target.value) }))}
                           disabled={isNoPunch}
-                          style={{ flex: 1, height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
+                          style={{ flex: 1, height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)', colorScheme: 'dark' }} />
                         <Button type="button" variant="secondary" onClick={handleEditAutoPunchOut} style={{ padding: '0 10px', minWidth: 'auto' }} title="Set Current Time" disabled={isNoPunch || !editFormData.punchIn}>⏱️</Button>
                       </div>
                     </div>
@@ -2062,9 +2260,9 @@ const Attendance = () => {
                   <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', opacity: isNoPunch ? 0.4 : 1, pointerEvents: isNoPunch ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
                     <div>
                       <label>Total Hours</label>
-                      <input type="number" step="0.1" placeholder="e.g. 8.5" value={editFormData.totalHours}
+                      <input type="text" placeholder="e.g. 08:30" value={editFormData.totalHours}
                         disabled={isNoPunch}
-                        onChange={(e) => setEditFormData(prev => ({ ...prev, totalHours: parseFloat(e.target.value) || 0 }))}
+                        onChange={(e) => setEditFormData(prev => ({ ...prev, totalHours: e.target.value }))}
                         style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
                     </div>
                     <div>
@@ -2203,20 +2401,20 @@ const Attendance = () => {
                   <div>
                     <label>Punch In Time {!isNoPunch && '*'}</label>
                     <div style={{ display: 'flex', gap: '5px' }}>
-                      <input type="text" placeholder="e.g. 09:00 AM" value={markFormData.punchIn}
-                        onChange={(e) => setMarkFormData(prev => ({ ...prev, punchIn: e.target.value }))}
+                      <input type="time" value={convert12to24(markFormData.punchIn)}
+                        onChange={(e) => setMarkFormData(prev => ({ ...prev, punchIn: convert24to12(e.target.value) }))}
                         disabled={isNoPunch}
-                        style={{ flex: 1 }} />
+                        style={{ flex: 1, height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)', colorScheme: 'dark' }} />
                       <Button type="button" variant="secondary" onClick={handleAutoPunchIn} style={{ padding: '0 10px', minWidth: 'auto' }} title="Set Current Time" disabled={isNoPunch}>⏱️</Button>
                     </div>
                   </div>
                   <div>
                     <label>Punch Out Time</label>
                     <div style={{ display: 'flex', gap: '5px' }}>
-                      <input type="text" placeholder="e.g. 06:00 PM" value={markFormData.punchOut}
-                        onChange={(e) => setMarkFormData(prev => ({ ...prev, punchOut: e.target.value }))}
+                      <input type="time" value={convert12to24(markFormData.punchOut)}
+                        onChange={(e) => setMarkFormData(prev => ({ ...prev, punchOut: convert24to12(e.target.value) }))}
                         disabled={isNoPunch}
-                        style={{ flex: 1 }} />
+                        style={{ flex: 1, height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)', colorScheme: 'dark' }} />
                       <Button type="button" variant="secondary" onClick={handleAutoPunchOut} style={{ padding: '0 10px', minWidth: 'auto' }} title="Set Current Time" disabled={isNoPunch || !markFormData.punchIn}>⏱️</Button>
                     </div>
                   </div>
@@ -2225,9 +2423,10 @@ const Attendance = () => {
                 <div className="form-field" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)', opacity: isNoPunch ? 0.4 : 1, pointerEvents: isNoPunch ? 'none' : 'auto', transition: 'opacity 0.2s' }}>
                   <div>
                     <label>Total Hours</label>
-                    <input type="number" step="0.1" placeholder="e.g. 8.5" value={markFormData.totalHours}
+                    <input type="text" placeholder="e.g. 08:30" value={markFormData.totalHours}
                       disabled={isNoPunch}
-                      onChange={(e) => setMarkFormData(prev => ({ ...prev, totalHours: parseFloat(e.target.value) || 0 }))} />
+                      onChange={(e) => setMarkFormData(prev => ({ ...prev, totalHours: e.target.value }))}
+                      style={{ width: '100%', height: '38px', backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '0 10px', color: 'var(--text-primary)' }} />
                   </div>
                   <div>
                     <label>Source Device</label>
