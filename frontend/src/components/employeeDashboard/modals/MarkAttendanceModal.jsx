@@ -51,10 +51,17 @@ const MarkAttendanceModal = ({
     }
   }, [todayRecord]);
 
+  const getLocalDateString = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const todayStr = '2026-06-03'; // Sync with seed dates
+    const todayStr = getLocalDateString(currentTime);
     const formattedTimeStr = formatTime(currentTime);
 
     if (action === 'in') {
@@ -124,7 +131,9 @@ const MarkAttendanceModal = ({
           <h2 className="attendance-clock-time">
             {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </h2>
-          <span className="attendance-clock-date">Date: 03 Jun 2026</span>
+          <span className="attendance-clock-date">
+            Date: {currentTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </span>
         </div>
 
         {/* Radio Actions */}

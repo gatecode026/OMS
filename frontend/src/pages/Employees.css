@@ -282,6 +282,8 @@
 .emp-name-clickable:hover { color: var(--color-primary); }
 .emp-email-sub { font-size: 0.72rem; color: var(--text-muted); }
 .emp-id-mono { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); }
+.emp-id-link { cursor: pointer; transition: color 0.15s, text-decoration 0.15s; }
+.emp-id-link:hover { color: var(--color-primary); text-decoration: underline; }
 .dept-text { color: var(--text-secondary); font-size: 0.8rem; }
 .text-secondary-sm { color: var(--text-secondary); font-size: 0.8rem; }
 

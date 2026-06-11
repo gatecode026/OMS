@@ -39,9 +39,17 @@ const Login = () => {
     setLoading(true);
     setTimeout(async () => {
       try {
-        await login(email, password);
+        const user = await login(email, password);
+        sessionStorage.setItem('just_logged_in', 'true');
         setLoading(false);
-        navigate('/');
+
+        // Redirect employees to their dashboard, admins to admin dashboard
+        const role = user?.roleId || user?.role || '';
+        if (role === 'employee') {
+          navigate('/employee-dashboard');
+        } else {
+          navigate('/');
+        }
       } catch (err) {
         setLoading(false);
       }

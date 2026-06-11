@@ -80,10 +80,44 @@ export const deleteRecord = async (id, currentUser) => {
   return repository.remove(id);
 };
 
+export const findToday = async (employeeId) => {
+  logger.info('Executing AttendanceService::findToday query for employee: ' + employeeId);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const records = await repository.find({ employeeId, date: todayStr });
+  return records[0] || null;
+};
+
+export const findSummary = async (employeeId, month) => {
+  logger.info(`Executing AttendanceService::findSummary query for employee: ${employeeId}, month: ${month}`);
+  // month is formatted as 'YYYY-MM'
+  const from = `${month}-01`;
+  const to = `${month}-31`; // mongo will compare string gte/lte lexicographically, which works for 31 days.
+  const records = await repository.find({ employeeId, from, to });
+  
+  const presentDays = records.filter(r => r.status === 'Present' || r.status === 'Work From Home' || r.status === 'WFH').length;
+  const absentDays = records.filter(r => r.status === 'Absent').length;
+  const lateDays = records.filter(r => r.status === 'Late').length;
+  
+  const hoursRecords = records.filter(r => r.totalHours > 0);
+  const avgHours = hoursRecords.length > 0 
+    ? parseFloat((hoursRecords.reduce((sum, r) => sum + r.totalHours, 0) / hoursRecords.length).toFixed(1))
+    : 0;
+    
+  return {
+    presentDays,
+    absentDays,
+    lateDays,
+    avgHours,
+    totalWorkingDays: 22
+  };
+};
+
 export default {
   findAll,
   findById,
   createRecord,
   updateRecord,
-  deleteRecord
+  deleteRecord,
+  findToday,
+  findSummary
 };

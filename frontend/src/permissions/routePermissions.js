@@ -42,6 +42,7 @@ export const ROUTE_PERMISSIONS = {
   '/documents': ROLES.EMPLOYEE,
   '/profile': ROLES.EMPLOYEE,
   '/my-profile': ROLES.EMPLOYEE,
+  '/employee-profile/:id': ROLES.EMPLOYEE,
   '/unauthorized': ROLES.EMPLOYEE
 };
 export const getRequiredRoleForPath = (path) => {
@@ -92,6 +93,7 @@ export const PATH_TO_MODULE = {
   '/employees': 'employees',
   '/employees/add': 'employees',
   '/employees/:id': 'employees',
+  '/employee-profile/:id': 'employees',
   '/branches': 'employees',
   '/departments': 'employees',
   '/teams': 'employees',

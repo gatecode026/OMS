@@ -9,8 +9,12 @@ import logger from '../../config/logger.js';
 export const find = async (query = {}) => {
   logger.debug('Executing AttendanceRepository::find', query);
   const filters = {};
-  if (query.date) filters.date = query.date;
   if (query.employeeId) filters.employeeId = query.employeeId;
+  if (query.from && query.to) {
+    filters.date = { $gte: query.from, $lte: query.to };
+  } else if (query.date) {  
+    filters.date = query.date;
+  }  
   if (query.branch) filters.branch = query.branch;
   if (query.department) filters.department = query.department;
   if (query.status) filters.status = query.status;

@@ -3,6 +3,12 @@
 ═══════════════════════════════════════════════════════ */
 .attendance-page { display:flex; flex-direction:column; gap:var(--spacing-5); padding-bottom: 90px; }
 
+/* Live pulse dot animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
 /* ── Header ── */
 .att-page-header {
   display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;

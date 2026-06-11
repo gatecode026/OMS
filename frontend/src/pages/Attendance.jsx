@@ -3,6 +3,13 @@ import './Attendance.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
 import { useNavigate } from 'react-router-dom';
+import TodayStatusCard from '../components/TodayStatusCard';
+import AttendanceDayCard from '../components/AttendanceDayCard';
+import AttendanceSummaryChart from '../components/AttendanceSummaryChart';
+import WeeklyTrendChart from '../components/WeeklyTrendChart';
+import MonthlyDonutChart from '../components/MonthlyDonutChart';
+import LiveActivityFeed from '../components/LiveActivityFeed';
+import useMyAttendance from '../hooks/useMyAttendance';
 import usePageLoading from '../hooks/usePageLoading';
 import DataTable from '../components/common/DataTable';
 import Badge from '../components/common/Badge';
@@ -82,6 +89,41 @@ const Attendance = () => {
     fetchAttendance,
     fetchEmployees
   } = useApp();
+
+  const [personalTab, setPersonalTab] = useState('today'); // today, 7days, month, custom
+  const [customRange, setCustomRange] = useState({ from: '', to: '' });
+
+  // Compute date range for useMyAttendance hook based on selected tab
+  const personalFilters = useMemo(() => {
+    const today = new Date();
+    const getFormattedDate = (d) => d.toISOString().split('T')[0];
+    
+    if (personalTab === 'today') {
+      const todayStr = getFormattedDate(today);
+      return { from: todayStr, to: todayStr };
+    }
+    if (personalTab === '7days') {
+      const start = new Date(today);
+      start.setDate(today.getDate() - 7);
+      return { from: getFormattedDate(start), to: getFormattedDate(today) };
+    }
+    if (personalTab === 'month') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { from: getFormattedDate(start), to: getFormattedDate(today) };
+    }
+    if (personalTab === 'custom') {
+      return { from: customRange.from, to: customRange.to };
+    }
+    return {};
+  }, [personalTab, customRange]);
+
+  const {
+    loading: personalLoading,
+    todayRecord: personalTodayRecord,
+    summary: personalSummary,
+    records: personalRecords,
+    refetch: personalRefetch
+  } = useMyAttendance(personalFilters);
 
   const scopedEmployees = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin') return employees;
@@ -987,6 +1029,256 @@ const Attendance = () => {
       dept: att.department
     }));
   }, [attendance]);
+
+  // ─── Helper: Export CSV ───
+  const handleDownloadReport = () => {
+    const rows = [['Date', 'Status', 'Punch In', 'Punch Out', 'Work Hours', 'Source']];
+    personalRecords.forEach(r => {
+      rows.push([
+        r.date || '', r.status || '',
+        r.punchIn || '--:--', r.punchOut || '--:--',
+        r.totalHours ? `${r.totalHours}h` : '0h',
+        r.source || 'Biometric'
+      ]);
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attendance_report_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('success', 'Attendance report downloaded successfully.');
+  };
+
+  if (currentUserRole === 'employee') {
+    if (personalLoading && personalRecords.length === 0) {
+      return (
+        <div className="attendance-page flex-column grid-gap padding-4">
+          <div className="card" style={{ height: '80px' }}><Skeleton variant="rect" height="100%" /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', margin: '8px 0' }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="card" style={{ height: '90px' }}><Skeleton variant="rect" height="100%" /></div>
+            ))}
+          </div>
+          <div className="card" style={{ height: '300px' }}><Skeleton variant="rect" height="100%" /></div>
+        </div>
+      );
+    }
+
+    // Compute overtime from records
+    const totalOvertimeHrs = personalRecords.reduce((sum, r) => {
+      const extra = (r.totalHours || 0) - 8;
+      return sum + (extra > 0 ? extra : 0);
+    }, 0);
+    const attendancePct = personalSummary.totalWorkingDays > 0
+      ? Math.round((personalSummary.presentDays / personalSummary.totalWorkingDays) * 100)
+      : 0;
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0 0 2rem 0' }}>
+        {/* ── Page Header ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px', height: '40px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, var(--color-primary), var(--color-success))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <Activity size={20} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>My Attendance</h2>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Personal punch log, shift analytics &amp; work hours</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <Button variant="secondary" onClick={personalRefetch} icon={RefreshCw} size="sm">Refresh</Button>
+            <Button variant="outline" onClick={handleDownloadReport} icon={Download} size="sm">Download Report</Button>
+          </div>
+        </div>
+
+        {/* ── 5 Stat Cards ── */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))',
+          gap: '12px'
+        }}>
+          {[
+            {
+              label: 'Present Days',
+              value: `${personalSummary.presentDays}`,
+              sub: `/ ${personalSummary.totalWorkingDays} working days`,
+              color: 'var(--color-success)',
+              bg: 'rgba(16,185,129,0.08)',
+              border: 'rgba(16,185,129,0.2)',
+              icon: <CheckCircle2 size={18} />
+            },
+            {
+              label: 'Absent Days',
+              value: `${personalSummary.absentDays}`,
+              sub: 'days missed',
+              color: 'var(--color-danger)',
+              bg: 'rgba(239,68,68,0.08)',
+              border: 'rgba(239,68,68,0.2)',
+              icon: <UserMinus size={18} />
+            },
+            {
+              label: 'Late Arrivals',
+              value: `${personalSummary.lateDays}`,
+              sub: 'days late this month',
+              color: 'var(--color-warning)',
+              bg: 'rgba(245,158,11,0.08)',
+              border: 'rgba(245,158,11,0.2)',
+              icon: <Clock size={18} />
+            },
+            {
+              label: 'Avg Work Hours',
+              value: `${personalSummary.avgHours}h`,
+              sub: 'per day',
+              color: 'var(--color-info)',
+              bg: 'rgba(59,130,246,0.08)',
+              border: 'rgba(59,130,246,0.2)',
+              icon: <BarChart2 size={18} />
+            },
+            {
+              label: 'Attendance Rate',
+              value: `${attendancePct}%`,
+              sub: `${personalSummary.presentDays} / ${personalSummary.totalWorkingDays} days`,
+              color: attendancePct >= 90 ? 'var(--color-success)' : attendancePct >= 75 ? 'var(--color-warning)' : 'var(--color-danger)',
+              bg: attendancePct >= 90 ? 'rgba(16,185,129,0.08)' : attendancePct >= 75 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)',
+              border: attendancePct >= 90 ? 'rgba(16,185,129,0.2)' : attendancePct >= 75 ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)',
+              icon: <Award size={18} />
+            }
+          ].map((card, i) => (
+            <div key={i} style={{
+              background: card.bg,
+              border: `1px solid ${card.border}`,
+              borderRadius: 'var(--radius-lg)',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  {card.label}
+                </span>
+                <span style={{ color: card.color, opacity: 0.8 }}>{card.icon}</span>
+              </div>
+              <span style={{ fontSize: '1.75rem', fontWeight: 800, color: card.color, lineHeight: 1 }}>{card.value}</span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{card.sub}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Date Filter Tabs ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'flex', gap: '4px',
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid var(--border-color)',
+            padding: '3px',
+            borderRadius: 'var(--radius-lg)'
+          }}>
+            {[
+              { key: 'today', label: 'Today' },
+              { key: '7days', label: 'Last 7 Days' },
+              { key: 'month', label: 'This Month' },
+              { key: 'custom', label: 'Custom' }
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setPersonalTab(t.key)}
+                style={{
+                  padding: '7px 16px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  border: '1px solid transparent',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  background: personalTab === t.key ? 'var(--color-primary)' : 'transparent',
+                  color: personalTab === t.key ? '#fff' : 'var(--text-secondary)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {personalTab === 'custom' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="date"
+                value={customRange.from}
+                onChange={e => setCustomRange(prev => ({ ...prev, from: e.target.value }))}
+                style={{ padding: '6px 10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.78rem' }}
+              />
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>to</span>
+              <input
+                type="date"
+                value={customRange.to}
+                onChange={e => setCustomRange(prev => ({ ...prev, to: e.target.value }))}
+                style={{ padding: '6px 10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.78rem' }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ── Today Status Card ── */}
+        {personalTab === 'today' && (
+          <TodayStatusCard todayRecord={personalTodayRecord} />
+        )}
+
+        {/* ── Charts Row: Bar + Weekly Trend + Donut ── */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '14px'
+        }}>
+          <AttendanceSummaryChart records={personalRecords} />
+          <WeeklyTrendChart records={personalRecords} />
+          <MonthlyDonutChart records={personalRecords} />
+        </div>
+
+        {/* ── Bottom Section: Attendance Log + Live Activity ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: '14px' }}>
+          {/* Attendance Log */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FileText size={15} style={{ color: 'var(--color-primary)' }} />
+                Attendance Log
+              </h3>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{personalRecords.length} record(s)</span>
+            </div>
+            {personalRecords.length === 0 ? (
+              <div style={{
+                background: 'var(--bg-card)',
+                border: '0.5px solid var(--border-color)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '40px',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                fontSize: '0.875rem'
+              }}>
+                No records found for the selected period
+              </div>
+            ) : (
+              personalRecords.map(rec => (
+                <AttendanceDayCard key={rec.id} record={rec} />
+              ))
+            )}
+          </div>
+
+          {/* Live Activity Feed */}
+          <LiveActivityFeed records={personalRecords} />
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

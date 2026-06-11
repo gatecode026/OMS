@@ -814,7 +814,7 @@ const Notifications = () => {
                   const isAdminRole = ['super_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
                   const myNotifications = notifications.filter(n => {
                     const recipientId   = n.recipientId || n.targetUserId || n.forUserId;
-                    const recipientRole = (n.recipientRole || n.targetRole || '').toLowerCase();
+                    const recipientRole = (n.recipientRole || n.targetRole || n.recipientType || '').toLowerCase();
                     const msg = (n.message || n.title || '').toLowerCase();
 
                     // Rule 1: specific user
@@ -824,23 +824,31 @@ const Notifications = () => {
                     if (recipientRole === 'employee') return currentUserRole === 'employee';
 
                     // Rule 3: admin-only
-                    if (recipientRole === 'admin') return isAdminRole;
+                    if (recipientRole === 'admin' || recipientRole === 'super_admin' || recipientRole === 'manager' || recipientRole === 'team_leader') return isAdminRole;
 
-                    // Rule 4: legacy — check message content
-                    const isPersonalEmployeeMsg =
-                      msg.startsWith('your ') ||
-                      msg.includes('your leave') ||
-                      msg.includes('your request') ||
-                      msg.includes('your attendance') ||
-                      msg.includes('has been approved') ||
-                      msg.includes('has been rejected') ||
-                      msg.includes('note: approved') ||
-                      msg.includes('note: rejected');
+                    // Rule 4: global / broadcast notification (recipientRole is 'all', 'everyone', or empty)
+                    if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
+                      // If it's an employee-personal message, only show it to employees
+                      const isPersonalEmployeeMsg =
+                        msg.startsWith('your ') ||
+                        msg.includes('your leave') ||
+                        msg.includes('your request') ||
+                        msg.includes('your attendance') ||
+                        msg.includes('has been approved') ||
+                        msg.includes('has been rejected') ||
+                        msg.includes('note: approved') ||
+                        msg.includes('note: rejected');
 
-                    if (isPersonalEmployeeMsg) return false;
+                      if (isPersonalEmployeeMsg) {
+                        return currentUserRole === 'employee';
+                      }
 
-                    // Broadcast → admins only
-                    return isAdminRole;
+                      // Broadcast / general notification → show to everyone
+                      return true;
+                    }
+
+                    // Fallback: match specific role
+                    return recipientRole === currentUserRole?.toLowerCase();
                   }).slice(0, 5);
 
 

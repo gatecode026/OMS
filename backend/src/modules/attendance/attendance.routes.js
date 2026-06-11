@@ -21,6 +21,9 @@ router.route('/')
   .get(controller.getAll)
   .post(validateRequest(validation.create), controller.create);
 
+router.get('/today', controller.getToday);
+router.get('/summary', controller.getSummary);
+
 router.route('/:id')
   .get(controller.getById)
   .put(validateRequest(validation.update), controller.update)

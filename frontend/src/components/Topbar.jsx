@@ -20,8 +20,34 @@ import {
   Search,
   Settings,
   Calendar,
-  ArrowRight
+  ArrowRight,
+  Clock,
+  Video
 } from 'lucide-react';
+
+const formatNotificationTime = (notif) => {
+  const dateObj = notif.createdAt 
+    ? new Date(notif.createdAt) 
+    : (notif.timestamp && notif.timestamp !== 'Just now' && notif.timestamp !== 'just now' ? new Date(notif.timestamp) : new Date());
+  
+  if (isNaN(dateObj.getTime())) {
+    return notif.timestamp || notif.time || 'Just now';
+  }
+
+  const formattedDate = dateObj.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+  
+  const formattedTime = dateObj.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+  
+  return `${formattedDate}  •  ${formattedTime}`;
+};
 
 const Topbar = ({ onMenuToggle }) => {
   const navigate = useNavigate();
@@ -58,9 +84,8 @@ const Topbar = ({ onMenuToggle }) => {
 
   const handleLogout = (e) => {
     e.preventDefault();
-    logout();
     setProfileOpen(false);
-    navigate('/login');
+    logout(); // logout() itself does window.location.href = '/login'
   };
 
   const isAdminRole = ['super_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
@@ -75,7 +100,7 @@ const Topbar = ({ onMenuToggle }) => {
   const getFilteredNotifications = () => {
     return notifications.filter(n => {
       const recipientId   = n.recipientId || n.targetUserId || n.forUserId;
-      const recipientRole = (n.recipientRole || n.targetRole || '').toLowerCase();
+      const recipientRole = (n.recipientRole || n.targetRole || n.recipientType || '').toLowerCase();
       const msg = (n.message || n.title || '').toLowerCase();
 
       // Rule 1 — specific user id set → show ONLY to that user
@@ -88,31 +113,35 @@ const Topbar = ({ onMenuToggle }) => {
         return currentUserRole === 'employee';
       }
 
-      // Rule 3 — explicitly tagged as admin-only
-      if (recipientRole === 'admin') {
+      // Rule 3 — explicitly tagged as admin-only / super_admin / manager
+      if (recipientRole === 'admin' || recipientRole === 'super_admin' || recipientRole === 'manager' || recipientRole === 'team_leader') {
         return isAdminRole;
       }
 
-      // Rule 4 — no recipient tag (legacy/old notifications)
-      // If the message reads like a personal result to an employee, hide from admins
-      const isPersonalEmployeeMsg =
-        msg.startsWith('your ') ||
-        msg.includes('your leave') ||
-        msg.includes('your request') ||
-        msg.includes('your attendance') ||
-        msg.includes('has been approved') ||
-        msg.includes('has been rejected') ||
-        msg.includes('has been rejected -') ||
-        msg.includes('note: approved') ||
-        msg.includes('note: rejected');
+      // Rule 4 — global / broadcast notification (recipientRole is 'all', 'everyone', or empty)
+      if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
+        // If it's an employee-personal message, only show it to employees
+        const isPersonalEmployeeMsg =
+          msg.startsWith('your ') ||
+          msg.includes('your leave') ||
+          msg.includes('your request') ||
+          msg.includes('your attendance') ||
+          msg.includes('has been approved') ||
+          msg.includes('has been rejected') ||
+          msg.includes('has been rejected -') ||
+          msg.includes('note: approved') ||
+          msg.includes('note: rejected');
 
-      if (isPersonalEmployeeMsg) {
-        // This is an employee-personal message — never show to admin
-        return false;
+        if (isPersonalEmployeeMsg) {
+          return currentUserRole === 'employee';
+        }
+
+        // Broadcast / general notification → show to everyone
+        return true;
       }
 
-      // Broadcast / general notification → show to admins by default
-      return isAdminRole;
+      // Fallback: match specific role
+      return recipientRole === currentUserRole?.toLowerCase();
     }).slice(0, 5);
   };
 
@@ -401,7 +430,7 @@ const Topbar = ({ onMenuToggle }) => {
                         key={n.id}
                         className={`notif-item ${!n.read ? 'unread' : ''}`}
                         onClick={() => handleNotificationClick(n)}
-                        style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '10px 14px' }}
+                        style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '12px 16px' }}
                       >
                         {/* Top row: icon + message + unread dot */}
                         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -410,7 +439,7 @@ const Topbar = ({ onMenuToggle }) => {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <p className="notif-message" style={{ margin: 0, lineHeight: 1.4 }}>{n.message}</p>
-                            <span className="notif-time" style={{ marginTop: 3, display: 'block' }}>{n.timestamp}</span>
+                            <span className="notif-time" style={{ marginTop: '6px', display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)' }}>{formatNotificationTime(n)}</span>
                           </div>
                           {!n.read && <span className="notif-unread-dot" style={{ flexShrink: 0, marginTop: 6 }}></span>}
                         </div>
@@ -470,36 +499,217 @@ const Topbar = ({ onMenuToggle }) => {
           </button>
 
           {meetingsOpen && (
-            <div className="topbar-dropdown-panel meetings-panel animate-slide-up" style={{ right: 0, width: '280px' }}>
-              <div className="panel-header">
-                <span className="panel-title" style={{ fontWeight: 600 }}>Meetings & Calendar</span>
+            <div className="topbar-dropdown-panel meetings-panel animate-slide-up" style={{ right: 0, width: '300px' }}>
+              <div className="panel-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
+                <span className="panel-title flex-row align-center gap-2" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={16} style={{ color: 'var(--color-primary, #d946ef)' }} />
+                  <span>Meetings & Events</span>
+                </span>
               </div>
-              <div className="panel-body" style={{ padding: '12px' }}>
+              
+              <div className="panel-body" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '380px' }}>
+                {/* Meetings Section */}
                 <div className="meetings-section">
-                  <span className="meetings-section-title" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Upcoming Meetings</span>
-                  <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
-                    <div className="meeting-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px' }}>
-                      <span className="meeting-time" style={{ color: 'var(--color-primary-light)', fontWeight: 600 }}>10:00 AM</span>
-                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Design Team Meeting</span>
+                  <span className="meetings-section-title" style={{ 
+                    fontSize: '0.68rem', 
+                    color: 'var(--text-muted)', 
+                    fontWeight: 700, 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.08em',
+                    display: 'block',
+                    marginBottom: '8px'
+                  }}>
+                    Upcoming Meetings
+                  </span>
+                  
+                  <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div 
+                      className="meeting-item-card transition-all" 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '12px', 
+                        padding: '10px 12px', 
+                        background: 'var(--bg-elevated, rgba(255, 255, 255, 0.02))', 
+                        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.02)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.borderColor = 'var(--border-color, rgba(255, 255, 255, 0.06))';
+                        e.currentTarget.style.background = 'var(--bg-elevated, rgba(255, 255, 255, 0.02))';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                        <div style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          background: 'rgba(59, 130, 246, 0.08)',
+                          color: '#3b82f6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Video size={14} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span className="meeting-name" style={{ color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 600 }}>Design Team Meeting</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={10} /> 10:00 AM
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="meeting-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px' }}>
-                      <span className="meeting-time" style={{ color: 'var(--color-primary-light)', fontWeight: 600 }}>03:00 PM</span>
-                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Project Review Meeting</span>
+
+                    <div 
+                      className="meeting-item-card transition-all" 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '12px', 
+                        padding: '10px 12px', 
+                        background: 'var(--bg-elevated, rgba(255, 255, 255, 0.02))', 
+                        border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                        e.currentTarget.style.background = 'rgba(139, 92, 246, 0.02)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.borderColor = 'var(--border-color, rgba(255, 255, 255, 0.06))';
+                        e.currentTarget.style.background = 'var(--bg-elevated, rgba(255, 255, 255, 0.02))';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                        <div style={{
+                          padding: '6px',
+                          borderRadius: '6px',
+                          background: 'rgba(139, 92, 246, 0.08)',
+                          color: '#8b5cf6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <Video size={14} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span className="meeting-name" style={{ color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 600 }}>Project Review Meeting</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={10} /> 03:00 PM
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="meetings-section" style={{ marginTop: '14px' }}>
-                  <span className="meetings-section-title" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Upcoming Events</span>
-                  <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
-                    <div className="meeting-item event-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px', borderLeft: '3px solid var(--color-success)' }}>
-                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Monthly Town Hall</span>
+                {/* Events Section */}
+                <div className="meetings-section">
+                  <span className="meetings-section-title" style={{ 
+                    fontSize: '0.68rem', 
+                    color: 'var(--text-muted)', 
+                    fontWeight: 700, 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.08em',
+                    display: 'block',
+                    marginBottom: '8px'
+                  }}>
+                    Upcoming Events
+                  </span>
+                  
+                  <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div 
+                      className="meeting-item event-item transition-all" 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '10px', 
+                        fontSize: '0.8rem', 
+                        padding: '10px 12px', 
+                        background: 'rgba(16, 185, 129, 0.02)', 
+                        border: '1px solid rgba(16, 185, 129, 0.08)', 
+                        borderLeft: '4px solid var(--color-success, #10b981)',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.04)';
+                        e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.02)';
+                        e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.08)';
+                      }}
+                    >
+                      <span className="meeting-name" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Monthly Town Hall</span>
                     </div>
-                    <div className="meeting-item event-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px', borderLeft: '3px solid var(--color-warning)' }}>
-                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Team Building Session</span>
+
+                    <div 
+                      className="meeting-item event-item transition-all" 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '10px', 
+                        fontSize: '0.8rem', 
+                        padding: '10px 12px', 
+                        background: 'rgba(245, 158, 11, 0.02)', 
+                        border: '1px solid rgba(245, 158, 11, 0.08)', 
+                        borderLeft: '4px solid var(--color-warning, #f59e0b)',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.background = 'rgba(245, 158, 11, 0.04)';
+                        e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.background = 'rgba(245, 158, 11, 0.02)';
+                        e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.08)';
+                      }}
+                    >
+                      <span className="meeting-name" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Team Building Session</span>
                     </div>
-                    <div className="meeting-item event-item" style={{ display: 'flex', gap: '8px', fontSize: '0.8rem', padding: '6px 8px', background: 'var(--bg-elevated)', borderRadius: '6px', borderLeft: '3px solid var(--color-primary)' }}>
-                      <span className="meeting-name" style={{ color: 'var(--text-secondary)' }}>Product Launch Meeting</span>
+
+                    <div 
+                      className="meeting-item event-item transition-all" 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        gap: '10px', 
+                        fontSize: '0.8rem', 
+                        padding: '10px 12px', 
+                        background: 'rgba(217, 70, 239, 0.02)', 
+                        border: '1px solid rgba(217, 70, 239, 0.08)', 
+                        borderLeft: '4px solid var(--color-primary, #d946ef)',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.background = 'rgba(217, 70, 239, 0.04)';
+                        e.currentTarget.style.borderColor = 'rgba(217, 70, 239, 0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'none';
+                        e.currentTarget.style.background = 'rgba(217, 70, 239, 0.02)';
+                        e.currentTarget.style.borderColor = 'rgba(217, 70, 239, 0.08)';
+                      }}
+                    >
+                      <span className="meeting-name" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>Product Launch Meeting</span>
                     </div>
                   </div>
                 </div>

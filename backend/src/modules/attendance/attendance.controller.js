@@ -36,11 +36,26 @@ export const getPublicData = asyncHandler(async (req, res) => {
   return successResponse(res, { status: 'mock_public_data' }, 'Public record fetched');
 });
 
+export const getToday = asyncHandler(async (req, res) => {
+  const employeeId = req.query.employeeId || req.user.id;
+  const data = await service.findToday(employeeId);
+  return successResponse(res, data, 'Today record fetched successfully');
+});
+
+export const getSummary = asyncHandler(async (req, res) => {
+  const employeeId = req.query.employeeId || req.user.id;
+  const month = req.query.month;
+  const data = await service.findSummary(employeeId, month);
+  return successResponse(res, data, 'Summary fetched successfully');
+});
+
 export default {
   getAll,
   getById,
   create,
   update,
   remove,
-  getPublicData
+  getPublicData,
+  getToday,
+  getSummary
 };
