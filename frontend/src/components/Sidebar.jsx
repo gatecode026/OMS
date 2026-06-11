@@ -204,9 +204,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
   const handleLogout = (e) => {
     e.preventDefault();
-    logout();
     setMobileOpen(false);
-    navigate('/login');
+    logout(); // logout() itself does window.location.href = '/login'
   };
 
   const renderItem = (item) => {
@@ -402,7 +401,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
               menuStructure.map(sec => ({
                 ...sec,
                 items: sec.items.filter(item => 
-                  currentUserRole !== 'super_admin' || item.name !== 'Employee Dashboard'
+                  item.name !== 'Employee Dashboard'
                 )
               })), 
               currentUserRole, 

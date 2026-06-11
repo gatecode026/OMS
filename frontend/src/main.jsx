@@ -43,6 +43,7 @@ const SecurityAudit = lazy(() => import('./pages/SecurityAudit'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 const Managers = lazy(() => import('./pages/Managers'));
 const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
+const EmployeeProfile = lazy(() => import('./pages/EmployeeProfile'));
 const Overview = lazy(() => import('./pages/Overview'));
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -66,7 +67,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 {/* ── People ── */}
                 <Route path="/employees" element={<Employees />} />
                 <Route path="/employees/add" element={<Employees />} />
-                <Route path="/employees/:id" element={<EmployeeDetail />} />
+                <Route path="/employees/:id" element={<EmployeeProfile />} />
+                <Route path="/employee-profile/:id" element={<EmployeeProfile />} />
                 <Route path="/attendance" element={<Attendance />} />
                 <Route path="/attendance/webportal" element={<WebPortalAttendance />} />
                 <Route path="/leaves" element={<LeaveManagement />} />

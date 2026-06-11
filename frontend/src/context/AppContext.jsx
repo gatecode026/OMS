@@ -541,11 +541,15 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('saas_user_id');
     localStorage.removeItem('saas_user');
     sessionStorage.removeItem('saas_token');
+    sessionStorage.removeItem('just_logged_in');
 
-    setCurrentUserRole('super_admin');
+    setCurrentUserRole(null);
     setCurrentUserId('');
     setCurrentUser(null);
     setToken('');
+
+    // Hard redirect to login — ensures full state reset and no stale role/context
+    window.location.href = '/login';
   };
 
   const fetchEmployees = async () => {

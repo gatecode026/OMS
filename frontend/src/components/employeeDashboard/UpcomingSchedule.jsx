@@ -9,7 +9,14 @@ const UpcomingSchedule = ({
   const navigate = useNavigate();
   const { addToast } = useApp();
 
-  const todayStr = '2026-06-03';
+  const getLocalDateString = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayStr = getLocalDateString();
 
   // Seed default meetings
   const defaultSchedule = [

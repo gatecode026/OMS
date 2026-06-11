@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import './AppShell.css';
 import Sidebar from './Sidebar';
@@ -9,21 +9,48 @@ import { ToastContainer } from './Toast';
 import ConfirmDialog from './common/ConfirmDialog';
 import Skeleton from './common/Skeleton';
 import { useApp } from '../context/AppContext';
+import WelcomeModal from './employeeDashboard/WelcomeModal';
 
 const AppShell = () => {
-  const { sidebarCollapsed, confirmDialog, commandPaletteOpen, setCommandPaletteOpen } = useApp();
+  const { sidebarCollapsed, confirmDialog, commandPaletteOpen, setCommandPaletteOpen, currentUser } = useApp();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Show welcome modal for ALL roles on first login
+  useEffect(() => {
+    const justLoggedIn = sessionStorage.getItem('just_logged_in');
+    if (justLoggedIn === 'true' && currentUser) {
+      setShowWelcome(true);
+      sessionStorage.removeItem('just_logged_in');
+    }
+  }, [currentUser]);
 
   return (
     <div className="app-shell-layout">
+
+      {/* Global Welcome Modal — shows for all roles after login */}
+      {showWelcome && currentUser && (
+        <WelcomeModal
+          currentUser={currentUser}
+          onClose={() => setShowWelcome(false)}
+        />
+      )}
+
       {/* Sidebar navigation */}
       <Sidebar
         mobileOpen={mobileSidebarOpen}
         setMobileOpen={setMobileSidebarOpen}
       />
 
-      {/* Main page content area */}
-      <div className={`app-shell-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      {/* Main page content area — hidden behind modal until dismissed */}
+      <div
+        className={`app-shell-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+        style={{
+          opacity: showWelcome ? 0 : 1,
+          transition: showWelcome ? 'none' : 'opacity 0.6s ease',
+          pointerEvents: showWelcome ? 'none' : 'auto'
+        }}
+      >
         <Topbar onMenuToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)} />
 
         {/* Scrollable page viewport */}

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 const TopSummaryCards = ({
+  currentUser = {},
   attendanceData = {},
   todayTasks = [],
   activeProjectsCount = 0,
@@ -28,7 +29,7 @@ const TopSummaryCards = ({
       detail: attendanceData.punchIn || '--:--',
       icon: Clock,
       color: 'text-success',
-      path: '/attendance/webportal'
+      path: '/attendance'
     },
     {
       id: 'tasks',
@@ -77,6 +78,41 @@ const TopSummaryCards = ({
     }
   ];
 
+  const renderValue = (card) => {
+    if (card.id === 'attendance') {
+      const status = card.value;
+      let badgeClass = 'status-badge ';
+      if (status === 'Present' || status === 'WFH' || status === 'Work From Home') {
+        badgeClass += 'status-present';
+      } else if (status === 'Late') {
+        badgeClass += 'status-late';
+      } else if (status === 'Absent') {
+        badgeClass += 'status-absent';
+      } else if (status === 'Half Day' || status === 'Half-Day') {
+        badgeClass += 'status-late';
+      } else if (status === 'On Leave' || status === 'Leave') {
+        badgeClass += 'status-leave';
+      } else {
+        badgeClass += 'status-neutral';
+      }
+      return (
+        <span className={badgeClass} style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 700 }}>
+          {status}
+        </span>
+      );
+    }
+
+    if (card.id === 'performance') {
+      return (
+        <span className="bold-text text-lg" style={{ fontSize: '1.35rem', color: '#10b981' }}>{card.value}</span>
+      );
+    }
+
+    return (
+      <span className="bold-text text-lg" style={{ fontSize: '1.35rem', color: 'var(--text-primary)' }}>{card.value}</span>
+    );
+  };
+
   return (
     <div className="summary-cards-grid">
       {cards.map((card) => {
@@ -87,15 +123,45 @@ const TopSummaryCards = ({
             className={`summary-card card-${card.id}`}
             onClick={() => navigate(card.path)}
           >
-            <div className="flex-row justify-between w-full align-center">
-              <Icon className={`${card.color}`} size={20} />
-              <ArrowUpRight className="text-text-muted" size={16} />
+            <div className="flex-row justify-between w-full align-center" style={{ marginBottom: '8px' }}>
+              <div className="icon-wrapper" style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.3s ease'
+              }}>
+                <Icon size={18} />
+              </div>
+              <div className="arrow-wrapper" style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255, 255, 255, 0.03)'
+              }}>
+                <ArrowUpRight size={14} />
+              </div>
             </div>
-            <div className="flex-column items-start mt-2">
-              <span className="bold-text text-lg" style={{ fontSize: '1.25rem' }}>{card.value}</span>
-              <span className="text-xs text-text-muted mt-1">{card.detail}</span>
+            
+            <div className="flex-column items-start" style={{ gap: '4px' }}>
+              <span className="text-xs text-text-muted bold-text uppercase tracking-wider" style={{ fontSize: '0.68rem', letterSpacing: '0.05em' }}>
+                {card.label}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', height: '28px' }}>
+                {renderValue(card)}
+              </div>
             </div>
-            <span className="text-xs text-text-muted bold-text uppercase tracking-wider mt-1">{card.label}</span>
+
+            <div className="flex-row justify-between w-full align-center" style={{ borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '8px', marginTop: '4px' }}>
+              <span className="text-xs text-text-muted" style={{ fontSize: '0.72rem' }}>
+                {card.id === 'attendance' ? `Punch In: ${card.detail}` : card.detail}
+              </span>
+            </div>
           </div>
         );
       })}

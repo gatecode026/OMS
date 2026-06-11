@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Calendar, CheckSquare, Shield } from 'lucide-react';
-import Badge from '../common/Badge';
+import { Clock } from 'lucide-react';
 
 const MyAttendanceWidget = ({
+  currentUser = {},
   attendanceRecord = {},
   attendanceHistory = [],
   onOpenPunchModal
@@ -12,12 +12,30 @@ const MyAttendanceWidget = ({
 
   // Calculate monthly stats
   const totalDaysInMonth = 24; // Average working days
-  const presentDays = attendanceHistory.filter(h => h.status === 'Present' || h.status === 'Late' || h.status === 'Overtime' || h.status === 'Work From Home').length;
-  const attendancePercentage = presentDays > 0 ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) : 96;
+  const presentDays = attendanceHistory.filter(h => 
+    h.status === 'Present' || 
+    h.status === 'Late' || 
+    h.status === 'Overtime' || 
+    h.status === 'Work From Home'
+  ).length;
+  const attendancePercentage = presentDays > 0 
+    ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) 
+    : 96;
 
-  // Working hours display
+  // Raw stats from record
   const workingHours = attendanceRecord.totalHours || attendanceRecord.workingHours || 0;
   const overtime = attendanceRecord.overtime || 0;
+
+  // Safely parse units to prevent double unit rendering (e.g. "0 hrs Hrs" or "4% %")
+  const parseVal = (val) => {
+    if (val === undefined || val === null) return '0';
+    if (typeof val === 'number') return String(val);
+    const cleaned = val.replace(/hrs|hr|hours|hour|%/gi, '').trim();
+    return cleaned === '' ? '0' : cleaned;
+  };
+
+  const workingHoursNum = useMemo(() => parseVal(workingHours), [workingHours]);
+  const overtimeNum = useMemo(() => parseVal(overtime), [overtime]);
 
   const getStatusBadge = (status) => {
     const s = (status || '').toLowerCase();
@@ -32,47 +50,86 @@ const MyAttendanceWidget = ({
   return (
     <div className="dashboard-widget">
       <div className="widget-header">
-        <h3>My Attendance</h3>
+        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '700' }}>My Attendance</h3>
         <button
-          onClick={() => navigate('/attendance/webportal')}
-          className="text-xs text-primary-500 hover:text-primary-400 font-semibold"
+          onClick={() => navigate(`/employee-profile/${currentUser?.id || ''}`)}
+          style={{ 
+            fontSize: '0.75rem', 
+            color: 'var(--color-primary, #d946ef)', 
+            fontWeight: '600',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+          onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
         >
           View History
         </button>
       </div>
+
       <div className="widget-content flex-column gap-4">
         {/* Main Display Row */}
         <div className="flex-row justify-between align-center flex-wrap gap-4">
           <div className="flex-column gap-1">
-            <span className="text-xs text-text-muted bold-text uppercase">Today's Status</span>
+            <span className="text-xs text-text-muted bold-text uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Today's Status</span>
             <div className="mt-1">{getStatusBadge(attendanceRecord.status)}</div>
           </div>
 
           <div className="flex-row gap-4">
             <div className="flex-column">
-              <span className="text-xs text-text-muted bold-text uppercase">Punch In</span>
+              <span className="text-xs text-text-muted bold-text uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Punch In</span>
               <span className="bold-text text-sm mt-1">{attendanceRecord.punchIn || '--:--'}</span>
             </div>
             <div className="flex-column">
-              <span className="text-xs text-text-muted bold-text uppercase">Punch Out</span>
+              <span className="text-xs text-text-muted bold-text uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Punch Out</span>
               <span className="bold-text text-sm mt-1">{attendanceRecord.punchOut || 'Pending'}</span>
             </div>
           </div>
         </div>
 
-        {/* Numeric stats */}
+        {/* Numeric stats with tinted professional styling */}
         <div className="summary-cards-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-          <div className="mini-stat-card">
-            <span className="text-xs text-text-muted block">Working Hours</span>
-            <span className="bold-text text-sm block mt-1">{workingHours} Hrs</span>
+          <div className="mini-stat-card" style={{ 
+            background: 'rgba(59, 130, 246, 0.04)', 
+            boxShadow: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '10px 8px',
+            borderRadius: '8px',
+            border: '1px solid var(--accent-blue-translucent, rgba(59, 130, 246, 0.15))'
+          }}>
+            <span className="text-xs text-text-muted block font-semibold" style={{ fontSize: '0.72rem' }}>Working Hours</span>
+            <span className="bold-text text-sm block mt-1" style={{ color: '#3b82f6', fontWeight: '700' }}>{workingHoursNum} Hrs</span>
           </div>
-          <div className="mini-stat-card">
-            <span className="text-xs text-text-muted block">Overtime</span>
-            <span className="bold-text text-sm block mt-1">{overtime} Hrs</span>
+
+          <div className="mini-stat-card" style={{ 
+            background: 'rgba(139, 92, 246, 0.04)', 
+            boxShadow: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '10px 8px',
+            borderRadius: '8px',
+            border: '1px solid var(--color-purple-light, rgba(139, 92, 246, 0.15))'
+          }}>
+            <span className="text-xs text-text-muted block font-semibold" style={{ fontSize: '0.72rem' }}>Overtime</span>
+            <span className="bold-text text-sm block mt-1" style={{ color: '#8b5cf6', fontWeight: '700' }}>{overtimeNum} Hrs</span>
           </div>
-          <div className="mini-stat-card">
-            <span className="text-xs text-text-muted block">Monthly Rate</span>
-            <span className="bold-text text-sm block mt-1">{attendancePercentage}%</span>
+
+          <div className="mini-stat-card" style={{ 
+            background: 'rgba(217, 70, 239, 0.04)', 
+            boxShadow: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '10px 8px',
+            borderRadius: '8px',
+            border: '1px solid var(--color-primary-light, rgba(217, 70, 239, 0.15))'
+          }}>
+            <span className="text-xs text-text-muted block font-semibold" style={{ fontSize: '0.72rem' }}>Monthly Rate</span>
+            <span className="bold-text text-sm block mt-1" style={{ color: 'var(--color-primary, #d946ef)', fontWeight: '700' }}>{attendancePercentage}%</span>
           </div>
         </div>
 
@@ -80,17 +137,47 @@ const MyAttendanceWidget = ({
         <div className="flex-row gap-3 mt-1 flex-wrap">
           <button
             onClick={onOpenPunchModal}
-            className="flex-1 padding-2 text-xs bold-text bg-primary-500 hover:bg-primary-hover text-white rounded flex-center gap-1 transition-all"
-            style={{ border: 'none', cursor: 'pointer', background: 'var(--color-primary)' }}
+            className="flex-1 padding-2 text-xs bold-text rounded flex-center gap-2 transition-all"
+            style={{ 
+              border: 'none', 
+              cursor: 'pointer', 
+              background: 'var(--color-primary, #d946ef)', 
+              color: '#ffffff',
+              fontWeight: '700',
+              padding: '10px 14px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-primary-hover, #e879f9)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--color-primary, #d946ef)';
+              e.currentTarget.style.transform = 'none';
+            }}
           >
             <Clock size={14} /> Mark Attendance
           </button>
           <button
             onClick={() => navigate('/attendance/webportal')}
-            className="flex-1 padding-2 text-xs bold-text bg-surface border-border text-primary-500 hover:text-primary-400 rounded flex-center gap-1 transition-all"
-            style={{ cursor: 'pointer' }}
+            className="flex-1 padding-2 text-xs bold-text rounded flex-center gap-2 transition-all"
+            style={{ 
+              cursor: 'pointer',
+              background: 'var(--bg-elevated, rgba(255, 255, 255, 0.02))',
+              border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+              color: 'var(--text-primary)',
+              fontWeight: '600',
+              padding: '10px 14px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              e.currentTarget.style.color = 'var(--color-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--bg-elevated, rgba(255, 255, 255, 0.02))';
+              e.currentTarget.style.color = 'var(--text-primary)';
+            }}
           >
-            View Attendance History
+            View History
           </button>
         </div>
       </div>

@@ -410,6 +410,7 @@ tbody td {
 .text-danger  { color: var(--color-danger)  !important; }
 .text-info    { color: var(--accent-blue-solid) !important; }
 .text-primary-c { color: var(--color-primary) !important; }
+.text-white   { color: var(--text-white, #ffffff) !important; }
 
 /* ==========================================================================
    RANK BADGE (used in leaderboards)

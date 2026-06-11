@@ -10,17 +10,33 @@ import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
 import Modal from '../components/common/Modal';
 import Skeleton from '../components/common/Skeleton';
+import LeaveBalanceCard from '../components/leave/LeaveBalanceCard';
+import LeaveRequestCard from '../components/leave/LeaveRequestCard';
+import ApplyLeavePanel from '../components/leave/ApplyLeavePanel';
+import LeaveFilterTabs from '../components/leave/LeaveFilterTabs';
+import UpcomingHolidays from '../components/leave/UpcomingHolidays';
+import LeaveUsageChart from '../components/leave/LeaveUsageChart';
 import {
   Check, X, Eye, FileText, CalendarDays, Search, Filter, Plus, Settings,
   AlertCircle, Calendar, TrendingUp, Users, BarChart3, ArrowRight,
   Clock, Settings2, FileSpreadsheet, FileUp, Download, Info, Bell, Briefcase,
   HeartPulse, Umbrella, UserCheck, Smile, ShieldAlert, Trash2, Edit, CheckCircle2,
-  Database, Save, RefreshCw
+  Database, Save, RefreshCw, Leaf, ChevronRight
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, BarChart as RechartsBarChart, Bar, Legend
 } from 'recharts';
+import { 
+  MdOutlineDateRange, MdHourglassEmpty, MdCheckCircle, MdCancel, MdAdd, MdRefresh, 
+  MdBeachAccess, MdLocalHospital, MdDateRange, MdChildCare, MdPeople, MdAssignment 
+} from 'react-icons/md';
+import { 
+  FiBriefcase, FiCalendar, FiClock, FiCheckSquare, FiAlertCircle, FiSettings, FiPlus, FiArrowRight 
+} from 'react-icons/fi';
+import { 
+  BsCalendarCheck, BsCalendarEvent, BsFileText, BsUmbrella 
+} from 'react-icons/bs';
 
 const LeaveManagement = () => {
   const isLoading = usePageLoading(600);
@@ -44,12 +60,17 @@ const LeaveManagement = () => {
     addHoliday,
     deleteHoliday,
     updateEmployee,
-    departments: rawDepartments
+    departments: rawDepartments,
+    fetchLeaves
   } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // Primary Tab state: 'requests' | 'analytics' | 'balances' | 'holidays' | 'policies'
   const [activeTab, setActiveTab] = useState('requests');
+
+  // Employee personal view state
+  const empStatusTabState = useState('Pending');
+  const applyPanelOpenState = useState(false);
 
   // Requests Sub-tab status filter: 'Pending' | 'Approved' | 'Rejected' | 'All'
   const [statusTab, setStatusTab] = useState('Pending');
@@ -953,6 +974,381 @@ const LeaveManagement = () => {
       <div className="leaves-page grid-gap animate-fade-in">
         <div className="card" style={{ height: '80px' }}><Skeleton variant="rect" height="100%" /></div>
         <div className="card" style={{ height: '400px' }}><Skeleton variant="rect" height="100%" /></div>
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════
+  // EMPLOYEE PERSONAL LEAVE DASHBOARD
+  // ═══════════════════════════════════════
+  if (currentUserRole === 'employee') {
+    // Build balance cards from policy configs
+    const myLeaves = leavesList; // already scoped to current user
+    
+    // Fallback holidays in case database has no holidays seeded
+    const myHolidays = (holidaysList && holidaysList.length > 0)
+      ? holidaysList
+      : [
+          { id: 'HOL-1', date: '2026-01-26', name: 'Republic Day', type: 'National', description: 'National holiday celebrating India\'s Republic Day' },
+          { id: 'HOL-2', date: '2026-03-03', name: 'Holi Festival', type: 'Festival', description: 'Festival of colors' },
+          { id: 'HOL-3', date: '2026-08-15', name: 'Independence Day', type: 'National', description: 'Celebration of Independence' },
+          { id: 'HOL-4', date: '2026-10-02', name: 'Gandhi Jayanti', type: 'National', description: 'Mahatma Gandhi\'s Birthday' },
+          { id: 'HOL-5', date: '2026-10-20', name: 'Dussehra', type: 'Festival', description: 'Festival celebrating victory of good over evil' },
+          { id: 'HOL-6', date: '2026-11-08', name: 'Diwali', type: 'Festival', description: 'Festival of lights' },
+          { id: 'HOL-7', date: '2026-12-25', name: 'Christmas', type: 'Festival', description: 'Christmas Day celebration' }
+        ];
+
+    // Fallback policies in case database has no active policies seeded
+    const currentPolicies = (leavePolicyConfigs && leavePolicyConfigs.length > 0)
+      ? leavePolicyConfigs
+      : [
+          { id: 'POL-001', leaveCode: 'CL', leaveName: 'Casual Leave', defaultDays: 8, maxCarryForward: 5, isActive: true },
+          { id: 'POL-002', leaveCode: 'SL', leaveName: 'Sick Leave', defaultDays: 10, maxCarryForward: 3, isActive: true },
+          { id: 'POL-003', leaveCode: 'PL', leaveName: 'Paid Leave', defaultDays: 15, maxCarryForward: 10, isActive: true },
+          { id: 'POL-010', leaveCode: 'UL', leaveName: 'Unpaid Leave', defaultDays: 30, maxCarryForward: 0, isActive: true }
+        ];
+
+    const getPolicyCodeOfRequest = (type) => {
+      const t = (type || '').toLowerCase();
+      if (t === 'cl' || t === 'casual' || t === 'casual leave') return 'CL';
+      if (t === 'sl' || t === 'sick' || t === 'sick leave') return 'SL';
+      if (t === 'pl' || t === 'el' || t === 'paid' || t === 'paid leave' || t === 'earned' || t === 'earned leave') return 'PL';
+      if (t === 'ml' || t === 'maternity' || t === 'maternity leave') return 'ML';
+      if (t === 'ul' || t === 'unpaid' || t === 'unpaid leave') return 'UL';
+      return type;
+    };
+
+    // Filter policies based on gender restriction
+    const filteredPolicies = currentPolicies.filter(p => {
+      if (!p.isActive) return false;
+      if (p.genderRestriction && p.genderRestriction !== 'All' && currentUser?.gender) {
+        return p.genderRestriction.toLowerCase() === currentUser.gender.toLowerCase();
+      }
+      return true;
+    });
+
+    const balances = filteredPolicies.map(policy => {
+      const code = policy.leaveCode;
+      const total = (() => {
+        if (code === 'CL' && typeof currentUser?.clBalance === 'number') return currentUser.clBalance;
+        if (code === 'SL' && typeof currentUser?.slBalance === 'number') return currentUser.slBalance;
+        if (code === 'PL' && typeof currentUser?.plBalance === 'number') return currentUser.plBalance;
+        if (code === 'ML' && typeof currentUser?.maternityBalance === 'number') return currentUser.maternityBalance;
+        return policy.defaultDays || 0;
+      })();
+      const used = myLeaves
+        .filter(r => r.status === 'Approved' && getPolicyCodeOfRequest(r.type) === code && !(r.reason || '').startsWith('Automatic policy allocation:'))
+        .reduce((s, r) => s + (Number(r.days) || 0), 0);
+      return { type: code, label: policy.leaveName, total, used };
+    });
+
+    const tabCounts = {
+      Pending:  myLeaves.filter(l => l.status === 'Pending').length,
+      Approved: myLeaves.filter(l => l.status === 'Approved').length,
+      Rejected: myLeaves.filter(l => l.status === 'Rejected').length,
+      All:      myLeaves.length,
+    };
+
+    const [empStatusTab, setEmpStatusTab] = empStatusTabState;
+    const [applyPanelOpen, setApplyPanelOpen] = applyPanelOpenState;
+
+    const filteredMyLeaves = empStatusTab === 'All'
+      ? [...myLeaves].sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate))
+      : myLeaves.filter(l => l.status === empStatusTab).sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate));
+
+    const handleEmpApply = (formData) => {
+      const newRequest = {
+        id: `LR-${Math.floor(100 + Math.random() * 900)}`,
+        employeeId: currentUser.id,
+        employeeName: currentUser.name,
+        department: currentUser.department || '',
+        type: formData.type,
+        fromDate: formData.fromDate,
+        toDate: formData.toDate,
+        days: formData.days,
+        reason: formData.reason || '',
+        status: 'Pending',
+        appliedDate: new Date().toISOString().split('T')[0],
+        history: [{ date: new Date().toISOString().split('T')[0], status: 'Pending', comment: 'Applied by employee' }]
+      };
+      addLeaveRequest(newRequest);
+      addToast('success', 'Leave request submitted successfully.');
+      if (fetchLeaves) fetchLeaves(); // Refresh the list from the server
+    };
+
+    const handleEmpCancel = (leaveId) => {
+      showConfirm(
+        'Cancel Leave Request',
+        'Are you sure you want to cancel this leave request?',
+        () => {
+          const leave = myLeaves.find(l => l.id === leaveId);
+          if (leave) {
+            updateLeaveRequest(leaveId, { ...leave, status: 'Cancelled' });
+            addToast('success', 'Leave request cancelled.');
+            if (fetchLeaves) fetchLeaves(); // Refresh the list from the server
+          }
+        },
+        'danger'
+      );
+    };
+
+    const totalAvailable = balances.filter(b => b.type !== 'UL').reduce((s, b) => s + Math.max(0, b.total - b.used), 0);
+    const totalUsed = balances.filter(b => b.type !== 'UL').reduce((s, b) => s + b.used, 0);
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', paddingBottom: '3rem' }}>
+
+        {/* ── Page Header ── */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          flexWrap: 'wrap', 
+          gap: '16px',
+          background: 'var(--bg-card)',
+          padding: '20px 24px',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid var(--border-color)',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              width: '48px', height: '48px', borderRadius: '14px',
+              background: 'linear-gradient(135deg, var(--color-success, #10b981), #059669)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.2)'
+            }}>
+              <BsUmbrella size={22} style={{ color: '#fff' }} />
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>My Leaves</h2>
+              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>Track your balance, requests &amp; upcoming time off</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={() => {
+                if (fetchLeaves) {
+                  fetchLeaves();
+                  addToast('success', 'Refreshed leave data');
+                }
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '40px', height: '40px',
+                background: 'var(--bg-elevated)',
+                color: 'var(--text-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              title="Refresh Data"
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+            >
+              <MdRefresh size={18} />
+            </button>
+            <button
+              onClick={() => setApplyPanelOpen(o => !o)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '0 22px', height: '40px',
+                background: 'linear-gradient(135deg, var(--color-success, #10b981), #059669)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.25)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.15)'; }}
+            >
+              <FiPlus size={16} />
+              Apply for Leave
+            </button>
+          </div>
+        </div>
+
+        {/* ── Apply Panel (inline, slides down) ── */}
+        <ApplyLeavePanel
+          open={applyPanelOpen}
+          onClose={() => setApplyPanelOpen(false)}
+          onSubmit={handleEmpApply}
+          balances={balances}
+          holidays={myHolidays}
+        />
+
+        {/* ── Quick Stats Row ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+          {[
+            { 
+              label: 'Available Balance', 
+              value: totalAvailable, 
+              color: 'var(--color-success, #10b981)', 
+              bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, rgba(16, 185, 129, 0.02) 100%)', 
+              border: 'rgba(16, 185, 129, 0.2)',
+              icon: BsCalendarCheck,
+              iconColor: '#10b981',
+              desc: 'Days remaining for use'
+            },
+            { 
+              label: 'Leaves Used', 
+              value: totalUsed, 
+              color: 'var(--color-warning, #f59e0b)', 
+              bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.07) 0%, rgba(245, 158, 11, 0.02) 100%)', 
+              border: 'rgba(245, 158, 11, 0.2)',
+              icon: FiClock,
+              iconColor: '#f59e0b',
+              desc: 'Approved days taken'
+            },
+            { 
+              label: 'Pending Approval', 
+              value: tabCounts.Pending, 
+              color: 'var(--color-info, #3b82f6)', 
+              bg: 'linear-gradient(135deg, rgba(59, 130, 246, 0.07) 0%, rgba(59, 130, 246, 0.02) 100%)', 
+              border: 'rgba(59, 130, 246, 0.2)',
+              icon: MdHourglassEmpty,
+              iconColor: '#3b82f6',
+              desc: 'Awaiting manager response'
+            },
+            { 
+              label: 'Approved Filings', 
+              value: tabCounts.Approved, 
+              color: 'var(--color-success, #10b981)', 
+              bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, rgba(16, 185, 129, 0.02) 100%)', 
+              border: 'rgba(16, 185, 129, 0.2)',
+              icon: MdCheckCircle,
+              iconColor: '#10b981',
+              desc: 'Successfully processed'
+            },
+          ].map((s, i) => {
+            const CardIcon = s.icon;
+            return (
+              <div 
+                key={i} 
+                style={{ 
+                  background: 'var(--bg-card)', 
+                  backgroundImage: s.bg,
+                  border: `1px solid var(--border-color)`, 
+                  borderRadius: 'var(--radius-lg)', 
+                  padding: '20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.25s ease',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-3px)';
+                  e.currentTarget.style.borderColor = s.iconColor;
+                  e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,0.08)`;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                  e.currentTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.02)';
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>{s.label}</div>
+                  <div style={{ fontSize: '2.1rem', fontWeight: 800, color: s.color, lineHeight: 1.1, marginBottom: '4px' }}>{s.value}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{s.desc}</div>
+                </div>
+                <div style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '12px',
+                  background: `${s.iconColor}12`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <CardIcon size={22} style={{ color: s.iconColor }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Leave Balance Cards ── */}
+        <div style={{
+          background: 'var(--bg-card)',
+          padding: '22px 24px',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid var(--border-color)',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+        }}>
+          <div style={{ 
+            fontSize: '0.8rem', 
+            fontWeight: 800, 
+            color: 'var(--text-primary)', 
+            textTransform: 'uppercase', 
+            letterSpacing: '0.08em', 
+            marginBottom: '18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <FiBriefcase size={16} style={{ color: 'var(--color-success)' }} />
+            <span>Leave Balances & Limits</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            {balances.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '20px', textAlign: 'center', gridColumn: '1/-1' }}>
+                No active leave policies configured
+              </div>
+            ) : (
+              balances.map(b => <LeaveBalanceCard key={b.type} type={b.type} label={b.label} total={b.total} used={b.used} />)
+            )}
+          </div>
+        </div>
+
+        {/* ── Request Cards Section ── */}
+        <div style={{ 
+          background: 'var(--bg-card)', 
+          border: '1px solid var(--border-color)', 
+          borderRadius: 'var(--radius-xl)', 
+          overflow: 'hidden',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
+        }}>
+          <div style={{
+            padding: '20px 24px 0',
+            borderBottom: '1px solid var(--border-color)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <FiCalendar size={16} style={{ color: 'var(--color-info)' }} />
+              <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-primary)' }}>
+                Filing Status & History
+              </h3>
+            </div>
+            <LeaveFilterTabs active={empStatusTab} onChange={setEmpStatusTab} counts={tabCounts} />
+          </div>
+          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {filteredMyLeaves.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                <FiCalendar size={40} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.25, color: 'var(--text-muted)' }} />
+                No {empStatusTab === 'All' ? '' : empStatusTab.toLowerCase()} leave requests found
+              </div>
+            ) : (
+              filteredMyLeaves.map(leave => (
+                <LeaveRequestCard key={leave.id} leave={leave} onCancel={handleEmpCancel} />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* ── Bottom Section: Chart + Holidays ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: '20px', alignItems: 'start' }}>
+          <LeaveUsageChart leaveRequests={myLeaves} />
+          <UpcomingHolidays holidays={myHolidays} />
+        </div>
+
       </div>
     );
   }
