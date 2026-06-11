@@ -1476,8 +1476,6 @@ const Employees = () => {
             </div>
           </div>
         </div>
-
-        {/* ── Performance Review & Recognition Spotlight Widgets ── */}
         <div className="emp-widgets-row" style={{ marginTop: 'var(--spacing-4)' }}>
           <div className="card emp-widget-card">
             <div className="widget-header">
