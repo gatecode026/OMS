@@ -194,8 +194,61 @@ const Payroll = () => {
   }, [activityLogs]);
 
   const scopedPayrollState = useMemo(() => {
-    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return payrollState;
-    return payrollState.filter(p => {
+    // 1. Filter database payments by the selected month and year
+    const monthlyPayments = payrollState.filter(p => p.month === month && p.year === year);
+    
+    // 2. If no payment records exist in the DB for this month and year,
+    // construct draft records from the active employees list so they can be processed.
+    let activeState = monthlyPayments;
+    if (monthlyPayments.length === 0 && employees && employees.length > 0) {
+      activeState = employees
+        .filter(emp => emp.status !== 'Inactive')
+        .map(emp => {
+          const empBasicSalary = Number(emp.salaryAmount) || 0;
+          const struct = salaryStructures[emp.id] || {
+            basic: empBasicSalary,
+            hra: Math.round(empBasicSalary * 0.4),
+            travel: 3000,
+            medical: 2000,
+            special: 1000,
+            pf: Math.round(empBasicSalary * 0.12),
+            esi: 0,
+            pt: 200,
+            tds: Math.round(empBasicSalary * 0.1)
+          };
+          const basicSalary = struct.basic || empBasicSalary;
+          const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
+          const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 200) + (struct.tds || 0);
+          const grossSalary = basicSalary + totalAllowances;
+          const netSalary = grossSalary - statutoryDeductions;
+          return {
+            id: `${emp.id}-${month}-${year}`,
+            employeeId: emp.id,
+            employeeName: emp.name,
+            department: emp.department || 'Management',
+            designation: emp.designation || 'Staff',
+            branch: emp.branch || 'Head Office',
+            month,
+            year,
+            status: 'Hold',
+            basicSalary,
+            grossSalary,
+            totalDeductions: statutoryDeductions,
+            netSalary,
+            overtimeAmount: 0,
+            bonusAmount: 0,
+            reimbursementAmount: 0,
+            loanEMI: 0,
+            advanceDeduct: 0,
+            leaveDeductions: 0,
+            lateDeductions: 0,
+            statutoryDeductions
+          };
+        });
+    }
+
+    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return activeState;
+    return activeState.filter(p => {
       const emp = employees.find(e => e.id === p.employeeId);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return p.employeeId === currentUser?.id;
@@ -211,7 +264,7 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [payrollState, employees, currentUser, currentUserRole, perspective]);
+  }, [payrollState, employees, currentUser, currentUserRole, perspective, month, year, salaryStructures]);
 
   const scopedReimbursements = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return reimbursements;
@@ -307,14 +360,26 @@ const Payroll = () => {
   const calculatedPayrollData = useMemo(() => {
     return scopedPayrollState.map(p => {
       const empId = p.employeeId;
-      const struct = salaryStructures[empId] || { basic: 50000, hra: 20000, travel: 3000, medical: 2000, special: 1000, pf: 6000, esi: 0, pt: 200, tds: 4000 };
+      const emp = employees.find(e => e.id === empId);
+      const empBasicSalary = Number(emp?.salaryAmount) || 0;
+      const struct = salaryStructures[empId] || {
+        basic: empBasicSalary,
+        hra: Math.round(empBasicSalary * 0.4),
+        travel: 3000,
+        medical: 2000,
+        special: 1000,
+        pf: Math.round(empBasicSalary * 0.12),
+        esi: 0,
+        pt: 200,
+        tds: Math.round(empBasicSalary * 0.1)
+      };
       const att = attendanceDaysMap[empId] || { present: 22, absent: 0, halfDays: 0, paidLeaves: 2, unpaidLeaves: 0, overtimeHours: 0, lateArrivals: 0 };
 
       // Allowances Sum
       const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
 
       // Unpaid Leave Deduction
-      const leaveDeduction = att.unpaidLeaves * Math.round((struct.basic || 50000) / 24);
+      const leaveDeduction = att.unpaidLeaves * Math.round((struct.basic || empBasicSalary) / 24);
 
       // Late penalty
       const lateDeduction = att.lateArrivals * attendanceConfigs.lateArrivalPenalty;
@@ -348,14 +413,14 @@ const Payroll = () => {
       const totalDeductions = statutoryDeductions + leaveDeduction + lateDeduction + loanEMI + advanceDeduct;
 
       // Gross Salary
-      const grossSalary = (struct.basic || 50000) + totalAllowances + overtimePay + approvedBonuses;
+      const grossSalary = (struct.basic || empBasicSalary) + totalAllowances + overtimePay + approvedBonuses;
 
       // Net Salary
       const netSalary = grossSalary - totalDeductions;
 
       return {
         ...p,
-        basicSalary: struct.basic || 50000,
+        basicSalary: struct.basic || empBasicSalary,
         grossSalary,
         attendanceDays: att.present + att.paidLeaves + (att.halfDays * 0.5),
         leaveDeductions: leaveDeduction,
@@ -375,7 +440,7 @@ const Payroll = () => {
         regime: taxProfiles[empId]?.regime || 'New'
       };
     });
-  }, [payrollState, salaryStructures, attendanceDaysMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles]);
+  }, [payrollState, salaryStructures, attendanceDaysMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees]);
 
   // --- Executive Dashboard KPI aggregations ---
   const totalEmployees = calculatedPayrollData.length;
@@ -429,7 +494,7 @@ const Payroll = () => {
       `Bulk ${actionType.toUpperCase()} Payroll`,
       `Are you sure you want to execute [${actionType}] action on all matching employee records?`,
       async () => {
-        const success = await bulkUpdatePayrollStatus(month, year, actionType);
+        const success = await bulkUpdatePayrollStatus(month, year, actionType, calculatedPayrollData);
         if (success) {
           addPageToast('success', `Successfully processed bulk action: ${actionType.toUpperCase()}`);
         }
@@ -439,7 +504,8 @@ const Payroll = () => {
 
   // Handle single status change
   const handleStatusChange = async (empId, nextStatus) => {
-    const success = await updateSinglePayrollStatus(empId, month, year, nextStatus);
+    const paymentObj = calculatedPayrollData.find(p => p.employeeId === empId);
+    const success = await updateSinglePayrollStatus(paymentObj, nextStatus);
     if (success) {
       addPageToast('info', `Status of employee ${empId} set to: ${nextStatus}`);
     }
@@ -760,12 +826,9 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         <div className="payroll-tabs-list">
           {perspective !== 'employee' && <button onClick={() => setActiveTab('dashboard')} className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}><TrendingUp size={16} />Dashboard & Analytics</button>}
           <button onClick={() => setActiveTab('processing')} className={`tab-btn ${activeTab === 'processing' ? 'active' : ''}`}><Sliders size={16} />{perspective === 'employee' ? 'My Payslips' : 'Processing Center'}</button>
-          <button onClick={() => setActiveTab('attendance')} className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`}><Clock size={16} />{perspective === 'employee' ? 'My Attendance Summary' : 'Attendance Link'}</button>
           {perspective !== 'employee' && <button onClick={() => setActiveTab('structures')} className={`tab-btn ${activeTab === 'structures' ? 'active' : ''}`}><Settings size={16} />Salary Structures</button>}
           <button onClick={() => setActiveTab('bonuses')} className={`tab-btn ${activeTab === 'bonuses' ? 'active' : ''}`}><Award size={16} />{perspective === 'employee' ? 'My Bonuses & Incentives' : 'Bonuses & Incentives'}</button>
-          <button onClick={() => setActiveTab('reimbursements')} className={`tab-btn ${activeTab === 'reimbursements' ? 'active' : ''}`}><Receipt size={16} />{perspective === 'employee' ? 'My Reimbursements' : 'Reimbursements'}</button>
           <button onClick={() => setActiveTab('loans')} className={`tab-btn ${activeTab === 'loans' ? 'active' : ''}`}><Scale size={16} />{perspective === 'employee' ? 'My Loans & Advances' : 'Loans & Advances'}</button>
-          <button onClick={() => setActiveTab('taxes')} className={`tab-btn ${activeTab === 'taxes' ? 'active' : ''}`}><FileText size={16} />{perspective === 'employee' ? 'My Tax Profile' : 'Tax Vault'}</button>
           <button onClick={() => setActiveTab('calendar')} className={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`}><Calendar size={16} />Payroll Calendar</button>
           {perspective !== 'employee' && <button onClick={() => setActiveTab('audit')} className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}><Database size={16} />Audit Trails & Reports</button>}
         </div>
