@@ -1,6 +1,6 @@
 /**
  * @file src/modules/roles/roles.service.js
- * @description Service business logic for Roles module.
+ * @description Service business logic for Roles and Permission Modules.
  */
 
 import repository from './roles.repository.js';
@@ -47,6 +47,23 @@ export const deleteOverrideRecord = async (id, currentUser) => {
   return overridesRepository.remove(id);
 };
 
+// --- Permission Modules ---
+
+export const findAllPermissionModules = async (query) => {
+  logger.info('Executing RolesService::findAllPermissionModules query');
+  return repository.findModules(query);
+};
+
+export const createPermissionModule = async (data, currentUser) => {
+  logger.info('Executing RolesService::createPermissionModule by user: ' + currentUser?.id);
+  return repository.saveModule(data);
+};
+
+export const deletePermissionModule = async (key, currentUser) => {
+  logger.info('Executing RolesService::deletePermissionModule for key: ' + key + ' by user: ' + currentUser?.id);
+  return repository.deleteModule(key);
+};
+
 export default {
   findAll,
   findById,
@@ -55,5 +72,8 @@ export default {
   deleteRecord,
   findAllOverrides,
   createOverrideRecord,
-  deleteOverrideRecord
+  deleteOverrideRecord,
+  findAllPermissionModules,
+  createPermissionModule,
+  deletePermissionModule
 };

@@ -197,55 +197,58 @@ const Payroll = () => {
     // 1. Filter database payments by the selected month and year
     const monthlyPayments = payrollState.filter(p => p.month === month && p.year === year);
     
-    // 2. If no payment records exist in the DB for this month and year,
-    // construct draft records from the active employees list so they can be processed.
-    let activeState = monthlyPayments;
-    if (monthlyPayments.length === 0 && employees && employees.length > 0) {
-      activeState = employees
-        .filter(emp => emp.status !== 'Inactive')
-        .map(emp => {
-          const empBasicSalary = Number(emp.salaryAmount) || 0;
-          const struct = salaryStructures[emp.id] || {
-            basic: empBasicSalary,
-            hra: Math.round(empBasicSalary * 0.4),
-            travel: 3000,
-            medical: 2000,
-            special: 1000,
-            pf: Math.round(empBasicSalary * 0.12),
-            esi: 0,
-            pt: 200,
-            tds: Math.round(empBasicSalary * 0.1)
-          };
-          const basicSalary = struct.basic || empBasicSalary;
-          const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
-          const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 200) + (struct.tds || 0);
-          const grossSalary = basicSalary + totalAllowances;
-          const netSalary = grossSalary - statutoryDeductions;
-          return {
-            id: `${emp.id}-${month}-${year}`,
-            employeeId: emp.id,
-            employeeName: emp.name,
-            department: emp.department || 'Management',
-            designation: emp.designation || 'Staff',
-            branch: emp.branch || 'Head Office',
-            month,
-            year,
-            status: 'Hold',
-            basicSalary,
-            grossSalary,
-            totalDeductions: statutoryDeductions,
-            netSalary,
-            overtimeAmount: 0,
-            bonusAmount: 0,
-            reimbursementAmount: 0,
-            loanEMI: 0,
-            advanceDeduct: 0,
-            leaveDeductions: 0,
-            lateDeductions: 0,
-            statutoryDeductions
-          };
-        });
-    }
+    // 2. Map over all active employees: use the saved payment record if it exists, otherwise generate a draft record
+    if (!employees || employees.length === 0) return [];
+    
+    const activeState = employees
+      .filter(emp => emp.status !== 'Inactive')
+      .map(emp => {
+        const savedPayment = monthlyPayments.find(p => p.employeeId === emp.id);
+        if (savedPayment) {
+          return savedPayment;
+        }
+
+        const empBasicSalary = Number(emp.salaryAmount) || 0;
+        const struct = salaryStructures[emp.id] || {
+          basic: empBasicSalary,
+          hra: Math.round(empBasicSalary * 0.4),
+          travel: 3000,
+          medical: 2000,
+          special: 1000,
+          pf: Math.round(empBasicSalary * 0.12),
+          esi: 0,
+          pt: 200,
+          tds: Math.round(empBasicSalary * 0.1)
+        };
+        const basicSalary = struct.basic || empBasicSalary;
+        const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
+        const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 200) + (struct.tds || 0);
+        const grossSalary = basicSalary + totalAllowances;
+        const netSalary = grossSalary - statutoryDeductions;
+        return {
+          id: `${emp.id}-${month}-${year}`,
+          employeeId: emp.id,
+          employeeName: emp.name,
+          department: emp.department || 'Management',
+          designation: emp.designation || 'Staff',
+          branch: emp.branch || 'Head Office',
+          month,
+          year,
+          status: 'Hold',
+          basicSalary,
+          grossSalary,
+          totalDeductions: statutoryDeductions,
+          netSalary,
+          overtimeAmount: 0,
+          bonusAmount: 0,
+          reimbursementAmount: 0,
+          loanEMI: 0,
+          advanceDeduct: 0,
+          leaveDeductions: 0,
+          lateDeductions: 0,
+          statutoryDeductions
+        };
+      });
 
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return activeState;
     return activeState.filter(p => {

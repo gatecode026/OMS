@@ -211,6 +211,7 @@ export const AppProvider = ({ children }) => {
   const [documentsList, setDocumentsList] = useState([]);
   const [activityLogs, setActivityLogs] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [permissionModules, setPermissionModules] = useState([]);
   const [userOverrides, setUserOverrides] = useState([]);
   const [dailyReports, setDailyReports] = useState([]);
   const [appraisalReviews, setAppraisalReviews] = useState([]);
@@ -626,6 +627,66 @@ export const AppProvider = ({ children }) => {
 
   // fetchEmployees and fetchPayrollData are called in the main data-loading useEffect below
 
+  const fetchSystemSettings = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success' && result.data) {
+        const data = result.data;
+        // Merge companyProfile.companyName into generalSettings so the sidebar always reflects the saved name
+        const mergedGeneral = {
+          ...(data.generalSettings || {}),
+          companyName: data.companyProfile?.companyName || data.generalSettings?.companyName || 'Office Management Pvt. Ltd.'
+        };
+        setGeneralSettingsState(mergedGeneral);
+        if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);
+        if (data.securitySettings) setSecuritySettingsState(data.securitySettings);
+      }
+    } catch (err) {
+      console.error('Failed to fetch system settings from database:', err);
+    }
+  };
+
+  const saveSystemSettings = async (payload) => {
+    if (!token) return false;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const data = result.data;
+        // Keep company name in sync across both companyProfile and generalSettings
+        const mergedGeneral = {
+          ...(data.generalSettings || {}),
+          companyName: data.companyProfile?.companyName || data.generalSettings?.companyName || 'Office Management Pvt. Ltd.'
+        };
+        setGeneralSettingsState(mergedGeneral);
+        if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);
+        if (data.securitySettings) setSecuritySettingsState(data.securitySettings);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to save settings to database:', err);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    fetchSystemSettings();
+  }, [token]);
+
   const fetchBranches = async () => {
     if (!token) {
       setBranches([]);
@@ -1008,6 +1069,79 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to fetch roles:', err);
       setRoles([]);
+    }
+  };
+
+  const fetchPermissionModules = async () => {
+    if (!token) {
+      setPermissionModules([]);
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/roles/permissions-modules', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPermissionModules(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch permission modules:', err);
+      setPermissionModules([]);
+    }
+  };
+
+  const addPermissionModule = async (name) => {
+    if (!token) return;
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/roles/permissions-modules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ label: name })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPermissionModules();
+        await fetchRoles();
+        addActivityLog(`Added permission module: ${name}`, 'Permissions', 'success');
+        addToast('success', `Permission module "${name}" added successfully.`);
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to add permission module.');
+      }
+    } catch (err) {
+      console.error('Failed to add permission module:', err);
+      addToast('danger', 'Error adding permission module.');
+    }
+  };
+
+  const deletePermissionModule = async (key) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/v1/roles/permissions-modules/${key}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPermissionModules();
+        await fetchRoles();
+        addActivityLog(`Deleted permission module: ${key}`, 'Permissions', 'warning');
+        addToast('warning', `Permission module "${key}" deleted successfully.`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to delete permission module.');
+      }
+    } catch (err) {
+      console.error('Failed to delete permission module:', err);
+      addToast('danger', 'Error deleting permission module.');
     }
   };
 
@@ -1528,6 +1662,7 @@ export const AppProvider = ({ children }) => {
     fetchDocuments();
     fetchActivityLogs();
     fetchRoles();
+    fetchPermissionModules();
     fetchUserOverrides();
   }, [token]);
 
@@ -3832,53 +3967,141 @@ export const AppProvider = ({ children }) => {
     const DEFAULT_ROLE_PERMISSIONS = {
       super_admin: {
         dashboard: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        employees: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        attendance: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        leaves: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        tasks: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        payroll: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        permissions: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        settings: { read: true, create: true, update: true, delete: true, approve: true, export: true }
+        company_overview: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        employee_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        agency_branch_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        department_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        team_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        attendance_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        leave_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        project_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        workflow_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        task_monitoring: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        work_reports: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        performance_analytics: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        payroll_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        announcements: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        notifications: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        document_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        role_permission: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        system_settings: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        security_audit_logs: { read: true, create: true, update: true, delete: true, approve: true, export: true },
+        profile_settings: { read: true, create: true, update: true, delete: true, approve: true, export: true }
       },
       branch_admin: {
         dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employees: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        attendance: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        leaves: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        tasks: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        payroll: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        permissions: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        settings: { read: true, create: true, update: true, delete: true, approve: true, export: true }
+        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employee_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        agency_branch_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        department_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        team_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        attendance_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        leave_management: { create: true, read: true, update: true, delete: true, approve: true, export: false },
+        project_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        workflow_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: false },
+        work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: false },
+        performance_analytics: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        payroll_management: { create: true, read: true, update: true, approve: true, export: true },
+        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        document_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        role_permission: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        system_settings: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        security_audit_logs: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
+      },
+      dept_admin: {
+        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employee_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        agency_branch_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        department_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        team_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        attendance_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        leave_management: { create: true, read: true, update: true, delete: true, approve: true, export: false },
+        project_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        workflow_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
+        task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: true },
+        work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: true },
+        performance_analytics: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        payroll_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        document_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        role_permission: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        system_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        security_audit_logs: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
       },
       manager: {
         dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employees: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        attendance: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        leaves: { read: true, create: true, update: true, delete: false, approve: true, export: false },
-        tasks: { read: true, create: true, update: true, delete: true, approve: true, export: false },
-        payroll: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        permissions: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
+        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employee_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        agency_branch_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        department_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        team_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        attendance_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        leave_management: { create: true, read: true, update: true, approve: true, delete: false, export: false },
+        project_management: { create: true, read: true, update: true, delete: true, approve: true, export: false },
+        workflow_management: { create: true, read: true, update: true, delete: true, approve: true, export: false },
+        task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: true },
+        work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: true },
+        performance_analytics: { create: true, read: true, update: true, approve: true, delete: false, export: false },
+        payroll_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        document_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        role_permission: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        system_settings: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        security_audit_logs: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
       },
       team_leader: {
         dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employees: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        attendance: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        leaves: { read: true, create: true, update: true, delete: false, approve: true, export: false },
-        tasks: { read: true, create: true, update: true, delete: true, approve: true, export: false },
-        payroll: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        permissions: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
+        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employee_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        agency_branch_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        department_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        team_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        attendance_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        leave_management: { read: true, update: true, approve: true, create: false, delete: false, export: false },
+        project_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        workflow_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: false },
+        work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: false },
+        performance_analytics: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        payroll_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        document_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        role_permission: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        system_settings: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        security_audit_logs: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
       },
       employee: {
         dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employees: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        attendance: { read: true, create: true, update: false, delete: false, approve: false, export: false },
-        leaves: { read: true, create: true, update: false, delete: false, approve: false, export: false },
-        tasks: { read: true, create: false, update: true, delete: false, approve: false, export: false },
-        payroll: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        permissions: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
+        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        employee_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        agency_branch_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        department_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        team_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        attendance_management: { create: true, read: true, update: false, delete: false, approve: false, export: false },
+        leave_management: { create: true, read: true, update: false, delete: false, approve: false, export: false },
+        project_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        workflow_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        task_monitoring: { read: true, update: true, create: false, delete: false, approve: false, export: false },
+        work_reports: { create: true, read: true, update: false, delete: false, approve: false, export: false },
+        performance_analytics: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        payroll_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
+        document_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        role_permission: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        system_settings: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        security_audit_logs: { read: false, create: false, update: false, delete: false, approve: false, export: false },
+        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
       }
     };
 
@@ -4020,6 +4243,9 @@ export const AppProvider = ({ children }) => {
         runPayroll,
         generatePayslip,
         updatePermissions,
+        permissionModules,
+        addPermissionModule,
+        deletePermissionModule,
         markAllNotificationsRead,
         markNotificationRead,
         hasPermission,
@@ -4038,6 +4264,7 @@ export const AppProvider = ({ children }) => {
         setNotificationSettings,
         securitySettings,
         setSecuritySettings,
+        saveSystemSettings,
         messages,
         markMessageRead,
         markAllMessagesRead,

@@ -28,6 +28,13 @@ router.route('/overrides')
 router.route('/overrides/:id')
   .delete(restrictTo('super_admin'), controller.deleteOverride);
 
+router.route('/permissions-modules')
+  .get(controller.getAllPermissionModules)
+  .post(controller.createPermissionModule);
+
+router.route('/permissions-modules/:key')
+  .delete(restrictTo('super_admin'), controller.deletePermissionModule);
+
 router.route('/:id')
   .get(controller.getById)
   .put(validateRequest(validation.update), controller.update)

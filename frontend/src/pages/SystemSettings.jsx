@@ -134,7 +134,18 @@ const SettingsSelect = ({ label, value, onChange, options }) => (
 const countries = ['India', 'United States', 'United Kingdom', 'Canada', 'Australia', 'United Arab Emirates', 'Singapore'];
 
 const statesByCountry = {
-  'India': ['Delhi', 'Haryana', 'Maharashtra', 'Karnataka', 'Rajasthan', 'Tamil Nadu', 'Telangana', 'Uttar Pradesh'],
+  'India': [
+    // 28 States
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+    'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+    'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+    'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+    'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+    // 8 Union Territories
+    'Andaman & Nicobar Islands', 'Chandigarh', 'Dadra & Nagar Haveli and Daman & Diu',
+    'Delhi', 'Jammu & Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
+  ],
   'United States': ['California', 'New York', 'Texas', 'Florida', 'Washington'],
   'United Kingdom': ['London', 'England', 'Scotland', 'Wales'],
   'Canada': ['Ontario', 'British Columbia', 'Quebec', 'Alberta'],
@@ -144,27 +155,63 @@ const statesByCountry = {
 };
 
 const citiesByState = {
-  'Haryana': ['Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Rohtak'],
-  'Delhi': ['New Delhi', 'Dwarka', 'Rohini', 'Saket'],
-  'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Thane'],
-  'Karnataka': ['Bangalore', 'Mysore', 'Hubli', 'Mangalore'],
-  'Rajasthan': ['Jaipur', 'Jodhpur', 'Udaipur', 'Kota'],
-  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai'],
-  'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad'],
-  'Uttar Pradesh': ['Noida', 'Ghaziabad', 'Lucknow', 'Kanpur'],
+  // Indian States
+  'Andhra Pradesh': ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Tirupati', 'Rajahmundry'],
+  'Arunachal Pradesh': ['Itanagar', 'Naharlagun', 'Tawang', 'Ziro', 'Pasighat'],
+  'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tinsukia'],
+  'Bihar': ['Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga'],
+  'Chhattisgarh': ['Raipur', 'Bhilai', 'Bilaspur', 'Korba', 'Durg', 'Rajnandgaon'],
+  'Goa': ['Panaji', 'Vasco da Gama', 'Margao', 'Mapusa', 'Ponda'],
+  'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Gandhinagar', 'Bhavnagar', 'Jamnagar'],
+  'Haryana': ['Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Rohtak', 'Hisar', 'Karnal', 'Sonipat'],
+  'Himachal Pradesh': ['Shimla', 'Manali', 'Dharamshala', 'Solan', 'Mandi', 'Kullu'],
+  'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh', 'Deoghar'],
+  'Karnataka': ['Bangalore', 'Mysore', 'Hubli', 'Mangalore', 'Belgaum', 'Davangere', 'Bellary', 'Shimoga'],
+  'Kerala': ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam', 'Kannur', 'Alappuzha'],
+  'Madhya Pradesh': ['Bhopal', 'Indore', 'Jabalpur', 'Gwalior', 'Ujjain', 'Sagar', 'Rewa'],
+  'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Thane', 'Nashik', 'Aurangabad', 'Solapur', 'Kolhapur'],
+  'Manipur': ['Imphal', 'Thoubal', 'Bishnupur', 'Churachandpur', 'Senapati'],
+  'Meghalaya': ['Shillong', 'Tura', 'Jowai', 'Nongstoin', 'Williamnagar'],
+  'Mizoram': ['Aizawl', 'Lunglei', 'Saiha', 'Champhai', 'Kolasib'],
+  'Nagaland': ['Kohima', 'Dimapur', 'Mokokchung', 'Tuensang', 'Wokha'],
+  'Odisha': ['Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', 'Puri', 'Balasore'],
+  'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Mohali', 'Hoshiarpur'],
+  'Rajasthan': ['Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Bikaner', 'Ajmer', 'Alwar', 'Bharatpur'],
+  'Sikkim': ['Gangtok', 'Namchi', 'Mangan', 'Gyalshing', 'Rangpo'],
+  'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 'Vellore', 'Erode'],
+  'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar', 'Khammam', 'Ramagundam'],
+  'Tripura': ['Agartala', 'Dharmanagar', 'Udaipur', 'Kailashahar', 'Belonia'],
+  'Uttar Pradesh': ['Noida', 'Ghaziabad', 'Lucknow', 'Kanpur', 'Agra', 'Varanasi', 'Meerut', 'Allahabad', 'Bareilly'],
+  'Uttarakhand': ['Dehradun', 'Haridwar', 'Roorkee', 'Haldwani', 'Rudrapur', 'Rishikesh', 'Mussoorie'],
+  'West Bengal': ['Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', 'Bardhaman', 'Malda'],
+  // Union Territories
+  'Andaman & Nicobar Islands': ['Port Blair', 'Diglipur', 'Mayabunder', 'Campbell Bay'],
+  'Chandigarh': ['Chandigarh'],
+  'Dadra & Nagar Haveli and Daman & Diu': ['Daman', 'Diu', 'Silvassa'],
+  'Delhi': ['New Delhi', 'Dwarka', 'Rohini', 'Saket', 'Noida Extension', 'Janakpuri', 'Lajpat Nagar'],
+  'Jammu & Kashmir': ['Srinagar', 'Jammu', 'Anantnag', 'Baramulla', 'Sopore', 'Udhampur'],
+  'Ladakh': ['Leh', 'Kargil', 'Diskit', 'Padum'],
+  'Lakshadweep': ['Kavaratti', 'Agatti', 'Amini', 'Andrott'],
+  'Puducherry': ['Puducherry', 'Karaikal', 'Mahe', 'Yanam'],
+  // US States
   'California': ['Los Angeles', 'San Francisco', 'San Diego', 'San Jose'],
   'New York': ['New York City', 'Buffalo', 'Rochester', 'Syracuse'],
   'Texas': ['Houston', 'Austin', 'Dallas', 'San Antonio'],
   'Florida': ['Miami', 'Orlando', 'Tampa', 'Jacksonville'],
   'Washington': ['Seattle', 'Spokane', 'Tacoma'],
+  // UK
   'London': ['London', 'Croydon', 'Ealing'],
   'England': ['Birmingham', 'Manchester', 'Leeds'],
+  // Canada
   'Ontario': ['Toronto', 'Ottawa', 'Mississauga'],
   'British Columbia': ['Vancouver', 'Victoria', 'Burnaby'],
+  // Australia
   'New South Wales': ['Sydney', 'Newcastle', 'Wollongong'],
   'Victoria': ['Melbourne', 'Geelong', 'Ballarat'],
+  // UAE
   'Dubai': ['Dubai City', 'Jebel Ali'],
   'Abu Dhabi': ['Abu Dhabi City', 'Al Ain'],
+  // Singapore
   'Central Region': ['Singapore Downtown', 'Bukit Merah'],
   'East Region': ['Tampines', 'Bedok'],
   'North Region': ['Woodlands', 'Yishun']
@@ -194,6 +241,15 @@ const SystemSettings = () => {
     setNotificationSettings,
     securitySettings,
     setSecuritySettings,
+    saveSystemSettings,
+    token,
+    // Real database branches & departments
+    branches: dbBranches,
+    departments: dbDepartments,
+    addBranch,
+    deleteBranch,
+    addDepartment,
+    deleteDepartment
   } = useApp();
 
   const [activeSection, setActiveSection] = useState('company');
@@ -242,29 +298,12 @@ const SystemSettings = () => {
     };
   });
 
-  // 2. Branch list state
-  const [branches, setBranches] = useState(() => {
-    const savedData = localStorage.getItem('saas_branches_config');
-    return savedData ? JSON.parse(savedData) : [
-      { code: 'BR-DEL', name: 'Delhi Head Office', manager: '', status: 'Active' },
-      { code: 'BR-MUM', name: 'Mumbai Branch', manager: '', status: 'Active' },
-      { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: '', status: 'Active' },
-      { code: 'BR-JPR', name: 'Jaipur Operations', manager: '', status: 'Active' }
-    ];
-  });
+  // 2. Branch list — sourced from real database via AppContext
+  const branches = dbBranches || [];
   const [newBranch, setNewBranch] = useState({ code: '', name: '', manager: '', status: 'Active' });
 
-  // 3. Departments list state
-  const [departments, setDepartments] = useState(() => {
-    const savedData = localStorage.getItem('saas_depts_config');
-    return savedData ? JSON.parse(savedData) : [
-      { id: '1', name: 'Engineering', head: '', capacity: 150 },
-      { id: '2', name: 'Human Resources', head: '', capacity: 30 },
-      { id: '3', name: 'Sales & Marketing', head: '', capacity: 80 },
-      { id: '4', name: 'Operations', head: '', capacity: 120 },
-      { id: '5', name: 'Finance', head: '', capacity: 25 }
-    ];
-  });
+  // 3. Departments list — sourced from real database via AppContext
+  const departments = dbDepartments || [];
   const [newDept, setNewDept] = useState({ name: '', head: '', capacity: 50 });
 
   // 4. Employee Rules
@@ -407,17 +446,68 @@ const SystemSettings = () => {
     setLocalGeneral(generalSettings);
   }, [generalSettings]);
 
-  const handleSave = () => {
-    // 1. Save global contexts
-    setGeneralSettings({
-      ...generalSettings,
-      companyName: companyProfile.companyName,
-      ...localGeneral
-    });
+  // Load all settings from the database on mount
+  useEffect(() => {
+    if (!token) return;
+    const loadFromDB = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/v1/settings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (result.status === 'success' && result.data) {
+          const d = result.data;
+          if (d.companyProfile) setCompanyProfile(d.companyProfile);
+          if (d.branches && Array.isArray(d.branches)) setBranches(d.branches);
+          if (d.departments && Array.isArray(d.departments)) setDepartments(d.departments);
+          if (d.empSettings) setEmpSettings(d.empSettings);
+          if (d.attendanceRules) setAttendanceRules(d.attendanceRules);
+          if (d.leaveRules) setLeaveRules(d.leaveRules);
+          if (d.payrollRules) setPayrollRules(d.payrollRules);
+          if (d.projectRules) setProjectRules(d.projectRules);
+          if (d.docRules) setDocRules(d.docRules);
+          if (d.smtpConfig) setSmtpConfig(d.smtpConfig);
+          if (d.smsConfig) setSmsConfig(d.smsConfig);
+          if (d.generalSettings) setLocalGeneral(d.generalSettings);
+          if (d.notificationSettings) setLocalNotif(d.notificationSettings);
+          if (d.securitySettings) setLocalSecurity(d.securitySettings);
+        }
+      } catch (err) {
+        console.error('Failed to load system settings from database:', err);
+      }
+    };
+    loadFromDB();
+  }, [token]);
+
+  const handleSave = async () => {
+    const mergedGeneral = { ...generalSettings, companyName: companyProfile.companyName, ...localGeneral };
+
+    // 1. Save global React contexts
+    setGeneralSettings(mergedGeneral);
     setNotificationSettings(localNotif);
     setSecuritySettings(localSecurity);
 
-    // 2. Save local configurations to localStorage
+    // 2. Build full payload and persist to MongoDB database
+    const payload = {
+      companyProfile,
+      branches,
+      departments,
+      empSettings,
+      attendanceRules,
+      leaveRules,
+      payrollRules,
+      projectRules,
+      docRules,
+      smtpConfig,
+      smsConfig,
+      generalSettings: mergedGeneral,
+      notificationSettings: localNotif,
+      securitySettings: localSecurity
+    };
+
+    const savedToDb = await saveSystemSettings(payload);
+
+    // 3. Also cache to localStorage as offline fallback
     localStorage.setItem('saas_company_profile', JSON.stringify(companyProfile));
     localStorage.setItem('saas_branches_config', JSON.stringify(branches));
     localStorage.setItem('saas_depts_config', JSON.stringify(departments));
@@ -429,9 +519,16 @@ const SystemSettings = () => {
     localStorage.setItem('saas_doc_rules', JSON.stringify(docRules));
     localStorage.setItem('saas_smtp_config', JSON.stringify(smtpConfig));
     localStorage.setItem('saas_sms_config', JSON.stringify(smsConfig));
+    localStorage.setItem('saas_general_settings', JSON.stringify(mergedGeneral));
+    localStorage.setItem('saas_notification_settings', JSON.stringify(localNotif));
+    localStorage.setItem('saas_security_settings', JSON.stringify(localSecurity));
 
     setSaved(true);
-    addToast('success', 'All system configurations persisted successfully!');
+    if (savedToDb) {
+      addToast('success', '✅ All system configurations saved to the database successfully!');
+    } else {
+      addToast('warning', '⚠️ Saved locally — database sync failed. Check your connection.');
+    }
     setTimeout(() => setSaved(false), 2000);
   };
 
@@ -514,6 +611,33 @@ const SystemSettings = () => {
       setAccentColor('#d946ef');
       setFontSize('medium');
       setSidebarDense(false);
+
+      // Also reset in the database
+      saveSystemSettings({
+        companyProfile: {
+          companyName: 'Office Management Pvt. Ltd.', regNumber: 'U72200DL2026PTC394850',
+          gstNumber: '07AAAAA1111A1Z1', panNumber: 'AAAAA1111A', cinNumber: 'L72200DL2026PLC394850',
+          websiteUrl: 'https://office-management.com', officialEmail: 'admin@saas.com',
+          officialPhone: '+91 11 4050 6070', address: 'Plot No. 12, Sector 18, Udyog Vihar',
+          city: 'Gurugram', state: 'Haryana', country: 'India', postalCode: '122008'
+        },
+        branches: [
+          { code: 'BR-DEL', name: 'Delhi Head Office', manager: '', status: 'Active' },
+          { code: 'BR-MUM', name: 'Mumbai Branch', manager: '', status: 'Active' },
+          { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: '', status: 'Active' },
+          { code: 'BR-JPR', name: 'Jaipur Operations', manager: '', status: 'Active' }
+        ],
+        departments: [
+          { id: '1', name: 'Engineering', head: '', capacity: 150 },
+          { id: '2', name: 'Human Resources', head: '', capacity: 30 },
+          { id: '3', name: 'Sales & Marketing', head: '', capacity: 80 },
+          { id: '4', name: 'Operations', head: '', capacity: 120 },
+          { id: '5', name: 'Finance', head: '', capacity: 25 }
+        ],
+        generalSettings: defaultGeneral,
+        notificationSettings: defaultNotif,
+        securitySettings: defaultSecurity
+      });
 
       addToast('info', 'System settings reverted to standard default state.');
     }
@@ -605,39 +729,50 @@ const SystemSettings = () => {
     );
   }
 
-  // Branch managers helper add
-  const addBranchRow = (e) => {
+  // Branch handlers — wired to real database API
+  const addBranchRow = async (e) => {
     e.preventDefault();
     if (!newBranch.code || !newBranch.name || !newBranch.manager) {
       addToast('error', 'Please fill all branch details.');
       return;
     }
-    setBranches(prev => [...prev, newBranch]);
-    setNewBranch({ code: '', name: '', manager: '', status: 'Active' });
-    addToast('success', `Branch ${newBranch.name} added. Click Save to persist.`);
+    const result = await addBranch({
+      id: newBranch.code,
+      code: newBranch.code,
+      name: newBranch.name,
+      manager: newBranch.manager,
+      status: newBranch.status || 'Active'
+    });
+    if (result) {
+      setNewBranch({ code: '', name: '', manager: '', status: 'Active' });
+    }
   };
 
-  const removeBranchRow = (code) => {
-    setBranches(prev => prev.filter(b => b.code !== code));
-    addToast('info', 'Branch queued for removal. Click Save to persist.');
+  const removeBranchRow = async (branch) => {
+    const idToDelete = branch._id || branch.id || branch.code;
+    await deleteBranch(idToDelete);
   };
 
-  // Department setup helper
-  const addDeptRow = (e) => {
+  // Department handlers — wired to real database API
+  const addDeptRow = async (e) => {
     e.preventDefault();
-    if (!newDept.name || !newDept.head) {
-      addToast('error', 'Please fill department name and assigned Head.');
+    if (!newDept.name) {
+      addToast('error', 'Please fill the department name.');
       return;
     }
-    const id = (departments.length + 1).toString();
-    setDepartments(prev => [...prev, { ...newDept, id }]);
-    setNewDept({ name: '', head: '', capacity: 50 });
-    addToast('success', `Department ${newDept.name} added. Click Save to persist.`);
+    const result = await addDepartment({
+      name: newDept.name,
+      head: newDept.head || '',
+      capacity: newDept.capacity || 50
+    });
+    if (result) {
+      setNewDept({ name: '', head: '', capacity: 50 });
+    }
   };
 
-  const removeDeptRow = (id) => {
-    setDepartments(prev => prev.filter(d => d.id !== id));
-    addToast('info', 'Department queued for removal. Click Save to persist.');
+  const removeDeptRow = async (dept) => {
+    const idToDelete = dept._id || dept.id;
+    await deleteDepartment(idToDelete);
   };
 
   // switch-case for rendering the tabs
@@ -767,59 +902,20 @@ const SystemSettings = () => {
                       <th>Branch Name</th>
                       <th>Branch Manager</th>
                       <th>Status</th>
-                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {branches.map(b => (
-                      <tr key={b.code}>
-                        <td><span className="font-mono text-primary">{b.code}</span></td>
+                      <tr key={b._id || b.id || b.code}>
+                        <td><span className="font-mono text-primary">{b.id || b.code}</span></td>
                         <td>{b.name}</td>
-                        <td>{b.manager}</td>
-                        <td><span className="badge badge-success">{b.status}</span></td>
-                        <td>
-                          <button className="settings-delete-row-btn" onClick={() => removeBranchRow(b.code)}>
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
+                        <td>{b.manager || b.managerName || <span className="text-muted">—</span>}</td>
+                        <td><span className="badge badge-success">{b.status || 'Active'}</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              {/* Add branch */}
-              <form onSubmit={addBranchRow} className="settings-inline-form">
-                <input
-                  type="text"
-                  placeholder="Code (e.g. BR-HYD)"
-                  value={newBranch.code}
-                  onChange={e => setNewBranch(p => ({ ...p, code: e.target.value.toUpperCase() }))}
-                  className="settings-input"
-                />
-                <input
-                  type="text"
-                  placeholder="Branch Location Name"
-                  value={newBranch.name}
-                  onChange={e => setNewBranch(p => ({ ...p, name: e.target.value }))}
-                  className="settings-input"
-                />
-                <select
-                  value={newBranch.manager}
-                  onChange={e => setNewBranch(p => ({ ...p, manager: e.target.value }))}
-                  className="settings-input"
-                >
-                  <option value="">Select Branch Manager</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.name}>
-                      {emp.name} ({emp.designation || emp.role})
-                    </option>
-                  ))}
-                </select>
-                <button type="submit" className="settings-inline-add-btn">
-                  <Plus size={16} /> Add Branch
-                </button>
-              </form>
             </div>
 
             <div className="settings-group">
@@ -832,59 +928,20 @@ const SystemSettings = () => {
                       <th>Department Name</th>
                       <th>Department Head (HOD)</th>
                       <th>Max Seat Capacity</th>
-                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {departments.map(d => (
-                      <tr key={d.id}>
-                        <td><span className="font-mono text-muted">#{d.id}</span></td>
+                      <tr key={d._id || d.id}>
+                        <td><span className="font-mono text-muted">#{d.id || d._id?.slice(-4) || '—'}</span></td>
                         <td><strong>{d.name}</strong></td>
-                        <td>{d.head}</td>
-                        <td>{d.capacity} active seats</td>
-                        <td>
-                          <button className="settings-delete-row-btn" onClick={() => removeDeptRow(d.id)}>
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
+                        <td>{d.head || d.headName || <span className="text-muted">—</span>}</td>
+                        <td>{d.capacity || d.maxCapacity || 0} active seats</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              {/* Add dept */}
-              <form onSubmit={addDeptRow} className="settings-inline-form">
-                <input
-                  type="text"
-                  placeholder="Department Name"
-                  value={newDept.name}
-                  onChange={e => setNewDept(p => ({ ...p, name: e.target.value }))}
-                  className="settings-input"
-                />
-                <select
-                  value={newDept.head}
-                  onChange={e => setNewDept(p => ({ ...p, head: e.target.value }))}
-                  className="settings-input"
-                >
-                  <option value="">Select Department Head (HOD)</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.name}>
-                      {emp.name} ({emp.designation || emp.role})
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  placeholder="Capacity"
-                  value={newDept.capacity || ''}
-                  onChange={e => setNewDept(p => ({ ...p, capacity: parseInt(e.target.value) || 0 }))}
-                  className="settings-input"
-                />
-                <button type="submit" className="settings-inline-add-btn">
-                  <Plus size={16} /> Add Dept
-                </button>
-              </form>
             </div>
           </div>
         );
