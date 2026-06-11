@@ -58,7 +58,10 @@ const RolesPermissions = () => {
     addUserOverride,
     deleteUserOverride,
     updateEmployee,
-    activityLogs
+    activityLogs,
+    permissionModules,
+    addPermissionModule,
+    deletePermissionModule
   } = useApp();
 
   // Active navigation tab
@@ -105,14 +108,68 @@ const RolesPermissions = () => {
   // Dynamic modules list state
   const [modulesList, setModulesList] = useState([
     { key: 'dashboard', label: 'Dashboard' },
-    { key: 'employees', label: 'Employees' },
-    { key: 'attendance', label: 'Attendance' },
-    { key: 'leaves', label: 'Leaves' },
-    { key: 'tasks', label: 'Projects & Tasks' },
-    { key: 'payroll', label: 'Payroll' },
-    { key: 'permissions', label: 'Role & Permissions' },
-    { key: 'settings', label: 'Settings' }
+    { key: 'company_overview', label: 'Company Overview' },
+    { key: 'employee_management', label: 'Employee Management' },
+    { key: 'agency_branch_management', label: 'Agency Branch Management' },
+    { key: 'department_management', label: 'Department Management' },
+    { key: 'team_management', label: 'Team Management' },
+    { key: 'attendance_management', label: 'Attendance Management' },
+    { key: 'leave_management', label: 'Leave Management' },
+    { key: 'project_management', label: 'Project Management' },
+    { key: 'workflow_management', label: 'Workflow Management' },
+    { key: 'task_monitoring', label: 'Task Monitoring' },
+    { key: 'work_reports', label: 'Work Reports' },
+    { key: 'performance_analytics', label: 'Performance Analytics' },
+    { key: 'payroll_management', label: 'Payroll Management' },
+    { key: 'announcements', label: 'Announcements' },
+    { key: 'notifications', label: 'Notifications' },
+    { key: 'document_management', label: 'Document Management' },
+    { key: 'role_permission', label: 'Role & Permission' },
+    { key: 'system_settings', label: 'System Settings' },
+    { key: 'security_audit_logs', label: 'Security & Audit Logs' },
+    { key: 'profile_settings', label: 'Profile Settings' }
   ]);
+
+  // Sync modulesList with context permissionModules and enforce sidebar order
+  useEffect(() => {
+    if (permissionModules && permissionModules.length > 0) {
+      const sidebarOrder = [
+        'dashboard',
+        'company_overview',
+        'employee_management',
+        'agency_branch_management',
+        'department_management',
+        'team_management',
+        'attendance_management',
+        'leave_management',
+        'project_management',
+        'workflow_management',
+        'task_monitoring',
+        'work_reports',
+        'performance_analytics',
+        'payroll_management',
+        'announcements',
+        'notifications',
+        'document_management',
+        'role_permission',
+        'system_settings',
+        'security_audit_logs',
+        'profile_settings'
+      ];
+
+      const sorted = [...permissionModules].sort((a, b) => {
+        const indexA = sidebarOrder.indexOf(a.key);
+        const indexB = sidebarOrder.indexOf(b.key);
+
+        if (indexA === -1 && indexB === -1) return 0;
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      });
+
+      setModulesList(sorted);
+    }
+  }, [permissionModules]);
 
   const operations = [
     { key: 'read', label: 'VIEW' },
@@ -153,7 +210,7 @@ const RolesPermissions = () => {
     name: '', defaultLevel: 'No'
   });
 
-  const handleAddPermissionModule = (e) => {
+  const handleAddPermissionModule = async (e) => {
     e.preventDefault();
     if (!newPermForm.name.trim()) return;
 
@@ -164,17 +221,37 @@ const RolesPermissions = () => {
       return;
     }
 
-    setModulesList(prev => [...prev, { key: moduleKey, label: newPermForm.name }]);
+    try {
+      await addPermissionModule(newPermForm.name);
+      setLocalPermissions(prev => ({
+        ...prev,
+        [moduleKey]: { read: false, create: false, update: false, delete: false, approve: false, export: false }
+      }));
+      setNewPermForm({ name: '', defaultLevel: 'No' });
+      setShowAddPermModal(false);
+    } catch (err) {
+      addPageToast('danger', 'Failed to add permission module to database.');
+    }
+  };
 
-    // Initialize the module keys as false in localPermissions
-    setLocalPermissions(prev => ({
-      ...prev,
-      [moduleKey]: { read: false, create: false, update: false, delete: false, approve: false, export: false }
-    }));
-
-    addPageToast('success', `Permission Module "${newPermForm.name}" added successfully.`);
-    setNewPermForm({ name: '', defaultLevel: 'No' });
-    setShowAddPermModal(false);
+  const handleDeletePermissionModule = (moduleKey, label) => {
+    showConfirm(
+      'Delete Permission Module',
+      `Are you sure you want to permanently delete the permission module "${label}"? This will delete it from all roles in the system.`,
+      async () => {
+        try {
+          await deletePermissionModule(moduleKey);
+          setLocalPermissions(prev => {
+            const updated = { ...prev };
+            delete updated[moduleKey];
+            return updated;
+          });
+        } catch (err) {
+          addPageToast('danger', 'Failed to delete permission module.');
+        }
+      },
+      'danger'
+    );
   };
 
   const handleCheckboxToggle = async (moduleKey, opKey) => {
@@ -501,16 +578,17 @@ const RolesPermissions = () => {
           accentColor: createForm.color,
           accessLevel: createForm.accessLevel,
           status: createForm.status,
-          permissions: {
-            dashboard: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-            employees: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-            attendance: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-            leaves: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-            tasks: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-            payroll: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-            permissions: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-            settings: { create: false, read: false, update: false, delete: false, approve: false, export: false }
-          }
+          permissions: modulesList.reduce((acc, m) => {
+            acc[m.key] = {
+              create: false,
+              read: ['dashboard', 'company_overview', 'profile_settings'].includes(m.key),
+              update: false,
+              delete: false,
+              approve: false,
+              export: false
+            };
+            return acc;
+          }, {})
         };
         await addRole(newRole);
         addPageToast('success', `New role "${createForm.name}" created successfully.`);
@@ -1283,9 +1361,23 @@ const RolesPermissions = () => {
                     {modulesList.map(mod => (
                       <tr key={mod.key}>
                         <td style={{ textAlign: 'left' }}>
-                          <div className="perm-module-icon font-bold">
+                          <div className="perm-module-icon font-bold" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Sliders size={14} className="text-muted" />
                             <span>{mod.label}</span>
+                            {!['dashboard', 'company_overview', 'employee_management', 'agency_branch_management', 'department_management', 'team_management', 'attendance_management', 'leave_management', 'project_management', 'workflow_management', 'task_monitoring', 'work_reports', 'performance_analytics', 'payroll_management', 'announcements', 'notifications', 'document_management', 'role_permission', 'system_settings', 'security_audit_logs', 'profile_settings'].includes(mod.key) && (
+                              <button
+                                type="button"
+                                className="icon-action-btn icon-action-danger"
+                                style={{ marginLeft: 8, padding: 2, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+                                title={`Delete ${mod.label} permission module`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePermissionModule(mod.key, mod.label);
+                                }}
+                              >
+                                <Trash2 size={13} style={{ color: '#ef4444' }} />
+                              </button>
+                            )}
                           </div>
                         </td>
                         {operations.map(op => {

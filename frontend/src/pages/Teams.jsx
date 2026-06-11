@@ -1502,13 +1502,11 @@ Active Teams Mapped: ${teams.length}
                             const role = (emp.role || '').toLowerCase();
                             const roleId = (emp.roleId || '').toLowerCase();
                             const designation = (emp.designation || '').toLowerCase();
-                            const isTL = role.includes('team leader') || role.includes('team lead') ||
-                                         roleId.includes('team_leader') || roleId.includes('team_lead') ||
-                                         designation.includes('team leader') || designation.includes('team lead') ||
-                                         roleId === 'tl';
+                            const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                            const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
                             const matchesBranch = emp.branch?.trim().toLowerCase() === newTeam.branch?.trim().toLowerCase();
                             const matchesDept = emp.department?.trim().toLowerCase() === newTeam.department?.trim().toLowerCase();
-                            return isTL && matchesBranch && matchesDept;
+                            return matchesBranch && matchesDept && !isManager && !isAdmin;
                           }).map(emp => (
                             <option key={emp.id} value={emp.name}>{emp.name} - {emp.designation || 'Team Leader'} ({emp.id})</option>
                           ))}
@@ -1517,13 +1515,11 @@ Active Teams Mapped: ${teams.length}
                           const role = (emp.role || '').toLowerCase();
                           const roleId = (emp.roleId || '').toLowerCase();
                           const designation = (emp.designation || '').toLowerCase();
-                          const isTL = role.includes('team leader') || role.includes('team lead') ||
-                                       roleId.includes('team_leader') || roleId.includes('team_lead') ||
-                                       designation.includes('team leader') || designation.includes('team lead') ||
-                                       roleId === 'tl';
+                          const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                          const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
                           const matchesBranch = emp.branch?.trim().toLowerCase() === newTeam.branch?.trim().toLowerCase();
                           const matchesDept = emp.department?.trim().toLowerCase() === newTeam.department?.trim().toLowerCase();
-                          return isTL && matchesBranch && matchesDept;
+                          return matchesBranch && matchesDept && !isManager && !isAdmin;
                         }).length === 0 && (
                           <span className="text-muted text-xs" style={{ display: 'block', marginTop: 4 }}>
                             No team leaders found in this branch &amp; department.
@@ -1815,17 +1811,51 @@ Active Teams Mapped: ${teams.length}
                       required
                     >
                       <option value="">Select Employee</option>
-                      {employees.filter(emp => {
-                        const role = (emp.role || '').toLowerCase();
-                        const roleId = (emp.roleId || '').toLowerCase();
-                        const designation = (emp.designation || '').toLowerCase();
-                        const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
-                        const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
-                        return !isManager && !isAdmin;
-                      }).map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
-                      ))}
+                      {(() => {
+                        const selectedTeamObj = teams.find(t => t.id === assignLeaderForm.teamId);
+                        return employees.filter(emp => {
+                          const role = (emp.role || '').toLowerCase();
+                          const roleId = (emp.roleId || '').toLowerCase();
+                          const designation = (emp.designation || '').toLowerCase();
+                          const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                          const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                          
+                          if (isManager || isAdmin) return false;
+                          if (!selectedTeamObj) return true;
+                          
+                          const matchesBranch = emp.branch?.trim().toLowerCase() === selectedTeamObj.branch?.trim().toLowerCase();
+                          const matchesDept = emp.department?.trim().toLowerCase() === selectedTeamObj.department?.trim().toLowerCase();
+                          return matchesBranch && matchesDept;
+                        }).map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
+                        ));
+                      })()}
                     </select>
+                    {(() => {
+                      const selectedTeamObj = teams.find(t => t.id === assignLeaderForm.teamId);
+                      if (selectedTeamObj) {
+                        const hasCandidates = employees.some(emp => {
+                          const role = (emp.role || '').toLowerCase();
+                          const roleId = (emp.roleId || '').toLowerCase();
+                          const designation = (emp.designation || '').toLowerCase();
+                          const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                          const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                          
+                          if (isManager || isAdmin) return false;
+                          const matchesBranch = emp.branch?.trim().toLowerCase() === selectedTeamObj.branch?.trim().toLowerCase();
+                          const matchesDept = emp.department?.trim().toLowerCase() === selectedTeamObj.department?.trim().toLowerCase();
+                          return matchesBranch && matchesDept;
+                        });
+                        if (!hasCandidates) {
+                          return (
+                            <span className="text-muted text-xs" style={{ display: 'block', marginTop: 4 }}>
+                              No eligible leaders found in this team's branch &amp; department.
+                            </span>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1874,18 +1904,55 @@ Active Teams Mapped: ${teams.length}
                       required
                     >
                       <option value="">Select Employee</option>
-                      {employees.filter(emp => {
-                        const role = (emp.role || '').toLowerCase();
-                        const roleId = (emp.roleId || '').toLowerCase();
-                        const designation = (emp.designation || '').toLowerCase();
-                        const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
-                        const isLeader = role.includes('leader') || role.includes('lead') || roleId.includes('leader') || roleId.includes('lead') || designation.includes('leader') || designation.includes('lead');
-                        const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
-                        return (roleId === 'employee' || role === 'employee') && !isManager && !isLeader && !isAdmin;
-                      }).map(emp => (
-                        <option key={emp.id} value={emp.id}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
-                      ))}
+                      {(() => {
+                        const targetTeamObj = teams.find(t => t.id === addMembersForm.teamId);
+                        return employees.filter(emp => {
+                          const role = (emp.role || '').toLowerCase();
+                          const roleId = (emp.roleId || '').toLowerCase();
+                          const designation = (emp.designation || '').toLowerCase();
+                          const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                          const isLeader = role.includes('leader') || role.includes('lead') || roleId.includes('leader') || roleId.includes('lead') || designation.includes('leader') || designation.includes('lead');
+                          const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                          
+                          const isGeneralEmployee = (roleId === 'employee' || role === 'employee') && !isManager && !isLeader && !isAdmin;
+                          if (!isGeneralEmployee) return false;
+                          if (!targetTeamObj) return true;
+                          
+                          const matchesBranch = emp.branch?.trim().toLowerCase() === targetTeamObj.branch?.trim().toLowerCase();
+                          const matchesDept = emp.department?.trim().toLowerCase() === targetTeamObj.department?.trim().toLowerCase();
+                          return matchesBranch && matchesDept;
+                        }).map(emp => (
+                          <option key={emp.id} value={emp.id}>{emp.name} - {emp.designation || 'Staff'} ({emp.id})</option>
+                        ));
+                      })()}
                     </select>
+                    {(() => {
+                      const targetTeamObj = teams.find(t => t.id === addMembersForm.teamId);
+                      if (targetTeamObj) {
+                        const hasCandidates = employees.some(emp => {
+                          const role = (emp.role || '').toLowerCase();
+                          const roleId = (emp.roleId || '').toLowerCase();
+                          const designation = (emp.designation || '').toLowerCase();
+                          const isManager = role.includes('manager') || roleId.includes('manager') || designation.includes('manager');
+                          const isLeader = role.includes('leader') || role.includes('lead') || roleId.includes('leader') || roleId.includes('lead') || designation.includes('leader') || designation.includes('lead');
+                          const isAdmin = role.includes('admin') || roleId.includes('admin') || designation.includes('admin');
+                          
+                          const isGeneralEmployee = (roleId === 'employee' || role === 'employee') && !isManager && !isLeader && !isAdmin;
+                          if (!isGeneralEmployee) return false;
+                          const matchesBranch = emp.branch?.trim().toLowerCase() === targetTeamObj.branch?.trim().toLowerCase();
+                          const matchesDept = emp.department?.trim().toLowerCase() === targetTeamObj.department?.trim().toLowerCase();
+                          return matchesBranch && matchesDept;
+                        });
+                        if (!hasCandidates) {
+                          return (
+                            <span className="text-muted text-xs" style={{ display: 'block', marginTop: 4 }}>
+                              No eligible employees found in this team's branch &amp; department.
+                            </span>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
               </div>

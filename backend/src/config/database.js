@@ -14,6 +14,7 @@ import AppraisalReview from '../modules/appraisal-reviews/appraisal-reviews.mode
 import { PayrollGrade, PayrollReimbursement, PayrollLoanAdvance, PayrollBonus, PayrollPayment, PayrollConfig } from '../modules/payroll/payroll.model.js';
 import { Announcement, EmergencyAlert, AnnouncementTrackingLog, AnnouncementAuditLog } from '../modules/announcements/announcement.model.js';
 import Role from '../modules/roles/roles.model.js';
+import PermissionModule from '../modules/roles/permission-modules.model.js';
 import UserOverride from '../modules/roles/overrides.model.js';
 import Goal from '../modules/performance/goal.model.js';
 import Pip from '../modules/performance/pip.model.js';
@@ -21,6 +22,7 @@ import { IpWhitelist, IpBlocklist, UserDevice, UserSession, SecurityAlert } from
 import ActivityLog from '../modules/activity-logs/activity-log.model.js';
 import Notification from '../modules/notifications/notification.model.js';
 import Document from '../modules/documents/document.model.js';
+import SystemSettings from '../modules/settings/settings.model.js';
 
 export let isDatabaseConnected = false;
 
@@ -196,6 +198,14 @@ export const database = {
         logger.info('Clean Payroll configuration initialized.');
       }
 
+      // Initialize clean SystemSettings if not present
+      const systemSettingsCount = await SystemSettings.countDocuments();
+      if (systemSettingsCount === 0) {
+        logger.info('system_settings collection is empty. Seeding default global settings...');
+        await SystemSettings.create({ key: 'global' });
+        logger.info('Global system settings seeded successfully.');
+      }
+
       // Ensure initial roles exist
       // Ensure initial User Overrides exist
       const overrideCount = await UserOverride.countDocuments();
@@ -206,10 +216,61 @@ export const database = {
         logger.info('User overrides seeded successfully.');
       }
 
+      // Clear old roles and permission modules to allow re-seeding the new 21-module configuration
+      await Role.deleteMany({});
+      await PermissionModule.deleteMany({});
+
+      const buildPermissions = (rules) => {
+        const defaultPerms = {
+          dashboard: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          company_overview: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          employee_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          agency_branch_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          department_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          team_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          attendance_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          leave_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          project_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          workflow_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          task_monitoring: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          work_reports: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          performance_analytics: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          payroll_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          announcements: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          notifications: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          document_management: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          role_permission: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          system_settings: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          security_audit_logs: { create: false, read: false, update: false, delete: false, approve: false, export: false },
+          profile_settings: { create: false, read: false, update: false, delete: false, approve: false, export: false }
+        };
+        
+        Object.keys(rules).forEach(mod => {
+          if (defaultPerms[mod]) {
+            defaultPerms[mod] = { ...defaultPerms[mod], ...rules[mod] };
+          }
+        });
+        
+        return defaultPerms;
+      };
+
       // Ensure initial roles exist
       const roleCount = await Role.countDocuments();
       if (roleCount === 0) {
         logger.info('rbac_roles collection is empty. Seeding initial records...');
+        
+        const fullRules = {};
+        [
+          'dashboard', 'company_overview', 'employee_management', 'agency_branch_management',
+          'department_management', 'team_management', 'attendance_management', 'leave_management',
+          'project_management', 'workflow_management', 'task_monitoring', 'work_reports',
+          'performance_analytics', 'payroll_management', 'announcements', 'notifications',
+          'document_management', 'role_permission', 'system_settings', 'security_audit_logs',
+          'profile_settings'
+        ].forEach(k => {
+          fullRules[k] = { create: true, read: true, update: true, delete: true, approve: true, export: true };
+        });
+
         const seedRoles = [
           {
             id: 'super_admin',
@@ -217,16 +278,7 @@ export const database = {
             description: 'Full system access to all branches, departments, billing, and settings.',
             userCount: 2,
             accentColor: '#2563eb',
-            permissions: {
-              dashboard: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              employees: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              attendance: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              leaves: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              tasks: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              payroll: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              permissions: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              settings: { create: true, read: true, update: true, delete: true, approve: true, export: true }
-            }
+            permissions: buildPermissions(fullRules)
           },
           {
             id: 'dept_admin',
@@ -234,16 +286,27 @@ export const database = {
             description: 'Access to employees, attendance, and tasks within the assigned department.',
             userCount: 5,
             accentColor: '#8b5cf6',
-            permissions: {
-              dashboard: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              employees: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-              attendance: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-              leaves: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-              tasks: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              payroll: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-              permissions: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              settings: { create: false, read: true, update: false, delete: false, approve: false, export: false }
-            }
+            permissions: buildPermissions({
+              dashboard: { read: true },
+              company_overview: { read: true },
+              employee_management: { create: true, read: true, update: true },
+              agency_branch_management: { read: true },
+              department_management: { create: true, read: true, update: true },
+              team_management: { create: true, read: true, update: true },
+              attendance_management: { create: true, read: true, update: true },
+              leave_management: { create: true, read: true, update: true, delete: true, approve: true },
+              project_management: { create: true, read: true, update: true },
+              workflow_management: { create: true, read: true, update: true },
+              task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: true },
+              work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: true },
+              performance_analytics: { read: true },
+              announcements: { read: true },
+              notifications: { read: true },
+              document_management: { read: true },
+              role_permission: { read: true },
+              system_settings: { read: true },
+              profile_settings: { read: true }
+            })
           },
           {
             id: 'branch_admin',
@@ -251,16 +314,28 @@ export const database = {
             description: 'Access to employees, attendance, payroll, and tasks within the assigned branch.',
             userCount: 4,
             accentColor: '#7c3aed',
-            permissions: {
-              dashboard: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              employees: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-              attendance: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-              leaves: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-              tasks: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-              payroll: { create: true, read: true, update: true, delete: false, approve: false, export: true },
-              permissions: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              settings: { create: false, read: true, update: true, delete: false, approve: false, export: false }
-            }
+            permissions: buildPermissions({
+              dashboard: { read: true },
+              company_overview: { read: true },
+              employee_management: { create: true, read: true, update: true },
+              agency_branch_management: { create: true, read: true, update: true },
+              department_management: { create: true, read: true, update: true },
+              team_management: { create: true, read: true, update: true },
+              attendance_management: { create: true, read: true, update: true },
+              leave_management: { create: true, read: true, update: true, delete: true, approve: true },
+              project_management: { create: true, read: true, update: true },
+              workflow_management: { create: true, read: true, update: true },
+              task_monitoring: { create: true, read: true, update: true, delete: true, approve: true },
+              work_reports: { create: true, read: true, update: true, delete: true, approve: true },
+              performance_analytics: { read: true },
+              payroll_management: { create: true, read: true, update: true, approve: true, export: true },
+              announcements: { read: true },
+              notifications: { read: true },
+              document_management: { read: true },
+              role_permission: { read: true },
+              system_settings: { create: true, read: true, update: true },
+              profile_settings: { read: true }
+            })
           },
           {
             id: 'manager',
@@ -268,16 +343,24 @@ export const database = {
             description: 'Monitor and manage projects, tasks, workflows, and team leader performance.',
             userCount: 3,
             accentColor: '#ec4899',
-            permissions: {
-              dashboard: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              employees: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              attendance: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              leaves: { create: true, read: true, update: true, delete: false, approve: true, export: false },
-              tasks: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-              payroll: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-              permissions: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-              settings: { create: false, read: true, update: false, delete: false, approve: false, export: false }
-            }
+            permissions: buildPermissions({
+              dashboard: { read: true },
+              company_overview: { read: true },
+              employee_management: { read: true },
+              department_management: { read: true },
+              team_management: { read: true },
+              attendance_management: { read: true },
+              leave_management: { create: true, read: true, update: true, approve: true },
+              project_management: { create: true, read: true, update: true, delete: true, approve: true },
+              workflow_management: { create: true, read: true, update: true, delete: true, approve: true },
+              task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: true },
+              work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: true },
+              performance_analytics: { create: true, read: true, update: true, approve: true },
+              announcements: { read: true },
+              notifications: { read: true },
+              document_management: { read: true },
+              profile_settings: { read: true }
+            })
           },
           {
             id: 'team_leader',
@@ -285,16 +368,22 @@ export const database = {
             description: 'Manage tasks, reviews, and attendance for assigned team members.',
             userCount: 8,
             accentColor: '#16a34a',
-            permissions: {
-              dashboard: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              employees: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              attendance: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              leaves: { create: false, read: true, update: true, delete: false, approve: true, export: false },
-              tasks: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-              payroll: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-              permissions: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-              settings: { create: false, read: true, update: false, delete: false, approve: false, export: false }
-            }
+            permissions: buildPermissions({
+              dashboard: { read: true },
+              company_overview: { read: true },
+              employee_management: { read: true },
+              team_management: { read: true },
+              attendance_management: { read: true },
+              leave_management: { read: true, update: true, approve: true },
+              project_management: { read: true },
+              task_monitoring: { create: true, read: true, update: true, delete: true, approve: true },
+              work_reports: { create: true, read: true, update: true, delete: true, approve: true },
+              performance_analytics: { read: true },
+              announcements: { read: true },
+              notifications: { read: true },
+              document_management: { read: true },
+              profile_settings: { read: true }
+            })
           },
           {
             id: 'employee',
@@ -302,20 +391,52 @@ export const database = {
             description: 'Standard employee access to check own tasks, leave requests, attendance, and profile.',
             userCount: 48,
             accentColor: '#64748b',
-            permissions: {
-              dashboard: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              employees: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-              attendance: { create: true, read: true, update: false, delete: false, approve: false, export: false },
-              leaves: { create: true, read: true, update: false, delete: false, approve: false, export: false },
-              tasks: { create: false, read: true, update: true, delete: false, approve: false, export: false },
-              payroll: { create: false, read: true, update: false, delete: false, approve: false, export: false },
-              permissions: { create: false, read: false, update: false, delete: false, approve: false, export: false },
-              settings: { create: false, read: true, update: false, delete: false, approve: false, export: false }
-            }
+            permissions: buildPermissions({
+              dashboard: { read: true },
+              company_overview: { read: true },
+              attendance_management: { create: true, read: true },
+              leave_management: { create: true, read: true },
+              task_monitoring: { read: true, update: true },
+              payroll_management: { read: true },
+              announcements: { read: true },
+              notifications: { read: true },
+              profile_settings: { read: true }
+            })
           }
         ];
         await Role.create(seedRoles);
         logger.info('rbac_roles seeded successfully.');
+      }
+
+      // Ensure initial Permission Modules exist
+      const pmCount = await PermissionModule.countDocuments();
+      if (pmCount === 0) {
+        logger.info('permission_modules collection is empty. Seeding default modules...');
+        const seedModules = [
+          { key: 'dashboard', label: 'Dashboard' },
+          { key: 'company_overview', label: 'Company Overview' },
+          { key: 'employee_management', label: 'Employee Management' },
+          { key: 'agency_branch_management', label: 'Agency Branch Management' },
+          { key: 'department_management', label: 'Department Management' },
+          { key: 'team_management', label: 'Team Management' },
+          { key: 'attendance_management', label: 'Attendance Management' },
+          { key: 'leave_management', label: 'Leave Management' },
+          { key: 'project_management', label: 'Project Management' },
+          { key: 'workflow_management', label: 'Workflow Management' },
+          { key: 'task_monitoring', label: 'Task Monitoring' },
+          { key: 'work_reports', label: 'Work Reports' },
+          { key: 'performance_analytics', label: 'Performance Analytics' },
+          { key: 'payroll_management', label: 'Payroll Management' },
+          { key: 'announcements', label: 'Announcements' },
+          { key: 'notifications', label: 'Notifications' },
+          { key: 'document_management', label: 'Document Management' },
+          { key: 'role_permission', label: 'Role & Permission' },
+          { key: 'system_settings', label: 'System Settings' },
+          { key: 'security_audit_logs', label: 'Security & Audit Logs' },
+          { key: 'profile_settings', label: 'Profile Settings' }
+        ];
+        await PermissionModule.create(seedModules);
+        logger.info('permission_modules seeded successfully.');
       }
 
       // Ensure initial goals exist

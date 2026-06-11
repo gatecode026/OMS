@@ -44,6 +44,26 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  recipientRole: {
+    type: String,
+    default: ''
+  },
+  recipientId: {
+    type: String,
+    default: ''
+  },
+  targetUserId: {
+    type: String,
+    default: ''
+  },
+  targetRole: {
+    type: String,
+    default: ''
+  },
+  forUserId: {
+    type: String,
+    default: ''
+  },
   sentBy: {
     type: String,
     default: ''
