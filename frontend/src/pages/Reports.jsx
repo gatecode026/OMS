@@ -118,7 +118,7 @@ const Reports = () => {
   const {
     currentUserRole,
     addToast,
-    departments,
+    departments: rawDepartments,
     branches,
     employees,
     payroll,
@@ -127,6 +127,7 @@ const Reports = () => {
     leaveRequests,
     tasks
   } = useApp();
+  const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // State
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');

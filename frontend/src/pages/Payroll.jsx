@@ -63,6 +63,8 @@ const Payroll = () => {
   const isLoading = usePageLoading(600);
   const {
     employees,
+    departments,
+    branches,
     runPayroll,
     showConfirm,
     currentUserRole,
@@ -914,18 +916,16 @@ BANK PAYMENT & COMPLIANCE DETAIL:
 
                 <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="table-filter-select" style={{ minWidth: '120px' }}>
                   <option value="">All Departments</option>
-                  <option value="Operations">Operations</option>
-                  <option value="Engineering">Engineering</option>
-                  <option value="Sales">Sales</option>
-                  <option value="Marketing">Marketing</option>
-                  <option value="Human Resources">Human Resources</option>
+                  {(departments || []).map(d => (
+                    <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                  ))}
                 </select>
 
                 <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="table-filter-select">
                   <option value="">All Branches</option>
-                  <option value="Delhi HQ">Delhi HQ</option>
-                  <option value="Bangalore Office">Bangalore Office</option>
-                  <option value="Mumbai Branch">Mumbai Branch</option>
+                  {(branches || []).map(b => (
+                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                  ))}
                 </select>
 
                 <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="table-filter-select">

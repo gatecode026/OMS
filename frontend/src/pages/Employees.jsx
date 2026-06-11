@@ -86,7 +86,7 @@ const isValidEmail = (email) => {
 const isValidPhone = (phone) => {
   if (!phone) return false;
   const cleaned = phone.replace(/\D/g, '');
-  return /^\d{10}$/.test(cleaned);
+  return /^[789]\d{9}$/.test(cleaned);
 };
 
 const isValidAlternatePhone = (phone) => {
@@ -264,7 +264,7 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: dbDepartments, teams, appraisalReviews } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews } = useApp();
   const location = useLocation();
 
 
@@ -344,7 +344,7 @@ const Employees = () => {
     name: '', email: '', phone: '', dob: '', gender: 'Male',
     personalEmail: '', alternatePhone: '',
     currentAddress: '', permanentAddress: '',
-    city: '', state: '', country: '', zipCode: '',
+    city: '', state: '', country: 'India', zipCode: '',
     bloodGroup: '', maritalStatus: '',
     emergencyContactName: '', emergencyContactPhone: '', emergencyContactPhoneAlt: '', emergencyContactAddress: '', emergencyContactRelation: '',
     username: '', password: '', confirmPassword: '', officialEmail: '',
@@ -394,6 +394,10 @@ const Employees = () => {
     contractEndDate: ''
   });
 
+  const dbDepartments = useMemo(() => {
+    return (rawDbDepartments || []).filter(d => d.status === 'Active' || d.name === formData.department);
+  }, [rawDbDepartments, formData.department]);
+
   const [uploadedDocs, setUploadedDocs] = useState({
     aadhaar: null, pan: null, resume: null,
     certificates: null, offerLetter: null, profilePhoto: null,
@@ -429,6 +433,7 @@ const Employees = () => {
   // --- Form Inline Validation Booleans ---
   const dupEmail = formData.email && employees.some(e => (e.email === formData.email || e.workEmail === formData.email) && e.id !== selectedEmployeeId);
   const dupPhone = formData.phone && employees.some(e => e.phone === formData.phone && e.id !== selectedEmployeeId);
+  const dupUsername = formData.username && employees.some(e => e.username && e.username.trim().toLowerCase() === formData.username.trim().toLowerCase() && e.id !== selectedEmployeeId);
   const dupEmpId = formMode === 'add' && formData.id && employees.some(e => e.id.trim().toLowerCase() === formData.id.trim().toLowerCase());
   const invalidPass = formData.password && formData.password !== '••••••••' && (formData.password.length < 8 || formData.password.length > 12);
 
@@ -465,7 +470,7 @@ const Employees = () => {
       name: '', email: '', phone: '', dob: '', gender: 'Male',
       personalEmail: '', alternatePhone: '',
       currentAddress: '', permanentAddress: '',
-      city: '', state: '', country: '', zipCode: '',
+      city: '', state: '', country: 'India', zipCode: '',
       bloodGroup: '', maritalStatus: '',
       emergencyContactName: '', emergencyContactPhone: '', emergencyContactPhoneAlt: '', emergencyContactAddress: '', emergencyContactRelation: '',
       username: '', password: '', confirmPassword: '', officialEmail: '',
@@ -585,6 +590,7 @@ const Employees = () => {
     const params = new URLSearchParams(location.search);
     const isAdd = location.pathname === '/employees/add' || params.get('action') === 'add';
     const editId = params.get('edit');
+    const stepParam = parseInt(params.get('step') || '1', 10);
 
     if (isAdd) {
       if (!showFormPanel || formMode !== 'add') {
@@ -594,7 +600,12 @@ const Employees = () => {
       if (!showFormPanel || formMode !== 'edit' || selectedEmployeeId !== editId) {
         const emp = employees.find(e => e.id === editId);
         if (emp) {
-          setTimeout(() => handleOpenEdit(emp), 0);
+          setTimeout(() => {
+            handleOpenEdit(emp);
+            if (stepParam && stepParam >= 1 && stepParam <= 7) {
+              setTimeout(() => setWizardStep(stepParam), 50);
+            }
+          }, 0);
         } else {
           if (showFormPanel) {
             setTimeout(() => setShowFormPanel(false), 0);
@@ -870,6 +881,8 @@ const Employees = () => {
     }
     if (step === 3) {
       const hasUsername = formData.username && formData.username.trim().length >= 3;
+      const isUsernameDuplicate = formData.username && employees.some(e => e.username && e.username.trim().toLowerCase() === formData.username.trim().toLowerCase() && e.id !== selectedEmployeeId);
+      if (isUsernameDuplicate) return false;
       const validOfficialEmail = isValidPersonalEmail(formData.officialEmail);
       if (!validOfficialEmail) return false;
 
@@ -1463,8 +1476,6 @@ const Employees = () => {
             </div>
           </div>
         </div>
-
-        {/* ── Performance Review & Recognition Spotlight Widgets ── */}
         <div className="emp-widgets-row" style={{ marginTop: 'var(--spacing-4)' }}>
           <div className="card emp-widget-card">
             <div className="widget-header">
@@ -1856,7 +1867,7 @@ const Employees = () => {
         <div className="emp-preview-card animate-preview" ref={previewRef} style={{ top: previewPos.top, left: previewPos.left }}>
           <button className="preview-close-btn" onClick={() => setPreviewEmp(null)}><X size={14} /></button>
           <div className="preview-top">
-            <Avatar name={previewEmp.name} size="lg" src={previewEmp.avatar || previewEmp.photoUrl} />
+            <Avatar name={previewEmp.name} size="lg" src={previewEmp.avatar || previewEmp.photoUrl || ''} />
             <div className="preview-name-block">
               <h4 className="preview-name">{previewEmp.name}</h4>
               <p className="preview-designation">{previewEmp.designation || previewEmp.role}</p>
@@ -1894,6 +1905,7 @@ const Employees = () => {
           <div className="preview-actions-grid">
             <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employees/${previewEmp.id}`); setPreviewEmp(null); }}>View Full Profile</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate(`?edit=${previewEmp.id}`); setPreviewEmp(null); }}>Edit Profile</button>
+            <button className="preview-btn preview-btn-secondary" onClick={() => { navigate(`?edit=${previewEmp.id}&step=7`); setPreviewEmp(null); }}>Profile Settings</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/tasks'); setPreviewEmp(null); }}>Assign Task</button>
             <button className="preview-btn preview-btn-ghost" onClick={() => { navigate('/work-reports'); setPreviewEmp(null); }}>View Reports</button>
           </div>
@@ -2069,7 +2081,7 @@ const Employees = () => {
                     <label>{FIELD_LABELS.phone} *</label>
                     <input type="text" placeholder="e.g. 9876543210" value={formData.phone} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData(p => ({ ...p, phone: val })); }} required />
                     {formData.phone && !isValidPhone(formData.phone) && (
-                      <span className="field-error-msg">⚠️ Number must contain exactly 10 digits.</span>
+                      <span className="field-error-msg">⚠️ Number must start with 7, 8, or 9 and contain exactly 10 digits.</span>
                     )}
                     {dupPhone && (
                       <span className="field-error-msg">⚠️ Duplicate Mobile: Phone number already in use.</span>
@@ -2079,7 +2091,7 @@ const Employees = () => {
                     <label>{FIELD_LABELS.alternatePhone}</label>
                     <input type="text" placeholder="e.g. 9876543211" value={formData.alternatePhone || ''} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData(p => ({ ...p, alternatePhone: val })); }} />
                     {formData.alternatePhone && !isValidPhone(formData.alternatePhone) && (
-                      <span className="field-error-msg">⚠️ Number must contain exactly 10 digits.</span>
+                      <span className="field-error-msg">⚠️ Number must start with 7, 8, or 9 and contain exactly 10 digits.</span>
                     )}
                   </div>
                   <div className="form-field">
@@ -2133,33 +2145,6 @@ const Employees = () => {
                   </div>
                   <div className="form-field"><label>{FIELD_LABELS.city}</label><input type="text" placeholder="e.g. Jaipur" value={formData.city || ''} onChange={e => setFormData(p => ({ ...p, city: e.target.value }))} /></div>
                   <div className="form-field"><label>{FIELD_LABELS.state}</label><input type="text" placeholder="e.g. Rajasthan" value={formData.state || ''} onChange={e => setFormData(p => ({ ...p, state: e.target.value }))} /></div>
-                  <div className="form-field">
-                    <label>{FIELD_LABELS.country}</label>
-                    <select
-                      value={formData.country || 'India'}
-                      onChange={e => {
-                        const nextCountry = e.target.value;
-                        setFormData(p => ({
-                          ...p,
-                          country: nextCountry,
-                          zipCode: '',
-                          city: '',
-                          state: ''
-                        }));
-                      }}
-                    >
-                      <option value="India">India</option>
-                      <option value="United States">United States</option>
-                      <option value="United Kingdom">United Kingdom</option>
-                      <option value="Canada">Canada</option>
-                      <option value="Australia">Australia</option>
-                      <option value="Germany">Germany</option>
-                      <option value="France">France</option>
-                      <option value="United Arab Emirates">United Arab Emirates</option>
-                      <option value="Singapore">Singapore</option>
-                      <option value="Japan">Japan</option>
-                    </select>
-                  </div>
                   <div className="form-field form-field-full"><label>{FIELD_LABELS.permanentAddress}</label><textarea rows="2" placeholder="Permanent address (if different)" value={formData.permanentAddress || ''} onChange={e => setFormData(p => ({ ...p, permanentAddress: e.target.value }))} /></div>
                 </div>
                 <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-5)' }}>Emergency Contact</h4>
@@ -2169,14 +2154,14 @@ const Employees = () => {
                     <label>{FIELD_LABELS.emergencyContactPhone}</label>
                     <input type="text" placeholder="e.g. 9876543211" value={formData.emergencyContactPhone || ''} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData(p => ({ ...p, emergencyContactPhone: val })); }} />
                     {formData.emergencyContactPhone && !isValidPhone(formData.emergencyContactPhone) && (
-                      <span className="field-error-msg">⚠️ Number must contain exactly 10 digits.</span>
+                      <span className="field-error-msg">⚠️ Number must start with 7, 8, or 9 and contain exactly 10 digits.</span>
                     )}
                   </div>
                   <div className="form-field">
                     <label>{FIELD_LABELS.emergencyContactPhoneAlt}</label>
                     <input type="text" placeholder="e.g. 9876543212" value={formData.emergencyContactPhoneAlt || ''} onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData(p => ({ ...p, emergencyContactPhoneAlt: val })); }} />
                     {formData.emergencyContactPhoneAlt && !isValidPhone(formData.emergencyContactPhoneAlt) && (
-                      <span className="field-error-msg">⚠️ Number must contain exactly 10 digits.</span>
+                      <span className="field-error-msg">⚠️ Number must start with 7, 8, or 9 and contain exactly 10 digits.</span>
                     )}
                   </div>
                   <div className="form-field"><label>{FIELD_LABELS.emergencyContactRelation}</label><select value={formData.emergencyContactRelation || ''} onChange={e => setFormData(p => ({ ...p, emergencyContactRelation: e.target.value }))}><option value="">Select</option><option>Spouse</option><option>Parent</option><option>Sibling</option><option>Friend</option><option>Relative</option><option>Other</option></select></div>
@@ -2398,6 +2383,9 @@ const Employees = () => {
                     {formData.username && formData.username.trim().length < 3 && (
                       <span className="field-error-msg">⚠️ Must be at least 3 characters.</span>
                     )}
+                    {dupUsername && (
+                      <span className="field-error-msg">⚠️ Duplicate Username: Already registered to another employee.</span>
+                    )}
                   </div>
                   <div className="form-field">
                     <label>{FIELD_LABELS.officialEmail}</label>
@@ -2614,10 +2602,12 @@ const Employees = () => {
                           ) : (
                             <div className="doc-file-preview">
                               {isImage && filePreview ? (
-                                <div className="doc-image-preview">
-                                  <a href={filePreview} download={file.name} target="_blank" rel="noopener noreferrer">
-                                    <img src={filePreview} alt={label} className="doc-preview-img" />
-                                  </a>
+                                <div style={{ position: 'relative' }}>
+                                  <div className="doc-image-preview">
+                                    <a href={filePreview} download={file.name} target="_blank" rel="noopener noreferrer">
+                                      <img src={filePreview} alt={label} className="doc-preview-img" />
+                                    </a>
+                                  </div>
                                   <button type="button" className="doc-remove-btn" onClick={() => handleRemoveDocument(key, label)} title="Remove file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
                                 </div>
                               ) : (
@@ -2662,7 +2652,7 @@ const Employees = () => {
                   <div>
                     <h4 className="form-subsection-title" style={{ marginTop: 0 }}>Employee Preview</h4>
                     <div className="pre-save-preview-card">
-                      <div className="pre-save-avatar-row"><Avatar name={formData.name || 'New Employee'} size="lg" src={uploadedDocs.profilePhoto ? (uploadedDocs.profilePhoto.downloadUrl || (uploadedDocs.profilePhoto instanceof Blob ? URL.createObjectURL(uploadedDocs.profilePhoto) : '')) : (formData.avatar || formData.photoUrl)} /><div className="pre-save-name-block"><h4>{formData.name || 'New Employee'}</h4><span>{formData.designation || 'Designation not set'}</span></div></div>
+                      <div className="pre-save-avatar-row"><Avatar name={formData.name || 'New Employee'} size="lg" src={uploadedDocs.profilePhoto ? (uploadedDocs.profilePhoto.downloadUrl || (uploadedDocs.profilePhoto instanceof Blob ? URL.createObjectURL(uploadedDocs.profilePhoto) : '')) : (formData.avatar || formData.photoUrl || '')} /><div className="pre-save-name-block"><h4>{formData.name || 'New Employee'}</h4><span>{formData.designation || 'Designation not set'}</span></div></div>
                       <div className="pre-save-id-badge">{formData.id || 'ID not generated'}</div>
                       <div className="pre-save-detail-list">
                         <div className="pre-save-detail-row"><span>Department</span><strong>{formData.department || '—'}</strong></div>

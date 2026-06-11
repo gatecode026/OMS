@@ -1126,9 +1126,9 @@ const Dashboard = () => {
                 {commModal === 'announcement' ? (
                   <>
                     <option value="All">All Employees (Company-wide)</option>
-                    <option value="IT">IT Department Only</option>
-                    <option value="HR">HR Department Only</option>
-                    <option value="Sales">Sales Department Only</option>
+                    {(departments || []).map(d => (
+                      <option key={d.id || d.name} value={d.name}>{d.name} Department Only</option>
+                    ))}
                   </>
                 ) : commModal === 'notification' ? (
                   <>

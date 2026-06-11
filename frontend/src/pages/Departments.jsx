@@ -22,35 +22,49 @@ import {
   PieChart as RechartsPieChart, Pie, Cell, BarChart as RechartsBarChart, Bar, Legend
 } from 'recharts';
 
-
-
 const Departments = () => {
   const isLoading = usePageLoading(600);
   const { 
-    employees, 
-    branches, 
-    departments: contextDepartments, 
+    employees = [], 
+    branches = [], 
+    departments: contextDepartments = [], 
     addDepartment, 
     updateDepartment, 
     addToast, 
     showConfirm,
-    teams: contextTeams,
+    teams: contextTeams = [],
     deleteTeam,
     updateTeam,
     addActivityLog
-  } = useApp();
+  } = useApp() || {};
 
-  // Tab State: 'directory' | 'analytics' | 'teams' | 'documents' | 'alerts'
+  // Tab State
   const [activeTab, setActiveTab] = useState('directory');
-
-  // Search & Filter state
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [branchFilter, setBranchFilter] = useState('All');
   const [perfFilter, setPerfFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All');
-
   const [branchOptions, setBranchOptions] = useState([]);
+  const [showCustomBranchInput, setShowCustomBranchInput] = useState(false);
+  const [customBranch, setCustomBranch] = useState('');
+  const [selectedDept, setSelectedDept] = useState(null);
+  const [addDeptOpen, setAddDeptOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingDeptId, setEditingDeptId] = useState(null);
+  const [transferForm, setTransferForm] = useState({
+    employee: '', source: 'Sales', target: 'Engineering', reason: '', date: '2026-06-01'
+  });
+  const [exportFormState, setExportFormState] = useState({
+    report: 'Department Summary Report', format: 'PDF'
+  });
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+
+  const departments = Array.isArray(contextDepartments) ? contextDepartments : [];
+  const teams = Array.isArray(contextTeams) ? contextTeams : [];
 
   useEffect(() => {
     if (branches && branches.length > 0) {
@@ -60,27 +74,12 @@ const Departments = () => {
     }
   }, [branches]);
 
-  const [showCustomBranchInput, setShowCustomBranchInput] = useState(false);
-  const [customBranch, setCustomBranch] = useState('');
-
-  // Dynamic Data Lists
-  const departments = contextDepartments || [];
-  const teams = contextTeams || [];
-
-  // Modals Toggle States
-  const [selectedDept, setSelectedDept] = useState(null);
-  const [addDeptOpen, setAddDeptOpen] = useState(false);
-
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-
   const defaultBranch = useMemo(() => {
     return branches.length > 0 ? branches[0].name : 'Delhi Head Office';
   }, [branches]);
 
-  // Form states
   const [newDeptForm, setNewDeptForm] = useState({
-    name: '', code: '', head: '', branch: '', budget: 100000, description: ''
+    name: '', code: '', head: '', branch: defaultBranch, description: ''
   });
 
   useEffect(() => {
@@ -89,6 +88,42 @@ const Departments = () => {
       branch: prev.branch || defaultBranch
     }));
   }, [defaultBranch]);
+
+  // Auto-generate serialized department code
+  useEffect(() => {
+    if (isEditMode) return;
+    const deptName = newDeptForm.name;
+    const branchName = newDeptForm.branch === 'add_custom' ? customBranch : newDeptForm.branch;
+    
+    if (!deptName || !branchName) {
+      setNewDeptForm(prev => ({ ...prev, code: '' }));
+      return;
+    }
+    
+    const cleanBranch = (branchName || '').replace(/branch|office|agency/gi, '').trim();
+    const branchAbbr = cleanBranch ? cleanBranch.slice(0, 3).toUpperCase() : 'HQ';
+    const cleanDept = (deptName || '').trim();
+    const deptAbbr = cleanDept ? cleanDept.slice(0, 3).toUpperCase() : 'DEPT';
+    const prefix = `${branchAbbr}-${deptAbbr}-`;
+    
+    const matchingCodes = departments
+      .map(d => d.departmentCode || d.code || '')
+      .filter(code => code && code.startsWith(prefix));
+      
+    let nextNum = 1;
+    if (matchingCodes.length > 0) {
+      const nums = matchingCodes.map(code => {
+        const suffix = code.replace(prefix, '');
+        const num = parseInt(suffix, 10);
+        return isNaN(num) ? 0 : num;
+      });
+      nextNum = Math.max(...nums) + 1;
+    }
+    const serial = String(nextNum).padStart(2, '00');
+    const generatedCode = `${prefix}${serial}`;
+    
+    setNewDeptForm(prev => ({ ...prev, code: generatedCode }));
+  }, [newDeptForm.name, newDeptForm.branch, customBranch, isEditMode, departments]);
 
   const availableTeamLeaders = useMemo(() => {
     if (!employees || employees.length === 0) return [];
@@ -100,9 +135,6 @@ const Departments = () => {
     );
   }, [employees]);
 
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editingDeptId, setEditingDeptId] = useState(null);
-
   const handleEditClick = (dept) => {
     setIsEditMode(true);
     setEditingDeptId(dept.id);
@@ -111,7 +143,6 @@ const Departments = () => {
       code: dept.departmentCode || dept.code || '',
       head: dept.head,
       branch: dept.branch,
-      budget: dept.budget,
       description: dept.description || ''
     });
     setAddDeptOpen(true);
@@ -120,67 +151,45 @@ const Departments = () => {
   const handleAddClick = () => {
     setIsEditMode(false);
     setEditingDeptId(null);
-    setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, budget: 100000, description: '' });
+    setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, description: '' });
     setAddDeptOpen(true);
   };
 
-
-  const [transferForm, setTransferForm] = useState({
-    employee: '', source: 'Sales', target: 'Engineering', reason: '', date: '2026-06-01'
-  });
-  const [exportFormState, setExportFormState] = useState({
-    report: 'Department Summary Report', format: 'PDF'
-  });
-  const [exporting, setExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-
-
-
-  // KPI Computations
-  const totalBudget = departments.reduce((acc, d) => acc + d.budget, 0);
-  const totalSpent = departments.reduce((acc, d) => acc + d.spent, 0);
-  const totalEmployees = departments.reduce((acc, d) => acc + d.employeeCount, 0);
-  const avgPerf = Math.round(departments.reduce((acc, d) => acc + d.avgPerformance, 0) / (departments.length || 1));
+  const totalEmployees = departments.reduce((acc, d) => acc + (d.employeeCount || 0), 0);
+  const avgPerf = departments.length > 0 ? Math.round(departments.reduce((acc, d) => acc + (d.avgPerformance || 0), 0) / departments.length) : 0;
   const activeDepts = departments.filter(d => d.status === 'Active').length;
   const totalTeams = teams.length;
 
   const handleApplyFilter = (d) => {
-    // Search Box filter
-    const matchesSearch =
-      d.name.toLowerCase().includes(search.toLowerCase()) ||
-      d.id.toLowerCase().includes(search.toLowerCase()) ||
-      d.head.toLowerCase().includes(search.toLowerCase()) ||
-      d.departmentCode.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = !search || 
+      d.name?.toLowerCase().includes(search.toLowerCase()) ||
+      d.id?.toLowerCase().includes(search.toLowerCase()) ||
+      d.head?.toLowerCase().includes(search.toLowerCase()) ||
+      d.departmentCode?.toLowerCase().includes(search.toLowerCase());
 
-    // Status Filter
     const matchesStatus = statusFilter === 'All' || d.status === statusFilter;
-
-    // Branch Filter
-    const matchesBranch = branchFilter === 'All' || d.branch.includes(branchFilter);
-
-    // Performance Filter
+    const matchesBranch = branchFilter === 'All' || (d.branch && d.branch.includes(branchFilter));
+    
     let matchesPerf = true;
-    if (perfFilter === 'High Performance') matchesPerf = d.avgPerformance >= 90;
-    else if (perfFilter === 'Average Performance') matchesPerf = d.avgPerformance >= 80 && d.avgPerformance < 90;
-    else if (perfFilter === 'Low Performance') matchesPerf = d.avgPerformance < 80;
+    const perf = d.avgPerformance || 0;
+    if (perfFilter === 'High Performance') matchesPerf = perf >= 90;
+    else if (perfFilter === 'Average Performance') matchesPerf = perf >= 80 && perf < 90;
+    else if (perfFilter === 'Low Performance') matchesPerf = perf < 80;
 
     return matchesSearch && matchesStatus && matchesBranch && matchesPerf;
   };
 
   const filteredDepts = departments.filter(handleApplyFilter);
 
-
-
-  // Handle Action - Add/Edit Department
   const handleAddDeptSubmit = async (e) => {
     e.preventDefault();
     if (!newDeptForm.name || !newDeptForm.code || !newDeptForm.head) {
-      addToast('error', 'Please fill in all required fields.');
+      if (addToast) addToast('error', 'Please fill in all required fields.');
       return;
     }
     const finalBranch = newDeptForm.branch === 'add_custom' ? customBranch.trim() : newDeptForm.branch;
     if (!finalBranch) {
-      addToast('error', 'Please enter a custom branch name.');
+      if (addToast) addToast('error', 'Please enter a custom branch name.');
       return;
     }
     
@@ -191,24 +200,23 @@ const Departments = () => {
       setBranchOptions([...branchOptions, finalBranch]);
     }
 
-    if (isEditMode) {
+    if (isEditMode && updateDepartment) {
       const updated = await updateDepartment(editingDeptId, {
         name: newDeptForm.name,
         departmentCode: newDeptForm.code,
         head: newDeptForm.head,
         headId: headId,
         branch: finalBranch,
-        budget: Number(newDeptForm.budget),
         description: newDeptForm.description
       });
-      if (updated) {
+      if (updated && addActivityLog) {
         await addActivityLog(`Department ${newDeptForm.name} Updated`, 'Departments', 'update');
         setAddDeptOpen(false);
-        setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, budget: 100000, description: '' });
+        setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, description: '' });
         setShowCustomBranchInput(false);
         setCustomBranch('');
       }
-    } else {
+    } else if (addDepartment) {
       const newDeptObj = {
         id: `DEPT-${Date.now().toString().slice(-4)}`,
         name: newDeptForm.name,
@@ -218,8 +226,6 @@ const Departments = () => {
         employeeCount: 0,
         activeTeams: 0,
         branch: finalBranch,
-        budget: Number(newDeptForm.budget),
-        spent: 0,
         projects: 0,
         activeProjects: 0,
         completedProjects: 0,
@@ -232,49 +238,47 @@ const Departments = () => {
         tasksInProgress: 0,
         description: newDeptForm.description,
         createdDate: new Date().toISOString().split('T')[0],
-        status: 'Active'
+        status: 'Active',
+        color: `#${Math.floor(Math.random()*16777215).toString(16)}`
       };
 
       const saved = await addDepartment(newDeptObj);
-      if (saved) {
+      if (saved && addActivityLog) {
         await addActivityLog(`New Department ${newDeptForm.name} Created`, 'Departments', 'create');
         setAddDeptOpen(false);
-        setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, budget: 100000, description: '' });
+        setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, description: '' });
         setShowCustomBranchInput(false);
         setCustomBranch('');
       }
     }
   };
 
-
-
-  // Handle Action - Transfer Employee
   const handleTransferSubmit = async (e) => {
     e.preventDefault();
     if (!transferForm.employee || !transferForm.reason) {
-      addToast('error', 'Please fill in all transfer fields.');
+      if (addToast) addToast('error', 'Please fill in all transfer fields.');
       return;
     }
-    // Update department sizes
     const sourceDept = departments.find(d => d.name === transferForm.source);
     const targetDept = departments.find(d => d.name === transferForm.target);
-    if (sourceDept) {
+    if (sourceDept && updateDepartment) {
       updateDepartment(sourceDept.id, {
-        employeeCount: Math.max(0, sourceDept.employeeCount - 1)
+        employeeCount: Math.max(0, (sourceDept.employeeCount || 0) - 1)
       });
     }
-    if (targetDept) {
+    if (targetDept && updateDepartment) {
       updateDepartment(targetDept.id, {
-        employeeCount: targetDept.employeeCount + 1
+        employeeCount: (targetDept.employeeCount || 0) + 1
       });
     }
-    await addActivityLog(`Transferred ${transferForm.employee} from ${transferForm.source} to ${transferForm.target}`, 'Departments', 'assign');
+    if (addActivityLog) {
+      await addActivityLog(`Transferred ${transferForm.employee} from ${transferForm.source} to ${transferForm.target}`, 'Departments', 'assign');
+    }
     setTransferOpen(false);
-    addToast('success', `Transfer of ${transferForm.employee} initiated successfully.`);
+    if (addToast) addToast('success', `Transfer of ${transferForm.employee} initiated successfully.`);
     setTransferForm({ employee: '', source: 'Sales', target: 'Engineering', reason: '', date: '2026-06-01' });
   };
 
-  // Handle Action - Export Reports simulation
   const handleExportSubmit = (e) => {
     e.preventDefault();
     setExporting(true);
@@ -287,7 +291,7 @@ const Departments = () => {
           setTimeout(() => {
             setExporting(false);
             setExportOpen(false);
-            addToast('success', `${exportFormState.report} exported successfully as ${exportFormState.format}.`);
+            if (addToast) addToast('success', `${exportFormState.report} exported successfully as ${exportFormState.format}.`);
           }, 400);
           return 100;
         }
@@ -296,27 +300,18 @@ const Departments = () => {
     }, 250);
   };
 
-
-
-  // Chart Data preparation
   const performanceTrendData = departments.map(d => ({
-    name: d.name,
-    Productivity: d.avgPerformance,
-    Attendance: d.attendanceRate,
-    Projects: d.activeProjects * 20
+    name: d.name || '',
+    Productivity: d.avgPerformance || 0,
+    Attendance: d.attendanceRate || 0,
+    Projects: (d.activeProjects || 0) * 20
   }));
 
   const employeeDistributionChartData = departments.map(d => ({
-    name: d.name,
-    value: d.employeeCount,
-    color: d.color
-  }));
-
-  const budgetUsageChartData = departments.map(d => ({
-    name: d.name,
-    Budget: d.budget,
-    Spent: d.spent
-  }));
+    name: d.name || '',
+    value: d.employeeCount || 0,
+    color: d.color || `#${Math.floor(Math.random()*16777215).toString(16)}`
+  })).filter(item => item.value > 0);
 
   if (isLoading) {
     return (
@@ -354,12 +349,10 @@ const Departments = () => {
           </div>
         </div>
         
-        {/* Quick Action Buttons on header */}
         <div className="dept-header-actions">
           <Button variant="primary" icon={Plus} onClick={() => handleAddClick()}>
             Add Dept
           </Button>
-
           <Button variant="secondary" icon={ArrowRight} onClick={() => setTransferOpen(true)}>
             Transfer Staff
           </Button>
@@ -396,15 +389,13 @@ const Departments = () => {
       {activeTab === 'directory' && (
         <div className="dept-tab-wrapper flex-column gap-4">
           
-          {/* Top Summary Cards */}
           <div className="dept-stats-row">
             {[
               { label: 'Total Departments', value: departments.length, icon: GitMerge, color: '#3b82f6', subtitle: 'Total configured sectors' },
               { label: 'Active Departments', value: activeDepts, icon: CheckCircle2, color: '#10b981', subtitle: 'Running operations' },
               { label: 'Total Employees', value: totalEmployees, icon: Users, color: '#06b6d4', subtitle: 'Workforce allocation' },
               { label: 'Active Teams', value: totalTeams, icon: Layers, color: '#8b5cf6', subtitle: 'Functional subgroups' },
-              { label: 'Avg Productivity', value: `${avgPerf}%`, icon: TrendingUp, color: '#ef4444', subtitle: 'Department performance' },
-              { label: 'Budget Utilization', value: `${Math.round((totalSpent / totalBudget) * 100)}%`, icon: Clock, color: '#f59e0b', subtitle: 'Financial spends rate' }
+              { label: 'Avg Productivity', value: `${avgPerf}%`, icon: TrendingUp, color: '#ef4444', subtitle: 'Department performance' }
             ].map((stat, i) => {
               const Icon = stat.icon;
               return (
@@ -485,9 +476,8 @@ const Departments = () => {
                   <th>Department Name</th>
                   <th>Department Code</th>
                   <th>Department Head</th>
-                  <th>{FIELD_LABELS.branch}</th>
+                  <th>{FIELD_LABELS?.branch || 'Branch'}</th>
                   <th>Workforce Count</th>
-                  <th>Budget Spent</th>
                   <th>Attendance Rate</th>
                   <th>Productivity Rate</th>
                   <th>Department Status</th>
@@ -498,7 +488,6 @@ const Departments = () => {
               <tbody>
                 {filteredDepts.length > 0 ? (
                   filteredDepts.map(dept => {
-                    const spentPct = Math.round((dept.spent / dept.budget) * 100);
                     return (
                       <tr key={dept.id}>
                         <td className="bold-text">{dept.id}</td>
@@ -516,36 +505,20 @@ const Departments = () => {
                           </div>
                         </td>
                         <td className="text-sm"><MapPin size={12} className="inline-icon" /> {dept.branch}</td>
-                        <td><Badge variant="neutral">{dept.employeeCount} active</Badge></td>
+                        <td><Badge variant="neutral">{dept.employeeCount || 0} active</Badge></td>
                         <td>
-                          <div className="dept-table-budget-util">
-                            <div className="flex-between text-xs mb-1">
-                              <span>${dept.spent.toLocaleString()} spent</span>
-                              <span>{spentPct}%</span>
-                            </div>
-                            <div className="dept-budget-bar-bg" style={{ height: '4px' }}>
-                              <div
-                                className="dept-budget-bar-fill"
-                                style={{ width: `${spentPct}%`, background: spentPct > 80 ? '#ef4444' : dept.color }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <Badge variant={dept.attendanceRate >= 92 ? 'success' : 'warning'}>
-                            {dept.attendanceRate}%
+                          <Badge variant={(dept.attendanceRate || 0) >= 92 ? 'success' : 'warning'}>
+                            {dept.attendanceRate || 0}%
                           </Badge>
                         </td>
                         <td>
                           <div className="flex-center gap-2">
-                            <TrendingUp size={12} style={{ color: dept.avgPerformance >= 90 ? 'var(--color-success)' : 'var(--color-warning)' }} />
-                            <span className="bold-text">{dept.avgPerformance}%</span>
+                            <TrendingUp size={12} style={{ color: (dept.avgPerformance || 0) >= 90 ? 'var(--color-success)' : 'var(--color-warning)' }} />
+                            <span className="bold-text">{dept.avgPerformance || 0}%</span>
                           </div>
                         </td>
                         <td>
-                          <Badge
-                            variant={dept.status === 'Active' ? 'success' : 'danger'}
-                          >
+                          <Badge variant={dept.status === 'Active' ? 'success' : 'danger'}>
                             {dept.status}
                           </Badge>
                         </td>
@@ -563,8 +536,10 @@ const Departments = () => {
                               title={dept.status === 'Active' ? 'Deactivate Department' : 'Activate Department'}
                               onClick={async () => {
                                 const nextStatus = dept.status === 'Active' ? 'Inactive' : 'Active';
-                                await updateDepartment(dept.id, { status: nextStatus });
-                                addToast('success', `Department status updated to ${nextStatus}`);
+                                if (updateDepartment) {
+                                  await updateDepartment(dept.id, { status: nextStatus });
+                                  if (addToast) addToast('success', `Department status updated to ${nextStatus}`);
+                                }
                               }}
                             >
                               <Power size={13} />
@@ -576,7 +551,7 @@ const Departments = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="12" className="text-center py-8 text-muted">
+                    <td colSpan="11" className="text-center py-8 text-muted">
                       No departments match the filter criteria.
                     </td>
                   </tr>
@@ -592,7 +567,6 @@ const Departments = () => {
         <div className="dept-tab-wrapper flex-column gap-5">
           <div className="dept-analytics-grid">
             
-            {/* Chart 1: Productivity & Attendance Metrics */}
             <div className="card chart-card">
               <div className="chart-header">
                 <h3 className="card-title">Department Performance Metrics</h3>
@@ -623,7 +597,6 @@ const Departments = () => {
               </div>
             </div>
 
-            {/* Chart 2: Employee Distribution */}
             <div className="card chart-card">
               <div className="chart-header">
                 <h3 className="card-title">Workforce Distribution</h3>
@@ -659,31 +632,10 @@ const Departments = () => {
                     <div key={i} className="legend-item">
                       <span className="legend-dot" style={{ background: item.color }} />
                       <span className="legend-name">{item.name}</span>
-                      <span className="legend-val">{item.value} ({Math.round((item.value / totalEmployees) * 100)}%)</span>
+                      <span className="legend-val">{item.value} ({totalEmployees > 0 ? Math.round((item.value / totalEmployees) * 100) : 0}%)</span>
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
-
-            {/* Chart 3: Financial Budget Utilization */}
-            <div className="card chart-card" style={{ gridColumn: 'span 2' }}>
-              <div className="chart-header">
-                <h3 className="card-title">Budget Allocation & Expenditures</h3>
-                <span className="chart-subtitle">Quarterly financial budget limit vs. actual spending rates by department</span>
-              </div>
-              <div className="chart-body" style={{ height: 320 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsBarChart data={budgetUsageChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={12} />
-                    <YAxis stroke="var(--text-muted)" fontSize={12} />
-                    <Tooltip contentStyle={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-color)' }} />
-                    <Legend />
-                    <Bar dataKey="Budget" fill="#334155" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Spent" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-                  </RechartsBarChart>
-                </ResponsiveContainer>
               </div>
             </div>
 
@@ -696,7 +648,6 @@ const Departments = () => {
         <div className="dept-tab-wrapper flex-column gap-4">
           <div className="card dept-toolbar">
             <h3 className="card-title">Team Directory</h3>
-
           </div>
 
           <div className="card table-responsive">
@@ -705,7 +656,7 @@ const Departments = () => {
                 <tr>
                   <th>Team ID</th>
                   <th>Team Name</th>
-                  <th>{FIELD_LABELS.teamLeader}</th>
+                  <th>{FIELD_LABELS?.teamLeader || 'Team Leader'}</th>
                   <th>Department</th>
                   <th>Employee Count</th>
                   <th>Active Projects</th>
@@ -725,8 +676,8 @@ const Departments = () => {
                       </div>
                     </td>
                     <td><Badge variant="purple">{team.department}</Badge></td>
-                    <td><Badge variant="neutral">{team.employeeCount} Members</Badge></td>
-                    <td><Badge variant="neutral">{team.activeProjects} Active</Badge></td>
+                    <td><Badge variant="neutral">{team.employeeCount || 0} Members</Badge></td>
+                    <td><Badge variant="neutral">{team.activeProjects || 0} Active</Badge></td>
                     <td>
                       <Badge variant={team.status === 'Active' ? 'success' : 'warning'}>
                         {team.status}
@@ -734,19 +685,21 @@ const Departments = () => {
                     </td>
                     <td>
                       <div className="dept-table-actions">
-                        <button className="icon-action-btn" title="View Team Performance" onClick={() => addToast('info', `Displaying ${team.name} performance metrics...`)}>
+                        <button className="icon-action-btn" title="View Team Performance" onClick={() => addToast && addToast('info', `Displaying ${team.name} performance metrics...`)}>
                           <TrendingUp size={13} />
                         </button>
-                        <button className="icon-action-btn" title="Edit Team" onClick={() => addToast('info', `Editing team ${team.name}...`)}>
+                        <button className="icon-action-btn" title="Edit Team" onClick={() => addToast && addToast('info', `Editing team ${team.name}...`)}>
                           <Edit2 size={13} />
                         </button>
                         <button
                           className={`icon-action-btn ${team.status === 'Active' ? 'text-success' : 'text-muted'}`}
                           title={team.status === 'Active' ? 'Deactivate Team' : 'Activate Team'}
                           onClick={async () => {
-                            const nextStatus = team.status === 'Active' ? 'Inactive' : 'Active';
-                            await updateTeam(team.id, { status: nextStatus });
-                            addToast('success', `Team status updated to ${nextStatus}`);
+                            if (updateTeam) {
+                              const nextStatus = team.status === 'Active' ? 'Inactive' : 'Active';
+                              await updateTeam(team.id, { status: nextStatus });
+                              if (addToast) addToast('success', `Team status updated to ${nextStatus}`);
+                            }
                           }}
                         >
                           <Power size={13} />
@@ -761,19 +714,49 @@ const Departments = () => {
         </div>
       )}
 
-
-
       {/* FOOTER NOTICE */}
       <div className="card dept-footer-section flex-center justify-between text-xs text-muted">
         <span>Total Configured Sectors: {departments.length} • Total Registered Subteams: {totalTeams}</span>
         <span>Last Updated Time: Just Now • Department Management System Active</span>
       </div>
 
-      {/* ─── ALL QUICK ACTION MODALS ────────────────────────────────────────── */}
-
       {/* MODAL 1: ADD/EDIT DEPARTMENT */}
       <Modal isOpen={addDeptOpen} onClose={() => setAddDeptOpen(false)} title={isEditMode ? "Edit Department" : "Add Department"} size="md">
         <form onSubmit={handleAddDeptSubmit} className="policy-form flex-column gap-4 py-2">
+          <div className="form-group flex-column gap-1">
+            <label htmlFor="deptBranch">Branch Location</label>
+            <select
+              id="deptBranch"
+              className="form-control"
+              value={newDeptForm.branch}
+              onChange={e => {
+                const val = e.target.value;
+                setNewDeptForm({ ...newDeptForm, branch: val });
+                setShowCustomBranchInput(val === 'add_custom');
+              }}
+            >
+              {branchOptions.map(branch => (
+                <option key={branch} value={branch}>{branch}</option>
+              ))}
+              <option value="add_custom">+ Add Custom Location...</option>
+            </select>
+          </div>
+
+          {showCustomBranchInput && (
+            <div className="form-group flex-column gap-1 animate-fade-in">
+              <label htmlFor="customBranch">Custom Branch Name *</label>
+              <input
+                id="customBranch"
+                type="text"
+                required
+                className="form-control"
+                placeholder="e.g. Bangalore Office"
+                value={customBranch}
+                onChange={e => setCustomBranch(e.target.value)}
+              />
+            </div>
+          )}
+
           <div className="form-group flex-column gap-1">
             <label htmlFor="deptName">Department Name *</label>
             <input
@@ -807,15 +790,9 @@ const Departments = () => {
               required
               className="form-control"
               value={newDeptForm.head}
-              onChange={e => {
-                const val = e.target.value;
-                setNewDeptForm({ ...newDeptForm, head: val });
-              }}
+              onChange={e => setNewDeptForm({ ...newDeptForm, head: e.target.value })}
             >
               <option value="">Select Department Head / Manager</option>
-              {newDeptForm.head && !availableTeamLeaders.some(tl => tl.name === newDeptForm.head) && (
-                <option value={newDeptForm.head}>{newDeptForm.head} (Current Head)</option>
-              )}
               {availableTeamLeaders.map(tl => (
                 <option key={tl.id} value={tl.name}>
                   {tl.name} ({tl.role || 'Team Leader'})
@@ -823,60 +800,6 @@ const Departments = () => {
               ))}
             </select>
           </div>
-
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="deptBranch">Branch Location</label>
-            <select
-              id="deptBranch"
-              className="form-control"
-              value={newDeptForm.branch}
-              onChange={e => {
-                const val = e.target.value;
-                setNewDeptForm({ ...newDeptForm, branch: val });
-                if (val === 'add_custom') {
-                  setShowCustomBranchInput(true);
-                } else {
-                  setShowCustomBranchInput(false);
-                }
-              }}
-            >
-              {newDeptForm.branch && !branchOptions.includes(newDeptForm.branch) && (
-                <option value={newDeptForm.branch}>{newDeptForm.branch} (Current Branch)</option>
-              )}
-              {branchOptions.map(branch => (
-                <option key={branch} value={branch}>{branch}</option>
-              ))}
-              <option value="add_custom">+ Add Custom Location...</option>
-            </select>
-          </div>
-
-          {showCustomBranchInput && (
-            <div className="form-group flex-column gap-1 animate-fade-in">
-              <label htmlFor="customBranch">Custom Branch Name *</label>
-              <input
-                id="customBranch"
-                type="text"
-                required
-                className="form-control"
-                placeholder="e.g. Bangalore Office"
-                value={customBranch}
-                onChange={e => setCustomBranch(e.target.value)}
-              />
-            </div>
-          )}
-
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="deptBudget">Allocated Annual Budget ($)</label>
-            <input
-              id="deptBudget"
-              type="number"
-              className="form-control"
-              value={newDeptForm.budget}
-              onChange={e => setNewDeptForm({ ...newDeptForm, budget: Number(e.target.value) })}
-            />
-          </div>
-
-          {/* Accent Color picker removed as requested */}
 
           <div className="form-group flex-column gap-1">
             <label htmlFor="deptDesc">Description</label>
@@ -897,12 +820,9 @@ const Departments = () => {
         </form>
       </Modal>
 
-
-
-      {/* MODAL 3: TRANSFER STAFF */}
+      {/* MODAL 2: TRANSFER STAFF */}
       <Modal isOpen={transferOpen} onClose={() => setTransferOpen(false)} title="Transfer Employees" size="md">
         <form onSubmit={handleTransferSubmit} className="policy-form flex-column gap-4 py-2">
-          
           <div className="form-group flex-column gap-1">
             <label htmlFor="transferEmpName">Employee Name *</label>
             <input
@@ -975,10 +895,9 @@ const Departments = () => {
         </form>
       </Modal>
 
-      {/* MODAL 4: EXPORT REPORT PROGRESS */}
+      {/* MODAL 3: EXPORT REPORT */}
       <Modal isOpen={exportOpen} onClose={() => setExportOpen(false)} title="Export Department Reports" size="sm">
         <form onSubmit={handleExportSubmit} className="policy-form flex-column gap-4 py-2">
-          
           <div className="form-group flex-column gap-1">
             <label>Select Report Target</label>
             <select
@@ -1023,7 +942,7 @@ const Departments = () => {
         </form>
       </Modal>
 
-      {/* MODAL 5: DETAILED DEPARTMENT OVERVIEW */}
+      {/* MODAL 4: DETAILED DEPARTMENT OVERVIEW */}
       {selectedDept && (
         <Modal
           isOpen={!!selectedDept}
@@ -1032,8 +951,6 @@ const Departments = () => {
           size="lg"
         >
           <div className="dept-modal-body">
-            
-            {/* Modal Head Banner */}
             <div className="dept-modal-head" style={{ borderColor: selectedDept.color }}>
               <div className="dept-modal-icon" style={{ background: `${selectedDept.color}20`, color: selectedDept.color }}>
                 <GitMerge size={28} />
@@ -1047,161 +964,37 @@ const Departments = () => {
               </div>
             </div>
 
-            {/* Description */}
-            <p className="dept-modal-desc">{selectedDept.description}</p>
+            <p className="dept-modal-desc">{selectedDept.description || 'No description provided.'}</p>
 
-            {/* Overview Stats (Tile Grid) */}
             <div className="dept-modal-stats-grid">
               <div className="dept-stat-tile">
                 <span className="dept-stat-label">Active Employees</span>
-                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.employeeCount}</span>
+                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.employeeCount || 0}</span>
               </div>
               <div className="dept-stat-tile">
                 <span className="dept-stat-label">Subteams Registered</span>
-                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.activeTeams}</span>
+                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.activeTeams || 0}</span>
               </div>
-              <Link to={`/projects?status=In Progress&department=${selectedDept.name}`} className="dept-stat-tile dept-stat-link">
+              <div className="dept-stat-tile">
                 <span className="dept-stat-label">Active Projects</span>
-                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.activeProjects}</span>
-              </Link>
+                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.activeProjects || 0}</span>
+              </div>
               <div className="dept-stat-tile">
                 <span className="dept-stat-label">Performance Rating</span>
-                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.avgPerformance}%</span>
+                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.avgPerformance || 0}%</span>
               </div>
             </div>
 
-            {/* Multi-Section Details Grid */}
-            <div className="dept-modal-detail-sections-grid">
-              
-              {/* Section A: Employees Overview */}
-              <div className="card detail-section-card flex-column gap-2">
-                <span className="section-small-title uppercase tracking-wider text-xs text-muted">Employees Overview</span>
-                <div className="flex-between text-sm py-1 border-bottom">
-                  <span>Workforce Strength</span>
-                  <span className="bold-text">{selectedDept.employeeCount} Active</span>
-                </div>
-                <div className="flex-between text-sm py-1 border-bottom">
-                  <span>Employees On Leave</span>
-                  <span className="bold-text text-warning">1 On Leave</span>
-                </div>
-                <div className="flex-between text-sm py-1">
-                  <span>WFH Filings (Monthly)</span>
-                  <span className="bold-text">{selectedDept.wfhFilings} Filings</span>
-                </div>
-              </div>
-
-              {/* Section B: Team Overview */}
-              <div className="card detail-section-card flex-column gap-2">
-                <span className="section-small-title uppercase tracking-wider text-xs text-muted">Team Structure</span>
-                <div className="flex-between text-sm py-1 border-bottom">
-                  <span>Subteams count</span>
-                  <span className="bold-text">{selectedDept.activeTeams} Teams</span>
-                </div>
-                <div className="flex-between text-sm py-1 border-bottom">
-                  <span>Team Leader Assigned</span>
-                  <span className="bold-text text-success">Yes</span>
-                </div>
-                <div className="flex-between text-sm py-1">
-                  <span>Managerial Span</span>
-                  <span className="bold-text">{Math.ceil(selectedDept.employeeCount / Math.max(1, selectedDept.activeTeams))} staff/team</span>
-                </div>
-              </div>
-
-              {/* Section C: Project Allocation */}
-              <div className="card detail-section-card flex-column gap-2">
-                <span className="section-small-title uppercase tracking-wider text-xs text-muted">Project Statistics</span>
-                <Link to={`/projects?status=In Progress&department=${selectedDept.name}`} className="flex-between text-sm py-1 border-bottom dept-stat-row-link">
-                  <span>Active Projects</span>
-                  <span className="bold-text text-primary">{selectedDept.activeProjects} In Progress</span>
-                </Link>
-                <Link to={`/projects?status=Completed&department=${selectedDept.name}`} className="flex-between text-sm py-1 border-bottom dept-stat-row-link">
-                  <span>Completed Targets</span>
-                  <span className="bold-text text-success">{selectedDept.completedProjects} Delivered</span>
-                </Link>
-                <Link to={`/projects?status=Delayed&department=${selectedDept.name}`} className="flex-between text-sm py-1 dept-stat-row-link">
-                  <span>Delayed Milestones</span>
-                  <span className="bold-text text-danger">{selectedDept.delayedProjects} Delayed</span>
-                </Link>
-              </div>
-
-              {/* Section D: Attendance Statistics */}
-              <div className="card detail-section-card flex-column gap-2">
-                <span className="section-small-title uppercase tracking-wider text-xs text-muted">Attendance Overview</span>
-                <div className="flex-between text-sm py-1 border-bottom">
-                  <span>Monthly Attendance %</span>
-                  <span className="bold-text text-success">{selectedDept.attendanceRate}%</span>
-                </div>
-                <div className="flex-between text-sm py-1 border-bottom">
-                  <span>Average Delay Rate</span>
-                  <span className="bold-text">1.2%</span>
-                </div>
-                <div className="flex-between text-sm py-1">
-                  <span>Present Ratio Today</span>
-                  <span className="bold-text">14/15 present</span>
-                </div>
-              </div>
-
-              {/* Section E: Productivity Overview */}
-              <div className="card detail-section-card flex-column gap-2" style={{ gridColumn: 'span 2' }}>
-                <span className="section-small-title uppercase tracking-wider text-xs text-muted">Productivity & Task Tracking</span>
-                <div className="dept-modal-productivity-grid">
-                  <div className="prod-meta-stat">
-                    <span>Tasks Completed</span>
-                    <strong className="text-success">{selectedDept.tasksCompleted}</strong>
-                  </div>
-                  <div className="prod-meta-stat">
-                    <span>Tasks in Progress</span>
-                    <strong className="text-primary">{selectedDept.tasksInProgress}</strong>
-                  </div>
-                  <div className="prod-meta-stat">
-                    <span>Department Rank</span>
-                    <strong>#2</strong>
-                  </div>
-                  <div className="prod-meta-stat">
-                    <span>Workflow Efficiency</span>
-                    <strong>94%</strong>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Financial Spends and Budget progress */}
-            <div className="dept-modal-budget">
-              <div className="dept-budget-header">
-                <span className="dept-stat-label">Budget Allocation and Spends ($)</span>
-                <span className="dept-budget-pct" style={{ color: Math.round((selectedDept.spent / selectedDept.budget) * 100) > 80 ? '#ef4444' : selectedDept.color }}>
-                  {Math.round((selectedDept.spent / selectedDept.budget) * 100)}% Used
-                </span>
-              </div>
-              <div className="dept-budget-bar-bg" style={{ height: '6px' }}>
-                <div
-                  className="dept-budget-bar-fill"
-                  style={{
-                    width: `${Math.round((selectedDept.spent / selectedDept.budget) * 100)}%`,
-                    background: Math.round((selectedDept.spent / selectedDept.budget) * 100) > 80 ? '#ef4444' : selectedDept.color
-                  }}
-                />
-              </div>
-              <div className="dept-budget-numbers mt-2 flex-between text-xs text-muted">
-                <span>Spent: ${selectedDept.spent.toLocaleString()}</span>
-                <span>Remaining: ${(selectedDept.budget - selectedDept.spent).toLocaleString()}</span>
-                <span>Total: ${selectedDept.budget.toLocaleString()}</span>
-              </div>
-            </div>
-
-            {/* Department Head Section */}
             <div className="dept-modal-head-section">
               <span className="dept-stat-label">Department Head Profile</span>
-              <Link to={`/employees/${selectedDept.headId}`} className="dept-head-profile">
+              <div className="dept-head-profile">
                 <Avatar name={selectedDept.head} size="md" />
                 <div className="flex-1">
                   <span className="dept-head-name">{selectedDept.head}</span>
                   <span className="dept-head-role">Authorized Manager • ID: {selectedDept.headId}</span>
                 </div>
-              </Link>
+              </div>
             </div>
-
           </div>
         </Modal>
       )}

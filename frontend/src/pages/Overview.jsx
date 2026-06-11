@@ -97,7 +97,7 @@ const Overview = () => {
   const loading = usePageLoading(600);
 
   const branches = contextBranches || [];
-  const departments = contextDepartments || [];
+  const departments = (contextDepartments || []).filter(d => d.status === 'Active');
   const alerts = notifications || [];
   const announcements = announcementsList || [];
 
@@ -790,7 +790,7 @@ const Overview = () => {
             <div className="overview-depts card">
               <div className="card-header">
                 <h3>Department Breakdown</h3>
-                <span className="card-subtitle">Headcount and annual budget allocation</span>
+                <span className="card-subtitle">Headcount breakdown</span>
               </div>
               <div className="depts-list">
                 {filteredDepts.map((dept) => {

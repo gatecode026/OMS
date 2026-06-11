@@ -19,7 +19,8 @@ import {
   CheckCheck,
   Search,
   Settings,
-  Calendar
+  Calendar,
+  ArrowRight
 } from 'lucide-react';
 
 const Topbar = ({ onMenuToggle }) => {
@@ -62,21 +63,62 @@ const Topbar = ({ onMenuToggle }) => {
     navigate('/login');
   };
 
-  const employeeNotifications = [
-    { id: 'en-1', message: 'New Task Assigned', timestamp: '10 min ago', type: 'info', read: false },
-    { id: 'en-2', message: 'Project Deadline Updated', timestamp: '1 hour ago', type: 'warning', read: false },
-    { id: 'en-3', message: 'Leave Request Approved', timestamp: '3 hours ago', type: 'success', read: false },
-    { id: 'en-4', message: 'Payroll Generated', timestamp: '1 day ago', type: 'success', read: true },
-    { id: 'en-5', message: 'Company Announcement Published', timestamp: '2 days ago', type: 'info', read: true }
-  ];
+  const isAdminRole = ['super_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
 
-  const unreadCount = currentUserRole === 'employee' 
-    ? employeeNotifications.filter(n => !n.read).length 
-    : notifications.filter(n => !n.read).length;
-    
-  const recentNotifications = currentUserRole === 'employee' 
-    ? employeeNotifications 
-    : notifications.slice(0, 5);
+  /**
+   * Simple rule:
+   *  1. recipientId set → only show to that exact user
+   *  2. recipientRole === 'employee' → only show to employees
+   *  3. recipientRole === 'admin'   → only show to admin roles
+   *  4. recipientRole === 'all' or empty → show to everyone
+   */
+  const getFilteredNotifications = () => {
+    return notifications.filter(n => {
+      const recipientId   = n.recipientId || n.targetUserId || n.forUserId;
+      const recipientRole = (n.recipientRole || n.targetRole || '').toLowerCase();
+      const msg = (n.message || n.title || '').toLowerCase();
+
+      // Rule 1 — specific user id set → show ONLY to that user
+      if (recipientId) {
+        return recipientId === currentUser?.id;
+      }
+
+      // Rule 2 — explicitly tagged as employee-only
+      if (recipientRole === 'employee') {
+        return currentUserRole === 'employee';
+      }
+
+      // Rule 3 — explicitly tagged as admin-only
+      if (recipientRole === 'admin') {
+        return isAdminRole;
+      }
+
+      // Rule 4 — no recipient tag (legacy/old notifications)
+      // If the message reads like a personal result to an employee, hide from admins
+      const isPersonalEmployeeMsg =
+        msg.startsWith('your ') ||
+        msg.includes('your leave') ||
+        msg.includes('your request') ||
+        msg.includes('your attendance') ||
+        msg.includes('has been approved') ||
+        msg.includes('has been rejected') ||
+        msg.includes('has been rejected -') ||
+        msg.includes('note: approved') ||
+        msg.includes('note: rejected');
+
+      if (isPersonalEmployeeMsg) {
+        // This is an employee-personal message — never show to admin
+        return false;
+      }
+
+      // Broadcast / general notification → show to admins by default
+      return isAdminRole;
+    }).slice(0, 5);
+  };
+
+
+  const recentNotifications = getFilteredNotifications();
+  const unreadCount = recentNotifications.filter(n => !n.read).length;
 
   const unreadMsgCount = messages.filter(m => m.unread).length;
 
@@ -135,6 +177,100 @@ const Topbar = ({ onMenuToggle }) => {
       default:
         return <Info size={16} className="text-info" />;
     }
+  };
+
+  // Maps notification message/type → route + action state for smart redirect
+  const getNotificationAction = (n) => {
+    const msg = (n.message || n.title || '').toLowerCase();
+    const cat = (n.category || '').toLowerCase();
+
+    // Leave-related → /leaves
+    if (
+      msg.includes('leave') ||
+      msg.includes('casual leave') ||
+      msg.includes('sick leave') ||
+      msg.includes('earned leave') ||
+      msg.includes('leave request') ||
+      msg.includes('leave applied') ||
+      cat.includes('leave')
+    ) {
+      return { path: '/leaves', state: { openPending: true, highlightId: n.referenceId || n.id } };
+    }
+
+    // Punch-in / Punch-out / Attendance → /attendance
+    if (
+      msg.includes('punch') ||
+      msg.includes('punched in') ||
+      msg.includes('punched out') ||
+      msg.includes('check-in') ||
+      msg.includes('check-out') ||
+      msg.includes('attendance') ||
+      cat.includes('attendance')
+    ) {
+      return { path: '/attendance', state: { highlightId: n.referenceId || n.id } };
+    }
+
+    // Payroll → /payroll
+    if (
+      msg.includes('payroll') ||
+      msg.includes('salary') ||
+      msg.includes('payslip') ||
+      msg.includes('payment') ||
+      cat.includes('payroll')
+    ) {
+      return { path: '/payroll', state: {} };
+    }
+
+    // Performance / Appraisal → /performance
+    if (
+      msg.includes('appraisal') ||
+      msg.includes('performance') ||
+      msg.includes('review') ||
+      msg.includes('kpi') ||
+      cat.includes('performance')
+    ) {
+      return { path: '/performance', state: {} };
+    }
+
+    // Task / Project → /tasks
+    if (
+      msg.includes('task') ||
+      msg.includes('project') ||
+      msg.includes('assigned') ||
+      msg.includes('deadline') ||
+      cat.includes('project')
+    ) {
+      return { path: '/tasks', state: {} };
+    }
+
+    // Employee profile / onboarding → /employees
+    if (
+      msg.includes('employee') ||
+      msg.includes('onboard') ||
+      msg.includes('profile') ||
+      cat.includes('employee')
+    ) {
+      return { path: '/employees', state: {} };
+    }
+
+    // Announcement → /announcements
+    if (
+      msg.includes('announcement') ||
+      msg.includes('company update') ||
+      cat.includes('announcement')
+    ) {
+      return { path: '/announcements', state: {} };
+    }
+
+    // Default → /notifications
+    return { path: '/notifications', state: {} };
+  };
+
+  const handleNotificationClick = (n) => {
+    markNotificationRead(n.id);
+    const action = getNotificationAction(n);
+    setNotifOpen(false);
+    navigate(action.path, { state: action.state });
   };
 
   return (
@@ -218,7 +354,11 @@ const Topbar = ({ onMenuToggle }) => {
                     </div>
                   ))
                 ) : (
-                  <div className="notif-empty">No messages.</div>
+                  <div className="notif-empty">
+                    <MessageSquare size={32} className="notif-empty-icon" />
+                    <span>No messages yet</span>
+                    <span className="notif-empty-subtitle">Your inbox is clear!</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -249,24 +389,64 @@ const Topbar = ({ onMenuToggle }) => {
 
               <div className="panel-body">
                 {recentNotifications.length > 0 ? (
-                  recentNotifications.map(n => (
-                    <div 
-                      key={n.id} 
-                      className={`notif-item ${!n.read ? 'unread' : ''}`}
-                      onClick={() => markNotificationRead(n.id)}
-                    >
-                      <div className="notif-icon-wrapper">
-                        {getNotifIcon(n.type)}
+                  recentNotifications.map(n => {
+                    const action = getNotificationAction(n);
+                    const isActionable = action.path !== '/notifications';
+                    const destLabel = action.path
+                      .replace('/', '')
+                      .replace(/-/g, ' ')
+                      .replace(/\b\w/g, c => c.toUpperCase());
+                    return (
+                      <div
+                        key={n.id}
+                        className={`notif-item ${!n.read ? 'unread' : ''}`}
+                        onClick={() => handleNotificationClick(n)}
+                        style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '10px 14px' }}
+                      >
+                        {/* Top row: icon + message + unread dot */}
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                          <div className="notif-icon-wrapper" style={{ marginTop: 2, flexShrink: 0 }}>
+                            {getNotifIcon(n.type)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p className="notif-message" style={{ margin: 0, lineHeight: 1.4 }}>{n.message}</p>
+                            <span className="notif-time" style={{ marginTop: 3, display: 'block' }}>{n.timestamp}</span>
+                          </div>
+                          {!n.read && <span className="notif-unread-dot" style={{ flexShrink: 0, marginTop: 6 }}></span>}
+                        </div>
+
+                        {/* Take Action button row */}
+                        {isActionable && (
+                          <div style={{ marginTop: 8, marginLeft: 26 }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              color: !n.read ? 'var(--color-primary)' : 'var(--text-muted)',
+                              background: !n.read ? 'var(--color-primary-light)' : 'var(--bg-elevated)',
+                              border: `1px solid ${!n.read ? 'var(--color-primary)' : 'var(--border-subtle)'}`,
+                              borderRadius: 20,
+                              padding: '3px 10px 3px 8px',
+                              letterSpacing: '0.01em',
+                              transition: 'all 0.2s',
+                              userSelect: 'none'
+                            }}>
+                              <ArrowRight size={11} />
+                              {destLabel}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      <div className="notif-content">
-                        <p className="notif-message">{n.message}</p>
-                        <span className="notif-time">{n.timestamp}</span>
-                      </div>
-                      {!n.read && <span className="notif-unread-dot"></span>}
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
-                  <div className="notif-empty">No notifications.</div>
+                  <div className="notif-empty">
+                    <Bell size={32} className="notif-empty-icon" />
+                    <span>No notifications</span>
+                    <span className="notif-empty-subtitle">You're all caught up!</span>
+                  </div>
                 )}
               </div>
 

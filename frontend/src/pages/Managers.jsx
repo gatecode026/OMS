@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useReducer, useRef } from 'react';
+import React, { useState, useMemo, useReducer, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Managers.css';
 import usePageLoading from '../hooks/usePageLoading';
@@ -118,8 +118,7 @@ function reducer(state, action) {
           endDate: proj.deadline || '2026-07-30',
           progress: proj.progress || 0,
           status: proj.status || 'In Progress',
-          clientName: proj.client || 'Internal',
-          budget: proj.budget || 10
+          clientName: proj.client || 'Internal'
         };
       });
 
@@ -409,8 +408,18 @@ const Managers = () => {
   const [rLoading,setRLoading] = useState(false);
 
   /* form */
-  const [form, setForm] = useState({ name:'',email:'',phone:'',department:'IT',branch:'Head Office',designation:'',joiningDate:'',status:'Active',successRate:90,productivity:90,clientSatisfaction:8.5 });
+  const [form, setForm] = useState({ name:'',email:'',phone:'',department:'',branch:'',designation:'',joiningDate:'',status:'Active',successRate:90,productivity:90,clientSatisfaction:8.5 });
   const [formErr, setFormErr] = useState({});
+
+  useEffect(() => {
+    if (!editingPM) {
+      setForm(f => ({
+        ...f,
+        department: departments?.[0]?.name || '',
+        branch: branches?.[0]?.name || ''
+      }));
+    }
+  }, [departments, branches, editingPM]);
 
   /* ── derived ──────────────────────────────────────────── */
   const summary = useMemo(()=>{
@@ -458,7 +467,7 @@ const Managers = () => {
     if (!selectedPM) return [];
     const matchedTasks = tasks.filter(t => 
       pmProjects.some(p => {
-        const pName = p.name.split(' ')[0].toLowerCase();
+        const pName = (p.name || '').split(' ')[0].toLowerCase();
         const tName = (t.project || t.projectName || '').toLowerCase();
         return tName.includes(pName);
       })
@@ -469,21 +478,24 @@ const Managers = () => {
     }));
   }, [selectedPM, pmProjects, tasks]);
 
+  const taskStats = useMemo(() => {
+    const assigned = pmTasks.length;
+    const completed = pmTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
+    const pending = pmTasks.filter(t => t.status !== 'Done' && t.status !== 'done').length;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const overdue = pmTasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
+    const efficiency = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
+    return { assigned, completed, pending, overdue, efficiency };
+  }, [pmTasks]);
+
   const projectTasks = useMemo(() => {
     if (!selectedProject) return [];
-    const pName = selectedProject.name.split(' ')[0].toLowerCase();
+    const pName = (selectedProject.name || '').split(' ')[0].toLowerCase();
     const matched = tasks.filter(t => (t.project || t.projectName || '').toLowerCase().includes(pName));
     return matched.length > 0 ? matched : SAMPLE_TASKS.filter(t => t.project.toLowerCase().includes(pName)).map(t => ({ ...t, project: selectedProject.name }));
   }, [selectedProject, tasks]);
 
-  const budgetSummary = useMemo(() => {
-    if (!selectedPM) return { total: 0, utilized: 0, remaining: 0, percentage: 0 };
-    const total = pmProjects.reduce((sum, p) => sum + (p.budget || 0), 0);
-    const utilized = pmProjects.reduce((sum, p) => sum + ((p.budget || 0) * (p.progress || 0)) / 100, 0);
-    const remaining = total - utilized;
-    const percentage = total > 0 ? Math.round((utilized / total) * 100) : 0;
-    return { total, utilized, remaining, percentage };
-  }, [pmProjects, selectedPM]);
+  // budgetSummary removed
 
   const teamMembersList = useMemo(() => {
     if (!selectedTL) return [];
@@ -498,7 +510,7 @@ const Managers = () => {
   /* ── Dynamic Chart Data ────────────────────────────────────────── */
   const DELIVERY_DATA = useMemo(() => {
     return pmList.map(pm => ({
-      name: pm.name.split(' ')[0],
+      name: (pm.name || '').split(' ')[0],
       delivery: pm.successRate
     }));
   }, [pmList]);
@@ -506,7 +518,7 @@ const Managers = () => {
   const RADIAL_DATA = useMemo(() => {
     const colors = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
     return teamLeaders.map((tl, i) => ({
-      name: tl.name.split(' ')[0],
+      name: (tl.name || '').split(' ')[0],
       productivity: tl.productivity,
       fill: colors[i % colors.length]
     }));
@@ -516,23 +528,16 @@ const Managers = () => {
     const totalMembers = pmList.reduce((sum, pm) => sum + pm.teamMembers, 0);
     const utilized = Math.round(totalMembers * 0.8) || 0;
     const bench = totalMembers - utilized;
+    if (utilized === 0 && bench === 0) {
+      return [{ name: 'No Capacity', value: 1, color: 'var(--bg-elevated)' }];
+    }
     return [
       { name: 'Utilized Capacity', value: utilized, color: '#3b82f6' },
       { name: 'Available Bench', value: bench, color: '#10b981' }
     ];
   }, [pmList]);
 
-  const BUDGET_DATA = useMemo(() => {
-    return projects.slice(0, 10).map(proj => {
-      const est = proj.budget || 0;
-      const act = Math.round(est * (proj.progress || 0) / 100 * 10) / 10;
-      return {
-        project: proj.name.split(' ')[0],
-        estimated: est,
-        actual: act
-      };
-    });
-  }, [projects]);
+  // BUDGET_DATA removed
 
   const DEADLINE_DATA = useMemo(() => {
     const completed = projects.filter(p => p.status === 'Completed').length;
@@ -540,15 +545,20 @@ const Managers = () => {
     const delayed = projects.filter(p => p.status === 'Delayed').length;
     const planning = projects.filter(p => p.status === 'Planning').length;
     const total = completed + inProgress + delayed + planning || 1;
+    const onTimeVal = Math.round((completed + inProgress + planning) / total * 100);
+    const delayedVal = Math.round(delayed / total * 100);
+    if (onTimeVal === 0 && delayedVal === 0) {
+      return [{ name: 'No Projects', value: 1, color: 'var(--bg-elevated)' }];
+    }
     return [
-      { name: 'On Time', value: Math.round((completed + inProgress + planning) / total * 100), color: '#10b981' },
-      { name: 'Delayed', value: Math.round(delayed / total * 100), color: '#ef4444' }
+      { name: 'On Time', value: onTimeVal, color: '#10b981' },
+      { name: 'Delayed', value: delayedVal, color: '#ef4444' }
     ];
   }, [projects]);
 
   const CSAT_DATA = useMemo(() => {
     return pmList.map(pm => ({
-      name: pm.name.split(' ')[0],
+      name: (pm.name || '').split(' ')[0],
       score: pm.clientSatisfaction || 8.5
     }));
   }, [pmList]);
@@ -579,21 +589,17 @@ const Managers = () => {
     });
   }, [taskStats]);
 
-  const taskStats = useMemo(() => {
-    const assigned = pmTasks.length;
-    const completed = pmTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
-    const pending = pmTasks.filter(t => t.status !== 'Done' && t.status !== 'done').length;
-    const todayStr = new Date().toISOString().split('T')[0];
-    const overdue = pmTasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
-    const efficiency = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
-    return { assigned, completed, pending, overdue, efficiency };
-  }, [pmTasks]);
-
   const taskPieData = useMemo(() => {
+    const completed = taskStats.completed;
+    const pending = Math.max(0, taskStats.pending - taskStats.overdue);
+    const overdue = taskStats.overdue;
+    if (completed === 0 && pending === 0 && overdue === 0) {
+      return [{ name: 'No Tasks', value: 1, color: 'var(--bg-elevated)' }];
+    }
     return [
-      { name: 'Completed', value: taskStats.completed },
-      { name: 'Pending', value: Math.max(0, taskStats.pending - taskStats.overdue) },
-      { name: 'Overdue', value: taskStats.overdue }
+      { name: 'Completed', value: completed },
+      { name: 'Pending', value: pending },
+      { name: 'Overdue', value: overdue }
     ];
   }, [taskStats]);
 
@@ -1016,24 +1022,7 @@ const Managers = () => {
                   </ResponsiveContainer>
                 </div>
               </div>
-              {/* 4 Budget Stacked */}
-              <div className="pm-chart-card">
-                <div className="pm-chart-title">Budget Management</div>
-                <div className="pm-chart-subtitle">Estimated vs Actual (Lakhs ₹)</div>
-                <div className="pm-chart-body">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={BUDGET_DATA} barSize={12}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/>
-                      <XAxis dataKey="project" stroke="var(--text-muted)" fontSize={10} tickLine={false}/>
-                      <YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false}/>
-                      <Tooltip {...TT}/>
-                      <Legend iconSize={8} wrapperStyle={{fontSize:'0.7rem',color:'var(--text-muted)'}}/>
-                      <Bar dataKey="estimated" name="Estimated" fill="#3b82f6" radius={[2,2,0,0]}/>
-                      <Bar dataKey="actual"    name="Actual"    fill="#10b981" radius={[2,2,0,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+              {/* Budget chart removed */}
               {/* 5 Deadline Pie */}
               <div className="pm-chart-card">
                 <div className="pm-chart-title">Deadline Compliance Rate</div>
@@ -1084,9 +1073,7 @@ const Managers = () => {
               </select>
               <select className="pm-filter-select" value={filters.department} onChange={e=>setFilter('department',e.target.value)}>
                 <option value="">All Departments</option>
-                {(departments && departments.length > 0 ? departments : [
-                  { name: 'IT' }, { name: 'Marketing' }, { name: 'Sales' }, { name: 'HR' }
-                ]).map(d => (
+                {(departments || []).map(d => (
                   <option key={d.id || d.name} value={d.name}>{d.name}</option>
                 ))}
               </select>
@@ -1095,9 +1082,7 @@ const Managers = () => {
               </select>
               <select className="pm-filter-select" value={filters.branch}    onChange={e=>setFilter('branch',e.target.value)}>
                 <option value="">All Branches</option>
-                {(branches && branches.length > 0 ? branches : [
-                  { name: 'Head Office' }, { name: 'Branch Office' }, { name: 'Agency' }
-                ]).map(b => (
+                {(branches || []).map(b => (
                   <option key={b.id || b.name} value={b.name}>{b.name}</option>
                 ))}
               </select>
@@ -1118,7 +1103,7 @@ const Managers = () => {
                 <table className="pm-dir-table">
                   <thead>
                     <tr>
-                      {[{c:'empId',l:'Employee ID',w:100},{c:'name',l:'Manager Name',w:180},{c:null,l:'Photo',w:60},{c:'department',l:'Department',w:120},{c:'branch',l:'Branch / Agency',w:140},{c:'designation',l:'Designation',w:160},{c:'activeProjects',l:'Active Projects',w:110},{c:null,l:'Team Leaders',w:110},{c:'teamMembers',l:'Team Members',w:110},{c:'successRate',l:'Success Rate',w:130},{c:'productivity',l:'Productivity',w:120},{c:'status',l:'Status',w:120},{c:null,l:'Actions',w:140}].map(({c,l,w})=>(
+                      {[{c:'empId',l:'Employee ID',w:100},{c:'name',l:'Manager Name',w:180},{c:'department',l:'Department',w:120},{c:'branch',l:'Branch / Agency',w:140},{c:'designation',l:'Designation',w:160},{c:'activeProjects',l:'Active Projects',w:110},{c:null,l:'Team Leaders',w:110},{c:'teamMembers',l:'Team Members',w:110},{c:'successRate',l:'Success Rate',w:130},{c:'productivity',l:'Productivity',w:120},{c:'status',l:'Status',w:120},{c:null,l:'Actions',w:140}].map(({c,l,w})=>(
                         <th key={l} style={{minWidth:w}} className={c&&sortCol===c?'sorted':''} onClick={c?()=>handleSort(c):undefined}>
                           <span style={{display:'inline-flex',alignItems:'center',gap:4}}>{l}{c&&<SI col={c}/>}</span>
                         </th>
@@ -1130,7 +1115,6 @@ const Managers = () => {
                       <tr key={pm.id} onClick={()=>dispatch({type:'SELECT_PM',pm})}>
                         <td style={{color:'var(--text-muted)',fontFamily:'monospace',fontSize:'0.8rem'}}>{pm.empId}</td>
                         <td><div className="pm-name-cell"><Avatar name={pm.name} size="sm"/><span className="pm-name-text">{pm.name}</span></div></td>
-                        <td><Avatar name={pm.name} size="sm"/></td>
                         <td>{pm.department}</td>
                         <td>{pm.branch}</td>
                         <td style={{fontSize:'0.82rem'}}>{pm.designation}</td>
@@ -1149,7 +1133,7 @@ const Managers = () => {
                         </td>
                       </tr>
                     )):(
-                      <tr><td colSpan={13}><div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'40px 0'}}><Users size={36} style={{color:'var(--text-muted)',opacity:.35}}/><span style={{color:'var(--text-muted)',fontSize:'0.875rem'}}>No project managers found</span></div></td></tr>
+                      <tr><td colSpan={12}><div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8,padding:'40px 0'}}><Users size={36} style={{color:'var(--text-muted)',opacity:.35}}/><span style={{color:'var(--text-muted)',fontSize:'0.875rem'}}>No project managers found</span></div></td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1327,7 +1311,7 @@ const Managers = () => {
             <div className="pm-detail-tabs-bar" style={{marginBottom:'var(--space-4)'}}>
               {[
                 { id: 'overview', label: 'Overview', icon: <UserCog size={15} /> },
-                { id: 'projects', label: 'Projects & Budget', icon: <Briefcase size={15} /> },
+                { id: 'projects', label: 'Projects', icon: <Briefcase size={15} /> },
                 { id: 'team', label: 'Team & Workload', icon: <Users size={15} /> },
                 { id: 'tasks', label: 'Tasks & Workflows', icon: <CheckCircle2 size={15} /> },
                 { id: 'governance', label: 'Governance & Risks', icon: <Shield size={15} /> },
@@ -1406,7 +1390,7 @@ const Managers = () => {
                     </div>
                     <div className="pm-dir-table-wrap">
                       <table className="pm-dir-table">
-                        <thead><tr><th style={{minWidth:90}}>ID</th><th style={{minWidth:180}}>Project Name</th><th style={{minWidth:140}}>Client Name</th><th style={{minWidth:130}}>Team Leader</th><th style={{minWidth:100}}>Start</th><th style={{minWidth:100}}>End</th><th style={{minWidth:100}}>Budget</th><th style={{minWidth:130}}>Progress</th><th style={{minWidth:100}}>Status</th><th>Actions</th></tr></thead>
+                        <thead><tr><th style={{minWidth:90}}>ID</th><th style={{minWidth:180}}>Project Name</th><th style={{minWidth:140}}>Client Name</th><th style={{minWidth:130}}>Team Leader</th><th style={{minWidth:100}}>Start</th><th style={{minWidth:100}}>End</th><th style={{minWidth:130}}>Progress</th><th style={{minWidth:100}}>Status</th><th>Actions</th></tr></thead>
                         <tbody>
                           {(healthFilter?pmProjects.filter(p=>p.status===healthFilter):pmProjects).map(p=>(
                             <tr key={p.id}>
@@ -1416,47 +1400,14 @@ const Managers = () => {
                               <td>{p.teamLeader}</td>
                               <td>{p.startDate}</td>
                               <td>{p.endDate}</td>
-                              <td style={{fontWeight:500,color:'var(--text-primary)'}}>₹{p.budget ? `${p.budget} L` : 'N/A'}</td>
                               <td><div style={{display:'flex',alignItems:'center',gap:8}}><div className="pm-progress-bar" style={{flex:1}}><div className="pm-progress-fill" style={{width:`${p.progress}%`,background:p.progress===100?'var(--color-success)':p.status==='Delayed'?'var(--color-danger)':'var(--color-primary)'}}/></div><span style={{fontSize:'0.78rem',color:'var(--text-muted)',minWidth:32}}>{p.progress}%</span></div></td>
                               <td><Badge variant={getProjBadge(p.status)}>{p.status}</Badge></td>
                               <td><Button variant="ghost" size="sm" onClick={() => { setSelectedProject(p); setProjectDetailOpen(true); }}>View</Button></td>
                             </tr>
                           ))}
-                          {pmProjects.length===0&&<tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--text-muted)'}}>No projects assigned to this PM.</td></tr>}
+                          {pmProjects.length===0&&<tr><td colSpan={9} style={{textAlign:'center',padding:24,color:'var(--text-muted)'}}>No projects assigned to this PM.</td></tr>}
                         </tbody>
                       </table>
-                    </div>
-                  </div>
-
-                  {/* Budget Management */}
-                  <div className="pm-section-card">
-                    <div className="pm-section-title"><TrendingUp size={16}/>Budget Management & Analysis</div>
-                    <div className="pm-proj-mini-grid" style={{marginBottom:'var(--space-4)'}}>
-                      <div className="pm-proj-mini-card">
-                        <div className="pm-proj-mini-num" style={{color:'var(--text-primary)'}}>₹{budgetSummary.total.toFixed(1)} L</div>
-                        <div className="pm-proj-mini-label">Total Budget Managed</div>
-                      </div>
-                      <div className="pm-proj-mini-card">
-                        <div className="pm-proj-mini-num" style={{color:'var(--color-success)'}}>₹{budgetSummary.utilized.toFixed(1)} L</div>
-                        <div className="pm-proj-mini-label">Budget Utilized</div>
-                      </div>
-                      <div className="pm-proj-mini-card">
-                        <div className="pm-proj-mini-num" style={{color:'var(--accent-blue-solid)'}}>₹{budgetSummary.remaining.toFixed(1)} L</div>
-                        <div className="pm-proj-mini-label">Budget Remaining</div>
-                      </div>
-                      <div className="pm-proj-mini-card">
-                        <div className="pm-proj-mini-num" style={{color:budgetSummary.percentage > 90 ? 'var(--color-danger)' : 'var(--color-primary)'}}>{budgetSummary.percentage}%</div>
-                        <div className="pm-proj-mini-label">Utilization Rate</div>
-                      </div>
-                    </div>
-                    <div className="pm-card-progress-section" style={{maxWidth:'600px'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',marginBottom: 6, fontSize:'0.82rem'}}>
-                        <span style={{fontWeight:600,color:'var(--text-secondary)'}}>Budget Consumption Progress</span>
-                        <span style={{fontWeight:700,color:'var(--color-primary)'}}>{budgetSummary.percentage}%</span>
-                      </div>
-                      <div className="pm-progress-bar" style={{height:8}}>
-                        <div className="pm-progress-fill" style={{width:`${budgetSummary.percentage}%`,background:budgetSummary.percentage > 90 ? 'var(--color-danger)' : 'var(--color-primary)'}}/>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1523,7 +1474,7 @@ const Managers = () => {
                       ))}
                     </div>
                     <div className="pm-detail-charts-row">
-                      <div className="pm-chart-card"><div className="pm-chart-title">Task Progress Breakdown</div><div className="pm-chart-body-sm"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={taskPieData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={3}>{taskPieData.map((_,i)=><Cell key={i} fill={TASK_PIE_COLORS[i]}/>)}</Pie><Tooltip {...TT}/><Legend iconSize={8} wrapperStyle={{fontSize:'0.7rem',color:'var(--text-muted)'}}/></PieChart></ResponsiveContainer></div></div>
+                      <div className="pm-chart-card"><div className="pm-chart-title">Task Progress Breakdown</div><div className="pm-chart-body-sm"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={taskPieData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={3}>{taskPieData.map((e,i)=><Cell key={i} fill={e.color || TASK_PIE_COLORS[i]}/>)}</Pie><Tooltip {...TT}/><Legend iconSize={8} wrapperStyle={{fontSize:'0.7rem',color:'var(--text-muted)'}}/></PieChart></ResponsiveContainer></div></div>
                       <div className="pm-chart-card"><div className="pm-chart-title">Completion Trends (8 Weeks)</div><div className="pm-chart-body-sm"><ResponsiveContainer width="100%" height="100%"><LineChart data={WEEKS_DATA}><CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)"/><XAxis dataKey="week" stroke="var(--text-muted)" fontSize={10} tickLine={false}/><YAxis stroke="var(--text-muted)" fontSize={10} tickLine={false}/><Tooltip {...TT}/><Legend iconSize={8} wrapperStyle={{fontSize:'0.7rem'}}/><Line type="monotone" dataKey="completed" stroke="#10b981" strokeWidth={2} dot={false} name="Completed"/><Line type="monotone" dataKey="pending" stroke="#f59e0b" strokeWidth={2} dot={false} name="Pending"/></LineChart></ResponsiveContainer></div></div>
                     </div>
                   </div>
@@ -1564,12 +1515,7 @@ const Managers = () => {
                         </div>
                         <div className="pm-proj-mini-label">Critical Milestones Overdue</div>
                       </div>
-                      <div className="pm-proj-mini-card">
-                        <div className="pm-proj-mini-num" style={{color:pmProjects.some(p=>p.status==='Delayed')?'var(--color-danger)':'var(--color-success)'}}>
-                          {pmProjects.some(p=>p.status==='Delayed') ? '₹1.8L Overrun' : '₹0.0L Overrun'}
-                        </div>
-                        <div className="pm-proj-mini-label">Budget Overruns Detected</div>
-                      </div>
+                      {/* Budget overrun card removed */}
                       <div className="pm-proj-mini-card">
                         <div className="pm-proj-mini-num" style={{color:'var(--accent-blue-solid)'}}>
                           {selectedPM.teamMembers > 200 ? 'High Capacity' : 'Optimal Capacity'}
@@ -1674,32 +1620,7 @@ const Managers = () => {
                         </div>}
                       </div>
 
-                      {/* Budget Hike */}
-                      <div className="pm-approval-panel">
-                        <div className="pm-approval-header" onClick={()=>setExpandedApp(p=>({...p,GovBud:!p.GovBud}))}>
-                          <div className="pm-approval-header-left"><TrendingUp size={14} style={{color:'var(--color-success)'}}/>Budget Hike Requests<Badge variant="info">1</Badge></div>
-                          {expandedApp.GovBud?<ChevronUp size={16} style={{color:'var(--text-muted)'}}/>:<ChevronDown size={16} style={{color:'var(--text-muted)'}}/>}
-                        </div>
-                        {expandedApp.GovBud&&<div className="pm-approval-body">
-                          <div className="pm-approval-item">
-                            <div style={{flex:1}}>
-                              <div className="pm-approval-desc"><strong>[Mobile App Redesign]</strong> Additional ₹3.0 Lakhs requested for AWS GPU dev instances and third-party UI framework licensing.</div>
-                              <div className="pm-approval-meta">Submitted by Sneha Patel (TL) · 3 hours ago</div>
-                            </div>
-                            <div className="pm-approval-actions">
-                              <Button variant="primary" size="sm" onClick={()=>{
-                                dispatch({
-                                  type: 'ADD_ACTIVITY',
-                                  entry: mkActivity('Approved ₹3.0L budget hike for Mobile App Redesign', 'Admin')
-                                });
-                                addToast('success','Budget hike of ₹3.0L approved.');
-                                setExpandedApp(p=>({...p,GovBud:false}));
-                              }}>Approve Hike</Button>
-                              <Button variant="danger" size="sm" onClick={()=>{addToast('danger','Budget hike request rejected.');}}>Reject</Button>
-                            </div>
-                          </div>
-                        </div>}
-                      </div>
+
                     </div>
                   </div>
 
@@ -1752,8 +1673,22 @@ const Managers = () => {
           <div className="pm-form-group"><label htmlFor="f-name" className="pm-form-label">Full Name *</label><input id="f-name" type="text" placeholder="e.g. Rahul Sharma" className={formErr.name?'pm-form-input-err':''} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>{formErr.name&&<span className="pm-form-err-text">{formErr.name}</span>}</div>
           <div className="pm-form-group"><label htmlFor="f-phone" className="pm-form-label">Contact Number *</label><input id="f-phone" type="tel" placeholder="+91-9876543210" className={formErr.phone?'pm-form-input-err':''} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))}/>{formErr.phone&&<span className="pm-form-err-text">{formErr.phone}</span>}</div>
           <div className="pm-form-group"><label htmlFor="f-email" className="pm-form-label">Official Email *</label><input id="f-email" type="email" placeholder="name@enterprise.com" className={formErr.email?'pm-form-input-err':''} value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/>{formErr.email&&<span className="pm-form-err-text">{formErr.email}</span>}</div>
-          <div className="pm-form-group"><label htmlFor="f-dept" className="pm-form-label">Department</label><select id="f-dept" value={form.department} onChange={e=>setForm(f=>({...f,department:e.target.value}))}><option>IT</option><option>Marketing</option><option>Sales</option><option>HR</option></select></div>
-          <div className="pm-form-group"><label htmlFor="f-branch" className="pm-form-label">Branch / Agency</label><select id="f-branch" value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))}><option>Head Office</option><option>Branch Office</option><option>Agency</option></select></div>
+          <div className="pm-form-group">
+            <label htmlFor="f-dept" className="pm-form-label">Department</label>
+            <select id="f-dept" value={form.department} onChange={e=>setForm(f=>({...f,department:e.target.value}))}>
+              {(departments || []).map(d => (
+                <option key={d.id || d.name} value={d.name}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="pm-form-group">
+            <label htmlFor="f-branch" className="pm-form-label">Branch / Agency</label>
+            <select id="f-branch" value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))}>
+              {(branches || []).map(b => (
+                <option key={b.id || b.name} value={b.name}>{b.name}</option>
+              ))}
+            </select>
+          </div>
           <div className="pm-form-group"><label htmlFor="f-desig" className="pm-form-label">Designation *</label><input id="f-desig" type="text" placeholder="e.g. Senior Manager" className={formErr.designation?'pm-form-input-err':''} value={form.designation} onChange={e=>setForm(f=>({...f,designation:e.target.value}))}/>{formErr.designation&&<span className="pm-form-err-text">{formErr.designation}</span>}</div>
           <div className="pm-form-group"><label htmlFor="f-join" className="pm-form-label">Joining Date</label><input id="f-join" type="date" value={form.joiningDate} onChange={e=>setForm(f=>({...f,joiningDate:e.target.value}))}/></div>
           <div className="pm-form-group"><label htmlFor="f-status" className="pm-form-label">Status</label><select id="f-status" value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option>Active</option><option>On Leave</option><option>Training</option><option>Inactive</option><option>Suspended</option></select></div>
@@ -1829,7 +1764,7 @@ const Managers = () => {
       <Modal isOpen={reportOpen} onClose={()=>setReportOpen(false)} title="Generate Report" size="md"
         footer={<div style={{display:'flex',justifyContent:'flex-end',gap:8,width:'100%'}}><Button variant="ghost" onClick={()=>setReportOpen(false)}>Cancel</Button><Button variant="primary" icon={Download} loading={rLoading} onClick={generateReport}>{rLoading?'Generating...':'Generate & Download'}</Button></div>}>
         <div style={{display:'flex',flexDirection:'column',gap:'var(--space-4)'}}>
-          <div className="pm-form-group"><label htmlFor="rpt-type" className="pm-form-label">Report Type</label><select id="rpt-type" value={rType} onChange={e=>setRType(e.target.value)}><optgroup label="PM Reports"><option>Manager Performance Report</option><option>Project Delivery Report</option><option>Budget Utilization Report</option></optgroup><optgroup label="Project Reports"><option>Project Progress Report</option><option>Milestone Report</option><option>Resource Utilization Report</option></optgroup><optgroup label="Team Reports"><option>Team Performance Report</option><option>Productivity Report</option></optgroup></select></div>
+          <div className="pm-form-group"><label htmlFor="rpt-type" className="pm-form-label">Report Type</label><select id="rpt-type" value={rType} onChange={e=>setRType(e.target.value)}><optgroup label="PM Reports"><option>Manager Performance Report</option><option>Project Delivery Report</option></optgroup><optgroup label="Project Reports"><option>Project Progress Report</option><option>Milestone Report</option><option>Resource Utilization Report</option></optgroup><optgroup label="Team Reports"><option>Team Performance Report</option><option>Productivity Report</option></optgroup></select></div>
           <div><label className="pm-form-label">Export Format</label><div style={{display:'flex',gap:'var(--space-3)',marginTop:8}}>{['PDF','Excel','CSV'].map(fmt=><label key={fmt} style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:'0.875rem',color:'var(--text-secondary)'}}><input type="radio" name="rpt-fmt" value={fmt} checked={rFmt===fmt} onChange={()=>setRFmt(fmt)} style={{width:'auto'}}/>{fmt}</label>)}</div></div>
           <div style={{background:'var(--bg-elevated)',borderRadius:'var(--radius-md)',padding:'var(--space-4)',fontSize:'0.82rem',color:'var(--text-muted)'}}>📄 <strong style={{color:'var(--text-primary)'}}>{rType}</strong> will be generated as <strong style={{color:'var(--text-primary)'}}>{rFmt}</strong> and downloaded automatically.</div>
         </div>
@@ -2004,10 +1939,6 @@ const Managers = () => {
             </div>
 
             <div className="pm-proj-popup-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 16, margin: '20px 0', background: 'var(--bg-elevated)', padding: 16, borderRadius: 'var(--radius-md)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Budget</span>
-                <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-primary)' }}>₹{selectedProject.budget || 0} Lakhs</span>
-              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>Team Leader</span>
                 <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedProject.teamLeader}</span>
