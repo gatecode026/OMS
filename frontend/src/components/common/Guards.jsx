@@ -35,46 +35,43 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
   if (allowedRoles.length > 0) {
     isAuthorized = allowedRoles.includes(currentUserRole);
   } else {
-    // Dynamic resolution based on URL path
-    const requiredRole = getRequiredRoleForPath(location.pathname);
-    isAuthorized = hasRoleAccess(currentUserRole, requiredRole);
+    const pathParts = location.pathname.split('/').filter(Boolean);
+    let moduleKey = null;
 
-    // Apply real-time database matrix permission checks
-    if (isAuthorized) {
-      const pathParts = location.pathname.split('/').filter(Boolean);
-      let moduleKey = null;
-
-      if (PATH_TO_MODULE[location.pathname]) {
-        moduleKey = PATH_TO_MODULE[location.pathname];
-      } else {
-        // Parametric path match
-        for (const route of Object.keys(PATH_TO_MODULE)) {
-          const routeParts = route.split('/').filter(Boolean);
-          if (routeParts.length !== pathParts.length) continue;
-          
-          let match = true;
-          for (let i = 0; i < routeParts.length; i++) {
-            if (routeParts[i].startsWith(':')) continue;
-            if (routeParts[i] !== pathParts[i]) {
-              match = false;
-              break;
-            }
-          }
-          if (match) {
-            moduleKey = PATH_TO_MODULE[route];
+    if (PATH_TO_MODULE[location.pathname]) {
+      moduleKey = PATH_TO_MODULE[location.pathname];
+    } else {
+      // Parametric path match
+      for (const route of Object.keys(PATH_TO_MODULE)) {
+        const routeParts = route.split('/').filter(Boolean);
+        if (routeParts.length !== pathParts.length) continue;
+        
+        let match = true;
+        for (let i = 0; i < routeParts.length; i++) {
+          if (routeParts[i].startsWith(':')) continue;
+          if (routeParts[i] !== pathParts[i]) {
+            match = false;
             break;
           }
         }
+        if (match) {
+          moduleKey = PATH_TO_MODULE[route];
+          break;
+        }
       }
+    }
 
-      if (moduleKey) {
-        isAuthorized = hasPermission(moduleKey, 'read');
-      }
+    if (moduleKey) {
+      // If granular matrix maps to this path, the database permissions matrix takes precedence.
+      isAuthorized = hasPermission(moduleKey, 'read');
+    } else {
+      // Fallback: Resolve required role and use hierarchy check if no granular module maps to this route
+      const requiredRole = getRequiredRoleForPath(location.pathname);
+      isAuthorized = hasRoleAccess(currentUserRole, requiredRole);
     }
 
     // Dynamic checks for specific resource endpoints (e.g., self-service or team visibility)
     if (!isAuthorized && currentUser) {
-      const pathParts = location.pathname.split('/').filter(Boolean);
       // Check if accessing '/employees/:id'
       if (pathParts.length === 2 && pathParts[0] === 'employees') {
         const targetEmployeeId = pathParts[1];

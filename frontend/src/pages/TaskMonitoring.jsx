@@ -42,7 +42,8 @@ const TaskMonitoring = () => {
     getWorkloadDistribution,
     showConfirm,
     addToast,
-    projectsList
+    projectsList,
+    hasPermission
   } = useApp();
 
   const scopedEmployees = useMemo(() => {
@@ -477,7 +478,7 @@ const TaskMonitoring = () => {
         </div>
         <div className="flex-center gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => setIsExportOpen(true)} icon={Download}>Export Report</Button>
-          {currentUserRole !== 'employee' && (
+          {hasPermission('task_monitoring', 'create') && (
             <Button variant="primary" onClick={() => setIsCreateOpen(true)} icon={Plus}>Create Task</Button>
           )}
         </div>
@@ -946,7 +947,7 @@ const TaskMonitoring = () => {
                             <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
                           </td>
                           <td>
-                            {currentUserRole !== 'employee' ? (
+                            {hasPermission('task_monitoring', 'update') ? (
                               <div className="flex-center gap-1">
                                 <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsReassignOpen(true); }}>Reassign</Button>
                                 <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsDeadlineOpen(true); }}>Extend</Button>
@@ -1176,8 +1177,8 @@ const TaskMonitoring = () => {
                         {app.status === 'Pending' && (
                           currentUserRole === 'super_admin' ||
                           (app.level === 1 && (currentUser?.id === selectedTask.assigneeId || currentUser?.name === app.approver)) ||
-                          (app.level === 2 && (currentUserRole === 'team_leader' || currentUser?.name === app.approver)) ||
-                          (app.level === 3 && (currentUserRole === 'manager' || currentUserRole === 'branch_admin' || currentUser?.name === app.approver)) ||
+                          (app.level === 2 && (hasPermission('task_monitoring', 'approve') || currentUser?.name === app.approver)) ||
+                          (app.level === 3 && (hasPermission('task_monitoring', 'approve') || currentUser?.name === app.approver)) ||
                           (app.level === 4 && currentUserRole === 'super_admin')
                         ) && (
                           <div className="flex-center gap-1">
@@ -1244,7 +1245,7 @@ const TaskMonitoring = () => {
 
             <div className="slide-over-footer flex-row justify-between">
               <Button variant="secondary" onClick={() => setIsDetailOpen(false)}>Close</Button>
-              {currentUserRole !== 'employee' && (
+              {hasPermission('task_monitoring', 'delete') && (
                 <Button variant="danger" onClick={() => {
                   showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, async () => {
                     await deleteTask(selectedTask.id);

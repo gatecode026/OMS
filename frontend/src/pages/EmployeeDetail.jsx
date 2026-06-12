@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import './EmployeeDetail.css';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, normalizeEmployee } from '../context/AppContext';
 import Avatar from '../components/common/Avatar';
 import Button from '../components/common/Button';
 import {
@@ -207,9 +207,28 @@ const EmployeeDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee } = useApp();
+  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee, token } = useApp();
 
-  const emp = useMemo(() => employees.find(e => e.id === id), [employees, id]);
+  const [fullEmp, setFullEmp] = useState(null);
+
+  useEffect(() => {
+    if (!id || !token) return;
+    fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(res => res.json())
+      .then(result => {
+        if (result.status === 'success' && result.data) {
+          setFullEmp(normalizeEmployee(result.data));
+        }
+      })
+      .catch(err => console.error('Failed to fetch full employee details:', err));
+  }, [id, token]);
+
+  const empFromContext = useMemo(() => employees.find(e => e.id === id), [employees, id]);
+  const emp = fullEmp || empFromContext;
 
   const activeTab = new URLSearchParams(location.search).get('tab') || 'personal';
 
@@ -217,7 +236,7 @@ const EmployeeDetail = () => {
   const [showIdCard, setShowIdCard] = useState(false);
   const idCardRef = useRef(null);
   
-  if (!emp) return (
+  if (!empFromContext) return (
     <div className="ed-not-found">
       <p>Employee not found.</p>
       <Button variant="secondary" onClick={() => navigate('/employees')} icon={ArrowLeft}>Back to Directory</Button>

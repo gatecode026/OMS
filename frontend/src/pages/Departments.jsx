@@ -35,7 +35,8 @@ const Departments = () => {
     teams: contextTeams = [],
     deleteTeam,
     updateTeam,
-    addActivityLog
+    addActivityLog,
+    hasPermission
   } = useApp() || {};
 
   // Tab State
@@ -350,15 +351,21 @@ const Departments = () => {
         </div>
         
         <div className="dept-header-actions">
-          <Button variant="primary" icon={Plus} onClick={() => handleAddClick()}>
-            Add Dept
-          </Button>
-          <Button variant="secondary" icon={ArrowRight} onClick={() => setTransferOpen(true)}>
-            Transfer Staff
-          </Button>
-          <Button variant="ghost" icon={Download} onClick={() => setExportOpen(true)}>
-            Export Reports
-          </Button>
+          {hasPermission('department_management', 'create') && (
+            <Button variant="primary" icon={Plus} onClick={() => handleAddClick()}>
+              Add Dept
+            </Button>
+          )}
+          {hasPermission('department_management', 'update') && (
+            <Button variant="secondary" icon={ArrowRight} onClick={() => setTransferOpen(true)}>
+              Transfer Staff
+            </Button>
+          )}
+          {hasPermission('department_management', 'export') && (
+            <Button variant="ghost" icon={Download} onClick={() => setExportOpen(true)}>
+              Export Reports
+            </Button>
+          )}
         </div>
       </div>
 
@@ -528,22 +535,26 @@ const Departments = () => {
                             <button className="icon-action-btn" title="View Details" onClick={() => setSelectedDept(dept)}>
                               <Eye size={13} />
                             </button>
-                            <button className="icon-action-btn" title="Edit" onClick={() => handleEditClick(dept)}>
-                              <Edit2 size={13} />
-                            </button>
-                            <button
-                              className={`icon-action-btn ${dept.status === 'Active' ? 'text-success' : 'text-muted'}`}
-                              title={dept.status === 'Active' ? 'Deactivate Department' : 'Activate Department'}
-                              onClick={async () => {
-                                const nextStatus = dept.status === 'Active' ? 'Inactive' : 'Active';
-                                if (updateDepartment) {
-                                  await updateDepartment(dept.id, { status: nextStatus });
-                                  if (addToast) addToast('success', `Department status updated to ${nextStatus}`);
-                                }
-                              }}
-                            >
-                              <Power size={13} />
-                            </button>
+                            {hasPermission('department_management', 'update') && (
+                              <button className="icon-action-btn" title="Edit" onClick={() => handleEditClick(dept)}>
+                                <Edit2 size={13} />
+                              </button>
+                            )}
+                            {hasPermission('department_management', 'delete') && (
+                              <button
+                                className={`icon-action-btn ${dept.status === 'Active' ? 'text-success' : 'text-muted'}`}
+                                title={dept.status === 'Active' ? 'Deactivate Department' : 'Activate Department'}
+                                onClick={async () => {
+                                  const nextStatus = dept.status === 'Active' ? 'Inactive' : 'Active';
+                                  if (updateDepartment) {
+                                    await updateDepartment(dept.id, { status: nextStatus });
+                                    if (addToast) addToast('success', `Department status updated to ${nextStatus}`);
+                                  }
+                                }}
+                              >
+                                <Power size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -688,22 +699,26 @@ const Departments = () => {
                         <button className="icon-action-btn" title="View Team Performance" onClick={() => addToast && addToast('info', `Displaying ${team.name} performance metrics...`)}>
                           <TrendingUp size={13} />
                         </button>
-                        <button className="icon-action-btn" title="Edit Team" onClick={() => addToast && addToast('info', `Editing team ${team.name}...`)}>
-                          <Edit2 size={13} />
-                        </button>
-                        <button
-                          className={`icon-action-btn ${team.status === 'Active' ? 'text-success' : 'text-muted'}`}
-                          title={team.status === 'Active' ? 'Deactivate Team' : 'Activate Team'}
-                          onClick={async () => {
-                            if (updateTeam) {
-                              const nextStatus = team.status === 'Active' ? 'Inactive' : 'Active';
-                              await updateTeam(team.id, { status: nextStatus });
-                              if (addToast) addToast('success', `Team status updated to ${nextStatus}`);
-                            }
-                          }}
-                        >
-                          <Power size={13} />
-                        </button>
+                        {hasPermission('team_management', 'update') && (
+                          <button className="icon-action-btn" title="Edit Team" onClick={() => addToast && addToast('info', `Editing team ${team.name}...`)}>
+                            <Edit2 size={13} />
+                          </button>
+                        )}
+                        {hasPermission('team_management', 'delete') && (
+                          <button
+                            className={`icon-action-btn ${team.status === 'Active' ? 'text-success' : 'text-muted'}`}
+                            title={team.status === 'Active' ? 'Deactivate Team' : 'Activate Team'}
+                            onClick={async () => {
+                              if (updateTeam) {
+                                const nextStatus = team.status === 'Active' ? 'Inactive' : 'Active';
+                                await updateTeam(team.id, { status: nextStatus });
+                                if (addToast) addToast('success', `Team status updated to ${nextStatus}`);
+                              }
+                            }}
+                          >
+                            <Power size={13} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

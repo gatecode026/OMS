@@ -31,7 +31,7 @@ const initialActivities = [];
 const Teams = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(600);
-  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments: rawDepartments, addTeam, updateTeam, deleteTeam, projectsList } = useApp();
+  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments: rawDepartments, addTeam, updateTeam, deleteTeam, projectsList, hasPermission } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // Recharts Chart Data (Dynamic useMemos)
@@ -675,9 +675,11 @@ Active Teams Mapped: ${teams.length}
           <Button variant="secondary" onClick={() => addToast('info', 'Refreshing dashboard data...')} size="sm">
             Refresh
           </Button>
-          <Button variant="primary" onClick={() => setCreateModalOpen(true)} icon={Plus} size="sm">
-            Create Team
-          </Button>
+          {hasPermission('team_management', 'create') && (
+            <Button variant="primary" onClick={() => setCreateModalOpen(true)} icon={Plus} size="sm">
+              Create Team
+            </Button>
+          )}
         </div>
       </div>
 
@@ -885,23 +887,27 @@ Active Teams Mapped: ${teams.length}
                               <button className="icon-action-btn" title="View details" onClick={() => handleRowClick(t)}>
                                 <Eye size={13} />
                               </button>
-                              <button className="icon-action-btn" title="Edit team" onClick={() => addToast('info', `Editing ${t.name}...`)}>
-                                <Edit2 size={13} />
-                              </button>
-                              <button
-                                className="icon-action-btn icon-action-danger"
-                                title="Disband team"
-                                onClick={() => showConfirm(
-                                  'Disband Team',
-                                  `Are you sure you want to disband ${t.name}?`,
-                                  () => {
-                                    deleteTeam(t.id);
-                                  },
-                                  'danger'
-                                )}
-                              >
-                                <Trash2 size={13} />
-                              </button>
+                              {hasPermission('team_management', 'update') && (
+                                <button className="icon-action-btn" title="Edit team" onClick={() => addToast('info', `Editing ${t.name}...`)}>
+                                  <Edit2 size={13} />
+                                </button>
+                              )}
+                              {hasPermission('team_management', 'delete') && (
+                                <button
+                                  className="icon-action-btn icon-action-danger"
+                                  title="Disband team"
+                                  onClick={() => showConfirm(
+                                    'Disband Team',
+                                    `Are you sure you want to disband ${t.name}?`,
+                                    () => {
+                                      deleteTeam(t.id);
+                                    },
+                                    'danger'
+                                  )}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1182,31 +1188,33 @@ Active Teams Mapped: ${teams.length}
                   <span>Quick Actions Grid</span>
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <Button variant="primary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => setCreateModalOpen(true)}>Create Team</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAssignLeaderForm({ teamId: '', employeeId: '' }); setShowAssignLeaderModal(true); }}>Assign Leader</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAddMembersForm({ teamId: '', employeeId: '' }); setShowAddMembersModal(true); }}>Add Members</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setTransferForm({ employeeId: '', fromTeamId: '', toTeamId: '' }); setShowTransferEmployeesModal(true); }}>Transfer Staff</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAllocateProjectForm({ teamId: '', projectName: '', description: '', priority: 'Medium', dueDate: '' }); setShowAllocateProjectModal(true); }}>Allocate Project</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setExportFormState({ format: exportFormat, type: 'Teams Directory', includeInactive: false }); setShowExportModal(true); }}>Export Registry</Button>
-                  <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem', gridColumn: 'span 2' }} onClick={() => { setReportFormState({ type: 'Performance Summary', dateRange: 'Last 7 Days', targetDepartment: 'All' }); setShowReportModal(true); }}>Generate Analytics Reports</Button>
+                  {hasPermission('team_management', 'create') && <Button variant="primary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => setCreateModalOpen(true)}>Create Team</Button>}
+                  {hasPermission('team_management', 'update') && <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAssignLeaderForm({ teamId: '', employeeId: '' }); setShowAssignLeaderModal(true); }}>Assign Leader</Button>}
+                  {hasPermission('team_management', 'update') && <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAddMembersForm({ teamId: '', employeeId: '' }); setShowAddMembersModal(true); }}>Add Members</Button>}
+                  {hasPermission('team_management', 'update') && <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setTransferForm({ employeeId: '', fromTeamId: '', toTeamId: '' }); setShowTransferEmployeesModal(true); }}>Transfer Staff</Button>}
+                  {hasPermission('team_management', 'update') && <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setAllocateProjectForm({ teamId: '', projectName: '', description: '', priority: 'Medium', dueDate: '' }); setShowAllocateProjectModal(true); }}>Allocate Project</Button>}
+                  {hasPermission('team_management', 'export') && <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem' }} onClick={() => { setExportFormState({ format: exportFormat, type: 'Teams Registry', includeInactive: false }); setShowExportModal(true); }}>Export Registry</Button>}
+                  {hasPermission('team_management', 'export') && <Button variant="secondary" style={{ padding: '8px 4px', fontSize: '0.75rem', gridColumn: 'span 2' }} onClick={() => { setReportFormState({ type: 'Performance Summary', dateRange: 'Last 7 Days', targetDepartment: 'All' }); setShowReportModal(true); }}>Generate Analytics Reports</Button>}
                 </div>
               </div>
 
               {/* SECTION 5 — TEAM MEMBER MANAGEMENT */}
-              <div className="teams-card">
-                <h3 className="teams-card-title" style={{ marginBottom: 16 }}>
-                  <Shield size={16} style={{ color: '#ef4444' }} />
-                  <span>Super Admin Actions</span>
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAddMembersForm({ teamId: '', employeeId: '' }); setShowAddMembersModal(true); }}>➕ Add Team Members</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setRemoveMembersForm({ teamId: '', employeeId: '' }); setShowRemoveMembersModal(true); }}>➖ Remove Team Members</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setTransferForm({ employeeId: '', fromTeamId: '', toTeamId: '' }); setShowTransferEmployeesModal(true); }}>🔄 Transfer Employees</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAssignLeaderForm({ teamId: '', employeeId: '' }); setShowAssignLeaderModal(true); }}>👤 Assign Team Leader</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setChangeManagerForm({ employeeId: '', managerName: '' }); setShowChangeManagerModal(true); }}>🔁 Change Reporting Manager</button>
-                  <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAllocateProjectForm({ teamId: '', projectName: '', description: '', priority: 'Medium', dueDate: '' }); setShowAllocateProjectModal(true); }}>📁 Allocate Projects</button>
+              {hasPermission('team_management', 'update') && (
+                <div className="teams-card">
+                  <h3 className="teams-card-title" style={{ marginBottom: 16 }}>
+                    <Shield size={16} style={{ color: '#ef4444' }} />
+                    <span>Super Admin Actions</span>
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAddMembersForm({ teamId: '', employeeId: '' }); setShowAddMembersModal(true); }}>➕ Add Team Members</button>
+                    <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setRemoveMembersForm({ teamId: '', employeeId: '' }); setShowRemoveMembersModal(true); }}>➖ Remove Team Members</button>
+                    <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setTransferForm({ employeeId: '', fromTeamId: '', toTeamId: '' }); setShowTransferEmployeesModal(true); }}>🔄 Transfer Employees</button>
+                    <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAssignLeaderForm({ teamId: '', employeeId: '' }); setShowAssignLeaderModal(true); }}>👤 Assign Team Leader</button>
+                    <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setChangeManagerForm({ employeeId: '', managerName: '' }); setShowChangeManagerModal(true); }}>🔁 Change Reporting Manager</button>
+                    <button className="teams-export-btn" style={{ justifyContent: 'center' }} onClick={() => { setAllocateProjectForm({ teamId: '', projectName: '', description: '', priority: 'Medium', dueDate: '' }); setShowAllocateProjectModal(true); }}>📁 Allocate Projects</button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* SECTION 6 — TEAM LEADER MANAGEMENT */}
               <div className="teams-card">
@@ -1228,10 +1236,12 @@ Active Teams Mapped: ${teams.length}
                     <div><strong>Experience:</strong> {displayedLeader?.exp || '—'}</div>
                     <div><strong>Performance Score:</strong> <span className="text-success bold-text">{displayedLeader?.score ? `${displayedLeader.score}%` : '—'}</span></div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                    <Button variant="secondary" size="sm" onClick={() => { setAssignLeaderForm({ teamId: displayedLeader?.teamId || '', employeeId: '' }); setShowAssignLeaderModal(true); }}>Change Lead</Button>
-                    <Button variant="secondary" size="sm" onClick={() => navigate('/permissions')}>Permissions</Button>
-                  </div>
+                  {hasPermission('team_management', 'update') && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      <Button variant="secondary" size="sm" onClick={() => { setAssignLeaderForm({ teamId: displayedLeader?.teamId || '', employeeId: '' }); setShowAssignLeaderModal(true); }}>Change Lead</Button>
+                      <Button variant="secondary" size="sm" onClick={() => navigate('/permissions')}>Permissions</Button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1343,11 +1353,13 @@ Active Teams Mapped: ${teams.length}
                       </button>
                     ))}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 4 }}>
-                    <Button variant="secondary" size="sm" onClick={() => handleExport(exportFormat)}>📄 Team Performance Summary</Button>
-                    <Button variant="secondary" size="sm" onClick={() => handleExport(exportFormat)}>📄 Employee Workload Audit</Button>
-                    <Button variant="secondary" size="sm" onClick={() => handleExport(exportFormat)}>📄 Roster Attendance Analytics</Button>
-                  </div>
+                  {hasPermission('team_management', 'export') && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 4 }}>
+                      <Button variant="secondary" size="sm" onClick={() => handleExport(exportFormat)}>📄 Team Performance Summary</Button>
+                      <Button variant="secondary" size="sm" onClick={() => handleExport(exportFormat)}>📄 Employee Workload Audit</Button>
+                      <Button variant="secondary" size="sm" onClick={() => handleExport(exportFormat)}>📄 Roster Attendance Analytics</Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

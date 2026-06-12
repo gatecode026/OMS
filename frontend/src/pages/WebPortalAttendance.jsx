@@ -159,7 +159,8 @@ const WebPortalAttendance = () => {
     updateAttendanceRecord,
     addAttendanceRecord,
     deleteAttendanceRecord,
-    addToast
+    addToast,
+    attendanceRules
   } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
@@ -433,10 +434,11 @@ const WebPortalAttendance = () => {
     const totalEmployees = employees.length;
     const completionRate = totalEmployees > 0 ? Math.min(100, Math.round((webPortalToday / totalEmployees) * 100)) : 0;
 
+    const lateThresholdMins = timeToMinutes(attendanceRules?.lateTimeThreshold || '09:15');
     const onTimeCount = todayRecords.filter(a => {
       if (!a.punchIn) return false;
       const mins = timeToMinutes(a.punchIn);
-      return mins !== null && mins <= 555; // 09:15 AM is 555 minutes
+      return mins !== null && mins <= lateThresholdMins;
     }).length;
 
     return {

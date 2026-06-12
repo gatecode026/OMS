@@ -42,7 +42,7 @@ export const createRecord = async (data, currentUser) => {
 
   // Initialize tracking logs for all active employees
   try {
-    const employees = await Employee.find({ status: 'Active' });
+    const employees = await Employee.find({ status: 'Active' }).select('id name department').lean();
     for (const emp of employees) {
       await repository.saveTrackingLog({
         announcementId: record.id,
@@ -112,7 +112,7 @@ export const acknowledgeNotice = async (id, employeeId, currentUser) => {
   }
 
   let department = 'Operations';
-  const emp = await Employee.findOne({ id: employeeId });
+  const emp = await Employee.findOne({ id: employeeId }).select('id department name').lean();
   if (emp && emp.department) {
     department = emp.department;
   }
@@ -213,7 +213,7 @@ export const logNoticeView = async (id, employeeId, currentUser) => {
   await announcement.save();
 
   let department = 'Operations';
-  const emp = await Employee.findOne({ id: employeeId });
+  const emp = await Employee.findOne({ id: employeeId }).select('id department name').lean();
   if (emp && emp.department) {
     department = emp.department;
   }

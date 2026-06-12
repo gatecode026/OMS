@@ -86,7 +86,8 @@ const Payroll = () => {
     bulkUpdatePayrollStatus,
     updateSinglePayrollStatus,
     toggleEmployeeTaxRegime,
-    savePayrollSalaryRevision
+    savePayrollSalaryRevision,
+    hasPermission
   } = useApp();
 
   // Selected Month/Year
@@ -782,7 +783,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
 
         <div className="flex-center gap-3 wrap-content">
           {/* Perspective Switching simulation */}
-          {currentUserRole !== 'employee' && (
+          {hasPermission('payroll_management', 'update') && (
             <div className="flex-center gap-1 perspective-container">
               <span className="text-muted font-small uppercase font-semibold">Perspective:</span>
               <select
@@ -816,7 +817,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
             <option value="2026">2026</option>
           </select>
 
-          {perspective !== 'employee' && (
+          {hasPermission('payroll_management', 'create') && (
             <Button variant="primary" onClick={handleProcessPayroll} icon={Landmark}>
               Process Payroll
             </Button>
@@ -1152,13 +1153,15 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <h3 className="card-sec-title" style={{ marginBottom: 2 }}>Compensation Structures & Pay Grades</h3>
               <p className="subtitle">Define salary bands, allowances, statutory deductions, and TDS rates per grade tier.</p>
             </div>
-            <Button variant="primary" size="sm" icon={Plus} onClick={() => {
-              setEditingGrade(null);
-              setGradeForm({ id: '', grade: '', payBand: '', basic: 50000, hra: 20000, travel: 5000, medical: 3000, special: 2000, pf: 6000, esi: 0, pt: 200, tdsRate: 10, effectiveDate: '2026-06-01' });
-              setShowGradeModal(true);
-            }}>
-              Add Structure Grade
-            </Button>
+            {hasPermission('payroll_management', 'create') && (
+              <Button variant="primary" size="sm" icon={Plus} onClick={() => {
+                setEditingGrade(null);
+                setGradeForm({ id: '', grade: '', payBand: '', basic: 50000, hra: 20000, travel: 5000, medical: 3000, special: 2000, pf: 6000, esi: 0, pt: 200, tdsRate: 10, effectiveDate: '2026-06-01' });
+                setShowGradeModal(true);
+              }}>
+                Add Structure Grade
+              </Button>
+            )}
           </div>
 
           {/* Grade Cards Grid */}
@@ -1255,12 +1258,16 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <Calendar size={11} /> Effective: {g.effectiveDate || '2026-01-01'}
                     </span>
                     <div className="flex-center gap-2">
-                      <button className="action-circle-btn" onClick={() => handleEditGradeClick(g)} title="Edit">
-                        <Edit size={12} />
-                      </button>
-                      <button className="action-circle-btn" style={{ color: 'var(--color-danger)' }} onClick={() => handleDeleteGrade(g.id)} title="Delete">
-                        <Trash2 size={12} />
-                      </button>
+                      {hasPermission('payroll_management', 'update') && (
+                        <button className="action-circle-btn" onClick={() => handleEditGradeClick(g)} title="Edit">
+                          <Edit size={12} />
+                        </button>
+                      )}
+                      {hasPermission('payroll_management', 'delete') && (
+                        <button className="action-circle-btn" style={{ color: 'var(--color-danger)' }} onClick={() => handleDeleteGrade(g.id)} title="Delete">
+                          <Trash2 size={12} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1302,6 +1309,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       onBlur={(e) => handleSalaryRevision(emp.employeeId, e.target.value)}
                       className="salary-rev-input"
                       placeholder="New Basic"
+                      disabled={!hasPermission('payroll_management', 'update')}
                     />
                   </div>
                 </div>
@@ -1317,8 +1325,11 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         <div className="flex-column grid-gap animate-fade-in">
           <div className="flex-center justify-between">
             <h3 className="card-sec-title">Bonus & Incentives Dashboard</h3>
-            {perspective !== 'employee' && (
-              <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowBonusModal(true)}>
+            {hasPermission('payroll_management', 'create') && (
+              <Button variant="primary" size="sm" icon={Plus} onClick={() => {
+                setBonusForm({ employeeId: employees[0]?.id || '', amount: 10000, type: 'Performance Bonus', remarks: 'Q2 Performance target achievement', effectiveDate: '2026-06-12' });
+                setShowBonusModal(true);
+              }}>
                 Recommend Bonus
               </Button>
             )}
@@ -1365,7 +1376,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                           ))}
                         </div>
                       </td>
-                      {perspective !== 'employee' && (
+                      {perspective !== 'employee' && hasPermission('payroll_management', 'approve') && (
                         <td>
                           <div className="flex-center gap-2 justify-start">
                             {perspective === 'branch_admin' && b.status === 'Pending' && (

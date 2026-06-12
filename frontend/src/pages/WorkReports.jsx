@@ -80,7 +80,8 @@ const WorkReports = () => {
     setNotifications: setGlobalNotifications,
     addActivityLog,
     markAllNotificationsRead,
-    departments: rawDepartments
+    departments: rawDepartments,
+    hasPermission
   } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
   const loading = usePageLoading(800);
@@ -794,7 +795,7 @@ const WorkReports = () => {
 
         {/* Dynamic Role Switcher & Tabs */}
         <div className="flex-center gap-3 flex-wrap">
-          {currentUserRole !== 'employee' && (
+          {(hasPermission('work_reports', 'update') || hasPermission('work_reports', 'approve')) && (
             <div className="role-switcher-container">
               <span className="role-switcher-label">View Perspective:</span>
               <select
@@ -844,9 +845,9 @@ const WorkReports = () => {
           { id: 'dashboard', label: 'Dashboard Overview', icon: <BarChart3 size={15} /> },
           { id: 'directory', label: 'Reports Directory', icon: <FileText size={15} /> },
           { id: 'calendar', label: 'Calendar Grid', icon: <Calendar size={15} /> },
-          currentUserRole !== 'employee' && { id: 'analytics', label: 'Analytics & Heatmap', icon: <TrendingUp size={15} /> },
-          currentUserRole !== 'employee' && { id: 'leaderboards', label: 'Leaderboard & Reminders', icon: <Award size={15} /> },
-          currentUserRole !== 'employee' && { id: 'logs', label: 'Notifications & Audits', icon: <ShieldAlert size={15} /> }
+          hasPermission('work_reports', 'update') && { id: 'analytics', label: 'Analytics & Heatmap', icon: <TrendingUp size={15} /> },
+          hasPermission('work_reports', 'update') && { id: 'leaderboards', label: 'Leaderboard & Reminders', icon: <Award size={15} /> },
+          hasPermission('work_reports', 'update') && { id: 'logs', label: 'Notifications & Audits', icon: <ShieldAlert size={15} /> }
         ].filter(Boolean).map(t => (
           <button
             key={t.id}
@@ -891,7 +892,7 @@ const WorkReports = () => {
             </div>
           </div>
 
-          {currentUserRole !== 'employee' ? (
+          {hasPermission('work_reports', 'update') ? (
             <div className="reports-stats" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
               <div className="card stat-metric-card border-left-teal">
                 <span className="card-lbl-gray">Active Workforce Logged</span>
@@ -1684,7 +1685,7 @@ const WorkReports = () => {
             </div>
 
             {/* Manager Review inputs */}
-            {(userRole !== 'Employee' && currentUserRole !== 'employee') && (
+            {(userRole !== 'Employee' && hasPermission('work_reports', 'approve')) && (
               <div className="drawer-review-inputs-wrapper" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
                 <span className="box-title" style={{ fontSize: '0.85rem', color: 'var(--color-primary)' }}>Manager Evaluation & Review Details</span>
                 
