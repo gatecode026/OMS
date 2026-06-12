@@ -17,8 +17,7 @@ export const isMenuItemAccessible = (item, userRole, hasPermission) => {
   if (hasPermission && item.path) {
     const moduleKey = PATH_TO_MODULE[item.path];
     if (moduleKey) {
-      const allowed = hasPermission(moduleKey, 'read');
-      if (!allowed) return false;
+      return hasPermission(moduleKey, 'read');
     }
   }
 
@@ -32,8 +31,8 @@ export const isMenuItemAccessible = (item, userRole, hasPermission) => {
     return item.subItems.some(subItem => {
       if (hasPermission) {
         const moduleKey = PATH_TO_MODULE[subItem.path];
-        if (moduleKey && !hasPermission(moduleKey, 'read')) {
-          return false;
+        if (moduleKey) {
+          return hasPermission(moduleKey, 'read');
         }
       }
       const requiredRole = getRequiredRoleForPath(subItem.path);
@@ -64,8 +63,8 @@ export const filterMenuByRole = (menuStructure, userRole, hasPermission) => {
           const accessibleSubItems = item.subItems.filter(sub => {
             if (hasPermission) {
               const moduleKey = PATH_TO_MODULE[sub.path];
-              if (moduleKey && !hasPermission(moduleKey, 'read')) {
-                return false;
+              if (moduleKey) {
+                return hasPermission(moduleKey, 'read');
               }
             }
             const reqRole = getRequiredRoleForPath(sub.path);
@@ -90,4 +89,3 @@ export const filterMenuByRole = (menuStructure, userRole, hasPermission) => {
     })
     .filter(section => section.items.length > 0);
 };
-

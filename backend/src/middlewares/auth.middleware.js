@@ -45,9 +45,9 @@ export const authenticate = async (req, res, next) => {
     // Retrieve associated active account from matching collection
     let user;
     if (decoded.role === 'super_admin') {
-      user = await Admin.findOne({ id: decoded.id });
+      user = await Admin.findOne({ id: decoded.id }).select('id name email roleId status').lean();
     } else {
-      user = await Employee.findOne({ id: decoded.id });
+      user = await Employee.findOne({ id: decoded.id }).select('id name email roleId status').lean();
     }
 
     if (!user) {

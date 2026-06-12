@@ -18,7 +18,7 @@ import ActivityFeed from '../../components/projects/ActivityFeed';
 
 
 const Projects = () => {
-  const { addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole } = useApp();
+  const { addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole, hasPermission } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // State Management
@@ -599,7 +599,7 @@ const Projects = () => {
 
       {/* Section G - Quick Action Buttons Bar */}
       <div className={styles.quickActionsRow}>
-        {currentUserRole !== 'employee' && (
+        {hasPermission('project_management', 'create') && (
           <>
             <button className={`${styles.pageBtn} ${styles.primaryAction}`} onClick={() => { setSelectedProject(null); setActiveModal('create'); }}>
               <Plus size={14} /> Create New Project

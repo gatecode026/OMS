@@ -20,7 +20,7 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, addBranch, updateBranch, deleteBranch, projectsList } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, addBranch, updateBranch, deleteBranch, projectsList, hasPermission } = useApp();
 
   const getBranchDepartments = (b) => {
     if (!b) return [];
@@ -1325,17 +1325,19 @@ const Branches = () => {
                   <p className="meta-row"><Mail size={12} /> {selectedBranch.managerEmail || 'No contact email record'}</p>
                 </div>
               </div>
-              <div className="manager-actions" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                <Button size="sm" variant="secondary" icon={Edit2} onClick={() => {
-                  setManagerUpdate({
-                    branchId: selectedBranch.id,
-                    name: selectedBranch.manager,
-                    phone: selectedBranch.managerPhone || '',
-                    email: selectedBranch.managerEmail || ''
-                  });
-                  setShowManagerModal(true);
-                }}>Change Branch Manager</Button>
-              </div>
+              {hasPermission('agency_branch_management', 'update') && (
+                <div className="manager-actions" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                  <Button size="sm" variant="secondary" icon={Edit2} onClick={() => {
+                    setManagerUpdate({
+                      branchId: selectedBranch.id,
+                      name: selectedBranch.manager,
+                      phone: selectedBranch.managerPhone || '',
+                      email: selectedBranch.managerEmail || ''
+                    });
+                    setShowManagerModal(true);
+                  }}>Change Branch Manager</Button>
+                </div>
+              )}
             </div>
 
             {/* Compliance Document Vault */}
@@ -1355,26 +1357,30 @@ const Branches = () => {
                         <button className="btn-file-icon btn-download" onClick={() => handleDownloadDocument(doc)} title="Download Document" type="button">
                           <Download size={14} />
                         </button>
-                        <button className="btn-file-icon btn-delete" onClick={() => handleDeleteDocument(doc)} title="Delete Document" type="button">
-                          <Trash2 size={14} />
-                        </button>
+                        {hasPermission('agency_branch_management', 'delete') && (
+                          <button className="btn-file-icon btn-delete" onClick={() => handleDeleteDocument(doc)} title="Delete Document" type="button">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
                 )}
               </div>
 
-              <div className="vault-upload-form" style={{ marginTop: '16px' }}>
-                <Button 
-                  size="sm" 
-                  variant="primary" 
-                  icon={Plus} 
-                  onClick={() => fileInputRef.current?.click()}
-                  type="button"
-                >
-                  Upload to Vault
-                </Button>
-              </div>
+              {hasPermission('agency_branch_management', 'create') && (
+                <div className="vault-upload-form" style={{ marginTop: '16px' }}>
+                  <Button 
+                    size="sm" 
+                    variant="primary" 
+                    icon={Plus} 
+                    onClick={() => fileInputRef.current?.click()}
+                    type="button"
+                  >
+                    Upload to Vault
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1519,23 +1525,27 @@ const Branches = () => {
           <p className="branches-subtitle">Manage, monitor, and control all company branches, agencies, offices, franchise locations, branch employees, department structures, attendance, projects, and operational performance from one centralized enterprise management system.</p>
         </div>
         <div className="branches-header-actions">
-          <Button variant="outline" icon={Download} onClick={handleExportCSV}>
-            Export Reports
-          </Button>
-          <Button variant="primary" icon={Plus} onClick={() => {
-            setNewBranch({
-              name: '', code: '', flag: '🇮🇳',
-              manager: '', managerPhone: '',
-              address: '', city: '', state: '', zipCode: '', phone: '', email: '',
-              status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
-              revenue: 500000, departments: [],
-              attendance: 95, productivity: 90,
-              employeeCount: 50,
-            });
-            setShowAddModal(true);
-          }}>
-            Add New Branch
-          </Button>
+          {hasPermission('agency_branch_management', 'export') && (
+            <Button variant="outline" icon={Download} onClick={handleExportCSV}>
+              Export Reports
+            </Button>
+          )}
+          {hasPermission('agency_branch_management', 'create') && (
+            <Button variant="primary" icon={Plus} onClick={() => {
+              setNewBranch({
+                name: '', code: '', flag: '🇮🇳',
+                manager: '', managerPhone: '',
+                address: '', city: '', state: '', zipCode: '', phone: '', email: '',
+                status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
+                revenue: 500000, departments: [],
+                attendance: 95, productivity: 90,
+                employeeCount: 50,
+              });
+              setShowAddModal(true);
+            }}>
+              Add New Branch
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1636,33 +1646,37 @@ const Branches = () => {
                     <Badge variant={getStatusBadgeVariant(branch.statusType)}>
                       {getStatusIcon(branch.statusType)} {branch.status}
                     </Badge>
-                    <button
-                      className="icon-action-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditBranch({ ...branch });
-                        setShowEditModal(true);
-                      }}
-                      title="Edit Branch"
-                    >
-                      <Edit2 size={13} />
-                    </button>
-                    <button
-                      className="icon-action-btn icon-action-danger"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        showConfirm('Delete Branch', `Are you sure you want to delete ${branch.name}? All data will be archived.`, async () => {
-                          await deleteBranch(branch.id);
-                          setActivities(prev => [
-                            { id: Date.now(), text: `Branch Deleted: ${branch.name}`, time: 'Just now', type: 'danger' },
-                            ...prev
-                          ]);
-                        }, 'danger');
-                      }}
-                      title="Delete Branch"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {hasPermission('agency_branch_management', 'update') && (
+                      <button
+                        className="icon-action-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditBranch({ ...branch });
+                          setShowEditModal(true);
+                        }}
+                        title="Edit Branch"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                    {hasPermission('agency_branch_management', 'delete') && (
+                      <button
+                        className="icon-action-btn icon-action-danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          showConfirm('Delete Branch', `Are you sure you want to delete ${branch.name}? All data will be archived.`, async () => {
+                            await deleteBranch(branch.id);
+                            setActivities(prev => [
+                              { id: Date.now(), text: `Branch Deleted: ${branch.name}`, time: 'Just now', type: 'danger' },
+                              ...prev
+                            ]);
+                          }, 'danger');
+                        }}
+                        title="Delete Branch"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1713,39 +1727,47 @@ const Branches = () => {
         {/* Right Column - Detailed View, Hierarchy, Analytics */}
         <div className="branches-right-panel">
           {/* Quick Actions Panel */}
-          <div className="card quick-actions-card">
-            <h3 className="panel-title"><Activity size={16} /> Quick Operations Bar</h3>
-            <div className="quick-actions-grid">
-              <button className="quick-action-btn-item" onClick={() => {
-                setNewBranch({
-                  name: '', code: '', flag: '🇮🇳',
-                  manager: '', managerPhone: '',
-                  address: '', city: '', state: '', zipCode: '', phone: '', email: '',
-                  status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
-                  revenue: 500000, departments: [],
-                  attendance: 95, productivity: 90,
-                  employeeCount: 50,
-                });
-                setShowAddModal(true);
-              }}>
-                <Plus size={14} /> Add Branch
-              </button>
-              <button className="quick-action-btn-item" onClick={() => {
-                setTransfer({
-                  employeeName: '',
-                  fromBranchId: selectedBranchId || 'BR-001',
-                  toBranchId: 'BR-002',
-                  department: 'Sales'
-                });
-                setShowTransferModal(true);
-              }}>
-                <Users size={14} /> Transfer Staff
-              </button>
-              <button className="quick-action-btn-item" onClick={handleExportCSV}>
-                <Download size={14} /> Export CSV Data
-              </button>
+          {(hasPermission('agency_branch_management', 'create') || hasPermission('agency_branch_management', 'update') || hasPermission('agency_branch_management', 'export')) && (
+            <div className="card quick-actions-card">
+              <h3 className="panel-title"><Activity size={16} /> Quick Operations Bar</h3>
+              <div className="quick-actions-grid">
+                {hasPermission('agency_branch_management', 'create') && (
+                  <button className="quick-action-btn-item" onClick={() => {
+                    setNewBranch({
+                      name: '', code: '', flag: '🇮🇳',
+                      manager: '', managerPhone: '',
+                      address: '', city: '', state: '', zipCode: '', phone: '', email: '',
+                      status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
+                      revenue: 500000, departments: [],
+                      attendance: 95, productivity: 90,
+                      employeeCount: 50,
+                    });
+                    setShowAddModal(true);
+                  }}>
+                    <Plus size={14} /> Add Branch
+                  </button>
+                )}
+                {hasPermission('agency_branch_management', 'update') && (
+                  <button className="quick-action-btn-item" onClick={() => {
+                    setTransfer({
+                      employeeName: '',
+                      fromBranchId: selectedBranchId || 'BR-001',
+                      toBranchId: 'BR-002',
+                      department: 'Sales'
+                    });
+                    setShowTransferModal(true);
+                  }}>
+                    <Users size={14} /> Transfer Staff
+                  </button>
+                )}
+                {hasPermission('agency_branch_management', 'export') && (
+                  <button className="quick-action-btn-item" onClick={handleExportCSV}>
+                    <Download size={14} /> Export CSV Data
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Branch Detail View - Selected Branch */}
           {selectedBranch ? (

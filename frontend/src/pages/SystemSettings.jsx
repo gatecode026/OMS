@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './Settings.css';
 import { useApp } from '../context/AppContext';
 import Button from '../components/common/Button';
@@ -340,7 +340,9 @@ const SystemSettings = () => {
       autoPunchOut: true,
       punchOutTime: '21:00',
       attendanceReminders: true,
-      missingAlerts: true
+      missingAlerts: true,
+      lateTimeThreshold: '09:15',
+      halfDayHoursThreshold: 8
     };
   });
 
@@ -441,6 +443,33 @@ const SystemSettings = () => {
   const updateLocalNotif = (key, val) => setLocalNotif(p => ({ ...p, [key]: val }));
   const updateLocalSecurity = (key, val) => setLocalSecurity(p => ({ ...p, [key]: val }));
 
+  // ── Live header stats derived from real database data ──────────────────
+  const headerStats = useMemo(() => {
+    const branchList = dbBranches || [];
+    const deptList   = dbDepartments || [];
+    const empList    = employees || [];
+
+    const activeBranches = branchList.filter(b => (b.status || 'Active') === 'Active').length;
+    const totalBranches  = branchList.length;
+
+    const totalDepts  = deptList.length;
+    const activeDepts = deptList.filter(d => (d.status || 'Active') === 'Active').length || totalDepts;
+
+    const totalUsers  = empList.length;
+    const activeUsers = empList.filter(e => e.status === 'Active').length;
+
+    // Count all nav items across all sidebar groups as the module count
+    const totalModules = sidebarGroups.reduce((sum, g) => sum + g.items.length, 0);
+
+    const is2FAEnabled = localSecurity?.twoFactor === true;
+
+    const now = new Date();
+    const updateDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const updateTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    return { activeBranches, totalBranches, totalDepts, activeDepts, totalUsers, activeUsers, totalModules, is2FAEnabled, updateDate, updateTime };
+  }, [dbBranches, dbDepartments, employees, localSecurity]);
+
   // Synchronize localGeneral on generalSettings changes
   useEffect(() => {
     setLocalGeneral(generalSettings);
@@ -480,7 +509,7 @@ const SystemSettings = () => {
   }, [token]);
 
   const handleSave = async () => {
-    const mergedGeneral = { ...generalSettings, companyName: companyProfile.companyName, ...localGeneral };
+    const mergedGeneral = { ...generalSettings, ...localGeneral, companyName: companyProfile.companyName };
 
     // 1. Save global React contexts
     setGeneralSettings(mergedGeneral);
@@ -1096,6 +1125,18 @@ const SystemSettings = () => {
                   type="number"
                   value={attendanceRules.gracePeriod}
                   onChange={v => setAttendanceRules(p => ({ ...p, gracePeriod: parseInt(v) || 0 }))}
+                />
+                <SettingsInput
+                  label="Late Arrival Time Threshold"
+                  type="time"
+                  value={attendanceRules.lateTimeThreshold || '09:15'}
+                  onChange={v => setAttendanceRules(p => ({ ...p, lateTimeThreshold: v }))}
+                />
+                <SettingsInput
+                  label="Half-Day Hours Threshold"
+                  type="number"
+                  value={attendanceRules.halfDayHoursThreshold !== undefined ? attendanceRules.halfDayHoursThreshold : 8}
+                  onChange={v => setAttendanceRules(p => ({ ...p, halfDayHoursThreshold: parseFloat(v) || 0 }))}
                 />
                 <SettingsInput
                   label="Late Mark Rules Threshold (Minutes)"
@@ -2266,55 +2307,57 @@ const SystemSettings = () => {
         </div>
       </div>
 
-      {/* Top Summary stats cards */}
+      {/* Top Summary stats cards — fetched from real database */}
       <div className="settings-stats-grid">
         <div className="sett-stat-card">
           <div className="sett-stat-top">
             <span className="sett-stat-label">Company Branches</span>
             <Building2 size={16} className="sett-stat-icon" />
           </div>
-          <span className="sett-stat-val">12 Active</span>
-          <span className="sett-stat-sub">Across 4 regions</span>
+          <span className="sett-stat-val">{headerStats.activeBranches} Active</span>
+          <span className="sett-stat-sub">Across {headerStats.totalBranches} branch{headerStats.totalBranches !== 1 ? 'es' : ''}</span>
         </div>
         <div className="sett-stat-card">
           <div className="sett-stat-top">
             <span className="sett-stat-label">Active Departments</span>
             <GitMerge size={16} className="sett-stat-icon" />
           </div>
-          <span className="sett-stat-val">24 Depts</span>
-          <span className="sett-stat-sub">5 core categories</span>
+          <span className="sett-stat-val">{headerStats.totalDepts} Dept{headerStats.totalDepts !== 1 ? 's' : ''}</span>
+          <span className="sett-stat-sub">{headerStats.activeDepts} active department{headerStats.activeDepts !== 1 ? 's' : ''}</span>
         </div>
         <div className="sett-stat-card">
           <div className="sett-stat-top">
             <span className="sett-stat-label">Active Users</span>
             <Users size={16} className="sett-stat-icon" />
           </div>
-          <span className="sett-stat-val">1,250 Users</span>
-          <span className="sett-stat-sub">Online: 412 active</span>
+          <span className="sett-stat-val">{headerStats.totalUsers.toLocaleString()} Users</span>
+          <span className="sett-stat-sub">{headerStats.activeUsers.toLocaleString()} currently active</span>
         </div>
         <div className="sett-stat-card">
           <div className="sett-stat-top">
             <span className="sett-stat-label">System Modules</span>
             <Layout size={16} className="sett-stat-icon" />
           </div>
-          <span className="sett-stat-val">32 Active</span>
+          <span className="sett-stat-val">{headerStats.totalModules} Active</span>
           <span className="sett-stat-sub">100% operational</span>
         </div>
         <div className="sett-stat-card">
           <div className="sett-stat-top">
             <span className="sett-stat-label">Security Status</span>
-            <Shield size={16} className="sett-stat-icon text-success" />
+            <Shield size={16} className={`sett-stat-icon ${headerStats.is2FAEnabled ? 'text-success' : 'text-warning'}`} />
           </div>
-          <span className="sett-stat-val text-success">Protected</span>
-          <span className="sett-stat-sub">2FA active</span>
+          <span className={`sett-stat-val ${headerStats.is2FAEnabled ? 'text-success' : 'text-warning'}`}>
+            {headerStats.is2FAEnabled ? 'Protected' : 'Standard'}
+          </span>
+          <span className="sett-stat-sub">{headerStats.is2FAEnabled ? '2FA active' : '2FA disabled'}</span>
         </div>
         <div className="sett-stat-card">
           <div className="sett-stat-top">
             <span className="sett-stat-label">Last System Update</span>
             <Clock size={16} className="sett-stat-icon" />
           </div>
-          <span className="sett-stat-val">Today</span>
-          <span className="sett-stat-sub">At 10:30 AM</span>
+          <span className="sett-stat-val">{headerStats.updateDate}</span>
+          <span className="sett-stat-sub">At {headerStats.updateTime}</span>
         </div>
       </div>
 

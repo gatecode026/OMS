@@ -75,7 +75,9 @@ const SystemSettingsSchema = new mongoose.Schema({
       autoPunchOut: true,
       punchOutTime: '21:00',
       attendanceReminders: true,
-      missingAlerts: true
+      missingAlerts: true,
+      lateTimeThreshold: '09:15',
+      halfDayHoursThreshold: 8
     }
   },
   leaveRules: {
