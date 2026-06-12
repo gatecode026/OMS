@@ -5,6 +5,7 @@
 
 import Document from './document.model.js';
 import logger from '../../config/logger.js';
+import { uploadToImageKit } from '../../utils/imagekit.js';
 
 export const find = async (query = {}) => {
   logger.info('DocumentsRepository::find querying documents from database...');
@@ -21,11 +22,27 @@ export const save = async (data) => {
   if (!data.id) {
     data.id = 'DOC-' + Math.floor(100 + Math.random() * 900);
   }
+
+  // Upload file to ImageKit if it is sent as a base64 string
+  if (data.fileUrl && data.fileUrl.startsWith('data:')) {
+    const fileExt = data.type ? data.type.toLowerCase() : 'bin';
+    const fileName = `${data.name.replace(/\s+/g, '_')}_${Date.now()}.${fileExt}`;
+    data.fileUrl = await uploadToImageKit(data.fileUrl, fileName);
+  }
+
   return Document.create(data);
 };
 
 export const update = async (id, data) => {
   logger.info(`DocumentsRepository::update updating document with ID: ${id}`);
+
+  // Upload file to ImageKit if it is updated as a base64 string
+  if (data.fileUrl && data.fileUrl.startsWith('data:')) {
+    const fileExt = data.type ? data.type.toLowerCase() : 'bin';
+    const fileName = `${data.name.replace(/\s+/g, '_')}_${Date.now()}.${fileExt}`;
+    data.fileUrl = await uploadToImageKit(data.fileUrl, fileName);
+  }
+
   return Document.findOneAndUpdate({ id }, data, { new: true });
 };
 
@@ -41,3 +58,4 @@ export default {
   update,
   remove
 };
+

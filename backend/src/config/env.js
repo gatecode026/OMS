@@ -6,11 +6,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const requiredEnv = ['JWT_SECRET', 'DB_URI'];
-const missingEnv = requiredEnv.filter((envVar) => !process.env[envVar]);
+const requiredEnv = ['JWT_SECRET', 'DB_URI', 'IMAGEKIT_PRIVATE_KEY'];
+const missingEnv = requiredEnv.filter((envVar) => !process.env[envVar] || process.env[envVar].includes('***'));
 
 if (missingEnv.length > 0) {
-  console.warn(`[WARNING] Missing critical environment variables: ${missingEnv.join(', ')}`);
+  console.warn(`[WARNING] Missing or unconfigured environment variables: ${missingEnv.join(', ')}`);
 }
 
 export const env = {
@@ -20,6 +20,9 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET || 'fallback_secret',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  imagekitPublicKey: process.env.IMAGEKIT_PUBLIC_KEY || 'public_CpBAKCTW3cCxoXfv',
+  imagekitUrlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || 'https://ik.imagekit.io/zjd5xircoy',
+  imagekitPrivateKey: process.env.IMAGEKIT_PRIVATE_KEY
 };
 
 export default env;

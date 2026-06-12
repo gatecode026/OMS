@@ -9,7 +9,7 @@ import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
 import {
   Shield, Key, Users, Lock, ShieldAlert, Award, FileText, CheckCircle,
-  XCircle, Clock, Plus, Edit, Trash2, Sliders, Database, Play,
+  XCircle, Clock, Plus, Edit, Trash2, Sliders, Database,
   Settings, HelpCircle, Download, Eye, Check, X, FileDown, Search, Filter, RefreshCw,
   MoreVertical, AlertTriangle, AlertCircle, Info, ChevronRight, ChevronDown, RefreshCcw, Building, ShieldCheck,
   UserCheck, UserX, Printer, Activity, LogIn, LogOut, Copy, ArrowUpRight, ArrowDownRight
@@ -42,6 +42,68 @@ const defaultColors = {
   employee: '#64748b'
 };
 
+const hexToRgba = (hex, alpha = 0.15) => {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(99, 102, 241, ${alpha})`;
+  let c = hex.substring(1);
+  if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+  const r = parseInt(c.substring(0, 2), 16) || 99;
+  const g = parseInt(c.substring(2, 4), 16) || 102;
+  const b = parseInt(c.substring(4, 6), 16) || 241;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const getRoleRank = (role) => {
+  if (role.id === 'super_admin') return 1;
+  if (role.id === 'branch_admin') return 2;
+  if (role.id === 'manager' || role.id === 'project_manager' || role.id === 'dept_admin') return 3;
+  if (role.id === 'team_leader') return 4;
+  if (role.id === 'employee') return 5;
+  
+  const level = (role.accessLevel || '').toLowerCase();
+  if (level.includes('full')) return 1;
+  if (level.includes('admin')) return 2;
+  if (level.includes('manager') || level.includes('manage')) return 3;
+  if (level.includes('lead')) return 4;
+  return 5;
+};
+
+const renderHierarchyTree = (rolesList, index = 0) => {
+  if (!rolesList || index >= rolesList.length) return null;
+  
+  const role = rolesList[index];
+  const color = role.color || '#6366f1';
+  const bgStyle = hexToRgba(color, 0.15);
+
+  if (index === 0) {
+    return (
+      <div className="hierarchy-root pt-3">
+        <div className="hierarchy-node">
+          <div className="hierarchy-node-icon" style={{ background: bgStyle, color: color }}>
+            {role.icon || '⚙️'}
+          </div>
+          <span>{role.name} (Level {index + 1})</span>
+        </div>
+        {renderHierarchyTree(rolesList, index + 1)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="hierarchy-children">
+      <div className="hierarchy-child-row">
+        <div className="hierarchy-connector"></div>
+        <div className="hierarchy-node">
+          <div className="hierarchy-node-icon" style={{ background: bgStyle, color: color }}>
+            {role.icon || '⚙️'}
+          </div>
+          <span>{role.name} (Level {index + 1})</span>
+        </div>
+      </div>
+      {renderHierarchyTree(rolesList, index + 1)}
+    </div>
+  );
+};
+
 const RolesPermissions = () => {
   const isLoading = usePageLoading(600);
   const { 
@@ -61,21 +123,14 @@ const RolesPermissions = () => {
     activityLogs,
     permissionModules,
     addPermissionModule,
-    deletePermissionModule
+    deletePermissionModule,
+    addToast
   } = useApp();
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Local state for toast notifications
-  const [pageToasts, setPageToasts] = useState([]);
-  const addPageToast = (type, message) => {
-    const id = Date.now();
-    setPageToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setPageToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
-  };
+
 
   // Local state for extended Roles list
   const [localRoles, setLocalRoles] = useState([]);
@@ -217,7 +272,7 @@ const RolesPermissions = () => {
     const moduleKey = newPermForm.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     const exists = modulesList.some(m => m.key === moduleKey);
     if (exists) {
-      addPageToast('danger', `Module "${newPermForm.name}" already exists in the matrix.`);
+      addToast('danger', `Module "${newPermForm.name}" already exists in the matrix.`);
       return;
     }
 
@@ -230,7 +285,7 @@ const RolesPermissions = () => {
       setNewPermForm({ name: '', defaultLevel: 'No' });
       setShowAddPermModal(false);
     } catch (err) {
-      addPageToast('danger', 'Failed to add permission module to database.');
+      addToast('danger', 'Failed to add permission module to database.');
     }
   };
 
@@ -247,7 +302,7 @@ const RolesPermissions = () => {
             return updated;
           });
         } catch (err) {
-          addPageToast('danger', 'Failed to delete permission module.');
+          addToast('danger', 'Failed to delete permission module.');
         }
       },
       'danger'
@@ -257,7 +312,7 @@ const RolesPermissions = () => {
   const handleCheckboxToggle = async (moduleKey, opKey) => {
     console.log("CHECKBOX TOGGLE CLICKED:", moduleKey, opKey);
     if (selectedRoleId === 'super_admin') {
-      addPageToast('warning', 'Super Admin permissions are permanently locked and cannot be modified.');
+      addToast('warning', 'Super Admin permissions are permanently locked and cannot be modified.');
       return;
     }
 
@@ -277,23 +332,23 @@ const RolesPermissions = () => {
     try {
       // Auto-save changes dynamically in real-time
       await updatePermissions(selectedRoleId, updatedPermissions);
-      addPageToast('success', `Permission '${opKey.toUpperCase()}' for module '${moduleKey}' saved automatically.`);
+      // No extra addToast here; context triggers generic toast
     } catch (err) {
       console.error('Real-time permission save failed:', err);
-      addPageToast('danger', 'Failed to save changes automatically.');
+      addToast('danger', 'Failed to save changes automatically.');
     }
   };
 
   const handleSaveRolePermissions = () => {
     if (selectedRoleId === 'super_admin') {
-      addPageToast('warning', 'Super Admin permissions are permanent and cannot be modified.');
+      addToast('warning', 'Super Admin permissions are permanent and cannot be modified.');
       return;
     }
     updatePermissions(selectedRoleId, localPermissions);
     
     // Sync into localRoles state so it shows updated count or info
     setLocalRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, permissions: localPermissions } : r));
-    addPageToast('success', `System permissions updated and saved for "${localRoles.find(r => r.id === selectedRoleId)?.name}" role.`);
+    // No extra addToast here; context triggers generic toast
   };
 
   // Cycle permissions chips (compatibility with other references)
@@ -301,7 +356,7 @@ const RolesPermissions = () => {
   const handleMatrixCellClick = (moduleKey, roleId) => {
     console.log("MATRIX CELL CLICKED:", moduleKey, roleId);
     if (roleId === 'super_admin') {
-      addPageToast('warning', 'Super Admin permissions are permanently locked.');
+      addToast('warning', 'Super Admin permissions are permanently locked.');
       return;
     }
     setMatrixData(prev => {
@@ -317,23 +372,10 @@ const RolesPermissions = () => {
         }
       };
     });
-    addPageToast('info', `Updated permission cell for ${roleId} -> ${moduleKey}`);
+    addToast('info', 'Permission updated.');
   };
 
-  // Custom permission builder states
-  const [builderRole, setBuilderRole] = useState('branch_admin');
-  const [builderCategory, setBuilderCategory] = useState('Employee Management');
-  const [builderPermissions, setBuilderPermissions] = useState({
-    view: true, create: false, edit: false, delete: false, approve: false, export: false
-  });
 
-  const handleBuilderCheckbox = (perm) => {
-    setBuilderPermissions(prev => ({ ...prev, [perm]: !prev[perm] }));
-  };
-
-  const handleGeneratePolicy = () => {
-    addPageToast('success', `Policy generated successfully for Category "${builderCategory}"!`);
-  };
 
   const userOverrides = contextUserOverrides || [];
 
@@ -558,21 +600,41 @@ const RolesPermissions = () => {
     try {
       if (editingRole) {
         // Edit mode
-        await updateRole(editingRole.id, {
-          name: createForm.name,
+        const success = await updateRole(editingRole.id, {
+          name: createForm.name.trim(),
           description: createForm.description,
           accentColor: createForm.color,
           accessLevel: createForm.accessLevel,
           status: createForm.status
         });
-        addPageToast('success', `Role "${createForm.name}" updated successfully.`);
-        setEditingRole(null);
+        if (success) {
+          setEditingRole(null);
+          setCreateForm({ name: '', description: '', parentRole: 'employee', accessLevel: 'Standard', status: 'Active', color: '#3b82f6', icon: '👤' });
+          setShowCreateModal(false);
+        }
       } else {
         // Create mode
-        const newId = `role_${createForm.name.toLowerCase().replace(/\s+/g, '_')}`;
+        const systemRoleIds = {
+          'super admin': 'super_admin',
+          'super_admin': 'super_admin',
+          'branch admin': 'branch_admin',
+          'branch_admin': 'branch_admin',
+          'department admin': 'dept_admin',
+          'dept admin': 'dept_admin',
+          'dept_admin': 'dept_admin',
+          'manager': 'manager',
+          'project manager': 'manager',
+          'team leader': 'team_leader',
+          'team_leader': 'team_leader',
+          'employee': 'employee'
+        };
+        const trimmedName = createForm.name.trim().toLowerCase();
+        const systemId = systemRoleIds[trimmedName];
+        const newId = systemId || `role_${trimmedName.replace(/\s+/g, '_')}`;
+
         const newRole = {
           id: newId,
-          name: createForm.name,
+          name: createForm.name.trim(),
           description: createForm.description,
           userCount: 0,
           accentColor: createForm.color,
@@ -590,15 +652,15 @@ const RolesPermissions = () => {
             return acc;
           }, {})
         };
-        await addRole(newRole);
-        addPageToast('success', `New role "${createForm.name}" created successfully.`);
+        const success = await addRole(newRole);
+        if (success) {
+          setCreateForm({ name: '', description: '', parentRole: 'employee', accessLevel: 'Standard', status: 'Active', color: '#3b82f6', icon: '👤' });
+          setShowCreateModal(false);
+        }
       }
-
-      setCreateForm({ name: '', description: '', parentRole: 'employee', accessLevel: 'Standard', status: 'Active', color: '#3b82f6', icon: '👤' });
-      setShowCreateModal(false);
     } catch (err) {
       console.error(err);
-      addPageToast('danger', 'Error saving role.');
+      addToast('danger', 'Error saving role.');
     }
   };
 
@@ -618,7 +680,7 @@ const RolesPermissions = () => {
 
   const handleDeleteRoleClick = (role) => {
     if (role.id === 'super_admin' || role.id === 'employee') {
-      addPageToast('danger', `Default role "${role.name}" cannot be deleted.`);
+      addToast('danger', `Default role "${role.name}" cannot be deleted.`);
       return;
     }
     showConfirm(
@@ -627,10 +689,9 @@ const RolesPermissions = () => {
       async () => {
         try {
           await deleteRole(role.id);
-          addPageToast('warning', `Role "${role.name}" has been deleted.`);
         } catch (err) {
           console.error(err);
-          addPageToast('danger', 'Error deleting role.');
+          addToast('danger', 'Error deleting role.');
         }
       },
       'danger'
@@ -644,10 +705,27 @@ const RolesPermissions = () => {
     const source = localRoles.find(r => r.id === cloneForm.sourceRoleId);
     if (!source) return;
 
-    const newId = `role_clone_${cloneForm.targetName.toLowerCase().replace(/\s+/g, '_')}`;
+    const systemRoleIds = {
+      'super admin': 'super_admin',
+      'super_admin': 'super_admin',
+      'branch admin': 'branch_admin',
+      'branch_admin': 'branch_admin',
+      'department admin': 'dept_admin',
+      'dept admin': 'dept_admin',
+      'dept_admin': 'dept_admin',
+      'manager': 'manager',
+      'project manager': 'manager',
+      'team leader': 'team_leader',
+      'team_leader': 'team_leader',
+      'employee': 'employee'
+    };
+    const trimmedTargetName = cloneForm.targetName.trim().toLowerCase();
+    const systemId = systemRoleIds[trimmedTargetName];
+    const newId = systemId || `role_clone_${trimmedTargetName.replace(/\s+/g, '_')}`;
+
     const cloned = {
       id: newId,
-      name: cloneForm.targetName,
+      name: cloneForm.targetName.trim(),
       description: `Cloned from ${source.name}. ${source.description}`,
       userCount: 0,
       accentColor: source.accentColor || source.color || '#3b82f6',
@@ -658,12 +736,11 @@ const RolesPermissions = () => {
 
     try {
       await addRole(cloned);
-      addPageToast('success', `Role "${source.name}" cloned into "${cloneForm.targetName}".`);
       setCloneForm({ sourceRoleId: 'employee', targetName: '', inheritAll: true });
       setShowCloneModal(false);
     } catch (err) {
       console.error(err);
-      addPageToast('danger', 'Error cloning role.');
+      addToast('danger', 'Error cloning role.');
     }
   };
 
@@ -675,11 +752,11 @@ const RolesPermissions = () => {
 
     try {
       await updateEmployee(assignForm.userId, { roleId: assignForm.roleId, role: roleObj.name });
-      addPageToast('success', `Assigned "${roleObj.name}" role to ${emp.name}.`);
+      addToast('success', `Assigned "${roleObj.name}" role to ${emp.name}.`);
       setShowAssignModal(false);
     } catch (err) {
       console.error(err);
-      addPageToast('danger', 'Failed to assign role.');
+      addToast('danger', 'Failed to assign role.');
     }
   };
 
@@ -699,37 +776,35 @@ const RolesPermissions = () => {
 
     try {
       await addUserOverride(newOverride);
-      addPageToast('success', `Configured permission restriction override for ${emp.name}.`);
       setShowRestrictModal(false);
     } catch (err) {
       console.error(err);
-      addPageToast('danger', 'Failed to add override.');
+      addToast('danger', 'Failed to add override.');
     }
   };
 
   const handleRemoveOverride = async (overrideId, userName) => {
     try {
       await deleteUserOverride(overrideId);
-      addPageToast('info', `Removed permission override for ${userName}.`);
     } catch (err) {
       console.error(err);
-      addPageToast('danger', 'Failed to remove override.');
+      addToast('danger', 'Failed to remove override.');
     }
   };
 
   const handleExportReportSubmit = (e) => {
     e.preventDefault();
-    addPageToast('info', `Compiling report. Download starting...`);
+    addToast('info', `Compiling report. Download starting...`);
     setTimeout(() => {
-      addPageToast('success', `Success: Permissions Audit report downloaded in ${exportForm.format} format.`);
+      addToast('success', `Success: Permissions Audit report downloaded in ${exportForm.format} format.`);
     }, 1200);
     setShowExportModal(false);
   };
 
   const handleExportReportDirect = (reportName, format) => {
-    addPageToast('info', `Exporting ${reportName} in ${format} format...`);
+    addToast('info', `Exporting ${reportName} in ${format} format...`);
     setTimeout(() => {
-      addPageToast('success', `Successfully downloaded: ${reportName}.${format.toLowerCase()}`);
+      addToast('success', `Successfully downloaded: ${reportName}.${format.toLowerCase()}`);
     }, 1500);
   };
 
@@ -762,16 +837,19 @@ const RolesPermissions = () => {
     });
   }, [auditLogs, auditSearch, auditModuleFilter]);
 
+  const sortedRolesForTree = useMemo(() => {
+    return [...localRoles].sort((a, b) => getRoleRank(a) - getRoleRank(b));
+  }, [localRoles]);
+
   // Save changes to system context
   const handleSaveSystemPermissions = async () => {
     try {
       await Promise.all(localRoles.map(role => 
         updatePermissions(role.id, role.permissions)
       ));
-      addPageToast('success', 'Enterprise permissions matrix saved globally to AppContext.');
     } catch (err) {
       console.error(err);
-      addPageToast('danger', 'Failed to save system permissions matrix.');
+      addToast('danger', 'Failed to save system permissions matrix.');
     }
   };
   // Skeleton loading wrapper
@@ -819,7 +897,7 @@ const RolesPermissions = () => {
               value={currentUserRole}
               onChange={(e) => {
                 setCurrentUserRole(e.target.value);
-                addPageToast('info', `Switched UI perspective view role: ${e.target.value}`);
+                addToast('info', `Switched UI perspective view role: ${e.target.value}`);
               }}
               className="perspective-select select-clean"
             >
@@ -1045,49 +1123,15 @@ const RolesPermissions = () => {
                 <Sliders size={16} /> Access Inheritance Hierarchy
               </h3>
               <p className="subtitle mb-4">Visual representation of system role priority levels. Higher nodes inherit all sub-nodes.</p>
-              
-              <div className="hierarchy-root pt-3">
-                <div className="hierarchy-node">
-                  <div className="hierarchy-node-icon" style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' }}>👑</div>
-                  <span>Super Admin (Level 1)</span>
+              {sortedRolesForTree.length > 0 ? (
+                renderHierarchyTree(sortedRolesForTree)
+              ) : (
+                <div className="py-5 text-center text-muted flex-column align-center justify-center gap-2">
+                  <Sliders size={28} className="opacity-50 mb-1" />
+                  <p className="m-0 font-medium">No active roles fetched from database</p>
+                  <span className="text-xs opacity-75">Create roles above to populate the hierarchy tree.</span>
                 </div>
-                <div className="hierarchy-children">
-                  <div className="hierarchy-child-row">
-                    <div className="hierarchy-connector"></div>
-                    <div className="hierarchy-node">
-                      <div className="hierarchy-node-icon" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}>🏢</div>
-                      <span>Branch Admin (Level 2)</span>
-                    </div>
-                  </div>
-                  <div className="hierarchy-children">
-                    <div className="hierarchy-child-row">
-                      <div className="hierarchy-connector"></div>
-                      <div className="hierarchy-node">
-                        <div className="hierarchy-node-icon" style={{ background: 'rgba(236,72,153,0.15)', color: '#ec4899' }}>💼</div>
-                        <span>Project Manager (Level 3)</span>
-                      </div>
-                    </div>
-                    <div className="hierarchy-children">
-                      <div className="hierarchy-child-row">
-                        <div className="hierarchy-connector"></div>
-                        <div className="hierarchy-node">
-                          <div className="hierarchy-node-icon" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>👥</div>
-                          <span>Team Leader (Level 4)</span>
-                        </div>
-                      </div>
-                      <div className="hierarchy-children">
-                        <div className="hierarchy-child-row">
-                          <div className="hierarchy-connector"></div>
-                          <div className="hierarchy-node">
-                            <div className="hierarchy-node-icon" style={{ background: 'rgba(100,116,139,0.15)', color: '#64748b' }}>👤</div>
-                            <span>Employee (Level 5)</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Recent permission activity feed */}
@@ -1414,73 +1458,7 @@ const RolesPermissions = () => {
           </div>
         </div>
 
-          {/* Granular Permission Builder */}
-          <div className="card p-5">
-            <h3 className="card-sec-title mb-2">
-              <Key size={16} /> Granular Access Policy Builder
-            </h3>
-            <p className="subtitle mb-4">
-              Select a target role and category, then check system actions to build customized overrides policies.
-            </p>
-            
-            <div className="form-grid-2 mb-4">
-              <div className="form-group">
-                <label className="form-label">Target Role Scope</label>
-                <select
-                  value={builderRole}
-                  onChange={(e) => setBuilderRole(e.target.value)}
-                  className="form-select"
-                >
-                  {localRoles.map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
-              </div>
 
-              <div className="form-group">
-                <label className="form-label">Permission Category</label>
-                <select
-                  value={builderCategory}
-                  onChange={(e) => setBuilderCategory(e.target.value)}
-                  className="form-select"
-                >
-                  <option value="Employee Management">Employee Management</option>
-                  <option value="Attendance Tracking">Attendance Tracking</option>
-                  <option value="Payroll Processing">Payroll Processing</option>
-                  <option value="System Security">System Security</option>
-                  <option value="Task Operations">Task Operations</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="perm-builder-grid mb-6">
-              {Object.keys(builderPermissions).map(perm => (
-                <div key={perm} className="perm-builder-category">
-                  <div className="perm-builder-cat-header bg-elevated border-bottom">
-                    <Lock size={12} className="text-primary" />
-                    <span>Action: {perm.toUpperCase()}</span>
-                  </div>
-                  <div className="perm-builder-options">
-                    <label className="perm-builder-option">
-                      <input
-                        type="checkbox"
-                        checked={builderPermissions[perm]}
-                        onChange={() => handleBuilderCheckbox(perm)}
-                      />
-                      <span>Enable {perm} operations</span>
-                    </label>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex-between">
-              <span className="text-xs text-muted">Policy string compiles to granular JSON schema in real time.</span>
-              <Button variant="primary" onClick={handleGeneratePolicy} icon={Play}>
-                Generate & Apply Policy
-              </Button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -2118,18 +2096,7 @@ const RolesPermissions = () => {
         </div>
       )}
 
-      {/* Floating toast notifications container */}
-      <div className="page-toast-container">
-        {pageToasts.map((toast) => (
-          <div key={toast.id} className={`page-toast border-left-${toast.type}`}>
-            {toast.type === 'success' && <CheckCircle size={16} className="text-success mr-2" />}
-            {toast.type === 'danger' && <XCircle size={16} className="text-danger mr-2" />}
-            {toast.type === 'warning' && <AlertTriangle size={16} className="text-warning mr-2" />}
-            {toast.type === 'info' && <Info size={16} className="text-info mr-2" />}
-            <span>{toast.message}</span>
-          </div>
-        ))}
-      </div>
+
 
     </>
   );

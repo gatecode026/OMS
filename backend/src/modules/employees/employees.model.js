@@ -78,8 +78,14 @@ const employeeSchema = new mongoose.Schema({
     default: 'employee'
   },
   designation: String,
-  department: String,
-  branch: String,
+  department: {
+    type: String,
+    index: true
+  },
+  branch: {
+    type: String,
+    index: true
+  },
   branchAddress: String,
   team: String,
   teamLeader: String,
@@ -95,7 +101,8 @@ const employeeSchema = new mongoose.Schema({
   employmentStatus: String,
   status: {
     type: String,
-    default: 'Active'
+    default: 'Active',
+    index: true
   },
   accountStatus: {
     type: String,

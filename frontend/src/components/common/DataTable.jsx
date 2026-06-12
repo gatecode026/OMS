@@ -78,15 +78,16 @@ const DataTable = ({
         <table>
           <thead>
             <tr>
-              {columns.map((col) => {
-                const isSorted = sortState.key === col.key;
+              {columns.map((col, colIdx) => {
+                const columnKey = col.key || col.accessor || `col-${colIdx}`;
+                const isSorted = sortState.key === columnKey;
                 const isAsc = isSorted && sortState.direction === 'asc';
                 const isDesc = isSorted && sortState.direction === 'desc';
 
                 return (
                   <th
-                    key={col.key}
-                    onClick={() => handleSort(col.key, col.sortable !== false)}
+                    key={columnKey}
+                    onClick={() => handleSort(columnKey, col.sortable !== false)}
                     className={col.sortable !== false ? 'sortable-header' : ''}
                     style={{ width: col.width }}
                   >
@@ -108,8 +109,8 @@ const DataTable = ({
               // Skeleton loading state
               Array.from({ length: rowsPerPage }).map((_, rIndex) => (
                 <tr key={`skeleton-row-${rIndex}`}>
-                  {columns.map((col) => (
-                    <td key={`skeleton-td-${col.key}`}>
+                  {columns.map((col, colIdx) => (
+                    <td key={`skeleton-td-${col.key || col.accessor || colIdx}`}>
                       <Skeleton variant="line" height={16} width={col.skeletonWidth || "70%"} style={{ margin: 0 }} />
                     </td>
                   ))}
@@ -118,11 +119,15 @@ const DataTable = ({
             ) : paginatedData.length > 0 ? (
               paginatedData.map((row, rIndex) => (
                 <tr key={row.id || `row-${rIndex}`}>
-                  {columns.map((col) => (
-                    <td key={`cell-${col.key}`}>
-                      {col.render ? col.render(row) : row[col.key]}
-                    </td>
-                  ))}
+                  {columns.map((col, colIdx) => {
+                    const columnKey = col.key || col.accessor || `col-${colIdx}`;
+                    const cellRender = col.render || col.cell;
+                    return (
+                      <td key={`cell-${columnKey}`}>
+                        {cellRender ? cellRender(row) : row[columnKey]}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             ) : (

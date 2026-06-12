@@ -4,13 +4,13 @@ import { useApp } from '../../../context/AppContext';
 
 const parseTimeToMinutes = (timeStr) => {
   if (!timeStr) return 0;
-  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
   if (!match) return 0;
   let [_, hours, minutes, ampm] = match;
-  hours = parseInt(hours);
-  minutes = parseInt(minutes);
-  if (ampm.toUpperCase() === 'PM' && hours !== 12) hours += 12;
-  if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+  hours = parseInt(hours, 10);
+  minutes = parseInt(minutes, 10);
+  if (ampm && ampm.toUpperCase() === 'PM' && hours !== 12) hours += 12;
+  if (ampm && ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
   return hours * 60 + minutes;
 };
 
@@ -30,7 +30,7 @@ const MarkAttendanceModal = ({
   todayRecord = {},
   currentUser = {}
 }) => {
-  const { addAttendanceRecord, updateAttendanceRecord, addToast } = useApp();
+  const { addAttendanceRecord, updateAttendanceRecord, addToast, attendanceRules } = useApp();
   const [action, setAction] = useState('in');
   const [location, setLocation] = useState('Office');
   const [notes, setNotes] = useState('');
@@ -81,7 +81,7 @@ const MarkAttendanceModal = ({
         punchOut: null,
         totalHours: 0,
         overtime: 0,
-        status: parseTimeToMinutes(formattedTimeStr) > parseTimeToMinutes('09:15 AM') ? 'Late' : 'Present',
+        status: parseTimeToMinutes(formattedTimeStr) > parseTimeToMinutes(attendanceRules?.lateTimeThreshold || '09:15') ? 'Late' : 'Present',
         workMode: location,
         notes: notes
       };
@@ -103,14 +103,16 @@ const MarkAttendanceModal = ({
       const outMins = parseTimeToMinutes(formattedTimeStr);
       const diffMins = Math.max(0, outMins - inMins);
       const diffHrs = parseFloat((diffMins / 60).toFixed(2));
-      const overtime = parseFloat(Math.max(0, diffHrs - 8).toFixed(2));
+      const dailyHours = parseFloat(attendanceRules?.dailyHours) || 8;
+      const halfDayHrs = parseFloat(attendanceRules?.halfDayHoursThreshold) || 8;
+      const overtime = parseFloat(Math.max(0, diffHrs - dailyHours).toFixed(2));
 
       updateAttendanceRecord(todayRecord.id, {
         ...todayRecord,
         punchOut: formattedTimeStr,
         totalHours: diffHrs,
         overtime: overtime,
-        status: diffHrs >= 8 ? 'Present' : 'Half Day',
+        status: diffHrs >= halfDayHrs ? 'Present' : 'Half Day',
         workMode: location,
         notes: notes
       });

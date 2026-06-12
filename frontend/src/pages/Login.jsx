@@ -9,7 +9,7 @@ import { Sparkles, Key, Mail, Eye, EyeOff, ShieldCheck, Smartphone, CheckCircle,
 const VALID_OTP = '1234';
 
 const Login = () => {
-  const { addToast, login } = useApp();
+  const { addToast, login, generalSettings } = useApp();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -170,7 +170,7 @@ const Login = () => {
           <div className="brand-logo-icon">
             <Sparkles size={22} className="text-primary" />
           </div>
-          <h2>SaaS Enterprise</h2>
+          <h2>{generalSettings?.companyName || 'Office Management Pvt. Ltd.'}</h2>
           <p>Workforce Management Administration Panel</p>
         </div>
 
@@ -221,13 +221,6 @@ const Login = () => {
                 <input type="checkbox" defaultChecked />
                 <span>Keep session active</span>
               </label>
-              <button
-                type="button"
-                className="forgot-password-link-btn"
-                onClick={() => setAuthMode('forgot')}
-              >
-                Forgot password?
-              </button>
             </div>
 
             <Button variant="primary" type="submit" loading={loading} className="login-submit-btn">

@@ -5,7 +5,7 @@ import Avatar from '../common/Avatar';
 import { useApp } from '../../context/AppContext';
 
 const ProjectsTable = ({ projects, onView, onEdit, onAssignTeam }) => {
-  const { currentUserRole } = useApp();
+  const { currentUserRole, hasPermission } = useApp();
   // Sort state: { key: string, direction: 'asc' | 'desc' }
   const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
   const [currentPage, setCurrentPage] = useState(1);
@@ -219,7 +219,7 @@ const ProjectsTable = ({ projects, onView, onEdit, onAssignTeam }) => {
                         >
                           <Eye size={13} />
                         </button>
-                        {currentUserRole !== 'employee' && (
+                        {hasPermission('project_management', 'update') && (
                           <>
                             <button
                               className={`${styles.actionBtn} ${styles.actionBtnEdit}`}

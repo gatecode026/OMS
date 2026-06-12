@@ -538,6 +538,56 @@ const Notifications = () => {
     ];
   }, [notifications]);
 
+  const dynamicStats = useMemo(() => {
+    // 1. Total Dispatch Logs
+    const totalDispatchesCount = notifications.reduce((sum, n) => sum + (n.recipients || 0), 0);
+
+    // 2. Trigger rules configured and active
+    const totalTriggerRules = automationRules.reduce((sum, cat) => sum + cat.rules.length, 0);
+    const activeTriggerRules = automationRules.reduce((sum, cat) => sum + cat.rules.filter(r => r.enabled).length, 0);
+
+    // 3. Dispatched Today
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayNotifs = notifications.filter(n => (n.sentDate || '').startsWith(todayStr));
+    const dispatchedTodayCount = todayNotifs.reduce((sum, n) => sum + (n.recipients || 0), 0);
+
+    // 4. Pending / Queued
+    const pendingNotifs = notifications.filter(n => ['Scheduled', 'Pending'].includes(n.deliveryStatus));
+    const pendingCount = pendingNotifs.reduce((sum, n) => sum + (n.recipients || 0), 0);
+
+    // 5. Delivered Dispatches
+    const deliveredCount = notifications.reduce((sum, n) => sum + (n.delivered || 0), 0);
+
+    // 6. Read / Acknowledged
+    const readCount = notifications.reduce((sum, n) => sum + (typeof n.read === 'number' ? n.read : (n.read === true ? (n.recipients || 1) : 0)), 0);
+
+    // 7. Unread Notifications
+    const unreadCount = Math.max(0, totalDispatchesCount - readCount);
+
+    // 8. Delivery Success Rate
+    let totalDelivered = 0;
+    let totalFailed = 0;
+    notifications.forEach(n => {
+      totalDelivered += n.delivered || 0;
+      totalFailed += n.failed || 0;
+    });
+    const totalSent = totalDelivered + totalFailed;
+    const successRate = totalSent > 0 ? parseFloat(((totalDelivered / totalSent) * 100).toFixed(1)) : 100.0;
+
+    return {
+      totalDispatchesCount,
+      totalTriggerRules,
+      activeTriggerRules,
+      dispatchedTodayCount,
+      todayNotifsCount: todayNotifs.length,
+      pendingCount,
+      deliveredCount,
+      readCount,
+      unreadCount,
+      successRate
+    };
+  }, [notifications, automationRules]);
+
   const getPriorityStyle = (priority) => {
     switch (priority) {
       case 'Critical': return '#ef4444';
@@ -657,10 +707,10 @@ const Notifications = () => {
                 <span className="stat-label">Total Dispatch Logs</span>
                 <div className="stat-icon-chip"><Inbox size={18} /></div>
               </div>
-              <div className="stat-num">{formatNumber(125480)}</div>
+              <div className="stat-num">{formatNumber(dynamicStats.totalDispatchesCount)}</div>
               <div className="flex-center justify-between">
-                <Badge variant="primary" style={{ fontSize: '0.68rem' }}>Month</Badge>
-                <div className="stat-trend trend-green"><TrendingUp size={11} /> +12.4% vs May</div>
+                <Badge variant="primary" style={{ fontSize: '0.68rem' }}>Total</Badge>
+                <div className="stat-trend trend-green"><TrendingUp size={11} /> {notifications.length} Campaigns</div>
               </div>
             </div>
 
@@ -669,10 +719,10 @@ const Notifications = () => {
                 <span className="stat-label">Automated Trigger Rules</span>
                 <div className="stat-icon-chip"><Zap size={18} /></div>
               </div>
-              <div className="stat-num">24</div>
+              <div className="stat-num">{dynamicStats.activeTriggerRules}</div>
               <div className="flex-center justify-between">
                 <Badge variant="info" style={{ fontSize: '0.68rem' }}>Active</Badge>
-                <div className="stat-trend trend-blue"><Activity size={11} /> 8 Rules Configured</div>
+                <div className="stat-trend trend-blue"><Activity size={11} /> {dynamicStats.totalTriggerRules} Rules Configured</div>
               </div>
             </div>
 
@@ -681,10 +731,10 @@ const Notifications = () => {
                 <span className="stat-label">Dispatched Today</span>
                 <div className="stat-icon-chip"><Send size={18} /></div>
               </div>
-              <div className="stat-num">{formatNumber(1285)}</div>
+              <div className="stat-num">{formatNumber(dynamicStats.dispatchedTodayCount)}</div>
               <div className="flex-center justify-between">
                 <Badge variant="success" style={{ fontSize: '0.68rem' }}>Realtime</Badge>
-                <div className="stat-trend trend-green"><CheckCircle size={11} /> 100% uptime</div>
+                <div className="stat-trend trend-green"><CheckCircle size={11} /> {dynamicStats.todayNotifsCount} campaigns today</div>
               </div>
             </div>
 
@@ -693,10 +743,10 @@ const Notifications = () => {
                 <span className="stat-label">Pending / Queued</span>
                 <div className="stat-icon-chip"><Clock size={18} /></div>
               </div>
-              <div className="stat-num">42</div>
+              <div className="stat-num">{formatNumber(dynamicStats.pendingCount)}</div>
               <div className="flex-center justify-between">
                 <Badge variant="warning" style={{ fontSize: '0.68rem' }}>Scheduler</Badge>
-                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Awaiting cron cycle</span>
+                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Awaiting transmission</span>
               </div>
             </div>
           </div>
@@ -707,10 +757,10 @@ const Notifications = () => {
                 <span className="stat-label">Delivered Dispatches</span>
                 <div className="stat-icon-chip"><CheckCircle size={18} /></div>
               </div>
-              <div className="stat-num">{formatNumber(124210)}</div>
+              <div className="stat-num">{formatNumber(dynamicStats.deliveredCount)}</div>
               <div className="flex-center justify-between">
-                <Badge variant="success" style={{ fontSize: '0.68rem' }}>99.2%</Badge>
-                <div className="stat-trend trend-green">Gateway confirmed delivery</div>
+                <Badge variant="success" style={{ fontSize: '0.68rem' }}>{dynamicStats.successRate}%</Badge>
+                <div className="stat-trend trend-green">Confirmed delivered</div>
               </div>
             </div>
 
@@ -719,10 +769,12 @@ const Notifications = () => {
                 <span className="stat-label">Read / Acknowledged</span>
                 <div className="stat-icon-chip"><Eye size={18} /></div>
               </div>
-              <div className="stat-num">{formatNumber(118450)}</div>
+              <div className="stat-num">{formatNumber(dynamicStats.readCount)}</div>
               <div className="flex-center justify-between">
                 <Badge variant="primary" style={{ fontSize: '0.68rem' }}>Audited</Badge>
-                <div className="stat-trend trend-blue">95.3% engagement</div>
+                <div className="stat-trend trend-blue">
+                  {dynamicStats.totalDispatchesCount > 0 ? ((dynamicStats.readCount / dynamicStats.totalDispatchesCount) * 100).toFixed(1) : 0}% engagement
+                </div>
               </div>
             </div>
 
@@ -731,10 +783,10 @@ const Notifications = () => {
                 <span className="stat-label">Unread Notifications</span>
                 <div className="stat-icon-chip"><Bell size={18} /></div>
               </div>
-              <div className="stat-num">{formatNumber(5760)}</div>
+              <div className="stat-num">{formatNumber(dynamicStats.unreadCount)}</div>
               <div className="flex-center justify-between">
                 <Badge variant="warning" style={{ fontSize: '0.68rem' }}>Inbox</Badge>
-                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Pending reader session</span>
+                <span className="text-muted" style={{ fontSize: '0.72rem' }}>Awaiting acknowledgment</span>
               </div>
             </div>
 
@@ -743,10 +795,10 @@ const Notifications = () => {
                 <span className="stat-label">Delivery Success Rate</span>
                 <div className="stat-icon-chip"><TrendingUp size={18} /></div>
               </div>
-              <div className="stat-num">99.2%</div>
+              <div className="stat-num">{dynamicStats.successRate}%</div>
               <div className="flex-center justify-between">
                 <Badge variant="success" style={{ fontSize: '0.68rem' }}>KPI</Badge>
-                <div className="stat-trend trend-green">+0.1% gains</div>
+                <div className="stat-trend trend-green">Target 99%</div>
               </div>
             </div>
           </div>
@@ -806,7 +858,7 @@ const Notifications = () => {
               <div className="flex-center justify-between border-bottom pb-3 mb-4">
                 <div>
                   <h3 className="card-sec-title flex-center gap-2" style={{ margin: 0 }}><Bell size={18} className="text-primary" /> Today's Live Dispatch Feed</h3>
-                  <p className="subtitle" style={{ marginTop: 2 }}>Real-time audit log of communications sent on June 4, 2026</p>
+                  <p className="subtitle" style={{ marginTop: 2 }}>Real-time audit log of communications sent on {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => addPageToast('success', 'Feed records refreshed in realtime.')}></Button>
@@ -1081,7 +1133,7 @@ const Notifications = () => {
                   </RePieChart>
                 </ResponsiveContainer>
               </div>
-              <strong style={{ fontSize: '1.4rem', color: 'var(--text-primary)', marginTop: '-20px' }}>99.2%</strong>
+              <strong style={{ fontSize: '1.4rem', color: 'var(--text-primary)', marginTop: '-20px' }}>{dynamicStats.successRate}%</strong>
               <span className="text-muted text-xs">Gateway Response Confirmed</span>
             </div>
 
