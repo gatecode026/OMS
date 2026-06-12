@@ -2348,7 +2348,6 @@ const LeaveManagement = () => {
                   <option value="Inactive">Inactive Policies</option>
                 </select>
               </div>
-
               <div className="filter-input-box">
                 <label>Total Policies</label>
                 <div className="flex-center gap-2 mt-2">

@@ -32,8 +32,16 @@ const Avatar = ({ name = '', size = 'md', className = '', src = undefined }) => 
   const bgColor = getAvatarColor(name);
 
   // Look up matching employee/user to see if they have uploaded a profile photo
-  const emp = employees?.find(e => e.name === name) || (currentUser?.name === name ? currentUser : null);
-  const imageUrl = (src !== undefined && src !== null) ? src : (emp?.photoUrl || emp?.avatar || '');
+  const emp = employees?.find(e => 
+    e.name?.toLowerCase().trim() === name?.toLowerCase().trim() ||
+    e.fullName?.toLowerCase().trim() === name?.toLowerCase().trim()
+  ) || (
+    currentUser?.name?.toLowerCase().trim() === name?.toLowerCase().trim() ||
+    currentUser?.fullName?.toLowerCase().trim() === name?.toLowerCase().trim()
+      ? currentUser 
+      : null
+  );
+  const imageUrl = src || emp?.photoUrl || emp?.avatar || '';
 
   return (
     <div
