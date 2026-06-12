@@ -36,6 +36,18 @@ const getLocalDateString = () => {
   return `${year}-${month}-${day}`;
 };
 
+const formatTime12 = (time24) => {
+  if (!time24) return '09:15 AM';
+  const parts = time24.split(':');
+  if (parts.length < 2) return time24;
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // 0 should be 12
+  return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+};
+
 const getDatesRange = (rangeType) => {
   const dates = [];
   const today = new Date();
@@ -189,7 +201,8 @@ const Attendance = () => {
     currentUser,
     currentUserRole,
     fetchAttendance,
-    fetchEmployees
+    fetchEmployees,
+    attendanceRules
   } = useApp();
 
   const [personalTab, setPersonalTab] = useState('today'); // today, 7days, month, custom
@@ -1608,7 +1621,7 @@ const Attendance = () => {
             </div>
             <div className="att-kpi-value">{statusCounts.late}</div>
             <div className="att-kpi-sub">
-              <span>After 09:15 AM</span>
+              <span>After {formatTime12(attendanceRules?.lateTimeThreshold || '09:15')}</span>
             </div>
           </div>
 

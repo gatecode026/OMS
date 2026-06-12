@@ -314,7 +314,7 @@ const PER_PAGE = 10;
 const Managers = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(700);
-  const { addToast, showConfirm, employees, tasks, addTask, departments, branches, addEmployee, updateEmployee, deactivateEmployee, projectsList, teams, updateProject, updateTeam } = useApp();
+  const { addToast, showConfirm, employees, tasks, addTask, departments, branches, addEmployee, updateEmployee, deactivateEmployee, projectsList, teams, updateProject, updateTeam, hasPermission } = useApp();
   const directoryRef = useRef(null);
   const [activeDetailTab, setActiveDetailTab] = useState('overview');
 
@@ -819,12 +819,13 @@ const Managers = () => {
             </div>
           </div>
 
-          {/* ── QUICK ACTIONS ── */}
-          <div style={{display:'flex',gap:'var(--space-2)',flexWrap:'wrap'}}>
-            <Button variant="secondary" size="sm" icon={Briefcase}  onClick={()=>setAssignProjOpen(true)}>Assign Project</Button>
-            <Button variant="secondary" size="sm" icon={UserPlus}   onClick={()=>setAssignLeaderOpen(true)}>Assign Team Leader</Button>
-            <Button variant="secondary" size="sm" icon={Package}    onClick={()=>setAllocateOpen(true)}>Allocate Resources</Button>
-          </div>
+          {hasPermission('team_management', 'update') && (
+            <div style={{display:'flex',gap:'var(--space-2)',flexWrap:'wrap'}}>
+              <Button variant="secondary" size="sm" icon={Briefcase}  onClick={()=>setAssignProjOpen(true)}>Assign Project</Button>
+              <Button variant="secondary" size="sm" icon={UserPlus}   onClick={()=>setAssignLeaderOpen(true)}>Assign Team Leader</Button>
+              <Button variant="secondary" size="sm" icon={Package}    onClick={()=>setAllocateOpen(true)}>Allocate Resources</Button>
+            </div>
+          )}
 
           {/* ── SUMMARY CARDS ── */}
           <div className="pm-summary-grid" style={{flexShrink: 0}}>
@@ -1136,8 +1137,12 @@ const Managers = () => {
                         <td onClick={e=>e.stopPropagation()}>
                           <div className="pm-row-actions">
                             <button className="icon-action-btn" title="View" aria-label="View" onClick={()=>dispatch({type:'SELECT_PM',pm})}><Eye size={14}/></button>
-                            <button className="icon-action-btn" title="Edit" aria-label="Edit" onClick={()=>openEdit(pm)}><Pencil size={14}/></button>
-                            <button className="icon-action-btn icon-action-danger" title="Delete" aria-label="Delete" onClick={()=>deletePM(pm)}><Trash2 size={14}/></button>
+                            {hasPermission('team_management', 'update') && (
+                              <button className="icon-action-btn" title="Edit" aria-label="Edit" onClick={()=>openEdit(pm)}><Pencil size={14}/></button>
+                            )}
+                            {hasPermission('team_management', 'delete') && (
+                              <button className="icon-action-btn icon-action-danger" title="Delete" aria-label="Delete" onClick={()=>deletePM(pm)}><Trash2 size={14}/></button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1221,8 +1226,12 @@ const Managers = () => {
                         <div className="pm-card-actions" onClick={e => e.stopPropagation()}>
                           <Button variant="ghost" size="sm" icon={Eye} onClick={() => dispatch({ type: 'SELECT_PM', pm })}>View Profile</Button>
                           <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="icon-action-btn" title="Edit" aria-label="Edit" onClick={() => openEdit(pm)}><Pencil size={14}/></button>
-                            <button className="icon-action-btn icon-action-danger" title="Delete" aria-label="Delete" onClick={() => deletePM(pm)}><Trash2 size={14}/></button>
+                            {hasPermission('team_management', 'update') && (
+                              <button className="icon-action-btn" title="Edit" aria-label="Edit" onClick={() => openEdit(pm)}><Pencil size={14}/></button>
+                            )}
+                            {hasPermission('team_management', 'delete') && (
+                              <button className="icon-action-btn icon-action-danger" title="Delete" aria-label="Delete" onClick={() => deletePM(pm)}><Trash2 size={14}/></button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1270,8 +1279,12 @@ const Managers = () => {
               <div className="pm-detail-topbar">
                 <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={()=>dispatch({type:'GO_BACK'})}>Back</Button>
                 <div className="pm-detail-topbar-actions">
-                  <Button variant="secondary" size="sm" icon={Pencil} onClick={()=>openEdit(selectedPM)}>Edit Profile</Button>
-                  <Button variant="ghost" size="sm" icon={Download} onClick={()=>addToast('success','PM Profile PDF exported.')}>Export PDF</Button>
+                  {hasPermission('team_management', 'update') && (
+                    <Button variant="secondary" size="sm" icon={Pencil} onClick={()=>openEdit(selectedPM)}>Edit Profile</Button>
+                  )}
+                  {hasPermission('team_management', 'export') && (
+                    <Button variant="ghost" size="sm" icon={Download} onClick={()=>addToast('success','PM Profile PDF exported.')}>Export PDF</Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1448,9 +1461,15 @@ const Managers = () => {
                               <td onClick={e=>e.stopPropagation()}>
                                 <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                                   <Button variant="ghost" size="sm" onClick={()=>{ setSelectedTL(tl); setViewTeamOpen(true); }}>View Team</Button>
-                                  <Button variant="ghost" size="sm" onClick={()=>{ setSelectedTL(tl); setWorkProject(pmProjects[0]?.name || ''); setAssignWorkOpen(true); }}>Assign Work</Button>
-                                  <Button variant="ghost" size="sm" onClick={()=>{ setSelectedTL(tl); setRevProductivity(tl.productivity); setRevAttendance(tl.attendance); setReviewLeaderOpen(true); }}>Review Performance</Button>
-                                  <Button variant="ghost" size="sm" onClick={()=>{ setSelectedTL(tl); setTransferTargetPM(''); setTransferTeamOpen(true); }}>Transfer Team</Button>
+                                  {hasPermission('team_management', 'update') && (
+                                    <Button variant="ghost" size="sm" onClick={()=>{ setSelectedTL(tl); setWorkProject(pmProjects[0]?.name || ''); setAssignWorkOpen(true); }}>Assign Work</Button>
+                                  )}
+                                  {hasPermission('team_management', 'update') && (
+                                    <Button variant="ghost" size="sm" onClick={()=>{ setSelectedTL(tl); setRevProductivity(tl.productivity); setRevAttendance(tl.attendance); setReviewLeaderOpen(true); }}>Review Performance</Button>
+                                  )}
+                                  {hasPermission('team_management', 'update') && (
+                                    <Button variant="ghost" size="sm" onClick={()=>{ setSelectedTL(tl); setTransferTargetPM(''); setTransferTeamOpen(true); }}>Transfer Team</Button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -1581,9 +1600,15 @@ const Managers = () => {
                             <div key={item.id} className="pm-approval-item">
                               <div style={{flex:1}}><div className="pm-approval-desc">{item.description}</div><div className="pm-approval-meta">By {item.requester} · {item.submittedDate}</div></div>
                               <div className="pm-approval-actions">
-                                <Button variant="primary" size="sm" icon={Check} onClick={()=>approve(item)}>Approve</Button>
-                                <Button variant="danger"  size="sm" icon={XCircle} onClick={()=>setRejectingItem(item)}>Reject</Button>
-                                {type==='Team Resource Requests'&&<Button variant="ghost" size="sm" onClick={()=>addToast('info','Escalating...')}>Escalate</Button>}
+                                {hasPermission('team_management', 'approve') && (
+                                  <Button variant="primary" size="sm" icon={Check} onClick={()=>approve(item)}>Approve</Button>
+                                )}
+                                {hasPermission('team_management', 'approve') && (
+                                  <Button variant="danger"  size="sm" icon={XCircle} onClick={()=>setRejectingItem(item)}>Reject</Button>
+                                )}
+                                {type==='Team Resource Requests' && hasPermission('team_management', 'approve') && (
+                                  <Button variant="ghost" size="sm" onClick={()=>addToast('info','Escalating...')}>Escalate</Button>
+                                )}
                               </div>
                             </div>
                           )):<div style={{textAlign:'center',padding:'16px',color:'var(--text-muted)',fontSize:'0.82rem'}}>✓ No pending {type.toLowerCase()}</div>}

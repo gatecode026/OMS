@@ -277,8 +277,28 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance } = useApp();
   const location = useLocation();
+
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getTodayAttendance = (empId) => {
+    if (!attendance || attendance.length === 0) return null;
+    const todayStr = getLocalDateString();
+    return attendance.find(a => a.employeeId === empId && a.date === todayStr);
+  };
+
+  const getTodayStatus = (row) => {
+    const att = getTodayAttendance(row.id);
+    if (att) return att.status;
+    return 'Absent';
+  };
 
 
   const handleZipCodeChange = async (zipVal) => {
@@ -611,26 +631,46 @@ const Employees = () => {
       }
     } else if (editId) {
       if (!showFormPanel || formMode !== 'edit' || selectedEmployeeId !== editId) {
-        const emp = employees.find(e => e.id === editId);
-        if (emp) {
-          setTimeout(() => {
-            handleOpenEdit(emp);
-            if (stepParam && stepParam >= 1 && stepParam <= 7) {
-              setTimeout(() => setWizardStep(stepParam), 50);
-            }
-          }, 0);
-        } else {
-          if (showFormPanel) {
-            setTimeout(() => setShowFormPanel(false), 0);
+        fetch(`http://localhost:5000/api/v1/employees/${editId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-        }
+        })
+          .then(res => res.json())
+          .then(result => {
+            if (result.status === 'success' && result.data) {
+              const fullEmp = normalizeEmployee(result.data);
+              handleOpenEdit(fullEmp);
+              if (stepParam && stepParam >= 1 && stepParam <= 7) {
+                setWizardStep(stepParam);
+              }
+            } else {
+              const emp = employees.find(e => e.id === editId);
+              if (emp) {
+                handleOpenEdit(emp);
+                if (stepParam && stepParam >= 1 && stepParam <= 7) {
+                  setWizardStep(stepParam);
+                }
+              }
+            }
+          })
+          .catch(err => {
+            console.error('Failed to fetch full employee data for editing:', err);
+            const emp = employees.find(e => e.id === editId);
+            if (emp) {
+              handleOpenEdit(emp);
+              if (stepParam && stepParam >= 1 && stepParam <= 7) {
+                setWizardStep(stepParam);
+              }
+            }
+          });
       }
     } else {
       if (showFormPanel) {
         setTimeout(() => setShowFormPanel(false), 0);
       }
     }
-  }, [location.pathname, location.search, employees, showFormPanel, formMode, selectedEmployeeId]);
+  }, [location.pathname, location.search, employees, showFormPanel, formMode, selectedEmployeeId, token]);
 
   useEffect(() => {
     localStorage.setItem(LS_KEY, JSON.stringify(colVis));
@@ -668,13 +708,20 @@ const Employees = () => {
     const md = deptFilter ? e.department === deptFilter : true;
     const mb = branchFilter ? e.branch === branchFilter : true;
     const mst = statusFilter ? e.status === statusFilter : true;
+    
+    const resolvedAttStatus = getTodayStatus(e);
     const ma = attFilter ? (
-      attFilter === 'WFH' || attFilter === 'Work From Home' ? (e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH') :
-        attFilter === 'On Leave' || attFilter === 'Leave' ? (e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave') :
-          e.attendanceStatus === attFilter
+      attFilter === 'WFH' || attFilter === 'Work From Home' ? (resolvedAttStatus === 'Work From Home' || resolvedAttStatus === 'WFH') :
+        attFilter === 'On Leave' || attFilter === 'Leave' ? (resolvedAttStatus === 'On Leave' || resolvedAttStatus === 'Leave') :
+          resolvedAttStatus === attFilter
     ) : true;
+    
     const msh = shiftFilter ? (e.shift && e.shift.toLowerCase().includes(shiftFilter.toLowerCase())) : true;
-    const mp = punchFilter ? e.todayPunchStatus === punchFilter : true;
+    
+    const att = getTodayAttendance(e.id);
+    const resolvedPunchStatus = att && att.punchIn && att.punchIn !== '--:--' ? 'Punched In' : 'Not Punched';
+    const mp = punchFilter ? resolvedPunchStatus === punchFilter : true;
+    
     return ms && md && mb && mst && ma && msh && mp;
   }).sort((a, b) => {
     let av = a[sortKey] || '', bv = b[sortKey] || '';
@@ -847,9 +894,19 @@ const Employees = () => {
     addToast('info', 'Exporting attendance logs...');
     setTimeout(() => {
       const headers = ['ID', 'Name', 'Today Status', 'Today Punch In', 'Today Punch Out', 'Working Hours', 'Last Seen'];
-      const rows = selectedEmployees.map(e => [
-        e.id, e.name, e.attendanceStatus, e.todayPunchIn || '—', e.todayPunchOut || '—', e.todayWorkingHours ? `${e.todayWorkingHours} hrs` : '0 hrs', e.lastSeen || '—'
-      ]);
+      const rows = selectedEmployees.map(e => {
+        const att = getTodayAttendance(e.id);
+        const resolvedStatus = getTodayStatus(e);
+        const hasPunchedIn = att && att.punchIn && att.punchIn !== '--:--';
+        
+        const punchIn = hasPunchedIn ? att.punchIn : '-';
+        const punchOut = (hasPunchedIn && att.punchOut && att.punchOut !== '--:--') ? att.punchOut : '-';
+        const workingHours = hasPunchedIn ? ((att.totalHours !== undefined && att.totalHours !== null) ? `${att.totalHours} hrs` : '0 hrs') : '-';
+        
+        return [
+          e.id, e.name, resolvedStatus, punchIn, punchOut, workingHours, e.lastSeen || '—'
+        ];
+      });
       const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
@@ -1115,10 +1172,16 @@ const Employees = () => {
   const handleClearFilters = () => { setSearchTerm(''); setDeptFilter(''); setBranchFilter(''); setStatusFilter(''); setAttFilter(''); setShiftFilter(''); setPunchFilter(''); };
 
   const totalEmp = employees.length;
-  const presentCount = employees.filter(e => e.attendanceStatus === 'Present').length;
-  const absentCount = employees.filter(e => e.attendanceStatus === 'Absent').length;
-  const lateCount = employees.filter(e => e.attendanceStatus === 'Late').length;
-  const leaveCount = employees.filter(e => e.attendanceStatus === 'On Leave').length;
+  const presentCount = employees.filter(e => {
+    const status = getTodayStatus(e);
+    return ['Present', 'Overtime', 'Half Day', 'Half-Day'].includes(status);
+  }).length;
+  const absentCount = employees.filter(e => getTodayStatus(e) === 'Absent').length;
+  const lateCount = employees.filter(e => getTodayStatus(e) === 'Late').length;
+  const leaveCount = employees.filter(e => {
+    const status = getTodayStatus(e);
+    return ['On Leave', 'Leave'].includes(status);
+  }).length;
   const topPerformers = employees.filter(e => (e.performanceScore?.overall || 0) >= 85).length;
   const needsAttention = employees.filter(e => (e.performanceScore?.overall || 0) < 60).length;
   const avgTaskCompletion = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.taskCompletion || 70), 0) / Math.max(employees.length, 1));
@@ -1283,8 +1346,10 @@ const Employees = () => {
     return scoreB - scoreA;
   });
   const sortedByAttendance = [...employees].sort((a, b) => {
-    const attA = a.performanceScore?.attendance || (a.attendanceStatus === 'Present' ? 95 : 80);
-    const attB = b.performanceScore?.attendance || (b.attendanceStatus === 'Present' ? 95 : 80);
+    const statusA = getTodayStatus(a);
+    const statusB = getTodayStatus(b);
+    const attA = a.performanceScore?.attendance || (statusA === 'Present' ? 95 : 80);
+    const attB = b.performanceScore?.attendance || (statusB === 'Present' ? 95 : 80);
     return attB - attA;
   });
 
@@ -1302,7 +1367,9 @@ const Employees = () => {
           <h2>Employee Directory</h2>
           <p className="page-desc-text">Manage employee access, profiles, branches, and roles</p>
         </div>
-        <Button variant="primary" onClick={() => navigate('/employees/add')} icon={UserPlus}>Add Employee</Button>
+        {hasPermission('employee_management', 'create') && (
+          <Button variant="primary" onClick={() => navigate('/employees/add')} icon={UserPlus}>Add Employee</Button>
+        )}
       </div>
 
       {!showFormPanel && (<>
@@ -1570,11 +1637,23 @@ const Employees = () => {
           <div className="snapshot-left">
             <span className="snapshot-title">Today's Attendance Snapshot:</span>
             <div className="snapshot-metrics">
-              <span className="snapshot-metric"><span className="emoji">✅</span> Punched In: <strong>{employees.filter(e => ['Present', 'Late', 'Work From Home', 'Overtime'].includes(e.attendanceStatus)).length.toLocaleString()}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">⚠️</span> Not Yet: <strong>{employees.filter(e => e.attendanceStatus === 'Absent' || !e.attendanceStatus).length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🕐</span> Late: <strong>{employees.filter(e => e.attendanceStatus === 'Late').length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🏠</span> WFH: <strong>{employees.filter(e => e.attendanceStatus === 'Work From Home' || e.attendanceStatus === 'WFH').length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🌴</span> On Leave: <strong>{employees.filter(e => e.attendanceStatus === 'On Leave' || e.attendanceStatus === 'Leave').length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">✅</span> Punched In: <strong>{employees.filter(e => {
+                const status = getTodayStatus(e);
+                return ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime'].includes(status);
+              }).length.toLocaleString()}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">⚠️</span> Not Yet: <strong>{employees.filter(e => {
+                const status = getTodayStatus(e);
+                return status === 'Absent' || !status;
+              }).length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🕐</span> Late: <strong>{employees.filter(e => getTodayStatus(e) === 'Late').length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🏠</span> WFH: <strong>{employees.filter(e => {
+                const status = getTodayStatus(e);
+                return status === 'Work From Home' || status === 'WFH';
+              }).length}</strong></span>
+              <span className="snapshot-metric"><span className="emoji">🌴</span> On Leave: <strong>{employees.filter(e => {
+                const status = getTodayStatus(e);
+                return status === 'On Leave' || status === 'Leave';
+              }).length}</strong></span>
             </div>
           </div>
           <button className="snapshot-link-btn" onClick={() => navigate('/attendance')}>
@@ -1590,48 +1669,76 @@ const Employees = () => {
             <button className="bulk-deselect-link" onClick={() => setSelectedIds(new Set())}>Deselect All</button>
           </div>
           <div className="bulk-bar-right" style={{ flexWrap: 'wrap', gap: '8px' }}>
-            <button className="bulk-btn bulk-btn-success" onClick={handleBulkMarkPresent} title="Mark Present">
-              <CheckCircle size={14} /> Mark Present
-            </button>
-            <button className="bulk-btn bulk-btn-danger" onClick={handleBulkMarkAbsent} title="Mark Absent">
-              <XCircle size={14} /> Mark Absent
-            </button>
-            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowShiftModal(true)} title="Assign Shift">
-              <Clock size={14} /> Assign Shift
-            </button>
-            <button className="bulk-btn bulk-btn-success" onClick={handleBulkExportAttendance} title="Export Attendance">
-              <Download size={14} /> Export Attendance
-            </button>
-            <button className="bulk-btn bulk-btn-danger" onClick={handleBulkDelete} title="Delete Selected">
-              <Trash2 size={14} /> Delete
-            </button>
-            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowTransferModal(true)} title="Transfer Department">
-              <Briefcase size={14} /> Transfer Dept
-            </button>
-            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowAssignLeaderModal(true)} title="Assign Team Leader">
-              <UserCheck size={14} /> Assign Leader
-            </button>
-            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowRoleModal(true)} title="Assign Role">
-              <Shield size={14} /> Assign Role
-            </button>
-            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowStatusModal(true)} title="Update Status">
-              <Activity size={14} /> Status
-            </button>
-            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowLeaveModal(true)} title="Allocate Leave">
-              <Calendar size={14} /> Allocate Leave
-            </button>
-            <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowNotifyModal(true)} title="Send Alert">
-              <Mail size={14} /> Send Alert
-            </button>
-            <button className="bulk-btn bulk-btn-success" onClick={handleBulkActivate} title="Activate Accounts">
-              <CheckCircle size={14} /> Activate
-            </button>
-            <button className="bulk-btn bulk-btn-warning" onClick={handleBulkDisable} title="Disable Accounts">
-              <XCircle size={14} /> Disable
-            </button>
-            <button className="bulk-btn bulk-btn-ghost" onClick={handleBulkExport} title="Export CSV">
-              <Download size={14} /> Export
-            </button>
+            {hasPermission('attendance_management', 'update') && (
+              <button className="bulk-btn bulk-btn-success" onClick={handleBulkMarkPresent} title="Mark Present">
+                <CheckCircle size={14} /> Mark Present
+              </button>
+            )}
+            {hasPermission('attendance_management', 'update') && (
+              <button className="bulk-btn bulk-btn-danger" onClick={handleBulkMarkAbsent} title="Mark Absent">
+                <XCircle size={14} /> Mark Absent
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowShiftModal(true)} title="Assign Shift">
+                <Clock size={14} /> Assign Shift
+              </button>
+            )}
+            {hasPermission('attendance_management', 'export') && (
+              <button className="bulk-btn bulk-btn-success" onClick={handleBulkExportAttendance} title="Export Attendance">
+                <Download size={14} /> Export Attendance
+              </button>
+            )}
+            {hasPermission('employee_management', 'delete') && (
+              <button className="bulk-btn bulk-btn-danger" onClick={handleBulkDelete} title="Delete Selected">
+                <Trash2 size={14} /> Delete
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowTransferModal(true)} title="Transfer Department">
+                <Briefcase size={14} /> Transfer Dept
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowAssignLeaderModal(true)} title="Assign Team Leader">
+                <UserCheck size={14} /> Assign Leader
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowRoleModal(true)} title="Assign Role">
+                <Shield size={14} /> Assign Role
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowStatusModal(true)} title="Update Status">
+                <Activity size={14} /> Status
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowLeaveModal(true)} title="Allocate Leave">
+                <Calendar size={14} /> Allocate Leave
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowNotifyModal(true)} title="Send Alert">
+                <Mail size={14} /> Send Alert
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-success" onClick={handleBulkActivate} title="Activate Accounts">
+                <CheckCircle size={14} /> Activate
+              </button>
+            )}
+            {hasPermission('employee_management', 'update') && (
+              <button className="bulk-btn bulk-btn-warning" onClick={handleBulkDisable} title="Disable Accounts">
+                <XCircle size={14} /> Disable
+              </button>
+            )}
+            {hasPermission('employee_management', 'export') && (
+              <button className="bulk-btn bulk-btn-ghost" onClick={handleBulkExport} title="Export CSV">
+                <Download size={14} /> Export
+              </button>
+            )}
           </div>
         </div>
 
@@ -1775,10 +1882,46 @@ const Employees = () => {
                     {colVis.leaveBalance && <td><span className="bold-text font-mono text-warning">{row.leaveBalance || 18} days</span></td>}
                     {colVis.productivityScore && <td><span className="bold-text font-mono text-success" style={{ fontWeight: 600 }}>{row.productivityScore || 85}%</span></td>}
                     {colVis.performanceRating && <td><Badge variant={(row.performanceRating || 90) >= 90 ? 'success' : (row.performanceRating || 90) >= 75 ? 'primary' : 'warning'}>{row.performanceRating || 90}</Badge></td>}
-                    {colVis.todayPunchIn && <td><span className="punch-time-mono">{row.todayPunchIn || '--:--'}</span></td>}
-                    {colVis.todayPunchOut && <td><span className="punch-time-mono">{row.todayPunchOut || '--:--'}</span></td>}
-                    {colVis.todayWorkingHours && <td><span className="bold-text font-mono text-secondary">{row.todayWorkingHours ? fmtHoursTo60(row.todayWorkingHours) : '0h 00m'}</span></td>}
-                    {colVis.attendanceStatus && <td><AttBadge status={row.attendanceStatus} /></td>}
+                    {colVis.todayPunchIn && (
+                      <td>
+                        <span className="punch-time-mono">
+                          {(() => {
+                            const att = getTodayAttendance(row.id);
+                            const time = (att && att.punchIn && att.punchIn !== '--:--') ? att.punchIn : row.todayPunchIn;
+                            return time || '-';
+                          })()}
+                        </span>
+                      </td>
+                    )}
+                    {colVis.todayPunchOut && (
+                      <td>
+                        <span className="punch-time-mono">
+                          {(() => {
+                            const att = getTodayAttendance(row.id);
+                            const time = (att && att.punchOut && att.punchOut !== '--:--') ? att.punchOut : row.todayPunchOut;
+                            return time || '-';
+                          })()}
+                        </span>
+                      </td>
+                    )}
+                    {colVis.todayWorkingHours && (
+                      <td>
+                        <span className="bold-text font-mono text-secondary">
+                          {(() => {
+                            const att = getTodayAttendance(row.id);
+                            const hours = (att && att.totalHours !== undefined && att.totalHours !== null) ? att.totalHours : row.todayWorkingHours;
+                            const hasPunchedIn = (att && att.punchIn && att.punchIn !== '--:--') || row.todayPunchIn;
+                            if (!hasPunchedIn) return '-';
+                            return hours ? fmtHoursTo60(hours) : '0h 00m';
+                          })()}
+                        </span>
+                      </td>
+                    )}
+                    {colVis.attendanceStatus && (
+                      <td>
+                        <AttBadge status={row.attendanceStatus || getTodayStatus(row)} />
+                      </td>
+                    )}
                     {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '—'}</span></td>}
                     {colVis.workStatus && <td><WorkStatusDot status={row.workStatus} /></td>}
                     {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
@@ -1787,20 +1930,24 @@ const Employees = () => {
                         <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${row.id}`); }} title="View Full Profile">
                           <Eye size={16} />
                         </button>
-                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`?edit=${row.id}`); }} title="Edit">
-                          <Edit2 size={16} />
-                        </button>
+                        {hasPermission('employee_management', 'update') && (
+                          <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`?edit=${row.id}`); }} title="Edit">
+                            <Edit2 size={16} />
+                          </button>
+                        )}
                         <button className="table-action-icon-btn action-idcard-btn" onClick={(e) => { e.stopPropagation(); setIdCardEmployee(row); setShowIdCard(true); }} title="ID Card">
                           <CreditCard size={16} />
                         </button>
-                        {row.status === 'Inactive' ? (
-                          <button className="table-action-icon-btn action-activate-btn" onClick={(e) => { e.stopPropagation(); handleActivate(row.id, row.name); }} title="Activate">
-                            <CheckCircle size={16} />
-                          </button>
-                        ) : (
-                          <button className="table-action-icon-btn action-deactivate-btn" onClick={(e) => { e.stopPropagation(); handleDeactivate(row.id, row.name); }} title="Deactivate">
-                            <Trash2 size={16} />
-                          </button>
+                        {hasPermission('employee_management', 'delete') && (
+                          row.status === 'Inactive' ? (
+                            <button className="table-action-icon-btn action-activate-btn" onClick={(e) => { e.stopPropagation(); handleActivate(row.id, row.name); }} title="Activate">
+                              <CheckCircle size={16} />
+                            </button>
+                          ) : (
+                            <button className="table-action-icon-btn action-deactivate-btn" onClick={(e) => { e.stopPropagation(); handleDeactivate(row.id, row.name); }} title="Deactivate">
+                              <Trash2 size={16} />
+                            </button>
+                          )
                         )}
                       </div>
                     </td>
@@ -1861,15 +2008,36 @@ const Employees = () => {
           <div className="hover-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem' }}>
             <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
               <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Today:</span>
-              <span className="hover-card-value" style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{hoveredEmp.todayPunchIn ? `Punched In ✅ at ${hoveredEmp.todayPunchIn}` : 'Not Punched ⚠️'}</span>
+              <span className="hover-card-value" style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+                {(() => {
+                  const att = getTodayAttendance(hoveredEmp.id);
+                  return (att && att.punchIn && att.punchIn !== '--:--') ? `Punched In ✅ at ${att.punchIn}` : 'Not Punched ⚠️';
+                })()}
+              </span>
             </div>
             <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
               <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Status:</span>
-              <span className="hover-card-value" style={{ color: hoveredEmp.attendanceStatus === 'Present' || hoveredEmp.attendanceStatus === 'Overtime' ? 'var(--color-success)' : hoveredEmp.attendanceStatus === 'Late' ? 'var(--color-warning)' : 'var(--color-danger)', fontWeight: 600 }}>{hoveredEmp.attendanceStatus || 'Offline'}</span>
+              <span className="hover-card-value" style={{ 
+                color: (() => {
+                  const status = getTodayStatus(hoveredEmp);
+                  return status === 'Present' || status === 'Overtime' ? 'var(--color-success)' : status === 'Late' ? 'var(--color-warning)' : 'var(--color-danger)';
+                })(),
+                fontWeight: 600 
+              }}>
+                {getTodayStatus(hoveredEmp)}
+              </span>
             </div>
             <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
               <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Working Hours:</span>
-              <span className="hover-card-value font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{hoveredEmp.todayWorkingHours ? `${fmtHoursTo60(hoveredEmp.todayWorkingHours)} so far` : '0h 00m'}</span>
+              <span className="hover-card-value font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                {(() => {
+                  const att = getTodayAttendance(hoveredEmp.id);
+                  const hours = (att && att.totalHours !== undefined && att.totalHours !== null) ? att.totalHours : hoveredEmp.todayWorkingHours;
+                  const hasPunchedIn = (att && att.punchIn && att.punchIn !== '--:--') || hoveredEmp.todayPunchIn;
+                  if (!hasPunchedIn) return '-';
+                  return hours ? `${fmtHoursTo60(hours)} so far` : '0h 00m';
+                })()}
+              </span>
             </div>
           </div>
         </div>
@@ -1960,8 +2128,12 @@ const Employees = () => {
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Assign Role to {selectedIds.size} employee(s)</h3>
             <select value={bulkRole} onChange={e => setBulkRole(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>
-              <option value="super_admin">Super Admin</option><option value="manager">Manager</option>
-              <option value="team_leader">Team Leader</option><option value="employee">Employee</option>
+              <option value="">Select Role</option>
+              {(roles || []).map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
             </select>
             <div className="modal-footer"><Button variant="secondary" onClick={() => setShowRoleModal(false)}>Cancel</Button><Button variant="primary" onClick={handleBulkRoleAssign}>Assign Role</Button></div>
           </div>
@@ -2130,7 +2302,7 @@ const Employees = () => {
                   <div className="form-field">
                     <label>{FIELD_LABELS.roleId} *</label>
                     <select
-                      value={formData.roleId || 'employee'}
+                      value={formData.roleId || ''}
                       onChange={e => {
                         const nextRole = e.target.value;
                         setFormData(p => ({
@@ -2140,9 +2312,12 @@ const Employees = () => {
                         }));
                       }}
                     >
-                      <option value="manager">Manager</option>
-                      <option value="team_leader">Team Leader</option>
-                      <option value="employee">Employee</option>
+                      <option value="">Select Role</option>
+                      {(roles || []).map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>

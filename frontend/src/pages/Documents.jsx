@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import './Documents.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import Skeleton from '../components/common/Skeleton';
+import Modal from '../components/common/Modal';
 import {
   FolderClosed, Upload, Search, FileText, FileImage, File,
   Download, Trash2, Eye, FolderOpen, Clock, User
@@ -29,7 +30,9 @@ const Documents = () => {
   const [category, setCategory] = useState('All');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [uploadForm, setUploadForm] = useState({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
+  const fileInputRef = useRef(null);
 
   const isEmployee = currentUserRole === 'employee';
 
@@ -70,12 +73,70 @@ const Documents = () => {
   };
   const totalSize = computeTotalSize(visibleDocs);
 
+  const handleCloseModal = () => {
+    setShowUploadModal(false);
+    setSelectedFile(null);
+    setUploadForm({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+
+    // Auto-detect extension
+    const ext = file.name.split('.').pop().toUpperCase();
+    let type = 'PDF';
+    if (['PDF'].includes(ext)) type = 'PDF';
+    else if (['XLSX', 'XLS'].includes(ext)) type = 'XLSX';
+    else if (['PNG', 'JPG', 'JPEG', 'GIF'].includes(ext)) type = 'PNG';
+    else if (['ZIP', 'RAR', '7Z', 'TAR', 'GZ'].includes(ext)) type = 'ZIP';
+    else if (['DOCX', 'DOC'].includes(ext)) type = 'DOCX';
+    else if (['PPTX', 'PPT'].includes(ext)) type = 'PPTX';
+
+    // Format size
+    let sizeStr = '0 KB';
+    if (file.size < 1024 * 1024) {
+      sizeStr = `${(file.size / 1024).toFixed(1)} KB`;
+    } else {
+      sizeStr = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    // Remove extension from name for cleaner title
+    const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+
+    setUploadForm(prev => ({
+      ...prev,
+      name: nameWithoutExt,
+      type: type,
+      size: sizeStr
+    }));
+  };
+
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (!uploadForm.name.trim()) {
       addToast('warning', 'Document name is required.');
       return;
     }
+
+    let fileBase64 = '';
+    if (selectedFile) {
+      try {
+        fileBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(selectedFile);
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (error) => reject(error);
+        });
+      } catch (err) {
+        console.error('FileReader error:', err);
+        addToast('danger', 'Failed to read the selected file.');
+        return;
+      }
+    }
+
     const docData = {
       name: uploadForm.name,
       type: uploadForm.type,
@@ -83,11 +144,39 @@ const Documents = () => {
       size: uploadForm.size,
       uploadedBy: currentUser?.name || 'Balram Suman',
       uploadDate: new Date().toISOString().split('T')[0],
-      downloads: 0
+      downloads: 0,
+      fileUrl: fileBase64
     };
     await addDocument(docData);
-    setShowUploadModal(false);
-    setUploadForm({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
+    handleCloseModal();
+  };
+
+  const handleDownloadFile = async (doc) => {
+    if (!doc.fileUrl) {
+      addToast('warning', 'No download file available.');
+      return;
+    }
+    addToast('info', `Downloading "${doc.name}"...`);
+    try {
+      const response = await fetch(doc.fileUrl);
+      if (!response.ok) throw new Error('Failed to fetch file');
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      const fileExt = doc.type ? doc.type.toLowerCase() : 'bin';
+      link.download = doc.name.endsWith(`.${fileExt}`) ? doc.name : `${doc.name}.${fileExt}`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      addToast('success', `Downloaded "${doc.name}" successfully.`);
+    } catch (err) {
+      console.error('Download failed, falling back to open:', err);
+      window.open(doc.fileUrl, '_blank');
+    }
   };
 
   if (isLoading) {
@@ -181,14 +270,20 @@ const Documents = () => {
                 <button
                   className="doc-action-btn"
                   title="Preview"
-                  onClick={() => addToast('info', `Opening preview for "${doc.name}"...`)}
+                  onClick={() => {
+                    if (doc.fileUrl) {
+                      window.open(doc.fileUrl, '_blank');
+                    } else {
+                      addToast('warning', 'No preview file available.');
+                    }
+                  }}
                 >
                   <Eye size={14} />
                 </button>
                 <button
                   className="doc-action-btn"
                   title="Download"
-                  onClick={() => addToast('success', `Downloading "${doc.name}"...`)}
+                  onClick={() => handleDownloadFile(doc)}
                 >
                   <Download size={14} />
                 </button>
@@ -218,83 +313,118 @@ const Documents = () => {
       </div>
 
       {/* Upload Document Modal */}
-      {showUploadModal && (
-        <div className="modal-backdrop" onClick={() => setShowUploadModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 450 }}>
-            <div className="modal-header">
-              <h3>Upload Document</h3>
-              <button className="close-btn" onClick={() => setShowUploadModal(false)}>&times;</button>
+      <Modal
+        isOpen={showUploadModal}
+        onClose={handleCloseModal}
+        title="Upload Document"
+        size="sm"
+      >
+        <form onSubmit={handleUploadSubmit} className="flex-column gap-3 padding-1">
+          <div className="form-group flex-column gap-1">
+            <label>Choose File</label>
+            <div className="file-upload-wrapper" style={{ position: 'relative' }}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  opacity: 0,
+                  width: '100%',
+                  height: '100%',
+                  cursor: 'pointer',
+                  zIndex: 2
+                }}
+              />
+              <div
+                className="file-upload-btn"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px dashed var(--border-color-dark)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-secondary)',
+                  transition: 'all 0.2s',
+                  textAlign: 'center'
+                }}
+              >
+                <Upload size={16} />
+                <span style={{ fontSize: '0.85rem' }}>
+                  {selectedFile ? selectedFile.name : 'Choose local file...'}
+                </span>
+              </div>
             </div>
-            <form onSubmit={handleUploadSubmit} className="modal-form flex-column gap-3 padding-1">
-              <div className="form-group flex-column gap-1">
-                <label>Document Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Employee Handbook 2026.pdf"
-                  value={uploadForm.name}
-                  onChange={e => setUploadForm({ ...uploadForm, name: e.target.value })}
-                  className="dept-search-input"
-                  style={{ width: '100%', padding: '8px 12px' }}
-                />
-              </div>
-
-              <div className="form-group flex-column gap-1">
-                <label>Document Category</label>
-                <select
-                  value={uploadForm.category}
-                  onChange={e => setUploadForm({ ...uploadForm, category: e.target.value })}
-                  className="dept-search-input"
-                  style={{ width: '100%', padding: '8px 12px' }}
-                >
-                  {categories.filter(c => c !== 'All').map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group flex-column gap-1">
-                <label>File Type</label>
-                <select
-                  value={uploadForm.type}
-                  onChange={e => setUploadForm({ ...uploadForm, type: e.target.value })}
-                  className="dept-search-input"
-                  style={{ width: '100%', padding: '8px 12px' }}
-                >
-                  <option value="PDF">PDF Document</option>
-                  <option value="XLSX">Excel Sheet (XLSX)</option>
-                  <option value="PNG">Image file (PNG)</option>
-                  <option value="ZIP">ZIP Archive</option>
-                  <option value="DOCX">Word Document (DOCX)</option>
-                  <option value="PPTX">PowerPoint Presentation (PPTX)</option>
-                </select>
-              </div>
-
-              <div className="form-group flex-column gap-1">
-                <label>File Size</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 1.2 MB"
-                  value={uploadForm.size}
-                  onChange={e => setUploadForm({ ...uploadForm, size: e.target.value })}
-                  className="dept-search-input"
-                  style={{ width: '100%', padding: '8px 12px' }}
-                />
-              </div>
-
-              <div className="flex-row gap-3 justify-end mt-2">
-                <Button type="button" variant="secondary" onClick={() => setShowUploadModal(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" variant="primary">
-                  Upload
-                </Button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+
+          <div className="form-group flex-column gap-1">
+            <label>Document Name</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Employee Handbook 2026.pdf"
+              value={uploadForm.name}
+              onChange={e => setUploadForm({ ...uploadForm, name: e.target.value })}
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div className="form-group flex-column gap-1">
+            <label>Document Category</label>
+            <select
+              value={uploadForm.category}
+              onChange={e => setUploadForm({ ...uploadForm, category: e.target.value })}
+              style={{ width: '100%' }}
+            >
+              {categories.filter(c => c !== 'All').map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group flex-column gap-1">
+            <label>File Type</label>
+            <select
+              value={uploadForm.type}
+              onChange={e => setUploadForm({ ...uploadForm, type: e.target.value })}
+              style={{ width: '100%' }}
+            >
+              <option value="PDF">PDF Document</option>
+              <option value="XLSX">Excel Sheet (XLSX)</option>
+              <option value="PNG">Image file (PNG)</option>
+              <option value="ZIP">ZIP Archive</option>
+              <option value="DOCX">Word Document (DOCX)</option>
+              <option value="PPTX">PowerPoint Presentation (PPTX)</option>
+            </select>
+          </div>
+
+          <div className="form-group flex-column gap-1">
+            <label>File Size</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. 1.2 MB"
+              value={uploadForm.size}
+              onChange={e => setUploadForm({ ...uploadForm, size: e.target.value })}
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div className="flex-row gap-3 justify-end mt-2">
+            <Button type="button" variant="secondary" onClick={handleCloseModal}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary">
+              Upload
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
     </div>
   );

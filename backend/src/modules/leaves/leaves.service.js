@@ -111,7 +111,7 @@ export const createPolicyRecord = async (data, currentUser) => {
         query.gender = 'Female';
       }
       
-      const employees = await Employee.find(query);
+      const employees = await Employee.find(query).select('id name department gender').lean();
       
       if (employees && employees.length > 0) {
         const fromDate = new Date().toISOString().split('T')[0];
@@ -168,7 +168,7 @@ export const resetPolicyRecords = async (currentUser) => {
       const fromDate = new Date().toISOString().split('T')[0];
       const start = new Date(fromDate);
       
-      const allEmployees = await Employee.find({});
+      const allEmployees = await Employee.find({}).select('id name department gender').lean();
       
       const leaveRecords = [];
       for (const policy of policies) {

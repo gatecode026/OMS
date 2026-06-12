@@ -34,7 +34,19 @@ export const remove = asyncHandler(async (req, res) => {
 });
 
 export const getPublicData = asyncHandler(async (req, res) => {
-  return successResponse(res, { status: 'mock_public_data' }, 'Public record fetched');
+  const settings = await service.findById('global');
+  if (settings && settings.companyProfile?.companyName && settings.generalSettings?.companyName !== settings.companyProfile.companyName) {
+    if (typeof settings.set === 'function') {
+      settings.set('generalSettings.companyName', settings.companyProfile.companyName);
+      await settings.save();
+    }
+  }
+  return successResponse(res, {
+    companyName: settings?.companyProfile?.companyName || settings?.generalSettings?.companyName || 'Office Management Pvt. Ltd.',
+    websiteUrl: settings?.companyProfile?.websiteUrl || 'https://office-management.com',
+    officialEmail: settings?.companyProfile?.officialEmail || 'admin@saas.com',
+    officialPhone: settings?.companyProfile?.officialPhone || '+91 11 4050 6070'
+  }, 'Public settings fetched successfully');
 });
 
 export default {

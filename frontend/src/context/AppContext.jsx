@@ -368,6 +368,31 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('saas_general_settings', JSON.stringify(settings));
   };
 
+  // Load public company name and profile settings on initial mount
+  useEffect(() => {
+    const fetchPublicSettings = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/v1/settings/public?_t=' + Date.now(), { cache: 'no-store' });
+        const result = await response.json();
+        if (result.status === 'success' && result.data) {
+          const data = result.data;
+          setGeneralSettingsState(prev => {
+            const nextSettings = {
+              ...prev,
+              companyName: data.companyName || prev.companyName || 'Office Management Pvt. Ltd.'
+            };
+            // Sync to local storage as offline fallback
+            localStorage.setItem('saas_general_settings', JSON.stringify(nextSettings));
+            return nextSettings;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch public settings from database:', err);
+      }
+    };
+    fetchPublicSettings();
+  }, []);
+
   // Notification Settings
   const [notificationSettings, setNotificationSettingsState] = useState(() => {
     const saved = localStorage.getItem('saas_notification_settings');
@@ -400,6 +425,33 @@ export const AppProvider = ({ children }) => {
   const setSecuritySettings = (settings) => {
     setSecuritySettingsState(settings);
     localStorage.setItem('saas_security_settings', JSON.stringify(settings));
+  };
+
+  // Attendance Rules Settings
+  const [attendanceRules, setAttendanceRulesState] = useState(() => {
+    const saved = localStorage.getItem('saas_attendance_rules');
+    return saved ? JSON.parse(saved) : {
+      dailyHours: 8,
+      weeklyHours: 40,
+      shiftRules: 'Fixed Shift Rules',
+      startTime: '09:00',
+      endTime: '18:00',
+      gracePeriod: 15,
+      lateMarkLimit: 30,
+      halfDayLimit: 120,
+      overtimeRate: 1.5,
+      autoPunchOut: true,
+      punchOutTime: '21:00',
+      attendanceReminders: true,
+      missingAlerts: true,
+      lateTimeThreshold: '09:15',
+      halfDayHoursThreshold: 8
+    };
+  });
+
+  const setAttendanceRules = (rules) => {
+    setAttendanceRulesState(rules);
+    localStorage.setItem('saas_attendance_rules', JSON.stringify(rules));
   };
 
   // Messages states
@@ -646,6 +698,10 @@ export const AppProvider = ({ children }) => {
         setGeneralSettingsState(mergedGeneral);
         if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);
         if (data.securitySettings) setSecuritySettingsState(data.securitySettings);
+        if (data.attendanceRules) {
+          setAttendanceRulesState(data.attendanceRules);
+          localStorage.setItem('saas_attendance_rules', JSON.stringify(data.attendanceRules));
+        }
       }
     } catch (err) {
       console.error('Failed to fetch system settings from database:', err);
@@ -674,6 +730,10 @@ export const AppProvider = ({ children }) => {
         setGeneralSettingsState(mergedGeneral);
         if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);
         if (data.securitySettings) setSecuritySettingsState(data.securitySettings);
+        if (data.attendanceRules) {
+          setAttendanceRulesState(data.attendanceRules);
+          localStorage.setItem('saas_attendance_rules', JSON.stringify(data.attendanceRules));
+        }
         return true;
       }
       return false;
@@ -1672,10 +1732,17 @@ export const AppProvider = ({ children }) => {
   // Toast Handler
   const addToast = (type, message) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts(prev => [...prev, { id, type, message }]);
+    setToasts(prev => {
+      // Remove any active toast with the same message to prevent duplicate alerts stacking
+      const filtered = prev.filter(t => t.message !== message);
+      // Keep only the most recent toast to prevent vertical overflow/stacking clutter
+      const limited = filtered.slice(-1);
+      return [...limited, { id, type, message }];
+    });
+    // Auto-dismiss after 2.5 seconds (cleaner, faster transition)
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
+    }, 2500);
   };
 
   // Confirm Dialog Handler
@@ -3849,7 +3916,7 @@ export const AppProvider = ({ children }) => {
       if (result.status === 'success') {
         fetchRoles();
         addActivityLog(`Modified system permissions for role: ${roleId}`, 'Permissions', 'success');
-        addToast('success', `Permissions updated for ${roleId} role.`);
+        addToast('success', 'Permission saved automatically.');
         return result.data;
       } else {
         addToast('danger', result.message || 'Failed to update permissions.');
@@ -4264,6 +4331,8 @@ export const AppProvider = ({ children }) => {
         setNotificationSettings,
         securitySettings,
         setSecuritySettings,
+        attendanceRules,
+        setAttendanceRules,
         saveSystemSettings,
         messages,
         markMessageRead,

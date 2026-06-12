@@ -14,7 +14,7 @@ const enrichBranchWithManager = async (branch) => {
   if (!branch) return null;
   const branchObj = branch.toObject ? branch.toObject() : branch;
   if (branchObj.managerId) {
-    const manager = await Employee.findOne({ id: branchObj.managerId });
+    const manager = await Employee.findOne({ id: branchObj.managerId }).select('name phone email').lean();
     if (manager) {
       branchObj.manager = manager.name;
       branchObj.managerPhone = manager.phone || '';

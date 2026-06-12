@@ -26,7 +26,7 @@ const mockPerformanceHistory = [
 
 const TeamLeaders = () => {
   const isLoading = usePageLoading(600);
-  const { addToast, employees, addEmployee, updateEmployee, teams, updateTeam, departments: rawDepartments } = useApp();
+  const { addToast, employees, addEmployee, updateEmployee, teams, updateTeam, departments: rawDepartments, hasPermission } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   const [search, setSearch] = useState('');
@@ -201,9 +201,11 @@ const TeamLeaders = () => {
           </div>
         </div>
         <div>
-          <Button variant="primary" onClick={() => setAssignModalOpen(true)} icon={Plus} size="sm">
-            Assign Leader
-          </Button>
+          {hasPermission('team_management', 'create') && (
+            <Button variant="primary" onClick={() => setAssignModalOpen(true)} icon={Plus} size="sm">
+              Assign Leader
+            </Button>
+          )}
         </div>
       </div>
 
@@ -338,44 +340,50 @@ const TeamLeaders = () => {
             </div>
 
             <div className="leader-card-actions">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setActiveLeader(leader);
-                  setChangeModalOpen(true);
-                }}
-              >
-                Change Leader
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setActiveLeader(leader);
-                  setTeamTarget(leader.team);
-                  setChangeTeamModalOpen(true);
-                }}
-              >
-                Change Team
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setActiveLeader(leader);
-                  setSelectedPerms({
-                    tasks: true,
-                    attendance: true,
-                    performance: leader.score >= 90,
-                    transfer: false,
-                    documents: true
-                  });
-                  setPermsModalOpen(true);
-                }}
-              >
-                Permissions
-              </Button>
+              {hasPermission('team_management', 'update') && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setActiveLeader(leader);
+                    setChangeModalOpen(true);
+                  }}
+                >
+                  Change Leader
+                </Button>
+              )}
+              {hasPermission('team_management', 'update') && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setActiveLeader(leader);
+                    setTeamTarget(leader.team);
+                    setChangeTeamModalOpen(true);
+                  }}
+                >
+                  Change Team
+                </Button>
+              )}
+              {hasPermission('team_management', 'update') && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setActiveLeader(leader);
+                    setSelectedPerms({
+                      tasks: true,
+                      attendance: true,
+                      performance: leader.score >= 90,
+                      transfer: false,
+                      documents: true
+                    });
+                    setPermsModalOpen(true);
+                  }}
+                >
+                  Permissions
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 size="sm"

@@ -6,6 +6,7 @@
 import Employee from './employees.model.js';
 import Admin from '../admin/admin.model.js';
 import logger from '../../config/logger.js';
+import { processEmployeeAssets } from '../../utils/imagekit.js';
 
 /**
  * Find all employees matching optional query filters
@@ -13,7 +14,9 @@ import logger from '../../config/logger.js';
  */
 export const find = async (query = {}) => {
   logger.info('EmployeesRepository::find querying employees from database...');
-  return Employee.find(query);
+  return Employee.find(query)
+    .select('-attendanceHistory -overtimeHistory -leaveHistory -taskHistory -activityLog -documents')
+    .lean();
 };
 
 /**
@@ -36,7 +39,8 @@ export const findOne = async (id) => {
  */
 export const save = async (data) => {
   logger.info(`EmployeesRepository::save creating employee: ${data.name}`);
-  return Employee.create(data);
+  const processedData = await processEmployeeAssets(data);
+  return Employee.create(processedData);
 };
 
 import bcrypt from 'bcryptjs';
@@ -48,7 +52,7 @@ import bcrypt from 'bcryptjs';
  */
 export const update = async (id, data) => {
   logger.info(`EmployeesRepository::update updating employee with ID: ${id}`);
-  const updateData = { ...data };
+  const updateData = await processEmployeeAssets(data);
   if (updateData.password === '••••••••' || !updateData.password) {
     delete updateData.password;
   } else {
