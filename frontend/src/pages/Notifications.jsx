@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import './Notifications.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -80,8 +80,19 @@ const Notifications = () => {
   // Role Perspective override (defaults to currentUserRole, but can be switched)
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
 
-  // Active navigation tab
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Active navigation tab (defaults to all-notifications/inbox for employee, dashboard for admin)
+  const [activeTab, setActiveTab] = useState(() => {
+    return (currentUserRole === 'employee') ? 'all-notifications' : 'dashboard';
+  });
+
+  // Sync activeTab with perspective selector changes
+  useEffect(() => {
+    if (perspective === 'employee') {
+      setActiveTab('all-notifications');
+    } else {
+      setActiveTab('dashboard');
+    }
+  }, [perspective]);
 
   // --- Search & Filters ---
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,20 +208,65 @@ const Notifications = () => {
   // Audited Logs
   const [logs, setLogs] = useState([]);
 
-  // Computed / Filtered Notifications
+  // Computed / Filtered Notifications with Employee Inbox constraints
   const filteredNotifications = useMemo(() => {
+    const isEmployeeView = perspective === 'employee';
+
     return notifications.filter(notif => {
+      // If we are in Employee View, filter notifications to only those meant for the employee
+      if (isEmployeeView) {
+        const recipientId = notif.recipientId || notif.targetUserId || notif.forUserId;
+        const recipientRole = (notif.recipientRole || notif.targetRole || notif.recipientType || '').toLowerCase();
+        const msg = (notif.message || notif.title || '').toLowerCase();
+
+        let allowed = false;
+
+        // 1. Direct recipient check
+        if (recipientId) {
+          allowed = recipientId === currentUser?.id;
+        }
+        // 2. Role specific check
+        else if (recipientRole === 'employee' || recipientRole === 'all employees') {
+          allowed = true;
+        }
+        // 3. Broadcast check
+        else if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
+          const isPersonalEmployeeMsg =
+            msg.startsWith('your ') ||
+            msg.includes('your leave') ||
+            msg.includes('your request') ||
+            msg.includes('your attendance') ||
+            msg.includes('has been approved') ||
+            msg.includes('has been rejected') ||
+            msg.includes('note: approved') ||
+            msg.includes('note: rejected');
+
+          if (isPersonalEmployeeMsg) {
+            allowed = false; // Personal messages without recipientId belong to someone else
+          } else {
+            allowed = true; // General broadcasts are for everyone
+          }
+        }
+        // 4. Matches role
+        else if (recipientRole === currentUserRole?.toLowerCase()) {
+          allowed = true;
+        }
+
+        if (!allowed) return false;
+      }
+
       // Search text filter
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchesSearch =
-          notif.id.toLowerCase().includes(q) ||
-          notif.title.toLowerCase().includes(q) ||
-          notif.message.toLowerCase().includes(q) ||
-          notif.recipientType.toLowerCase().includes(q) ||
-          notif.sentBy.toLowerCase().includes(q);
+          (notif.id || '').toLowerCase().includes(q) ||
+          (notif.title || '').toLowerCase().includes(q) ||
+          (notif.message || '').toLowerCase().includes(q) ||
+          (notif.recipientType || '').toLowerCase().includes(q) ||
+          (notif.sentBy || '').toLowerCase().includes(q);
         if (!matchesSearch) return false;
       }
+      
       // Dropdown filters
       if (filterCategory && notif.category !== filterCategory) return false;
       if (filterPriority && notif.priority !== filterPriority) return false;
@@ -218,7 +274,103 @@ const Notifications = () => {
 
       return true;
     });
-  }, [notifications, searchQuery, filterCategory, filterPriority, filterStatus]);
+  }, [notifications, searchQuery, filterCategory, filterPriority, filterStatus, perspective, currentUser, currentUserRole]);
+
+  // Dynamically configured columns for employee vs admin views
+  const tableColumns = useMemo(() => {
+    const baseCols = [
+      {
+        key: 'select',
+        header: (
+          <input
+            type="checkbox"
+            checked={filteredNotifications.length > 0 && selectedRowIds.length === filteredNotifications.length}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedRowIds(filteredNotifications.map(n => n.id));
+              } else {
+                setSelectedRowIds([]);
+              }
+            }}
+          />
+        ),
+        render: (row) => (
+          <input
+            type="checkbox"
+            checked={selectedRowIds.includes(row.id)}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedRowIds(prev => [...prev, row.id]);
+              } else {
+                setSelectedRowIds(prev => prev.filter(id => id !== row.id));
+              }
+            }}
+          />
+        )
+      },
+      { key: 'id', header: 'ID', render: (row) => <strong className="font-semibold text-primary">{row.id}</strong> },
+      {
+        key: 'title',
+        header: 'Title & Message',
+        render: (row) => (
+          <div 
+            style={{ maxWidth: '350px', cursor: 'pointer' }} 
+            onClick={() => handleViewDetails(row)}
+            title="Click to view details"
+          >
+            <strong className="text-primary block text-sm">{row.title}</strong>
+            <p className="text-muted text-xs truncate" style={{ margin: '2px 0 0 0' }}>{row.message}</p>
+          </div>
+        )
+      },
+      { key: 'category', header: 'Category', render: (row) => <Badge variant="neutral">{row.category}</Badge> },
+      {
+        key: 'priority',
+        header: 'Priority',
+        render: (row) => (
+          <Badge variant={getPriorityBadgeClass(row.priority)} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <span className="color-dot" style={{ backgroundColor: getPriorityStyle(row.priority) }}></span>
+            {row.priority}
+          </Badge>
+        )
+      }
+    ];
+
+    if (perspective !== 'employee') {
+      baseCols.push(
+        { key: 'recipientType', header: 'Recipients', render: (row) => <div className="text-xs font-medium text-secondary">{row.recipientType} ({row.recipients})</div> },
+        { key: 'sentBy', header: 'Sent By' },
+        { key: 'sentDate', header: 'Sent Date' },
+        { key: 'deliveryStatus', header: 'Delivery Status', render: (row) => <Badge variant={getStatusBadgeClass(row.deliveryStatus)}>{row.deliveryStatus}</Badge> },
+        { key: 'readStatus', header: 'Read Status', render: (row) => <Badge variant={row.readStatus === 'Read' ? 'success' : 'warning'}>{row.readStatus}</Badge> }
+      );
+    } else {
+      baseCols.push(
+        { key: 'sentBy', header: 'Sender' },
+        { key: 'sentDate', header: 'Date Received' },
+        { key: 'readStatus', header: 'Status', render: (row) => <Badge variant={row.readStatus === 'Read' ? 'success' : 'warning'}>{row.readStatus}</Badge> }
+      );
+    }
+
+    baseCols.push({
+      key: 'actions',
+      header: 'Actions',
+      render: (row) => (
+        <div className="flex-center gap-2">
+          <button className="action-circle-btn" onClick={() => handleViewDetails(row)} title="View Detail"><Eye size={13} /></button>
+          <button className="action-circle-btn" onClick={() => handleToggleReadStatus(row.id)} title="Toggle Read/Unread">{row.readStatus === 'Read' ? <EyeOff size={13} /> : <Check size={13} />}</button>
+          {row.deliveryStatus === 'Failed' && perspective !== 'employee' && (
+            <button className="action-circle-btn" onClick={() => handleResendSingle(row.id)} title="Retry Failures"><RefreshCw size={13} /></button>
+          )}
+          {perspective === 'super_admin' && (
+            <button className="action-circle-btn danger-btn" onClick={() => handleDeleteSingle(row.id)} title="Delete dispatch"><Trash2 size={13} /></button>
+          )}
+        </div>
+      )
+    });
+
+    return baseCols;
+  }, [filteredNotifications, selectedRowIds, perspective]);
 
   // Toggle Automation Rules
   const handleToggleRule = (catId, ruleId) => {
@@ -587,29 +739,39 @@ const Notifications = () => {
     <div className="notifications-page animate-fade-in">
       {/* ==================== PAGE HEADER ==================== */}
       <div className="notifications-page-header flex-between mb-6">
-        <div>
-          <div className="flex-center gap-2">
-            <h2 className="title-bold" style={{ margin: 0 }}>Notification Dispatch Center</h2>
-            <Badge variant="primary" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>v2.4 Enterprise</Badge>
+        <div className="flex-column align-start">
+          <div className="flex align-center gap-2">
+            <h2 className="title-bold" style={{ margin: 0 }}>
+              {perspective === 'employee' ? 'My Notifications' : 'Notification Dispatch Center'}
+            </h2>
+            {perspective !== 'employee' && (
+              <Badge variant="primary" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>v2.4 Enterprise</Badge>
+            )}
           </div>
-          <p className="subtitle" style={{ marginTop: 4 }}>Monitor, trigger, and configure communication logs, automated workflows, templates & delivery metrics</p>
+          <p className="subtitle" style={{ marginTop: 4, textAlign: 'left' }}>
+            {perspective === 'employee'
+              ? 'View your received notifications, broadcasts, and personal alerts'
+              : 'Monitor, trigger, and configure communication logs, automated workflows, templates & delivery metrics'}
+          </p>
         </div>
 
         <div className="flex-center gap-3">
-          <div className="perspective-container flex-center gap-1">
-            <span className="text-muted text-xs font-semibold uppercase">Perspective:</span>
-            <select
-              value={perspective}
-              onChange={(e) => setPerspective(e.target.value)}
-              className="perspective-select"
-            >
-              <option value="super_admin">Super Admin</option>
-              <option value="branch_admin">Branch Admin</option>
-              <option value="manager">Manager</option>
-              <option value="team_leader">Team Leader</option>
-              <option value="employee">Employee</option>
-            </select>
-          </div>
+          {currentUserRole !== 'employee' && (
+            <div className="perspective-container flex-center gap-1">
+              <span className="text-muted text-xs font-semibold uppercase">Perspective:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                className="perspective-select"
+              >
+                <option value="super_admin">Super Admin</option>
+                <option value="branch_admin">Branch Admin</option>
+                <option value="manager">Manager</option>
+                <option value="team_leader">Team Leader</option>
+                <option value="employee">Employee</option>
+              </select>
+            </div>
+          )}
 
           <select
             value={month}
@@ -637,18 +799,20 @@ const Notifications = () => {
       </div>
 
       {/* ==================== TAB NAVIGATION ==================== */}
-      <div className="tab-bar-card card p-1 mb-6">
-        <div className="notifications-tabs-list">
-          <button className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}><Activity size={16} /> Dashboard</button>
-          <button className={`tab-btn ${activeTab === 'all-notifications' ? 'active' : ''}`} onClick={() => setActiveTab('all-notifications')}><Inbox size={16} /> Notification Logs</button>
-          <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}><BarChart3 size={16} /> Analytics</button>
-          <button className={`tab-btn ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}><Copy size={16} /> Templates</button>
-          <button className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`} onClick={() => setActiveTab('logs')}><FileText size={16} /> System Logs</button>
+      {perspective !== 'employee' && (
+        <div className="tab-bar-card card p-1 mb-6">
+          <div className="notifications-tabs-list">
+            <button className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}><Activity size={16} /> Dashboard</button>
+            <button className={`tab-btn ${activeTab === 'all-notifications' ? 'active' : ''}`} onClick={() => setActiveTab('all-notifications')}><Inbox size={16} /> Notification Logs</button>
+            <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}><BarChart3 size={16} /> Analytics</button>
+            <button className={`tab-btn ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}><Copy size={16} /> Templates</button>
+            <button className={`tab-btn ${activeTab === 'logs' ? 'active' : ''}`} onClick={() => setActiveTab('logs')}><FileText size={16} /> System Logs</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ==================== TAB CONTENT: DASHBOARD ==================== */}
-      {activeTab === 'dashboard' && (
+      {activeTab === 'dashboard' && perspective !== 'employee' && (
         <div className="flex-column gap-6">
           {/* Stats Cards Row */}
           <div className="notifications-stats-row">
@@ -958,8 +1122,12 @@ const Notifications = () => {
                   <div className="flex-center gap-2 animate-fade-in" style={{ background: 'var(--color-primary-light)', padding: '4px 10px', borderRadius: '6px', marginRight: 10 }}>
                     <span className="text-xs font-semibold text-primary">{selectedRowIds.length} Selected</span>
                     <Button variant="secondary" size="xs" onClick={handleBulkMarkRead}>Mark Read</Button>
-                    <Button variant="secondary" size="xs" onClick={handleBulkResend}>Resend</Button>
-                    <Button variant="secondary" size="xs" onClick={handleBulkDelete} style={{ color: 'var(--color-danger)' }}>Delete</Button>
+                    {perspective !== 'employee' && (
+                      <>
+                        <Button variant="secondary" size="xs" onClick={handleBulkResend}>Resend</Button>
+                        <Button variant="secondary" size="xs" onClick={handleBulkDelete} style={{ color: 'var(--color-danger)' }}>Delete</Button>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -974,78 +1142,7 @@ const Notifications = () => {
           {/* Database Table */}
           <div className="card table-wrapper-card p-0">
             <DataTable
-              columns={[
-                {
-                  header: (
-                    <input
-                      type="checkbox"
-                      checked={filteredNotifications.length > 0 && selectedRowIds.length === filteredNotifications.length}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedRowIds(filteredNotifications.map(n => n.id));
-                        } else {
-                          setSelectedRowIds([]);
-                        }
-                      }}
-                    />
-                  ),
-                  cell: (row) => (
-                    <input
-                      type="checkbox"
-                      checked={selectedRowIds.includes(row.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedRowIds(prev => [...prev, row.id]);
-                        } else {
-                          setSelectedRowIds(prev => prev.filter(id => id !== row.id));
-                        }
-                      }}
-                    />
-                  )
-                },
-                { header: 'ID', accessor: 'id', cell: (row) => <strong className="font-semibold text-primary">{row.id}</strong> },
-                {
-                  header: 'Title & Message',
-                  accessor: 'title',
-                  cell: (row) => (
-                    <div style={{ maxWidth: '350px' }}>
-                      <strong className="text-primary block text-sm" style={{ cursor: 'pointer' }} onClick={() => handleViewDetails(row)}>{row.title}</strong>
-                      <p className="text-muted text-xs truncate" style={{ margin: '2px 0 0 0' }}>{row.message}</p>
-                    </div>
-                  )
-                },
-                { header: 'Category', accessor: 'category', cell: (row) => <Badge variant="neutral">{row.category}</Badge> },
-                {
-                  header: 'Priority',
-                  accessor: 'priority',
-                  cell: (row) => (
-                    <Badge variant={getPriorityBadgeClass(row.priority)} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <span className="color-dot" style={{ backgroundColor: getPriorityStyle(row.priority) }}></span>
-                      {row.priority}
-                    </Badge>
-                  )
-                },
-                { header: 'Recipients', accessor: 'recipientType', cell: (row) => <div className="text-xs font-medium text-secondary">{row.recipientType} ({row.recipients})</div> },
-                { header: 'Sent By', accessor: 'sentBy' },
-                { header: 'Sent Date', accessor: 'sentDate' },
-                { header: 'Delivery Status', accessor: 'deliveryStatus', cell: (row) => <Badge variant={getStatusBadgeClass(row.deliveryStatus)}>{row.deliveryStatus}</Badge> },
-                { header: 'Read Status', accessor: 'readStatus', cell: (row) => <Badge variant={row.readStatus === 'Read' ? 'success' : 'warning'}>{row.readStatus}</Badge> },
-                {
-                  header: 'Actions',
-                  cell: (row) => (
-                    <div className="flex-center gap-2">
-                      <button className="action-circle-btn" onClick={() => handleViewDetails(row)} title="View Detail Audit"><Eye size={13} /></button>
-                      <button className="action-circle-btn" onClick={() => handleToggleReadStatus(row.id)} title="Toggle Read/Unread">{row.readStatus === 'Read' ? <EyeOff size={13} /> : <Check size={13} />}</button>
-                      {row.deliveryStatus === 'Failed' && (
-                        <button className="action-circle-btn" onClick={() => handleResendSingle(row.id)} title="Retry Failures"><RefreshCw size={13} /></button>
-                      )}
-                      {perspective === 'super_admin' && (
-                        <button className="action-circle-btn danger-btn" onClick={() => handleDeleteSingle(row.id)} title="Delete dispatch"><Trash2 size={13} /></button>
-                      )}
-                    </div>
-                  )
-                }
-              ]}
+              columns={tableColumns}
               data={filteredNotifications}
             />
           </div>
@@ -1053,7 +1150,7 @@ const Notifications = () => {
       )}
 
       {/* ==================== TAB CONTENT: ANALYTICS ==================== */}
-      {activeTab === 'analytics' && (
+      {activeTab === 'analytics' && perspective !== 'employee' && (
         <div className="flex-column gap-6 animate-fade-in">
           <div className="grid-4-col gap-5">
             {/* Delivery Rate Gauge */}
@@ -1170,7 +1267,7 @@ const Notifications = () => {
       )}
 
       {/* ==================== TAB CONTENT: TEMPLATES ==================== */}
-      {activeTab === 'templates' && (
+      {activeTab === 'templates' && perspective !== 'employee' && (
         <div className="flex-column gap-6 animate-fade-in">
           <div className="flex-center justify-between">
             <div>
@@ -1214,7 +1311,7 @@ const Notifications = () => {
 
 
       {/* ==================== TAB CONTENT: AUDIT LOGS ==================== */}
-      {activeTab === 'logs' && (
+      {activeTab === 'logs' && perspective !== 'employee' && (
         <div className="flex-column gap-6 animate-fade-in">
           <div className="flex-center justify-between">
             <div>
@@ -1230,12 +1327,12 @@ const Notifications = () => {
           <div className="card table-wrapper-card p-0">
             <DataTable
               columns={[
-                { header: 'Timestamp', accessor: 'timestamp' },
-                { header: 'Trigger Rule / Manual Dispatch', accessor: 'trigger' },
-                { header: 'Recipient Group', accessor: 'recipient' },
-                { header: 'Gateway Channel', accessor: 'channel' },
-                { header: 'Response Status', accessor: 'status', cell: (row) => <Badge variant={row.status === 'Success' ? 'success' : 'danger'}>{row.status}</Badge> },
-                { header: 'Gateway API Server Response Message', accessor: 'response', cell: (row) => <code style={{ fontSize: '0.78rem', color: row.status === 'Success' ? 'var(--text-secondary)' : 'var(--color-danger)' }}>{row.response}</code> }
+                { header: 'Timestamp', key: 'timestamp' },
+                { header: 'Trigger Rule / Manual Dispatch', key: 'trigger' },
+                { header: 'Recipient Group', key: 'recipient' },
+                { header: 'Gateway Channel', key: 'channel' },
+                { header: 'Response Status', key: 'status', render: (row) => <Badge variant={row.status === 'Success' ? 'success' : 'danger'}>{row.status}</Badge> },
+                { header: 'Gateway API Server Response Message', key: 'response', render: (row) => <code style={{ fontSize: '0.78rem', color: row.status === 'Success' ? 'var(--text-secondary)' : 'var(--color-danger)' }}>{row.response}</code> }
               ]}
               data={logs}
             />
@@ -1268,7 +1365,7 @@ const Notifications = () => {
               <button className="action-circle-btn" type="button" onClick={() => setShowCreateModal(false)}><X size={18} /></button>
             </div>
 
-            <div className="flex-column gap-3 font-small">
+            <div className="flex-column gap-4 font-small">
               <div>
                 <label className="input-label">Notification Title</label>
                 <input
@@ -1344,30 +1441,30 @@ const Notifications = () => {
 
               <div>
                 <label className="input-label">Active Gateway Channels</label>
-                <div className="flex gap-4 p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <label className="flex-center gap-2 cursor-pointer">
+                <div className="gateway-channels-row">
+                  <label className="gateway-channel-item">
                     <input
                       type="checkbox"
                       checked={createForm.channels.email}
                       onChange={(e) => setCreateForm(prev => ({ ...prev, channels: { ...prev.channels, email: e.target.checked } }))}
                     />
-                    <span>Email Gateway</span>
+                    <span className="gateway-channel-label">Email Gateway</span>
                   </label>
-                  <label className="flex-center gap-2 cursor-pointer">
+                  <label className="gateway-channel-item">
                     <input
                       type="checkbox"
                       checked={createForm.channels.push}
                       onChange={(e) => setCreateForm(prev => ({ ...prev, channels: { ...prev.channels, push: e.target.checked } }))}
                     />
-                    <span>Push Notice</span>
+                    <span className="gateway-channel-label">Push Notice</span>
                   </label>
-                  <label className="flex-center gap-2 cursor-pointer">
+                  <label className="gateway-channel-item">
                     <input
                       type="checkbox"
                       checked={createForm.channels.sms}
                       onChange={(e) => setCreateForm(prev => ({ ...prev, channels: { ...prev.channels, sms: e.target.checked } }))}
                     />
-                    <span>SMS Gateway</span>
+                    <span className="gateway-channel-label">SMS Gateway</span>
                   </label>
                 </div>
               </div>
@@ -1463,66 +1560,74 @@ const Notifications = () => {
               </div>
 
               {/* Delivery Analytics tracking section */}
-              <div className="section-label"><Activity size={12} /> Delivery Analytics Metrics</div>
-              <div className="grid-4-col gap-3 mb-4 text-center">
-                <div className="p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <span className="text-xs text-muted block">Recipients</span>
-                  <strong className="text-md text-primary">{selectedNotif.recipients}</strong>
-                </div>
-                <div className="p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <span className="text-xs text-muted block">Delivered</span>
-                  <strong className="text-md text-success">{selectedNotif.delivered}</strong>
-                </div>
-                <div className="p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <span className="text-xs text-muted block">Read Rate</span>
-                  <strong className="text-md text-primary">{selectedNotif.recipients > 0 ? Math.round((selectedNotif.read / selectedNotif.recipients) * 100) : 0}%</strong>
-                </div>
-                <div className="p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <span className="text-xs text-muted block">Failures</span>
-                  <strong className="text-md text-danger">{selectedNotif.failed}</strong>
-                </div>
-              </div>
+              {perspective !== 'employee' && (
+                <>
+                  <div className="section-label"><Activity size={12} /> Delivery Analytics Metrics</div>
+                  <div className="grid-4-col gap-3 mb-4 text-center">
+                    <div className="p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <span className="text-xs text-muted block">Recipients</span>
+                      <strong className="text-md text-primary">{selectedNotif.recipients}</strong>
+                    </div>
+                    <div className="p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <span className="text-xs text-muted block">Delivered</span>
+                      <strong className="text-md text-success">{selectedNotif.delivered}</strong>
+                    </div>
+                    <div className="p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <span className="text-xs text-muted block">Read Rate</span>
+                      <strong className="text-md text-primary">{selectedNotif.recipients > 0 ? Math.round((selectedNotif.read / selectedNotif.recipients) * 100) : 0}%</strong>
+                    </div>
+                    <div className="p-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <span className="text-xs text-muted block">Failures</span>
+                      <strong className="text-md text-danger">{selectedNotif.failed}</strong>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Recipient breakdown list */}
-              <div className="section-label"><Users size={12} /> Detailed Recipient Log Audit</div>
-              <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
-                <table className="notifications-data-table" style={{ fontSize: '0.78rem' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ padding: '8px 12px' }}>Recipient Employee</th>
-                      <th style={{ padding: '8px 12px' }}>Channel Route</th>
-                      <th style={{ padding: '8px 12px' }}>Gateway Status</th>
-                      <th style={{ padding: '8px 12px' }}>Audit Response</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={{ padding: '6px 12px' }}>Balram Suman (EMP-2026-001)</td>
-                      <td style={{ padding: '6px 12px' }}>Email + Push</td>
-                      <td style={{ padding: '6px 12px' }}><Badge variant="success">Delivered</Badge></td>
-                      <td style={{ padding: '6px 12px' }}>Read (10m ago)</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '6px 12px' }}>Vikram Singh (EMP-2026-002)</td>
-                      <td style={{ padding: '6px 12px' }}>Email + Push</td>
-                      <td style={{ padding: '6px 12px' }}><Badge variant="success">Delivered</Badge></td>
-                      <td style={{ padding: '6px 12px' }}>Read (1h ago)</td>
-                    </tr>
-                    {selectedNotif.failed > 0 && (
-                      <tr>
-                        <td style={{ padding: '6px 12px' }}>Suresh Kumar (EMP-2026-009)</td>
-                        <td style={{ padding: '6px 12px' }}>SMS Gateway</td>
-                        <td style={{ padding: '6px 12px' }}><Badge variant="danger">Failed</Badge></td>
-                        <td style={{ padding: '6px 12px' }}>Nexmo 401 Auth Error</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              {perspective !== 'employee' && (
+                <>
+                  <div className="section-label"><Users size={12} /> Detailed Recipient Log Audit</div>
+                  <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                    <table className="notifications-data-table" style={{ fontSize: '0.78rem' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '8px 12px' }}>Recipient Employee</th>
+                          <th style={{ padding: '8px 12px' }}>Channel Route</th>
+                          <th style={{ padding: '8px 12px' }}>Gateway Status</th>
+                          <th style={{ padding: '8px 12px' }}>Audit Response</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td style={{ padding: '6px 12px' }}>Balram Suman (EMP-2026-001)</td>
+                          <td style={{ padding: '6px 12px' }}>Email + Push</td>
+                          <td style={{ padding: '6px 12px' }}><Badge variant="success">Delivered</Badge></td>
+                          <td style={{ padding: '6px 12px' }}>Read (10m ago)</td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '6px 12px' }}>Vikram Singh (EMP-2026-002)</td>
+                          <td style={{ padding: '6px 12px' }}>Email + Push</td>
+                          <td style={{ padding: '6px 12px' }}><Badge variant="success">Delivered</Badge></td>
+                          <td style={{ padding: '6px 12px' }}>Read (1h ago)</td>
+                        </tr>
+                        {selectedNotif.failed > 0 && (
+                          <tr>
+                            <td style={{ padding: '6px 12px' }}>Suresh Kumar (EMP-2026-009)</td>
+                            <td style={{ padding: '6px 12px' }}>SMS Gateway</td>
+                            <td style={{ padding: '6px 12px' }}><Badge variant="danger">Failed</Badge></td>
+                            <td style={{ padding: '6px 12px' }}>Nexmo 401 Auth Error</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex justify-end mt-4 pt-3" style={{ borderTop: '1px solid var(--border-color)' }}>
-              {selectedNotif.deliveryStatus === 'Failed' && (
+              {selectedNotif.deliveryStatus === 'Failed' && perspective !== 'employee' && (
                 <Button variant="primary" onClick={() => { handleResendSingle(selectedNotif.id); setShowDetailModal(false); }} style={{ marginRight: 10 }}>Resend logs</Button>
               )}
               <Button variant="secondary" onClick={() => setShowDetailModal(false)}>Close Window</Button>
@@ -1547,7 +1652,7 @@ const Notifications = () => {
               <button className="action-circle-btn" type="button" onClick={() => { setShowTemplateModal(false); setEditingTemplate(null); }}><X size={18} /></button>
             </div>
 
-            <div className="flex-column gap-3 font-small">
+            <div className="flex-column gap-4 font-small">
               <div>
                 <label className="input-label">Template Name</label>
                 <input

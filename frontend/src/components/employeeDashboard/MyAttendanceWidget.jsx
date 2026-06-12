@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 
@@ -9,6 +9,66 @@ const MyAttendanceWidget = ({
   onOpenPunchModal
 }) => {
   const navigate = useNavigate();
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update clock every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const parseTimeToSeconds = (timeStr) => {
+    if (!timeStr || timeStr === '--:--') return null;
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+    if (!match) {
+      const parts = timeStr.trim().split(':');
+      if (parts.length >= 2) {
+        const hrs = parseInt(parts[0], 10);
+        const mins = parseInt(parts[1], 10);
+        const secs = parts.length >= 3 ? parseInt(parts[2], 10) : 0;
+        if (!isNaN(hrs) && !isNaN(mins)) {
+          return hrs * 3600 + mins * 60 + (isNaN(secs) ? 0 : secs);
+        }
+      }
+      return null;
+    }
+    let hrs = parseInt(match[1], 10);
+    const mins = parseInt(match[2], 10);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && hrs !== 12) hrs += 12;
+    if (ampm === 'AM' && hrs === 12) hrs = 0;
+    return hrs * 3600 + mins * 60;
+  };
+
+  const getLiveWorkingSeconds = () => {
+    if (attendanceRecord?.punchIn && attendanceRecord.punchIn !== '--:--') {
+      const inSecs = parseTimeToSeconds(attendanceRecord.punchIn);
+      if (inSecs !== null) {
+        const hasPunchOut = attendanceRecord.punchOut && attendanceRecord.punchOut !== '--:--';
+        const outSecs = hasPunchOut 
+          ? parseTimeToSeconds(attendanceRecord.punchOut)
+          : (currentTime.getHours() * 3600 + currentTime.getMinutes() * 60 + currentTime.getSeconds());
+          
+        if (outSecs !== null) {
+          let diffSecs = outSecs - inSecs;
+          if (diffSecs < 0) {
+            diffSecs += 24 * 3600;
+          }
+          return diffSecs;
+        }
+      }
+    }
+    
+    // Fallback to totalHours or workingHours in decimal format
+    const hrsVal = attendanceRecord?.totalHours || attendanceRecord?.workingHours || 0;
+    if (typeof hrsVal === 'number') {
+      return Math.round(hrsVal * 3600);
+    }
+    const parsedHrs = parseFloat(String(hrsVal).replace(/hrs|hr|hours|hour|%/gi, '').trim());
+    return isNaN(parsedHrs) ? 0 : Math.round(parsedHrs * 3600);
+  };
 
   // Calculate monthly stats
   const totalDaysInMonth = 24; // Average working days
@@ -22,20 +82,24 @@ const MyAttendanceWidget = ({
     ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) 
     : 96;
 
-  // Raw stats from record
-  const workingHours = attendanceRecord.totalHours || attendanceRecord.workingHours || 0;
-  const overtime = attendanceRecord.overtime || 0;
+  // Live stats from record in seconds
+  const workingSeconds = getLiveWorkingSeconds();
+  const overtimeSeconds = Math.max(0, workingSeconds - 8 * 3600);
 
-  // Safely parse units to prevent double unit rendering (e.g. "0 hrs Hrs" or "4% %")
-  const parseVal = (val) => {
-    if (val === undefined || val === null) return '0';
-    if (typeof val === 'number') return String(val);
-    const cleaned = val.replace(/hrs|hr|hours|hour|%/gi, '').trim();
-    return cleaned === '' ? '0' : cleaned;
+  const formatSecondsTo60 = (totalSeconds) => {
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    return `${String(hrs).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`;
   };
 
-  const workingHoursNum = useMemo(() => parseVal(workingHours), [workingHours]);
-  const overtimeNum = useMemo(() => parseVal(overtime), [overtime]);
+  const workingHoursFormatted = useMemo(() => {
+    return formatSecondsTo60(workingSeconds);
+  }, [workingSeconds]);
+
+  const overtimeFormatted = useMemo(() => {
+    return formatSecondsTo60(overtimeSeconds);
+  }, [overtimeSeconds]);
 
   const getStatusBadge = (status) => {
     const s = (status || '').toLowerCase();
@@ -101,7 +165,7 @@ const MyAttendanceWidget = ({
             border: '1px solid var(--accent-blue-translucent, rgba(59, 130, 246, 0.15))'
           }}>
             <span className="text-xs text-text-muted block font-semibold" style={{ fontSize: '0.72rem' }}>Working Hours</span>
-            <span className="bold-text text-sm block mt-1" style={{ color: '#3b82f6', fontWeight: '700' }}>{workingHoursNum} Hrs</span>
+            <span className="bold-text text-sm block mt-1" style={{ color: '#3b82f6', fontWeight: '700' }}>{workingHoursFormatted}</span>
           </div>
 
           <div className="mini-stat-card" style={{ 
@@ -115,7 +179,7 @@ const MyAttendanceWidget = ({
             border: '1px solid var(--color-purple-light, rgba(139, 92, 246, 0.15))'
           }}>
             <span className="text-xs text-text-muted block font-semibold" style={{ fontSize: '0.72rem' }}>Overtime</span>
-            <span className="bold-text text-sm block mt-1" style={{ color: '#8b5cf6', fontWeight: '700' }}>{overtimeNum} Hrs</span>
+            <span className="bold-text text-sm block mt-1" style={{ color: '#8b5cf6', fontWeight: '700' }}>{overtimeFormatted}</span>
           </div>
 
           <div className="mini-stat-card" style={{ 

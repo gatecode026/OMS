@@ -101,9 +101,16 @@ const MarkAttendanceModal = ({
       // Calculate total hours
       const inMins = parseTimeToMinutes(todayRecord.punchIn);
       const outMins = parseTimeToMinutes(formattedTimeStr);
-      const diffMins = Math.max(0, outMins - inMins);
+      let diffMins = outMins - inMins;
+      if (diffMins < 0) {
+        diffMins += 24 * 60;
+      }
       const diffHrs = parseFloat((diffMins / 60).toFixed(2));
       const overtime = parseFloat(Math.max(0, diffHrs - 8).toFixed(2));
+
+      const toastHrs = Math.floor(diffMins / 60);
+      const toastMins = diffMins % 60;
+      const formattedDuration = `${toastHrs}h ${toastMins}m`;
 
       updateAttendanceRecord(todayRecord.id, {
         ...todayRecord,
@@ -114,7 +121,7 @@ const MarkAttendanceModal = ({
         workMode: location,
         notes: notes
       });
-      addToast('success', `Punched out successfully at ${formattedTimeStr}. Total working hours: ${diffHrs}`);
+      addToast('success', `Punched out successfully at ${formattedTimeStr}. Total working hours: ${formattedDuration}`);
     } else {
       addToast('info', `Logged ${action === 'break_start' ? 'Break Start' : 'Break End'} at ${formattedTimeStr}`);
     }

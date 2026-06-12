@@ -2,14 +2,22 @@ import React, { useState } from 'react';
 import Modal from '../../common/Modal';
 import { useApp } from '../../../context/AppContext';
 
-const getDaysDiff = (start, end) => {
-  if (!start || !end) return 1;
+const getWorkingDaysDiff = (start, end, holidays = []) => {
+  if (!start || !end) return 0;
+  if (start === end) return 1;
   const d1 = new Date(start);
   const d2 = new Date(end);
   if (d2 < d1) return 0;
-  const diffTime = Math.abs(d2 - d1);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  return diffDays;
+  let count = 0;
+  const cur = new Date(d1);
+  const holidaySet = new Set(holidays.map(h => h.date));
+  while (cur <= d2) {
+    const day = cur.getUTCDay();
+    const dateStr = cur.toISOString().split('T')[0];
+    if (day !== 0 && !holidaySet.has(dateStr)) count++;
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return count;
 };
 
 const ApplyLeaveModal = ({
@@ -17,12 +25,14 @@ const ApplyLeaveModal = ({
   onClose,
   currentUser = {}
 }) => {
-  const { applyLeave, addToast } = useApp();
+  const { applyLeave, addToast, holidaysList = [], leaveRequests = [] } = useApp();
   const [type, setType] = useState('Casual Leave');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
   const [document, setDocument] = useState(null);
+
+  const days = getWorkingDaysDiff(startDate, endDate, holidaysList);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -32,9 +42,20 @@ const ApplyLeaveModal = ({
       return;
     }
 
-    const days = getDaysDiff(startDate, endDate);
     if (days <= 0) {
-      addToast('error', 'End date must be on or after start date.');
+      addToast('error', 'End date must be on or after start date and contain at least 1 working day.');
+      return;
+    }
+
+    // Check for overlapping approved/pending leaves
+    const myLeaves = leaveRequests.filter(l => l.employeeId === currentUser.id);
+    const hasOverlap = myLeaves.some(l => {
+      if (l.status !== 'Approved' && l.status !== 'Pending') return false;
+      return l.fromDate <= endDate && startDate <= l.toDate;
+    });
+
+    if (hasOverlap) {
+      addToast('error', 'You already have an approved or pending leave request that overlaps with this date range.');
       return;
     }
 
@@ -103,6 +124,12 @@ const ApplyLeaveModal = ({
             />
           </div>
         </div>
+
+        {startDate && endDate && (
+          <div className="text-xs bold-text" style={{ color: days > 0 ? 'var(--color-success, #10b981)' : 'var(--color-danger, #ef4444)', marginTop: '-8px' }}>
+            Working Days: {days} {days === 1 ? 'day' : 'days'}
+          </div>
+        )}
 
         {/* Reason */}
         <div className="flex-column gap-1">

@@ -59,6 +59,19 @@ const getBranchAddress = (branchName) => {
   return 'Malviya Nagar, Jaipur, Rajasthan 302017';
 };
 
+const fmtHoursTo60 = (decimalHours) => {
+  if (!decimalHours || isNaN(decimalHours)) return '0h 00m';
+  const hrs = Math.floor(decimalHours);
+  const mins = Math.round((decimalHours - hrs) * 60);
+  let displayHrs = hrs;
+  let displayMins = mins;
+  if (displayMins === 60) {
+    displayHrs += 1;
+    displayMins = 0;
+  }
+  return `${displayHrs}h ${String(displayMins).padStart(2, '0')}m`;
+};
+
 const isNewJoiner = (dateStr) => {
   if (!dateStr) return false;
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -1764,7 +1777,7 @@ const Employees = () => {
                     {colVis.performanceRating && <td><Badge variant={(row.performanceRating || 90) >= 90 ? 'success' : (row.performanceRating || 90) >= 75 ? 'primary' : 'warning'}>{row.performanceRating || 90}</Badge></td>}
                     {colVis.todayPunchIn && <td><span className="punch-time-mono">{row.todayPunchIn || '--:--'}</span></td>}
                     {colVis.todayPunchOut && <td><span className="punch-time-mono">{row.todayPunchOut || '--:--'}</span></td>}
-                    {colVis.todayWorkingHours && <td><span className="bold-text font-mono text-secondary">{row.todayWorkingHours ? `${row.todayWorkingHours} hrs` : '0 hrs'}</span></td>}
+                    {colVis.todayWorkingHours && <td><span className="bold-text font-mono text-secondary">{row.todayWorkingHours ? fmtHoursTo60(row.todayWorkingHours) : '0h 00m'}</span></td>}
                     {colVis.attendanceStatus && <td><AttBadge status={row.attendanceStatus} /></td>}
                     {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '—'}</span></td>}
                     {colVis.workStatus && <td><WorkStatusDot status={row.workStatus} /></td>}
@@ -1856,7 +1869,7 @@ const Employees = () => {
             </div>
             <div className="hover-card-row" style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
               <span className="hover-card-label" style={{ color: 'var(--text-muted)' }}>Working Hours:</span>
-              <span className="hover-card-value font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{hoveredEmp.todayWorkingHours ? `${hoveredEmp.todayWorkingHours} hrs so far` : '0 hrs'}</span>
+              <span className="hover-card-value font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{hoveredEmp.todayWorkingHours ? `${fmtHoursTo60(hoveredEmp.todayWorkingHours)} so far` : '0h 00m'}</span>
             </div>
           </div>
         </div>
