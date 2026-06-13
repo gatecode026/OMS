@@ -4,8 +4,9 @@ import { useApp } from '../../context/AppContext';
 const DashboardFooter = ({
   myTasks = [],
   myAttendance = [],
-  myLeaves = [],
-  currentUser = {}
+  currentUser = {},
+  activeProjectsCount = 0,
+  leaveBalance = 0
 }) => {
   const [lastUpdated, setLastUpdated] = useState('Just now');
 
@@ -20,17 +21,13 @@ const DashboardFooter = ({
   // Compute values
   const totalDaysInMonth = 24;
   const presentDays = myAttendance.filter(h => h.status === 'Present' || h.status === 'Late' || h.status === 'Overtime' || h.status === 'Work From Home').length;
-  const attendancePercentage = presentDays > 0 ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) : 96;
+  const attendancePercentage = presentDays > 0 ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) : 0;
 
   const scoreData = currentUser.performanceScore || {};
-  const performanceScore = scoreData.overall || 92;
-  const activeProjectsCount = 4;
+  const performanceScore = scoreData.overall !== undefined ? `${scoreData.overall}%` : 'N/A';
   
-  // Total completed tasks (sum of current list done + fallback baseline)
-  const completedTasks = myTasks.filter(t => t.status === 'Done').length + 50;
-
-  // Leave balance
-  const leaveBalance = 25; // default sum/balance
+  // Total completed tasks (sum of current list done)
+  const completedTasks = myTasks.filter(t => t.status === 'Done').length;
 
   return (
     <div className="dashboard-footer-bar flex-row justify-between align-center flex-wrap gap-4 padding-3 bg-surface border-border border-b-border rounded-lg mt-3">
@@ -54,7 +51,7 @@ const DashboardFooter = ({
         </div>
         <div className="flex-column">
           <span className="text-xs text-text-muted bold-text uppercase">Performance Score</span>
-          <span className="bold-text text-sm mt-1">{performanceScore}%</span>
+          <span className="bold-text text-sm mt-1">{performanceScore}</span>
         </div>
       </div>
 

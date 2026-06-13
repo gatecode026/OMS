@@ -46,13 +46,13 @@ const WelcomeModal = ({ currentUser, onClose }) => {
     }
 
     const messages = {
-      Monday: "Let's kick off this fresh week with determination and high energy!",
-      Tuesday: "Keep up the great momentum! Focus on your goals today.",
-      Wednesday: "Happy Mid-Week! Halfway there, stay strong and productive.",
-      Thursday: "Friday is just around the corner! Let's make today count.",
-      Friday: "Happy Friday! Let's finish all our tasks strong and enjoy the weekend.",
-      Saturday: "Have a wonderful and relaxing Saturday! Enjoy your day off.",
-      Sunday: "Rest, recharge, and prepare for a successful upcoming week."
+      Monday: "Wishing you a productive and successful week ahead. Let's achieve our targets together!",
+      Tuesday: "Welcome back! Let's keep up the momentum as we work towards our goals today.",
+      Wednesday: "Happy mid-week! A perfect time to review progress and stay focused on our objectives.",
+      Thursday: "Let's maintain our drive and finish the week's projects on a strong note.",
+      Friday: "Happy Friday! Let's conclude our weekly goals and prepare for a restful weekend.",
+      Saturday: "Wishing you a relaxing weekend. Time to unwind, recharge, and enjoy your break!",
+      Sunday: "Have a peaceful Sunday. Recharge well and prepare for a successful upcoming week."
     };
 
     return {

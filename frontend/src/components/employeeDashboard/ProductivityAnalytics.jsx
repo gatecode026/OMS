@@ -33,38 +33,71 @@ const ProductivityAnalytics = ({
 
   const totalDaysInMonth = 24;
   const presentDays = myAttendance.filter(h => h.status === 'Present' || h.status === 'Late' || h.status === 'Overtime' || h.status === 'Work From Home').length;
-  const attendancePercentage = presentDays > 0 ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) : 96;
+  const attendancePercentage = presentDays > 0 ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) : 0;
 
   // Project Contribution: % of user's completed tasks relative to all completed tasks in their project
-  const projectContribution = currentUser.performanceScore?.overall || 92;
+  const projectContribution = currentUser.performanceScore?.overall !== undefined ? currentUser.performanceScore.overall : 0;
 
   // Chart Data
-  const weeklyTrendData = [
-    { name: 'Mon', Completed: 1 },
-    { name: 'Tue', Completed: 2 },
-    { name: 'Wed', Completed: completedThisWeek > 3 ? 3 : completedThisWeek },
-    { name: 'Thu', Completed: completedThisWeek > 4 ? 2 : 1 },
-    { name: 'Fri', Completed: completedThisWeek > 5 ? 4 : 2 },
-    { name: 'Sat', Completed: 0 },
-    { name: 'Sun', Completed: 0 }
-  ];
+  const getDatesOfCurrentWeek = () => {
+    const today = new Date();
+    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday...
+    const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + distanceToMonday);
 
+    const weekdays = [];
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(monday);
+      dayDate.setDate(monday.getDate() + i);
+      const year = dayDate.getFullYear();
+      const month = String(dayDate.getMonth() + 1).padStart(2, '0');
+      const day = String(dayDate.getDate()).padStart(2, '0');
+      weekdays.push({
+        label: labels[i],
+        dateStr: `${year}-${month}-${day}`
+      });
+    }
+    return weekdays;
+  };
+
+  const weekdays = getDatesOfCurrentWeek();
+
+  // Weekly Productivity Trend (completed tasks due on each day of the current week)
+  const weeklyTrendData = weekdays.map(day => {
+    const completedOnDay = myTasks.filter(t => 
+      (t.status === 'Done' || t.status === 'done' || t.completed === true) && 
+      t.dueDate === day.dateStr
+    ).length;
+    return {
+      name: day.label,
+      Completed: completedOnDay
+    };
+  });
+
+  // Monthly Performance Trend (from employee's real historical monthly scores array)
+  const monthlyScores = currentUser.performanceScore?.monthly || [];
   const monthlyTrendData = [
-    { name: 'Week 1', Score: 85 },
-    { name: 'Week 2', Score: 88 },
-    { name: 'Week 3', Score: 90 },
-    { name: 'Week 4', Score: projectContribution }
+    { name: 'Week 1', Score: monthlyScores[0] !== undefined ? monthlyScores[0] : Math.max(70, Math.round(projectContribution * 0.85)) },
+    { name: 'Week 2', Score: monthlyScores[1] !== undefined ? monthlyScores[1] : Math.max(70, Math.round(projectContribution * 0.9)) },
+    { name: 'Week 3', Score: monthlyScores[2] !== undefined ? monthlyScores[2] : Math.max(70, Math.round(projectContribution * 0.95)) },
+    { name: 'Week 4', Score: monthlyScores[3] !== undefined ? monthlyScores[3] : projectContribution }
   ];
 
-  const taskCompletionData = [
-    { name: 'Mon', Assigned: 3, Completed: 2 },
-    { name: 'Tue', Assigned: 4, Completed: 3 },
-    { name: 'Wed', Assigned: 5, Completed: 4 },
-    { name: 'Thu', Assigned: 2, Completed: 1 },
-    { name: 'Fri', Assigned: 6, Completed: 5 },
-    { name: 'Sat', Assigned: 2, Completed: 2 },
-    { name: 'Sun', Assigned: 0, Completed: 0 }
-  ];
+  // Task Completion Trend (Assigned vs Completed for each day of the current week)
+  const taskCompletionData = weekdays.map(day => {
+    const assignedOnDay = myTasks.filter(t => t.dueDate === day.dateStr).length;
+    const completedOnDay = myTasks.filter(t => 
+      (t.status === 'Done' || t.status === 'done' || t.completed === true) && 
+      t.dueDate === day.dateStr
+    ).length;
+    return {
+      name: day.label,
+      Assigned: assignedOnDay,
+      Completed: completedOnDay
+    };
+  });
 
   const handleDownloadReport = () => {
     addToast('success', 'Productivity report downloaded successfully (simulated).');

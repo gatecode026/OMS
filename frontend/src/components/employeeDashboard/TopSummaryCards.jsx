@@ -6,7 +6,6 @@ import {
   Briefcase,
   FileText,
   Calendar,
-  Award,
   ArrowUpRight
 } from 'lucide-react';
 
@@ -66,15 +65,6 @@ const TopSummaryCards = ({
       icon: Calendar,
       color: 'text-purple',
       path: '/leaves'
-    },
-    {
-      id: 'performance',
-      label: 'Performance Score',
-      value: performance.overall ? `${performance.overall}%` : 'N/A',
-      detail: performance.overall >= 90 ? 'Excellent' : performance.overall >= 80 ? 'Good' : 'Average',
-      icon: Award,
-      color: 'text-success',
-      path: '/performance'
     }
   ];
 
@@ -99,12 +89,6 @@ const TopSummaryCards = ({
         <span className={badgeClass} style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 700 }}>
           {status}
         </span>
-      );
-    }
-
-    if (card.id === 'performance') {
-      return (
-        <span className="bold-text text-lg" style={{ fontSize: '1.35rem', color: '#10b981' }}>{card.value}</span>
       );
     }
 

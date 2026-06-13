@@ -253,6 +253,8 @@ const EmployeeDashboard = () => {
           {/* Performance Summary Widget */}
           <PerformanceSummaryWidget
             currentUser={currentUser}
+            myTasks={myTasks}
+            myAttendance={myAttendance}
           />
 
           {/* Notifications Center */}
@@ -295,8 +297,9 @@ const EmployeeDashboard = () => {
       <DashboardFooter
         myTasks={myTasks}
         myAttendance={myAttendance}
-        myLeaves={myLeaves}
         currentUser={currentUser}
+        activeProjectsCount={myProjects.length}
+        leaveBalance={leaveBalance}
       />
 
       {/* ─── MODALS ─── */}

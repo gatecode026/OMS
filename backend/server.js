@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 import app from './src/app.js';
 import logger from './src/config/logger.js';
 import database from './src/config/database.js';
+import { startEventScheduler } from './src/modules/events/event.scheduler.js';
 
 // Load environment variables
 dotenv.config();
@@ -22,6 +23,9 @@ const bootstrap = async () => {
   try {
     // Connect to database (simulated/future integration)
     await database.connect();
+
+    // Start background meeting reminder checks
+    startEventScheduler();
 
     const server = app.listen(PORT, () => {
       logger.info(`  Server running in [${NODE_ENV}] mode on port ${PORT}`);
