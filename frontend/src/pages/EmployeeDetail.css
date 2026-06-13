@@ -1647,3 +1647,122 @@ tr.row-red td:first-child   { border-left: 3px solid #ef4444; }
 .btn-reject:hover {
   background: rgba(239, 68, 68, 0.16);
 }
+
+/* Premium Info Display Cards (matching MyProfile.css) */
+.profile-info-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-5);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.info-display-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: var(--spacing-5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.info-display-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-primary-light);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: var(--spacing-4);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-3);
+}
+
+.info-card-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.info-card-icon-wrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-card-icon-wrap.primary {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.info-card-icon-wrap.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.info-card-icon-wrap.danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.info-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-4) var(--spacing-6);
+}
+
+@media (max-width: 640px) {
+  .info-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.info-card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-card-item.full-width {
+  grid-column: span 2;
+}
+
+@media (max-width: 640px) {
+  .info-card-item.full-width {
+    grid-column: span 1;
+  }
+}
+
+.info-item-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.info-item-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.info-item-value.secured-value {
+  letter-spacing: 1px;
+}
+
+.info-item-value.highlight-blood {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  width: fit-content;
+  font-size: 0.85rem;
+}

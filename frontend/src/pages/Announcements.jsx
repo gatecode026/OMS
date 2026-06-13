@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import './Announcements.css';
+import './Payroll.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
 import DataTable from '../components/common/DataTable';
@@ -84,6 +85,10 @@ const Announcements = () => {
   // Selected view perspective override
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
 
+  React.useEffect(() => {
+    setPerspective(currentUserRole || 'super_admin');
+  }, [currentUserRole]);
+
   // Sub-navigation tabs
   const [activeTab, setActiveTab] = useState('board');
 
@@ -102,6 +107,10 @@ const Announcements = () => {
     title: '', category: 'Company', priority: 'Medium', description: '', publishDate: '', expiryDate: '',
     audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
   });
+
+  const branchesList = useMemo(() => {
+    return [...new Set((employees || []).map(e => e.branch).filter(Boolean))];
+  }, [employees]);
 
   // Selected announcement for detail view & comments
   const [selectedAnn, setSelectedAnn] = useState(null);
@@ -385,23 +394,6 @@ const Announcements = () => {
         </div>
 
         <div className="flex-center gap-3 wrap-content">
-          <div className="flex-center gap-1 perspective-container">
-            <span className="text-muted font-small uppercase font-semibold">Perspective:</span>
-            <select
-              value={perspective}
-              onChange={(e) => {
-                setPerspective(e.target.value);
-                addPageToast('info', `Switched perspective to: ${e.target.value.toUpperCase()}`);
-              }}
-              className="payroll-selector perspective-select"
-            >
-              <option value="employee">Employee View</option>
-              <option value="team_leader">Team Leader</option>
-              <option value="department_manager">Dept Manager</option>
-              <option value="branch_admin">HR Manager</option>
-              <option value="super_admin">Admin / Super Admin</option>
-            </select>
-          </div>
 
           {perspective !== 'employee' && (
             <Button variant="primary" onClick={() => setShowCreateModal(true)} icon={Plus}>
@@ -966,8 +958,12 @@ const Announcements = () => {
                     onChange={(e) => {
                       const type = e.target.value;
                       let targetVal = 'All Employees';
-                      if (type === 'Department') targetVal = 'Engineering';
-                      if (type === 'Branch') targetVal = 'Delhi HQ';
+                      if (type === 'Department') {
+                        targetVal = departments[0]?.name || 'Engineering';
+                      } else if (type === 'Branch') {
+                        const branches = [...new Set((employees || []).map(e => e.branch).filter(Boolean))];
+                        targetVal = branches[0] || 'Delhi HQ';
+                      }
                       setCreateForm(prev => ({ ...prev, audienceType: type, targetAudience: targetVal }));
                     }}
                     className="table-filter-select width-full p-2"
@@ -978,6 +974,29 @@ const Announcements = () => {
                   </select>
                 </div>
               </div>
+
+              {createForm.audienceType !== 'All' && (
+                <div>
+                  <label className="input-label">
+                    {createForm.audienceType === 'Department' ? 'Select Target Department' : 'Select Target Branch'}
+                  </label>
+                  <select
+                    value={createForm.targetAudience}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, targetAudience: e.target.value }))}
+                    className="table-filter-select width-full p-2"
+                  >
+                    {createForm.audienceType === 'Department' ? (
+                      (departments || []).map(d => (
+                        <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                      ))
+                    ) : (
+                      (branchesList.length > 0 ? branchesList : ['Delhi HQ', 'Bangalore Office', 'Mumbai Branch']).map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))
+                    )}
+                  </select>
+                </div>
+              )}
 
               <div className="grid-2-col gap-3">
                 <div>
@@ -1013,7 +1032,7 @@ const Announcements = () => {
               </div>
             </div>
 
-            <div className="flex-end gap-3 border-top pt-4 mt-4">
+            <div className="flex justify-end gap-3 border-top pt-4 mt-4">
               <Button variant="secondary" type="button" onClick={() => setShowCreateModal(false)}>Cancel</Button>
               <Button variant="primary" type="submit">Submit & Publish</Button>
             </div>
@@ -1124,7 +1143,7 @@ const Announcements = () => {
 
             </div>
 
-            <div className="flex-end gap-3 border-top pt-4 mt-4">
+            <div className="flex justify-end gap-3 border-top pt-4 mt-4">
               <Button variant="secondary" onClick={() => setSelectedAnn(null)}>Close</Button>
             </div>
           </div>

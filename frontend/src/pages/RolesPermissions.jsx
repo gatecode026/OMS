@@ -890,25 +890,6 @@ const RolesPermissions = () => {
         
         {/* Perspective Switcher */}
         <div className="flex-center gap-3">
-          <div className="perspective-container flex-center gap-2">
-            <Shield size={14} className="text-primary" />
-            <span className="text-xs font-semibold text-muted uppercase tracking-wide">View As:</span>
-            <select
-              value={currentUserRole}
-              onChange={(e) => {
-                setCurrentUserRole(e.target.value);
-                addToast('info', `Switched UI perspective view role: ${e.target.value}`);
-              }}
-              className="perspective-select select-clean"
-            >
-              <option value="super_admin">Super Admin</option>
-              <option value="branch_admin">Branch Admin</option>
-              <option value="project_manager">Project Manager</option>
-              <option value="team_leader">Team Leader</option>
-              <option value="employee">Employee</option>
-            </select>
-          </div>
-          
           <Button variant="primary" onClick={() => setShowCreateModal(true)} icon={Plus}>
             New Role
           </Button>

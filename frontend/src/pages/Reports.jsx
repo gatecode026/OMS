@@ -131,6 +131,10 @@ const Reports = () => {
 
   // State
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
+
+  React.useEffect(() => {
+    setPerspective(currentUserRole || 'super_admin');
+  }, [currentUserRole]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [empSubTab, setEmpSubTab] = useState('analytics');
   const [paySubTab, setPaySubTab] = useState('salary');
@@ -444,16 +448,6 @@ const Reports = () => {
           <p className="page-desc-text font-small">Centralized business intelligence and reporting hub providing real-time insights into employees, attendance, leaves, payroll, projects, tasks, productivity, departments, branches, and overall company performance</p>
         </div>
         <div className="flex-center gap-3 wrap-content">
-          <div className="flex-center gap-1 perspective-container">
-            <span className="text-muted font-small uppercase font-semibold">Perspective:</span>
-            <select value={perspective} onChange={e => { setPerspective(e.target.value); addPageToast('info', `View switched to: ${e.target.value}`); }} className="payroll-selector perspective-select">
-              <option value="employee">Employee View</option>
-              <option value="team_leader">Team Leader</option>
-              <option value="branch_admin">HR Manager</option>
-              <option value="project_manager">Project Manager</option>
-              <option value="super_admin">Super Admin</option>
-            </select>
-          </div>
           <select value={dateRange} onChange={e => setDateRange(e.target.value)} className="payroll-selector">
             <option value="today">Today</option>
             <option value="this_week">This Week</option>

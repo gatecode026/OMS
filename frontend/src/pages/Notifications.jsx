@@ -85,6 +85,11 @@ const Notifications = () => {
     return (currentUserRole === 'employee') ? 'all-notifications' : 'dashboard';
   });
 
+  // Sync perspective with currentUserRole changes
+  useEffect(() => {
+    setPerspective(currentUserRole || 'super_admin');
+  }, [currentUserRole]);
+
   // Sync activeTab with perspective selector changes
   useEffect(() => {
     if (perspective === 'employee') {
@@ -146,44 +151,59 @@ const Notifications = () => {
   };
 
   // Automation Rules
-  const [automationRules, setAutomationRules] = useState([
-    {
-      id: 'CAT-SYS',
-      category: 'System Events',
-      rules: [
-        { id: 'SYS-01', trigger: 'Database CPU Threshold > 90%', channel: 'Email + Push', enabled: true },
-        { id: 'SYS-02', trigger: 'Failed API Integrations Warning', channel: 'SMS + Dashboard', enabled: true },
-        { id: 'SYS-03', trigger: 'Server Deployment Complete', channel: 'Slack webhook', enabled: false }
-      ]
-    },
-    {
-      id: 'CAT-HR',
-      category: 'HR Alerts',
-      rules: [
-        { id: 'HR-01', trigger: 'New Employee Profile Created', channel: 'Email Onboarding', enabled: true },
-        { id: 'HR-02', trigger: 'Leave Request Status Update', channel: 'Push Notification', enabled: true },
-        { id: 'HR-03', trigger: 'Performance Appraisal Opened', channel: 'Dashboard Toast', enabled: true }
-      ]
-    },
-    {
-      id: 'CAT-PERF',
-      category: 'Performance Notifications',
-      rules: [
-        { id: 'PRF-01', trigger: 'Daily Task Overdue Report', channel: 'Email to Lead', enabled: true },
-        { id: 'PRF-02', trigger: 'KPI Metrics Quarterly Publish', channel: 'Dashboard Alert', enabled: false },
-        { id: 'PRF-03', trigger: 'Activity Log Security Exception', channel: 'SMS Alert', enabled: true }
-      ]
-    },
-    {
-      id: 'CAT-PRJ',
-      category: 'Project Actions',
-      rules: [
-        { id: 'PRJ-01', trigger: 'New Project Assignment', channel: 'Email + Push', enabled: true },
-        { id: 'PRJ-02', trigger: 'Project Budget Threshold > 95%', channel: 'SMS to Lead', enabled: true },
-        { id: 'PRJ-03', trigger: 'Milestone Review Submitted', channel: 'Slack alert', enabled: false }
-      ]
+  const [automationRules, setAutomationRules] = useState(() => {
+    const saved = localStorage.getItem('automation_rules');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse automation_rules from localStorage:', e);
+      }
     }
-  ]);
+    return [
+      {
+        id: 'CAT-ATT',
+        category: 'Attendance Events',
+        rules: [
+          { id: 'ATT-01', trigger: 'Late Punch In Warning', channel: 'Push Notification', enabled: true },
+          { id: 'ATT-02', trigger: 'Overtime Work Confirmed', channel: 'SMS + Dashboard', enabled: true },
+          { id: 'ATT-03', trigger: 'Absenteeism Notification', channel: 'Email + Push', enabled: true }
+        ]
+      },
+      {
+        id: 'CAT-LV',
+        category: 'Leave Management',
+        rules: [
+          { id: 'LV-01', trigger: 'New Leave Application Submitted', channel: 'Email to Manager', enabled: true },
+          { id: 'LV-02', trigger: 'Leave Request Approved', channel: 'Push Notification', enabled: true },
+          { id: 'LV-03', trigger: 'Leave Request Rejected', channel: 'Dashboard Toast', enabled: true }
+        ]
+      },
+      {
+        id: 'CAT-TSK',
+        category: 'Tasks & Reports Alerts',
+        rules: [
+          { id: 'TSK-01', trigger: 'New Task Assigned', channel: 'Email + Push', enabled: true },
+          { id: 'TSK-02', trigger: 'Task Overdue Alert', channel: 'SMS Alert', enabled: true },
+          { id: 'TSK-03', trigger: 'Daily Work Report Submitted', channel: 'Dashboard Alert', enabled: true }
+        ]
+      },
+      {
+        id: 'CAT-HR',
+        category: 'Employee & HR Operations',
+        rules: [
+          { id: 'HR-01', trigger: 'New Employee Profile Created', channel: 'Email Onboarding', enabled: true },
+          { id: 'HR-02', trigger: 'Employee Account Deactivated', channel: 'Email + SMS', enabled: true },
+          { id: 'HR-03', trigger: 'Performance Appraisal Score Updated', channel: 'Push + Dashboard', enabled: true }
+        ]
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('automation_rules', JSON.stringify(automationRules));
+  }, [automationRules]);
+
 
   // Notification Templates
   const [templates, setTemplates] = useState([
@@ -806,22 +826,6 @@ const Notifications = () => {
         </div>
 
         <div className="flex-center gap-3">
-          {currentUserRole !== 'employee' && (
-            <div className="perspective-container flex-center gap-1">
-              <span className="text-muted text-xs font-semibold uppercase">Perspective:</span>
-              <select
-                value={perspective}
-                onChange={(e) => setPerspective(e.target.value)}
-                className="perspective-select"
-              >
-                <option value="super_admin">Super Admin</option>
-                <option value="branch_admin">Branch Admin</option>
-                <option value="manager">Manager</option>
-                <option value="team_leader">Team Leader</option>
-                <option value="employee">Employee</option>
-              </select>
-            </div>
-          )}
 
           <select
             value={month}
