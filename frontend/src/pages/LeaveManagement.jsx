@@ -91,7 +91,6 @@ const LeaveManagement = () => {
   const [filterLeaveType, setFilterLeaveType] = useState('All');
   const [filterDept, setFilterDept] = useState('All');
   const [filterDateRange, setFilterDateRange] = useState('All');
-  const [alertFeedOpen, setAlertFeedOpen] = useState(true);
 
   // Leave List state (includes user-added leaves locally)
   const [leavesList, setLeavesList] = useState([]);
@@ -1439,21 +1438,11 @@ const LeaveManagement = () => {
           ))}
         </div>
         
-        {activeTab === 'requests' && (
-          <button 
-            className={`alert-feed-toggle-btn flex-center gap-1 ${alertFeedOpen ? 'active' : ''}`}
-            onClick={() => setAlertFeedOpen(!alertFeedOpen)}
-          >
-            <Bell size={16} />
-            <span>Alerts Feed</span>
-            <span className="pulse-dot"></span>
-          </button>
-        )}
       </div>
 
       {/* ==================== TAB 1: REQUESTS & APPROVALS ==================== */}
       {activeTab === 'requests' && (
-        <div className={`leaves-tab-layout ${alertFeedOpen ? 'with-sidebar' : 'full-width'}`}>
+        <div className="leaves-tab-layout full-width">
           
           <div className="leaves-main-panel flex-column grid-gap">
             
@@ -1657,67 +1646,6 @@ const LeaveManagement = () => {
             </div>
 
           </div>
-
-          {/* Right sidebar panel: Alerts Feed */}
-          {alertFeedOpen && (
-            <div className="leaves-right-sidebar card animate-fade-in">
-              <div className="sidebar-feed-header">
-                <div className="flex-center gap-2">
-                  <Bell size={18} className="text-primary" />
-                  <h4>Notifications & Alerts</h4>
-                </div>
-                <button 
-                  className="mark-all-read-btn"
-                  onClick={() => {
-                    setAlertsFeed(prev => prev.map(a => ({ ...a, read: true })));
-                    addToast('info', 'Marked all notifications as read.');
-                  }}
-                >
-                  Mark All Read
-                </button>
-              </div>
-
-              <div className="alerts-list-feed">
-                {alertsFeed.map((alert) => (
-                  <div key={alert.id} className={`alert-feed-item type-${alert.type} ${alert.read ? 'read' : 'unread'}`}>
-                    <div className="alert-meta-top">
-                      <span className={`alert-type-bullet color-${alert.type}`}></span>
-                      <span className="alert-time-text">{alert.timestamp}</span>
-                    </div>
-                    <p className="alert-message-content">{alert.message}</p>
-                    {!alert.read && (
-                      <button
-                        className="mark-single-read-btn"
-                        onClick={() => {
-                          setAlertsFeed(prev => prev.map(a => (a.id === alert.id ? { ...a, read: true } : a)));
-                        }}
-                      >
-                        Dismiss
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="quick-actions-bar mt-4 pt-4 border-top">
-                <h5>Quick System Actions</h5>
-                <div className="actions-button-grid">
-                  <button className="quick-act-btn" onClick={() => { setActiveTab('balances'); addToast('info', 'Adjust employee quotas below.'); }}>
-                    <Edit size={14} />
-                    <span>Adjust Balance</span>
-                  </button>
-                  <button className="quick-act-btn" onClick={() => { setActiveTab('holidays'); addToast('info', 'Select format and download reports.'); }}>
-                    <Download size={14} />
-                    <span>Export Reports</span>
-                  </button>
-                  <button className="quick-act-btn" onClick={() => { setActiveTab('analytics'); addToast('info', 'Leave analytics page focused.'); }}>
-                    <TrendingUp size={14} />
-                    <span>Generate Analytics</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
         </div>
       )}

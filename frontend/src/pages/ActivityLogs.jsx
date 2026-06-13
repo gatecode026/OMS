@@ -40,6 +40,10 @@ const ActivityLogs = () => {
   // Role Perspective override (defaults to currentUserRole, but can be switched)
   const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
 
+  React.useEffect(() => {
+    setPerspective(currentUserRole || 'super_admin');
+  }, [currentUserRole]);
+
   // Active navigation tab
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -352,19 +356,6 @@ const ActivityLogs = () => {
         </div>
 
         <div className="flex-center gap-3">
-          <div className="perspective-container flex-center gap-1">
-            <span className="text-muted text-xs font-semibold uppercase">Perspective:</span>
-            <select
-              value={perspective}
-              onChange={(e) => setPerspective(e.target.value)}
-              className="perspective-select"
-            >
-              <option value="super_admin">Super Admin</option>
-              <option value="security_admin">Security Admin</option>
-              <option value="branch_manager">Branch Manager</option>
-              <option value="it_auditor">IT Auditor</option>
-            </select>
-          </div>
 
           <select
             value={month}

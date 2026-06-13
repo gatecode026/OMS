@@ -1049,6 +1049,53 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const triggerAutomaticNotification = async (ruleId, { title, message, recipientId, recipientRole, category }) => {
+    try {
+      const savedRules = localStorage.getItem('automation_rules');
+      let isEnabled = true;
+      if (savedRules) {
+        const parsed = JSON.parse(savedRules);
+        for (const cat of parsed) {
+          const rule = cat.rules.find(r => r.id === ruleId);
+          if (rule) {
+            isEnabled = rule.enabled;
+            break;
+          }
+        }
+      }
+      if (!isEnabled) {
+        console.log(`Notification trigger ${ruleId} is disabled.`);
+        return;
+      }
+
+      const newNotif = {
+        id: `NTF-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+        type: 'info',
+        title,
+        message,
+        time: new Date().toISOString(),
+        category: category || 'System',
+        priority: 'Normal',
+        recipientType: recipientId ? 'Individual' : (recipientRole === 'employee' ? 'Employees' : 'All Employees'),
+        recipientRole: recipientRole || 'all',
+        recipientId: recipientId || '',
+        sentBy: 'System Automation',
+        sentDate: new Date().toISOString().split('T')[0],
+        deliveryStatus: 'Delivered',
+        readStatus: 'Unread',
+        readTime: '—',
+        recipients: recipientId ? 1 : 100,
+        delivered: recipientId ? 1 : 100,
+        read: 0,
+        failed: 0
+      };
+
+      await addNotification(newNotif);
+    } catch (e) {
+      console.error('Failed to trigger automatic notification:', e);
+    }
+  };
+
   const updateNotification = async (id, updatedFields) => {
     if (!token) return;
     try {
@@ -1694,6 +1741,16 @@ export const AppProvider = ({ children }) => {
         setAppraisalReviews(prev => [newReview, ...prev]);
         addActivityLog(`Submitted appraisal review for ${reviewData.employeeName}`, 'Performance', 'success');
         addToast('success', `Appraisal review for ${reviewData.employeeName} submitted successfully.`);
+        
+        // Trigger Automatic Notification
+        await triggerAutomaticNotification('HR-03', {
+          title: 'Performance Appraisal Score Updated',
+          message: `Your performance review for period ${newReview.period} has been submitted. Rating: ${newReview.rating}.`,
+          recipientId: newReview.employeeId,
+          recipientRole: 'employee',
+          category: 'HR'
+        });
+
         fetchEmployees();
         return newReview;
       } else {
@@ -1894,6 +1951,14 @@ export const AppProvider = ({ children }) => {
         addActivityLog(`Added new employee: ${savedEmp.name}`, 'Employees', 'success');
         addToast('success', `Employee ${savedEmp.name} created successfully!`);
         
+        // Trigger Automatic Notification
+        await triggerAutomaticNotification('HR-01', {
+          title: 'New Employee Profile Created',
+          message: `Welcome aboard! A new profile has been created for ${savedEmp.name} (${savedEmp.designation || 'Staff'}) in the ${savedEmp.department || 'General'} department.`,
+          recipientRole: 'admin',
+          category: 'HR'
+        });
+
         // Increment User Count in Role Card
         setRoles(prev =>
           prev.map(r => (r.id === newEmp.roleId ? { ...r, userCount: r.userCount + 1 } : r))
@@ -1974,6 +2039,14 @@ export const AppProvider = ({ children }) => {
         );
         addActivityLog(`Deactivated employee: ${emp.name}`, 'Employees', 'danger');
         addToast('warning', `Employee ${emp.name} has been deactivated.`);
+
+        // Trigger Automatic Notification
+        await triggerAutomaticNotification('HR-02', {
+          title: 'Employee Account Deactivated',
+          message: `The employee account for ${emp.name} (${emp.id}) has been deactivated.`,
+          recipientRole: 'admin',
+          category: 'HR'
+        });
       } else {
         addToast('error', result.message || 'Failed to deactivate employee in database');
       }
@@ -2209,20 +2282,13 @@ export const AppProvider = ({ children }) => {
         addToast('success', `Leave request for ${leave.employeeName} approved.`);
         
         // Add Notification — targeted to the employee who requested leave
-        setNotifications(prev => [
-          {
-            id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
-            type: 'success',
-            message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Approved. Note: ${notes || 'Approved by Manager'}`,
-            timestamp: 'Just now',
-            read: false,
-            recipientId: leave.employeeId,
-            recipientRole: 'employee',
-            category: 'leave',
-            referenceId: leave.id
-          },
-          ...prev
-        ]);
+        await triggerAutomaticNotification('LV-02', {
+          title: 'Leave Request Approved',
+          message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Approved. Note: ${notes || 'Approved by Manager'}`,
+          recipientId: leave.employeeId,
+          recipientRole: 'employee',
+          category: 'Leave'
+        });
       } else {
         addToast('error', result.message || 'Failed to approve leave request');
       }
@@ -2267,20 +2333,13 @@ export const AppProvider = ({ children }) => {
         addToast('error', `Leave request for ${leave.employeeName} rejected.`);
 
         // Add Notification — targeted to the employee who requested leave
-        setNotifications(prev => [
-          {
-            id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
-            type: 'error',
-            message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Rejected. Note: ${notes || 'Rejected by Manager'}`,
-            timestamp: 'Just now',
-            read: false,
-            recipientId: leave.employeeId,
-            recipientRole: 'employee',
-            category: 'leave',
-            referenceId: leave.id
-          },
-          ...prev
-        ]);
+        await triggerAutomaticNotification('LV-03', {
+          title: 'Leave Request Rejected',
+          message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Rejected. Note: ${notes || 'Rejected by Manager'}`,
+          recipientId: leave.employeeId,
+          recipientRole: 'employee',
+          category: 'Leave'
+        });
       } else {
         addToast('error', result.message || 'Failed to reject leave request');
       }
@@ -2331,19 +2390,12 @@ export const AppProvider = ({ children }) => {
         
         // Notify admin/manager about the new leave application (only if status is Pending)
         if (result.data.status === 'Pending') {
-          setNotifications(prev => [
-            {
-              id: `NTF-${Math.random().toString(36).substring(2, 9)}`,
-              type: 'info',
-              message: `${result.data.employeeName} has applied for ${result.data.type || 'Leave'} from ${result.data.fromDate} to ${result.data.toDate || result.data.fromDate} (${result.data.days || 1} day(s)). Action required.`,
-              timestamp: 'Just now',
-              read: false,
-              recipientRole: 'admin',
-              category: 'leave',
-              referenceId: result.data.id
-            },
-            ...prev
-          ]);
+          await triggerAutomaticNotification('LV-01', {
+            title: 'New Leave Application Submitted',
+            message: `${result.data.employeeName} has applied for ${result.data.type || 'Leave'} from ${result.data.fromDate} to ${result.data.toDate || result.data.fromDate} (${result.data.days || 1} day(s)). Action required.`,
+            recipientRole: 'admin',
+            category: 'Leave'
+          });
         }
         
         return result.data;
@@ -2884,6 +2936,25 @@ export const AppProvider = ({ children }) => {
         setAttendance(prev => [result.data, ...prev]);
         addActivityLog(`Logged attendance record for ${result.data.employeeName}`, 'Attendance', 'success');
         addToast('success', 'Attendance record logged successfully.');
+
+        // Trigger Automatic Notification
+        if (result.data.status === 'Late') {
+          await triggerAutomaticNotification('ATT-01', {
+            title: 'Late Punch In Warning',
+            message: `Dear ${result.data.employeeName}, your punch in at ${result.data.punchIn || 'late time'} on ${result.data.date} has been marked as Late. Please check with your supervisor.`,
+            recipientId: result.data.employeeId,
+            recipientRole: 'employee',
+            category: 'Attendance'
+          });
+        } else if (result.data.status === 'Absent') {
+          await triggerAutomaticNotification('ATT-03', {
+            title: 'Absenteeism Notification',
+            message: `Dear ${result.data.employeeName}, you were marked as Absent on ${result.data.date}. Please verify your check-in or request leave.`,
+            recipientId: result.data.employeeId,
+            recipientRole: 'employee',
+            category: 'Attendance'
+          });
+        }
       } else {
         addToast('error', result.message || 'Failed to log attendance to database');
       }
@@ -2910,6 +2981,16 @@ export const AppProvider = ({ children }) => {
         );
         addActivityLog(`Updated attendance record for ${result.data.employeeName}`, 'Attendance', 'success');
         addToast('success', 'Attendance record updated successfully.');
+
+        // Trigger Automatic Notification
+        if (result.data.totalHours > 9) {
+          await triggerAutomaticNotification('ATT-02', {
+            title: 'Overtime Work Confirmed',
+            message: `${result.data.employeeName} completed ${result.data.totalHours} hours of work on ${result.data.date} (Overtime confirmed).`,
+            recipientRole: 'admin',
+            category: 'Attendance'
+          });
+        }
       } else {
         addToast('error', result.message || 'Failed to update attendance in database');
       }
@@ -3027,6 +3108,16 @@ export const AppProvider = ({ children }) => {
     if (success) {
       addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
       addToast('success', 'Task created successfully.');
+
+      // Trigger Automatic Notification
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'New Task Assigned',
+        message: `You have been assigned a new task: "${newTask.title}" in project "${project.name}". Due Date: ${newTask.dueDate || 'No due date'}.`,
+        recipientId: newTask.assigneeId,
+        recipientRole: 'employee',
+        category: 'Project'
+      });
+
       return newTask;
     }
   };
@@ -3889,6 +3980,16 @@ export const AppProvider = ({ children }) => {
         );
         addActivityLog(`Updated report ${id} status to ${status}`, 'Work Reports', 'success');
         addToast('success', `Report ${id} successfully updated to ${status}.`);
+
+        // Trigger Automatic Notification for work report review status update
+        await triggerAutomaticNotification('TSK-03', {
+          title: 'Daily Work Report Status Updated',
+          message: `Your daily work report for ${updatedReport.date} has been reviewed and marked as "${status}". Feedback: ${feedback || 'None'}`,
+          recipientId: updatedReport.employeeId,
+          recipientRole: 'employee',
+          category: 'Project'
+        });
+
         return updatedReport;
       } else {
         addToast('danger', result.message || 'Failed to update report status.');
@@ -4231,6 +4332,7 @@ export const AppProvider = ({ children }) => {
         setNotifications,
         fetchNotifications,
         addNotification,
+        triggerAutomaticNotification,
         updateNotification,
         deleteNotification,
         documentsList,

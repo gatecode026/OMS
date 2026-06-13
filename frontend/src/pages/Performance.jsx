@@ -56,13 +56,36 @@ const Performance = () => {
     activityLogs,
     projectsList,
     addNotification,
-    markAllNotificationsRead
+    markAllNotificationsRead,
+    currentUserRole
   } = useApp();
   const departments = useMemo(() => (contextDepartments || []).filter(d => d.status === 'Active'), [contextDepartments]);
   const isLoading = usePageLoading(800);
 
+  const mappedUserRole = useMemo(() => {
+    switch (currentUserRole) {
+      case 'employee': return 'Employee';
+      case 'team_leader': return 'Team Leader';
+      case 'manager':
+      case 'dept_admin':
+      case 'project_manager':
+      case 'department_manager':
+        return 'Department Manager';
+      case 'branch_admin':
+      case 'hr_admin':
+        return 'HR/Admin';
+      case 'super_admin':
+      default:
+        return 'Super Admin';
+    }
+  }, [currentUserRole]);
+
   /* Simulated view perspective */
-  const [userRole, setUserRole] = useState('Super Admin'); // Employee, Team Leader, Department Manager, HR/Admin, Super Admin
+  const [userRole, setUserRole] = useState(mappedUserRole);
+
+  React.useEffect(() => {
+    setUserRole(mappedUserRole);
+  }, [mappedUserRole]);
 
   /* Sub-Navigation workspace tabs */
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, directory, framework, goals, reviews, pips, audits
@@ -686,28 +709,6 @@ const Performance = () => {
 
         {/* Dynamic Role Selector / Perspective */}
         <div className="flex-center gap-3 flex-wrap">
-          <div className="role-switcher-container">
-            <span className="role-switcher-label">View Perspective:</span>
-            <select
-              value={userRole}
-              onChange={(e) => {
-                setUserRole(e.target.value);
-                setPage(1);
-                // Switch tabs back to dashboard if locked tab is active
-                if (e.target.value === 'Employee' && ['framework', 'pips'].includes(activeTab)) {
-                  setActiveTab('dashboard');
-                }
-                addToast('info', `Performance dashboard role swapped to: ${e.target.value}`);
-              }}
-              className="role-selector-input"
-            >
-              <option>Employee</option>
-              <option>Team Leader</option>
-              <option>Department Manager</option>
-              <option>HR/Admin</option>
-              <option>Super Admin</option>
-            </select>
-          </div>
 
           <Button variant="ghost" size="sm" icon={Download} onClick={() => triggerExport('CSV')}>
             {exporting ? 'Exporting...' : 'Export Results'}
