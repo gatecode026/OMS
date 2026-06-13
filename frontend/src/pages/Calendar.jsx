@@ -32,64 +32,7 @@ const todayOffset = (n) => { const d = new Date(); d.setDate(d.getDate() + n); r
 
 // ─── Sample Events ────────────────────────────────────────────────────────────
 
-const INITIAL_EVENTS = [
-  {
-    id: 'evt-1', title: 'Weekly Sprint Sync', type: 'meeting',
-    date: todayOffset(0),  time: '10:00', endTime: '10:45',
-    description: 'Sync on sprint tasks, code reviews, and upcoming deployments.',
-    location: 'https://meet.google.com/abc-defg-hij',
-    attendees: 'Uttam Rajpurohit, Ananya Gupta, Priya Patel',
-    color: '#38bdf8',
-  },
-  {
-    id: 'evt-2', title: 'Daily Report Reminder', type: 'reminder',
-    date: todayOffset(0),  time: '18:00', endTime: '18:15',
-    description: 'Submit daily work reports before EOD.',
-    location: 'Office Portal',
-    attendees: 'Uttam Rajpurohit',
-    color: '#f59e0b',
-  },
-  {
-    id: 'evt-3', title: 'Marketing Alignment Sync', type: 'meeting',
-    date: todayOffset(1),  time: '11:00', endTime: '12:00',
-    description: 'Align on content strategy for Q3.',
-    location: 'Conference Room 204',
-    attendees: 'Priya Patel, Rahul Sharma',
-    color: '#8b5cf6',
-  },
-  {
-    id: 'evt-4', title: 'Architecture Review', type: 'reminder',
-    date: todayOffset(1),  time: '14:30', endTime: '15:00',
-    description: 'Complete final architecture documentation check.',
-    location: 'Document Vault',
-    attendees: 'Uttam Rajpurohit',
-    color: '#f59e0b',
-  },
-  {
-    id: 'evt-5', title: '1-on-1 Manager Feedback', type: 'meeting',
-    date: todayOffset(3),  time: '15:00', endTime: '15:30',
-    description: 'Quarterly performance feedback session with line manager.',
-    location: 'Manager Cabin',
-    attendees: 'Uttam Rajpurohit, Neha Verma',
-    color: '#60a5fa',
-  },
-  {
-    id: 'evt-6', title: 'Q2 Payroll Audit', type: 'reminder',
-    date: todayOffset(4),  time: '10:00', endTime: '11:00',
-    description: 'Verify attendance sheets and salary breakdown for Q2.',
-    location: 'HR Portal',
-    attendees: 'Sarah Connor, James Wilson',
-    color: '#f87171',
-  },
-  {
-    id: 'evt-7', title: 'Project Alpha Retrospective', type: 'meeting',
-    date: todayOffset(7),  time: '14:00', endTime: '15:30',
-    description: 'Post-launch retrospective for Project Alpha. Discuss wins, blockers, and next steps.',
-    location: 'https://zoom.us/j/123456789',
-    attendees: 'Engineering Team, Design Team',
-    color: '#34d399',
-  },
-];
+const INITIAL_EVENTS = [];
 
 const BLANK_FORM = {
   id: '', title: '', type: 'meeting',
@@ -108,7 +51,11 @@ const AVATAR_COLORS = ['#ec4899','#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d
 
 export default function Calendar() {
   const isLoading = usePageLoading(600);
-  const { addToast, showConfirm, employees = [], currentUser = null, currentUserRole = '' } = useApp();
+  const { token, addToast, showConfirm, employees = [], currentUser = null, currentUserRole = '', attendanceRules = {} } = useApp();
+
+  const todayNavLabel = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+  }, []);
 
   // ── State ──
   const [currentDate,    setCurrentDate]    = useState(new Date());
@@ -225,16 +172,7 @@ export default function Calendar() {
     );
   }, []);
 
-  const [events, setEvents] = useState(() => {
-    try {
-      const saved = localStorage.getItem('office_calendar_events_v2');
-      return saved ? JSON.parse(saved) : INITIAL_EVENTS;
-    } catch { return INITIAL_EVENTS; }
-  });
-
-  useEffect(() => {
-    localStorage.setItem('office_calendar_events_v2', JSON.stringify(events));
-  }, [events]);
+  const [events, setEvents] = useState([]);
 
   // ── Derived calendar grid data ──
   const year  = currentDate.getFullYear();
@@ -264,6 +202,134 @@ export default function Calendar() {
       return d;
     });
   }, [selectedDate]);
+
+  // ── Query range for API fetching ──
+  const queryRange = useMemo(() => {
+    if (viewMode === 'month' && calendarCells.length > 0) {
+      return {
+        from: formatDate(calendarCells[0].date),
+        to: formatDate(calendarCells[calendarCells.length - 1].date)
+      };
+    } else if (viewMode === 'week' && weekCells.length > 0) {
+      return {
+        from: formatDate(weekCells[0]),
+        to: formatDate(weekCells[6])
+      };
+    } else {
+      const fromDate = new Date(year, month - 1, 1);
+      const toDate = new Date(year, month + 3, 0);
+      return {
+        from: formatDate(fromDate),
+        to: formatDate(toDate)
+      };
+    }
+  }, [viewMode, calendarCells, weekCells, year, month]);
+
+  const fetchEvents = useCallback(async () => {
+    if (!token) return;
+    try {
+      const { from, to } = queryRange;
+      const response = await fetch(`http://localhost:5000/api/events?from=${from}&to=${to}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.status === 401) {
+        return;
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        const mapped = data.map(evt => ({
+          id: evt._id || evt.id,
+          title: evt.title,
+          type: evt.type,
+          date: evt.date,
+          time: evt.startTime,
+          endTime: evt.endTime || '',
+          location: evt.location || '',
+          description: evt.description || '',
+          attendees: Array.isArray(evt.attendees) ? evt.attendees.map(a => a.name).join(', ') : '',
+          rawAttendees: Array.isArray(evt.attendees) ? evt.attendees : [],
+          color: evt.color || '#38bdf8',
+          createdBy: evt.createdBy || null,
+          status: evt.status || 'confirmed'
+        }));
+        setEvents(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch calendar events:', err);
+    }
+  }, [token, queryRange]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  // ── Role-based action access ──
+  const canModify = useCallback((evt) => {
+    if (!evt || !currentUser) return false;
+    const isAdmin = currentUserRole === 'super_admin' || currentUserRole === 'admin' || currentUserRole === 'branch_admin' || currentUserRole === 'hr' || currentUserRole === 'hr_manager';
+    const isCreator = evt.createdBy && (evt.createdBy.id === currentUser.id || evt.createdBy._id === currentUser._id);
+    return isAdmin || isCreator;
+  }, [currentUser, currentUserRole]);
+
+  const isUserSenior = useMemo(() => {
+    if (!currentUser) return false;
+    const role = (currentUserRole || '').toLowerCase();
+    const designation = (currentUser.designation || '').toLowerCase();
+    const empRole = (currentUser.role || '').toLowerCase();
+    return (
+      role.includes('admin') ||
+      role.includes('manager') ||
+      role.includes('leader') ||
+      role.includes('tl') ||
+      role.includes('hr') ||
+      designation.includes('admin') ||
+      designation.includes('manager') ||
+      designation.includes('leader') ||
+      designation.includes('tl') ||
+      designation.includes('hr') ||
+      empRole.includes('admin') ||
+      empRole.includes('manager') ||
+      empRole.includes('leader') ||
+      empRole.includes('tl') ||
+      empRole.includes('hr')
+    );
+  }, [currentUser, currentUserRole]);
+
+  const isAttendeeOfSelectedEvent = useMemo(() => {
+    if (!selectedEvent || !currentUser || !selectedEvent.rawAttendees) return false;
+    return selectedEvent.rawAttendees.some(att => 
+      att.id === currentUser.id || 
+      att._id === currentUser._id || 
+      (att.name && currentUser.name && att.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+    );
+  }, [selectedEvent, currentUser]);
+
+  const handleUpdateStatus = async (eventId, newStatus) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/events/${eventId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        addToast('error', data.error || 'Failed to update meeting status.');
+        return;
+      }
+      addToast('success', newStatus === 'confirmed' ? 'Meeting request approved.' : 'Meeting request declined.');
+      setIsDetailsOpen(false);
+      fetchEvents();
+    } catch (err) {
+      console.error('Error updating status:', err);
+      addToast('error', 'An error occurred while updating the status.');
+    }
+  };
 
   // ── Filtered events ──
   const filteredEvents = useMemo(() => {
@@ -361,46 +427,165 @@ export default function Calendar() {
     setIsFormOpen(true);
   }, []);
 
-  const handleSaveEvent = (e) => {
+  const handleSaveEvent = async (e) => {
     e.preventDefault();
     if (!formState.title.trim()) { addToast('error', 'Event title is required.'); return; }
-    if (formState.id) {
-      setEvents((prev) => prev.map((ev) => ev.id === formState.id ? { ...formState } : ev));
-      addToast('success', `"${formState.title}" updated successfully.`);
-    } else {
-      setEvents((prev) => [...prev, { ...formState, id: `evt-${Date.now()}` }]);
-      addToast('success', `"${formState.title}" scheduled.`);
+    if (formState.date < todayStr) {
+      addToast('error', 'Cannot schedule events before today.');
+      return;
     }
-    setIsFormOpen(false);
+    
+    // Office hours validation on frontend
+    const officeStart = attendanceRules?.startTime || '09:00';
+    const officeEnd = attendanceRules?.endTime || '18:00';
+
+    if (formState.time < officeStart || formState.time > officeEnd) {
+      addToast('error', `Meetings must be scheduled between ${officeStart} and ${officeEnd}.`);
+      return;
+    }
+    if (formState.type === 'meeting' && formState.endTime) {
+      if (formState.endTime < officeStart || formState.endTime > officeEnd) {
+        addToast('error', `Meetings must be scheduled between ${officeStart} and ${officeEnd}.`);
+        return;
+      }
+      if (formState.endTime <= formState.time) {
+        addToast('error', 'End time must be after start time.');
+        return;
+      }
+    }
+
+    // Map attendee names to custom string employee IDs
+    const attendeeNames = formState.attendees.split(',').map(n => n.trim()).filter(Boolean);
+    const attendeeIds = attendeeNames.map(name => {
+      const emp = employees.find(e => e.name && e.name.toLowerCase().trim() === name.toLowerCase().trim());
+      return emp ? emp.id : null;
+    }).filter(Boolean);
+
+    // Construct API payload
+    const payload = {
+      title: formState.title,
+      type: formState.type,
+      date: formState.date,
+      startTime: formState.time,
+      endTime: formState.type === 'meeting' && formState.endTime ? formState.endTime : null,
+      location: formState.location,
+      description: formState.description,
+      attendees: attendeeIds,
+      color: formState.color
+    };
+
+    try {
+      let response;
+      if (formState.id) {
+        // Update
+        response = await fetch(`http://localhost:5000/api/events/${formState.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        // Create
+        response = await fetch('http://localhost:5000/api/events', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      const resData = await response.json();
+      if (!response.ok) {
+        addToast('error', resData.error || 'Failed to save event.');
+        return;
+      }
+
+      if (resData.warning) {
+        addToast('warning', resData.warning);
+      } else {
+        if (resData.status === 'pending') {
+          addToast('success', 'Meeting request submitted. Pending senior approval.');
+        } else {
+          addToast('success', formState.id ? `"${formState.title}" updated successfully.` : `"${formState.title}" scheduled.`);
+        }
+      }
+
+      setIsFormOpen(false);
+      fetchEvents();
+    } catch (err) {
+      console.error('Error saving event:', err);
+      addToast('error', 'An error occurred while saving the event.');
+    }
   };
 
   const handleDeleteEvent = useCallback((id, title) => {
-    showConfirm('Cancel Event', `Remove "${title}" from the calendar?`, () => {
-      setEvents((prev) => prev.filter((e) => e.id !== id));
-      setIsDetailsOpen(false);
-      addToast('warning', `"${title}" removed.`);
+    showConfirm('Cancel Event', `Remove "${title}" from the calendar?`, async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/events/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const resData = await response.json();
+        if (!response.ok) {
+          addToast('error', resData.error || 'Failed to cancel event.');
+          return;
+        }
+        setIsDetailsOpen(false);
+        addToast('warning', `"${title}" removed.`);
+        fetchEvents();
+      } catch (err) {
+        console.error('Error deleting event:', err);
+        addToast('error', 'An error occurred while canceling the event.');
+      }
     }, 'danger');
-  }, [showConfirm, addToast]);
+  }, [showConfirm, addToast, token, fetchEvents]);
 
   const handleCellClick     = (date) => { setSelectedDate(date); openAddEvent(date); };
   const handleEventClick    = (e, evt) => { e.stopPropagation(); setSelectedEvent(evt); setIsDetailsOpen(true); };
 
   // ── Attendee avatars ──
-  const renderAvatars = (attendeesStr, max = 3) => {
+  const renderAvatars = useCallback((attendeesStr, max = 3, size = '') => {
     if (!attendeesStr) return null;
     const list = attendeesStr.split(',').map((s) => s.trim()).filter(Boolean);
+    const listClass = size ? `cal-avatar-list cal-avatar-list--${size}` : 'cal-avatar-list';
+
     return (
-      <div className="cal-avatar-list">
-        {list.slice(0, max).map((name, i) => (
-          <div
-            key={name}
-            className="cal-avatar"
-            style={{ backgroundColor: AVATAR_COLORS[i % AVATAR_COLORS.length] }}
-            title={name}
-          >
-            {getInitials(name)}
-          </div>
-        ))}
+      <div className={listClass}>
+        {list.slice(0, max).map((name, i) => {
+          const emp = employees.find(e => e.name && e.name.toLowerCase().trim() === name.toLowerCase().trim());
+          const initials = getInitials(name);
+          const bgColor = AVATAR_COLORS[i % AVATAR_COLORS.length];
+
+          if (emp && emp.photoUrl) {
+            return (
+              <img
+                key={name}
+                src={emp.photoUrl}
+                alt={name}
+                className="cal-avatar"
+                style={{ objectFit: 'cover' }}
+                title={name}
+              />
+            );
+          }
+
+          return (
+            <div
+              key={name}
+              className="cal-avatar"
+              style={{ backgroundColor: bgColor }}
+              title={name}
+            >
+              {initials}
+            </div>
+          );
+        })}
         {list.length > max && (
           <div
             className="cal-avatar"
@@ -412,7 +597,7 @@ export default function Calendar() {
         )}
       </div>
     );
-  };
+  }, [employees]);
 
   // ── Type label helpers ──
   const relDateLabel = (ds) => {
@@ -498,7 +683,7 @@ export default function Calendar() {
       {/* ── Stats Row ── */}
       <div className="cal-stats-row">
         {[
-          { num: events.filter((e) => e.date === todayStr).length,         label: 'Today',     },
+          { num: events.filter((e) => e.date === todayStr).length,         label: todayNavLabel,     },
           { num: events.filter((e) => e.type === 'meeting').length,         label: 'Meetings',  },
           { num: events.filter((e) => e.type === 'reminder').length,        label: 'Reminders', },
         ].map(({ num, label }) => (
@@ -594,6 +779,11 @@ export default function Calendar() {
                       <span className={`cal-type-pill cal-type-pill--${evt.type}`}>
                         {evt.type === 'meeting' ? 'Meeting' : 'Reminder'}
                       </span>
+                      {evt.status && evt.status !== 'confirmed' && (
+                        <span className={`cal-status-badge cal-status-badge--${evt.status}`} style={{ padding: '2px 6px', fontSize: '0.6rem', marginLeft: 'auto' }}>
+                          {evt.status}
+                        </span>
+                      )}
                     </div>
                     <p className="cal-agenda-item__title">{evt.title}</p>
                     {evt.location && (
@@ -631,7 +821,7 @@ export default function Calendar() {
                   <button className="cal-nav-arrow" onClick={prevPeriod} aria-label="Previous period">
                     <ChevronLeft size={15} />
                   </button>
-                  <button className="cal-nav-today" onClick={jumpToday}>Today</button>
+                  <button className="cal-nav-today" onClick={jumpToday}>{todayNavLabel}</button>
                   <button className="cal-nav-arrow" onClick={nextPeriod} aria-label="Next period">
                     <ChevronRight size={15} />
                   </button>
@@ -676,38 +866,58 @@ export default function Calendar() {
                       !cell.isCurrentMonth && 'cal-cell--other',
                       isToday   && 'cal-cell--today',
                       isSel     && 'cal-cell--selected',
+                      ds < todayStr && 'cal-cell--past',
                     ].filter(Boolean).join(' ')}
-                    onClick={() => handleCellClick(cell.date)}
+                    onClick={() => {
+                      if (ds >= todayStr) {
+                        handleCellClick(cell.date);
+                      }
+                    }}
                   >
                     <div className="cal-cell__top">
                       <span className={`cal-date-num ${isToday ? 'cal-date-num--today' : ''}`}>
                         {cell.date.getDate()}
                       </span>
-                      <button
-                        className="cal-cell-add-btn"
-                        title="Add event on this day"
-                        onClick={(e) => { e.stopPropagation(); handleCellClick(cell.date); }}
-                        aria-label="Add event"
-                      >
-                        <Plus size={10} />
-                      </button>
+                      {ds >= todayStr && (
+                        <button
+                          className="cal-cell-add-btn"
+                          title="Add event on this day"
+                          onClick={(e) => { e.stopPropagation(); handleCellClick(cell.date); }}
+                          aria-label="Add event"
+                        >
+                          <Plus size={10} />
+                        </button>
+                      )}
                     </div>
 
                     <div className="cal-cell__events">
                       {cellEvts.slice(0, 3).map((evt) => (
-                        <div
-                          key={evt.id}
-                          className="cal-event-chip"
-                          style={{
-                            borderLeftColor: evt.color,
-                            background:      evt.color + '1a',
-                            color:           evt.color,
-                          }}
-                          onClick={(e) => handleEventClick(e, evt)}
-                          title={`${evt.time} – ${evt.title}`}
-                        >
-                          <span className="cal-event-chip__time">{evt.time}</span>
-                          <span className="cal-event-chip__title">{evt.title}</span>
+                        <div key={evt.id} className="cal-cell-event-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div
+                            className="cal-event-chip"
+                            style={{
+                              borderLeftColor: evt.color,
+                              background:      evt.color + '1a',
+                              color:           evt.color,
+                            }}
+                            onClick={(e) => handleEventClick(e, evt)}
+                            title={`${evt.time} – ${evt.title}`}
+                          >
+                            <span className="cal-event-chip__time">{evt.time}</span>
+                            <span className="cal-event-chip__title">
+                              {evt.status && evt.status !== 'confirmed' && (
+                                <span className={`cal-mini-badge cal-mini-badge--${evt.status}`} style={{ marginRight: '4px' }}>
+                                  {evt.status === 'pending' ? 'P' : 'D'}
+                                </span>
+                              )}
+                              {evt.title}
+                            </span>
+                          </div>
+                          {evt.type === 'meeting' && evt.attendees && (
+                            <div className="cal-cell-avatars" style={{ paddingLeft: '4px' }}>
+                              {renderAvatars(evt.attendees, 3, 'sm')}
+                            </div>
+                          )}
                         </div>
                       ))}
                       {cellEvts.length > 3 && (
@@ -732,7 +942,7 @@ export default function Calendar() {
                   <div
                     key={ds}
                     role="gridcell"
-                    className={`cal-week-col ${isToday ? 'cal-week-col--today' : ''}`}
+                    className={`cal-week-col ${isToday ? 'cal-week-col--today' : ''} ${ds < todayStr ? 'cal-cell--past' : ''}`}
                   >
                     <div className="cal-week-col-header">
                       <span className="cal-week-col-name">{WEEK_DAYS_SHORT[date.getDay()]}</span>
@@ -756,15 +966,27 @@ export default function Calendar() {
                           <span className="cal-week-event-time">
                             {evt.time}{evt.type === 'meeting' && evt.endTime ? ` – ${evt.endTime}` : ''}
                           </span>
-                          <span className="cal-week-event-title" style={{ color: 'var(--cal-text-primary)' }}>
+                          <span className="cal-week-event-title" style={{ color: 'var(--cal-text-primary)', marginBottom: evt.type === 'meeting' && evt.attendees ? '4px' : '0' }}>
+                            {evt.status && evt.status !== 'confirmed' && (
+                              <span className={`cal-mini-badge cal-mini-badge--${evt.status}`} style={{ marginRight: '4px' }}>
+                                {evt.status}
+                              </span>
+                            )}
                             {evt.title}
                           </span>
+                          {evt.type === 'meeting' && evt.attendees && (
+                            <div className="cal-week-event-avatars">
+                              {renderAvatars(evt.attendees, 3, 'sm')}
+                            </div>
+                          )}
                         </div>
                       ))}
 
-                      <div className="cal-week-add-slot" onClick={() => handleCellClick(date)}>
-                        <Plus size={12} /> Add
-                      </div>
+                      {ds >= todayStr && (
+                        <div className="cal-week-add-slot" onClick={() => handleCellClick(date)}>
+                          <Plus size={12} /> Add
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -820,6 +1042,11 @@ export default function Calendar() {
                                   <span className={`cal-type-pill cal-type-pill--${evt.type}`}>
                                     {evt.type === 'meeting' ? 'Meeting' : 'Reminder'}
                                   </span>
+                                  {evt.status && evt.status !== 'confirmed' && (
+                                    <span className={`cal-status-badge cal-status-badge--${evt.status}`} style={{ padding: '2px 8px', fontSize: '0.65rem' }}>
+                                      {evt.status}
+                                    </span>
+                                  )}
                                 </div>
 
                                 <h4 className="cal-agenda-event-title">{evt.title}</h4>
@@ -861,22 +1088,26 @@ export default function Calendar() {
                                     <Video size={11} /> Join
                                   </a>
                                 )}
-                                <button
-                                  className="cal-action-icon-btn"
-                                  onClick={() => openEditEvent(evt)}
-                                  title="Edit event"
-                                  aria-label="Edit event"
-                                >
-                                  <Edit2 size={13} />
-                                </button>
-                                <button
-                                  className="cal-action-icon-btn cal-action-icon-btn--danger"
-                                  onClick={() => handleDeleteEvent(evt.id, evt.title)}
-                                  title="Cancel event"
-                                  aria-label="Cancel event"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
+                                {canModify(evt) && (
+                                  <>
+                                    <button
+                                      className="cal-action-icon-btn"
+                                      onClick={() => openEditEvent(evt)}
+                                      title="Edit event"
+                                      aria-label="Edit event"
+                                    >
+                                      <Edit2 size={13} />
+                                    </button>
+                                    <button
+                                      className="cal-action-icon-btn cal-action-icon-btn--danger"
+                                      onClick={() => handleDeleteEvent(evt.id, evt.title)}
+                                      title="Cancel event"
+                                      aria-label="Cancel event"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -988,6 +1219,7 @@ export default function Calendar() {
                     id="evt-date"
                     className="cal-form__input"
                     type="date"
+                    min={todayStr}
                     value={formState.date}
                     onChange={(e) => setFormState((s) => ({ ...s, date: e.target.value }))}
                     required
@@ -1188,10 +1420,15 @@ export default function Calendar() {
           <div className="cal-modal cal-modal--details" onClick={(e) => e.stopPropagation()}>
             <div className="cal-modal__stripe" style={{ background: selectedEvent.color }} />
 
-            <div className="cal-modal__header">
+            <div className="cal-modal__header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className={`cal-type-pill cal-type-pill--${selectedEvent.type}`}>
                 {selectedEvent.type === 'meeting' ? 'Meeting' : 'Reminder'}
               </span>
+              {selectedEvent.status && selectedEvent.status !== 'confirmed' && (
+                <span className={`cal-status-badge cal-status-badge--${selectedEvent.status}`}>
+                  {selectedEvent.status}
+                </span>
+              )}
               <button
                 className="cal-modal__close"
                 onClick={() => setIsDetailsOpen(false)}
@@ -1261,19 +1498,39 @@ export default function Calendar() {
             </div>
 
             <div className="cal-details__footer">
-              <button
-                className="cal-btn cal-btn--danger"
-                onClick={() => handleDeleteEvent(selectedEvent.id, selectedEvent.title)}
-              >
-                <Trash2 size={13} /> Cancel Event
-              </button>
+              {selectedEvent.status === 'pending' && isUserSenior && isAttendeeOfSelectedEvent && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="cal-btn cal-btn--success"
+                    onClick={() => handleUpdateStatus(selectedEvent.id, 'confirmed')}
+                  >
+                    <Check size={13} /> Approve
+                  </button>
+                  <button
+                    className="cal-btn cal-btn--danger"
+                    onClick={() => handleUpdateStatus(selectedEvent.id, 'declined')}
+                  >
+                    <X size={13} /> Decline
+                  </button>
+                </div>
+              )}
+              {canModify(selectedEvent) && (
+                <button
+                  className="cal-btn cal-btn--danger"
+                  onClick={() => handleDeleteEvent(selectedEvent.id, selectedEvent.title)}
+                >
+                  <Trash2 size={13} /> Cancel Event
+                </button>
+              )}
               <div className="cal-details__footer-right">
                 <button className="cal-btn cal-btn--ghost" onClick={() => setIsDetailsOpen(false)}>
                   Close
                 </button>
-                <button className="cal-btn cal-btn--primary" onClick={() => openEditEvent(selectedEvent)}>
-                  <Edit2 size={13} /> Edit
-                </button>
+                {canModify(selectedEvent) && (
+                  <button className="cal-btn cal-btn--primary" onClick={() => openEditEvent(selectedEvent)}>
+                    <Edit2 size={13} /> Edit
+                  </button>
+                )}
               </div>
             </div>
           </div>

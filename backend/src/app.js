@@ -19,6 +19,7 @@ import { loggerMiddleware } from './middlewares/logger.middleware.js';
 
 // Global Router Import
 import globalRouter from './routes/index.js';
+import eventRoutes from './routes/eventRoutes.js';
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.get('/health', (req, res) => {
 
 // ─── GLOBAL MODULAR ROUTING BINDING ─────────────────────────────────────────
 app.use('/api/v1', globalRouter);
+app.use('/api/events', eventRoutes);
 
 // ─── FALLBACK FOR UNKNOWN ROUTES ─────────────────────────────────────────────
 app.all('*', (req, res, next) => {

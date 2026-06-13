@@ -7,7 +7,8 @@ const UpcomingSchedule = ({
   myTasks = []
 }) => {
   const navigate = useNavigate();
-  const { addToast } = useApp();
+  const { addToast, token } = useApp();
+  const [todayEvents, setTodayEvents] = React.useState([]);
 
   const getLocalDateString = (date = new Date()) => {
     const year = date.getFullYear();
@@ -18,12 +19,38 @@ const UpcomingSchedule = ({
 
   const todayStr = getLocalDateString();
 
-  // Seed default meetings
-  const defaultSchedule = [
-    { time: '10:00 AM', event: 'Daily Standup Meeting', type: 'Meeting', link: 'https://meet.google.com/abc-defg-hij' },
-    { time: '12:00 PM', event: 'Project UI Review', type: 'Meeting', link: 'https://meet.google.com/abc-defg-hij' },
-    { time: '04:30 PM', event: 'Sprint Planning Session', type: 'Meeting', link: 'https://meet.google.com/abc-defg-hij' }
-  ];
+  React.useEffect(() => {
+    if (!token) return;
+    const fetchTodayEvents = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/events?from=${todayStr}&to=${todayStr}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          // Filter out declined events
+          const visible = data.filter(e => e.status !== 'declined');
+          setTodayEvents(visible);
+        }
+      } catch (err) {
+        console.error('Failed to fetch today\'s events:', err);
+      }
+    };
+    fetchTodayEvents();
+  }, [token, todayStr]);
+
+  const formatTime12h = (time24) => {
+    if (!time24) return '12:00 PM';
+    const [hoursStr, minutesStr] = time24.split(':');
+    const hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    const minutesFormatted = String(minutes).padStart(2, '0');
+    return `${hours12}:${minutesFormatted} ${ampm}`;
+  };
 
   // Map tasks due today
   const taskDeadlines = myTasks
@@ -36,9 +63,42 @@ const UpcomingSchedule = ({
       taskId: t.id
     }));
 
-  const scheduleItems = [...defaultSchedule, ...taskDeadlines].sort((a, b) => {
+  // Map today's events/meetings
+  const mappedEvents = todayEvents.map(evt => ({
+    time: formatTime12h(evt.startTime),
+    event: evt.status === 'pending' ? `${evt.title} (Pending)` : evt.title,
+    type: evt.type === 'meeting' ? 'Meeting' : 'Event',
+    link: evt.videoLink || null,
+    id: evt.id || evt._id,
+    color: evt.color,
+    status: evt.status
+  }));
+
+  const scheduleItems = [...mappedEvents, ...taskDeadlines].sort((a, b) => {
     return a.time.localeCompare(b.time);
   });
+
+  const getIconBg = (item) => {
+    if (item.type === 'Deadline') return 'rgba(239, 68, 68, 0.12)';
+    if (item.color) {
+      if (item.color.startsWith('#')) return `${item.color}1e`; // Hex color with ~12% opacity (1e)
+      return `var(--color-${item.color}-light, rgba(16, 185, 129, 0.12))`;
+    }
+    return 'rgba(16, 185, 129, 0.12)';
+  };
+
+  const getIconColor = (item) => {
+    if (item.type === 'Deadline') return 'text-danger';
+    if (item.color && item.color.startsWith('#')) return '';
+    return 'text-success';
+  };
+
+  const getIconStyle = (item) => {
+    if (item.type !== 'Deadline' && item.color && item.color.startsWith('#')) {
+      return { color: item.color };
+    }
+    return {};
+  };
 
   const handleJoinMeeting = (link) => {
     if (link) {
@@ -69,12 +129,12 @@ const UpcomingSchedule = ({
               <div className="flex-row align-center gap-3">
                 <div 
                   className="activity-icon-container" 
-                  style={{ backgroundColor: item.type === 'Deadline' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)' }}
+                  style={{ backgroundColor: getIconBg(item) }}
                 >
                   {item.type === 'Deadline' ? (
                     <Clock size={14} className="text-danger" />
                   ) : (
-                    <Video size={14} className="text-success" />
+                    <Video size={14} className={getIconColor(item)} style={getIconStyle(item)} />
                   )}
                 </div>
                 <div className="flex-column">

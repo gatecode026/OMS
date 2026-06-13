@@ -708,6 +708,16 @@
   box-shadow: inset 0 0 0 2px var(--cal-accent);
 }
 
+.cal-cell--past {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: rgba(10, 13, 20, 0.25);
+}
+
+.cal-cell--past:hover {
+  background: rgba(10, 13, 20, 0.25);
+}
+
 .cal-cell__top {
   display: flex;
   align-items: center;
@@ -1143,6 +1153,19 @@
 }
 
 .cal-avatar:first-child {
+  margin-left: 0;
+}
+
+/* Compact Avatars for Date Cells & Cards */
+.cal-avatar-list--sm .cal-avatar {
+  width: 18px;
+  height: 18px;
+  font-size: 0.52rem;
+  border: 1.5px solid var(--cal-bg-raised);
+  margin-left: -5px;
+}
+
+.cal-avatar-list--sm .cal-avatar:first-child {
   margin-left: 0;
 }
 
@@ -1884,4 +1907,71 @@
 }
 .light-theme .cal-dropdown-card {
   box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+}
+
+/* ── Meeting Status Badges ── */
+.cal-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--cal-radius-pill);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.cal-status-badge--pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.cal-status-badge--declined {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.cal-status-badge--confirmed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.cal-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.cal-mini-badge--pending {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.cal-mini-badge--declined {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Success Button Style */
+.cal-btn--success {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.cal-btn--success:hover {
+  background: #059669;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
 }

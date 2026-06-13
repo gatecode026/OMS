@@ -6,25 +6,87 @@ import { useApp } from '../../context/AppContext';
 
 const CompanyUpdates = () => {
   const navigate = useNavigate();
-  const { addToast } = useApp();
+  const { addToast, announcementsList = [], holidaysList = [], currentUser } = useApp();
   const [activeTab, setActiveTab] = useState('hr');
   const [selectedUpdate, setSelectedUpdate] = useState(null);
 
+  // Filter announcements for the current employee
+  const publishedAnnouncements = announcementsList.filter(ann => {
+    if (ann.status !== 'Published') return false;
+
+    if (ann.audienceType === 'All') return true;
+
+    if (currentUser) {
+      if (ann.audienceType === 'Department') {
+        return ann.targetAudience === currentUser.department;
+      }
+      if (ann.audienceType === 'Branch') {
+        return ann.targetAudience === currentUser.branch;
+      }
+    }
+
+    return false;
+  });
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = String(d.getDate()).padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[d.getMonth()];
+      const year = d.getFullYear();
+      return `${day} ${month} ${year}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  // Map to categorized updates
+  const hrUpdates = publishedAnnouncements
+    .filter(ann => (ann.category === 'HR' || ann.category === 'Company' || ann.category === 'Emergency') && ann.audienceType !== 'Department')
+    .map(ann => ({
+      id: ann.id,
+      title: ann.title,
+      date: formatDate(ann.publishDate),
+      body: ann.description,
+      category: 'HR Announcement'
+    }));
+
+  const deptUpdates = publishedAnnouncements
+    .filter(ann => ann.audienceType === 'Department' && currentUser && ann.targetAudience === currentUser.department)
+    .map(ann => ({
+      id: ann.id,
+      title: ann.title,
+      date: formatDate(ann.publishDate),
+      body: ann.description,
+      category: 'Department Notice'
+    }));
+
+  const teamUpdates = publishedAnnouncements
+    .filter(ann => (ann.category === 'Project' || ann.category === 'Event') && ann.audienceType !== 'Department')
+    .map(ann => ({
+      id: ann.id,
+      title: ann.title,
+      date: formatDate(ann.publishDate),
+      body: ann.description,
+      category: 'Team Update'
+    }));
+
+  const holidayUpdates = (holidaysList || []).map(h => ({
+    id: h.id || h._id,
+    title: `Upcoming Holiday: ${h.name}`,
+    date: formatDate(h.date),
+    body: h.description || `Enjoy your ${h.name} holiday!`,
+    category: 'Holiday Notification'
+  }));
+
   const updatesData = {
-    hr: [
-      { id: 'u1', title: 'CEO Townhall Meeting', date: '02 Jun 2026', body: 'The quarterly CEO Townhall meeting is scheduled for June 5th at 3:00 PM IST. Please submit your questions in advance through the portal. Link will be shared via email.', category: 'HR Announcement' },
-      { id: 'u2', title: 'Health Insurance Renewals', date: '30 May 2026', body: 'The window for updating family details for health insurance coverage is now open until June 10th. Please make sure to verify all details under the profile documents.', category: 'HR Announcement' }
-    ],
-    dept: [
-      { id: 'u3', title: 'Engineering Coding Standards v2', date: '01 Jun 2026', body: 'We have updated the coding standard guidelines for frontend project repositories. Please review the PR configurations and rules uploaded in the Document Vault.', category: 'Department Notice' },
-      { id: 'u4', title: 'Database Maintenance Alert', date: '28 May 2026', body: 'Vite staging database will undergo scheduled maintenance this Saturday between 2:00 AM and 6:00 AM. Staging build access may be intermittent during this time.', category: 'Department Notice' }
-    ],
-    team: [
-      { id: 'u5', title: 'Sprint UI Polishing Sync', date: '03 Jun 2026', body: 'Frontend team will meet today at 4:30 PM to align on design tokens and Custom CSS gradients across dashboard widgets. Participation is mandatory for all UI developers.', category: 'Team Update' }
-    ],
-    holidays: [
-      { id: 'u6', title: 'Upcoming Holiday: Kabir Jayanti', date: '03 Jun 2026', body: 'Please note that our offices will remain closed on June 15th on account of Kabir Jayanti. Have a wonderful long weekend!', category: 'Holiday Notification' }
-    ]
+    hr: hrUpdates,
+    dept: deptUpdates,
+    team: teamUpdates,
+    holidays: holidayUpdates
   };
 
   const getTabLabel = (tab) => {
