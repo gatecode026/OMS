@@ -230,3 +230,32 @@
 .comment-balloon:hover .comment-delete-btn {
   opacity: 1;
 }
+
+/* ==========================================================================
+   FORM GRID & SELECT LAYOUT OVERRIDES
+   ========================================================================== */
+
+.grid-2-col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.grid-3-col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .grid-2-col, .grid-3-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Modal Form styling overrides to stretch selectors fully */
+.payroll-modal-container select.table-filter-select {
+  max-width: none !important;
+  width: 100% !important;
+}
+

@@ -41,8 +41,6 @@
   flex-wrap: wrap;
   gap: var(--space-1);
 }
-
-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
 .docs-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

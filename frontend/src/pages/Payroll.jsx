@@ -101,8 +101,8 @@ const Payroll = () => {
   const [activeTab, setActiveTab] = useState(currentUserRole === 'employee' ? 'processing' : 'dashboard');
 
   React.useEffect(() => {
+    setPerspective(currentUserRole || 'super_admin');
     if (currentUserRole === 'employee') {
-      setPerspective('employee');
       setActiveTab('processing');
     }
   }, [currentUserRole]);
@@ -783,26 +783,6 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         </div>
 
         <div className="flex-center gap-3 wrap-content">
-          {/* Perspective Switching simulation */}
-          {hasPermission('payroll_management', 'update') && (
-            <div className="flex-center gap-1 perspective-container">
-              <span className="text-muted font-small uppercase font-semibold">Perspective:</span>
-              <select
-                value={perspective}
-                onChange={(e) => {
-                  setPerspective(e.target.value);
-                  addPageToast('info', `Switched view perspective to: ${e.target.value.toUpperCase()}`);
-                }}
-                className="payroll-selector perspective-select"
-              >
-                <option value="employee">Employee View</option>
-                <option value="team_leader">Team Leader</option>
-                <option value="branch_admin">HR Manager</option>
-                <option value="manager">Manager</option>
-                <option value="super_admin">Super Admin</option>
-              </select>
-            </div>
-          )}
 
           <select value={month} onChange={(e) => setMonth(e.target.value)} className="payroll-selector">
             <option value="January">January</option>

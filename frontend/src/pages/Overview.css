@@ -286,13 +286,15 @@
   font-size: 0.875rem;
 }
 
-.overview-filters-card select {
+.overview-filters-card select,
+.overview-filters-card .filters-grid select {
   padding: 8px 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-primary);
   min-width: 140px;
+  width: auto;
   cursor: pointer;
   outline: none;
 }

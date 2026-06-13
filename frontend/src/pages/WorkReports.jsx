@@ -795,25 +795,6 @@ const WorkReports = () => {
 
         {/* Dynamic Role Switcher & Tabs */}
         <div className="flex-center gap-3 flex-wrap">
-          {(hasPermission('work_reports', 'update') || hasPermission('work_reports', 'approve')) && (
-            <div className="role-switcher-container">
-              <span className="role-switcher-label">View Perspective:</span>
-              <select
-                value={userRole}
-                onChange={(e) => {
-                  setUserRole(e.target.value);
-                  addToast('info', `Dashboard view role changed to: ${e.target.value}`);
-                }}
-                className="role-selector-input"
-              >
-                <option>Employee</option>
-                <option>Team Leader</option>
-                <option>Project Manager</option>
-                <option>HR/Admin</option>
-                <option>Super Admin</option>
-              </select>
-            </div>
-          )}
 
           <div className="role-switcher-container">
             <span className="role-switcher-label">Time Period:</span>
