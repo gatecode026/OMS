@@ -78,7 +78,8 @@ const menuStructure = [
       { name: 'Task Monitoring', icon: KanbanSquare, path: '/tasks' },
       { name: 'Work Reports', icon: FileText, path: '/work-reports' },
       { name: 'Performance Analytics', icon: BarChart3, path: '/performance' },
-      { name: 'Payroll Management', icon: DollarSign, path: '/payroll' }
+      { name: 'Payroll Management', icon: DollarSign, path: '/payroll' },
+      { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }
     ]
   },
   {

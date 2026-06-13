@@ -67,6 +67,28 @@ export const TodayStatusCard = ({ todayRecord }) => {
   const punchInTime = todayRecord?.punchIn || '--:--';
   const punchOutTime = todayRecord?.punchOut || '--:--';
 
+  const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr || timeStr === '--:--') return null;
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+    if (!match) {
+      const parts = timeStr.trim().split(':');
+      if (parts.length >= 2) {
+        const hrs = parseInt(parts[0], 10);
+        const mins = parseInt(parts[1], 10);
+        if (!isNaN(hrs) && !isNaN(mins)) {
+          return hrs * 60 + mins;
+        }
+      }
+      return null;
+    }
+    let hrs = parseInt(match[1], 10);
+    const mins = parseInt(match[2], 10);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && hrs !== 12) hrs += 12;
+    if (ampm === 'AM' && hrs === 12) hrs = 0;
+    return hrs * 60 + mins;
+  };
+
   // Format work hours nicely (e.g., "8.5" to "8h 30m")
   const formatWorkHours = (hoursVal) => {
     if (!hoursVal) return '0h 0m';
@@ -75,9 +97,28 @@ export const TodayStatusCard = ({ todayRecord }) => {
     return `${hrs}h ${mins}m`;
   };
 
-  const elapsedHoursStr = todayRecord?.totalHours 
-    ? formatWorkHours(todayRecord.totalHours)
-    : '0h 0m';
+  const getElapsedHours = () => {
+    if (todayRecord?.punchIn && todayRecord.punchIn !== '--:--') {
+      const inMins = parseTimeToMinutes(todayRecord.punchIn);
+      if (inMins !== null) {
+        const hasPunchOut = todayRecord.punchOut && todayRecord.punchOut !== '--:--';
+        const outMins = hasPunchOut 
+          ? parseTimeToMinutes(todayRecord.punchOut)
+          : (currentTime.getHours() * 60 + currentTime.getMinutes());
+          
+        if (outMins !== null) {
+          let diffMins = outMins - inMins;
+          if (diffMins < 0) {
+            diffMins += 24 * 60;
+          }
+          return diffMins / 60;
+        }
+      }
+    }
+    return todayRecord?.totalHours || todayRecord?.workingHours || 0;
+  };
+
+  const elapsedHoursStr = formatWorkHours(getElapsedHours());
 
   // Live time string for display
   const timeString = currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
