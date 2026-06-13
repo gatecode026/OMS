@@ -1,5 +1,5 @@
 import React from 'react';
-import { MdBeachAccess, MdLocalHospital, MdDateRange, MdChildCare, MdPeople, MdAssignment, MdOutlineCancel } from 'react-icons/md';
+import { MdBeachAccess, MdLocalHospital, MdDateRange, MdChildCare, MdPeople, MdAssignment, MdOutlineCancel, MdEdit } from 'react-icons/md';
 import { BsCalendarRange, BsClockHistory, BsFileText } from 'react-icons/bs';
 import { FiClock } from 'react-icons/fi';
 
@@ -25,7 +25,7 @@ const fmtDate = (d) => {
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const LeaveRequestCard = ({ leave, onCancel }) => {
+const LeaveRequestCard = ({ leave, onCancel, onEdit }) => {
   const sc = STATUS_CONFIG[leave.status] || STATUS_CONFIG.Pending;
   const tc = TYPE_CONFIG[leave.type] || { label: leave.type, Icon: MdAssignment, color: '#94a3b8' };
   const { Icon: TypeIcon, label: typeLabel, color: typeColor } = tc;
@@ -122,27 +122,49 @@ const LeaveRequestCard = ({ leave, onCancel }) => {
           </div>
         )}
 
-        {/* Cancel button for pending */}
-        {leave.status === 'Pending' && onCancel && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => onCancel(leave.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
-                padding: '5px 13px',
-                background: 'transparent',
-                color: 'var(--color-danger)',
-                border: '1px solid var(--color-danger, #ef4444)',
-                borderRadius: 'var(--radius-md)',
-                cursor: 'pointer',
-                fontSize: '0.75rem', fontWeight: 600,
-                transition: 'background 0.2s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-            >
-              <MdOutlineCancel size={14} /> Cancel Request
-            </button>
+        {/* Actions for pending */}
+        {leave.status === 'Pending' && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(leave)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '5px 13px',
+                  background: 'transparent',
+                  color: 'var(--color-primary, #3b82f6)',
+                  border: '1px solid var(--color-primary, #3b82f6)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem', fontWeight: 600,
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <MdEdit size={14} /> Edit Request
+              </button>
+            )}
+            {onCancel && (
+              <button
+                onClick={() => onCancel(leave.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '5px 13px',
+                  background: 'transparent',
+                  color: 'var(--color-danger, #ef4444)',
+                  border: '1px solid var(--color-danger, #ef4444)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem', fontWeight: 600,
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <MdOutlineCancel size={14} /> Cancel Request
+              </button>
+            )}
           </div>
         )}
       </div>

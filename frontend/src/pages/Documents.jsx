@@ -270,9 +270,21 @@ const Documents = () => {
                 <button
                   className="doc-action-btn"
                   title="Preview"
-                  onClick={() => {
+                  onClick={async () => {
                     if (doc.fileUrl) {
-                      window.open(doc.fileUrl, '_blank');
+                      if (doc.fileUrl.startsWith('data:')) {
+                        try {
+                          const response = await fetch(doc.fileUrl);
+                          const blob = await response.blob();
+                          const blobUrl = URL.createObjectURL(blob);
+                          window.open(blobUrl, '_blank');
+                        } catch (err) {
+                          console.error('Failed to generate preview blob:', err);
+                          addToast('danger', 'Failed to load preview.');
+                        }
+                      } else {
+                        window.open(doc.fileUrl, '_blank');
+                      }
                     } else {
                       addToast('warning', 'No preview file available.');
                     }

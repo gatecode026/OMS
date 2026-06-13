@@ -26,6 +26,7 @@ const TaskMonitoring = () => {
     currentUserRole,
     currentUser,
     updateTaskStatus,
+    updateTaskProgress,
     addTask,
     deleteTask,
     reassignTask,
@@ -658,206 +659,275 @@ const TaskMonitoring = () => {
 
       {/* ── Section 6-11: LIST VIEW ── */}
       {activeView === 'list' && (
-        <div className="flex-column grid-gap">
-          
-          {/* Employee Task Monitoring Table */}
-          <div className="card table-wrapper-card">
-            <div className="table-toolbar">
-              <span className="table-count-label">Employee Task Performance monitoring</span>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th>Employee Name</th>
-                    <th>Assigned</th>
-                    <th>Completed</th>
-                    <th>Pending</th>
-                    <th>Overdue</th>
-                    <th>Productivity Score</th>
-                    <th>Performance Rating</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employeeSummaries.map(emp => (
-                    <React.Fragment key={emp.id}>
-                      <tr className="cursor-pointer" onClick={() => setExpandedEmployeeId(expandedEmployeeId === emp.id ? null : emp.id)}>
-                        <td style={{ minWidth: '240px' }}>
-                          <div className="flex-center gap-2 justify-start">
-                            <Avatar name={emp.name} size="sm" />
-                            <div className="flex-column" style={{ whiteSpace: 'nowrap' }}>
-                              <strong>{emp.name}</strong>
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{emp.designation} ({emp.department})</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td><Badge variant="neutral">{emp.assigned}</Badge></td>
-                        <td><Badge variant="success">{emp.completed}</Badge></td>
-                        <td><Badge variant="info">{emp.pending}</Badge></td>
-                        <td>
-                          <span className={emp.overdue > 0 ? 'text-danger-bold' : ''}>
-                            {emp.overdue}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="flex-center gap-2 justify-start">
-                            <div className="progress-bar-mini" style={{ width: '80px', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
-                              <div style={{ width: `${emp.productivity}%`, height: '100%', background: 'var(--color-success)', borderRadius: '3px' }} />
-                            </div>
-                            <span style={{ fontSize: '0.78rem' }}>{emp.productivity}%</span>
-                          </div>
-                        </td>
-                        <td>
-                          <Badge variant={emp.rating === 'Excellent' ? 'success' : emp.rating === 'Good' ? 'primary' : emp.rating === 'Average' ? 'warning' : 'danger'}>
-                            {emp.rating}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Button variant="ghost" size="sm">
-                            {expandedEmployeeId === emp.id ? 'Hide Details' : 'Show Details'}
-                          </Button>
-                        </td>
-                      </tr>
-                      {expandedEmployeeId === emp.id && (
-                        <tr>
-                          <td colSpan="8" style={{ background: 'rgba(255,255,255,0.01)', padding: '12px var(--spacing-5)' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                              <div>
-                                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Daily Trend (Last 7 days)</span>
-                                <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>Optimal Output</strong>
-                                <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Avg completion time: 2.4 days per task</span>
-                              </div>
-                              <div>
-                                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Weekly compliance</span>
-                                <strong style={{ fontSize: '1rem', color: 'var(--color-success)' }}>96% compliance rate</strong>
-                              </div>
-                              <div>
-                                <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Current shift</span>
-                                <span style={{ display: 'block', fontSize: '0.85rem' }}>{emp.shift || 'Flexible Shift'}</span>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Team Performance Ranking */}
-          <div className="card table-wrapper-card">
-            <div className="table-toolbar justify-between">
-              <span className="table-count-label">Team Performance Ranking</span>
-              <div className="flex-center gap-2">
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sort by:</span>
-                <select value={teamSortKey} onChange={e => setTeamSortKey(e.target.value)} style={{ padding: '4px', fontSize: '0.75rem' }}>
-                  <option value="productivity">Productivity</option>
-                  <option value="totalTasks">Total Tasks</option>
-                </select>
-                <button className="toggle-cols-btn" onClick={() => setTeamSortDir(d => d === 'asc' ? 'desc' : 'asc')} style={{ padding: '4px 8px' }}>
-                  {teamSortDir === 'asc' ? '↑' : '↓'}
-                </button>
-              </div>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th>Rank</th>
-                    <th>Team Name</th>
-                    <th>Team Leader</th>
-                    <th>Total Tasks</th>
-                    <th>Completed Tasks</th>
-                    <th>Productivity</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {teamRankings.map((team, index) => (
-                    <tr key={team.name}>
-                      <td>
+        currentUserRole === 'employee' ? (
+          <div className="personal-tasks-container flex-column gap-4">
+            {filteredTasks.length > 0 ? (
+              filteredTasks.map(task => {
+                const overdue = isTaskOverdue(task);
+                return (
+                  <div key={task.id} className={`personal-task-card card glass ${overdue ? 'overdue' : ''}`}>
+                    <div className="task-card-main-row flex-row justify-between flex-wrap gap-4">
+                      {/* Left Column: ID, Project, Title */}
+                      <div className="task-info-col flex-column gap-1">
                         <div className="flex-center gap-2 justify-start">
-                          <strong>#{index + 1}</strong>
-                          {index === 0 ? '🏆' : index === teamRankings.length - 1 ? '⚠️' : ''}
+                          <span className="task-id-badge">#{task.id}</span>
+                          <span className="task-project-tag">{task.project}</span>
                         </div>
-                      </td>
-                      <td><strong>{team.name}</strong></td>
-                      <td>{team.leader}</td>
-                      <td>{team.totalTasks}</td>
-                      <td>{team.completedTasks}</td>
-                      <td>
-                        <div className="flex-center gap-2 justify-start">
-                          <div className="progress-bar-mini" style={{ width: '80px', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
-                            <div style={{ width: `${team.productivity}%`, height: '100%', background: 'var(--color-primary)', borderRadius: '3px' }} />
-                          </div>
-                          <span>{team.productivity}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Project Task Monitoring & Gantt Toggle */}
-          <div className="card table-wrapper-card">
-            <div className="table-toolbar justify-between">
-              <span className="table-count-label">Project Milestone & Deliverables tracker</span>
-            </div>
-            
-            {ganttViewEnabled ? (
-              <div className="gantt-chart-container" style={{ padding: '20px var(--spacing-5)' }}>
-                <h4 style={{ marginBottom: '16px' }}>Project Timelines & Gantt Schedule</h4>
-                <div className="gantt-chart-wrapper flex-column gap-3">
-                  {projectSummaries.map(p => (
-                    <div key={p.name} className="gantt-row flex-column" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-                      <div className="flex-row justify-between">
-                        <strong>{p.name}</strong>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Progress: {p.progress}% ({p.completed}/{p.total} tasks)</span>
+                        <h3 className="task-title-text">{task.title}</h3>
+                        {task.description && (
+                          <p className="task-desc-preview">{task.description}</p>
+                        )}
                       </div>
-                      <div className="gantt-bar-track" style={{ width: '100%', height: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginTop: '6px', position: 'relative', overflow: 'hidden' }}>
-                        <div className="gantt-bar-fill flex-center text-white" style={{ width: `${p.progress}%`, height: '100%', background: 'linear-gradient(90deg, var(--color-primary-light), var(--color-primary))', borderRadius: '12px', fontSize: '0.7rem' }}>
-                          {p.progress > 15 ? p.progress + '%' : ''}
+
+                      {/* Middle Column: Status, Priority, Due Date */}
+                      <div className="task-meta-col flex-row gap-4 flex-wrap" style={{ alignItems: 'center' }}>
+                        <div className="flex-column gap-1">
+                          <span className="meta-label">Status</span>
+                          <Badge variant={getStatusVariant(task.status)}>{getDisplayStatus(task.status)}</Badge>
                         </div>
+                        <div className="flex-column gap-1">
+                          <span className="meta-label">Priority</span>
+                          <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
+                        </div>
+                        <div className="flex-column gap-1">
+                          <span className="meta-label">Due Date</span>
+                          <div className={`task-date-info ${overdue ? 'text-danger-bold' : ''}`}>
+                            <Calendar size={14} />
+                            <span>{task.dueDate}</span>
+                          </div>
+                        </div>
+                        <div className="flex-column gap-1">
+                          <span className="meta-label">Est. Hours</span>
+                          <span className="hours-text">{task.estimatedHours || 0} hrs</span>
+                        </div>
+                      </div>
+
+                      {/* Right Column: Progress & Interactive Slider */}
+                      <div className="task-progress-col flex-column gap-2">
+                        <div className="flex-row justify-between">
+                          <span className="meta-label">Progress</span>
+                          <span className="progress-percent-text">{task.progress || 0}%</span>
+                        </div>
+                        <div className="progress-slider-wrapper">
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={task.progress || 0}
+                            onChange={async (e) => {
+                              const val = parseInt(e.target.value);
+                              let nextStatus = task.status;
+                              if (val === 100) nextStatus = 'done';
+                              else if (val > 0 && (task.status === 'todo' || task.status === 'To Do')) nextStatus = 'in_progress';
+                              await updateTaskProgress(task.id, nextStatus, val, task.remarks);
+                            }}
+                            className="task-progress-slider"
+                          />
+                        </div>
+                        <div className="progress-bar-mini" style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                          <div style={{ width: `${task.progress || 0}%`, height: '100%', background: 'var(--color-primary)', borderRadius: '3px' }} />
+                        </div>
+                      </div>
+
+                      {/* Far Right Column: Quick Action buttons */}
+                      <div className="task-actions-col flex-center gap-2 flex-wrap">
+                        {getDisplayStatus(task.status) === 'To Do' && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={async () => await updateTaskProgress(task.id, 'in_progress', 10, '')}
+                            icon={Play}
+                          >
+                            Start
+                          </Button>
+                        )}
+                        {getDisplayStatus(task.status) === 'In Progress' && (
+                          <Button
+                            variant="info"
+                            size="sm"
+                            onClick={async () => await updateTaskProgress(task.id, 'review', 90, '')}
+                            icon={UserCheck}
+                          >
+                            Review
+                          </Button>
+                        )}
+                        {getDisplayStatus(task.status) === 'In Review' && (
+                          <span className="pending-review-label">Pending Approval</span>
+                        )}
+                        {getDisplayStatus(task.status) !== 'Done' && getDisplayStatus(task.status) !== 'In Review' && (
+                          <Button
+                            variant="success"
+                            size="sm"
+                            onClick={async () => await updateTaskProgress(task.id, 'done', 100, '')}
+                            icon={Check}
+                          >
+                            Complete
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setSelectedTask(task); setIsDetailOpen(true); }}
+                          icon={Eye}
+                        >
+                          Details
+                        </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+
+                    {/* Remarks panel if present */}
+                    {task.remarks && (
+                      <div className="task-card-remarks">
+                        <strong>Manager Remarks:</strong> {task.remarks}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             ) : (
+              <div className="personal-tasks-empty card flex-column flex-center text-center">
+                <CheckSquare size={48} className="text-muted" style={{ opacity: 0.5 }} />
+                <h3>No tasks assigned</h3>
+                <p>You have no active tasks matching your filter selections.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-column grid-gap">
+            
+            {/* Employee Task Monitoring Table */}
+            <div className="card table-wrapper-card">
+              <div className="table-toolbar">
+                <span className="table-count-label">Employee Task Performance monitoring</span>
+              </div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="emp-table">
                   <thead>
                     <tr>
-                      <th>Project Name</th>
-                      <th>Total Tasks</th>
+                      <th>Employee Name</th>
+                      <th>Assigned</th>
                       <th>Completed</th>
                       <th>Pending</th>
-                      <th>Delayed</th>
-                      <th>Progress</th>
+                      <th>Overdue</th>
+                      <th>Productivity Score</th>
+                      <th>Performance Rating</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {projectSummaries.map(p => (
-                      <tr key={p.name}>
-                        <td><strong>{p.name}</strong></td>
-                        <td>{p.total}</td>
-                        <td><Badge variant="success">{p.completed}</Badge></td>
-                        <td><Badge variant="info">{p.pending}</Badge></td>
-                        <td>
-                          <Badge variant={p.delayed > 0 ? 'danger' : 'neutral'}>
-                            {p.delayed} Delayed
-                          </Badge>
-                        </td>
+                    {employeeSummaries.map(emp => (
+                      <React.Fragment key={emp.id}>
+                        <tr className="cursor-pointer" onClick={() => setExpandedEmployeeId(expandedEmployeeId === emp.id ? null : emp.id)}>
+                          <td style={{ minWidth: '240px' }}>
+                            <div className="flex-center gap-2 justify-start">
+                              <Avatar name={emp.name} size="sm" />
+                              <div className="flex-column" style={{ whiteSpace: 'nowrap' }}>
+                                <strong>{emp.name}</strong>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{emp.designation} ({emp.department})</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td><Badge variant="neutral">{emp.assigned}</Badge></td>
+                          <td><Badge variant="success">{emp.completed}</Badge></td>
+                          <td><Badge variant="info">{emp.pending}</Badge></td>
+                          <td>
+                            <span className={emp.overdue > 0 ? 'text-danger-bold' : ''}>
+                              {emp.overdue}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="flex-center gap-2 justify-start">
+                              <div className="progress-bar-mini" style={{ width: '80px', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                                <div style={{ width: `${emp.productivity}%`, height: '100%', background: 'var(--color-success)', borderRadius: '3px' }} />
+                              </div>
+                              <span style={{ fontSize: '0.78rem' }}>{emp.productivity}%</span>
+                            </div>
+                          </td>
+                          <td>
+                            <Badge variant={emp.rating === 'Excellent' ? 'success' : emp.rating === 'Good' ? 'primary' : emp.rating === 'Average' ? 'warning' : 'danger'}>
+                              {emp.rating}
+                            </Badge>
+                          </td>
+                          <td>
+                            <Button variant="ghost" size="sm">
+                              {expandedEmployeeId === emp.id ? 'Hide Details' : 'Show Details'}
+                            </Button>
+                          </td>
+                        </tr>
+                        {expandedEmployeeId === emp.id && (
+                          <tr>
+                            <td colSpan="8" style={{ background: 'rgba(255,255,255,0.01)', padding: '12px var(--spacing-5)' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                                <div>
+                                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Daily Trend (Last 7 days)</span>
+                                  <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>Optimal Output</strong>
+                                  <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Avg completion time: 2.4 days per task</span>
+                                </div>
+                                <div>
+                                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Weekly compliance</span>
+                                  <strong style={{ fontSize: '1rem', color: 'var(--color-success)' }}>96% compliance rate</strong>
+                                </div>
+                                <div>
+                                  <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Current shift</span>
+                                  <span style={{ display: 'block', fontSize: '0.85rem' }}>{emp.shift || 'Flexible Shift'}</span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Team Performance Ranking */}
+            <div className="card table-wrapper-card">
+              <div className="table-toolbar justify-between">
+                <span className="table-count-label">Team Performance Ranking</span>
+                <div className="flex-center gap-2">
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sort by:</span>
+                  <select value={teamSortKey} onChange={e => setTeamSortKey(e.target.value)} style={{ padding: '4px', fontSize: '0.75rem' }}>
+                    <option value="productivity">Productivity</option>
+                    <option value="totalTasks">Total Tasks</option>
+                  </select>
+                  <button className="toggle-cols-btn" onClick={() => setTeamSortDir(d => d === 'asc' ? 'desc' : 'asc')} style={{ padding: '4px 8px' }}>
+                    {teamSortDir === 'asc' ? '↑' : '↓'}
+                  </button>
+                </div>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Team Name</th>
+                      <th>Team Leader</th>
+                      <th>Total Tasks</th>
+                      <th>Completed Tasks</th>
+                      <th>Productivity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamRankings.map((team, index) => (
+                      <tr key={team.name}>
                         <td>
                           <div className="flex-center gap-2 justify-start">
-                            <div className="progress-bar-mini" style={{ width: '100px', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
-                              <div style={{ width: `${p.progress}%`, height: '100%', background: 'var(--color-purple)', borderRadius: '4px' }} />
+                            <strong>#{index + 1}</strong>
+                            {index === 0 ? '🏆' : index === teamRankings.length - 1 ? '⚠️' : ''}
+                          </div>
+                        </td>
+                        <td><strong>{team.name}</strong></td>
+                        <td>{team.leader}</td>
+                        <td>{team.totalTasks}</td>
+                        <td>{team.completedTasks}</td>
+                        <td>
+                          <div className="flex-center gap-2 justify-start">
+                            <div className="progress-bar-mini" style={{ width: '80px', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                              <div style={{ width: `${team.productivity}%`, height: '100%', background: 'var(--color-primary)', borderRadius: '3px' }} />
                             </div>
-                            <strong>{p.progress}%</strong>
+                            <span>{team.productivity}%</span>
                           </div>
                         </td>
                       </tr>
@@ -865,153 +935,219 @@ const TaskMonitoring = () => {
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-
-          {/* Workload Distribution */}
-          <div className="card table-wrapper-card">
-            <div className="table-toolbar">
-              <span className="table-count-label">Workload Distribution & Allocation</span>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th>Employee</th>
-                    <th>Assigned Tasks</th>
-                    <th>Pending</th>
-                    <th>Overdue</th>
-                    <th>Workload Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {workloadDistribution.slice(0, 10).map(w => (
-                    <tr key={w.id}>
-                      <td>
-                        <div className="flex-center gap-2 justify-start">
-                          <Avatar name={w.name} size="sm" />
-                          <span>{w.name}</span>
+
+            {/* Project Task Monitoring & Gantt Toggle */}
+            <div className="card table-wrapper-card">
+              <div className="table-toolbar justify-between">
+                <span className="table-count-label">Project Milestone & Deliverables tracker</span>
+              </div>
+              
+              {ganttViewEnabled ? (
+                <div className="gantt-chart-container" style={{ padding: '20px var(--spacing-5)' }}>
+                  <h4 style={{ marginBottom: '16px' }}>Project Timelines & Gantt Schedule</h4>
+                  <div className="gantt-chart-wrapper flex-column gap-3">
+                    {projectSummaries.map(p => (
+                      <div key={p.name} className="gantt-row flex-column" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                        <div className="flex-row justify-between">
+                          <strong>{p.name}</strong>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Progress: {p.progress}% ({p.completed}/{p.total} tasks)</span>
                         </div>
-                      </td>
-                      <td>{w.assignedTasks}</td>
-                      <td>{w.pendingTasks}</td>
-                      <td>
-                        <span className={w.overdueTasks > 0 ? 'text-danger-bold' : ''}>
-                          {w.overdueTasks}
-                        </span>
-                      </td>
-                      <td>
-                        <Badge variant={w.workloadStatus === 'Normal' ? 'success' : w.workloadStatus === 'Balanced' ? 'primary' : w.workloadStatus === 'High' ? 'warning' : 'danger'}>
-                          {w.workloadStatus}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Overdue Task Management */}
-          <div className="card table-wrapper-card">
-            <div className="table-toolbar">
-              <span className="table-count-label">Overdue Tasks Action board</span>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th>Task ID</th>
-                    <th>Task Name</th>
-                    <th>Employee</th>
-                    <th>Due Date</th>
-                    <th>Delay</th>
-                    <th>Priority</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overdueTasksList.length > 0 ? (
-                    overdueTasksList.map(task => {
-                      const delayDays = Math.round((new Date(todayStr) - new Date(task.dueDate)) / (1000 * 60 * 60 * 24));
-                      return (
-                        <tr key={task.id}>
-                          <td><strong>{task.id}</strong></td>
-                          <td>{task.title}</td>
-                          <td>{task.assigneeName}</td>
-                          <td className="text-danger-bold">{task.dueDate}</td>
+                        <div className="gantt-bar-track" style={{ width: '100%', height: '24px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginTop: '6px', position: 'relative', overflow: 'hidden' }}>
+                          <div className="gantt-bar-fill flex-center text-white" style={{ width: `${p.progress}%`, height: '100%', background: 'linear-gradient(90deg, var(--color-primary-light), var(--color-primary))', borderRadius: '12px', fontSize: '0.7rem' }}>
+                            {p.progress > 15 ? p.progress + '%' : ''}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="emp-table">
+                    <thead>
+                      <tr>
+                        <th>Project Name</th>
+                        <th>Total Tasks</th>
+                        <th>Completed</th>
+                        <th>Pending</th>
+                        <th>Delayed</th>
+                        <th>Progress</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {projectSummaries.map(p => (
+                        <tr key={p.name}>
+                          <td><strong>{p.name}</strong></td>
+                          <td>{p.total}</td>
+                          <td><Badge variant="success">{p.completed}</Badge></td>
+                          <td><Badge variant="info">{p.pending}</Badge></td>
                           <td>
-                            <Badge variant="danger">{delayDays} days delay</Badge>
+                            <Badge variant={p.delayed > 0 ? 'danger' : 'neutral'}>
+                              {p.delayed} Delayed
+                            </Badge>
                           </td>
                           <td>
-                            <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
-                          </td>
-                          <td>
-                            {hasPermission('task_monitoring', 'update') ? (
-                              <div className="flex-center gap-1">
-                                <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsReassignOpen(true); }}>Reassign</Button>
-                                <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsDeadlineOpen(true); }}>Extend</Button>
-                                <Button variant="ghost" size="sm" onClick={async () => await escalateTask(task.id)}>Escalate</Button>
-                                <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsRemarksOpen(true); }}>Remarks</Button>
+                            <div className="flex-center gap-2 justify-start">
+                              <div className="progress-bar-mini" style={{ width: '100px', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                <div style={{ width: `${p.progress}%`, height: '100%', background: 'var(--color-purple)', borderRadius: '4px' }} />
                               </div>
-                            ) : (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No actions allowed</span>
-                            )}
+                              <strong>{p.progress}%</strong>
+                            </div>
                           </td>
                         </tr>
-                      );
-                    })
-                  ) : (
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Workload Distribution */}
+            <div className="card table-wrapper-card">
+              <div className="table-toolbar">
+                <span className="table-count-label">Workload Distribution & Allocation</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="emp-table">
+                  <thead>
                     <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
-                        ✓ All task schedules are current! No overdue tasks flagged.
-                      </td>
+                      <th>Employee</th>
+                      <th>Assigned Tasks</th>
+                      <th>Pending</th>
+                      <th>Overdue</th>
+                      <th>Workload Status</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Department-wise Analytics */}
-          <div className="card table-wrapper-card">
-            <div className="table-toolbar">
-              <span className="table-count-label">Department-wise Task Allocation & Completion</span>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="emp-table">
-                <thead>
-                  <tr>
-                    <th>Department</th>
-                    <th>Total Tasks</th>
-                    <th>Completed</th>
-                    <th>Pending</th>
-                    <th>Completion Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {departmentSummaries.map(d => (
-                    <tr key={d.department} className="cursor-pointer" onClick={() => setDeptFilter(d.department)}>
-                      <td><strong>{d.department}</strong></td>
-                      <td>{d.totalTasks}</td>
-                      <td><Badge variant="success">{d.completed}</Badge></td>
-                      <td><Badge variant="info">{d.pending}</Badge></td>
-                      <td>
-                        <div className="flex-center gap-2 justify-start">
-                          <div className="progress-bar-mini" style={{ width: '80px', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
-                            <div style={{ width: `${d.completionRate}%`, height: '100%', background: 'var(--color-purple)', borderRadius: '3px' }} />
+                  </thead>
+                  <tbody>
+                    {workloadDistribution.slice(0, 10).map(w => (
+                      <tr key={w.id}>
+                        <td>
+                          <div className="flex-center gap-2 justify-start">
+                            <Avatar name={w.name} size="sm" />
+                            <span>{w.name}</span>
                           </div>
-                          <span>{d.completionRate}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                        <td>{w.assignedTasks}</td>
+                        <td>{w.pendingTasks}</td>
+                        <td>
+                          <span className={w.overdueTasks > 0 ? 'text-danger-bold' : ''}>
+                            {w.overdueTasks}
+                          </span>
+                        </td>
+                        <td>
+                          <Badge variant={w.workloadStatus === 'Normal' ? 'success' : w.workloadStatus === 'Balanced' ? 'primary' : w.workloadStatus === 'High' ? 'warning' : 'danger'}>
+                            {w.workloadStatus}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
 
-        </div>
+            {/* Overdue Task Management */}
+            <div className="card table-wrapper-card">
+              <div className="table-toolbar">
+                <span className="table-count-label">Overdue Tasks Action board</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th>Task ID</th>
+                      <th>Task Name</th>
+                      <th>Employee</th>
+                      <th>Due Date</th>
+                      <th>Delay</th>
+                      <th>Priority</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overdueTasksList.length > 0 ? (
+                      overdueTasksList.map(task => {
+                        const delayDays = Math.round((new Date(todayStr) - new Date(task.dueDate)) / (1000 * 60 * 60 * 24));
+                        return (
+                          <tr key={task.id}>
+                            <td><strong>{task.id}</strong></td>
+                            <td>{task.title}</td>
+                            <td>{task.assigneeName}</td>
+                            <td className="text-danger-bold">{task.dueDate}</td>
+                            <td>
+                              <Badge variant="danger">{delayDays} days delay</Badge>
+                            </td>
+                            <td>
+                              <Badge variant={getPriorityVariant(task.priority)}>{task.priority}</Badge>
+                            </td>
+                            <td>
+                              {currentUserRole !== 'employee' ? (
+                                <div className="flex-center gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsReassignOpen(true); }}>Reassign</Button>
+                                  <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsDeadlineOpen(true); }}>Extend</Button>
+                                  <Button variant="ghost" size="sm" onClick={async () => await escalateTask(task.id)}>Escalate</Button>
+                                  <Button variant="ghost" size="sm" onClick={() => { setActionTaskId(task.id); setIsRemarksOpen(true); }}>Remarks</Button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No actions allowed</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                          ✓ All task schedules are current! No overdue tasks flagged.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Department-wise Analytics */}
+            <div className="card table-wrapper-card">
+              <div className="table-toolbar">
+                <span className="table-count-label">Department-wise Task Allocation & Completion</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="emp-table">
+                  <thead>
+                    <tr>
+                      <th>Department</th>
+                      <th>Total Tasks</th>
+                      <th>Completed</th>
+                      <th>Pending</th>
+                      <th>Completion Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {departmentSummaries.map(d => (
+                      <tr key={d.department} className="cursor-pointer" onClick={() => setDeptFilter(d.department)}>
+                        <td><strong>{d.department}</strong></td>
+                        <td>{d.totalTasks}</td>
+                        <td><Badge variant="success">{d.completed}</Badge></td>
+                        <td><Badge variant="info">{d.pending}</Badge></td>
+                        <td>
+                          <div className="flex-center gap-2 justify-start">
+                            <div className="progress-bar-mini" style={{ width: '80px', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px' }}>
+                              <div style={{ width: `${d.completionRate}%`, height: '100%', background: 'var(--color-purple)', borderRadius: '3px' }} />
+                            </div>
+                            <span>{d.completionRate}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )
       )}
 
       {/* ── Section 3 & 12: ANALYTICS VIEW ── */}

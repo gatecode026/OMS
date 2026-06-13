@@ -84,31 +84,39 @@ const normalizeWorkMode = (mode) => {
   return 'WFO';
 };
 
-const calculateWorkingHours = (punchIn, punchOut) => {
-  if (!punchIn || !punchOut || punchIn === '--:--' || punchOut === '--:--') return 0;
-  try {
-    const parseTime = (timeStr) => {
-      let standardized = timeStr.trim().toUpperCase();
-      if (/^[0-9]{1,2}:[0-9]{2}[AP]M$/.test(standardized)) {
-        standardized = standardized.replace(/([AP]M)$/, ' $1');
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr || timeStr === '--:--') return null;
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+  if (!match) {
+    const parts = timeStr.trim().split(':');
+    if (parts.length >= 2) {
+      const hrs = parseInt(parts[0], 10);
+      const mins = parseInt(parts[1], 10);
+      if (!isNaN(hrs) && !isNaN(mins)) {
+        return hrs * 60 + mins;
       }
-      const parsed = new Date(`2000/01/01 ${standardized}`);
-      return parsed;
-    };
-
-    const inTime = parseTime(punchIn);
-    const outTime = parseTime(punchOut);
-    if (isNaN(inTime.getTime()) || isNaN(outTime.getTime())) return 0;
-    
-    let diffMs = outTime - inTime;
-    if (diffMs < 0) {
-      diffMs += 24 * 60 * 60 * 1000;
     }
-    const diffHours = diffMs / (1000 * 60 * 60);
-    return Math.round(diffHours * 100) / 100; // round to 2 decimal places
-  } catch (e) {
-    return 0;
+    return null;
   }
+  let hrs = parseInt(match[1], 10);
+  const mins = parseInt(match[2], 10);
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'PM' && hrs !== 12) hrs += 12;
+  if (ampm === 'AM' && hrs === 12) hrs = 0;
+  return hrs * 60 + mins;
+};
+
+const calculateWorkingHours = (punchIn, punchOut) => {
+  const inMins = parseTimeToMinutes(punchIn);
+  const outMins = parseTimeToMinutes(punchOut);
+  if (inMins === null || outMins === null) return 0;
+  
+  let diffMins = outMins - inMins;
+  if (diffMins < 0) {
+    diffMins += 24 * 60;
+  }
+  const diffHours = diffMins / 60;
+  return Math.round(diffHours * 100) / 100;
 };
 
 const convert12to24 = (time12) => {
@@ -165,32 +173,17 @@ const timeStrToDecimal = (timeStr) => {
 };
 
 const calculateWorkingHours60 = (punchIn, punchOut) => {
-  if (!punchIn || !punchOut || punchIn === '--:--' || punchOut === '--:--') return '00:00';
-  try {
-    const parseTime = (timeStr) => {
-      let standardized = timeStr.trim().toUpperCase();
-      if (/^[0-9]{1,2}:[0-9]{2}[AP]M$/.test(standardized)) {
-        standardized = standardized.replace(/([AP]M)$/, ' $1');
-      }
-      const parsed = new Date(`2000/01/01 ${standardized}`);
-      return parsed;
-    };
-
-    const inTime = parseTime(punchIn);
-    const outTime = parseTime(punchOut);
-    if (isNaN(inTime.getTime()) || isNaN(outTime.getTime())) return '00:00';
-    
-    let diffMs = outTime - inTime;
-    if (diffMs < 0) {
-      diffMs += 24 * 60 * 60 * 1000;
-    }
-    const diffMins = Math.round(diffMs / (1000 * 60));
-    const hours = Math.floor(diffMins / 60);
-    const mins = diffMins % 60;
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-  } catch (e) {
-    return '00:00';
+  const inMins = parseTimeToMinutes(punchIn);
+  const outMins = parseTimeToMinutes(punchOut);
+  if (inMins === null || outMins === null) return '00:00';
+  
+  let diffMins = outMins - inMins;
+  if (diffMins < 0) {
+    diffMins += 24 * 60;
   }
+  const hours = Math.floor(diffMins / 60);
+  const mins = diffMins % 60;
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
 const Attendance = () => {

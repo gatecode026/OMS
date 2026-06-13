@@ -862,4 +862,516 @@
   color: var(--text-primary);
 }
 
+/* ==========================================================================
+   PERSONAL PAYSLIP SPLIT LAYOUT STYLES
+   ========================================================================== */
+.personal-payslip-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--spacing-5);
+  align-items: flex-start;
+  width: 100%;
+}
+
+@media (max-width: 992px) {
+  .personal-payslip-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.payslips-history-sidebar {
+  padding: var(--spacing-5);
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.payslip-periods-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-3);
+}
+
+.payslip-period-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-3) var(--spacing-4);
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.payslip-period-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(217, 70, 239, 0.25);
+  transform: translateX(2px);
+}
+
+.payslip-period-item.active {
+  background: rgba(217, 70, 239, 0.08);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 10px rgba(217, 70, 239, 0.15);
+}
+
+.period-month {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.period-net {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.payslip-detailed-view {
+  padding: var(--spacing-6);
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-5);
+}
+
+.payslip-watermark-inline {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  font-size: 8rem;
+  font-weight: 950;
+  color: rgba(16, 185, 129, 0.03);
+  letter-spacing: 0.2em;
+  pointer-events: none;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+:root.light-theme .payslip-watermark-inline {
+  color: rgba(16, 185, 129, 0.02);
+}
+
+.payslip-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.payslip-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-4);
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-color);
+  padding: var(--spacing-4);
+  border-radius: var(--radius-lg);
+}
+
+.payslip-info-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.payslip-info-grid div span.text-muted {
+  color: var(--text-muted);
+}
+
+.payslip-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-6);
+  width: 100%;
+}
+
+.payslip-details-grid .border-right {
+  border-right: 1px solid var(--border-color);
+}
+
+@media (max-width: 768px) {
+  .payslip-details-grid .border-right {
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-4);
+  }
+}
+
+.payslip-net-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(217, 70, 239, 0.04);
+  border: 1.5px solid rgba(217, 70, 239, 0.2) !important;
+  padding: var(--spacing-4) var(--spacing-5);
+  margin-top: var(--spacing-2);
+}
+
+.payslip-net-summary .font-large {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--color-success);
+}
+
+/* ==========================================================================
+   PREMIUM LOANS & ADVANCES STYLES
+   ========================================================================== */
+.loans-kpi-grid, .bonuses-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--spacing-5);
+  margin-bottom: var(--spacing-5);
+}
+
+.loan-card-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5);
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.loan-card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(217, 70, 239, 0.25);
+}
+
+.loan-card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: var(--spacing-3);
+  margin-bottom: var(--spacing-3);
+}
+
+.loan-avatar-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.loan-progress-track {
+  margin-top: var(--spacing-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.loan-progress-text {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.loan-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.loan-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.loan-request-widget {
+  background: var(--bg-card);
+  border: 1.5px dashed rgba(217, 70, 239, 0.25);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.loan-empty-state, .bonuses-empty-state {
+  text-align: center;
+  padding: var(--spacing-8) var(--spacing-6);
+  background: var(--bg-card);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-3);
+}
+
+.loan-empty-icon, .bonuses-empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  margin-bottom: var(--spacing-2);
+}
+
+/* ==========================================================================
+   PAYROLL CALENDAR TIMELINE & COMPLIANCE
+   ========================================================================== */
+.calendar-split-layout {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--spacing-6);
+  align-items: flex-start;
+  width: 100%;
+}
+
+@media (max-width: 992px) {
+  .calendar-split-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.calendar-timeline-v {
+  position: relative;
+  padding-left: var(--spacing-6);
+  margin-left: 10px;
+  border-left: 2px dashed var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+}
+
+.timeline-step-item {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4) var(--spacing-5);
+  transition: all 0.2s;
+}
+
+.timeline-step-item:hover {
+  border-color: var(--color-primary);
+  transform: translateX(3px);
+}
+
+.timeline-step-item.step-active {
+  border-color: var(--color-primary);
+  background: rgba(217, 70, 239, 0.02);
+  box-shadow: 0 0 12px rgba(217, 70, 239, 0.05);
+}
+
+.timeline-step-node {
+  position: absolute;
+  left: -33px;
+  top: 22px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 3px solid var(--border-color);
+  z-index: 2;
+  transition: all 0.2s;
+}
+
+.timeline-step-item.step-active .timeline-step-node {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(217, 70, 239, 0.2);
+}
+
+.timeline-step-item.step-passed .timeline-step-node {
+  border-color: var(--color-success);
+  background: var(--color-success);
+}
+
+.timeline-step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.compliance-grid-v {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.compliance-card-premium {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4) var(--spacing-5);
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.compliance-card-premium:hover {
+  border-color: var(--color-success);
+  transform: translateY(-1px);
+}
+
+.calendar-sheet {
+  width: 52px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color-dark);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.calendar-sheet-header {
+  width: 100%;
+  height: 18px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-sheet-header.bg-success {
+  background: var(--color-success);
+}
+
+.calendar-sheet-header.bg-primary {
+  background: var(--color-primary);
+}
+
+.calendar-sheet-day {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 34px;
+}
+
+.compliance-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.compliance-card-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.compliance-card-due {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   PREMIUM GLASSMORPHIC KPI CARDS & GLOW EFFECTS
+   ========================================================================== */
+.premium-kpi-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: all 0.25s ease;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: relative;
+}
+
+.premium-kpi-card:hover {
+  transform: translateY(-2.5px);
+  box-shadow: var(--shadow-md), 0 8px 30px rgba(0, 0, 0, 0.12);
+  border-color: rgba(217, 70, 239, 0.35);
+}
+
+.premium-kpi-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+
+.premium-kpi-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.premium-kpi-card:hover .premium-kpi-icon-badge {
+  transform: scale(1.08) rotate(3deg);
+}
+
+/* Glowing backgrounds for icons */
+.badge-glow-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.05);
+}
+
+.badge-glow-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.05);
+}
+
+.badge-glow-primary {
+  background: rgba(217, 70, 239, 0.1);
+  color: var(--color-primary);
+  border: 1px solid rgba(217, 70, 239, 0.25);
+  box-shadow: 0 0 10px rgba(217, 70, 239, 0.05);
+}
+
+.badge-glow-info {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-blue-solid);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.05);
+}
+
+.badge-glow-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.05);
+}
+
+
+
+
 

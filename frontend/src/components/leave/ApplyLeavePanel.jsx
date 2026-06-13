@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MdClose, MdCheckCircle, MdError, MdBeachAccess, MdLocalHospital, MdDateRange, MdChildCare, MdPeople, MdAssignment } from 'react-icons/md';
 import { BsCalendar2Date, BsInfoCircle } from 'react-icons/bs';
 import { IoSendSharp } from 'react-icons/io5';
+import { useApp } from '../../context/AppContext';
 
 const LEAVE_TYPES = [
   { code: 'CL',        label: 'Casual Leave',    Icon: MdBeachAccess },
@@ -14,6 +15,7 @@ const LEAVE_TYPES = [
 
 const diffWorkingDays = (from, to, holidays = []) => {
   if (!from || !to) return 0;
+  if (from === to) return 1;
   const start = new Date(from);
   const end = new Date(to);
   if (isNaN(start) || isNaN(end) || end < start) return 0;
@@ -21,15 +23,16 @@ const diffWorkingDays = (from, to, holidays = []) => {
   const cur = new Date(start);
   const holidaySet = new Set(holidays.map(h => h.date));
   while (cur <= end) {
-    const day = cur.getDay();
+    const day = cur.getUTCDay();
     const dateStr = cur.toISOString().split('T')[0];
-    if (day !== 0 && day !== 6 && !holidaySet.has(dateStr)) count++;
-    cur.setDate(cur.getDate() + 1);
+    if (day !== 0 && !holidaySet.has(dateStr)) count++;
+    cur.setUTCDate(cur.getUTCDate() + 1);
   }
   return count;
 };
 
-const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = [] }) => {
+const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = [], editingLeave = null }) => {
+  const { leaveRequests = [], currentUser } = useApp();
   const [form, setForm] = useState({ type: 'CL', from: '', to: '', reason: '' });
   const [days, setDays] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -37,17 +40,48 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setDays(diffWorkingDays(form.from, form.to, holidays));
-  }, [form.from, form.to, holidays]);
+    const calculatedDays = diffWorkingDays(form.from, form.to, holidays);
+    setDays(calculatedDays);
+    
+    if (form.from && form.to) {
+      const myLeaves = leaveRequests.filter(l => l.employeeId === currentUser?.id && l.id !== editingLeave?.id);
+      const overlap = myLeaves.some(l => {
+        if (l.status !== 'Approved' && l.status !== 'Pending') return false;
+        return l.fromDate <= form.to && form.from <= l.toDate;
+      });
+      if (overlap) {
+        setError('You already have an approved or pending leave request that overlaps with this date range.');
+      } else {
+        setError('');
+      }
+    } else {
+      setError('');
+    }
+  }, [form.from, form.to, holidays, leaveRequests, currentUser, editingLeave]);
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      if (editingLeave) {
+        const typeCode = editingLeave.type === 'Casual Leave' ? 'CL' : 
+                         editingLeave.type === 'Sick Leave' ? 'SL' : 
+                         editingLeave.type === 'Earned Leave' || editingLeave.type === 'PL' ? 'PL' : 
+                         editingLeave.type;
+        setForm({
+          type: typeCode,
+          from: editingLeave.fromDate,
+          to: editingLeave.toDate,
+          reason: editingLeave.reason || '',
+        });
+      } else {
+        setForm({ type: 'CL', from: '', to: '', reason: '' });
+      }
+    } else {
       setForm({ type: 'CL', from: '', to: '', reason: '' });
       setDays(0);
       setSuccess(false);
       setError('');
     }
-  }, [open]);
+  }, [open, editingLeave]);
 
   const selectedBalance = balances.find(b => b.type === form.type);
   const remaining = selectedBalance ? Math.max(0, (selectedBalance.total || 0) - (selectedBalance.used || 0)) : null;
@@ -57,6 +91,18 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
     setError('');
     if (!form.from || !form.to) { setError('Please select From and To dates.'); return; }
     if (days <= 0) { setError('Date range has 0 working days. Please adjust.'); return; }
+
+    const myLeaves = leaveRequests.filter(l => l.employeeId === currentUser?.id && l.id !== editingLeave?.id);
+    const hasOverlap = myLeaves.some(l => {
+      if (l.status !== 'Approved' && l.status !== 'Pending') return false;
+      return l.fromDate <= form.to && form.from <= l.toDate;
+    });
+
+    if (hasOverlap) {
+      setError('You already have an approved or pending leave request that overlaps with this date range.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       await onSubmit({ type: form.type, fromDate: form.from, toDate: form.to, days, reason: form.reason });
@@ -112,7 +158,7 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
             <BsCalendar2Date size={16} style={{ color: 'var(--color-success, #10b981)' }} />
           </div>
           <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-            Apply for Leave
+            {editingLeave ? 'Edit Leave Request' : 'Apply for Leave'}
           </h3>
         </div>
         <button
@@ -128,7 +174,9 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
       {success ? (
         <div style={{ textAlign: 'center', padding: '28px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
           <MdCheckCircle size={48} style={{ color: 'var(--color-success, #10b981)' }} />
-          <p style={{ margin: 0, fontWeight: 700, color: 'var(--color-success)', fontSize: '0.95rem' }}>Leave request submitted!</p>
+          <p style={{ margin: 0, fontWeight: 700, color: 'var(--color-success)', fontSize: '0.95rem' }}>
+            {editingLeave ? 'Leave request updated!' : 'Leave request submitted!'}
+          </p>
           <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>Your request is pending approval.</p>
         </div>
       ) : (
@@ -248,7 +296,7 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
               }}
             >
               <IoSendSharp size={14} />
-              {submitting ? 'Submitting…' : 'Submit Request'}
+              {submitting ? 'Submitting…' : (editingLeave ? 'Update Request' : 'Submit Request')}
             </button>
           </div>
         </form>

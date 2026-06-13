@@ -531,15 +531,16 @@ const Payroll = () => {
   // Apply new loan or advance
   const handleCreateLoanAdvance = async (e) => {
     e.preventDefault();
-    const targetEmp = employees.find(emp => emp.id === applyForm.employeeId) || { name: 'Employee' };
+    const empId = perspective === 'employee' ? (currentUser?.id || 'EMP-2026-001') : (applyForm.employeeId || employees[0]?.id);
+    const targetEmp = employees.find(emp => emp.id === empId) || { name: 'Employee' };
     const payload = {
-      employeeId: applyForm.employeeId,
+      employeeId: empId,
       amount: parseInt(applyForm.amount),
-      recoverySchedule: applyForm.recoverySchedule,
+      recoverySchedule: applyForm.recoverySchedule || (applyType === 'Loan' ? '10 Months' : 'Next Month'),
     };
     if (applyType === 'Loan') {
       payload.type = 'Loan';
-      payload.loanType = applyForm.type;
+      payload.loanType = applyForm.type || 'Personal Loan';
       payload.emi = parseInt(applyForm.emi) || 0;
     } else {
       payload.type = 'Advance';
@@ -548,7 +549,7 @@ const Payroll = () => {
     }
     const success = await createLoanOrAdvance(payload);
     if (success) {
-      addPageToast('success', `${applyType === 'Loan' ? 'Loan application approved' : 'Salary Advance issued'} for ${targetEmp.name}`);
+      addPageToast('success', `${applyType === 'Loan' ? 'Loan application submitted' : 'Salary Advance requested'} for ${targetEmp.name} successfully.`);
       setShowApplyModal(false);
     }
   };
@@ -967,183 +968,300 @@ BANK PAYMENT & COMPLIANCE DETAIL:
 
       {/* ==================== TAB CONTENT: PROCESSING CENTER ==================== */}
       {activeTab === 'processing' && (
-        <div className="flex-column grid-gap animate-fade-in">
-          {/* Filter Bar */}
-          <div className="card filter-wrapper-card flex-column gap-3">
-            <div className="flex-center justify-between wrap-content gap-3">
-              <div className="flex-center gap-3 wrap-content flex-grow-1">
-                <input
-                  type="text"
-                  placeholder="Search Employee name, ID, department..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="table-search-input"
-                  style={{ minWidth: '120px', flex: '1 1 180px', maxWidth: '240px' }}
-                />
-
-                <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="table-filter-select" style={{ minWidth: '120px' }}>
-                  <option value="">All Departments</option>
-                  {(departments || []).map(d => (
-                    <option key={d.id || d.name} value={d.name}>{d.name}</option>
-                  ))}
-                </select>
-
-                <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="table-filter-select">
-                  <option value="">All Branches</option>
-                  {(branches || []).map(b => (
-                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
-                  ))}
-                </select>
-
-                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="table-filter-select">
-                  <option value="">All Statuses</option>
-                  <option value="Calculated">Calculated</option>
-                  <option value="HR Verified">HR Verified</option>
-                  <option value="Finance Approved">Finance Approved</option>
-                  <option value="Released">Released (Paid)</option>
-                  <option value="Hold">On Hold</option>
-                </select>
-              </div>
-
-              {/* Bulk Actions Panel */}
-              {perspective !== 'employee' && (
-                <div className="flex-center gap-2 wrap-content">
-                  {perspective === 'branch_admin' && (
-                    <Button variant="secondary" onClick={() => handleBulkAction('verify')} icon={CheckCircle}>
-                      Bulk Verify (HR)
-                    </Button>
-                  )}
-                  {perspective === 'manager' && (
-                    <Button variant="secondary" onClick={() => handleBulkAction('approve')} icon={CheckCircle}>
-                      Bulk Approve (Finance)
-                    </Button>
-                  )}
-                  {perspective === 'super_admin' && (
-                    <div className="flex-center gap-2">
-                      <Button variant="secondary" onClick={() => handleBulkAction('approve')} icon={CheckCircle}>
-                        Approve (Fin)
-                      </Button>
-                      <Button variant="primary" onClick={() => handleBulkAction('release')} icon={Landmark}>
-                        Release Salary
-                      </Button>
+        perspective === 'employee' ? (
+          <div className="personal-payslip-layout animate-fade-in">
+            {/* Left Sidebar: Select Month/Year or List of Past Payslips */}
+            <div className="payslips-history-sidebar card glass flex-column gap-3">
+              <h4 className="payslip-title">My Pay Statements</h4>
+              <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Select a pay period to view and download your statement.</p>
+              
+              <div className="payslip-periods-list">
+                {['June', 'May', 'April', 'March', 'February', 'January'].map(m => {
+                  const isCurrent = month === m;
+                  // Find the payslip object for this month
+                  const periodObj = calculatedPayrollData.find(p => p.month === m && p.year === year);
+                  const isPaid = periodObj?.status === 'Released';
+                  
+                  return (
+                    <div
+                      key={m}
+                      className={`payslip-period-item ${isCurrent ? 'active' : ''}`}
+                      onClick={() => setMonth(m)}
+                    >
+                      <div className="flex-column gap-1">
+                        <span className="period-month">{m} {year}</span>
+                        <span className="period-net">{periodObj ? formatCurrency(periodObj.netSalary) : '—'}</span>
+                      </div>
+                      <Badge variant={isPaid ? 'success' : 'warning'}>
+                        {isPaid ? 'Paid' : 'Pending'}
+                      </Badge>
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right Pane: Payslip Detailed View */}
+            <div className="payslip-detailed-view card glass">
+              {selectedEmployeeObj ? (
+                <>
+                  {/* Watermark paid/pending stamp */}
+                  <div className="payslip-watermark-inline">
+                    {selectedEmployeeObj.status === 'Released' ? 'PAID' : 'PENDING'}
+                  </div>
+
+                  <div className="payslip-header-row flex-row justify-between align-center border-bottom pb-3">
+                    <div className="flex-center gap-2">
+                      <Receipt className="text-primary" size={24} />
+                      <h3 className="payslip-title">Salary Statement for {month} {year}</h3>
+                    </div>
+                    <Button
+                      variant="primary"
+                      icon={Download}
+                      onClick={() => handleDownloadPayslip(selectedEmployeeObj)}
+                    >
+                      Download PDF
+                    </Button>
+                  </div>
+
+                  {/* Info Grid */}
+                  <div className="payslip-info-grid bg-secondary rounded">
+                    <div>
+                      <div><span className="text-muted">Employee ID:</span> <strong>{selectedEmployeeObj.employeeId}</strong></div>
+                      <div><span className="text-muted">Employee Name:</span> <strong>{selectedEmployeeObj.employeeName}</strong></div>
+                      <div><span className="text-muted">Bank Name:</span> <strong>{selectedEmployeeObj.bankName}</strong></div>
+                      <div><span className="text-muted">Bank Account:</span> <strong>{selectedEmployeeObj.bankAccount}</strong></div>
+                    </div>
+                    <div>
+                      <div><span className="text-muted">Department:</span> <strong>{selectedEmployeeObj.department}</strong></div>
+                      <div><span className="text-muted">Designation:</span> <strong>{selectedEmployeeObj.designation}</strong></div>
+                      <div><span className="text-muted">PAN Card:</span> <strong>{selectedEmployeeObj.pan}</strong></div>
+                      <div><span className="text-muted">Tax Regime:</span> <strong>{selectedEmployeeObj.regime} Regime</strong></div>
+                    </div>
+                  </div>
+
+                  {/* Earnings vs Deductions */}
+                  <div className="payslip-details-grid">
+                    {/* Earnings */}
+                    <div className="flex-column gap-2 border-right pr-4">
+                      <span className="font-bold text-success border-bottom pb-1 flex-row gap-1 align-center">
+                        <TrendingUp size={14} /> Earnings
+                      </span>
+                      <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{formatCurrency(selectedEmployeeObj.basicSalary)}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.4))}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Conveyance & Medical Allowances:</span> <strong>{formatCurrency(8000)}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{formatCurrency(selectedEmployeeObj.overtimeAmount)}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{formatCurrency(selectedEmployeeObj.bonusAmount)}</strong></div>
+                      <div className="flex-center justify-between border-top pt-2 font-semibold text-success"><span>Gross Earnings:</span> <strong>{formatCurrency(selectedEmployeeObj.grossSalary)}</strong></div>
+                    </div>
+
+                    {/* Deductions */}
+                    <div className="flex-column gap-2">
+                      <span className="font-bold text-danger border-bottom pb-1 flex-row gap-1 align-center">
+                        <MinusCircle size={14} /> Deductions
+                      </span>
+                      <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.12))}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.1))}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{formatCurrency(200)}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{formatCurrency(selectedEmployeeObj.leaveDeductions)}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{formatCurrency(selectedEmployeeObj.lateDeductions)}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{formatCurrency(selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct)}</strong></div>
+                      <div className="flex-center justify-between border-top pt-2 font-semibold text-danger"><span>Total Deductions:</span> <strong>{formatCurrency(selectedEmployeeObj.totalDeductions)}</strong></div>
+                    </div>
+                  </div>
+
+                  {/* Summary Net Take-Home */}
+                  <div className="payslip-net-summary flex-row justify-between align-center p-4 rounded border">
+                    <div className="flex-column">
+                      <span className="font-semibold text-primary">Net Take-Home Salary</span>
+                      <span className="font-xsmall text-muted">Transferred to your bank account on disbursal</span>
+                    </div>
+                    <span className="font-bold text-success font-large">{formatCurrency(selectedEmployeeObj.netSalary)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center p-8 text-muted animate-fade-in">
+                  No statement record calculated for {month} {year}. Please contact your HR department.
                 </div>
               )}
             </div>
           </div>
+        ) : (
+          <div className="flex-column grid-gap animate-fade-in">
+            {/* Filter Bar */}
+            <div className="card filter-wrapper-card flex-column gap-3">
+              <div className="flex-center justify-between wrap-content gap-3">
+                <div className="flex-center gap-3 wrap-content flex-grow-1">
+                  <input
+                    type="text"
+                    placeholder="Search Employee name, ID, department..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="table-search-input"
+                    style={{ minWidth: '120px', flex: '1 1 180px', maxWidth: '240px' }}
+                  />
 
-          {/* Main Processing Table */}
-          <div className="card table-wrapper-card">
-            <div className="overflow-x-auto">
-              <table className="payroll-data-table">
-                <thead>
-                  <tr>
-                    <th>Emp ID</th>
-                    <th>Employee Name</th>
-                    <th>Dept & Designation</th>
-                    <th>Branch</th>
-                    <th>Basic Salary</th>
-                    <th>Present Days</th>
-                    <th>OT Pay</th>
-                    <th>Bonus</th>
-                    <th>Deductions</th>
-                    <th>Net Salary</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredData.length > 0 ? (
-                    filteredData.map(row => (
-                      <tr key={row.employeeId} className={selectedEmpId === row.employeeId ? 'selected-row-highlight' : ''}>
-                        <td className="font-semibold">{row.employeeId}</td>
-                        <td>
-                          <div className="flex-center gap-2 justify-start">
-                            <Avatar name={row.employeeName} size="sm" />
-                            <span className="emp-name-bold">{row.employeeName}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="flex-column font-xsmall text-muted">
-                            <span className="font-semibold text-primary">{row.department}</span>
-                            <span>{row.designation}</span>
-                          </div>
-                        </td>
-                        <td><span className="badge badge-secondary">{row.branch}</span></td>
-                        <td className="font-semibold">{formatCurrency(row.basicSalary)}</td>
-                        <td className="text-center font-semibold">{row.attendanceDays}</td>
-                        <td className="text-success font-semibold">+{formatCurrency(row.overtimeAmount)}</td>
-                        <td className="text-success font-semibold">+{formatCurrency(row.bonusAmount)}</td>
-                        <td className="text-danger font-semibold">-{formatCurrency(row.totalDeductions)}</td>
-                        <td className="text-info font-bold">{formatCurrency(row.netSalary)}</td>
-                        <td>
-                          <Badge variant={
-                            row.status === 'Released' ? 'success' :
-                            row.status === 'Finance Approved' ? 'info' :
-                            row.status === 'HR Verified' ? 'primary' :
-                            row.status === 'Hold' ? 'danger' : 'warning'
-                          }>
-                            {row.status === 'Released' ? 'Disbursed' : row.status}
-                          </Badge>
-                        </td>
-                        <td>
-                          <div className="flex-center gap-2 justify-start">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              icon={Receipt}
-                              onClick={() => {
-                                setPayslipEmpId(row.employeeId);
-                                setPayslipModalOpen(true);
-                              }}
-                              title="Generate Payslip"
-                            >
-                              Payslip
-                            </Button>
-                            
-                            {perspective !== 'employee' && (
+                  <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="table-filter-select" style={{ minWidth: '120px' }}>
+                    <option value="">All Departments</option>
+                    {(departments || []).map(d => (
+                      <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+
+                  <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="table-filter-select">
+                    <option value="">All Branches</option>
+                    {(branches || []).map(b => (
+                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                    ))}
+                  </select>
+
+                  <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="table-filter-select">
+                    <option value="">All Statuses</option>
+                    <option value="Calculated">Calculated</option>
+                    <option value="HR Verified">HR Verified</option>
+                    <option value="Finance Approved">Finance Approved</option>
+                    <option value="Released">Released (Paid)</option>
+                    <option value="Hold">On Hold</option>
+                  </select>
+                </div>
+
+                {/* Bulk Actions Panel */}
+                {perspective !== 'employee' && (
+                  <div className="flex-center gap-2 wrap-content">
+                    {perspective === 'branch_admin' && (
+                      <Button variant="secondary" onClick={() => handleBulkAction('verify')} icon={CheckCircle}>
+                        Bulk Verify (HR)
+                      </Button>
+                    )}
+                    {perspective === 'manager' && (
+                      <Button variant="secondary" onClick={() => handleBulkAction('approve')} icon={CheckCircle}>
+                        Bulk Approve (Finance)
+                      </Button>
+                    )}
+                    {perspective === 'super_admin' && (
+                      <div className="flex-center gap-2">
+                        <Button variant="secondary" onClick={() => handleBulkAction('approve')} icon={CheckCircle}>
+                          Approve (Fin)
+                        </Button>
+                        <Button variant="primary" onClick={() => handleBulkAction('release')} icon={Landmark}>
+                          Release Salary
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Main Processing Table */}
+            <div className="card table-wrapper-card">
+              <div className="overflow-x-auto">
+                <table className="payroll-data-table">
+                  <thead>
+                    <tr>
+                      <th>Emp ID</th>
+                      <th>Employee Name</th>
+                      <th>Dept & Designation</th>
+                      <th>Branch</th>
+                      <th>Basic Salary</th>
+                      <th>Present Days</th>
+                      <th>OT Pay</th>
+                      <th>Bonus</th>
+                      <th>Deductions</th>
+                      <th>Net Salary</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredData.length > 0 ? (
+                      filteredData.map(row => (
+                        <tr key={row.employeeId} className={selectedEmpId === row.employeeId ? 'selected-row-highlight' : ''}>
+                          <td className="font-semibold">{row.employeeId}</td>
+                          <td>
+                            <div className="flex-center gap-2 justify-start">
+                              <Avatar name={row.employeeName} size="sm" />
+                              <span className="emp-name-bold">{row.employeeName}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="flex-column font-xsmall text-muted">
+                              <span className="font-semibold text-primary">{row.department}</span>
+                              <span>{row.designation}</span>
+                            </div>
+                          </td>
+                          <td><span className="badge badge-secondary">{row.branch}</span></td>
+                          <td className="font-semibold">{formatCurrency(row.basicSalary)}</td>
+                          <td className="text-center font-semibold">{row.attendanceDays}</td>
+                          <td className="text-success font-semibold">+{formatCurrency(row.overtimeAmount)}</td>
+                          <td className="text-success font-semibold">+{formatCurrency(row.bonusAmount)}</td>
+                          <td className="text-danger font-semibold">-{formatCurrency(row.totalDeductions)}</td>
+                          <td className="text-info font-bold">{formatCurrency(row.netSalary)}</td>
+                          <td>
+                            <Badge variant={
+                              row.status === 'Released' ? 'success' :
+                              row.status === 'Finance Approved' ? 'info' :
+                              row.status === 'HR Verified' ? 'primary' :
+                              row.status === 'Hold' ? 'danger' : 'warning'
+                            }>
+                              {row.status === 'Released' ? 'Disbursed' : row.status}
+                            </Badge>
+                          </td>
+                          <td>
+                            <div className="flex-center gap-2 justify-start">
                               <Button
                                 variant="secondary"
                                 size="sm"
-                                icon={Edit}
+                                icon={Receipt}
                                 onClick={() => {
-                                  setSelectedEmpId(row.employeeId);
-                                  setActiveTab('attendance');
+                                  setPayslipEmpId(row.employeeId);
+                                  setPayslipModalOpen(true);
                                 }}
-                                title="Adjust Adjustments"
-                              />
-                            )}
-
-                            {perspective === 'super_admin' && row.status !== 'Released' && (
-                              <button
-                                className="action-circle-btn success-btn"
-                                onClick={() => handleStatusChange(row.employeeId, 'Released')}
-                                title="Release Salary"
+                                title="Generate Payslip"
                               >
-                                <Check size={14} />
-                              </button>
-                            )}
-                          </div>
+                                Payslip
+                              </Button>
+                              
+                              {perspective !== 'employee' && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  icon={Edit}
+                                  onClick={() => {
+                                    setSelectedEmpId(row.employeeId);
+                                    setActiveTab('attendance');
+                                  }}
+                                  title="Adjust Adjustments"
+                                />
+                              )}
+
+                              {perspective === 'super_admin' && row.status !== 'Released' && (
+                                <button
+                                  className="action-circle-btn success-btn"
+                                  onClick={() => handleStatusChange(row.employeeId, 'Released')}
+                                  title="Release Salary"
+                                >
+                                  <Check size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="12" className="text-center p-8 text-muted">
+                          No employee records found matching selected filters.
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="12" className="text-center p-8 text-muted">
-                        No employee records found matching selected filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
+        )
       )}
-
-
-
       {/* ==================== TAB CONTENT: SALARY STRUCTURES ==================== */}
       {activeTab === 'structures' && perspective !== 'employee' && (
         <div className="flex-column grid-gap animate-fade-in">
@@ -1318,47 +1436,83 @@ BANK PAYMENT & COMPLIANCE DETAIL:
           </div>
         </div>
       )}
-
-
       {/* ==================== TAB CONTENT: BONUSES & INCENTIVES ==================== */}
       {activeTab === 'bonuses' && (
         <div className="flex-column grid-gap animate-fade-in">
           <div className="flex-center justify-between">
-            <h3 className="card-sec-title">Bonus & Incentives Dashboard</h3>
-            {hasPermission('payroll_management', 'create') && (
+            <div>
+              <h3 className="card-sec-title" style={{ marginBottom: 2 }}>{perspective === 'employee' ? 'My Bonuses & Incentives' : 'Bonus & Incentives Dashboard'}</h3>
+              <p className="subtitle">Recommend performance awards, track verification flow milestones, and monitor disbursements.</p>
+            </div>
+            {perspective !== 'employee' && hasPermission('payroll_management', 'create') && (
               <Button variant="primary" size="sm" icon={Plus} onClick={() => {
                 setBonusForm({ employeeId: employees[0]?.id || '', amount: 10000, type: 'Performance Bonus', remarks: 'Q2 Performance target achievement', effectiveDate: '2026-06-12' });
                 setShowBonusModal(true);
               }}>
-                Recommend Bonus
+                Recommend Award
               </Button>
             )}
           </div>
 
-          <div className="card table-wrapper-card">
-            <div className="overflow-x-auto">
-              <table className="payroll-data-table">
-                <thead>
-                  <tr>
-                    <th>Request ID</th>
-                    <th>Employee Name</th>
-                    <th>Bonus Type</th>
-                    <th>Amount</th>
-                    <th>Request Date</th>
-                    <th>Approval Status</th>
-                    <th>Verification Path</th>
-                    {perspective !== 'employee' && <th>Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {scopedBonuses.map(b => (
-                    <tr key={b.id}>
-                      <td className="font-semibold">{b.id}</td>
-                      <td>{b.employeeName}</td>
-                      <td><span className="text-primary font-semibold">{b.type}</span></td>
-                      <td className="font-bold text-success">+{formatCurrency(b.amount)}</td>
-                      <td>{b.requestDate}</td>
-                      <td>
+          {perspective === 'employee' ? (
+            <div className="flex-column grid-gap animate-fade-in">
+              {/* Summary Metrics Row */}
+              <div className="bonuses-kpi-grid">
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Total Bonuses Received</span>
+                    <h3 className="stat-num text-success">
+                      {formatCurrency(scopedBonuses.filter(b => b.status === 'Super Admin Approved').reduce((sum, curr) => sum + curr.amount, 0))}
+                    </h3>
+                    <span className="font-xsmall text-muted">Disbursed in current cycle</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-success">
+                    <Award size={20} />
+                  </div>
+                </div>
+
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Pending Recommendation</span>
+                    <h3 className="stat-num text-warning">
+                      {formatCurrency(scopedBonuses.filter(b => b.status !== 'Super Admin Approved').reduce((sum, curr) => sum + curr.amount, 0))}
+                    </h3>
+                    <span className="font-xsmall text-muted">Awaiting admin verification</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-warning">
+                    <Clock size={20} />
+                  </div>
+                </div>
+
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Active Claims Count</span>
+                    <h3 className="stat-num text-primary">
+                      {scopedBonuses.length} Request(s)
+                    </h3>
+                    <span className="font-xsmall text-muted">Total submitted claims</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-primary">
+                    <TrendingUp size={20} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card List of Bonuses */}
+              <div className="flex-column gap-3">
+                {scopedBonuses.length > 0 ? (
+                  scopedBonuses.map(b => (
+                    <div key={b.id} className="card p-4 flex-row justify-between align-center flex-wrap gap-4 border-left-primary">
+                      <div className="flex-column gap-1">
+                        <div className="flex-center gap-2 justify-start">
+                          <span className="badge badge-primary font-xsmall">{b.id}</span>
+                          <span className="font-semibold text-primary">{b.type}</span>
+                        </div>
+                        <span className="font-xsmall text-muted">Requested on: {b.requestDate}</span>
+                      </div>
+                      
+                      <div className="flex-column align-end">
+                        <span className="font-bold text-success font-medium">+{formatCurrency(b.amount)}</span>
                         <Badge variant={
                           b.status === 'Super Admin Approved' ? 'success' :
                           b.status === 'Finance Approved' ? 'info' :
@@ -1366,8 +1520,11 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                         }>
                           {b.status}
                         </Badge>
-                      </td>
-                      <td>
+                      </div>
+
+                      {/* Approval Flow Timeline */}
+                      <div className="flex-column gap-1" style={{ minWidth: 200 }}>
+                        <span className="font-xsmall text-muted font-semibold">Verification Milestones</span>
                         <div className="flex-center gap-1 font-xsmall wrap-content justify-start">
                           {b.approvalFlow.map((flow, index) => (
                             <span key={index} className="badge badge-secondary p-1 flex-center gap-1">
@@ -1375,28 +1532,143 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                             </span>
                           ))}
                         </div>
-                      </td>
-                      {perspective !== 'employee' && hasPermission('payroll_management', 'approve') && (
-                        <td>
-                          <div className="flex-center gap-2 justify-start">
-                            {perspective === 'branch_admin' && b.status === 'Pending' && (
-                              <Button variant="secondary" size="sm" onClick={() => handleBonusStatus(b.id, 'HR Verified')}>Verify</Button>
-                            )}
-                            {perspective === 'manager' && b.status === 'HR Verified' && (
-                              <Button variant="secondary" size="sm" onClick={() => handleBonusStatus(b.id, 'Finance Approved')}>Approve</Button>
-                            )}
-                            {perspective === 'super_admin' && b.status !== 'Super Admin Approved' && (
-                              <Button variant="primary" size="sm" onClick={() => handleBonusStatus(b.id, 'Super Admin Approved')}>Verify & Approve</Button>
-                            )}
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="bonuses-empty-state">
+                    <div className="bonuses-empty-icon">
+                      <Award size={32} />
+                    </div>
+                    <h4 className="font-semibold text-primary">No active bonuses on record</h4>
+                    <p className="font-small text-muted mt-1">When your team lead recommends a performance award, it will appear here.</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex-column grid-gap">
+              {/* Stats cards for Admin/Manager */}
+              <div className="bonuses-kpi-grid">
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Total Approved Bonuses</span>
+                    <h3 className="stat-num text-success">
+                      {formatCurrency(scopedBonuses.filter(b => b.status === 'Super Admin Approved').reduce((sum, curr) => sum + curr.amount, 0))}
+                    </h3>
+                    <span className="font-xsmall text-muted">Disbursed performance awards</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-success">
+                    <Award size={20} />
+                  </div>
+                </div>
+
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Pending Approvals Budget</span>
+                    <h3 className="stat-num text-warning">
+                      {formatCurrency(scopedBonuses.filter(b => b.status !== 'Super Admin Approved').reduce((sum, curr) => sum + curr.amount, 0))}
+                    </h3>
+                    <span className="font-xsmall text-muted">Awaiting manager checks</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-warning">
+                    <Clock size={20} />
+                  </div>
+                </div>
+
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Total Recommendations</span>
+                    <h3 className="stat-num text-primary">
+                      {scopedBonuses.length} Records
+                    </h3>
+                    <span className="font-xsmall text-muted">Cycle submissions total</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-primary">
+                    <TrendingUp size={20} />
+                  </div>
+                </div>
+              </div>
+
+              {scopedBonuses.length > 0 ? (
+                <div className="card table-wrapper-card">
+                  <div className="overflow-x-auto">
+                    <table className="payroll-data-table">
+                      <thead>
+                        <tr>
+                          <th>Request ID</th>
+                          <th>Employee Name</th>
+                          <th>Bonus Type</th>
+                          <th>Amount</th>
+                          <th>Request Date</th>
+                          <th>Approval Status</th>
+                          <th>Verification Path</th>
+                          {perspective !== 'employee' && <th>Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scopedBonuses.map(b => (
+                          <tr key={b.id}>
+                            <td className="font-semibold">{b.id}</td>
+                            <td>
+                              <span className="emp-name-bold">{b.employeeName}</span>
+                            </td>
+                            <td><span className="text-primary font-semibold">{b.type}</span></td>
+                            <td className="font-bold text-success">+{formatCurrency(b.amount)}</td>
+                            <td>{b.requestDate}</td>
+                            <td>
+                              <Badge variant={
+                                b.status === 'Super Admin Approved' ? 'success' :
+                                b.status === 'Finance Approved' ? 'info' :
+                                b.status === 'HR Verified' ? 'primary' : 'warning'
+                              }>
+                                {b.status}
+                              </Badge>
+                            </td>
+                            <td>
+                              <div className="flex-center gap-1 font-xsmall wrap-content justify-start">
+                                {b.approvalFlow.map((flow, index) => (
+                                  <span key={index} className="badge badge-secondary p-1 flex-center gap-1">
+                                    <Check size={10} className="text-success" /> {flow}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            {perspective !== 'employee' && (
+                              <td>
+                                <div className="flex-center gap-2 justify-start">
+                                  {perspective === 'branch_admin' && b.status === 'Pending' && (
+                                    <Button variant="secondary" size="sm" onClick={() => handleBonusStatus(b.id, 'HR Verified')}>Verify</Button>
+                                  )}
+                                  {perspective === 'manager' && b.status === 'HR Verified' && (
+                                    <Button variant="secondary" size="sm" onClick={() => handleBonusStatus(b.id, 'Finance Approved')}>Approve</Button>
+                                  )}
+                                  {perspective === 'super_admin' && b.status !== 'Super Admin Approved' && (
+                                    <Button variant="primary" size="sm" onClick={() => handleBonusStatus(b.id, 'Super Admin Approved')}>Verify & Approve</Button>
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="bonuses-empty-state">
+                  <div className="bonuses-empty-icon">
+                    <Award size={32} />
+                  </div>
+                  <h4 className="font-semibold text-primary">No Performance Bonus Recommendations</h4>
+                  <p className="font-small text-muted mt-1">There are no bonus recommendations submitted for this period.</p>
+                  <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowBonusModal(true)} style={{ marginTop: 8 }}>
+                    Recommend Bonus Now
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1404,74 +1676,367 @@ BANK PAYMENT & COMPLIANCE DETAIL:
       {activeTab === 'loans' && (
         <div className="flex-column grid-gap animate-fade-in">
           <div className="flex-center justify-between">
-            <h3 className="card-sec-title">Loans & Salary Advances Ledger</h3>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => {
-                setApplyForm({
-                  employeeId: employees[0]?.id || '',
-                  type: 'Personal Loan',
-                  amount: 50000,
-                  emi: 5000,
-                  recoverySchedule: '10 Months'
-                });
-                setShowApplyModal(true);
-              }}
-            >
-              Apply / Disburse Loan
-            </Button>
+            <div>
+              <h3 className="card-sec-title" style={{ marginBottom: 2 }}>{perspective === 'employee' ? 'My Loans & Advances' : 'Loans & Salary Advances Ledger'}</h3>
+              <p className="subtitle">Track outstanding agreements, check monthly recovery deductions, and apply for financial assistance.</p>
+            </div>
+            {perspective !== 'employee' && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                onClick={() => {
+                  setApplyForm({
+                    employeeId: employees[0]?.id || '',
+                    type: 'Personal Loan',
+                    amount: 50000,
+                    emi: 5000,
+                    recoverySchedule: '10 Months'
+                  });
+                  setShowApplyModal(true);
+                }}
+              >
+                Apply / Disburse Loan
+              </Button>
+            )}
           </div>
 
-          {/* Ledger Cards */}
-          <div className="grid-2-col gap-6">
-            {/* Active Loans */}
-            <div className="card p-5 flex-column gap-3">
-              <h4 className="text-primary font-bold">Active Employee Loans</h4>
-              
-              <div className="flex-column gap-4">
-                {scopedLoans.map(l => (
-                  <div key={l.id} className="p-3 border rounded bg-secondary flex-column gap-2">
-                    <div className="flex-center justify-between font-small">
-                      <span className="font-semibold">{l.employeeName} ({l.loanType})</span>
-                      <span className="text-danger font-semibold">{formatCurrency(l.remainingBalance)} / {formatCurrency(l.amount)}</span>
-                    </div>
-                    <div className="flex-center justify-between font-xsmall text-muted">
-                      <span>EMI: {formatCurrency(l.emi)}/mo</span>
-                      <span>Recovery Schedule: {l.recoverySchedule}</span>
-                    </div>
-                    <div className="width-full bg-secondary-dark rounded-full" style={{ height: '6px', overflow: 'hidden' }}>
-                      <div className="bg-primary" style={{ width: `${l.progress}%`, height: '100%' }}></div>
-                    </div>
+          {perspective === 'employee' ? (
+            <div className="flex-column grid-gap animate-fade-in">
+              {/* Employee Personal KPIs */}
+              <div className="loans-kpi-grid">
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Outstanding Loan Balance</span>
+                    <h3 className="stat-num text-danger">{formatCurrency(scopedLoans.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <span className="font-xsmall text-muted">Remaining principal balance</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="premium-kpi-icon-badge badge-glow-danger">
+                    <Scale size={20} />
+                  </div>
+                </div>
 
-            {/* Salary Advances */}
-            <div className="card p-5 flex-column gap-3">
-              <h4 className="text-success font-bold">Salary Advances Outstanding</h4>
-              
-              <div className="flex-column gap-4">
-                {scopedAdvances.map(a => (
-                  <div key={a.id} className="p-3 border rounded bg-secondary flex-column gap-2">
-                    <div className="flex-center justify-between font-small">
-                      <span className="font-semibold">{a.employeeName}</span>
-                      <span className="text-warning font-semibold">{formatCurrency(a.remainingBalance)} / {formatCurrency(a.amount)}</span>
-                    </div>
-                    <div className="flex-center justify-between font-xsmall text-muted">
-                      <span>Terms: {a.recoverySchedule}</span>
-                      <span>Status: <Badge variant="success">{a.status}</Badge></span>
-                    </div>
-                    <div className="width-full bg-secondary-dark rounded-full" style={{ height: '6px', overflow: 'hidden' }}>
-                      <div className="bg-success" style={{ width: `${a.progress}%`, height: '100%' }}></div>
-                    </div>
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Salary Advance Balance</span>
+                    <h3 className="stat-num text-warning">{formatCurrency(scopedAdvances.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <span className="font-xsmall text-muted">Awaiting payroll settlement</span>
                   </div>
-                ))}
+                  <div className="premium-kpi-icon-badge badge-glow-warning">
+                    <Clock size={20} />
+                  </div>
+                </div>
+
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Next Month's Recovery EMI</span>
+                    <h3 className="stat-num text-success">
+                      {formatCurrency(
+                        scopedLoans.reduce((sum, curr) => sum + curr.emi, 0) +
+                        scopedAdvances.reduce((sum, curr) => sum + curr.remainingBalance, 0)
+                      )}
+                    </h3>
+                    <span className="font-xsmall text-muted">Estimated paycheck deduction</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-success">
+                    <DollarSign size={20} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Split layout: agreements vs apply inline widget */}
+              <div className="grid-2-col gap-6" style={{ alignItems: 'start' }}>
+                {/* Active Agreements */}
+                <div className="card p-5 flex-column gap-3">
+                  <h4 className="text-primary font-bold">My Active Agreements</h4>
+                  
+                  <div className="flex-column gap-4">
+                    {scopedLoans.length === 0 && scopedAdvances.length === 0 ? (
+                      <div className="loan-empty-state">
+                        <div className="loan-empty-icon">
+                          <CheckCircle size={32} className="text-success" />
+                        </div>
+                        <h4 className="font-semibold text-success">Debt-Free Profile</h4>
+                        <p className="font-small text-muted mt-1">You have no outstanding loans or active salary advance accounts.</p>
+                      </div>
+                    ) : (
+                      <>
+                        {scopedLoans.map(l => (
+                          <div key={l.id} className="loan-card-item flex-column gap-2">
+                            <div className="loan-card-header-row">
+                              <div className="flex-column">
+                                <span className="font-semibold text-primary">{l.loanType}</span>
+                                <span className="font-xsmall text-muted">Agreement: {l.id}</span>
+                              </div>
+                              <span className="text-danger font-semibold">{formatCurrency(l.remainingBalance)} / {formatCurrency(l.amount)}</span>
+                            </div>
+                            <div className="flex-center justify-between font-xsmall text-muted">
+                              <span>EMI Recovery: {formatCurrency(l.emi)}/mo</span>
+                              <span>Terms: {l.recoverySchedule}</span>
+                            </div>
+                            <div className="loan-progress-track">
+                              <div className="loan-progress-text">
+                                <span>Recovery Progress</span>
+                                <span>{Math.round(l.progress)}% Paid</span>
+                              </div>
+                              <div className="loan-progress-bar-bg">
+                                <div className="loan-progress-bar-fill bg-primary" style={{ width: `${l.progress}%` }}></div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {scopedAdvances.map(a => (
+                          <div key={a.id} className="loan-card-item flex-column gap-2" style={{ borderColor: 'var(--color-success-light)' }}>
+                            <div className="loan-card-header-row">
+                              <div className="flex-column">
+                                <span className="font-semibold text-success">Salary Advance</span>
+                                <span className="font-xsmall text-muted">Reference ID: {a.id}</span>
+                              </div>
+                              <span className="text-warning font-semibold">{formatCurrency(a.remainingBalance)} / {formatCurrency(a.amount)}</span>
+                            </div>
+                            <div className="flex-center justify-between font-xsmall text-muted">
+                              <span>Terms: {a.recoverySchedule}</span>
+                              <span>Status: <Badge variant="success">{a.status}</Badge></span>
+                            </div>
+                            <div className="loan-progress-track">
+                              <div className="loan-progress-text">
+                                <span>Settlement Progress</span>
+                                <span>{Math.round(a.progress)}% Deducted</span>
+                              </div>
+                              <div className="loan-progress-bar-bg">
+                                <div className="loan-progress-bar-fill bg-success" style={{ width: `${a.progress}%` }}></div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Inline Request Form Widget */}
+                <div className="loan-request-widget">
+                  <h4 className="font-semibold text-primary" style={{ margin: 0 }}>Request Financial Advance</h4>
+                  <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Submit requests for corporate salary loans or immediate advances. Admin approval is required.</p>
+                  
+                  <div className="flex-center gap-4 bg-secondary p-2 rounded justify-center">
+                    <label className="flex-center gap-1 cursor-pointer font-small font-semibold">
+                      <input type="radio" checked={applyType === 'Loan'} onChange={() => { setApplyType('Loan'); setApplyForm(prev => ({ ...prev, amount: 50000, emi: 5000, type: 'Personal Loan', recoverySchedule: '10 Months' })) }} /> Loan Structure
+                    </label>
+                    <label className="flex-center gap-1 cursor-pointer font-small font-semibold">
+                      <input type="radio" checked={applyType === 'Advance'} onChange={() => { setApplyType('Advance'); setApplyForm(prev => ({ ...prev, amount: 10000, recoverySchedule: 'Single Deduct (Next Month)' })) }} /> Salary Advance
+                    </label>
+                  </div>
+
+                  <form className="flex-column gap-3" onSubmit={handleCreateLoanAdvance}>
+                    {applyType === 'Loan' && (
+                      <div>
+                        <label className="input-label">Loan Purpose Category</label>
+                        <select
+                          value={applyForm.type}
+                          onChange={(e) => setApplyForm(prev => ({ ...prev, type: e.target.value }))}
+                          className="table-filter-select width-full p-2"
+                        >
+                          <option value="Personal Loan">Personal Loan</option>
+                          <option value="Emergency Loan">Emergency Loan</option>
+                          <option value="Company Loan">Company Loan</option>
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="grid-2-col">
+                      <div>
+                        <label className="input-label">{applyType === 'Loan' ? 'Total Loan Principal (₹)' : 'Advance Principal (₹)'}</label>
+                        <input
+                          type="number"
+                          value={applyForm.amount}
+                          onChange={(e) => setApplyForm(prev => ({ ...prev, amount: parseInt(e.target.value) || 0 }))}
+                          className="table-search-input width-full"
+                          placeholder="e.g. 50000"
+                        />
+                      </div>
+                      {applyType === 'Loan' ? (
+                        <div>
+                          <label className="input-label">Monthly EMI (₹)</label>
+                          <input
+                            type="number"
+                            value={applyForm.emi}
+                            onChange={(e) => setApplyForm(prev => ({ ...prev, emi: parseInt(e.target.value) || 0 }))}
+                            className="table-search-input width-full"
+                            placeholder="e.g. 5000"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="input-label">Recovery Term</label>
+                          <input
+                            type="text"
+                            value={applyForm.recoverySchedule}
+                            onChange={(e) => setApplyForm(prev => ({ ...prev, recoverySchedule: e.target.value }))}
+                            className="table-search-input width-full"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {applyType === 'Loan' && (
+                      <div className="p-2 bg-secondary rounded flex-center justify-between font-xsmall text-muted">
+                        <span>Calculated Tenure:</span>
+                        <strong className="text-primary">{applyForm.emi > 0 ? Math.ceil(applyForm.amount / applyForm.emi) : '0'} Months</strong>
+                      </div>
+                    )}
+
+                    <Button variant="primary" type="submit" style={{ width: '100%', marginTop: 8 }}>
+                      Submit Request
+                    </Button>
+                  </form>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex-column grid-gap animate-fade-in">
+              {/* Admin KPIs */}
+              <div className="loans-kpi-grid">
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Total Disbursed Loans</span>
+                    <h3 className="stat-num text-primary">{formatCurrency(loans.reduce((sum, curr) => sum + curr.amount, 0))}</h3>
+                    <span className="font-xsmall text-muted">Total corporate loan capital</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-primary">
+                    <Scale size={20} />
+                  </div>
+                </div>
+
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Salary Advances Outstanding</span>
+                    <h3 className="stat-num text-warning">{formatCurrency(advances.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <span className="font-xsmall text-muted">Pending salary settlements</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-warning">
+                    <Clock size={20} />
+                  </div>
+                </div>
+
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Monthly EMI Recovery Pool</span>
+                    <h3 className="stat-num text-success">{formatCurrency(loans.reduce((sum, curr) => sum + curr.emi, 0))}</h3>
+                    <span className="font-xsmall text-muted">Recoverable next payroll run</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-success">
+                    <DollarSign size={20} />
+                  </div>
+                </div>
+
+                <div className="premium-kpi-card">
+                  <div className="premium-kpi-info">
+                    <span className="stat-label">Active Debtors Count</span>
+                    <h3 className="stat-num text-info">{new Set([...loans, ...advances].map(item => item.employeeId)).size} Staff</h3>
+                    <span className="font-xsmall text-muted">Active balances total</span>
+                  </div>
+                  <div className="premium-kpi-icon-badge badge-glow-info">
+                    <Users size={20} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Ledger Cards */}
+              <div className="grid-2-col gap-6">
+                {/* Active Loans */}
+                <div className="card p-5 flex-column gap-3">
+                  <h4 className="text-primary font-bold">Active Employee Loans</h4>
+                  
+                  <div className="flex-column gap-4">
+                    {scopedLoans.length > 0 ? (
+                      scopedLoans.map(l => (
+                        <div key={l.id} className="loan-card-item flex-column gap-2">
+                          <div className="loan-card-header-row">
+                            <div className="loan-avatar-info">
+                              <Avatar name={l.employeeName} size="sm" />
+                              <div className="flex-column">
+                                <span className="font-semibold text-primary">{l.employeeName} ({l.loanType})</span>
+                                <span className="font-xsmall text-muted">ID: {l.id} • Emp ID: {l.employeeId}</span>
+                              </div>
+                            </div>
+                            <span className="text-danger font-semibold">{formatCurrency(l.remainingBalance)} / {formatCurrency(l.amount)}</span>
+                          </div>
+                          <div className="flex-center justify-between font-xsmall text-muted">
+                            <span>EMI: {formatCurrency(l.emi)}/mo</span>
+                            <span>Tenure: {l.recoverySchedule}</span>
+                          </div>
+                          <div className="loan-progress-track">
+                            <div className="loan-progress-text">
+                              <span>Recovery Progress</span>
+                              <span>{Math.round(l.progress)}%</span>
+                            </div>
+                            <div className="loan-progress-bar-bg">
+                              <div className="loan-progress-bar-fill bg-primary" style={{ width: `${l.progress}%` }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="loan-empty-state">
+                        <div className="loan-empty-icon">
+                          <Scale size={32} />
+                        </div>
+                        <h4 className="font-semibold text-muted">No Active Loans</h4>
+                        <p className="font-small text-muted">There are no outstanding employee loans on record.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Salary Advances */}
+                <div className="card p-5 flex-column gap-3">
+                  <h4 className="text-success font-bold">Salary Advances Outstanding</h4>
+                  
+                  <div className="flex-column gap-4">
+                    {scopedAdvances.length > 0 ? (
+                      scopedAdvances.map(a => (
+                        <div key={a.id} className="loan-card-item flex-column gap-2" style={{ borderColor: 'var(--color-success-light)' }}>
+                          <div className="loan-card-header-row">
+                            <div className="loan-avatar-info">
+                              <Avatar name={a.employeeName} size="sm" />
+                              <div className="flex-column">
+                                <span className="font-semibold text-success">{a.employeeName}</span>
+                                <span className="font-xsmall text-muted">ID: {a.id} • Emp ID: {a.employeeId}</span>
+                              </div>
+                            </div>
+                            <span className="text-warning font-semibold">{formatCurrency(a.remainingBalance)} / {formatCurrency(a.amount)}</span>
+                          </div>
+                          <div className="flex-center justify-between font-xsmall text-muted">
+                            <span>Terms: {a.recoverySchedule}</span>
+                            <span>Status: <Badge variant="success">{a.status}</Badge></span>
+                          </div>
+                          <div className="loan-progress-track">
+                            <div className="loan-progress-text">
+                              <span>Settlement Progress</span>
+                              <span>{Math.round(a.progress)}%</span>
+                            </div>
+                            <div className="loan-progress-bar-bg">
+                              <div className="loan-progress-bar-fill bg-success" style={{ width: `${a.progress}%` }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="loan-empty-state">
+                        <div className="loan-empty-icon">
+                          <Clock size={32} />
+                        </div>
+                        <h4 className="font-semibold text-muted">No Advances Outstanding</h4>
+                        <p className="font-small text-muted">All salary advances have been recovered or fully settled.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1544,34 +2109,121 @@ BANK PAYMENT & COMPLIANCE DETAIL:
       {/* ==================== TAB CONTENT: PAYROLL CALENDAR ==================== */}
       {activeTab === 'calendar' && (
         <div className="flex-column grid-gap animate-fade-in">
-          <h3 className="card-sec-title">Payroll Cutoff & Schedules Calendar</h3>
-          
-          <div className="grid-3-col gap-6">
-            <div className="card p-4 border-left-primary flex-column gap-2">
-              <span className="font-semibold text-primary flex-center gap-1"><Calendar size={14} /> June Cutoff Deadlines</span>
-              <div className="flex-column gap-2 font-small mt-2">
-                <div className="flex-center justify-between"><span>Reimbursements Cutoff:</span> <strong className="text-warning">June 20, 2026</strong></div>
-                <div className="flex-center justify-between"><span>Attendance Verification:</span> <strong className="text-warning">June 25, 2026</strong></div>
-                <div className="flex-center justify-between"><span>Payroll Processing Due:</span> <strong className="text-danger">June 28, 2026</strong></div>
-                <div className="flex-center justify-between"><span>Salary Disbursement Release:</span> <strong className="text-success">June 30, 2026</strong></div>
+          <div>
+            <h3 className="card-sec-title" style={{ marginBottom: 2 }}>Payroll Cutoff & Schedules Calendar</h3>
+            <p className="subtitle">Track monthly processing deadlines, cutoff milestones, and tax compliance dates for the current quarter.</p>
+          </div>
+
+          <div className="calendar-split-layout">
+            {/* Left Column: Payroll Processing Timeline */}
+            <div className="card p-5 flex-column gap-4">
+              <h4 className="font-semibold text-primary flex-center gap-2 justify-start" style={{ margin: 0 }}>
+                <Clock size={18} /> Payroll Run Cycle Timeline (June 2026)
+              </h4>
+              <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Key stages for monthly attendance auditing, verification, and disbursement.</p>
+              
+              <div className="calendar-timeline-v">
+                {/* Step 1: Completed */}
+                <div className="timeline-step-item step-passed">
+                  <div className="timeline-step-node"></div>
+                  <div className="timeline-step-header">
+                    <span className="font-bold font-small">1. Reimbursements Cutoff</span>
+                    <Badge variant="success">Passed</Badge>
+                  </div>
+                  <span className="font-xsmall text-muted font-semibold">Deadline: June 20, 2026</span>
+                  <p className="font-xsmall text-muted mt-1">Submit travel, medical, and client expense claims for inclusion in this cycle.</p>
+                </div>
+
+                {/* Step 2: Active */}
+                <div className="timeline-step-item step-active">
+                  <div className="timeline-step-node"></div>
+                  <div className="timeline-step-header">
+                    <span className="font-bold font-small text-primary">2. Attendance & Log Verification</span>
+                    <Badge variant="warning">In Progress</Badge>
+                  </div>
+                  <span className="font-xsmall text-muted font-semibold">Deadline: June 25, 2026</span>
+                  <p className="font-xsmall text-muted mt-1">Verify employee check-ins, half days, overtime, and punch records for payroll sync.</p>
+                </div>
+
+                {/* Step 3: Upcoming */}
+                <div className="timeline-step-item">
+                  <div className="timeline-step-node"></div>
+                  <div className="timeline-step-header">
+                    <span className="font-bold font-small text-secondary">3. Payroll Run Processing Due</span>
+                    <Badge variant="secondary">Scheduled</Badge>
+                  </div>
+                  <span className="font-xsmall text-muted font-semibold">Deadline: June 28, 2026</span>
+                  <p className="font-xsmall text-muted mt-1">Recalculate structures, basic revision edits, TDS deductions, and professional tax.</p>
+                </div>
+
+                {/* Step 4: Upcoming */}
+                <div className="timeline-step-item">
+                  <div className="timeline-step-node"></div>
+                  <div className="timeline-step-header">
+                    <span className="font-bold font-small text-secondary">4. Salary Disbursement Release</span>
+                    <Badge variant="secondary">Disbursement</Badge>
+                  </div>
+                  <span className="font-xsmall text-muted font-semibold">Deadline: June 30, 2026</span>
+                  <p className="font-xsmall text-muted mt-1">Disburse payments to bank accounts and send system notification slips.</p>
+                </div>
               </div>
             </div>
 
-            <div className="card p-4 border-left-success flex-column gap-2">
-              <span className="font-semibold text-success flex-center gap-1"><Calendar size={14} /> Tax Compliance Calendar</span>
-              <div className="flex-column gap-2 font-small mt-2">
-                <div className="flex-center justify-between"><span>TDS Deposit Due:</span> <strong>July 07, 2026</strong></div>
-                <div className="flex-center justify-between"><span>TDS Return filing (Q1):</span> <strong>July 31, 2026</strong></div>
-                <div className="flex-center justify-between"><span>PF & ESI Filing:</span> <strong>July 15, 2026</strong></div>
-              </div>
-            </div>
+            {/* Right Column: Tax Compliance Calendar */}
+            <div className="card p-5 flex-column gap-4">
+              <h4 className="font-semibold text-success flex-center gap-2 justify-start" style={{ margin: 0 }}>
+                <Calendar size={18} /> Statutory Tax Compliance Schedule
+              </h4>
+              <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Important quarterly and monthly filing deadlines for government audits.</p>
+              
+              <div className="compliance-grid-v">
+                {/* Due 1 */}
+                <div className="compliance-card-premium">
+                  <div className="calendar-sheet">
+                    <div className="calendar-sheet-header bg-primary">Jul</div>
+                    <div className="calendar-sheet-day">07</div>
+                  </div>
+                  <div className="compliance-card-info">
+                    <span className="compliance-card-title">Monthly TDS Deposit Due</span>
+                    <span className="compliance-card-due font-xsmall text-muted">Filing period: June 2026 • Challan ITNS 281</span>
+                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 25 Days</span>
+                  </div>
+                </div>
 
-            <div className="card p-4 border-left-warning flex-column gap-2">
-              <span className="font-semibold text-warning flex-center gap-1"><Clock size={14} /> Payroll Reminders Feed</span>
-              <div className="flex-column gap-2 font-xsmall mt-1 text-muted">
-                <div className="pb-1 border-bottom">🔔 Processing for June month starts in 10 days.</div>
-                <div className="pb-1 border-bottom">🔔 Ensure late logs and team bonuses are approved before June 25.</div>
-                <div>🔔 Income tax proof declaration portal is open for Q1 submissions.</div>
+                {/* Due 2 */}
+                <div className="compliance-card-premium" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+                  <div className="calendar-sheet">
+                    <div className="calendar-sheet-header bg-success">Jul</div>
+                    <div className="calendar-sheet-day">15</div>
+                  </div>
+                  <div className="compliance-card-info">
+                    <span className="compliance-card-title">PF & ESI Filing Deadline</span>
+                    <span className="compliance-card-due font-xsmall text-muted">Filing period: June 2026 • Form 5 & Form 10</span>
+                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 33 Days</span>
+                  </div>
+                </div>
+
+                {/* Due 3 */}
+                <div className="compliance-card-premium" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+                  <div className="calendar-sheet">
+                    <div className="calendar-sheet-header">Jul</div>
+                    <div className="calendar-sheet-day">31</div>
+                  </div>
+                  <div className="compliance-card-info">
+                    <span className="compliance-card-title">TDS Return Filing (Q1)</span>
+                    <span className="compliance-card-due font-xsmall text-muted">Form 24Q Submission • FY 2026-27</span>
+                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 49 Days</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reminders box */}
+              <div className="p-4 bg-secondary rounded flex-column gap-2 mt-2">
+                <span className="font-semibold text-warning font-small flex-center gap-1"><AlertTriangle size={14} /> Compliance Notices</span>
+                <div className="flex-column gap-1 font-xsmall text-muted">
+                  <div>🔔 Submission window for Q1 Investment Proofs is currently open.</div>
+                  <div>🔔 Penalty for late TDS return filing is ₹200 per day under Section 234E.</div>
+                </div>
               </div>
             </div>
           </div>

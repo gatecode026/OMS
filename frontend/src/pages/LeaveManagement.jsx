@@ -1057,22 +1057,45 @@ const LeaveManagement = () => {
       : myLeaves.filter(l => l.status === empStatusTab).sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate));
 
     const handleEmpApply = (formData) => {
-      const newRequest = {
-        id: `LR-${Math.floor(100 + Math.random() * 900)}`,
-        employeeId: currentUser.id,
-        employeeName: currentUser.name,
-        department: currentUser.department || '',
-        type: formData.type,
-        fromDate: formData.fromDate,
-        toDate: formData.toDate,
-        days: formData.days,
-        reason: formData.reason || '',
-        status: 'Pending',
-        appliedDate: new Date().toISOString().split('T')[0],
-        history: [{ date: new Date().toISOString().split('T')[0], status: 'Pending', comment: 'Applied by employee' }]
-      };
-      addLeaveRequest(newRequest);
-      addToast('success', 'Leave request submitted successfully.');
+      const typeLabel = formData.type === 'CL' ? 'Casual Leave' : 
+                        formData.type === 'SL' ? 'Sick Leave' : 
+                        formData.type === 'PL' ? 'Earned Leave' : 
+                        formData.type;
+
+      if (editingLeave) {
+        const updatedRequest = {
+          ...editingLeave,
+          type: typeLabel,
+          fromDate: formData.fromDate,
+          toDate: formData.toDate,
+          days: formData.days,
+          reason: formData.reason || '',
+          history: [
+            ...(editingLeave.history || []),
+            { date: new Date().toISOString().split('T')[0], status: 'Pending', comment: 'Edited by employee' }
+          ]
+        };
+        updateLeaveRequest(editingLeave.id, updatedRequest);
+        addToast('success', 'Leave request updated successfully.');
+        setEditingLeave(null);
+      } else {
+        const newRequest = {
+          id: `LR-${Math.floor(100 + Math.random() * 900)}`,
+          employeeId: currentUser.id,
+          employeeName: currentUser.name,
+          department: currentUser.department || '',
+          type: typeLabel,
+          fromDate: formData.fromDate,
+          toDate: formData.toDate,
+          days: formData.days,
+          reason: formData.reason || '',
+          status: 'Pending',
+          appliedDate: new Date().toISOString().split('T')[0],
+          history: [{ date: new Date().toISOString().split('T')[0], status: 'Pending', comment: 'Applied by employee' }]
+        };
+        addLeaveRequest(newRequest);
+        addToast('success', 'Leave request submitted successfully.');
+      }
       if (fetchLeaves) fetchLeaves(); // Refresh the list from the server
     };
 
@@ -1090,6 +1113,17 @@ const LeaveManagement = () => {
         },
         'danger'
       );
+    };
+
+    const handleEmpEdit = (leave) => {
+      setEditingLeave(leave);
+      setApplyPanelOpen(true);
+      setTimeout(() => {
+        const el = document.getElementById('apply-leave-panel-container');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     };
 
     const totalAvailable = balances.filter(b => b.type !== 'UL').reduce((s, b) => s + Math.max(0, b.total - b.used), 0);
@@ -1174,13 +1208,16 @@ const LeaveManagement = () => {
         </div>
 
         {/* ── Apply Panel (inline, slides down) ── */}
-        <ApplyLeavePanel
-          open={applyPanelOpen}
-          onClose={() => setApplyPanelOpen(false)}
-          onSubmit={handleEmpApply}
-          balances={balances}
-          holidays={myHolidays}
-        />
+        <div id="apply-leave-panel-container">
+          <ApplyLeavePanel
+            open={applyPanelOpen}
+            onClose={() => { setApplyPanelOpen(false); setEditingLeave(null); }}
+            onSubmit={handleEmpApply}
+            balances={balances}
+            holidays={myHolidays}
+            editingLeave={editingLeave}
+          />
+        </div>
 
         {/* ── Quick Stats Row ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
@@ -1337,7 +1374,7 @@ const LeaveManagement = () => {
               </div>
             ) : (
               filteredMyLeaves.map(leave => (
-                <LeaveRequestCard key={leave.id} leave={leave} onCancel={handleEmpCancel} />
+                <LeaveRequestCard key={leave.id} leave={leave} onCancel={handleEmpCancel} onEdit={handleEmpEdit} />
               ))
             )}
           </div>
@@ -2357,7 +2394,6 @@ const LeaveManagement = () => {
               </div>
             </div>
           </div>
-
           {/* Main Policy Table */}
           <div className="card">
             <div className="table-inner-wrapper">

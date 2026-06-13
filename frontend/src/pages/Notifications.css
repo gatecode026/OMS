@@ -392,8 +392,16 @@
   font-size: 0.85rem;
   transition: all 0.2s;
   font-family: inherit;
-  width: auto !important;
+  width: auto;
   min-width: 220px;
+}
+
+/* Force full width when .width-full is also applied */
+.table-search-input.width-full,
+.table-filter-select.width-full {
+  width: 100% !important;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .table-search-input::placeholder {
@@ -415,7 +423,7 @@
   font-size: 0.85rem;
   cursor: pointer;
   min-width: 150px;
-  width: auto !important;
+  width: auto;
   font-family: inherit;
   appearance: none;
   -webkit-appearance: none;
@@ -423,6 +431,55 @@
   background-repeat: no-repeat;
   background-position: right 10px center;
   background-size: 14px;
+}
+
+/* Gateway channels row — always one line */
+.gateway-channels-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.gateway-channel-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  padding: 10px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  border-right: 1px solid var(--border-color);
+  transition: background 0.15s;
+  margin: 0 !important;
+}
+
+.gateway-channel-item:last-child {
+  border-right: none;
+}
+
+.gateway-channel-item:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+.gateway-channel-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.gateway-channel-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
 }
 
 .table-filter-select:focus {
@@ -435,32 +492,37 @@
   color: var(--text-primary);
 }
 
-/* Modals Overlay */
+/* Modals Overlay — fixed to full viewport, above sidebar + topbar */
 .notifications-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  inset: 0;                         /* top/right/bottom/left: 0 */
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 9999;                    /* above sidebar (z ~200) and topbar (z ~300) */
+  padding: 16px;
 }
 
 .notifications-modal-container {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: var(--spacing-6);
-  width: 90%;
+  width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), var(--shadow-xl);
   position: relative;
+  animation: notifModalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes notifModalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);     }
 }
 
 /* Page Toasts */
@@ -945,8 +1007,8 @@ input:checked + .switch-slider:before {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .animate-fade-in {

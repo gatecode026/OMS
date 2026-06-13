@@ -77,8 +77,9 @@ export const login = async (email, password) => {
     throw err;
   }
 
-  if (user.status !== 'Active') {
-    logger.warn(`AuthService::login block attempt for inactive account ${resolvedEmail} (status: ${user.status})`);
+  const accountStatus = isEmployee ? user.accountStatus : user.status;
+  if (accountStatus !== 'Active') {
+    logger.warn(`AuthService::login block attempt for inactive account ${resolvedEmail} (accountStatus: ${accountStatus})`);
     const err = new Error('Your account has been deactivated. Please contact your system administrator.');
     err.statusCode = 403;
     err.status = 'fail';

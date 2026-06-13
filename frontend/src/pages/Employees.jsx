@@ -59,6 +59,19 @@ const getBranchAddress = (branchName) => {
   return 'Malviya Nagar, Jaipur, Rajasthan 302017';
 };
 
+const fmtHoursTo60 = (decimalHours) => {
+  if (!decimalHours || isNaN(decimalHours)) return '0h 00m';
+  const hrs = Math.floor(decimalHours);
+  const mins = Math.round((decimalHours - hrs) * 60);
+  let displayHrs = hrs;
+  let displayMins = mins;
+  if (displayMins === 60) {
+    displayHrs += 1;
+    displayMins = 0;
+  }
+  return `${displayHrs}h ${String(displayMins).padStart(2, '0')}m`;
+};
+
 const isNewJoiner = (dateStr) => {
   if (!dateStr) return false;
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -1874,7 +1887,8 @@ const Employees = () => {
                         <span className="punch-time-mono">
                           {(() => {
                             const att = getTodayAttendance(row.id);
-                            return (att && att.punchIn && att.punchIn !== '--:--') ? att.punchIn : '-';
+                            const time = (att && att.punchIn && att.punchIn !== '--:--') ? att.punchIn : row.todayPunchIn;
+                            return time || '-';
                           })()}
                         </span>
                       </td>
@@ -1884,8 +1898,8 @@ const Employees = () => {
                         <span className="punch-time-mono">
                           {(() => {
                             const att = getTodayAttendance(row.id);
-                            const hasPunchedIn = att && att.punchIn && att.punchIn !== '--:--';
-                            return (hasPunchedIn && att.punchOut && att.punchOut !== '--:--') ? att.punchOut : '-';
+                            const time = (att && att.punchOut && att.punchOut !== '--:--') ? att.punchOut : row.todayPunchOut;
+                            return time || '-';
                           })()}
                         </span>
                       </td>
@@ -1895,16 +1909,17 @@ const Employees = () => {
                         <span className="bold-text font-mono text-secondary">
                           {(() => {
                             const att = getTodayAttendance(row.id);
-                            const hasPunchedIn = att && att.punchIn && att.punchIn !== '--:--';
+                            const hours = (att && att.totalHours !== undefined && att.totalHours !== null) ? att.totalHours : row.todayWorkingHours;
+                            const hasPunchedIn = (att && att.punchIn && att.punchIn !== '--:--') || row.todayPunchIn;
                             if (!hasPunchedIn) return '-';
-                            return (att.totalHours !== undefined && att.totalHours !== null) ? `${att.totalHours} hrs` : '0 hrs';
+                            return hours ? fmtHoursTo60(hours) : '0h 00m';
                           })()}
                         </span>
                       </td>
                     )}
                     {colVis.attendanceStatus && (
                       <td>
-                        <AttBadge status={getTodayStatus(row)} />
+                        <AttBadge status={row.attendanceStatus || getTodayStatus(row)} />
                       </td>
                     )}
                     {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '—'}</span></td>}
@@ -2017,9 +2032,10 @@ const Employees = () => {
               <span className="hover-card-value font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
                 {(() => {
                   const att = getTodayAttendance(hoveredEmp.id);
-                  const hasPunchedIn = att && att.punchIn && att.punchIn !== '--:--';
+                  const hours = (att && att.totalHours !== undefined && att.totalHours !== null) ? att.totalHours : hoveredEmp.todayWorkingHours;
+                  const hasPunchedIn = (att && att.punchIn && att.punchIn !== '--:--') || hoveredEmp.todayPunchIn;
                   if (!hasPunchedIn) return '-';
-                  return (att.totalHours !== undefined && att.totalHours !== null) ? `${att.totalHours} hrs so far` : '0 hrs';
+                  return hours ? `${fmtHoursTo60(hours)} so far` : '0h 00m';
                 })()}
               </span>
             </div>

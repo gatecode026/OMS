@@ -1,9 +1,81 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 
 export const AttendanceDayCard = ({ record }) => {
   const s = (record?.status || '').toLowerCase();
-  
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  const parseTimeToMinutes = (timeStr) => {
+    if (!timeStr || timeStr === '--:--') return null;
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+    if (!match) {
+      const parts = timeStr.trim().split(':');
+      if (parts.length >= 2) {
+        const hrs = parseInt(parts[0], 10);
+        const mins = parseInt(parts[1], 10);
+        if (!isNaN(hrs) && !isNaN(mins)) {
+          return hrs * 60 + mins;
+        }
+      }
+      return null;
+    }
+    let hrs = parseInt(match[1], 10);
+    const mins = parseInt(match[2], 10);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && hrs !== 12) hrs += 12;
+    if (ampm === 'AM' && hrs === 12) hrs = 0;
+    return hrs * 60 + mins;
+  };
+
+  const isTodayRecord = (dateVal) => {
+    if (!dateVal) return false;
+    let y, m, d;
+    if (typeof dateVal === 'string') {
+      const match = dateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        y = parseInt(match[1], 10);
+        m = parseInt(match[2], 10) - 1;
+        d = parseInt(match[3], 10);
+      }
+    }
+    if (y === undefined) {
+      const parsedDate = new Date(dateVal);
+      y = parsedDate.getFullYear();
+      m = parsedDate.getMonth();
+      d = parsedDate.getDate();
+    }
+    const today = new Date();
+    return y === today.getFullYear() && m === today.getMonth() && d === today.getDate();
+  };
+
+  const isToday = isTodayRecord(record?.date);
+  const hasPunchIn = record?.punchIn && record.punchIn !== '--:--';
+  const hasPunchOut = record?.punchOut && record.punchOut !== '--:--';
+  const isActive = isToday && hasPunchIn && !hasPunchOut;
+
+  useEffect(() => {
+    if (!isActive) return;
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [isActive]);
+
+  const getDisplayHours = () => {
+    if (isActive) {
+      const inMins = parseTimeToMinutes(record.punchIn);
+      if (inMins !== null) {
+        const outMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+        let diffMins = outMins - inMins;
+        if (diffMins < 0) {
+          diffMins += 24 * 60;
+        }
+        return diffMins / 60;
+      }
+    }
+    return record?.totalHours || record?.workingHours || 0;
+  };
+
   // Choose border-color and badge variants based on status
   let statusColorVar = 'var(--color-success)';
   let badgeClass = 'ep-badge-success';
@@ -46,7 +118,13 @@ export const AttendanceDayCard = ({ record }) => {
     const punchMins = hrs * 60 + mins;
     const shiftStartMins = 9 * 60 + 30; // 09:30 AM
     const diff = punchMins - shiftStartMins;
-    return diff > 0 ? ` (+${diff} min)` : '';
+    if (diff <= 0) return '';
+    if (diff >= 60) {
+      const h = Math.floor(diff / 60);
+      const m = diff % 60;
+      return m > 0 ? ` (+${h}h ${m}m)` : ` (+${h}h)`;
+    }
+    return ` (+${diff} min)`;
   };
 
   const lateOffsetStr = s === 'late' ? getLateMinutesText(record.punchIn) : '';
@@ -126,7 +204,7 @@ export const AttendanceDayCard = ({ record }) => {
               <span>Punch Out: <strong>{record?.punchOut || '--:--'}</strong></span>
             </div>
             <div className="flex-row gap-4 flex-wrap">
-              <span>Work Hours: <strong>{formatWorkHours(record?.totalHours || record?.workingHours)}</strong></span>
+              <span>Work Hours: <strong>{formatWorkHours(getDisplayHours())}</strong></span>
               <span>Shift: <strong>09:30 AM – 06:00 PM</strong></span>
             </div>
           </div>
