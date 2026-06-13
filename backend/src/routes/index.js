@@ -28,6 +28,7 @@ import appraisalReviewsRouter from '../modules/appraisal-reviews/appraisal-revie
 import announcementsRouter from '../modules/announcements/announcements.routes.js';
 import performanceRouter from '../modules/performance/performance.routes.js';
 import securityRouter from '../modules/security/security.routes.js';
+import eventsRouter from '../modules/events/event.routes.js';
 
 const router = express.Router();
 
@@ -54,5 +55,6 @@ router.use('/appraisal-reviews', appraisalReviewsRouter);
 router.use('/announcements', announcementsRouter);
 router.use('/performance', performanceRouter);
 router.use('/security', securityRouter);
+router.use('/events', eventsRouter);
 
 export default router;
