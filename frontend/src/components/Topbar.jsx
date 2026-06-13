@@ -679,6 +679,8 @@ const Topbar = ({ onMenuToggle }) => {
                                 e.currentTarget.style.transform = 'none';
                                 e.currentTarget.style.background = (evt.color || '#10b981') + '04';
                                 e.currentTarget.style.borderColor = (evt.color || '#10b981') + '14';
+
+                                
                               }}
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>
