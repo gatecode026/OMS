@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const roleSchema = new mongoose.Schema({
   id: {
@@ -43,6 +44,8 @@ const roleSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'rbac_roles'
 });
+
+roleSchema.plugin(tenantPlugin);
 
 const Role = mongoose.model('Role', roleSchema);
 

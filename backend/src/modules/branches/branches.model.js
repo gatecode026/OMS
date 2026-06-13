@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const branchSchema = new mongoose.Schema({
   id: {
@@ -141,6 +142,8 @@ const branchSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'branches'
 });
+
+branchSchema.plugin(tenantPlugin);
 
 const Branch = mongoose.model('Branch', branchSchema);
 

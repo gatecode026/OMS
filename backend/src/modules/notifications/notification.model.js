@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const notificationSchema = new mongoose.Schema({
   id: {
@@ -100,6 +101,8 @@ const notificationSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'notifications'
 });
+
+notificationSchema.plugin(tenantPlugin);
 
 const Notification = mongoose.model('Notification', notificationSchema);
 

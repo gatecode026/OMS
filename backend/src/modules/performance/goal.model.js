@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const goalSchema = new mongoose.Schema({
   id: {
@@ -60,6 +61,8 @@ const goalSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'performance_goals'
 });
+
+goalSchema.plugin(tenantPlugin);
 
 const Goal = mongoose.model('Goal', goalSchema);
 

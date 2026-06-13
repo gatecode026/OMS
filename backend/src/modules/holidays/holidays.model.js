@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const holidaySchema = new mongoose.Schema({
   id: {
@@ -34,6 +35,8 @@ const holidaySchema = new mongoose.Schema({
   timestamps: true,
   collection: 'holidays'
 });
+
+holidaySchema.plugin(tenantPlugin);
 
 const Holiday = mongoose.model('Holiday', holidaySchema);
 

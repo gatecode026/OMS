@@ -5,6 +5,7 @@
 
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const employeeSchema = new mongoose.Schema({
   id: {
@@ -259,6 +260,8 @@ employeeSchema.methods.comparePassword = async function(candidatePassword) {
   if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+employeeSchema.plugin(tenantPlugin);
 
 const Employee = mongoose.model('Employee', employeeSchema);
 

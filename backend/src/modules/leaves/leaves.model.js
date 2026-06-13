@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const leaveSchema = new mongoose.Schema({
   id: {
@@ -115,6 +116,8 @@ const leaveSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'leaves'
 });
+
+leaveSchema.plugin(tenantPlugin);
 
 const Leave = mongoose.model('Leave', leaveSchema);
 

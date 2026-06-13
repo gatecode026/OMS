@@ -96,7 +96,7 @@ export const login = async (email, password) => {
   }
 
   const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.roleId },
+    { id: user.id, email: user.email, role: user.roleId, companyId: user.companyId || 'COMP-DEFAULT' },
     env.jwtSecret,
     { expiresIn: env.jwtExpiresIn }
   );

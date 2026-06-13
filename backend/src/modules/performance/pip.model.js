@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const pipSchema = new mongoose.Schema({
   id: {
@@ -49,6 +50,8 @@ const pipSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'performance_pips'
 });
+
+pipSchema.plugin(tenantPlugin);
 
 const Pip = mongoose.model('Pip', pipSchema);
 

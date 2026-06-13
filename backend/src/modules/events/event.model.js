@@ -5,6 +5,7 @@
 
 import mongoose from 'mongoose';
 import Employee from '../employees/employees.model.js';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const EVENT_TYPES = ["meeting", "reminder", "audit", "review", "one-on-one"];
 
@@ -38,6 +39,8 @@ const eventSchema = new mongoose.Schema(
 // Indexes for high-performance calendar and attendee queries
 eventSchema.index({ date: 1, startTime: 1 });
 eventSchema.index({ attendees: 1, date: 1 });
+
+eventSchema.plugin(tenantPlugin);
 
 const Event = mongoose.model("Event", eventSchema);
 

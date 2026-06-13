@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const SystemSettingsSchema = new mongoose.Schema({
   key: {
@@ -188,6 +189,8 @@ const SystemSettingsSchema = new mongoose.Schema({
     }
   }
 }, { timestamps: true });
+
+SystemSettingsSchema.plugin(tenantPlugin);
 
 const SystemSettings = mongoose.model('SystemSettings', SystemSettingsSchema, 'system_settings');
 export default SystemSettings;

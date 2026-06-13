@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const userOverrideSchema = new mongoose.Schema({
   id: {
@@ -41,6 +42,8 @@ const userOverrideSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'user_overrides'
 });
+
+userOverrideSchema.plugin(tenantPlugin);
 
 const UserOverride = mongoose.model('UserOverride', userOverrideSchema);
 
