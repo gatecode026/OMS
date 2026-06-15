@@ -9,6 +9,7 @@ import Admin from '../modules/admin/admin.model.js';
 import Employee from '../modules/employees/employees.model.js';
 import logger from '../config/logger.js';
 import { isDatabaseConnected } from '../config/database.js';
+import { runWithTenant } from '../utils/tenantContext.js';
 
 /**
  * Validates JWT access token stored in Authorization header.
@@ -36,18 +37,19 @@ export const authenticate = async (req, res, next) => {
         id: decoded.id,
         email: decoded.email,
         role: decoded.role,
+        companyId: decoded.companyId || 'COMP-DEFAULT',
         name: decoded.name || 'Offline User'
       };
       logger.debug(`User authenticated offline successfully: ${req.user.name} (${req.user.role})`);
-      return next();
+      return runWithTenant(req.user.companyId, next);
     }
 
     // Retrieve associated active account from matching collection
     let user;
     if (decoded.role === 'super_admin') {
-      user = await Admin.findOne({ id: decoded.id }).select('id name email roleId status').lean();
+      user = await Admin.findOne({ id: decoded.id }).select('id name email roleId status companyId').lean();
     } else {
-      user = await Employee.findOne({ id: decoded.id }).select('id name email roleId status').lean();
+      user = await Employee.findOne({ id: decoded.id }).select('id name email roleId status companyId').lean();
     }
 
     if (!user) {
@@ -70,10 +72,12 @@ export const authenticate = async (req, res, next) => {
       name: user.name,
       email: user.email,
       role: user.roleId,
+      companyId: user.companyId || 'COMP-DEFAULT'
     };
 
+    const isSuperAdmin = user.roleId === 'super_admin';
     logger.debug(`User authenticated successfully: ${req.user.name} (${req.user.role})`);
-    next();
+    runWithTenant(req.user.companyId, next, isSuperAdmin);
   } catch (error) {
     logger.error('Authentication Middleware Error:', error);
     return res.status(401).json({

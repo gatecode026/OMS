@@ -11,7 +11,7 @@ export const ROUTE_PERMISSIONS = {
   '/security': ROLES.SUPER_ADMIN,
   '/audit-logs': ROLES.SUPER_ADMIN,
   '/reports': ROLES.SUPER_ADMIN,
-  '/settings': ROLES.SUPER_ADMIN,
+  '/settings': ROLES.COMPANY_ADMIN,
 
   // Branch Admin and above
   '/employees': ROLES.BRANCH_ADMIN,

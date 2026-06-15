@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const permissionModuleSchema = new mongoose.Schema({
   key: {
@@ -20,6 +21,8 @@ const permissionModuleSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'permission_modules'
 });
+
+permissionModuleSchema.plugin(tenantPlugin);
 
 const PermissionModule = mongoose.model('PermissionModule', permissionModuleSchema);
 

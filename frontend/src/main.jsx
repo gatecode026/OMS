@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import { AppProvider } from './context/AppContext';
+import { BrandingProvider } from './context/BrandingContext';
 import AppShell from './components/AppShell';
 import { AuthGuard, RoleGuard } from './components/common/Guards';
 import { ToastContainer } from './components/Toast';
@@ -46,10 +47,18 @@ const EmployeeDashboard = lazy(() => import('./pages/EmployeeDashboard'));
 const EmployeeProfile = lazy(() => import('./pages/EmployeeProfile'));
 const Overview = lazy(() => import('./pages/Overview'));
 
+// ─── Super Admin Console Pages ───────────────────────────────────────────────
+const SuperAdminLayout = lazy(() => import('./pages/superadmin/SuperAdminLayout'));
+const PlatformOverview = lazy(() => import('./pages/superadmin/PlatformOverview'));
+const CompaniesList = lazy(() => import('./pages/superadmin/CompaniesList'));
+const CompanyCreate = lazy(() => import('./pages/superadmin/CompanyCreate'));
+const CompanyDetail = lazy(() => import('./pages/superadmin/CompanyDetail'));
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <AppProvider>
-      <BrowserRouter>
+    <BrandingProvider>
+      <AppProvider>
+        <BrowserRouter>
         <Routes>
           {/* Public Login Route - rendered outside AppShell */}
           <Route path="/login" element={<Login />} />
@@ -113,9 +122,23 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
             </Route>
           </Route>
+
+          {/* ─── Super Admin Dedicated Routes ─────────────────────────────────── */}
+          <Route element={<AuthGuard />}>
+            <Route element={<RoleGuard allowedRoles={['super_admin', 'SuperAdmin']} />}>
+              <Route element={<SuperAdminLayout />}>
+                <Route path="/superadmin" element={<Navigate to="/superadmin/overview" replace />} />
+                <Route path="/superadmin/overview" element={<PlatformOverview />} />
+                <Route path="/superadmin/companies" element={<CompaniesList />} />
+                <Route path="/superadmin/companies/create" element={<CompanyCreate />} />
+                <Route path="/superadmin/companies/:id" element={<CompanyDetail />} />
+              </Route>
+            </Route>
+          </Route>
         </Routes>
         <ToastContainer />
       </BrowserRouter>
     </AppProvider>
+    </BrandingProvider>
   </React.StrictMode>
 );

@@ -43,9 +43,11 @@ const Login = () => {
         sessionStorage.setItem('just_logged_in', 'true');
         setLoading(false);
 
-        // Redirect employees to their dashboard, admins to admin dashboard
+        // Redirect employees to their dashboard, super admins to superadmin dashboard, admins to admin dashboard
         const role = user?.roleId || user?.role || '';
-        if (role === 'employee') {
+        if (role === 'super_admin' || role === 'SuperAdmin') {
+          navigate('/superadmin/overview');
+        } else if (role === 'employee') {
           navigate('/employee-dashboard');
         } else {
           navigate('/');

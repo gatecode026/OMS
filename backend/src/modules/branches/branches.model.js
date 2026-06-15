@@ -4,12 +4,12 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const branchSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   name: {
@@ -20,7 +20,6 @@ const branchSchema = new mongoose.Schema({
   code: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   manager: {
@@ -141,6 +140,10 @@ const branchSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'branches'
 });
+
+branchSchema.plugin(tenantPlugin);
+branchSchema.index({ id: 1, companyId: 1 }, { unique: true });
+branchSchema.index({ code: 1, companyId: 1 }, { unique: true });
 
 const Branch = mongoose.model('Branch', branchSchema);
 

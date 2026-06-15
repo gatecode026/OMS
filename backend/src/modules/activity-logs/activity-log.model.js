@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const activityLogSchema = new mongoose.Schema({
   id: {
@@ -44,6 +45,8 @@ const activityLogSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'activity_logs'
 });
+
+activityLogSchema.plugin(tenantPlugin);
 
 const ActivityLog = mongoose.model('ActivityLog', activityLogSchema);
 

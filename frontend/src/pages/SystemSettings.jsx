@@ -48,7 +48,8 @@ const sidebarGroups = [
   {
     title: 'Branding & Theme',
     items: [
-      { id: 'appearance', label: 'Branding & Theme', icon: Palette }
+      { id: 'appearance', label: 'Theme Customization', icon: Palette },
+      { id: 'branding', label: 'Branding Settings', icon: Globe }
     ]
   },
   {
@@ -254,6 +255,35 @@ const SystemSettings = () => {
 
   const [activeSection, setActiveSection] = useState('company');
   const [saved, setSaved] = useState(false);
+
+  // ── Branding Settings State (Phase 4 / CompanyAdmin Customization) ─────
+  const [brandingForm, setBrandingForm] = useState({
+    name: '',
+    subdomain: '',
+    logoUrl: '',
+    primaryColor: '#3b82f6',
+    secondaryColor: '#1d4ed8'
+  });
+  const [brandingLogoPreview, setBrandingLogoPreview] = useState(null);
+  const [isBrandingLoading, setIsBrandingLoading] = useState(false);
+
+  // Filter sidebar groups based on user role:
+  // - company_admin hides backup & admin, showing branding
+  // - super_admin hides branding, showing backup & admin
+  const filteredSidebarGroups = useMemo(() => {
+    return sidebarGroups.map(group => {
+      const items = group.items.filter(item => {
+        if (currentUserRole === 'company_admin') {
+          if (item.id === 'backup' || item.id === 'admin') return false;
+          return true;
+        } else {
+          if (item.id === 'branding') return false;
+          return true;
+        }
+      });
+      return { ...group, items };
+    }).filter(group => group.items.length > 0);
+  }, [currentUserRole]);
 
   const handleCountryChange = (c) => {
     const newStates = statesByCountry[c] || [];
@@ -487,8 +517,6 @@ const SystemSettings = () => {
         if (result.status === 'success' && result.data) {
           const d = result.data;
           if (d.companyProfile) setCompanyProfile(d.companyProfile);
-          if (d.branches && Array.isArray(d.branches)) setBranches(d.branches);
-          if (d.departments && Array.isArray(d.departments)) setDepartments(d.departments);
           if (d.empSettings) setEmpSettings(d.empSettings);
           if (d.attendanceRules) setAttendanceRules(d.attendanceRules);
           if (d.leaveRules) setLeaveRules(d.leaveRules);
@@ -508,7 +536,109 @@ const SystemSettings = () => {
     loadFromDB();
   }, [token]);
 
+  // Load branding info when activeSection becomes 'branding'
+  useEffect(() => {
+    if (activeSection !== 'branding' || !currentUser?.companyId || !token) return;
+
+    const fetchCompanyBranding = async () => {
+      try {
+        setIsBrandingLoading(true);
+        const res = await fetch(`http://localhost:5000/api/v1/companies/${currentUser.companyId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await res.json();
+        if (result.status === 'success' && result.data) {
+          const company = result.data;
+          setBrandingForm({
+            name: company.name || '',
+            subdomain: company.subdomain || '',
+            logoUrl: company.settings?.logoUrl || '',
+            primaryColor: company.settings?.primaryColor || '#3b82f6',
+            secondaryColor: company.settings?.secondaryColor || '#1d4ed8'
+          });
+          setBrandingLogoPreview(company.settings?.logoUrl || null);
+        }
+      } catch (err) {
+        console.error('Failed to fetch company branding:', err);
+        addToast('danger', 'Failed to load company branding details.');
+      } finally {
+        setIsBrandingLoading(false);
+      }
+    };
+
+    fetchCompanyBranding();
+  }, [activeSection, currentUser, token]);
+
+  const handleSaveBranding = async () => {
+    if (!token || !currentUser?.companyId) return;
+    try {
+      setIsBrandingLoading(true);
+      const payload = {
+        name: brandingForm.name,
+        settings: {
+          logoUrl: brandingForm.logoUrl,
+          primaryColor: brandingForm.primaryColor,
+          secondaryColor: brandingForm.secondaryColor
+        }
+      };
+
+      const res = await fetch(`http://localhost:5000/api/v1/companies/${currentUser.companyId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await res.json();
+      if (!res.ok || result.status !== 'success') {
+        throw new Error(result.message || 'Failed to update branding settings.');
+      }
+
+      // Automatically apply theme updates immediately to document custom properties and page title/favicon!
+      if (brandingForm.primaryColor) {
+        document.documentElement.style.setProperty('--color-primary', brandingForm.primaryColor);
+        if (brandingForm.primaryColor.startsWith('#') && brandingForm.primaryColor.length === 7) {
+          const r = parseInt(brandingForm.primaryColor.slice(1, 3), 16);
+          const g = parseInt(brandingForm.primaryColor.slice(3, 5), 16);
+          const b = parseInt(brandingForm.primaryColor.slice(5, 7), 16);
+          document.documentElement.style.setProperty('--color-primary-light', `rgba(${r}, ${g}, ${b}, 0.15)`);
+          document.documentElement.style.setProperty('--shadow-focus', `0 0 0 3px rgba(${r}, ${g}, ${b}, 0.3)`);
+        }
+      }
+      if (brandingForm.secondaryColor) {
+        document.documentElement.style.setProperty('--color-secondary', brandingForm.secondaryColor);
+      }
+      if (brandingForm.name) {
+        document.title = brandingForm.name;
+      }
+      if (brandingForm.logoUrl) {
+        let link = document.querySelector("link[rel~='icon']");
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = 'icon';
+          document.head.appendChild(link);
+        }
+        link.href = brandingForm.logoUrl;
+      }
+
+      setSaved(true);
+      addToast('success', '✅ Branding settings updated successfully!');
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error(err);
+      addToast('danger', err.message || 'Failed to update branding settings.');
+    } finally {
+      setIsBrandingLoading(false);
+    }
+  };
+
   const handleSave = async () => {
+    if (activeSection === 'branding') {
+      await handleSaveBranding();
+      return;
+    }
     const mergedGeneral = { ...generalSettings, ...localGeneral, companyName: companyProfile.companyName };
 
     // 1. Save global React contexts
@@ -591,19 +721,6 @@ const SystemSettings = () => {
         country: 'India',
         postalCode: '122008'
       });
-      setBranches([
-        { code: 'BR-DEL', name: 'Delhi Head Office', manager: '', status: 'Active' },
-        { code: 'BR-MUM', name: 'Mumbai Branch', manager: '', status: 'Active' },
-        { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: '', status: 'Active' },
-        { code: 'BR-JPR', name: 'Jaipur Operations', manager: '', status: 'Active' }
-      ]);
-      setDepartments([
-        { id: '1', name: 'Engineering', head: '', capacity: 150 },
-        { id: '2', name: 'Human Resources', head: '', capacity: 30 },
-        { id: '3', name: 'Sales & Marketing', head: '', capacity: 80 },
-        { id: '4', name: 'Operations', head: '', capacity: 120 },
-        { id: '5', name: 'Finance', head: '', capacity: 25 }
-      ]);
       
       const defaultGeneral = {
         companyName: 'Office Management Pvt. Ltd.',
@@ -729,7 +846,7 @@ const SystemSettings = () => {
   };
 
   // Access check
-  if (currentUserRole !== 'super_admin') {
+  if (currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
     return (
       <div className="settings-page">
         <div className="settings-header">
@@ -740,14 +857,14 @@ const SystemSettings = () => {
           <div className="denied-icon-wrap">
             <Lock size={64} className="text-danger" />
           </div>
-          <h3>Super Admin Access Required</h3>
+          <h3>Admin Access Required</h3>
           <p>
             You are logged in as a <strong>{currentUserRole?.toUpperCase()?.replace('_', ' ') || 'Guest'}</strong>. 
-            Only users with the role of <strong>Super Admin</strong> are authorized to view and modify system-wide configuration metrics.
+            Only users with the role of <strong>Super Admin</strong> or <strong>Company Admin</strong> are authorized to view and modify system-wide configuration metrics.
           </p>
           <div className="denied-actions">
-            <Button variant="primary" onClick={() => setCurrentUserRole('super_admin')}>
-              <Sparkles size={16} /> Switch to Super Admin
+            <Button variant="primary" onClick={() => setCurrentUserRole('company_admin')}>
+              <Sparkles size={16} /> Switch to Company Admin
             </Button>
             <Button variant="ghost" onClick={() => window.history.back()}>
               Return Back
@@ -2279,6 +2396,178 @@ const SystemSettings = () => {
           </div>
         );
 
+      case 'branding':
+        return (
+          <div className="settings-section-content">
+            <h3 className="settings-section-title">Branding Settings</h3>
+            <p className="settings-section-desc">Customize your organization's logo, primary/secondary colors, and company name settings.</p>
+
+            {isBrandingLoading ? (
+              <div className="flex justify-center items-center py-8" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
+                <RefreshCw className="animate-spin text-primary" size={32} />
+                <span className="ml-2" style={{ marginLeft: '12px', fontSize: '1rem', color: 'var(--text-muted)' }}>Loading branding parameters...</span>
+              </div>
+            ) : (
+              <>
+                <div className="settings-group">
+                  <h4 className="settings-group-title">Organization Info</h4>
+                  <div className="settings-fields-grid">
+                    <SettingsInput
+                      label="Company Name"
+                      value={brandingForm.name}
+                      onChange={v => setBrandingForm(p => ({ ...p, name: v }))}
+                      placeholder="Acme Corporation"
+                    />
+                    <div className="settings-field">
+                      <label className="settings-field-label">Target Subdomain (Read-only)</label>
+                      <div className="input-group-subdomain" style={{ display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          className="settings-input"
+                          value={brandingForm.subdomain}
+                          disabled={true}
+                          style={{ cursor: 'not-allowed', background: 'rgba(255, 255, 255, 0.05)', flex: 1 }}
+                        />
+                        <span style={{ marginLeft: '8px', color: 'var(--text-muted)' }}>.saas.com</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-group">
+                  <h4 className="settings-group-title">Theme Colors</h4>
+                  <div className="settings-fields-grid">
+                    <div className="settings-field">
+                      <label className="settings-field-label">Primary Theme Color</label>
+                      <div className="color-picker-row" style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="color"
+                          value={brandingForm.primaryColor}
+                          onChange={e => setBrandingForm(p => ({ ...p, primaryColor: e.target.value }))}
+                          style={{
+                            width: '40px',
+                            height: '40px',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            background: 'transparent'
+                          }}
+                        />
+                        <input
+                          type="text"
+                          className="settings-input"
+                          value={brandingForm.primaryColor}
+                          onChange={e => setBrandingForm(p => ({ ...p, primaryColor: e.target.value }))}
+                          placeholder="#3b82f6"
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                      <span className="setting-item-desc" style={{ marginTop: '4px', display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Controls main action highlights, active states, and primary buttons.
+                      </span>
+                    </div>
+
+                    <div className="settings-field">
+                      <label className="settings-field-label">Secondary Theme Color</label>
+                      <div className="color-picker-row" style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="color"
+                          value={brandingForm.secondaryColor}
+                          onChange={e => setBrandingForm(p => ({ ...p, secondaryColor: e.target.value }))}
+                          style={{
+                            width: '40px',
+                            height: '40px',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            background: 'transparent'
+                          }}
+                        />
+                        <input
+                          type="text"
+                          className="settings-input"
+                          value={brandingForm.secondaryColor}
+                          onChange={e => setBrandingForm(p => ({ ...p, secondaryColor: e.target.value }))}
+                          placeholder="#1d4ed8"
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                      <span className="setting-item-desc" style={{ marginTop: '4px', display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Controls background secondary gradients, hover highlights, and alternate highlights.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-group">
+                  <h4 className="settings-group-title">Organization Logo</h4>
+                  <div className="settings-field">
+                    <label className="settings-field-label">Branding Logo Banner</label>
+                    <div 
+                      className="logo-upload-zone" 
+                      style={{
+                        border: '2px dashed rgba(255, 255, 255, 0.15)',
+                        borderRadius: '8px',
+                        padding: '20px',
+                        textAlign: 'center',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        transition: 'border-color 0.2s',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {brandingLogoPreview ? (
+                        <div className="logo-preview-box" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                          <img 
+                            src={brandingLogoPreview} 
+                            alt="Company Logo Preview" 
+                            style={{ maxHeight: '80px', maxWidth: '200px', objectFit: 'contain', borderRadius: '4px' }} 
+                          />
+                          <button
+                            type="button"
+                            className="btn-remove-logo settings-sub-btn"
+                            onClick={() => {
+                              setBrandingLogoPreview(null);
+                              setBrandingForm(prev => ({ ...prev, logoUrl: '' }));
+                            }}
+                            style={{ padding: '6px 12px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '4px', cursor: 'pointer' }}
+                          >
+                            Remove Logo
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="upload-placeholder" style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <Upload size={32} className="text-muted mb-2" />
+                          <span className="upload-title" style={{ fontWeight: '500', color: 'var(--text-primary)' }}>Choose logo file</span>
+                          <span className="upload-desc" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>PNG, JPG up to 2MB</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (!file) return;
+                              if (file.size > 2 * 1024 * 1024) {
+                                addToast('danger', 'Logo image size cannot exceed 2MB.');
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setBrandingLogoPreview(reader.result);
+                                setBrandingForm(prev => ({ ...prev, logoUrl: reader.result }));
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                            style={{ display: 'none' }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+
       default:
         return null;
     }
@@ -2365,7 +2654,7 @@ const SystemSettings = () => {
       <div className="settings-layout">
         {/* Settings Sidebar Nav */}
         <div className="card settings-nav">
-          {sidebarGroups.map(group => (
+          {filteredSidebarGroups.map(group => (
             <div key={group.title} className="settings-nav-group">
               <span className="settings-nav-group-title">{group.title}</span>
               <div className="settings-nav-group-items">

@@ -20,6 +20,11 @@ import { loggerMiddleware } from './middlewares/logger.middleware.js';
 // Global Router Import
 import globalRouter from './routes/index.js';
 import eventRoutes from './routes/eventRoutes.js';
+import adminRouter from './modules/admin/admin.routes.js';
+import { authenticate } from './middlewares/auth.middleware.js';
+import { tenantMiddleware } from './middlewares/tenant.middleware.js';
+import { checkRoleAccess } from './middlewares/roleGuard.middleware.js';
+import publicRouter from './modules/companies/public.routes.js';
 
 const app = express();
 
@@ -53,9 +58,24 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ─── PUBLIC BRANDING ROUTES ──────────────────────────────────────────────────
+app.use('/api/public', publicRouter);
+
 // ─── GLOBAL MODULAR ROUTING BINDING ─────────────────────────────────────────
+app.use('/api/v1', (req, res, next) => {
+  if (req.path.startsWith('/auth')) {
+    return next();
+  }
+  return authenticate(req, res, () => {
+    checkRoleAccess(req, res, () => {
+      tenantMiddleware(req, res, next);
+    });
+  });
+});
+
 app.use('/api/v1', globalRouter);
-app.use('/api/events', eventRoutes);
+app.use('/api/admin', authenticate, checkRoleAccess, adminRouter);
+app.use('/api/events', authenticate, checkRoleAccess, tenantMiddleware, eventRoutes);
 
 // ─── FALLBACK FOR UNKNOWN ROUTES ─────────────────────────────────────────────
 app.all('*', (req, res, next) => {

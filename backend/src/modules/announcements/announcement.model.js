@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const commentSchema = new mongoose.Schema({
   id: { type: String, required: true },
@@ -218,6 +219,11 @@ const announcementAuditLogSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'announcement_audit_logs'
 });
+
+announcementSchema.plugin(tenantPlugin);
+emergencyAlertSchema.plugin(tenantPlugin);
+announcementTrackingLogSchema.plugin(tenantPlugin);
+announcementAuditLogSchema.plugin(tenantPlugin);
 
 export const Announcement = mongoose.model('Announcement', announcementSchema);
 export const EmergencyAlert = mongoose.model('EmergencyAlert', emergencyAlertSchema);

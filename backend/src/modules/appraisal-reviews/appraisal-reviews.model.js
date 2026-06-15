@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const appraisalReviewSchema = new mongoose.Schema({
   id: {
@@ -56,6 +57,8 @@ const appraisalReviewSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'appraisal_reviews'
 });
+
+appraisalReviewSchema.plugin(tenantPlugin);
 
 const AppraisalReview = mongoose.model('AppraisalReview', appraisalReviewSchema);
 
