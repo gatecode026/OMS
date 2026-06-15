@@ -10,7 +10,6 @@ const roleSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   name: {
@@ -45,6 +44,7 @@ const roleSchema = new mongoose.Schema({
   collection: 'rbac_roles'
 });
 
+roleSchema.index({ companyId: 1, id: 1 }, { unique: true });
 roleSchema.plugin(tenantPlugin);
 
 const Role = mongoose.model('Role', roleSchema);

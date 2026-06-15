@@ -10,7 +10,6 @@ const userOverrideSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   userId: {
@@ -43,6 +42,7 @@ const userOverrideSchema = new mongoose.Schema({
   collection: 'user_overrides'
 });
 
+userOverrideSchema.index({ companyId: 1, id: 1 }, { unique: true });
 userOverrideSchema.plugin(tenantPlugin);
 
 const UserOverride = mongoose.model('UserOverride', userOverrideSchema);
