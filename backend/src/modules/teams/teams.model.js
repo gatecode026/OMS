@@ -106,13 +106,16 @@ const teamSchema = new mongoose.Schema({
 });
 
 teamSchema.plugin(tenantPlugin);
+teamSchema.index({ companyId: 1, id: 1 }, { unique: true, sparse: true });
 teamSchema.index({ companyId: 1, teamCode: 1 }, { unique: true, sparse: true });
 
 teamSchema.pre('save', async function(next) {
-  if (this.isNew && !this.teamCode) {
+  if (this.isNew) {
     try {
       const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-      this.teamCode = await generateCompanyUniqueId(this.companyId, 'teams');
+      const generatedCode = await generateCompanyUniqueId(this.companyId, 'teams');
+      if (!this.id || this.id.trim() === '') this.id = generatedCode;
+      if (!this.teamCode || this.teamCode.trim() === '') this.teamCode = generatedCode;
     } catch (err) {
       return next(err);
     }
