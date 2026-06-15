@@ -18,6 +18,12 @@ const taskSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  taskCode: {
+    type: String,
+    sparse: true,
+    trim: true,
+    index: true
+  },
   description: {
     type: String,
     default: ''
@@ -50,6 +56,22 @@ const taskSchema = new mongoose.Schema({
 });
 
 taskSchema.plugin(tenantPlugin);
+taskSchema.index({ companyId: 1, id: 1 }, { unique: true, sparse: true });
+taskSchema.index({ companyId: 1, taskCode: 1 }, { unique: true, sparse: true });
+
+taskSchema.pre('save', async function(next) {
+  if (this.isNew) {
+    try {
+      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+      const generatedCode = await generateCompanyUniqueId(this.companyId, 'tasks');
+      if (!this.id || this.id.trim() === '') this.id = generatedCode;
+      if (!this.taskCode || this.taskCode.trim() === '') this.taskCode = generatedCode;
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 const Task = mongoose.model('Task', taskSchema);
 

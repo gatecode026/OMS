@@ -18,7 +18,7 @@ import ActivityFeed from '../../components/projects/ActivityFeed';
 
 
 const Projects = () => {
-  const { addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole, hasPermission } = useApp();
+  const { addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole, hasPermission, currentUser } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // State Management
@@ -26,9 +26,23 @@ const Projects = () => {
 
   React.useEffect(() => {
     if (projectsList) {
-      setProjects(projectsList);
+      if (currentUserRole === 'employee' && currentUser) {
+        const filtered = projectsList.filter(p => {
+          const isManager = p.manager?.toLowerCase() === currentUser.name?.toLowerCase();
+          const isLeader = p.leader?.toLowerCase() === currentUser.name?.toLowerCase();
+          const isMember = p.members?.some(m => m?.toLowerCase() === currentUser.name?.toLowerCase());
+          const hasTask = p.tasks?.some(t => 
+            (t.assigneeId && t.assigneeId === currentUser.id) || 
+            (t.assigneeName && t.assigneeName.toLowerCase() === currentUser.name?.toLowerCase())
+          );
+          return isManager || isLeader || isMember || hasTask;
+        });
+        setProjects(filtered);
+      } else {
+        setProjects(projectsList);
+      }
     }
-  }, [projectsList]);
+  }, [projectsList, currentUserRole, currentUser]);
   const [filters, setFilters] = useState({
     search: '',
     status: 'All',

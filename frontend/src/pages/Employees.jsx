@@ -1103,24 +1103,24 @@ const Employees = () => {
     };
 
     if (formMode === 'add') {
-      const year = finalData.joinDate ? new Date(finalData.joinDate).getFullYear() : new Date().getFullYear();
-      let finalId = finalData.id;
-      if (!finalId) {
-        let suffix = employees.length;
-        do {
-          finalId = `EMP-${year}-${100 + suffix}`;
-          suffix++;
-        } while (employees.some(e => e.id === finalId));
-      }
       const finalEmail = finalData.officialEmail || `${formData.name.toLowerCase().split(' ').join('.')}@saas.io`;
+      // id is omitted — backend generates the company-scoped ID
+      const submittedData = { ...finalData, workEmail: finalEmail };
+      delete submittedData.id; // ensure no stale frontend id is sent
+
+      // Optimistically set placeholder; update with real id after API responds
       setCreatedEmpInfo({
-        ...finalData,
-        id: finalId,
+        ...submittedData,
+        id: 'Generating...',
         workEmail: finalEmail,
         password: formData.password || 'temp@123'
       });
-      addEmployee({ ...finalData, id: finalId, workEmail: finalEmail });
-      addToast('success', `Employee ${formData.name} created successfully!`);
+
+      // addEmployee returns the savedEmp from the API (with backend-assigned id)
+      const savedEmp = await addEmployee(submittedData);
+      if (savedEmp) {
+        setCreatedEmpInfo(prev => ({ ...prev, id: savedEmp.id }));
+      }
     } else {
       updateEmployee(selectedEmployeeId, finalData);
       addToast('success', `Employee ${formData.name} updated successfully!`);
@@ -2365,27 +2365,24 @@ const Employees = () => {
                   <div className="form-section-grid">
                     <div className="form-field">
                       <label>{FIELD_LABELS.id}</label>
-                      <div className="id-input-group">
+                      {formMode === 'add' ? (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '8px',
+                          background: 'var(--bg-secondary, #1e293b)',
+                          border: '1px dashed var(--border-color, #334155)',
+                          borderRadius: '8px', padding: '10px 14px',
+                          color: 'var(--text-muted, #94a3b8)', fontSize: '13px'
+                        }}>
+                          <span style={{ fontSize: '16px' }}>🔒</span>
+                          <span>Auto-assigned by system after save</span>
+                        </div>
+                      ) : (
                         <input
                           type="text"
-                          placeholder="e.g. EMP-2026-100"
                           value={formData.id}
-                          onChange={e => setFormData(p => ({ ...p, id: e.target.value }))}
-                          disabled={formMode === 'edit'}
+                          disabled
+                          style={{ opacity: 0.6, cursor: 'not-allowed' }}
                         />
-                        {formMode === 'add' && (
-                          <button
-                            type="button"
-                            className="id-generate-btn"
-                            onClick={handleGenerateEmployeeId}
-                            title="Generate ID"
-                          >
-                            🔑
-                          </button>
-                        )}
-                      </div>
-                      {dupEmpId && (
-                        <span className="field-error-msg">⚠️ Duplicate Employee ID: Already assigned to another employee.</span>
                       )}
                     </div>
                     {formData.roleId !== 'manager' && (

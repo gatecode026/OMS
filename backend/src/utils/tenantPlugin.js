@@ -36,16 +36,16 @@ mongoose.model = function (name, schema, collection) {
   return new Proxy(defaultModel, {
     construct(target, args) {
       const activeConn = getActiveConnection();
-      const tenantModel = activeConn.models[name] || activeConn.model(name, schema);
+      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema);
       return Reflect.construct(tenantModel, args);
     },
     
     get(target, prop) {
       const activeConn = getActiveConnection();
-      const tenantModel = activeConn.models[name] || activeConn.model(name, schema);
+      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema);
 
       if (prop === 'schema') {
-        return schema;
+        return target.schema;
       }
 
       if (prop === 'db') {
@@ -61,7 +61,7 @@ mongoose.model = function (name, schema, collection) {
 
     getPrototypeOf(target) {
       const activeConn = getActiveConnection();
-      const tenantModel = activeConn.models[name] || activeConn.model(name, schema);
+      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema);
       return Reflect.getPrototypeOf(tenantModel);
     }
   });
@@ -77,6 +77,7 @@ export const tenantPlugin = (schema) => {
     schema.add({
       companyId: {
         type: String,
+        ref: 'Company',
         required: true,
         index: true
       }

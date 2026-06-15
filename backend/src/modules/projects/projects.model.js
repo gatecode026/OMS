@@ -18,6 +18,12 @@ const projectSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  projectCode: {
+    type: String,
+    sparse: true,
+    trim: true,
+    index: true
+  },
   description: {
     type: String,
     default: ''
@@ -108,7 +114,8 @@ const projectSchema = new mongoose.Schema({
     name: String,
     type: { type: String },
     size: String,
-    uploadedBy: String
+    uploadedBy: String,
+    downloadUrl: String
   }],
   tasks: [{
     id: String,
@@ -186,6 +193,22 @@ const projectSchema = new mongoose.Schema({
 });
 
 projectSchema.plugin(tenantPlugin);
+projectSchema.index({ companyId: 1, id: 1 }, { unique: true, sparse: true });
+projectSchema.index({ companyId: 1, projectCode: 1 }, { unique: true, sparse: true });
+
+projectSchema.pre('save', async function(next) {
+  if (this.isNew) {
+    try {
+      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+      const generatedCode = await generateCompanyUniqueId(this.companyId, 'projects');
+      if (!this.id || this.id.trim() === '') this.id = generatedCode;
+      if (!this.projectCode || this.projectCode.trim() === '') this.projectCode = generatedCode;
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 const Project = mongoose.model('Project', projectSchema);
 

@@ -84,7 +84,8 @@ const leaveSchema = new mongoose.Schema({
   leaveCode: {
     type: String,
     required: function() { return this.isPolicy; },
-    trim: true
+    trim: true,
+    index: true
   },
   leaveName: {
     type: String,
@@ -118,6 +119,19 @@ const leaveSchema = new mongoose.Schema({
 });
 
 leaveSchema.plugin(tenantPlugin);
+leaveSchema.index({ companyId: 1, leaveCode: 1 }, { unique: true, sparse: true });
+
+leaveSchema.pre('save', async function(next) {
+  if (this.isNew && !this.isPolicy && !this.leaveCode) {
+    try {
+      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+      this.leaveCode = await generateCompanyUniqueId(this.companyId, 'leaves');
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 const Leave = mongoose.model('Leave', leaveSchema);
 

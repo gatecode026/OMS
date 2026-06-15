@@ -9,6 +9,7 @@ const GlobalSearch = ({
   projects = [],
   reports = [],
   notifications = [],
+  documents = [],
   currentUser = {}
 }) => {
   const navigate = useNavigate();
@@ -96,14 +97,17 @@ const GlobalSearch = ({
     });
 
     // 5. Search Documents
-    if (currentUser.documents) {
-      currentUser.documents.forEach(d => {
-        if (d.fileName.toLowerCase().includes(q) || d.category.toLowerCase().includes(q)) {
+    if (documents) {
+      documents.forEach(d => {
+        const docName = d.name || d.fileName || '';
+        const docCat = d.category || '';
+        const docType = d.type || d.fileType || '';
+        if (docName.toLowerCase().includes(q) || docCat.toLowerCase().includes(q)) {
           matches.push({
-            id: d.id,
+            id: d.id || d._id,
             category: 'Documents',
-            title: d.fileName,
-            sub: `Category: ${d.category} | Type: ${d.fileType}`,
+            title: docName,
+            sub: `Category: ${docCat} | Type: ${docType}`,
             icon: FolderClosed,
             path: '/documents'
           });
@@ -112,7 +116,7 @@ const GlobalSearch = ({
     }
 
     setResults(matches);
-  }, [query, tasks, projects, reports, notifications, currentUser]);
+  }, [query, tasks, projects, reports, notifications, documents, currentUser]);
 
   if (!isOpen) return null;
 

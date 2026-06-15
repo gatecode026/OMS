@@ -175,7 +175,7 @@ export const getCompanyUsage = asyncHandler(async (req, res) => {
 
   // Resolve connection to query details from tenant's database
   const connection = await getTenantConnection(id);
-  const isCustomDb = !!company.settings?.dbUri;
+  const isCustomDb = company.databaseType === 'dedicated' || !!company.settings?.dbUri;
 
   const EmployeeModel = connection.models['Employee'] || connection.model('Employee', Employee.schema);
   const ProjectModel = connection.models['Project'] || connection.model('Project', Project.schema);
@@ -259,7 +259,7 @@ export const getOverview = asyncHandler(async (req, res) => {
 
   // 2. Fetch stats in parallel using Promise.all()
   const statsPromises = companies.map(async (company) => {
-    const isCustomDb = !!company.settings?.dbUri;
+    const isCustomDb = company.databaseType === 'dedicated' || !!company.settings?.dbUri;
     
     console.log(`\n[DEBUG getOverview] Loop iteration started for Company ID: "${company.id}" | Name: "${company.name}"`);
     console.log(`[DEBUG getOverview] settings.dbUri: "${company.settings?.dbUri || '(empty)'}"`);

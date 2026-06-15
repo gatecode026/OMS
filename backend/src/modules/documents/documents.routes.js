@@ -24,6 +24,6 @@ router.route('/')
 router.route('/:id')
   .get(controller.getById)
   .put(validateRequest(validation.update), controller.update)
-  .delete(restrictTo('super_admin'), controller.remove);
+  .delete(controller.remove);
 
 export default router;

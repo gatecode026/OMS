@@ -6,7 +6,8 @@ import Badge from '../common/Badge';
 const TodayTasksWidget = ({
   tasks = [],
   onUpdateStatus,
-  onOpenUpdateModal
+  onOpenUpdateModal,
+  timePeriod = 'today'
 }) => {
   const navigate = useNavigate();
 
@@ -42,7 +43,7 @@ const TodayTasksWidget = ({
   return (
     <div className="dashboard-widget">
       <div className="widget-header">
-        <h3>Today's Tasks</h3>
+        <h3>{timePeriod === 'today' ? "Today's Tasks" : timePeriod === 'week' ? "This Week's Tasks" : "This Month's Tasks"}</h3>
         <button
           onClick={() => navigate('/tasks')}
           className="text-xs text-primary-500 hover:text-primary-400 font-semibold"

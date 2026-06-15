@@ -47,6 +47,12 @@ const teamSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  teamCode: {
+    type: String,
+    sparse: true,
+    trim: true,
+    index: true
+  },
   leader: {
     type: String,
     required: true,
@@ -100,6 +106,22 @@ const teamSchema = new mongoose.Schema({
 });
 
 teamSchema.plugin(tenantPlugin);
+teamSchema.index({ companyId: 1, id: 1 }, { unique: true, sparse: true });
+teamSchema.index({ companyId: 1, teamCode: 1 }, { unique: true, sparse: true });
+
+teamSchema.pre('save', async function(next) {
+  if (this.isNew) {
+    try {
+      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+      const generatedCode = await generateCompanyUniqueId(this.companyId, 'teams');
+      if (!this.id || this.id.trim() === '') this.id = generatedCode;
+      if (!this.teamCode || this.teamCode.trim() === '') this.teamCode = generatedCode;
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 const Team = mongoose.model('Team', teamSchema);
 

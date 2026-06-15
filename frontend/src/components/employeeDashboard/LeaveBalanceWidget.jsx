@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, History } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 const LeaveBalanceWidget = ({
   myLeaves = [],
@@ -8,32 +9,49 @@ const LeaveBalanceWidget = ({
   onOpenLeaveModal
 }) => {
   const navigate = useNavigate();
+  const { leavePolicyConfigs = [] } = useApp();
 
-  // Calculate used days per leave type from approved requests
-  const getUsedDays = (typeKeys) => {
-    return myLeaves
-      .filter(l => l.status === 'Approved' && typeKeys.includes(l.type))
-      .reduce((sum, l) => sum + (Number(l.days) || 0), 0);
-  };
+  // Filter policies based on gender restriction and active status
+  const activePolicies = React.useMemo(() => {
+    return (leavePolicyConfigs || []).filter(policy => {
+      if (!policy.isActive) return false;
+      if (policy.genderRestriction && policy.genderRestriction !== 'All') {
+        const userGender = currentUser.gender || 'Male';
+        if (policy.genderRestriction.toLowerCase() !== userGender.toLowerCase()) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [leavePolicyConfigs, currentUser]);
 
-  const clUsed = getUsedDays(['Casual Leave', 'CL']);
-  const slUsed = getUsedDays(['Sick Leave', 'SL']);
-  const elUsed = getUsedDays(['Earned Leave', 'PL', 'Paid Leave', 'Annual Leave']);
+  // Calculate dynamic leave balances for table
+  const leaveData = React.useMemo(() => {
+    return activePolicies.map(policy => {
+      const code = policy.leaveCode;
+      
+      // Use the employee-specific override if defined, otherwise fall back to the policy's configured defaultDays
+      const fieldName = code === 'ML' ? 'maternityBalance' : `${code.toLowerCase()}Balance`;
+      let available = typeof currentUser?.[fieldName] === 'number' ? currentUser[fieldName] : (policy.defaultDays || 0);
 
-  // Fetch balances from database or default to DB/policy schemas
-  const clAvailable = currentUser.clBalance !== undefined ? currentUser.clBalance : 8;
-  const slAvailable = currentUser.slBalance !== undefined ? currentUser.slBalance : 12;
-  const elAvailable = currentUser.plBalance !== undefined ? currentUser.plBalance : 15;
+      // Calculate used days for this leave type from approved requests
+      const used = myLeaves
+        .filter(l => 
+          l.status === 'Approved' && 
+          (l.type === policy.leaveName || l.type === code || (code === 'PL' && l.type === 'Earned Leave'))
+        )
+        .reduce((sum, l) => sum + (Number(l.days) || 0), 0);
 
-  const clRemaining = Math.max(0, clAvailable - clUsed);
-  const slRemaining = Math.max(0, slAvailable - slUsed);
-  const elRemaining = Math.max(0, elAvailable - elUsed);
+      const remaining = Math.max(0, available - used);
 
-  const leaveData = [
-    { type: 'Casual Leave', available: clAvailable, used: clUsed, remaining: clRemaining },
-    { type: 'Sick Leave', available: slAvailable, used: slUsed, remaining: slRemaining },
-    { type: 'Earned Leave', available: elAvailable, used: elUsed, remaining: elRemaining }
-  ];
+      return {
+        type: policy.leaveName,
+        available,
+        used,
+        remaining
+      };
+    });
+  }, [activePolicies, currentUser, myLeaves]);
 
   // Request statuses count based on user's actual leaves
   const pendingRequests = myLeaves.filter(l => l.status === 'Pending').length;
