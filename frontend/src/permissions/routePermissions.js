@@ -71,7 +71,7 @@ export const getRequiredRoleForPath = (path) => {
         match = false;
         break;
       }
-    }
+    }    
     
     if (match) {
       return ROUTE_PERMISSIONS[route];
