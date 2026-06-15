@@ -19,7 +19,6 @@ const announcementSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   title: {
@@ -116,7 +115,6 @@ const emergencyAlertSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     default: 'EMERGENCY_ALERT'
   },
   isActive: {
@@ -144,7 +142,6 @@ const announcementTrackingLogSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   announcementId: {
@@ -192,7 +189,6 @@ const announcementAuditLogSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   user: {
@@ -219,6 +215,11 @@ const announcementAuditLogSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'announcement_audit_logs'
 });
+
+announcementSchema.index({ companyId: 1, id: 1 }, { unique: true });
+emergencyAlertSchema.index({ companyId: 1, id: 1 }, { unique: true });
+announcementTrackingLogSchema.index({ companyId: 1, id: 1 }, { unique: true });
+announcementAuditLogSchema.index({ companyId: 1, id: 1 }, { unique: true });
 
 announcementSchema.plugin(tenantPlugin);
 emergencyAlertSchema.plugin(tenantPlugin);

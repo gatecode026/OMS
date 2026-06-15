@@ -8,7 +8,7 @@ import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 // 1. Salary Grades Schema
 const payrollGradeSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true, index: true },
+  id: { type: String, required: true, index: true },
   grade: { type: String, required: true },
   payBand: { type: String, required: true },
   basic: { type: Number, required: true },
@@ -25,7 +25,7 @@ const payrollGradeSchema = new mongoose.Schema({
 
 // 2. Reimbursements Schema
 const payrollReimbursementSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true, index: true },
+  id: { type: String, required: true, index: true },
   employeeId: { type: String, required: true, index: true },
   employeeName: { type: String, required: true },
   category: { type: String, required: true },
@@ -37,7 +37,7 @@ const payrollReimbursementSchema = new mongoose.Schema({
 
 // 3. Loans & Advances Schema
 const payrollLoanAdvanceSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true, index: true },
+  id: { type: String, required: true, index: true },
   employeeId: { type: String, required: true, index: true },
   employeeName: { type: String, required: true },
   type: { type: String, enum: ['Loan', 'Advance'], required: true },
@@ -60,7 +60,7 @@ payrollLoanAdvanceSchema.pre('validate', function (next) {
 
 // 4. Bonuses & Incentives Schema
 const payrollBonusSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true, index: true },
+  id: { type: String, required: true, index: true },
   employeeId: { type: String, required: true, index: true },
   employeeName: { type: String, required: true },
   type: { type: String, required: true },
@@ -72,7 +72,7 @@ const payrollBonusSchema = new mongoose.Schema({
 
 // 5. Monthly Processed Payroll Payments Schema
 const payrollPaymentSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true, index: true }, // employeeId-month-year
+  id: { type: String, required: true, index: true }, // employeeId-month-year
   payrollCode: {
     type: String,
     sparse: true,
@@ -108,7 +108,7 @@ const payrollPaymentSchema = new mongoose.Schema({
 
 // 6. Global Configuration Schema (Stores penality settings, custom salary structures, tax regimes, and attendance configurations)
 const payrollConfigSchema = new mongoose.Schema({
-  id: { type: String, required: true, default: 'GLOBAL_CONFIG', unique: true, index: true },
+  id: { type: String, required: true, default: 'GLOBAL_CONFIG', index: true },
   leaveDeductionRate: { type: Number, default: 2000 },
   lateArrivalPenalty: { type: Number, default: 300 },
   overtimeHourlyRate: { type: Number, default: 500 },
@@ -117,6 +117,13 @@ const payrollConfigSchema = new mongoose.Schema({
   salaryStructures: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
   attendanceDaysMap: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} }
 }, { timestamps: true, collection: 'payroll_configs' });
+
+payrollGradeSchema.index({ companyId: 1, id: 1 }, { unique: true });
+payrollReimbursementSchema.index({ companyId: 1, id: 1 }, { unique: true });
+payrollLoanAdvanceSchema.index({ companyId: 1, id: 1 }, { unique: true });
+payrollBonusSchema.index({ companyId: 1, id: 1 }, { unique: true });
+payrollPaymentSchema.index({ companyId: 1, id: 1 }, { unique: true });
+payrollConfigSchema.index({ companyId: 1, id: 1 }, { unique: true });
 
 payrollGradeSchema.plugin(tenantPlugin);
 payrollReimbursementSchema.plugin(tenantPlugin);

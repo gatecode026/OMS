@@ -934,18 +934,6 @@ const SystemSettings = () => {
               <h4 className="settings-group-title">Company Information</h4>
               <div className="settings-fields-grid">
                 <SettingsInput
-                  label="Company Name"
-                  value={companyProfile.companyName}
-                  onChange={v => setCompanyProfile(p => ({ ...p, companyName: v }))}
-                  placeholder="Office Management Pvt. Ltd."
-                />
-                <SettingsInput
-                  label="Company Website URL"
-                  value={companyProfile.websiteUrl}
-                  onChange={v => setCompanyProfile(p => ({ ...p, websiteUrl: v }))}
-                  placeholder="https://office-management.com"
-                />
-                <SettingsInput
                   label="Official Contact Email"
                   value={companyProfile.officialEmail}
                   onChange={v => setCompanyProfile(p => ({ ...p, officialEmail: v }))}
@@ -959,7 +947,6 @@ const SystemSettings = () => {
                 />
               </div>
             </div>
-
             <div className="settings-group">
               <h4 className="settings-group-title">Taxation & Corporate Numbers</h4>
               <div className="settings-fields-grid">
