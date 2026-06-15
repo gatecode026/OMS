@@ -10,7 +10,6 @@ const permissionModuleSchema = new mongoose.Schema({
   key: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   label: {
@@ -22,6 +21,7 @@ const permissionModuleSchema = new mongoose.Schema({
   collection: 'permission_modules'
 });
 
+permissionModuleSchema.index({ companyId: 1, key: 1 }, { unique: true });
 permissionModuleSchema.plugin(tenantPlugin);
 
 const PermissionModule = mongoose.model('PermissionModule', permissionModuleSchema);
