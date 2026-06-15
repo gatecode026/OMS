@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const memberSchema = new mongoose.Schema({
   name: {
@@ -97,6 +98,8 @@ const teamSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'teams'
 });
+
+teamSchema.plugin(tenantPlugin);
 
 const Team = mongoose.model('Team', teamSchema);
 

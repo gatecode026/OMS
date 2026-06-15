@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const departmentSchema = new mongoose.Schema({
   id: {
@@ -112,6 +113,8 @@ const departmentSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'departments'
 });
+
+departmentSchema.plugin(tenantPlugin);
 
 const Department = mongoose.model('Department', departmentSchema);
 

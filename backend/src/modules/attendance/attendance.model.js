@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const attendanceSchema = new mongoose.Schema({
   id: {
@@ -77,6 +78,8 @@ const attendanceSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'attendance'
 });
+
+attendanceSchema.plugin(tenantPlugin);
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 

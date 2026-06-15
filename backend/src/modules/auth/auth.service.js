@@ -6,6 +6,7 @@
 import jwt from 'jsonwebtoken';
 import Admin from '../admin/admin.model.js';
 import Employee from '../employees/employees.model.js';
+import Company from '../companies/company.model.js';
 import env from '../../config/env.js';
 import logger from '../../config/logger.js';
 import { isDatabaseConnected } from '../../config/database.js';
@@ -16,9 +17,14 @@ import { isDatabaseConnected } from '../../config/database.js';
  * 
  * @param {string} email - User input email.
  * @param {string} password - User input plain password.
+ * @param {Object} [options] - Additional parameters for resolving tenant.
+ * @param {string} [options.companyCode] - Optional company code or subdomain passed in request.
+ * @param {string} [options.subdomain] - Optional subdomain resolved from request host.
  * @returns {Promise<{user: Object, token: string}>} The user payload and valid session token.
  */
-export const login = async (email, password) => {
+export const login = async (email, password, options = {}) => {
+  const { companyCode, subdomain } = options;
+
   if (!email || !password) {
     const err = new Error('Email and password are required');
     err.statusCode = 400;
@@ -29,7 +35,7 @@ export const login = async (email, password) => {
   // Normalize input email
   const resolvedEmail = email.toLowerCase().trim();
 
-  console.log(`[DEBUG login] Email received: "${email}" | Password length: ${password ? password.length : 0} | Resolved Email: "${resolvedEmail}"`);
+  console.log(`[DEBUG login] Email received: "${email}" | Password length: ${password ? password.length : 0} | Resolved Email: "${resolvedEmail}" | Company Code: "${companyCode}" | Subdomain: "${subdomain}"`);
 
   if (!isDatabaseConnected) {
     logger.error('AuthService::login [Error] Database is not connected');
@@ -43,6 +49,21 @@ export const login = async (email, password) => {
 
   const prefix = resolvedEmail.split('@')[0];
 
+  // Resolve company if companyCode or subdomain is provided
+  let resolvedCompany = null;
+  if (companyCode) {
+    resolvedCompany = await Company.findOne({
+      $or: [
+        { id: companyCode.toUpperCase().trim() },
+        { subdomain: companyCode.toLowerCase().trim() }
+      ]
+    });
+  } else if (subdomain && !['www', 'localhost', 'app', 'admin'].includes(subdomain.toLowerCase().trim())) {
+    resolvedCompany = await Company.findOne({
+      subdomain: subdomain.toLowerCase().trim()
+    });
+  }
+
   // Fetch account from the dedicated Super Admin collection or Employee collection
   let user = await Admin.findOne({
     $or: [
@@ -54,18 +75,35 @@ export const login = async (email, password) => {
 
   let isEmployee = false;
   if (!user) {
-    user = await Employee.findOne({ email: resolvedEmail }).select('+password');
-    if (!user) {
-      user = await Employee.findOne({
-        $or: [
-          { username: prefix },
-          { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
-          { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
-        ]
-      }).select('+password');
-    }
-    if (user) {
-      isEmployee = true;
+    if (resolvedCompany) {
+      user = await Employee.findOne({ email: resolvedEmail, companyId: resolvedCompany.id }).select('+password');
+      if (!user) {
+        user = await Employee.findOne({
+          $or: [
+            { username: prefix },
+            { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
+            { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
+          ],
+          companyId: resolvedCompany.id
+        }).select('+password');
+      }
+      if (user) {
+        isEmployee = true;
+      }
+    } else {
+      user = await Employee.findOne({ email: resolvedEmail }).select('+password');
+      if (!user) {
+        user = await Employee.findOne({
+          $or: [
+            { username: prefix },
+            { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
+            { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
+          ]
+        }).select('+password');
+      }
+      if (user) {
+        isEmployee = true;
+      }
     }
   }
 
@@ -75,6 +113,18 @@ export const login = async (email, password) => {
     err.statusCode = 401;
     err.status = 'fail';
     throw err;
+  }
+
+  // Verify company status first if user is an employee
+  if (isEmployee && user.companyId) {
+    const userCompany = await Company.findOne({ id: user.companyId });
+    if (userCompany && userCompany.status === 'Suspended') {
+      logger.warn(`AuthService::login block attempt for user ${resolvedEmail} under suspended company ${user.companyId}`);
+      const err = new Error("Your organization's access has been suspended");
+      err.statusCode = 403;
+      err.status = 'fail';
+      throw err;
+    }
   }
 
   const accountStatus = isEmployee ? user.accountStatus : user.status;
@@ -95,8 +145,19 @@ export const login = async (email, password) => {
     throw err;
   }
 
+  // Update lastLoginAt for Employee
+  if (isEmployee) {
+    await Employee.updateOne({ id: user.id }, { $set: { lastLoginAt: new Date() } });
+  }
+
   const token = jwt.sign(
-    { id: user.id, email: user.email, role: user.roleId },
+    { 
+      id: user.id, 
+      email: user.email, 
+      role: user.roleId, 
+      roleId: user.roleId,
+      companyId: user.companyId || null 
+    },
     env.jwtSecret,
     { expiresIn: env.jwtExpiresIn }
   );

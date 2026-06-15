@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const workReportSchema = new mongoose.Schema({
   id: {
@@ -136,6 +137,8 @@ const workReportSchema = new mongoose.Schema({
   timestamps: true,
   collection: 'work_reports'
 });
+
+workReportSchema.plugin(tenantPlugin);
 
 const WorkReport = mongoose.model('WorkReport', workReportSchema);
 

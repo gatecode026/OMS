@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 // 1. Salary Grades Schema
 const payrollGradeSchema = new mongoose.Schema({
@@ -110,6 +111,13 @@ const payrollConfigSchema = new mongoose.Schema({
   salaryStructures: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
   attendanceDaysMap: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} }
 }, { timestamps: true, collection: 'payroll_configs' });
+
+payrollGradeSchema.plugin(tenantPlugin);
+payrollReimbursementSchema.plugin(tenantPlugin);
+payrollLoanAdvanceSchema.plugin(tenantPlugin);
+payrollBonusSchema.plugin(tenantPlugin);
+payrollPaymentSchema.plugin(tenantPlugin);
+payrollConfigSchema.plugin(tenantPlugin);
 
 export const PayrollGrade = mongoose.model('PayrollGrade', payrollGradeSchema);
 export const PayrollReimbursement = mongoose.model('PayrollReimbursement', payrollReimbursementSchema);
