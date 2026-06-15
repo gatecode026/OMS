@@ -6,6 +6,9 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import env from '../config/env.js';
+import dns from 'dns';
+
+dns.setServers(['1.1.1.1']);
 
 // Import Models & Services
 import Company from '../modules/companies/company.model.js';

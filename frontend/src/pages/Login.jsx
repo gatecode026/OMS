@@ -15,6 +15,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [signInError, setSignInError] = useState('');
 
   // Authentication mode: 'signin' | 'forgot'
   const [authMode, setAuthMode] = useState('signin');
@@ -36,6 +37,7 @@ const Login = () => {
   // ─── Sign In ───────────────────────────────────────────────────────
   const handleSubmit = (e) => {
     e.preventDefault();
+    setSignInError('');
     setLoading(true);
     setTimeout(async () => {
       try {
@@ -54,6 +56,7 @@ const Login = () => {
         }
       } catch (err) {
         setLoading(false);
+        setSignInError(err.message || 'Authentication failed. Please check your credentials.');
       }
     }, 800);
   };
@@ -172,23 +175,30 @@ const Login = () => {
           <div className="brand-logo-icon">
             <Sparkles size={22} className="text-primary" />
           </div>
-          <h2>{generalSettings?.companyName || 'Office Management Pvt. Ltd.'}</h2>
+          <h2>GateCode OMS</h2>
           <p>Workforce Management Administration Panel</p>
         </div>
 
         {/* ── SIGN IN FORM ── */}
         {authMode === 'signin' && (
           <form onSubmit={handleSubmit} className="login-form">
+            {signInError && (
+              <div className="login-error-alert animate-shake">
+                <AlertCircle size={16} className="text-danger flex-shrink-0" />
+                <span>{signInError}</span>
+              </div>
+            )}
+
             <div className="form-group">
               <label htmlFor="email">Email Address</label>
-              <div className="login-input-wrapper">
+              <div className="login-input-wrapper" style={{ borderColor: signInError ? '#ef4444' : '' }}>
                 <Mail size={16} className="input-icon" />
                 <input
                   id="email"
                   type="email"
                   required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setSignInError(''); }}
                   placeholder="admin@saas.com"
                   className="form-control login-control"
                 />
@@ -197,14 +207,14 @@ const Login = () => {
 
             <div className="form-group">
               <label htmlFor="password">Password</label>
-              <div className="login-input-wrapper">
+              <div className="login-input-wrapper" style={{ borderColor: signInError ? '#ef4444' : '' }}>
                 <Key size={16} className="input-icon" />
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setSignInError(''); }}
                   placeholder="Enter password"
                   className="form-control login-control"
                 />
@@ -216,13 +226,6 @@ const Login = () => {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-            </div>
-
-            <div className="login-options">
-              <label className="remember-me">
-                <input type="checkbox" defaultChecked />
-                <span>Keep session active</span>
-              </label>
             </div>
 
             <Button variant="primary" type="submit" loading={loading} className="login-submit-btn">

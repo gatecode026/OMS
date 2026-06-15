@@ -243,10 +243,17 @@ const employeeSchema = new mongoose.Schema({
   collection: 'employees'
 });
 
-// Pre-save: generate company-scoped id and employeeCode if not provided
-employeeSchema.pre('save', async function(next) {
+// Pre-validate: generate company-scoped id and employeeCode BEFORE Mongoose validates required fields
+employeeSchema.pre('validate', async function (next) {
   if (!this.isNew) return next();
   try {
+
+    const { getTenantId } = await import('../../utils/tenantContext.js');
+    const tenantId = getTenantId();
+    if (tenantId && !this.companyId) {
+      this.companyId = tenantId;
+    }
+
     const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
     // Always generate a company-scoped ID — never trust the frontend-supplied value
     const generatedCode = await generateCompanyUniqueId(this.companyId, 'employees');
@@ -263,10 +270,10 @@ employeeSchema.pre('save', async function(next) {
 });
 
 // Pre-save password hashing
-employeeSchema.pre('save', async function(next) {
+employeeSchema.pre('save', async function (next) {
   if (!this.password) return next();
   if (!this.isModified('password')) return next();
-  
+
   // Safeguard against double-hashing if already a bcrypt string
   if (/^\$2[ab]\$/.test(this.password)) return next();
 
@@ -279,7 +286,7 @@ employeeSchema.pre('save', async function(next) {
   }
 });
 
-employeeSchema.methods.comparePassword = async function(candidatePassword) {
+employeeSchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
@@ -288,6 +295,7 @@ employeeSchema.plugin(tenantPlugin);
 // Compound unique indexes: scoped per company (allows same id/email across different companies)
 employeeSchema.index({ companyId: 1, id: 1 }, { unique: true });
 employeeSchema.index({ companyId: 1, email: 1 }, { unique: true });
+
 employeeSchema.index({ companyId: 1, employeeCode: 1 }, { unique: true, sparse: true });
 
 const Employee = mongoose.model('Employee', employeeSchema);
