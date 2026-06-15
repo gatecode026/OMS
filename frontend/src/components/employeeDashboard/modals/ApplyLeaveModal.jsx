@@ -26,7 +26,8 @@ const ApplyLeaveModal = ({
   currentUser = {}
 }) => {
   const { applyLeave, addToast, holidaysList = [], leaveRequests = [] } = useApp();
-  const [type, setType] = useState('Casual Leave');
+
+  const [type, setType] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -37,7 +38,7 @@ const ApplyLeaveModal = ({
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!startDate || !endDate || !reason.trim()) {
+    if (!type.trim() || !startDate || !endDate || !reason.trim()) {
       addToast('error', 'Please fill in all required fields.');
       return;
     }
@@ -88,16 +89,15 @@ const ApplyLeaveModal = ({
         {/* Leave Type */}
         <div className="flex-column gap-1">
           <label className="text-xs text-text-muted bold-text uppercase">Leave Type *</label>
-          <select
+          <input
+            type="text"
             value={type}
             onChange={(e) => setType(e.target.value)}
+            placeholder="e.g. Casual Leave, Sick Leave, Paid Leave..."
+            required
             className="padding-2 border-border"
             style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
-          >
-            <option value="Casual Leave">Casual Leave</option>
-            <option value="Sick Leave">Sick Leave</option>
-            <option value="Earned Leave">Earned Leave</option>
-          </select>
+          />
         </div>
 
         {/* Dates */}

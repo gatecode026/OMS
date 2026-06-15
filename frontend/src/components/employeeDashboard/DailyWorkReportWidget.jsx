@@ -23,6 +23,20 @@ const DailyWorkReportWidget = ({
   const todayStr = getLocalDateString();
   const todayReport = sortedReports.find(r => r.date === todayStr);
 
+  const formatSubmittedTime = (timeStr) => {
+    if (!timeStr) return 'Not submitted';
+    if (timeStr.includes('AM') || timeStr.includes('PM') || /^\d{1,2}:\d{2}(:\d{2})?$/.test(timeStr)) {
+      return timeStr;
+    }
+    try {
+      const d = new Date(timeStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+    } catch (e) {}
+    return timeStr;
+  };
+
   const getDwrBadge = (status) => {
     const s = (status || '').toLowerCase();
     if (s === 'approved') return <span className="status-badge status-present">Approved ✓</span>;
@@ -65,9 +79,7 @@ const DailyWorkReportWidget = ({
           <div className="flex-column">
             <span className="text-xs text-text-muted bold-text uppercase">Submission Time</span>
             <span className="bold-text text-sm mt-1">
-              {todayReport?.submittedTime
-                ? new Date(todayReport.submittedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : 'Not submitted'}
+              {formatSubmittedTime(todayReport?.submittedTime)}
             </span>
           </div>
         </div>

@@ -33,7 +33,7 @@ const diffWorkingDays = (from, to, holidays = []) => {
 
 const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = [], editingLeave = null }) => {
   const { leaveRequests = [], currentUser } = useApp();
-  const [form, setForm] = useState({ type: 'CL', from: '', to: '', reason: '' });
+  const [form, setForm] = useState({ type: '', from: '', to: '', reason: '' });
   const [days, setDays] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -73,22 +73,26 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
           reason: editingLeave.reason || '',
         });
       } else {
-        setForm({ type: 'CL', from: '', to: '', reason: '' });
+        setForm({ type: '', from: '', to: '', reason: '' });
       }
     } else {
-      setForm({ type: 'CL', from: '', to: '', reason: '' });
+      setForm({ type: '', from: '', to: '', reason: '' });
       setDays(0);
       setSuccess(false);
       setError('');
     }
   }, [open, editingLeave]);
 
-  const selectedBalance = balances.find(b => b.type === form.type);
+  const selectedBalance = balances.find(b => {
+    const t = (form.type || '').trim().toLowerCase();
+    return b.type.toLowerCase() === t || (b.label || '').toLowerCase() === t;
+  });
   const remaining = selectedBalance ? Math.max(0, (selectedBalance.total || 0) - (selectedBalance.used || 0)) : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!form.type || !form.type.trim()) { setError('Please specify Leave Type.'); return; }
     if (!form.from || !form.to) { setError('Please select From and To dates.'); return; }
     if (days <= 0) { setError('Date range has 0 working days. Please adjust.'); return; }
 
@@ -185,15 +189,14 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
             {/* Leave Type */}
             <div>
               <label style={labelStyle}>Leave Type</label>
-              <select
+              <input
+                type="text"
                 value={form.type}
                 onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
-                style={{ ...inputStyle, cursor: 'pointer' }}
-              >
-                {LEAVE_TYPES.map(t => (
-                  <option key={t.code} value={t.code}>{t.label}</option>
-                ))}
-              </select>
+                placeholder="e.g. Casual Leave, Sick Leave..."
+                style={inputStyle}
+                required
+              />
             </div>
 
             {/* From Date */}

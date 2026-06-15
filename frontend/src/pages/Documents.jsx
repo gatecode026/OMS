@@ -26,27 +26,26 @@ const getIconForType = (type) => {
 const Documents = () => {
   const isLoading = usePageLoading(500);
   const { addToast, showConfirm, documentsList, addDocument, deleteDocument, currentUser, currentUserRole } = useApp();
+  const isEmployee = currentUserRole === 'employee';
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadForm, setUploadForm] = useState({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
+  const [uploadForm, setUploadForm] = useState({ name: '', type: 'PDF', category: isEmployee ? 'Project' : 'HR Policies', size: '1.2 MB' });
   const fileInputRef = useRef(null);
-
-  const isEmployee = currentUserRole === 'employee';
 
   const visibleDocs = React.useMemo(() => {
     if (isEmployee) {
-      return documentsList.filter(d => d.category === 'Project' || d.category === 'Reports');
+      return documentsList.filter(d => d.category === 'Project' || d.category === 'Reports' || d.category === 'HR Policies');
     }
     return documentsList;
   }, [documentsList, isEmployee]);
 
   const categories = React.useMemo(() => {
-    const allCats = ['All', 'HR Policies', 'Payroll', 'Marketing', 'Engineering', 'Reports', 'Compliance'];
+    const allCats = ['All', 'Project', 'HR Policies', 'Payroll', 'Marketing', 'Engineering', 'Reports', 'Compliance'];
     if (isEmployee) {
-      return allCats.filter(c => c === 'All' || c === 'Project' || c === 'Reports');
+      return allCats.filter(c => c === 'All' || c === 'Project' || c === 'Reports' || c === 'HR Policies');
     }
     return allCats;
   }, [isEmployee]);

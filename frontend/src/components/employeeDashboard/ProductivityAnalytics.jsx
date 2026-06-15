@@ -24,21 +24,6 @@ const ProductivityAnalytics = ({
 }) => {
   const { addToast } = useApp();
 
-  // Stats
-  const completedThisWeek = myTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
-  
-  const totalHoursThisWeek = myAttendance
-    .slice(0, 7)
-    .reduce((sum, entry) => sum + (Number(entry.totalHours || entry.workingHours) || 0), 0);
-
-  const totalDaysInMonth = 24;
-  const presentDays = myAttendance.filter(h => h.status === 'Present' || h.status === 'Late' || h.status === 'Overtime' || h.status === 'Work From Home').length;
-  const attendancePercentage = presentDays > 0 ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) : 0;
-
-  // Project Contribution: % of user's completed tasks relative to all completed tasks in their project
-  const projectContribution = currentUser.performanceScore?.overall !== undefined ? currentUser.performanceScore.overall : 0;
-
-  // Chart Data
   const getDatesOfCurrentWeek = () => {
     const today = new Date();
     const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday...
@@ -63,6 +48,27 @@ const ProductivityAnalytics = ({
   };
 
   const weekdays = getDatesOfCurrentWeek();
+  const weeklyDates = weekdays.map(w => w.dateStr);
+
+  // Stats
+  const completedThisWeek = myTasks.filter(t => 
+    (t.status === 'Done' || t.status === 'done' || t.completed === true) && 
+    weeklyDates.includes(t.dueDate)
+  ).length;
+  
+  const weeklyAttendance = myAttendance.filter(entry => entry.date && weeklyDates.includes(entry.date));
+  const totalHoursThisWeek = weeklyAttendance.reduce((sum, entry) => sum + (Number(entry.totalHours || entry.workingHours) || 0), 0);
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+  const monthPrefix = `${currentYear}-${currentMonth}`;
+  const thisMonthAttendance = myAttendance.filter(h => (h.date || '').startsWith(monthPrefix));
+
+  const presentDays = thisMonthAttendance.filter(h => h.status === 'Present' || h.status === 'Late' || h.status === 'Overtime' || h.status === 'Work From Home').length;
+  const attendancePercentage = thisMonthAttendance.length > 0 ? Math.min(100, Math.round((presentDays / thisMonthAttendance.length) * 100)) : 0;
+
+  // Project Contribution: % of user's completed tasks relative to all completed tasks in their project
+  const projectContribution = currentUser.performanceScore?.overall !== undefined ? currentUser.performanceScore.overall : 0;
 
   // Weekly Productivity Trend (completed tasks due on each day of the current week)
   const weeklyTrendData = weekdays.map(day => {

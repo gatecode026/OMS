@@ -49,9 +49,14 @@ export const login = async (email, password, options = {}) => {
 
   const prefix = resolvedEmail.split('@')[0];
 
-  // Resolve company if companyCode or subdomain is provided
+  // Resolve company via tenant registry lookup first, falling back to subdomain / companyCode parameters
+  const { getTenantIdByEmail } = await import('../../utils/tenantRegistry.js');
+  const registryCompanyId = await getTenantIdByEmail(resolvedEmail);
+
   let resolvedCompany = null;
-  if (companyCode) {
+  if (registryCompanyId) {
+    resolvedCompany = await Company.findOne({ id: registryCompanyId });
+  } else if (companyCode) {
     resolvedCompany = await Company.findOne({
       $or: [
         { id: companyCode.toUpperCase().trim() },
@@ -64,7 +69,7 @@ export const login = async (email, password, options = {}) => {
     });
   }
 
-  // Fetch account from the dedicated Super Admin collection or Employee collection
+  // Fetch account from the dedicated Super Admin collection
   let user = await Admin.findOne({
     $or: [
       { email: resolvedEmail },
@@ -74,8 +79,33 @@ export const login = async (email, password, options = {}) => {
   }).select('+password');
 
   let isEmployee = false;
-  if (!user) {
-    if (resolvedCompany) {
+  let isCompanyAdmin = false;
+
+  if (!user && resolvedCompany) {
+    if (resolvedCompany.databaseType === 'dedicated') {
+      // Query dedicated database connection using runWithTenant
+      const { runWithTenant } = await import('../../utils/tenantContext.js');
+      await runWithTenant(resolvedCompany.id, async () => {
+        user = await Employee.findOne({ email: resolvedEmail }).select('+password');
+        if (!user) {
+          user = await Employee.findOne({
+            $or: [
+              { username: prefix },
+              { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
+              { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
+            ]
+          }).select('+password');
+        }
+      });
+      if (user) {
+        if (user.roleId === 'company_admin') {
+          isCompanyAdmin = true;
+        } else {
+          isEmployee = true;
+        }
+      }
+    } else {
+      // Shared database flow
       user = await Employee.findOne({ email: resolvedEmail, companyId: resolvedCompany.id }).select('+password');
       if (!user) {
         user = await Employee.findOne({
@@ -90,19 +120,20 @@ export const login = async (email, password, options = {}) => {
       if (user) {
         isEmployee = true;
       }
-    } else {
-      user = await Employee.findOne({ email: resolvedEmail }).select('+password');
-      if (!user) {
-        user = await Employee.findOne({
-          $or: [
-            { username: prefix },
-            { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
-            { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
-          ]
-        }).select('+password');
-      }
+    }
+  }
+
+  // Fallback to Company Admin login lookup (for backward compatibility on shared databases)
+  if (!user) {
+    if (resolvedCompany && resolvedCompany.email === resolvedEmail) {
+      user = await Company.findOne({ id: resolvedCompany.id }).select('+password');
       if (user) {
-        isEmployee = true;
+        isCompanyAdmin = true;
+      }
+    } else {
+      user = await Company.findOne({ email: resolvedEmail }).select('+password');
+      if (user) {
+        isCompanyAdmin = true;
       }
     }
   }
@@ -152,11 +183,11 @@ export const login = async (email, password, options = {}) => {
 
   const token = jwt.sign(
     { 
-      id: user.id, 
+      id: isCompanyAdmin ? (user.companyId || user.id) : user.id, 
       email: user.email, 
-      role: user.roleId, 
-      roleId: user.roleId,
-      companyId: user.companyId || null 
+      role: isCompanyAdmin ? 'company_admin' : user.roleId, 
+      roleId: isCompanyAdmin ? 'company_admin' : user.roleId,
+      companyId: isCompanyAdmin ? (user.companyId || user.id) : (user.companyId || null) 
     },
     env.jwtSecret,
     { expiresIn: env.jwtExpiresIn }
@@ -165,7 +196,13 @@ export const login = async (email, password, options = {}) => {
   const userResponse = user.toObject();
   delete userResponse.password;
 
-  logger.info(`AuthService::login success for: ${user.name} (${user.roleId})`);
+  if (isCompanyAdmin) {
+    userResponse.role = 'CompanyAdmin';
+    userResponse.roleId = 'company_admin';
+    userResponse.companyId = user.companyId || user.id;
+  }
+
+  logger.info(`AuthService::login success for: ${user.name} (${isCompanyAdmin ? 'company_admin' : user.roleId})`);
 
   return {
     user: userResponse,

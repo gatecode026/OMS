@@ -12,9 +12,13 @@ const PerformanceSummaryWidget = ({
   const { addToast } = useApp();
 
   // Dynamic calculations using actual DB-backed data
-  const totalDaysInMonth = 24;
-  const presentDays = myAttendance.filter(h => h.status === 'Present' || h.status === 'Late' || h.status === 'Overtime' || h.status === 'Work From Home').length;
-  const attendanceVal = presentDays > 0 ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) : 0;
+  const currentYear = new Date().getFullYear();
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+  const monthPrefix = `${currentYear}-${currentMonth}`;
+  const thisMonthAttendance = myAttendance.filter(h => (h.date || '').startsWith(monthPrefix));
+  
+  const presentDays = thisMonthAttendance.filter(h => h.status === 'Present' || h.status === 'Late' || h.status === 'Overtime' || h.status === 'Work From Home').length;
+  const attendanceVal = thisMonthAttendance.length > 0 ? Math.min(100, Math.round((presentDays / thisMonthAttendance.length) * 100)) : 0;
 
   const totalTasks = myTasks.length;
   const completedTasksCount = myTasks.filter(t => t.status === 'Done' || t.status === 'done' || t.completed === true).length;
