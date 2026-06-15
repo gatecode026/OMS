@@ -23,7 +23,22 @@ const originalModel = mongoose.model;
  * This transparently routes all database operations (e.g. Employee.find, new Employee)
  * to the Mongoose Connection Pool corresponding to the active tenant's context.
  */
+// Map to store custom collection names for tenant-scoped models
+const modelCollectionMap = new Map();
+
+// Keep original Connection.prototype.model reference
+const originalConnectionModel = mongoose.Connection.prototype.model;
+
+mongoose.Connection.prototype.model = function (name, schema, collection) {
+  const customCollection = collection || modelCollectionMap.get(name);
+  return originalConnectionModel.call(this, name, schema, customCollection);
+};
+
 mongoose.model = function (name, schema, collection) {
+  if (collection) {
+    modelCollectionMap.set(name, collection);
+  }
+
   // 1. If it's a global platform model (like Company, Admin), compile normally on main connection
   if (!tenantScopedModelNames.has(name)) {
     return originalModel.call(mongoose, name, schema, collection);
@@ -36,13 +51,15 @@ mongoose.model = function (name, schema, collection) {
   return new Proxy(defaultModel, {
     construct(target, args) {
       const activeConn = getActiveConnection();
-      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema);
+      const customCollection = modelCollectionMap.get(name);
+      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema, customCollection);
       return Reflect.construct(tenantModel, args);
     },
     
     get(target, prop) {
       const activeConn = getActiveConnection();
-      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema);
+      const customCollection = modelCollectionMap.get(name);
+      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema, customCollection);
 
       if (prop === 'schema') {
         return target.schema;
@@ -61,7 +78,8 @@ mongoose.model = function (name, schema, collection) {
 
     getPrototypeOf(target) {
       const activeConn = getActiveConnection();
-      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema);
+      const customCollection = modelCollectionMap.get(name);
+      const tenantModel = activeConn.models[name] || activeConn.model(name, target.schema, customCollection);
       return Reflect.getPrototypeOf(tenantModel);
     }
   });

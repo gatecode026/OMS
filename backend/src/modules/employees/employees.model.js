@@ -243,10 +243,16 @@ const employeeSchema = new mongoose.Schema({
   collection: 'employees'
 });
 
-// Pre-save: generate company-scoped id and employeeCode if not provided
-employeeSchema.pre('save', async function(next) {
+// Pre-validate: generate company-scoped id and employeeCode BEFORE Mongoose validates required fields
+employeeSchema.pre('validate', async function(next) {
   if (!this.isNew) return next();
   try {
+    const { getTenantId } = await import('../../utils/tenantContext.js');
+    const tenantId = getTenantId();
+    if (tenantId && !this.companyId) {
+      this.companyId = tenantId;
+    }
+
     const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
     // Always generate a company-scoped ID — never trust the frontend-supplied value
     const generatedCode = await generateCompanyUniqueId(this.companyId, 'employees');
