@@ -22,6 +22,9 @@ export const createRecord = async (data, currentUser) => {
   // Enforce country default
   data.country = 'India';
 
+  // Always strip the frontend-supplied id – the backend generates a company-scoped one
+  delete data.id;
+
   // Check username uniqueness
   if (data.username) {
     const existing = await repository.find({ username: { $regex: new RegExp(`^${data.username.trim()}$`, 'i') } });

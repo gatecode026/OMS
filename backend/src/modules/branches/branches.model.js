@@ -152,12 +152,14 @@ branchSchema.index({ id: 1, companyId: 1 }, { unique: true });
 branchSchema.index({ code: 1, companyId: 1 }, { unique: true });
 branchSchema.index({ companyId: 1, branchCode: 1 }, { unique: true, sparse: true });
 
-// Pre-save branchCode generation
+// Pre-save: generate company-scoped id and branchCode if missing
 branchSchema.pre('save', async function(next) {
-  if (this.isNew && !this.branchCode) {
+  if (this.isNew) {
     try {
       const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-      this.branchCode = await generateCompanyUniqueId(this.companyId, 'branches');
+      const generatedCode = await generateCompanyUniqueId(this.companyId, 'branches');
+      if (!this.id || this.id.trim() === '') this.id = generatedCode;
+      if (!this.branchCode || this.branchCode.trim() === '') this.branchCode = generatedCode;
     } catch (err) {
       return next(err);
     }

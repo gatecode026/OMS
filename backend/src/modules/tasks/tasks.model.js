@@ -56,13 +56,16 @@ const taskSchema = new mongoose.Schema({
 });
 
 taskSchema.plugin(tenantPlugin);
+taskSchema.index({ companyId: 1, id: 1 }, { unique: true, sparse: true });
 taskSchema.index({ companyId: 1, taskCode: 1 }, { unique: true, sparse: true });
 
 taskSchema.pre('save', async function(next) {
-  if (this.isNew && !this.taskCode) {
+  if (this.isNew) {
     try {
       const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-      this.taskCode = await generateCompanyUniqueId(this.companyId, 'tasks');
+      const generatedCode = await generateCompanyUniqueId(this.companyId, 'tasks');
+      if (!this.id || this.id.trim() === '') this.id = generatedCode;
+      if (!this.taskCode || this.taskCode.trim() === '') this.taskCode = generatedCode;
     } catch (err) {
       return next(err);
     }

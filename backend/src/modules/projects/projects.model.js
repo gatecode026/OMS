@@ -193,13 +193,16 @@ const projectSchema = new mongoose.Schema({
 });
 
 projectSchema.plugin(tenantPlugin);
+projectSchema.index({ companyId: 1, id: 1 }, { unique: true, sparse: true });
 projectSchema.index({ companyId: 1, projectCode: 1 }, { unique: true, sparse: true });
 
 projectSchema.pre('save', async function(next) {
-  if (this.isNew && !this.projectCode) {
+  if (this.isNew) {
     try {
       const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-      this.projectCode = await generateCompanyUniqueId(this.companyId, 'projects');
+      const generatedCode = await generateCompanyUniqueId(this.companyId, 'projects');
+      if (!this.id || this.id.trim() === '') this.id = generatedCode;
+      if (!this.projectCode || this.projectCode.trim() === '') this.projectCode = generatedCode;
     } catch (err) {
       return next(err);
     }

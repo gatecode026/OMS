@@ -7,7 +7,8 @@ export const roleMatrix = {
   super_admin: {
     allowedRoutes: [
       '/api/admin/*', '/api/auth/*',
-      '/api/v1/companies/*', '/api/v1/admin/*', '/api/v1/auth/*'
+      '/api/v1/companies/*', '/api/v1/admin/*', '/api/v1/auth/*',
+      '/api/v1/roles/*'
     ],
     blockedRoutes: [
       '/api/employees/*', '/api/tasks/*', '/api/attendance/*', 
