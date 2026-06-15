@@ -244,9 +244,10 @@ const employeeSchema = new mongoose.Schema({
 });
 
 // Pre-validate: generate company-scoped id and employeeCode BEFORE Mongoose validates required fields
-employeeSchema.pre('validate', async function(next) {
+employeeSchema.pre('validate', async function (next) {
   if (!this.isNew) return next();
   try {
+
     const { getTenantId } = await import('../../utils/tenantContext.js');
     const tenantId = getTenantId();
     if (tenantId && !this.companyId) {
@@ -269,10 +270,10 @@ employeeSchema.pre('validate', async function(next) {
 });
 
 // Pre-save password hashing
-employeeSchema.pre('save', async function(next) {
+employeeSchema.pre('save', async function (next) {
   if (!this.password) return next();
   if (!this.isModified('password')) return next();
-  
+
   // Safeguard against double-hashing if already a bcrypt string
   if (/^\$2[ab]\$/.test(this.password)) return next();
 
@@ -285,7 +286,7 @@ employeeSchema.pre('save', async function(next) {
   }
 });
 
-employeeSchema.methods.comparePassword = async function(candidatePassword) {
+employeeSchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.password) return false;
   return bcrypt.compare(candidatePassword, this.password);
 };
