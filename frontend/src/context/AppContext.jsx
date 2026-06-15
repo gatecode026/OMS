@@ -6,7 +6,7 @@ const AppContext = createContext(undefined);
 export const normalizeEmployee = (emp) => {
   if (!emp) return emp;
   const normalized = { ...emp };
-  
+
   // 1. Employee ID / id / employeeId
   const idVal = normalized.id || normalized.employeeId;
   normalized.id = idVal;
@@ -60,8 +60,8 @@ export const normalizeEmployee = (emp) => {
   normalized.totalHours = hrs;
 
   // 10. Attendance Status / attendanceStatus / todayPunchStatus
-  const att = (normalized.attendanceStatus && normalized.attendanceStatus !== 'Active' && normalized.attendanceStatus !== 'Disabled' && normalized.attendanceStatus !== 'Suspended') 
-    ? normalized.attendanceStatus 
+  const att = (normalized.attendanceStatus && normalized.attendanceStatus !== 'Active' && normalized.attendanceStatus !== 'Disabled' && normalized.attendanceStatus !== 'Suspended')
+    ? normalized.attendanceStatus
     : (normalized.todayPunchStatus || 'Present');
   normalized.attendanceStatus = att;
   normalized.todayPunchStatus = att;
@@ -136,11 +136,7 @@ export const normalizeEmployee = (emp) => {
   normalized.officialMobile = normalized.officialMobile || normalized.phone || '';
   normalized.teamName = normalized.teamName || normalized.team || '';
 
-  // 12. Individual Leave Balances
-  normalized.clBalance = typeof normalized.clBalance === 'number' ? normalized.clBalance : 0;
-  normalized.slBalance = typeof normalized.slBalance === 'number' ? normalized.slBalance : 0;
-  normalized.plBalance = typeof normalized.plBalance === 'number' ? normalized.plBalance : 0;
-  normalized.maternityBalance = typeof normalized.maternityBalance === 'number' ? normalized.maternityBalance : 0;
+  // 12. Individual Leave Balances (preserved as undefined if not set to allow policy default fallback)
 
   return normalized;
 };
@@ -227,8 +223,8 @@ export const AppProvider = ({ children }) => {
     title: '',
     message: '',
     confirmType: 'primary', // 'primary', 'danger', 'warning'
-    onConfirm: () => {},
-    onCancel: () => {}
+    onConfirm: () => { },
+    onCancel: () => { }
   });
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState(() => {
@@ -264,7 +260,7 @@ export const AppProvider = ({ children }) => {
 
   const toggleTheme = () => {
     setTheme(prev => {
-      const currentResolved = prev === 'auto' 
+      const currentResolved = prev === 'auto'
         ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
         : prev;
       const next = currentResolved === 'dark' ? 'light' : 'dark';
@@ -499,7 +495,7 @@ export const AppProvider = ({ children }) => {
         if (u && u.roleId === 'super_admin') {
           savedSuperAdmin = u;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const userMap = {
@@ -616,7 +612,7 @@ export const AppProvider = ({ children }) => {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       if (response.status === 401) {
         logout();
         return;
@@ -1741,7 +1737,7 @@ export const AppProvider = ({ children }) => {
         setAppraisalReviews(prev => [newReview, ...prev]);
         addActivityLog(`Submitted appraisal review for ${reviewData.employeeName}`, 'Performance', 'success');
         addToast('success', `Appraisal review for ${reviewData.employeeName} submitted successfully.`);
-        
+
         // Trigger Automatic Notification
         await triggerAutomaticNotification('HR-03', {
           title: 'Performance Appraisal Score Updated',
@@ -1907,7 +1903,7 @@ export const AppProvider = ({ children }) => {
       performanceScore: { overall: 0, attendance: 0, taskCompletion: 0, reportSubmission: 0, leaveDiscipline: 0, monthly: [0, 0, 0, 0, 0, 0] },
       documents: newEmp.documents || [],
       activityLog: [],
-      
+
       // New default properties
       employeeType: newEmp.employeeType || 'Full-Time',
       probationEndDate: newEmp.probationEndDate || '',
@@ -1950,7 +1946,7 @@ export const AppProvider = ({ children }) => {
         setEmployees(prev => [...prev, savedEmp]);
         addActivityLog(`Added new employee: ${savedEmp.name}`, 'Employees', 'success');
         addToast('success', `Employee ${savedEmp.name} created successfully!`);
-        
+
         // Trigger Automatic Notification
         await triggerAutomaticNotification('HR-01', {
           title: 'New Employee Profile Created',
@@ -2096,7 +2092,7 @@ export const AppProvider = ({ children }) => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ roleId, role: roleObj ? roleObj.name : undefined })
+          body: JSON.stringify({ roleId, role: roleObj ? roleObj.name : (roleId === 'employee' ? 'Employee' : undefined) })
         });
         const result = await response.json();
         return result.status === 'success' ? normalizeEmployee(result.data) : null;
@@ -2104,7 +2100,7 @@ export const AppProvider = ({ children }) => {
 
       const updatedEmps = await Promise.all(updatePromises);
       const validUpdates = updatedEmps.filter(Boolean);
-      
+
       setEmployees(prev =>
         prev.map(e => {
           const match = validUpdates.find(u => u.id === e.id);
@@ -2136,7 +2132,7 @@ export const AppProvider = ({ children }) => {
 
       const updatedEmps = await Promise.all(updatePromises);
       const validUpdates = updatedEmps.filter(Boolean);
-      
+
       setEmployees(prev =>
         prev.map(e => {
           const match = validUpdates.find(u => u.id === e.id);
@@ -2168,7 +2164,7 @@ export const AppProvider = ({ children }) => {
 
       const updatedEmps = await Promise.all(updatePromises);
       const validUpdates = updatedEmps.filter(Boolean);
-      
+
       setEmployees(prev =>
         prev.map(e => {
           const match = validUpdates.find(u => u.id === e.id);
@@ -2189,7 +2185,7 @@ export const AppProvider = ({ children }) => {
       const updatePromises = Array.from(ids).map(async (id) => {
         const emp = employees.find(e => e.id === id);
         if (!emp) return null;
-        
+
         const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
           method: 'PUT',
           headers: {
@@ -2204,7 +2200,7 @@ export const AppProvider = ({ children }) => {
 
       const updatedEmps = await Promise.all(updatePromises);
       const validUpdates = updatedEmps.filter(Boolean);
-      
+
       setEmployees(prev =>
         prev.map(e => {
           const match = validUpdates.find(u => u.id === e.id);
@@ -2244,7 +2240,7 @@ export const AppProvider = ({ children }) => {
         ...(leave.history || []),
         { date: new Date().toISOString().split('T')[0], status: 'Approved', comment: `Approved by ${currentUser?.name || 'Manager'}` }
       ];
-      
+
       const payload = {
         status: 'Approved',
         approverNotes: notes || 'Approved by Manager',
@@ -2275,12 +2271,12 @@ export const AppProvider = ({ children }) => {
           },
           body: JSON.stringify({ status: 'On Leave' })
         });
-        
+
         fetchEmployees();
 
         addActivityLog(`Approved leave request for ${leave.employeeName}`, 'Leaves', 'success');
         addToast('success', `Leave request for ${leave.employeeName} approved.`);
-        
+
         // Add Notification — targeted to the employee who requested leave
         await triggerAutomaticNotification('LV-02', {
           title: 'Leave Request Approved',
@@ -2307,7 +2303,7 @@ export const AppProvider = ({ children }) => {
         ...(leave.history || []),
         { date: new Date().toISOString().split('T')[0], status: 'Rejected', comment: `Rejected by ${currentUser?.name || 'Manager'}: ${notes}` }
       ];
-      
+
       const payload = {
         status: 'Rejected',
         approverNotes: notes || 'Rejected by Manager',
@@ -2387,7 +2383,7 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Submitted leave request for ${result.data.employeeName}`, 'Leaves', 'success');
         addToast('success', result.data.status === 'Approved' ? `Leave assigned successfully for ${result.data.employeeName}.` : 'Leave request submitted successfully for approval.');
-        
+
         // Notify admin/manager about the new leave application (only if status is Pending)
         if (result.data.status === 'Pending') {
           await triggerAutomaticNotification('LV-01', {
@@ -2397,7 +2393,7 @@ export const AppProvider = ({ children }) => {
             category: 'Leave'
           });
         }
-        
+
         return result.data;
       } else {
         addToast('error', result.message || 'Failed to submit leave request');
@@ -3048,27 +3044,27 @@ export const AppProvider = ({ children }) => {
   const addTask = async (taskData) => {
     let projectId = taskData.projectId;
     let project = projectsList.find(p => p.id === projectId);
-    
+
     // If not found by ID, try finding by name (since Managers.jsx passes project name as taskData.project)
     if (!project && taskData.project) {
       project = projectsList.find(p => p.name === taskData.project);
     }
-    
+
     // Fallback to first project if still not found
     if (!project) {
       project = projectsList[0];
     }
-    
+
     if (!project) {
       addToast('error', 'Project not found');
       return;
     }
-    
+
     projectId = project.id;
     const nextTaskId = `t-${projectId}-${project.tasks.length + 1}`;
-    
+
     const assignee = employees.find(e => e.id === taskData.assigneeId);
-    
+
     const newTask = {
       id: nextTaskId,
       title: taskData.title.trim(),
@@ -3094,17 +3090,17 @@ export const AppProvider = ({ children }) => {
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
       ]
     };
-    
+
     const newTasks = [...project.tasks, newTask];
     const tasksTotal = project.tasksTotal + 1;
     const progress = Math.round((project.tasksDone / tasksTotal) * 100);
-    
+
     const success = await updateProject(projectId, {
       tasks: newTasks,
       tasksTotal,
       progress
     });
-    
+
     if (success) {
       addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
       addToast('success', 'Task created successfully.');
@@ -3941,7 +3937,7 @@ export const AppProvider = ({ children }) => {
         addToast('danger', `Report ${id} not found.`);
         return;
       }
-      
+
       const actionLabel = status === 'Approved' ? 'Approved' : status === 'Rejected' ? 'Rejected' : status === 'Changes Requested' ? 'Requested Changes' : 'Escalated';
       const updatedHistory = [
         ...(report.approvalHistory || []),
@@ -3953,7 +3949,7 @@ export const AppProvider = ({ children }) => {
           comments: feedback || ''
         }
       ];
-      
+
       const calculatedProd = Math.round((report.tasksCompleted / Math.max(1, report.tasksAssigned)) * 100);
       const newProductivityScore = status === 'Approved' ? calculatedProd : Math.round(calculatedProd * 0.7);
 
@@ -4069,8 +4065,8 @@ export const AppProvider = ({ children }) => {
 
   // Check RBAC permission helper with Overrides support
   const hasPermission = (module, action) => {
-    // Super admin has permission for everything
-    if (currentUserRole === 'super_admin') return true;
+    // Super admin and company admin have permission for everything
+    if (currentUserRole === 'super_admin' || currentUserRole === 'company_admin') return true;
 
     // 1. Check User Overrides first
     const activeUserId = currentUserId || currentUser?.id;
@@ -4078,11 +4074,11 @@ export const AppProvider = ({ children }) => {
       // Find matching overrides for this user and module
       const userOvs = userOverrides.filter(ov => {
         if (ov.userId !== activeUserId) return false;
-        
+
         // Normalize names
         const ovModule = (ov.module || '').toLowerCase();
         const targetModule = (module || '').toLowerCase();
-        
+
         // Match base module names
         const matchPayroll = ovModule.includes('payroll') && targetModule.includes('payroll');
         const matchLeave = ovModule.includes('leave') && targetModule.includes('leave');
@@ -4092,7 +4088,7 @@ export const AppProvider = ({ children }) => {
         const matchSetting = ovModule.includes('setting') && targetModule.includes('setting');
         const matchAttendance = ovModule.includes('attendance') && targetModule.includes('attendance');
         const matchDashboard = ovModule.includes('dashboard') && targetModule.includes('dashboard');
-        
+
         return matchPayroll || matchLeave || matchEmployee || matchTask || matchPermission || matchSetting || matchAttendance || matchDashboard || ovModule === targetModule;
       });
 
@@ -4131,175 +4127,19 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    // 2. Fallback to Role-based default permissions
-    const DEFAULT_ROLE_PERMISSIONS = {
-      super_admin: {
-        dashboard: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        company_overview: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        employee_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        agency_branch_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        department_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        team_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        attendance_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        leave_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        project_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        workflow_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        task_monitoring: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        work_reports: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        performance_analytics: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        payroll_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        announcements: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        notifications: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        document_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        role_permission: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        system_settings: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        security_audit_logs: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        profile_settings: { read: true, create: true, update: true, delete: true, approve: true, export: true }
-      },
-      company_admin: {
-        dashboard: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        company_overview: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        employee_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        agency_branch_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        department_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        team_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        attendance_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        leave_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        project_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        workflow_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        task_monitoring: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        work_reports: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        performance_analytics: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        payroll_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        announcements: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        notifications: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        document_management: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        role_permission: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        system_settings: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        security_audit_logs: { read: true, create: true, update: true, delete: true, approve: true, export: true },
-        profile_settings: { read: true, create: true, update: true, delete: true, approve: true, export: true }
-      },
-      branch_admin: {
-        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employee_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        agency_branch_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        department_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        team_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        attendance_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        leave_management: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-        project_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        workflow_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-        work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-        performance_analytics: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        payroll_management: { create: true, read: true, update: true, approve: true, export: true },
-        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        document_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        role_permission: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        system_settings: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        security_audit_logs: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
-      },
-      dept_admin: {
-        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employee_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        agency_branch_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        department_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        team_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        attendance_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        leave_management: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-        project_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        workflow_management: { create: true, read: true, update: true, delete: false, approve: false, export: false },
-        task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-        work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-        performance_analytics: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        payroll_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        document_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        role_permission: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        system_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        security_audit_logs: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
-      },
-      manager: {
-        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employee_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        agency_branch_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        department_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        team_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        attendance_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        leave_management: { create: true, read: true, update: true, approve: true, delete: false, export: false },
-        project_management: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-        workflow_management: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-        task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-        work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: true },
-        performance_analytics: { create: true, read: true, update: true, approve: true, delete: false, export: false },
-        payroll_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        document_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        role_permission: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        system_settings: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        security_audit_logs: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
-      },
-      team_leader: {
-        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employee_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        agency_branch_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        department_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        team_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        attendance_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        leave_management: { read: true, update: true, approve: true, create: false, delete: false, export: false },
-        project_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        workflow_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        task_monitoring: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-        work_reports: { create: true, read: true, update: true, delete: true, approve: true, export: false },
-        performance_analytics: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        payroll_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        document_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        role_permission: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        system_settings: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        security_audit_logs: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
-      },
-      employee: {
-        dashboard: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        company_overview: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        employee_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        agency_branch_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        department_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        team_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        attendance_management: { create: true, read: true, update: false, delete: false, approve: false, export: false },
-        leave_management: { create: true, read: true, update: false, delete: false, approve: false, export: false },
-        project_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        workflow_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        task_monitoring: { read: true, update: true, create: false, delete: false, approve: false, export: false },
-        work_reports: { create: true, read: true, update: false, delete: false, approve: false, export: false },
-        performance_analytics: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        payroll_management: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        announcements: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        notifications: { read: true, create: false, update: false, delete: false, approve: false, export: false },
-        document_management: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        role_permission: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        system_settings: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        security_audit_logs: { read: false, create: false, update: false, delete: false, approve: false, export: false },
-        profile_settings: { read: true, create: false, update: false, delete: false, approve: false, export: false }
-      }
-    };
-
     const roleObj = roles.find(r => r.id === currentUserRole);
-    const permissions = roleObj?.permissions || DEFAULT_ROLE_PERMISSIONS[currentUserRole];
-    if (!permissions) return false;
-    return !!permissions[module]?.[action];
+    const permissions = roleObj?.permissions;
+    const res = permissions ? !!permissions[module]?.[action] : false;
+    console.log('hasPermission internal details:', {
+      module,
+      action,
+      currentUserRole,
+      hasRoleObj: !!roleObj,
+      hasPermissionsObj: !!permissions,
+      permissionVal: permissions ? permissions[module]?.[action] : undefined,
+      result: res
+    });
+    return res;
   };
 
   // Memoize the normalized employees array to prevent creating a new reference

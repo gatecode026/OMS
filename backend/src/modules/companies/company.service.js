@@ -9,28 +9,59 @@ export const createCompany = async (data) => {
   // Check if subdomain already exists
   const existingSubdomain = await Company.findOne({ subdomain: data.subdomain.toLowerCase().trim() });
   if (existingSubdomain) {
-    const err = new Error('Subdomain already registered');
-    err.statusCode = 400;
-    throw err;
+    if (existingSubdomain.tenantStatus === 'provisioning' || existingSubdomain.tenantStatus === 'failed') {
+      logger.warn(`Orphaned or failed company found for subdomain "${data.subdomain}". Cleaning up...`);
+      await Company.deleteOne({ id: existingSubdomain.id });
+      const { TenantRegistry } = await import('../../utils/tenantRegistry.js');
+      await TenantRegistry.deleteMany({ companyId: existingSubdomain.id });
+    } else {
+      const err = new Error('Subdomain already registered');
+      err.statusCode = 400;
+      throw err;
+    }
   }
 
-  // Generate Company Business ID
-  const companyCount = await Company.countDocuments({});
-  const companyId = `COMP-${String(companyCount + 1).padStart(3, '0')}`;
+  // Generate Company Business ID robustly
+  const lastCompany = await Company.findOne({ id: /^COMP-\d+$/ }).sort({ createdAt: -1, id: -1 });
+  let nextNum = 1;
+  if (lastCompany) {
+    const match = lastCompany.id.match(/\d+/);
+    if (match) {
+      nextNum = parseInt(match[0], 10) + 1;
+    }
+  }
+
+  let companyId = `COMP-${String(nextNum).padStart(3, '0')}`;
+  let exists = await Company.findOne({ id: companyId });
+  while (exists) {
+    nextNum++;
+    companyId = `COMP-${String(nextNum).padStart(3, '0')}`;
+    exists = await Company.findOne({ id: companyId });
+  }
 
   // Set Trial expiration (14 days from now)
   const trialDays = 14;
   const trialEndsAt = new Date();
   trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
+  // 1. Create Company document with 'provisioning' lock if dedicated
+  const providedUri = data.settings?.dbUri || data.dbUri || data.mongoUri || '';
+  const isDedicated = !!providedUri;
+
   const newCompanyData = {
     id: companyId,
     name: data.name,
     subdomain: data.subdomain.toLowerCase().trim(),
+    companyCode: data.companyCode ? data.companyCode.toUpperCase().trim() : data.subdomain.toUpperCase().trim(),
     status: data.status || 'Active',
     plan: data.plan || 'Basic',
     trialEndsAt,
     subscriptionExpiresAt: data.subscriptionExpiresAt || null,
+    email: data.adminEmail ? data.adminEmail.toLowerCase().trim() : '',
+    password: data.adminPassword || '',
+    databaseType: isDedicated ? 'dedicated' : 'shared',
+    tenantStatus: isDedicated ? 'provisioning' : 'active',
+    databaseClusterKey: data.databaseClusterKey || 'cluster_1',
     settings: {
       logoUrl: data.settings?.logoUrl || '',
       primaryColor: data.settings?.primaryColor || '#3b82f6',
@@ -42,69 +73,117 @@ export const createCompany = async (data) => {
     }
   };
 
-  // 1. Create Company
   const company = await Company.create(newCompanyData);
   logger.info(`CompanyService::createCompany company document created for ${company.name}`);
 
-  // Create default system_settings document for this new company
-  await SystemSettings.create({
-    key: 'global',
-    companyId: company.id,
-    companyProfile: {
-      companyName: company.name,
-      officialEmail: data.adminEmail || `admin@${company.subdomain}.com`,
-      officialPhone: company.settings.companyPhone || '',
-      address: company.settings.address || '',
-      logoUrl: company.settings.logoUrl || ''
-    },
-    generalSettings: {
-      companyName: company.name,
-      timezone: company.settings.timezone || 'Asia/Kolkata',
-      language: 'English (IN)',
-      dateFormat: 'DD-MM-YYYY',
-      currency: 'INR (₹)',
-      fiscalYear: 'January'
+  try {
+    const { registerTenantUser } = await import('../../utils/tenantRegistry.js');
+
+    if (isDedicated) {
+      // Validate URI starts with mongodb:// or mongodb+srv://
+      if (!providedUri.startsWith('mongodb://') && !providedUri.startsWith('mongodb+srv://')) {
+        const err = new Error('Invalid MongoDB connection string. Must start with mongodb:// or mongodb+srv://');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // Save/update the cluster URI in .env and process.env
+      const clusterKey = company.databaseClusterKey || 'cluster_1';
+      const envKey = `${clusterKey.toUpperCase()}_URI`;
+      const fs = await import('fs');
+      const path = await import('path');
+      try {
+        const envPath = path.resolve(process.cwd(), '.env');
+        // Extract base URI (remove database name path if present)
+        let baseUri = providedUri;
+        const questionMarkIndex = providedUri.indexOf('?');
+        const baseWithoutQuery = questionMarkIndex !== -1 ? providedUri.substring(0, questionMarkIndex) : providedUri;
+        const protocolEndIndex = baseWithoutQuery.indexOf('://');
+        if (protocolEndIndex !== -1) {
+          const hostPartIndex = protocolEndIndex + 3;
+          const lastSlashIndex = baseWithoutQuery.lastIndexOf('/');
+          if (lastSlashIndex > hostPartIndex) {
+            baseUri = baseWithoutQuery.substring(0, lastSlashIndex);
+            if (questionMarkIndex !== -1) {
+              baseUri += providedUri.substring(questionMarkIndex);
+            }
+          }
+        }
+        
+        let envContent = '';
+        if (fs.existsSync(envPath)) {
+          envContent = fs.readFileSync(envPath, 'utf8');
+        }
+        
+        const regex = new RegExp(`^${envKey}=.*`, 'm');
+        if (regex.test(envContent)) {
+          envContent = envContent.replace(regex, `${envKey}=${baseUri}`);
+        } else {
+          envContent += `\n${envKey}=${baseUri}`;
+        }
+        fs.writeFileSync(envPath, envContent, 'utf8');
+        process.env[envKey] = baseUri;
+        logger.info(`Saved/updated cluster URI to .env: ${envKey}`);
+      } catch (envErr) {
+        logger.error('Failed to write cluster URI to .env:', envErr);
+      }
+
+      // Provision dedicated DB
+      const { provisionTenantDatabase, generateDbName } = await import('../../database/connectionManager.js');
+      const dbName = generateDbName(company.name);
+
+      const dbConfig = await provisionTenantDatabase(company, clusterKey, dbName, {
+        adminName: data.adminName || 'Company Admin',
+        adminEmail: company.email,
+        adminPhone: company.settings.companyPhone,
+        adminPassword: data.adminPassword,
+        address: company.settings.address,
+        logoUrl: company.settings.logoUrl,
+        timezone: company.settings.timezone
+      });
+
+      // Update company document with final connection metadata
+      company.databaseName = dbConfig.databaseName;
+      company.settings.dbUri = 'dedicated';
+      company.tenantStatus = 'active';
+      await company.save();
+
+      // Register company admin email in global lookup registry
+      await registerTenantUser(company.email, company.id, 'company_admin');
+      logger.info(`Dedicated database provisioning successfully completed for company: ${company.name}`);
+    } else {
+      // Register company admin email in global registry
+      await registerTenantUser(company.email, company.id, 'company_admin');
+
+      // Shared database flow: Create default settings in the shared database
+      await SystemSettings.deleteMany({ companyId: company.id }).setOptions({ bypassTenantScoping: true });
+      await SystemSettings.create({
+        key: 'global',
+        companyId: company.id,
+        companyProfile: {
+          companyName: company.name,
+          officialEmail: data.adminEmail || `admin@${company.subdomain}.com`,
+          officialPhone: company.settings.companyPhone || '',
+          address: company.settings.address || '',
+          logoUrl: company.settings.logoUrl || ''
+        },
+        generalSettings: {
+          companyName: company.name,
+          timezone: company.settings.timezone || 'Asia/Kolkata',
+          language: 'English (IN)',
+          dateFormat: 'DD-MM-YYYY',
+          currency: 'INR (₹)',
+          fiscalYear: 'January'
+        }
+      });
+      logger.info(`Shared database provisioning completed for company: ${company.name}`);
     }
-  });
-
-  // 2. Auto-Provision default CompanyAdmin user
-  const adminEmail = (data.adminEmail || `admin@${company.subdomain}.com`).toLowerCase().trim();
-  const plainPassword = data.adminPassword || 'Admin@123';
-  const adminName = data.adminName || `${company.name} Admin`;
-
-  // Check if employee email exists globally
-  const existingEmp = await Employee.findOne({ email: adminEmail });
-  if (existingEmp) {
-    logger.warn(`CompanyService::createCompany default admin email "${adminEmail}" already exists. Skipping user creation.`);
-    return company;
+  } catch (err) {
+    // Rollback Company document creation if provisioning fails
+    logger.error(`Rollback: Deleting company document ${company.id} due to provisioning failure:`, err);
+    await Company.deleteOne({ id: company.id });
+    throw err;
   }
-
-  // Generate unique Employee ID
-  const empCount = await Employee.countDocuments({});
-  const employeeId = `EMP-2026-${String(empCount + 1).padStart(3, '0')}`;
-
-  const defaultAdmin = {
-    id: employeeId,
-    name: adminName,
-    email: adminEmail,
-    username: `${company.subdomain}_admin`,
-    password: plainPassword, // Mongoose pre-save hook will hash this
-    phone: data.adminPhone || company.settings.companyPhone || '+91 00000 00000',
-    role: 'CompanyAdmin',
-    roleId: 'company_admin',
-    companyId: company.id,
-    designation: 'Company Administrator',
-    department: 'Administration',
-    branch: 'Head Office',
-    status: 'Active',
-    accountStatus: 'Active',
-    joinDate: new Date().toISOString().split('T')[0]
-  };
-
-  // We temporarily run this unscoped so that the employee is successfully created with the correct companyId
-  // even if the active request context is not set to this new company yet.
-  const employee = await Employee.create(defaultAdmin);
-  logger.info(`CompanyService::createCompany default admin user auto-created: ${employee.name} (${employee.email})`);
 
   return company;
 };

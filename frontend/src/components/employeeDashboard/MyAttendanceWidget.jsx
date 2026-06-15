@@ -70,17 +70,21 @@ const MyAttendanceWidget = ({
     return isNaN(parsedHrs) ? 0 : Math.round(parsedHrs * 3600);
   };
 
-  // Calculate monthly stats
-  const totalDaysInMonth = 24; // Average working days
-  const presentDays = attendanceHistory.filter(h => 
+  // Calculate monthly stats dynamically from database history of the current month
+  const currentYear = new Date().getFullYear();
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+  const monthPrefix = `${currentYear}-${currentMonth}`;
+  const thisMonthAttendance = attendanceHistory.filter(h => (h.date || '').startsWith(monthPrefix));
+  
+  const presentDays = thisMonthAttendance.filter(h => 
     h.status === 'Present' || 
     h.status === 'Late' || 
     h.status === 'Overtime' || 
     h.status === 'Work From Home'
   ).length;
-  const attendancePercentage = presentDays > 0 
-    ? Math.min(100, Math.round((presentDays / totalDaysInMonth) * 100)) 
-    : 96;
+  const attendancePercentage = thisMonthAttendance.length > 0 
+    ? Math.min(100, Math.round((presentDays / thisMonthAttendance.length) * 100)) 
+    : 0;
 
   // Live stats from record in seconds
   const workingSeconds = getLiveWorkingSeconds();

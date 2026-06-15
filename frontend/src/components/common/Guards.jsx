@@ -31,12 +31,12 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
   const location = useLocation();
 
   let isAuthorized = false;
+  let moduleKey = null;
 
   if (allowedRoles.length > 0) {
     isAuthorized = allowedRoles.includes(currentUserRole);
   } else {
     const pathParts = location.pathname.split('/').filter(Boolean);
-    let moduleKey = null;
 
     if (PATH_TO_MODULE[location.pathname]) {
       moduleKey = PATH_TO_MODULE[location.pathname];
@@ -72,8 +72,8 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
 
     // Dynamic checks for specific resource endpoints (e.g., self-service or team visibility)
     if (!isAuthorized && currentUser) {
-      // Check if accessing '/employees/:id'
-      if (pathParts.length === 2 && pathParts[0] === 'employees') {
+      // Check if accessing '/employees/:id' or '/employee-profile/:id'
+      if (pathParts.length === 2 && (pathParts[0] === 'employees' || pathParts[0] === 'employee-profile')) {
         const targetEmployeeId = pathParts[1];
         
         // 1. Self-service exception: any user can view their own profile
@@ -87,6 +87,8 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
       }
     }
   }
+
+  console.log('RoleGuard resolution:', { path: location.pathname, moduleKey, currentUserRole, isAuthorized });
 
   if (!isAuthorized) {
     return <Navigate to="/unauthorized" replace />;

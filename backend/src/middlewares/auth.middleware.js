@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
 import Admin from '../modules/admin/admin.model.js';
 import Employee from '../modules/employees/employees.model.js';
+import Company from '../modules/companies/company.model.js';
 import logger from '../config/logger.js';
 import { isDatabaseConnected } from '../config/database.js';
 import { runWithTenant } from '../utils/tenantContext.js';
@@ -48,6 +49,12 @@ export const authenticate = async (req, res, next) => {
     let user;
     if (decoded.role === 'super_admin') {
       user = await Admin.findOne({ id: decoded.id }).select('id name email roleId status companyId').lean();
+    } else if (decoded.role === 'company_admin') {
+      user = await Company.findOne({ id: decoded.id }).select('id name email status').lean();
+      if (user) {
+        user.roleId = 'company_admin';
+        user.companyId = user.id;
+      }
     } else {
       user = await Employee.findOne({ id: decoded.id }).select('id name email roleId status companyId').lean();
     }

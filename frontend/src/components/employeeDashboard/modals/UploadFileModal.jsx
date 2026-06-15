@@ -5,22 +5,75 @@ import { useApp } from '../../../context/AppContext';
 const UploadFileModal = ({
   isOpen,
   onClose,
+  project,
   projectName = 'SaaS Platform v2.0'
 }) => {
-  const { addToast } = useApp();
+  const { addToast, addDocument, updateProject, currentUser } = useApp();
   const [file, setFile] = useState(null);
   const [description, setDescription] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
       addToast('error', 'Please select a file.');
       return;
     }
-    addToast('success', `File "${file.name}" uploaded successfully for project "${projectName}"!`);
-    onClose();
-    setFile(null);
-    setDescription('');
+
+    let fileBase64 = '';
+    try {
+      fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (error) => reject(error);
+      });
+    } catch (err) {
+      console.error('FileReader error:', err);
+      addToast('danger', 'Failed to read the selected file.');
+      return;
+    }
+
+    const docName = file.name;
+    const docType = file.name.split('.').pop() || 'file';
+    const docSize = `${(file.size / 1024).toFixed(1)} KB`;
+    const targetProjectName = project?.name || projectName;
+
+    const docData = {
+      name: docName,
+      type: docType,
+      category: 'Project',
+      size: docSize,
+      uploadedBy: currentUser?.name || 'Employee',
+      uploadDate: new Date().toISOString().split('T')[0],
+      downloads: 0,
+      fileUrl: fileBase64,
+      remarks: `Uploaded for project: ${targetProjectName}. ${description}`
+    };
+
+    // 1. Upload file globally to Documents collection
+    const result = await addDocument(docData);
+    if (result) {
+      // 2. Link file locally to the Project model's documents list
+      if (project) {
+        const currentDocs = project.documents || [];
+        const newDocs = [
+          ...currentDocs,
+          {
+            name: docName,
+            type: docType,
+            size: docSize,
+            uploadedBy: currentUser?.name || 'Employee',
+            downloadUrl: result.fileUrl || result.downloadUrl || fileBase64
+          }
+        ];
+        
+        await updateProject(project.id, { documents: newDocs });
+      }
+
+      onClose();
+      setFile(null);
+      setDescription('');
+    }
   };
 
   return (

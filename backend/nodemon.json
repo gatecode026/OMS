@@ -1,4 +1,5 @@
 {
-  "watch": ["src", ".env", "server.js"],
-  "ext": "js,mjs,json,env"
+  "watch": ["src", "server.js"],
+  "ext": "js,mjs,json",
+  "ignore": [".env"]
 }

@@ -8,6 +8,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import mongoSanitize from 'express-mongo-sanitize';
+import rateLimit from 'express-rate-limit';
 
 // Configuration Imports
 import corsOptions from './config/cors.js';
@@ -32,6 +34,36 @@ const app = express();
 // ─── SECURITY MIDDLEWARES ────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors(corsOptions));
+
+// Sanitize MongoDB inputs to prevent Query Injection attacks
+app.use(mongoSanitize());
+
+// Rate Limiting Config
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'fail',
+    message: 'Too many requests from this IP, please try again after 15 minutes.'
+  }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15, // Limit each IP to 15 authentication attempts per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    status: 'fail',
+    message: 'Too many login attempts from this IP, please try again after 15 minutes.'
+  }
+});
+
+// Apply rate limiting
+app.use('/api', generalLimiter);
+app.use('/api/v1/auth', authLimiter);
 
 // ─── REQUEST PARSING ─────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));

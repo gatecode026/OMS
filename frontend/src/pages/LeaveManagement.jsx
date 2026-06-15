@@ -846,12 +846,8 @@ const LeaveManagement = () => {
     const inputs = {};
     activePolicies.forEach(policy => {
       const code = policy.leaveCode;
-      let val = 0;
-      if (code === 'CL') val = employee.clBalance || policy.defaultDays;
-      else if (code === 'SL') val = employee.slBalance || policy.defaultDays;
-      else if (code === 'PL') val = employee.plBalance || policy.defaultDays;
-      else if (code === 'ML') val = employee.maternityBalance || policy.defaultDays;
-      else val = employee[code + 'Balance'] || policy.defaultDays;
+      const fieldName = code === 'ML' ? 'maternityBalance' : `${code.toLowerCase()}Balance`;
+      let val = typeof employee[fieldName] === 'number' ? employee[fieldName] : (policy.defaultDays || 0);
       inputs[code] = val;
     });
     setBalanceInput(inputs);
@@ -984,28 +980,10 @@ const LeaveManagement = () => {
     // Build balance cards from policy configs
     const myLeaves = leavesList; // already scoped to current user
     
-    // Fallback holidays in case database has no holidays seeded
-    const myHolidays = (holidaysList && holidaysList.length > 0)
-      ? holidaysList
-      : [
-          { id: 'HOL-1', date: '2026-01-26', name: 'Republic Day', type: 'National', description: 'National holiday celebrating India\'s Republic Day' },
-          { id: 'HOL-2', date: '2026-03-03', name: 'Holi Festival', type: 'Festival', description: 'Festival of colors' },
-          { id: 'HOL-3', date: '2026-08-15', name: 'Independence Day', type: 'National', description: 'Celebration of Independence' },
-          { id: 'HOL-4', date: '2026-10-02', name: 'Gandhi Jayanti', type: 'National', description: 'Mahatma Gandhi\'s Birthday' },
-          { id: 'HOL-5', date: '2026-10-20', name: 'Dussehra', type: 'Festival', description: 'Festival celebrating victory of good over evil' },
-          { id: 'HOL-6', date: '2026-11-08', name: 'Diwali', type: 'Festival', description: 'Festival of lights' },
-          { id: 'HOL-7', date: '2026-12-25', name: 'Christmas', type: 'Festival', description: 'Christmas Day celebration' }
-        ];
+    const myHolidays = holidaysList || [];
 
-    // Fallback policies in case database has no active policies seeded
-    const currentPolicies = (leavePolicyConfigs && leavePolicyConfigs.length > 0)
-      ? leavePolicyConfigs
-      : [
-          { id: 'POL-001', leaveCode: 'CL', leaveName: 'Casual Leave', defaultDays: 8, maxCarryForward: 5, isActive: true },
-          { id: 'POL-002', leaveCode: 'SL', leaveName: 'Sick Leave', defaultDays: 10, maxCarryForward: 3, isActive: true },
-          { id: 'POL-003', leaveCode: 'PL', leaveName: 'Paid Leave', defaultDays: 15, maxCarryForward: 10, isActive: true },
-          { id: 'POL-010', leaveCode: 'UL', leaveName: 'Unpaid Leave', defaultDays: 30, maxCarryForward: 0, isActive: true }
-        ];
+    // Use policies from the database only — no hardcoded fallbacks
+    const currentPolicies = leavePolicyConfigs || [];
 
     const getPolicyCodeOfRequest = (type) => {
       const t = (type || '').toLowerCase();
