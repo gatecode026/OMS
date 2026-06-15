@@ -75,8 +75,9 @@ export const authenticate = async (req, res, next) => {
       companyId: user.companyId || 'COMP-DEFAULT'
     };
 
+    const isSuperAdmin = user.roleId === 'super_admin';
     logger.debug(`User authenticated successfully: ${req.user.name} (${req.user.role})`);
-    runWithTenant(req.user.companyId, next);
+    runWithTenant(req.user.companyId, next, isSuperAdmin);
   } catch (error) {
     logger.error('Authentication Middleware Error:', error);
     return res.status(401).json({

@@ -4,6 +4,7 @@
  */
 
 import mongoose from 'mongoose';
+import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 // ─── IP Whitelist Schema ───
 const ipWhitelistSchema = new mongoose.Schema({
@@ -16,6 +17,7 @@ const ipWhitelistSchema = new mongoose.Schema({
   status: { type: String, enum: ['Active', 'Inactive'], default: 'Active' }
 }, { timestamps: true });
 
+ipWhitelistSchema.plugin(tenantPlugin);
 export const IpWhitelist = mongoose.model('IpWhitelist', ipWhitelistSchema);
 
 // ─── IP Blocklist Schema ───
@@ -28,6 +30,7 @@ const ipBlocklistSchema = new mongoose.Schema({
   blockedBy: { type: String, default: 'Auth Gate' }
 }, { timestamps: true });
 
+ipBlocklistSchema.plugin(tenantPlugin);
 export const IpBlocklist = mongoose.model('IpBlocklist', ipBlocklistSchema);
 
 // ─── User Device Registry Schema ───
@@ -43,6 +46,7 @@ const userDeviceSchema = new mongoose.Schema({
   status: { type: String, enum: ['Active', 'Blocked', 'Pending'], default: 'Active' }
 }, { timestamps: true });
 
+userDeviceSchema.plugin(tenantPlugin);
 export const UserDevice = mongoose.model('UserDevice', userDeviceSchema);
 
 // ─── User Active Sessions Schema ───
@@ -62,6 +66,7 @@ const userSessionSchema = new mongoose.Schema({
   status: { type: String, enum: ['Active', 'Idle'], default: 'Active' }
 }, { timestamps: true });
 
+userSessionSchema.plugin(tenantPlugin);
 export const UserSession = mongoose.model('UserSession', userSessionSchema);
 
 // ─── Security Alerts Schema ───
@@ -77,6 +82,7 @@ const securityAlertSchema = new mongoose.Schema({
   status: { type: String, enum: ['New', 'Investigating', 'Resolved', 'Ignored'], default: 'New' }
 }, { timestamps: true });
 
+securityAlertSchema.plugin(tenantPlugin);
 export const SecurityAlert = mongoose.model('SecurityAlert', securityAlertSchema);
 
 export default {

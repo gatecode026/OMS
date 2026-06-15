@@ -38,6 +38,10 @@ const adminSchema = new mongoose.Schema({
     type: String,
     default: 'super_admin'
   },
+  companyId: {
+    type: String,
+    default: null
+  },
   status: {
     type: String,
     default: 'Active',

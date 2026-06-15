@@ -49,6 +49,7 @@ export const database = {
           role: 'Super Admin',
           roleId: 'super_admin',
           status: 'Active',
+          companyId: null,
           password: hashedPassword
         });
         logger.info('Primary Super Admin created successfully.');
@@ -73,7 +74,7 @@ export const database = {
       const systemSettingsCount = await SystemSettings.countDocuments();
       if (systemSettingsCount === 0) {
         logger.info('system_settings collection is empty. Seeding default global settings...');
-        await SystemSettings.create({ key: 'global' });
+        await SystemSettings.create({ key: 'global', companyId: 'COMP-DEFAULT' });
         logger.info('Global system settings seeded successfully.');
       }
 

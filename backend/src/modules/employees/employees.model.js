@@ -68,6 +68,10 @@ const employeeSchema = new mongoose.Schema({
     type: String,
     select: false
   },
+  lastLoginAt: {
+    type: Date,
+    default: null
+  },
 
   // Professional details
   role: {

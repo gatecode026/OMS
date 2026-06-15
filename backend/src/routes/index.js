@@ -29,6 +29,8 @@ import announcementsRouter from '../modules/announcements/announcements.routes.j
 import performanceRouter from '../modules/performance/performance.routes.js';
 import securityRouter from '../modules/security/security.routes.js';
 import eventsRouter from '../modules/events/event.routes.js';
+import companiesRouter from '../modules/companies/company.routes.js';
+import adminRouter from '../modules/admin/admin.routes.js';
 
 const router = express.Router();
 
@@ -56,5 +58,7 @@ router.use('/announcements', announcementsRouter);
 router.use('/performance', performanceRouter);
 router.use('/security', securityRouter);
 router.use('/events', eventsRouter);
+router.use('/companies', companiesRouter);
+router.use('/admin', adminRouter);
 
 export default router;

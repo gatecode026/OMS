@@ -1,36 +1,35 @@
 /**
  * @file src/modules/workflows/workflows.repository.js
- * @description Data Access layer for Workflows module.
+ * @description Data Access layer for Workflows module using Mongoose model.
  */
 
 import logger from '../../config/logger.js';
+import Workflow from './workflows.model.js';
 
 export const find = async (query) => {
-  logger.debug('Executing WorkflowsRepository::find placeholder');
-  return [
-    { id: 'MOCK-1', name: 'Placeholder Domain Record 1 for Workflows', status: 'Active' },
-    { id: 'MOCK-2', name: 'Placeholder Domain Record 2 for Workflows', status: 'Inactive' }
-  ];
+  logger.debug('Executing WorkflowsRepository::find');
+  return Workflow.find(query || {});
 };
 
 export const findOne = async (id) => {
-  logger.debug('Executing WorkflowsRepository::findOne placeholder for: ' + id);
-  return { id, name: 'Placeholder Single Domain Record for Workflows', status: 'Active' };
+  logger.debug('Executing WorkflowsRepository::findOne for: ' + id);
+  return Workflow.findOne({ id });
 };
 
 export const save = async (data) => {
-  logger.debug('Executing WorkflowsRepository::save placeholder', data);
-  return { id: 'MOCK-' + Math.floor(100 + Math.random() * 900), ...data };
+  logger.debug('Executing WorkflowsRepository::save', data);
+  const workflow = new Workflow(data);
+  return workflow.save();
 };
 
 export const update = async (id, data) => {
-  logger.debug('Executing WorkflowsRepository::update placeholder for: ' + id, data);
-  return { id, ...data };
+  logger.debug('Executing WorkflowsRepository::update for: ' + id, data);
+  return Workflow.findOneAndUpdate({ id }, data, { new: true });
 };
 
 export const remove = async (id) => {
-  logger.debug('Executing WorkflowsRepository::remove placeholder for: ' + id);
-  return { id, status: 'Deleted' };
+  logger.debug('Executing WorkflowsRepository::remove for: ' + id);
+  return Workflow.findOneAndDelete({ id });
 };
 
 export default {

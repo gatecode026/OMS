@@ -5,7 +5,6 @@ const SystemSettingsSchema = new mongoose.Schema({
   key: {
     type: String,
     required: true,
-    unique: true,
     default: 'global'
   },
   companyProfile: {
@@ -191,6 +190,7 @@ const SystemSettingsSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 SystemSettingsSchema.plugin(tenantPlugin);
+SystemSettingsSchema.index({ key: 1, companyId: 1 }, { unique: true });
 
 const SystemSettings = mongoose.model('SystemSettings', SystemSettingsSchema, 'system_settings');
 export default SystemSettings;

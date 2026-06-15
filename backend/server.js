@@ -9,6 +9,8 @@ import app from './src/app.js';
 import logger from './src/config/logger.js';
 import database from './src/config/database.js';
 import { startEventScheduler } from './src/modules/events/event.scheduler.js';
+import { startConnectionCleanupJob } from './src/jobs/connectionCleanup.job.js';
+import { closeAllConnections } from './src/utils/multidbConnection.js';
 
 // Load environment variables
 dotenv.config();
@@ -27,16 +29,24 @@ const bootstrap = async () => {
     // Start background meeting reminder checks
     startEventScheduler();
 
+    // Start background multi-db connection cleanup checks
+    startConnectionCleanupJob();
+
     const server = app.listen(PORT, () => {
       logger.info(`  Server running in [${NODE_ENV}] mode on port ${PORT}`);
       logger.info(`  Client URL allowed: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     });
 
     // Handle graceful shutdown
-    const shutdown = (signal) => {
+    const shutdown = async (signal) => {
       logger.warn(`Received ${signal}. Gracefully shutting down server...`);
-      server.close(() => {
+      server.close(async () => {
         logger.info('HTTP server closed.');
+        try {
+          await closeAllConnections();
+        } catch (err) {
+          logger.error('Error closing tenant connections during shutdown:', err);
+        }
         database.disconnect().then(() => {
           logger.info('Database connection closed.');
           process.exit(0);
