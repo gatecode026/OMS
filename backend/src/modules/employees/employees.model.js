@@ -20,6 +20,12 @@ const employeeSchema = new mongoose.Schema({
     trim: true
   },
   dob: String,
+  employeeCode: {
+    type: String,
+    sparse: true,
+    trim: true,
+    index: true
+  },
   gender: String,
   phone: {
     type: String,
@@ -181,24 +187,19 @@ const employeeSchema = new mongoose.Schema({
     default: 'Good'
   },
   leaveBalance: {
-    type: Number,
-    default: 15
+    type: Number
   },
   clBalance: {
-    type: Number,
-    default: 8
+    type: Number
   },
   slBalance: {
-    type: Number,
-    default: 12
+    type: Number
   },
   plBalance: {
-    type: Number,
-    default: 15
+    type: Number
   },
   maternityBalance: {
-    type: Number,
-    default: 0
+    type: Number
   },
   currentProjectsCount: {
     type: Number,
@@ -243,6 +244,19 @@ const employeeSchema = new mongoose.Schema({
   collection: 'employees'
 });
 
+// Pre-save employeeCode generation
+employeeSchema.pre('save', async function(next) {
+  if (this.isNew && !this.employeeCode) {
+    try {
+      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+      this.employeeCode = await generateCompanyUniqueId(this.companyId, 'employees');
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
+
 // Pre-save password hashing
 employeeSchema.pre('save', async function(next) {
   if (!this.password) return next();
@@ -266,6 +280,7 @@ employeeSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 employeeSchema.plugin(tenantPlugin);
+employeeSchema.index({ companyId: 1, employeeCode: 1 }, { unique: true, sparse: true });
 
 const Employee = mongoose.model('Employee', employeeSchema);
 

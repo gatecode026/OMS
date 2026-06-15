@@ -21,7 +21,6 @@ const departmentSchema = new mongoose.Schema({
   departmentCode: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   head: {
@@ -115,6 +114,21 @@ const departmentSchema = new mongoose.Schema({
 });
 
 departmentSchema.plugin(tenantPlugin);
+departmentSchema.index({ companyId: 1, departmentCode: 1 }, { unique: true });
+
+// Pre-validate departmentCode generation
+departmentSchema.pre('validate', async function(next) {
+  if (this.isNew && !this.departmentCode) {
+    try {
+      const companyId = this.companyId || 'COMP-DEFAULT';
+      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+      this.departmentCode = await generateCompanyUniqueId(companyId, 'departments');
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 const Department = mongoose.model('Department', departmentSchema);
 

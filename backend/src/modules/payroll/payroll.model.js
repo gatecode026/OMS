@@ -73,6 +73,12 @@ const payrollBonusSchema = new mongoose.Schema({
 // 5. Monthly Processed Payroll Payments Schema
 const payrollPaymentSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true, index: true }, // employeeId-month-year
+  payrollCode: {
+    type: String,
+    sparse: true,
+    trim: true,
+    index: true
+  },
   employeeId: { type: String, required: true, index: true },
   employeeName: { type: String, required: true },
   department: { type: String, required: true },
@@ -117,7 +123,20 @@ payrollReimbursementSchema.plugin(tenantPlugin);
 payrollLoanAdvanceSchema.plugin(tenantPlugin);
 payrollBonusSchema.plugin(tenantPlugin);
 payrollPaymentSchema.plugin(tenantPlugin);
+payrollPaymentSchema.index({ companyId: 1, payrollCode: 1 }, { unique: true, sparse: true });
 payrollConfigSchema.plugin(tenantPlugin);
+
+payrollPaymentSchema.pre('save', async function(next) {
+  if (this.isNew && !this.payrollCode) {
+    try {
+      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+      this.payrollCode = await generateCompanyUniqueId(this.companyId, 'payroll');
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 export const PayrollGrade = mongoose.model('PayrollGrade', payrollGradeSchema);
 export const PayrollReimbursement = mongoose.model('PayrollReimbursement', payrollReimbursementSchema);

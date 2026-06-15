@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './EmployeeDashboard.css';
 import { useApp } from '../context/AppContext';
@@ -44,7 +44,9 @@ const EmployeeDashboard = () => {
     activityLogs,
     updateTaskStatus,
     projectsList,
-    addToast
+    documentsList,
+    addToast,
+    leavePolicyConfigs = []
   } = useApp();
 
   useEffect(() => {
@@ -105,11 +107,28 @@ const EmployeeDashboard = () => {
   const myAttendance = attendance.filter(a => a.employeeId === currentUser.id);
   const myTasks = tasks.filter(t => t.assigneeId === currentUser.id);
 
-  // Projects: Dynamically map projects containing user's tasks or matches user's department
-  const myProjects = (projectsList || []).filter(p =>
-    p.department === currentUser.department ||
-    myTasks.some(t => t.project === p.name || t.projectName === p.name)
-  );
+  // Projects: Dynamically map projects where user is manager, leader, member, or has tasks
+  const myProjects = (projectsList || []).filter(p => {
+    const isManager = p.manager?.toLowerCase() === currentUser.name?.toLowerCase();
+    const isLeader = p.leader?.toLowerCase() === currentUser.name?.toLowerCase();
+    const isMember = p.members?.some(m => m?.toLowerCase() === currentUser.name?.toLowerCase());
+    const hasTask = p.tasks?.some(t => 
+      (t.assigneeId && t.assigneeId === currentUser.id) || 
+      (t.assigneeName && t.assigneeName.toLowerCase() === currentUser.name?.toLowerCase())
+    );
+    return isManager || isLeader || isMember || hasTask;
+  });
+
+  const filteredProjects = myProjects.filter(p => {
+    if (projectFilter === 'all') return true;
+    const isCompleted = p.status === 'Completed' || p.status === 'completed';
+    if (projectFilter === 'completed') return isCompleted;
+    if (projectFilter === 'active') return !isCompleted;
+    return true;
+  });
+
+  const myActiveProjects = myProjects.filter(p => p.status === 'In Progress' || p.status === 'in_progress' || p.status === 'Active' || p.status === 'active');
+  const activeProjectsCount = myActiveProjects.length;
 
   const myReports = dailyReports.filter(r => r.employeeId === currentUser.id);
   const myLeaves = leaveRequests.filter(l => l.employeeId === currentUser.id);
@@ -128,29 +147,79 @@ const EmployeeDashboard = () => {
   // Today's report status
   const todayReport = myReports.find(r => r.date === todayStr) || {};
 
-  // Available leave balance sum calculated dynamically from database fields and approved requests
-  const getUsedDays = (typeKeys) => {
-    return myLeaves
-      .filter(l => l.status === 'Approved' && typeKeys.includes(l.type))
-      .reduce((sum, l) => sum + (Number(l.days) || 0), 0);
-  };
+  // Dynamic leave balance sum calculated dynamically from database fields and approved requests
+  const activePolicies = useMemo(() => {
+    return (leavePolicyConfigs || []).filter(policy => {
+      if (!policy.isActive) return false;
+      if (policy.genderRestriction && policy.genderRestriction !== 'All') {
+        const userGender = currentUser.gender || 'Male';
+        if (policy.genderRestriction.toLowerCase() !== userGender.toLowerCase()) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [leavePolicyConfigs, currentUser]);
 
-  const clUsed = getUsedDays(['Casual Leave', 'CL']);
-  const slUsed = getUsedDays(['Sick Leave', 'SL']);
-  const elUsed = getUsedDays(['Earned Leave', 'PL', 'Paid Leave', 'Annual Leave']);
+  const leaveBalance = useMemo(() => {
+    return activePolicies.reduce((sum, policy) => {
+      const code = policy.leaveCode;
+      // Use the employee-specific override if defined, otherwise fall back to the policy's configured defaultDays
+      const fieldName = code === 'ML' ? 'maternityBalance' : `${code.toLowerCase()}Balance`;
+      let available = typeof currentUser?.[fieldName] === 'number' ? currentUser[fieldName] : (policy.defaultDays || 0);
 
-  const clAvailable = currentUser.clBalance !== undefined ? currentUser.clBalance : 8;
-  const slAvailable = currentUser.slBalance !== undefined ? currentUser.slBalance : 12;
-  const elAvailable = currentUser.plBalance !== undefined ? currentUser.plBalance : 15;
+      const used = myLeaves
+        .filter(l => 
+          l.status === 'Approved' && 
+          (l.type === policy.leaveName || l.type === code || (code === 'PL' && l.type === 'Earned Leave'))
+        )
+        .reduce((s, l) => s + (Number(l.days) || 0), 0);
 
-  const clRemaining = Math.max(0, clAvailable - clUsed);
-  const slRemaining = Math.max(0, slAvailable - slUsed);
-  const elRemaining = Math.max(0, elAvailable - elUsed);
-
-  const leaveBalance = clRemaining + slRemaining + elRemaining;
+      return sum + Math.max(0, available - used);
+    }, 0);
+  }, [activePolicies, currentUser, myLeaves]);
 
   // Today's tasks (due today or overdue)
   const todayTasks = myTasks.filter(t => t.dueDate === todayStr || (t.dueDate < todayStr && t.status !== 'Done'));
+
+  // Filter tasks dynamically based on timePeriod
+  const getFilteredTasks = () => {
+    if (timePeriod === 'today') {
+      return todayTasks;
+    }
+    
+    const getWeekRange = () => {
+      const today = new Date();
+      const currentDay = today.getDay();
+      const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+      const monday = new Date(today);
+      monday.setDate(today.getDate() + distanceToMonday);
+      
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      
+      return {
+        start: monday.toISOString().split('T')[0],
+        end: sunday.toISOString().split('T')[0]
+      };
+    };
+    
+    if (timePeriod === 'week') {
+      const range = getWeekRange();
+      return myTasks.filter(t => t.dueDate >= range.start && t.dueDate <= range.end);
+    }
+    
+    if (timePeriod === 'month') {
+      const currentYear = new Date().getFullYear();
+      const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+      const prefix = `${currentYear}-${currentMonth}`;
+      return myTasks.filter(t => (t.dueDate || '').startsWith(prefix));
+    }
+    
+    return myTasks;
+  };
+  
+  const displayTasks = getFilteredTasks();
 
   // Handler to open task status update modal
   const handleOpenTaskUpdate = (task) => {
@@ -202,7 +271,7 @@ const EmployeeDashboard = () => {
         currentUser={currentUser}
         attendanceData={todayAttendance}
         todayTasks={todayTasks}
-        activeProjectsCount={myProjects.length}
+        activeProjectsCount={activeProjectsCount}
         dwrStatus={todayReport.status}
         leaveBalance={leaveBalance}
         performance={currentUser.performanceScore}
@@ -222,14 +291,15 @@ const EmployeeDashboard = () => {
 
           {/* Today's Tasks Widget */}
           <TodayTasksWidget
-            tasks={todayTasks}
+            tasks={displayTasks}
             onUpdateStatus={updateTaskStatus}
             onOpenUpdateModal={handleOpenTaskUpdate}
+            timePeriod={timePeriod}
           />
 
           {/* Active Projects Widget */}
           <ActiveProjectsWidget
-            projects={myProjects}
+            projects={filteredProjects}
             allTasks={tasks}
             myTasks={myTasks}
             onOpenUploadModal={() => setUploadFileOpen(true)}
@@ -298,7 +368,7 @@ const EmployeeDashboard = () => {
         myTasks={myTasks}
         myAttendance={myAttendance}
         currentUser={currentUser}
-        activeProjectsCount={myProjects.length}
+        activeProjectsCount={activeProjectsCount}
         leaveBalance={leaveBalance}
       />
 
@@ -337,7 +407,7 @@ const EmployeeDashboard = () => {
         <UploadFileModal
           isOpen={uploadFileOpen}
           onClose={() => setUploadFileOpen(false)}
-          projectName={myProjects[0]?.name || 'SaaS Platform v2.0'}
+          project={filteredProjects[0] || myProjects[0]}
         />
       )}
 
@@ -350,6 +420,7 @@ const EmployeeDashboard = () => {
           projects={myProjects}
           reports={myReports}
           notifications={notifications}
+          documents={documentsList}
           currentUser={currentUser}
         />
       )}

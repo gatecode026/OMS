@@ -22,6 +22,12 @@ const branchSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  branchCode: {
+    type: String,
+    sparse: true,
+    trim: true,
+    index: true
+  },
   manager: {
     type: String,
     required: true
@@ -144,6 +150,20 @@ const branchSchema = new mongoose.Schema({
 branchSchema.plugin(tenantPlugin);
 branchSchema.index({ id: 1, companyId: 1 }, { unique: true });
 branchSchema.index({ code: 1, companyId: 1 }, { unique: true });
+branchSchema.index({ companyId: 1, branchCode: 1 }, { unique: true, sparse: true });
+
+// Pre-save branchCode generation
+branchSchema.pre('save', async function(next) {
+  if (this.isNew && !this.branchCode) {
+    try {
+      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+      this.branchCode = await generateCompanyUniqueId(this.companyId, 'branches');
+    } catch (err) {
+      return next(err);
+    }
+  }
+  next();
+});
 
 const Branch = mongoose.model('Branch', branchSchema);
 

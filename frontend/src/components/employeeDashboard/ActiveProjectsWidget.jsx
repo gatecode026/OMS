@@ -10,21 +10,36 @@ const ActiveProjectsWidget = ({
 }) => {
   const navigate = useNavigate();
 
+  // Date formatter
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const day = String(d.getDate()).padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   // Calculate stats
-  const activeProjects = projects.filter(p => p.status === 'In Progress' || p.status === 'in_progress');
+  const activeProjects = projects.filter(p => p.status === 'In Progress' || p.status === 'in_progress' || p.status === 'Active' || p.status === 'active');
   const completedProjects = projects.filter(p => p.status === 'Completed' || p.status === 'completed');
   const assignedWorkItemsCount = myTasks.length;
   
   // Find upcoming deadline (nearest due date of user's tasks or project deadlines)
   const sortedTasksWithDeadlines = [...myTasks]
-    .filter(t => t.dueDate && t.status !== 'Done')
+    .filter(t => t.dueDate && t.status !== 'Done' && t.status !== 'done')
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  const upcomingDeadline = sortedTasksWithDeadlines.length > 0 ? sortedTasksWithDeadlines[0].dueDate : '20 Jun 2026';
+  const upcomingDeadline = sortedTasksWithDeadlines.length > 0 ? formatDate(sortedTasksWithDeadlines[0].dueDate) : '—';
 
   // Calculate progress for each project based on its tasks completion
-  const getProjectProgress = (projectName) => {
-    const projTasks = allTasks.filter(t => t.project === projectName || t.projectName === projectName);
-    if (projTasks.length === 0) return 60; // fallback default progress
+  const getProjectProgress = (project) => {
+    if (typeof project.progress === 'number' && project.progress > 0) return project.progress;
+    const projTasks = allTasks.filter(t => t.project === project.name || t.projectName === project.name);
+    if (projTasks.length === 0) return project.progress || 0;
     const completed = projTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
     return Math.round((completed / projTasks.length) * 100);
   };
@@ -56,7 +71,7 @@ const ActiveProjectsWidget = ({
             <span className="bold-text text-sm block mt-1">{assignedWorkItemsCount}</span>
           </div>
           <div className="mini-stat-card">
-            <span className="text-xs text-text-muted block">Next Deadline</span>
+            <span className="text-xs text-text-muted block">Next Task Due</span>
             <span className="bold-text text-xs block mt-1" style={{ fontSize: '0.72rem' }}>{upcomingDeadline}</span>
           </div>
         </div>
@@ -75,10 +90,10 @@ const ActiveProjectsWidget = ({
               </thead>
               <tbody>
                 {activeProjects.map((project) => {
-                  const progress = getProjectProgress(project.name);
-                  const deadline = project.name.includes('SaaS') ? '20 Jun 2026' : project.name.includes('Sales') ? '25 Jun 2026' : '30 Jun 2026';
+                  const progress = getProjectProgress(project);
+                  const deadline = formatDate(project.deadline);
                   return (
-                    <tr key={project.id} className="border-b-border">
+                    <tr key={project.id || project._id} className="border-b-border">
                       <td style={{ padding: '8px 12px' }}>
                         <span className="bold-text text-sm">{project.name}</span>
                       </td>
