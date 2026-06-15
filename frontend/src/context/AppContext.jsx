@@ -1868,8 +1868,6 @@ export const AppProvider = ({ children }) => {
 
   // Employee CRUD Handlers
   const addEmployee = async (newEmp) => {
-    const year = newEmp.joinDate ? new Date(newEmp.joinDate).getFullYear() : new Date().getFullYear();
-    const generatedId = `EMP-${year}-${100 + employees.length}`;
     const [firstName, ...restParts] = (newEmp.name || '').split(' ');
     const lastName = restParts.join('') || 'user';
     const defaultWorkEmail = firstName ? `${firstName.toLowerCase()}.${lastName.toLowerCase()}@saas.io` : `emp.${employees.length + 1}@saas.io`;
@@ -1877,7 +1875,7 @@ export const AppProvider = ({ children }) => {
 
     const entry = {
       ...newEmp,
-      id: newEmp.id || generatedId,
+      // id is intentionally NOT set here — backend generates the company-scoped ID
       status: newEmp.status || 'Active',
       email: newEmp.officialEmail || newEmp.email,
       workEmail: newEmp.workEmail || newEmp.officialEmail || defaultWorkEmail,
@@ -1945,7 +1943,7 @@ export const AppProvider = ({ children }) => {
         const savedEmp = normalizeEmployee(result.data);
         setEmployees(prev => [...prev, savedEmp]);
         addActivityLog(`Added new employee: ${savedEmp.name}`, 'Employees', 'success');
-        addToast('success', `Employee ${savedEmp.name} created successfully!`);
+        addToast('success', `Employee ${savedEmp.name} created successfully! ID: ${savedEmp.id}`);
 
         // Trigger Automatic Notification
         await triggerAutomaticNotification('HR-01', {
@@ -1959,6 +1957,8 @@ export const AppProvider = ({ children }) => {
         setRoles(prev =>
           prev.map(r => (r.id === newEmp.roleId ? { ...r, userCount: r.userCount + 1 } : r))
         );
+
+        return savedEmp; // return so caller can display the backend-assigned id
       } else {
         addToast('error', result.message || 'Failed to save employee to database');
       }

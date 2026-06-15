@@ -11,7 +11,6 @@ const employeeSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   name: {
@@ -35,9 +34,9 @@ const employeeSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true,
     lowercase: true,
-    trim: true
+    trim: true,
+    index: true
   },
   personalEmail: String,
   workEmail: String,
@@ -244,15 +243,21 @@ const employeeSchema = new mongoose.Schema({
   collection: 'employees'
 });
 
-// Pre-save employeeCode generation
+// Pre-save: generate company-scoped id and employeeCode if not provided
 employeeSchema.pre('save', async function(next) {
-  if (this.isNew && !this.employeeCode) {
-    try {
-      const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-      this.employeeCode = await generateCompanyUniqueId(this.companyId, 'employees');
-    } catch (err) {
-      return next(err);
+  if (!this.isNew) return next();
+  try {
+    const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+    // Always generate a company-scoped ID — never trust the frontend-supplied value
+    const generatedCode = await generateCompanyUniqueId(this.companyId, 'employees');
+    if (!this.id || this.id.trim() === '') {
+      this.id = generatedCode;
     }
+    if (!this.employeeCode || this.employeeCode.trim() === '') {
+      this.employeeCode = generatedCode;
+    }
+  } catch (err) {
+    return next(err);
   }
   next();
 });
@@ -280,6 +285,9 @@ employeeSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 employeeSchema.plugin(tenantPlugin);
+// Compound unique indexes: scoped per company (allows same id/email across different companies)
+employeeSchema.index({ companyId: 1, id: 1 }, { unique: true });
+employeeSchema.index({ companyId: 1, email: 1 }, { unique: true });
 employeeSchema.index({ companyId: 1, employeeCode: 1 }, { unique: true, sparse: true });
 
 const Employee = mongoose.model('Employee', employeeSchema);

@@ -10,7 +10,6 @@ const departmentSchema = new mongoose.Schema({
   id: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   name: {
@@ -114,15 +113,18 @@ const departmentSchema = new mongoose.Schema({
 });
 
 departmentSchema.plugin(tenantPlugin);
+departmentSchema.index({ companyId: 1, id: 1 }, { unique: true });
 departmentSchema.index({ companyId: 1, departmentCode: 1 }, { unique: true });
 
-// Pre-validate departmentCode generation
+// Pre-validate: generate company-scoped id and departmentCode if missing
 departmentSchema.pre('validate', async function(next) {
-  if (this.isNew && !this.departmentCode) {
+  if (this.isNew) {
     try {
       const companyId = this.companyId || 'COMP-DEFAULT';
       const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-      this.departmentCode = await generateCompanyUniqueId(companyId, 'departments');
+      const generatedCode = await generateCompanyUniqueId(companyId, 'departments');
+      if (!this.id || this.id.trim() === '') this.id = generatedCode;
+      if (!this.departmentCode || this.departmentCode.trim() === '') this.departmentCode = generatedCode;
     } catch (err) {
       return next(err);
     }

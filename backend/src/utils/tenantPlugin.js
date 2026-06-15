@@ -77,6 +77,7 @@ export const tenantPlugin = (schema) => {
     schema.add({
       companyId: {
         type: String,
+        ref: 'Company',
         required: true,
         index: true
       }
