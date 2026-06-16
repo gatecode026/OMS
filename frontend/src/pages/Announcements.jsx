@@ -981,7 +981,7 @@ const Announcements = () => {
                       const type = e.target.value;
                       let targetVal = 'All Employees';
                       if (type === 'Department') {
-                        targetVal = departments[0]?.name || 'Engineering';
+                        targetVal = departments[0]?.name || '';
                       } else if (type === 'Branch') {
                         const branches = [...new Set((employees || []).map(e => e.branch).filter(Boolean))];
                         targetVal = branches[0] || 'Delhi HQ';

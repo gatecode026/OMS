@@ -63,7 +63,7 @@ const ApplyLeaveModal = ({
     const leaveData = {
       employeeId: currentUser.id,
       employeeName: currentUser.name,
-      department: currentUser.department || 'Engineering',
+      department: currentUser.department || '',
       type: type,
       fromDate: startDate,
       toDate: endDate,

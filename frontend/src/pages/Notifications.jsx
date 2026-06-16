@@ -71,7 +71,7 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#d
 
 const Notifications = () => {
   const isLoading = usePageLoading(600);
-  const { currentUserRole, currentUser, showConfirm, notifications, addNotification, updateNotification, deleteNotification } = useApp();
+  const { currentUserRole, currentUser, showConfirm, notifications, addNotification, updateNotification, deleteNotification, employees } = useApp();
 
   // Selected Month/Year
   const [month, setMonth] = useState('June');
@@ -463,6 +463,15 @@ const Notifications = () => {
     if (createForm.recipientType === 'Managers') recipientRole = 'manager';
     if (createForm.recipientType === 'Admins') recipientRole = 'admin';
 
+    const allCount = employees ? employees.length : 0;
+    const employeeCount = employees ? employees.filter(e => e.roleId === 'employee').length : 0;
+    const managerCount = employees ? employees.filter(e => e.roleId === 'manager').length : 0;
+    const adminCount = employees ? employees.filter(e => ['super_admin', 'branch_admin', 'dept_admin'].includes(e.roleId)).length : 0;
+
+    const targetCount = createForm.recipientType === 'All Employees' ? allCount : 
+                        createForm.recipientType === 'Employees' ? employeeCount : 
+                        createForm.recipientType === 'Managers' ? managerCount : adminCount;
+
     const newNotif = {
       title: createForm.title,
       message: createForm.message,
@@ -475,8 +484,8 @@ const Notifications = () => {
       deliveryStatus: createForm.schedule === 'Immediate' ? 'Delivered' : 'Scheduled',
       readStatus: 'Unread',
       readTime: '—',
-      recipients: createForm.recipientType === 'All Employees' ? 320 : createForm.recipientType === 'Employees' ? 240 : createForm.recipientType === 'Managers' ? 60 : 20,
-      delivered: createForm.schedule === 'Immediate' ? (createForm.recipientType === 'All Employees' ? 320 : createForm.recipientType === 'Employees' ? 240 : createForm.recipientType === 'Managers' ? 60 : 20) : 0,
+      recipients: targetCount,
+      delivered: createForm.schedule === 'Immediate' ? targetCount : 0,
       read: 0,
       failed: 0
     };
@@ -623,17 +632,6 @@ const Notifications = () => {
       }
     });
     
-    const sumSent = data.reduce((sum, d) => sum + d.sent, 0);
-    if (sumSent === 0) {
-      return [
-        { name: 'Jan', sent: 10, delivered: 10, failed: 0 },
-        { name: 'Feb', sent: 20, delivered: 20, failed: 0 },
-        { name: 'Mar', sent: 30, delivered: 30, failed: 0 },
-        { name: 'Apr', sent: 40, delivered: 40, failed: 0 },
-        { name: 'May', sent: 50, delivered: 50, failed: 0 },
-        { name: 'Jun', sent: 60, delivered: 60, failed: 0 }
-      ];
-    }
     return data;
   }, [notifications]);
 
@@ -643,12 +641,7 @@ const Notifications = () => {
       const dept = n.department || 'All';
       counts[dept] = (counts[dept] || 0) + 1;
     });
-    const results = Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
-    return results.length > 0 ? results : [
-      { name: 'Engineering', count: 5 },
-      { name: 'HR', count: 3 },
-      { name: 'Sales', count: 2 }
-    ];
+    return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [notifications]);
 
   const branchData = useMemo(() => {
@@ -657,11 +650,7 @@ const Notifications = () => {
       const b = n.branch || 'Head Office';
       counts[b] = (counts[b] || 0) + 1;
     });
-    const results = Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
-    return results.length > 0 ? results : [
-      { name: 'Head Office', count: 8 },
-      { name: 'Branch Office', count: 2 }
-    ];
+    return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [notifications]);
 
   const pieStatusData = useMemo(() => {
@@ -678,11 +667,7 @@ const Notifications = () => {
     });
     
     if (delivered === 0 && failed === 0 && scheduled === 0) {
-      return [
-        { name: 'Delivered', value: 1, fill: '#10b981' },
-        { name: 'Failed', value: 0, fill: '#ef4444' },
-        { name: 'Scheduled', value: 0, fill: '#3b82f6' }
-      ];
+      return [];
     }
     return [
       { name: 'Delivered', value: delivered, fill: '#10b981' },

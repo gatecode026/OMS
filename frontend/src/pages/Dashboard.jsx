@@ -474,7 +474,7 @@ const Dashboard = () => {
     return (employees || [])
       .map(e => ({
         name: e.name,
-        dept: e.department || 'Engineering',
+        dept: e.department || '',
         score: e.productivityScore || (e.performanceScore?.overall) || 75,
         color: (e.productivityScore || 75) > 90 ? '#10b981' : (e.productivityScore || 75) > 80 ? '#3b82f6' : '#f59e0b'
       }))

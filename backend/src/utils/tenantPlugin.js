@@ -149,7 +149,8 @@ export const tenantPlugin = (schema) => {
   // 4. Aggregation hook: prepend $match stage at the beginning of the pipeline
   schema.pre('aggregate', function (next) {
     const tenantId = getTenantId();
-    if (tenantId) {
+    const options = this.options || {};
+    if (tenantId && !options.bypassTenantScoping) {
       this.pipeline().unshift({ $match: { companyId: tenantId } });
     }
     next();

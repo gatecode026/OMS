@@ -407,7 +407,7 @@ const LeaveManagement = () => {
     });
     
     leavesList.forEach(l => {
-      const dept = l.department || 'Engineering';
+      const dept = l.department || '';
       if (!data[dept]) {
         data[dept] = { name: dept, Approved: 0, Rejected: 0 };
       }
@@ -2736,7 +2736,7 @@ const LeaveManagement = () => {
                 <div className="flex-row items-center gap-2 mt-1 flex-wrap">
                   <span className="profile-tag-detail">ID: {selectedLeave.employeeId || 'EMP-2026-006'}</span>
                   <span className="profile-tag-divider">•</span>
-                  <span className="profile-tag-detail">Dept: {selectedLeave.department || 'Engineering'}</span>
+                  <span className="profile-tag-detail">Dept: {selectedLeave.department || ''}</span>
                   <span className="profile-tag-divider">•</span>
                   <span className="profile-tag-detail">Role: {selectedEmp?.designation || 'Staff'}</span>
                 </div>
