@@ -20,7 +20,7 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, addBranch, updateBranch, deleteBranch, projectsList, hasPermission } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, addBranch, updateBranch, deleteBranch, updateEmployee, projectsList, hasPermission } = useApp();
 
   const getBranchDepartments = (b) => {
     if (!b) return [];
@@ -167,6 +167,10 @@ const Branches = () => {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showWfhModal, setShowWfhModal] = useState(false);
   const [showManagerModal, setShowManagerModal] = useState(false);
+  const [showAssignEmpModal, setShowAssignEmpModal] = useState(false);
+  const [assignEmpBranch, setAssignEmpBranch] = useState(null);
+  const [assignEmpSearch, setAssignEmpSearch] = useState('');
+  const [assigningEmpIds, setAssigningEmpIds] = useState([]);
   const [newDocName, setNewDocName] = useState('');
   const fileInputRef = useRef(null);
 
@@ -234,6 +238,41 @@ const Branches = () => {
 
   // Activity Timeline
   const [activities, setActivities] = useState([]);
+
+  // Employees with no branch assigned (to show in Assign Employee modal)
+  const unassignedEmployees = useMemo(() => {
+    if (!employees) return [];
+    return employees.filter(emp => {
+      if (emp.roleId === 'manager' || emp.role === 'Manager') return false;
+      const b = (emp.branch || emp.branchAgency || '').trim();
+      return !b || b === '' || b === '-' || b === 'N/A';
+    });
+  }, [employees]);
+
+  const filteredUnassignedEmployees = useMemo(() => {
+    const q = assignEmpSearch.toLowerCase();
+    if (!q) return unassignedEmployees;
+    return unassignedEmployees.filter(emp =>
+      emp.name.toLowerCase().includes(q) ||
+      emp.id.toLowerCase().includes(q) ||
+      (emp.designation || '').toLowerCase().includes(q) ||
+      (emp.department || '').toLowerCase().includes(q)
+    );
+  }, [unassignedEmployees, assignEmpSearch]);
+
+  const handleAssignEmployeeToBranch = async (emp) => {
+    if (!assignEmpBranch) return;
+    setAssigningEmpIds(prev => [...prev, emp.id]);
+    try {
+      const result = await updateEmployee(emp.id, { branch: assignEmpBranch.name });
+      if (result !== false) {
+        addToast('success', `${emp.name} assigned to ${assignEmpBranch.name}`);
+      }
+    } catch (err) {
+      addToast('error', `Failed to assign ${emp.name}`);
+    }
+    setAssigningEmpIds(prev => prev.filter(id => id !== emp.id));
+  };
 
   // Filter employees loaded from context to only display those with manager roles
   const combinedAvailableManagers = useMemo(() => {
@@ -609,13 +648,14 @@ const Branches = () => {
 
   const selectedBranch = branches.find(b => b.id === selectedBranchId);
   
-  // Filter employees for the selected branch
+  // Filter employees for the selected branch — exact branch name match (case-insensitive)
   const branchEmployees = useMemo(() => {
     if (!selectedBranch) return [];
-    const searchName = selectedBranch.name.split(' ')[0].toLowerCase();
+    const branchNameLower = selectedBranch.name.trim().toLowerCase();
     return (employees || []).filter(emp => {
-      const loc = (emp.workLocation || emp.branch || emp.branchAgency || '').toLowerCase();
-      return loc.includes(searchName);
+      const empBranch = (emp.branch || emp.branchAgency || '').trim().toLowerCase();
+      // exact match OR the branch name contains the employee's branch value
+      return empBranch === branchNameLower || (empBranch && branchNameLower.includes(empBranch) && empBranch.length > 3);
     });
   }, [employees, selectedBranch]);
 
@@ -624,17 +664,33 @@ const Branches = () => {
     return branchEmployees.filter(emp => {
       const q = localEmpSearch.toLowerCase();
       return (
-        emp.name.toLowerCase().includes(q) ||
-        emp.id.toLowerCase().includes(q) ||
-        (emp.designation && emp.designation.toLowerCase().includes(q)) ||
-        emp.department.toLowerCase().includes(q)
+        (emp.name || '').toLowerCase().includes(q) ||
+        (emp.id || '').toLowerCase().includes(q) ||
+        ((emp.designation || '').toLowerCase().includes(q)) ||
+        ((emp.department || '').toLowerCase().includes(q))
       );
     });
   }, [branchEmployees, localEmpSearch]);
   
+  // Real employee counts by branch (from actual employees data)
+  const branchEmployeeCountMap = useMemo(() => {
+    const map = {};
+    (employees || []).forEach(emp => {
+      const b = (emp.branch || emp.branchAgency || '').trim();
+      if (b) {
+        map[b.toLowerCase()] = (map[b.toLowerCase()] || 0) + 1;
+      }
+    });
+    return map;
+  }, [employees]);
+
+  const getRealEmpCount = (branchName) => {
+    return branchEmployeeCountMap[(branchName || '').trim().toLowerCase()] || 0;
+  };
+
   const totalBranches = branches.length;
   const activeBranches = branches.filter(b => b.statusType === 'active').length;
-  const totalEmployees = branches.reduce((acc, b) => acc + b.employeeCount, 0);
+  const totalEmployees = (employees || []).length;
   const totalDepartments = branches.reduce((acc, b) => acc + b.departments.length, 0);
   const totalActiveProjects = branches.reduce((acc, b) => acc + b.projects.active, 0);
   const avgProductivity = (branches.reduce((acc, b) => acc + b.productivity, 0) / branches.length).toFixed(1);
@@ -1213,6 +1269,82 @@ const Branches = () => {
             </div>
           </div>
         )}
+        {/* Assign Employee to Branch Modal */}
+        {showAssignEmpModal && assignEmpBranch && (
+          <div className="modal-overlay animate-fade-in">
+            <div className="modal-box card animate-scale-up" style={{ maxWidth: '560px', width: '95%' }}>
+              <div className="modal-header">
+                <h3><Users size={16} /> Add Employee to {assignEmpBranch.name}</h3>
+                <button className="modal-close-btn" onClick={() => { setShowAssignEmpModal(false); setAssignEmpSearch(''); }} type="button"><X size={16} /></button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                  Showing <strong>{filteredUnassignedEmployees.length}</strong> employee{filteredUnassignedEmployees.length !== 1 ? 's' : ''} with no branch assigned.
+                </p>
+                <div style={{ position: 'relative', marginBottom: '14px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                  <input
+                    type="text"
+                    placeholder="Search by name, ID, designation, department..."
+                    value={assignEmpSearch}
+                    onChange={e => setAssignEmpSearch(e.target.value)}
+                    style={{ width: '100%', paddingLeft: '34px', paddingRight: '12px', paddingTop: '8px', paddingBottom: '8px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    autoFocus
+                  />
+                </div>
+                {filteredUnassignedEmployees.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    {unassignedEmployees.length === 0 ? '✅ All employees already have a branch assigned.' : 'No employees match your search.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {filteredUnassignedEmployees.map(emp => {
+                      const isAssigning = assigningEmpIds.includes(emp.id);
+                      return (
+                        <div
+                          key={emp.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '10px 12px', background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', gap: '12px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                            <Avatar name={emp.name} size="sm" />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{emp.name}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {emp.id} · {emp.designation || 'Employee'} · {emp.department || '—'}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleAssignEmployeeToBranch(emp)}
+                            disabled={isAssigning}
+                            style={{
+                              padding: '6px 14px', borderRadius: 'var(--radius-sm)', border: 'none',
+                              background: isAssigning ? 'var(--bg-elevated)' : 'var(--color-primary)',
+                              color: isAssigning ? 'var(--text-muted)' : '#fff',
+                              fontWeight: 600, fontSize: '0.78rem', cursor: isAssigning ? 'not-allowed' : 'pointer',
+                              flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', transition: 'background 0.2s'
+                            }}
+                            type="button"
+                          >
+                            {isAssigning ? 'Assigning...' : <><Plus size={12} /> Assign</>}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer">
+                <Button variant="outline" size="sm" onClick={() => { setShowAssignEmpModal(false); setAssignEmpSearch(''); }}>Close</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <input
           type="file"
           ref={fileInputRef}
@@ -1264,8 +1396,8 @@ const Branches = () => {
             <div className="stat-card-icon" style={{ background: '#3b82f620', color: '#3b82f6' }}><Users size={20} /></div>
             <div>
               <h3>Total Headcount</h3>
-              <p className="val">{selectedBranch.employeeCount} Employees</p>
-              <p className="sub">{selectedBranch.employeesOnLeave} Currently on Leave</p>
+              <p className="val">{getRealEmpCount(selectedBranch.name)} Employees</p>
+              <p className="sub">{selectedBranch.employeesOnLeave || 0} Currently on Leave</p>
             </div>
           </div>
           <div className="stat-card card">
@@ -1281,7 +1413,7 @@ const Branches = () => {
             <div>
               <h3>Attendance Average</h3>
               <p className="val">{selectedBranch.attendance}%</p>
-              <p className="sub">Present today: {Math.round(selectedBranch.employeeCount * selectedBranch.attendance / 100)} staff</p>
+              <p className="sub">Present today: {Math.round(getRealEmpCount(selectedBranch.name) * selectedBranch.attendance / 100)} staff</p>
             </div>
           </div>
           <div className="stat-card card">
@@ -1390,15 +1522,32 @@ const Branches = () => {
             <div className="card detail-employees-card">
               <div className="employees-card-header">
                 <h2 className="section-title"><Users size={16} /> Branch Employees Directory ({branchEmployees.length})</h2>
-                <div className="employees-search">
-                  <Search size={14} className="search-icon" />
-                  <input
-                    type="text"
-                    placeholder="Search employees by name, ID, role..."
-                    value={localEmpSearch}
-                    onChange={e => setLocalEmpSearch(e.target.value)}
-                    className="emp-search-input"
-                  />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {hasPermission('agency_branch_management', 'update') && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={Plus}
+                      onClick={() => {
+                        setAssignEmpBranch(selectedBranch);
+                        setAssignEmpSearch('');
+                        setAssigningEmpIds([]);
+                        setShowAssignEmpModal(true);
+                      }}
+                    >
+                      Add Employee
+                    </Button>
+                  )}
+                  <div className="employees-search">
+                    <Search size={14} className="search-icon" />
+                    <input
+                      type="text"
+                      placeholder="Search employees by name, ID, role..."
+                      value={localEmpSearch}
+                      onChange={e => setLocalEmpSearch(e.target.value)}
+                      className="emp-search-input"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1688,7 +1837,7 @@ const Branches = () => {
                 <div className="branch-info-grid">
                   <div className="branch-info-cell">
                     <span className="branch-info-label"><Users size={11} /> Employees</span>
-                    <span className="branch-info-val">{branch.employeeCount}</span>
+                    <span className="branch-info-val">{getRealEmpCount(branch.name)}</span>
                   </div>
                   <div className="branch-info-cell">
                     <span className="branch-info-label"><Activity size={11} /> Attendance</span>
@@ -1717,7 +1866,25 @@ const Branches = () => {
                     <Avatar name={branch.manager} size="xs" />
                     <span>{branch.manager}</span>
                   </div>
-                  <span className="branch-since"><Calendar size={10} /> {branch.established}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="branch-since"><Calendar size={10} /> {branch.established}</span>
+                    {hasPermission('agency_branch_management', 'update') && (
+                      <button
+                        className="icon-action-btn"
+                        title="Add unassigned employee to this branch"
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', padding: '4px 8px', borderRadius: 'var(--radius-sm)', background: 'var(--color-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAssignEmpBranch(branch);
+                          setAssignEmpSearch('');
+                          setAssigningEmpIds([]);
+                          setShowAssignEmpModal(true);
+                        }}
+                      >
+                        <Plus size={11} /> Add Employee
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -1830,7 +1997,7 @@ const Branches = () => {
                   <div className="detail-section animate-fade-in">
                     <h4><Users size={14} /> Staff Allocation Overview</h4>
                     <div className="stats-mini-grid">
-                      <div className="stat-mini"><span>Employees</span><strong>{selectedBranch.employeeCount}</strong></div>
+                      <div className="stat-mini"><span>Employees</span><strong>{getRealEmpCount(selectedBranch.name)}</strong></div>
                       <div className="stat-mini"><span>On Leave</span><strong>{selectedBranch.employeesOnLeave}</strong></div>
                       <div className="stat-mini"><span>Team Leaders</span><strong>{selectedBranch.teamLeaders}</strong></div>
                       <div className="stat-mini"><span>Project Mgrs</span><strong>{selectedBranch.projectManagers}</strong></div>
@@ -1933,8 +2100,8 @@ const Branches = () => {
                           <div className="progress-label"><span>Present Rate</span><strong>{selectedBranch.attendance}%</strong></div>
                           <div className="progress-bar" style={{ height: '6px' }}><div className="progress-fill" style={{ width: `${selectedBranch.attendance}%`, background: selectedBranch.attendance >= 94 ? '#10b981' : '#f59e0b' }}></div></div>
                           <div className="attendance-mini-stats" style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.78rem', marginTop: '10px' }}>
-                            <span>✅ Present: <strong>{Math.round(selectedBranch.employeeCount * selectedBranch.attendance / 100)}</strong> staff</span>
-                            <span>❌ Absent: <strong>{Math.round(selectedBranch.employeeCount * (100 - selectedBranch.attendance) / 100)}</strong> staff</span>
+                            <span>✅ Present: <strong>{Math.round(getRealEmpCount(selectedBranch.name) * selectedBranch.attendance / 100)}</strong> staff</span>
+                            <span>❌ Absent: <strong>{Math.round(getRealEmpCount(selectedBranch.name) * (100 - selectedBranch.attendance) / 100)}</strong> staff</span>
                             <span>🌴 On Leave: <strong>{selectedBranch.employeesOnLeave}</strong> staff</span>
                           </div>
                         </div>

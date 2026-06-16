@@ -381,7 +381,7 @@ const Employees = () => {
     bloodGroup: '', maritalStatus: '',
     emergencyContactName: '', emergencyContactPhone: '', emergencyContactPhoneAlt: '', emergencyContactAddress: '', emergencyContactRelation: '',
     username: '', password: '', confirmPassword: '', officialEmail: '',
-    department: 'Engineering', branch: 'Jaipur', team: '', teamName: '',
+    department: '', branch: '', team: '', teamName: '',
     designation: '', role: 'Employee', roleId: 'employee',
     joinDate: new Date().toISOString().split('T')[0],
     id: '', avatar: '',
@@ -448,7 +448,7 @@ const Employees = () => {
 
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showAssignLeaderModal, setShowAssignLeaderModal] = useState(false);
-  const [transferDept, setTransferDept] = useState('Engineering');
+  const [transferDept, setTransferDept] = useState('');
   const [assignLeader, setAssignLeader] = useState('');
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [bulkRole, setBulkRole] = useState('employee');
@@ -499,6 +499,16 @@ const Employees = () => {
   const invalidUpiVal = formData.bankUpiId && !isValidUpi(formData.bankUpiId);
 
   const handleOpenAdd = () => {
+    const defaultBranch = '';
+
+    const filteredDepts = dbDepartments && dbDepartments.length > 0
+      ? dbDepartments.filter(d => d.branch?.trim().toLowerCase() === defaultBranch.trim().toLowerCase())
+      : [];
+
+    const defaultDept = filteredDepts.length > 0 
+      ? filteredDepts[0].name 
+      : (dbDepartments && dbDepartments.length > 0 ? dbDepartments[0].name : '');
+
     setFormData({
       name: '', email: '', phone: '', dob: '', gender: 'Male',
       personalEmail: '', alternatePhone: '',
@@ -507,7 +517,7 @@ const Employees = () => {
       bloodGroup: '', maritalStatus: '',
       emergencyContactName: '', emergencyContactPhone: '', emergencyContactPhoneAlt: '', emergencyContactAddress: '', emergencyContactRelation: '',
       username: '', password: '', confirmPassword: '', officialEmail: '',
-      department: 'Engineering', branch: 'Jaipur', team: '', teamName: '',
+      department: '', branch: '', team: '', teamName: '',
       designation: '', role: 'Employee', roleId: 'employee',
       joinDate: new Date().toISOString().split('T')[0],
       id: '', avatar: '',
@@ -564,6 +574,10 @@ const Employees = () => {
     const generatedUsername = emp.username || (emp.name ? `${emp.name.split(' ')[0].toLowerCase()}.${emp.name.split(' ')[1]?.toLowerCase() || 'emp'}` : 'emp');
     const generatedOfficialEmail = emp.officialEmail || emp.workEmail || emp.email || `${emp.name?.split(' ')[0]?.toLowerCase() || 'employee'}@saas.io`;
 
+    // When editing a manager, clear branch and department
+    const cleanDept = emp.roleId === 'manager' ? '' : (emp.department === 'Management' ? '' : (emp.department || ''));
+    const cleanBranch = emp.roleId === 'manager' ? '' : (emp.branch || emp.branchAgency || emp.workLocation || '');
+
     setFormData({
       ...emp,
       currentAddress: addressToString(emp.currentAddress),
@@ -575,7 +589,9 @@ const Employees = () => {
       experience: emp.experience || '',
       employeeType: emp.employeeType || 'Full Time',
       probationEndDate: emp.probationEndDate || '',
-      contractEndDate: emp.contractEndDate || ''
+      contractEndDate: emp.contractEndDate || '',
+      department: cleanDept,
+      branch: cleanBranch
     });
 
     const docs = {
@@ -618,6 +634,22 @@ const Employees = () => {
 
     setWizardStep(1); setFormMode('edit'); setSelectedEmployeeId(emp.id); setShowFormPanel(true);
   };
+
+  // Sync department options when branch changes in "add" mode
+  useEffect(() => {
+    if (showFormPanel && formMode === 'add' && formData.branch) {
+      const availableDepts = dbDepartments && dbDepartments.length > 0
+        ? dbDepartments.filter(d => d.branch?.trim().toLowerCase() === formData.branch.trim().toLowerCase()).map(d => d.name)
+        : [];
+      const currentDeptValid = availableDepts.includes(formData.department);
+      if (availableDepts.length > 0 && (!formData.department || !currentDeptValid)) {
+        setFormData(p => ({
+          ...p,
+          department: availableDepts[0]
+        }));
+      }
+    }
+  }, [showFormPanel, formMode, dbBranches, dbDepartments, formData.branch]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -801,10 +833,11 @@ const Employees = () => {
   };
 
   const handleTransferDept = () => {
-    selectedIds.forEach(id => updateEmployee(id, { department: transferDept }));
+    const finalDept = transferDept || depts[0] || '';
+    selectedIds.forEach(id => updateEmployee(id, { department: finalDept }));
     setShowTransferModal(false);
     setSelectedIds(new Set());
-    addToast('success', `${selectedIds.size} employee(s) transferred to ${transferDept}.`);
+    addToast('success', `${selectedIds.size} employee(s) transferred to ${finalDept}.`);
   };
 
   const handleAssignLeader = () => {
@@ -940,7 +973,7 @@ const Employees = () => {
       return !!(
         (formData.roleId === 'manager' || (formData.designation && formData.designation.trim().length >= 2)) &&
         (formData.roleId === 'manager' || formData.department) &&
-        formData.branch &&
+        (formData.roleId === 'manager' || formData.branch) &&
         formData.joinDate &&
         !isIdDuplicate &&
         validBankName &&
@@ -1090,12 +1123,15 @@ const Employees = () => {
       }
     }
 
+    const isManager = matchingRole.id === 'manager';
     const finalData = {
       ...formData,
       name: formData.name,
-      designation: formData.roleId === 'manager' ? 'Manager' : formData.designation,
+      designation: isManager ? 'Manager' : formData.designation,
       roleId: matchingRole.id,
       role: matchingRole.name,
+      branch: isManager ? '' : formData.branch,
+      department: isManager ? '' : formData.department,
       avatar: avatarBase64,
       documents: docsToSave,
       currentAddress: addressToString(formData.currentAddress),
@@ -2105,7 +2141,7 @@ const Employees = () => {
         <div className="modal-overlay" onClick={() => setShowTransferModal(false)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <h3>Transfer {selectedIds.size} employee(s) to department</h3>
-            <select value={transferDept} onChange={e => setTransferDept(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>{depts.map(d => <option key={d} value={d}>{d}</option>)}</select>
+            <select value={transferDept || depts[0] || ''} onChange={e => setTransferDept(e.target.value)} style={{ marginTop: 16, marginBottom: 16 }}>{depts.map(d => <option key={d} value={d}>{d}</option>)}</select>
             <div className="modal-footer"><Button variant="secondary" onClick={() => setShowTransferModal(false)}>Cancel</Button><Button variant="primary" onClick={handleTransferDept}>Confirm Transfer</Button></div>
           </div>
         </div>
@@ -2305,11 +2341,18 @@ const Employees = () => {
                       value={formData.roleId || ''}
                       onChange={e => {
                         const nextRole = e.target.value;
-                        setFormData(p => ({
-                          ...p,
-                          roleId: nextRole,
-                          department: nextRole === 'manager' ? 'Management' : (p.department === 'Management' ? '' : p.department)
-                        }));
+                        setFormData(p => {
+                          const updated = {
+                            ...p,
+                            roleId: nextRole
+                          };
+                          if (nextRole === 'manager') {
+                            updated.branch = '';
+                            updated.department = '';
+                            updated.designation = 'Manager';
+                          }
+                          return updated;
+                        });
                       }}
                     >
                       <option value="">Select Role</option>
@@ -2394,66 +2437,68 @@ const Employees = () => {
                         )}
                       </div>
                     )}
-                    <div className="form-field">
-                      <label>{FIELD_LABELS.branch} *</label>
-                      <select
-                        value={formData.branch}
-                        onChange={e => {
-                          const selectedBranch = e.target.value;
-                          const filtered = (dbDepartments || []).filter(
-                            d => d.branch?.trim().toLowerCase() === selectedBranch.trim().toLowerCase()
-                          );
-                          const firstDept = filtered.length > 0 ? filtered[0].name : '';
-                          setFormData(p => ({
-                            ...p,
-                            branch: selectedBranch,
-                            department: firstDept
-                          }));
-                        }}
-                        required
-                      >
-                        <option value="">Select Branch/Agency</option>
-                        {dbBranches && dbBranches.length > 0 ? (
-                          dbBranches.map(b => (
-                            <option key={b.id || b._id} value={b.name}>
-                              {b.name}
-                            </option>
-                          ))
-                        ) : (
-                          branches.map(bName => (
-                            <option key={bName} value={bName}>
-                              {bName}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
                     {formData.roleId !== 'manager' && (
                       <div className="form-field">
-                        <label>{FIELD_LABELS.department} *</label>
+                        <label>{FIELD_LABELS.branch} *</label>
+                        <select
+                          value={formData.branch}
+                          onChange={e => {
+                            const selectedBranch = e.target.value;
+                            const filtered = (dbDepartments || []).filter(
+                              d => d.branch?.trim().toLowerCase() === selectedBranch.trim().toLowerCase()
+                            );
+                            const firstDept = filtered.length > 0 ? filtered[0].name : '';
+                            setFormData(p => ({
+                              ...p,
+                              branch: selectedBranch,
+                              department: formData.roleId === 'manager' ? p.department : firstDept
+                            }));
+                          }}
+                          required
+                        >
+                          {(() => {
+                            const hasDbBranches = dbBranches && dbBranches.length > 0;
+                            if (!hasDbBranches) {
+                              return <option value="">Select Branch/Agency</option>;
+                            }
+                            return [
+                              <option key="__empty" value="">Select Branch/Agency</option>,
+                              ...dbBranches.map(b => (
+                                <option key={b.id || b._id} value={b.name}>
+                                  {b.name}
+                                </option>
+                              ))
+                            ];
+                          })()}
+                        </select>
+                      </div>
+                    )}
+                    {formData.roleId !== 'manager' && (
+                      <div className="form-field">
+                        <label>{FIELD_LABELS.department}</label>
                         <select
                           value={formData.department}
                           onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}
-                          required={formData.roleId !== 'manager'}
                         >
-                          <option value="">Select Department</option>
-                          {dbDepartments && dbDepartments.length > 0 ? (
-                            dbDepartments
-                              .filter(
-                                d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase()
-                              )
-                              .map(d => (
+                          {(() => {
+                            const filteredDbDepts = dbDepartments && dbDepartments.length > 0
+                              ? (formData.branch
+                                  ? dbDepartments.filter(d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase())
+                                  : dbDepartments)
+                              : [];
+                            const hasDbDepts = filteredDbDepts.length > 0;
+                            if (!hasDbDepts) {
+                              return <option value="">Select Department</option>;
+                            }
+                            return [
+                              <option key="__empty_dept" value="">Select Department</option>,
+                              ...filteredDbDepts.map(d => (
                                 <option key={d.id || d._id} value={d.name}>
                                   {d.name}
                                 </option>
                               ))
-                          ) : (
-                            depts.map(dName => (
-                              <option key={dName} value={dName}>
-                                {dName}
-                              </option>
-                            ))
-                          )}
+                            ];
+                          })()}
                         </select>
                       </div>
                     )}

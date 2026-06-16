@@ -163,7 +163,7 @@ export const AppProvider = ({ children }) => {
             project: proj.name,
             projectId: proj.id,
             projectName: proj.name,
-            department: proj.department || 'Engineering',
+            department: proj.department || '',
             assigneeId: t.assigneeId || 'EMP-2026-003',
             assigneeName: t.assigneeName || proj.leader || 'Unassigned',
             description: t.description || '',
@@ -1080,8 +1080,16 @@ export const AppProvider = ({ children }) => {
         deliveryStatus: 'Delivered',
         readStatus: 'Unread',
         readTime: '—',
-        recipients: recipientId ? 1 : 100,
-        delivered: recipientId ? 1 : 100,
+        recipients: recipientId ? 1 : (
+          recipientRole === 'employee' 
+            ? (employees ? employees.filter(e => e.roleId === 'employee').length : 1)
+            : (employees ? employees.length : 1)
+        ),
+        delivered: recipientId ? 1 : (
+          recipientRole === 'employee' 
+            ? (employees ? employees.filter(e => e.roleId === 'employee').length : 1)
+            : (employees ? employees.length : 1)
+        ),
         read: 0,
         failed: 0
       };
@@ -1922,11 +1930,11 @@ export const AppProvider = ({ children }) => {
       currentProjectsCount: newEmp.currentProjectsCount || 0,
       experience: newEmp.experience || 0,
       shift: newEmp.shift || 'Morning (09:00 AM - 06:00 PM)',
-      todayPunchIn: '09:02 AM',
-      todayPunchOut: '06:15 PM',
-      todayWorkingHours: 8.2,
-      todayPunchStatus: 'Punched In',
-      lastSeen: 'Just now'
+      todayPunchIn: null,
+      todayPunchOut: null,
+      todayWorkingHours: 0,
+      todayPunchStatus: 'Not Punched',
+      lastSeen: '—'
     };
 
     try {
@@ -4144,7 +4152,34 @@ export const AppProvider = ({ children }) => {
 
   // Memoize the normalized employees array to prevent creating a new reference
   // on every render, which would cause all context consumers to re-render infinitely.
-  const memoizedEmployees = useMemo(() => employees.map(normalizeEmployee), [employees]);
+  // Also dynamically resolve branch and department for manager roles.
+  const memoizedEmployees = useMemo(() => {
+    return (employees || []).map(emp => {
+      const normalized = normalizeEmployee(emp);
+      if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager')) {
+        const hasNoBranch = !normalized.branch || normalized.branch === '—' || normalized.branch === '-';
+        if (hasNoBranch) {
+          const foundBranch = (branches || []).find(
+            b => (b.managerId && b.managerId === normalized.id) || (b.manager && b.manager.trim().toLowerCase() === normalized.name.trim().toLowerCase())
+          );
+          if (foundBranch) {
+            normalized.branch = foundBranch.name;
+            normalized.branchAgency = foundBranch.name;
+          }
+        }
+        const hasNoDept = !normalized.department || normalized.department === '—' || normalized.department === '-';
+        if (hasNoDept) {
+          const foundDept = (departments || []).find(
+            d => (d.headId && d.headId === normalized.id) || (d.head && d.head.trim().toLowerCase() === normalized.name.trim().toLowerCase())
+          );
+          if (foundDept) {
+            normalized.department = foundDept.name;
+          }
+        }
+      }
+      return normalized;
+    });
+  }, [employees, branches, departments]);
 
   return (
     <AppContext.Provider

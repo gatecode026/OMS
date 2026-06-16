@@ -237,6 +237,37 @@ const Teams = () => {
     }
   }, [createModalOpen, newTeam.branch, newTeam.department]);
 
+  // Auto-initialize first branch and department when create team modal is opened and lists are loaded
+  React.useEffect(() => {
+    if (createModalOpen) {
+      const availableBranches = branches && branches.length > 0 ? branches : [];
+      const currentBranchValid = availableBranches.some(b => b.name === newTeam.branch);
+      
+      let defaultBranch = newTeam.branch;
+      if (availableBranches.length > 0 && (!newTeam.branch || !currentBranchValid)) {
+        defaultBranch = availableBranches[0].name;
+      }
+      
+      const availableDepts = departments && departments.length > 0
+        ? departments.filter(d => d.branch?.trim().toLowerCase() === defaultBranch.trim().toLowerCase()).map(d => d.name)
+        : [];
+      
+      let defaultDept = newTeam.department;
+      const currentDeptValid = availableDepts.includes(newTeam.department);
+      if (availableDepts.length > 0 && (!newTeam.department || !currentDeptValid)) {
+        defaultDept = availableDepts[0];
+      }
+      
+      if (defaultBranch !== newTeam.branch || defaultDept !== newTeam.department) {
+        setNewTeam(prev => ({
+          ...prev,
+          branch: defaultBranch,
+          department: defaultDept
+        }));
+      }
+    }
+  }, [createModalOpen, branches, departments, newTeam.branch, newTeam.department]);
+
   // Auto-generate team code based on branch + department
   React.useEffect(() => {
     if (!newTeam.branch || !newTeam.department) return;
@@ -1449,12 +1480,17 @@ Active Teams Mapped: ${teams.length}
                       }}
                       required
                     >
-                      <option value="">Select Branch/Agency</option>
-                      {(branches || []).map(b => (
-                        <option key={b.id || b._id} value={b.name}>
-                          {b.name}
-                        </option>
-                      ))}
+                      {(() => {
+                        const hasBranches = branches && branches.length > 0;
+                        if (!hasBranches) {
+                          return <option value="">Select Branch/Agency</option>;
+                        }
+                        return branches.map(b => (
+                          <option key={b.id || b._id} value={b.name}>
+                            {b.name}
+                          </option>
+                        ));
+                      })()}
                     </select>
                   </div>
                   <div className="teams-form-group">
@@ -1465,16 +1501,19 @@ Active Teams Mapped: ${teams.length}
                       onChange={e => setNewTeam(prev => ({ ...prev, department: e.target.value }))}
                       required
                     >
-                      <option value="">Select Department</option>
-                      {(departments || [])
-                        .filter(
+                      {(() => {
+                        const filteredDepts = (departments || []).filter(
                           d => d.branch?.trim().toLowerCase() === newTeam.branch?.trim().toLowerCase()
-                        )
-                        .map(d => (
+                        );
+                        if (filteredDepts.length === 0) {
+                          return <option value="">Select Department</option>;
+                        }
+                        return filteredDepts.map(d => (
                           <option key={d.id || d._id} value={d.name}>
                             {d.name}
                           </option>
-                        ))}
+                        ));
+                      })()}
                     </select>
                   </div>
                   <div className="teams-form-full">

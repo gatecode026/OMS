@@ -212,27 +212,27 @@ const Payroll = () => {
         const empBasicSalary = Number(emp.salaryAmount) || 0;
         const struct = salaryStructures[emp.id] || {
           basic: empBasicSalary,
-          hra: Math.round(empBasicSalary * 0.4),
-          travel: 3000,
-          medical: 2000,
-          special: 1000,
-          pf: Math.round(empBasicSalary * 0.12),
+          hra: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.4) : 0,
+          travel: empBasicSalary > 0 ? 3000 : 0,
+          medical: empBasicSalary > 0 ? 2000 : 0,
+          special: empBasicSalary > 0 ? 1000 : 0,
+          pf: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.12) : 0,
           esi: 0,
-          pt: 200,
-          tds: Math.round(empBasicSalary * 0.1)
+          pt: empBasicSalary > 0 ? 200 : 0,
+          tds: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.1) : 0
         };
         const basicSalary = struct.basic || empBasicSalary;
         const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
-        const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 200) + (struct.tds || 0);
+        const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
         const grossSalary = basicSalary + totalAllowances;
         const netSalary = grossSalary - statutoryDeductions;
         return {
           id: `${emp.id}-${month}-${year}`,
           employeeId: emp.id,
           employeeName: emp.name,
-          department: emp.department || 'Management',
-          designation: emp.designation || 'Staff',
-          branch: emp.branch || 'Head Office',
+          department: emp.department || '—',
+          designation: emp.designation || '—',
+          branch: emp.branch || '—',
           month,
           year,
           status: 'Hold',
@@ -368,16 +368,16 @@ const Payroll = () => {
       const empBasicSalary = Number(emp?.salaryAmount) || 0;
       const struct = salaryStructures[empId] || {
         basic: empBasicSalary,
-        hra: Math.round(empBasicSalary * 0.4),
-        travel: 3000,
-        medical: 2000,
-        special: 1000,
-        pf: Math.round(empBasicSalary * 0.12),
+        hra: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.4) : 0,
+        travel: empBasicSalary > 0 ? 3000 : 0,
+        medical: empBasicSalary > 0 ? 2000 : 0,
+        special: empBasicSalary > 0 ? 1000 : 0,
+        pf: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.12) : 0,
         esi: 0,
-        pt: 200,
-        tds: Math.round(empBasicSalary * 0.1)
+        pt: empBasicSalary > 0 ? 200 : 0,
+        tds: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.1) : 0
       };
-      const att = attendanceDaysMap[empId] || { present: 22, absent: 0, halfDays: 0, paidLeaves: 2, unpaidLeaves: 0, overtimeHours: 0, lateArrivals: 0 };
+      const att = attendanceDaysMap[empId] || { present: 0, absent: 0, halfDays: 0, paidLeaves: 0, unpaidLeaves: 0, overtimeHours: 0, lateArrivals: 0 };
 
       // Allowances Sum
       const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
@@ -411,7 +411,7 @@ const Payroll = () => {
         .reduce((sum, curr) => sum + curr.amount, 0);
 
       // Total Statutory Deductions
-      const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 200) + (struct.tds || 0);
+      const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
 
       // Total Deductions
       const totalDeductions = statutoryDeductions + leaveDeduction + lateDeduction + loanEMI + advanceDeduct;
@@ -437,11 +437,11 @@ const Payroll = () => {
         reimbursementAmount: approvedReimbursements,
         totalDeductions,
         netSalary,
-        bankName: struct.bankName || 'HDFC Bank',
-        bankAccount: struct.bankAccountNumber || 'XXXX-XXXX-XXXX-9823',
-        bankIfsc: struct.bankIfscCode || 'HDFC0000245',
-        pan: taxProfiles[empId]?.pan || 'AAAPS1234F',
-        regime: taxProfiles[empId]?.regime || 'New'
+        bankName: emp?.bank?.bankName || struct.bankName || '—',
+        bankAccount: emp?.bank?.accountNumber || struct.bankAccountNumber || '—',
+        bankIfsc: emp?.bank?.ifsc || struct.bankIfscCode || '—',
+        pan: emp?.panNumber || taxProfiles[empId]?.pan || '—',
+        regime: taxProfiles[empId]?.regime || '—'
       };
     });
   }, [payrollState, salaryStructures, attendanceDaysMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees]);
@@ -1027,36 +1027,36 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <span className="font-bold text-success border-bottom pb-1 flex-row gap-1 align-center">
                         <TrendingUp size={14} /> Earnings
                       </span>
-                      <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{formatCurrency(selectedEmployeeObj.basicSalary)}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.4))}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Conveyance & Medical Allowances:</span> <strong>{formatCurrency(8000)}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{formatCurrency(selectedEmployeeObj.overtimeAmount)}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{formatCurrency(selectedEmployeeObj.bonusAmount)}</strong></div>
-                      <div className="flex-center justify-between border-top pt-2 font-semibold text-success"><span>Gross Earnings:</span> <strong>{formatCurrency(selectedEmployeeObj.grossSalary)}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(selectedEmployeeObj.basicSalary) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.4)) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Conveyance & Medical Allowances:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(8000) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{selectedEmployeeObj.overtimeAmount > 0 ? formatCurrency(selectedEmployeeObj.overtimeAmount) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{selectedEmployeeObj.bonusAmount > 0 ? formatCurrency(selectedEmployeeObj.bonusAmount) : '—'}</strong></div>
+                      <div className="flex-center justify-between border-top pt-2 font-semibold text-success"><span>Gross Earnings:</span> <strong>{selectedEmployeeObj.grossSalary > 0 ? formatCurrency(selectedEmployeeObj.grossSalary) : '—'}</strong></div>
                     </div>
-
+ 
                     {/* Deductions */}
                     <div className="flex-column gap-2">
                       <span className="font-bold text-danger border-bottom pb-1 flex-row gap-1 align-center">
                         <MinusCircle size={14} /> Deductions
                       </span>
-                      <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.12))}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.1))}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{formatCurrency(200)}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{formatCurrency(selectedEmployeeObj.leaveDeductions)}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{formatCurrency(selectedEmployeeObj.lateDeductions)}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{formatCurrency(selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct)}</strong></div>
-                      <div className="flex-center justify-between border-top pt-2 font-semibold text-danger"><span>Total Deductions:</span> <strong>{formatCurrency(selectedEmployeeObj.totalDeductions)}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.12)) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.1)) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(200) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{selectedEmployeeObj.leaveDeductions > 0 ? formatCurrency(selectedEmployeeObj.leaveDeductions) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{selectedEmployeeObj.lateDeductions > 0 ? formatCurrency(selectedEmployeeObj.lateDeductions) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct > 0 ? formatCurrency(selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct) : '—'}</strong></div>
+                      <div className="flex-center justify-between border-top pt-2 font-semibold text-danger"><span>Total Deductions:</span> <strong>{selectedEmployeeObj.totalDeductions > 0 ? formatCurrency(selectedEmployeeObj.totalDeductions) : '—'}</strong></div>
                     </div>
                   </div>
-
+ 
                   {/* Summary Net Take-Home */}
                   <div className="payslip-net-summary flex-row justify-between align-center p-4 rounded border">
                     <div className="flex-column">
                       <span className="font-semibold text-primary">Net Take-Home Salary</span>
                       <span className="font-xsmall text-muted">Transferred to your bank account on disbursal</span>
                     </div>
-                    <span className="font-bold text-success font-large">{formatCurrency(selectedEmployeeObj.netSalary)}</span>
+                    <span className="font-bold text-success font-large">{selectedEmployeeObj.netSalary > 0 ? formatCurrency(selectedEmployeeObj.netSalary) : '—'}</span>
                   </div>
                 </>
               ) : (
@@ -1171,12 +1171,12 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                             </div>
                           </td>
                           <td><span className="badge badge-secondary">{row.branch}</span></td>
-                          <td className="font-semibold">{formatCurrency(row.basicSalary)}</td>
-                          <td className="text-center font-semibold">{row.attendanceDays}</td>
-                          <td className="text-success font-semibold">+{formatCurrency(row.overtimeAmount)}</td>
-                          <td className="text-success font-semibold">+{formatCurrency(row.bonusAmount)}</td>
-                          <td className="text-danger font-semibold">-{formatCurrency(row.totalDeductions)}</td>
-                          <td className="text-info font-bold">{formatCurrency(row.netSalary)}</td>
+                          <td className="font-semibold">{row.basicSalary > 0 ? formatCurrency(row.basicSalary) : '—'}</td>
+                          <td className="text-center font-semibold">{row.attendanceDays > 0 ? row.attendanceDays : '—'}</td>
+                          <td className="text-success font-semibold">{row.overtimeAmount > 0 ? `+${formatCurrency(row.overtimeAmount)}` : '—'}</td>
+                          <td className="text-success font-semibold">{row.bonusAmount > 0 ? `+${formatCurrency(row.bonusAmount)}` : '—'}</td>
+                          <td className="text-danger font-semibold">{row.totalDeductions > 0 ? `-${formatCurrency(row.totalDeductions)}` : '—'}</td>
+                          <td className="text-info font-bold">{row.netSalary > 0 ? formatCurrency(row.netSalary) : '—'}</td>
                           <td>
                             <Badge variant={
                               row.status === 'Released' ? 'success' :
