@@ -73,6 +73,7 @@ export const createCompany = async (data) => {
     }
   };
 
+  let originalEnvValue;
   const company = await Company.create(newCompanyData);
   logger.info(`CompanyService::createCompany company document created for ${company.name}`);
 
@@ -80,6 +81,10 @@ export const createCompany = async (data) => {
     const { registerTenantUser } = await import('../../utils/tenantRegistry.js');
 
     if (isDedicated) {
+      const clusterKey = company.databaseClusterKey || 'cluster_1';
+      const envKey = `${clusterKey.toUpperCase()}_URI`;
+      originalEnvValue = process.env[envKey];
+
       // Validate URI starts with mongodb:// or mongodb+srv://
       if (!providedUri.startsWith('mongodb://') && !providedUri.startsWith('mongodb+srv://')) {
         const err = new Error('Invalid MongoDB connection string. Must start with mongodb:// or mongodb+srv://');
@@ -88,8 +93,6 @@ export const createCompany = async (data) => {
       }
 
       // Save/update the cluster URI in .env and process.env
-      const clusterKey = company.databaseClusterKey || 'cluster_1';
-      const envKey = `${clusterKey.toUpperCase()}_URI`;
       const fs = await import('fs');
       const path = await import('path');
       try {
@@ -182,6 +185,32 @@ export const createCompany = async (data) => {
     // Rollback Company document creation if provisioning fails
     logger.error(`Rollback: Deleting company document ${company.id} due to provisioning failure:`, err);
     await Company.deleteOne({ id: company.id });
+
+    if (isDedicated) {
+      const clusterKey = company.databaseClusterKey || 'cluster_1';
+      const envKey = `${clusterKey.toUpperCase()}_URI`;
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const envPath = path.resolve(process.cwd(), '.env');
+        if (fs.existsSync(envPath)) {
+          let envContent = fs.readFileSync(envPath, 'utf8');
+          const regex = new RegExp(`^${envKey}=.*`, 'm');
+          if (originalEnvValue !== undefined) {
+            envContent = envContent.replace(regex, `${envKey}=${originalEnvValue}`);
+            process.env[envKey] = originalEnvValue;
+          } else {
+            envContent = envContent.replace(new RegExp(`\\r?\\n?${envKey}=.*`, 'g'), '');
+            delete process.env[envKey];
+          }
+          fs.writeFileSync(envPath, envContent, 'utf8');
+          logger.info(`Rollback: Restored/removed ${envKey} in .env file`);
+        }
+      } catch (restoreErr) {
+        logger.error(`Failed to restore env on rollback: ${restoreErr.message}\nStack: ${restoreErr.stack}`);
+      }
+    }
+
     throw err;
   }
 

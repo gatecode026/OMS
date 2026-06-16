@@ -84,7 +84,7 @@ app.use('/uploads', express.static('uploads'));
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'success',
-    message: 'Office Management Workforce Backend API is fully operational',
+    message: 'Gatecode OMS Workforce Backend API is fully operational',
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });

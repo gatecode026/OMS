@@ -96,6 +96,12 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
     if (!form.from || !form.to) { setError('Please select From and To dates.'); return; }
     if (days <= 0) { setError('Date range has 0 working days. Please adjust.'); return; }
 
+    const today = new Date().toISOString().split('T')[0];
+    if (form.from < today) {
+      setError('Start date cannot be before today.');
+      return;
+    }
+
     const myLeaves = leaveRequests.filter(l => l.employeeId === currentUser?.id && l.id !== editingLeave?.id);
     const hasOverlap = myLeaves.some(l => {
       if (l.status !== 'Approved' && l.status !== 'Pending') return false;

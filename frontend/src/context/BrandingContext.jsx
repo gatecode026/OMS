@@ -4,7 +4,7 @@ const BrandingContext = createContext(undefined);
 
 export const BrandingProvider = ({ children }) => {
   const [branding, setBranding] = useState({
-    companyName: 'Office Management',
+    companyName: 'Gatecode OMS',
     logoUrl: '',
     primaryColor: '#d946ef',
     secondaryColor: '#1d4ed8',

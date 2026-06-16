@@ -42,7 +42,7 @@ export const getPublicData = asyncHandler(async (req, res) => {
     }
   }
   return successResponse(res, {
-    companyName: settings?.companyProfile?.companyName || settings?.generalSettings?.companyName || 'Office Management Pvt. Ltd.',
+    companyName: settings?.companyProfile?.companyName || settings?.generalSettings?.companyName || 'Gatecode OMS',
     websiteUrl: settings?.companyProfile?.websiteUrl || 'https://office-management.com',
     officialEmail: settings?.companyProfile?.officialEmail || 'admin@saas.com',
     officialPhone: settings?.companyProfile?.officialPhone || '+91 11 4050 6070'

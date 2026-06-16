@@ -312,7 +312,7 @@ const SystemSettings = () => {
   const [companyProfile, setCompanyProfile] = useState(() => {
     const savedData = localStorage.getItem('saas_company_profile');
     return savedData ? JSON.parse(savedData) : {
-      companyName: 'Office Management Pvt. Ltd.',
+      companyName: 'Gatecode OMS',
       regNumber: 'U72200DL2026PTC394850',
       gstNumber: '07AAAAA1111A1Z1',
       panNumber: 'AAAAA1111A',
@@ -707,7 +707,7 @@ const SystemSettings = () => {
 
       // Reset local react hooks
       setCompanyProfile({
-        companyName: 'Office Management Pvt. Ltd.',
+        companyName: 'Gatecode OMS',
         regNumber: 'U72200DL2026PTC394850',
         gstNumber: '07AAAAA1111A1Z1',
         panNumber: 'AAAAA1111A',
@@ -723,7 +723,7 @@ const SystemSettings = () => {
       });
       
       const defaultGeneral = {
-        companyName: 'Office Management Pvt. Ltd.',
+        companyName: 'Gatecode OMS',
         timezone: 'IST (UTC+5:30)',
         language: 'English (IN)',
         dateFormat: 'DD-MM-YYYY',
@@ -761,7 +761,7 @@ const SystemSettings = () => {
       // Also reset in the database
       saveSystemSettings({
         companyProfile: {
-          companyName: 'Office Management Pvt. Ltd.', regNumber: 'U72200DL2026PTC394850',
+          companyName: 'Gatecode OMS', regNumber: 'U72200DL2026PTC394850',
           gstNumber: '07AAAAA1111A1Z1', panNumber: 'AAAAA1111A', cinNumber: 'L72200DL2026PLC394850',
           websiteUrl: 'https://office-management.com', officialEmail: 'admin@saas.com',
           officialPhone: '+91 11 4050 6070', address: 'Plot No. 12, Sector 18, Udyog Vihar',
@@ -937,7 +937,8 @@ const SystemSettings = () => {
                   label="Official Contact Email"
                   value={companyProfile.officialEmail}
                   onChange={v => setCompanyProfile(p => ({ ...p, officialEmail: v }))}
-                  placeholder="info@office-management.com"
+                  placeholder="info@yourcompany.com"
+                  disabled={true}
                 />
                 <SettingsInput
                   label="Official Contact Number"
@@ -1084,50 +1085,6 @@ const SystemSettings = () => {
           <div className="settings-section-content">
             <h3 className="settings-section-title">Employee Settings</h3>
             <p className="settings-section-desc">Configure system-wide employee status options, ID generation schemes, and probation rules.</p>
-
-            <div className="settings-group">
-              <h4 className="settings-group-title">Employee ID Generation Settings</h4>
-              <ToggleSwitch
-                checked={empSettings.autoIdGen}
-                onChange={v => setEmpSettings(p => ({ ...p, autoIdGen: v }))}
-                label="Automatic Employee ID Generation"
-                desc="Generate new employee code numbers dynamically on profile registration"
-              />
-              {empSettings.autoIdGen && (
-                <div className="settings-fields-grid">
-                  <SettingsInput
-                    label="Code Prefix Prefix"
-                    value={empSettings.idPrefix}
-                    onChange={v => setEmpSettings(p => ({ ...p, idPrefix: v }))}
-                    placeholder="EMP-"
-                  />
-                  <SettingsInput
-                    label="Code Suffix Pattern"
-                    value={empSettings.idSuffix}
-                    onChange={v => setEmpSettings(p => ({ ...p, idSuffix: v }))}
-                    placeholder="-2026"
-                  />
-                  <SettingsInput
-                    label="Starting Sequence"
-                    value={empSettings.startingSeq}
-                    onChange={v => setEmpSettings(p => ({ ...p, startingSeq: v }))}
-                    placeholder="001"
-                  />
-                  <div className="settings-field">
-                    <label className="settings-field-label">ID Generation Logic</label>
-                    <select
-                      className="settings-input"
-                      value={empSettings.idType}
-                      onChange={e => setEmpSettings(p => ({ ...p, idType: e.target.value }))}
-                    >
-                      <option value="Sequential Global">Sequential Global</option>
-                      <option value="Branch-Based">Branch-Based (e.g. DEL-001)</option>
-                      <option value="Department-Based">Department-Based (e.g. ENG-001)</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-            </div>
 
             <div className="settings-group">
               <h4 className="settings-group-title">Active Employee Status Options</h4>
@@ -1582,7 +1539,7 @@ const SystemSettings = () => {
                 <div className="path-arrow">➔</div>
                 <div className="path-node">Team Leader</div>
                 <div className="path-arrow">➔</div>
-                <div className="path-node">Project Manager</div>
+                <div className="path-node">Manager</div>
                 <div className="path-arrow">➔</div>
                 <div className="path-node admin">Super Admin</div>
               </div>
@@ -1595,7 +1552,7 @@ const SystemSettings = () => {
                 <div className="path-arrow">➔</div>
                 <div className="path-node">Team Leader</div>
                 <div className="path-arrow">➔</div>
-                <div className="path-node">Project Manager</div>
+                <div className="path-node">Manager</div>
                 <div className="path-arrow">➔</div>
                 <div className="path-node admin">HR / Super Admin</div>
               </div>
@@ -1606,7 +1563,7 @@ const SystemSettings = () => {
               <div className="approval-path-visual">
                 <div className="path-node current">HR Executive</div>
                 <div className="path-arrow">➔</div>
-                <div className="path-node">Finance Manager</div>
+                <div className="path-node">Manager</div>
                 <div className="path-arrow">➔</div>
                 <div className="path-node admin">Super Admin Approval</div>
               </div>
@@ -1615,7 +1572,7 @@ const SystemSettings = () => {
             <div className="settings-group">
               <h4 className="settings-group-title">Project Initiation Approval Path</h4>
               <div className="approval-path-visual">
-                <div className="path-node current">Project Manager</div>
+                <div className="path-node current">Manager</div>
                 <div className="path-arrow">➔</div>
                 <div className="path-node">Department Head</div>
                 <div className="path-arrow">➔</div>

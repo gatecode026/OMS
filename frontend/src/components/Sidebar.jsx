@@ -74,7 +74,6 @@ const menuStructure = [
     title: 'Operations',
     items: [
       { name: 'Project Management', icon: Briefcase, path: '/projects' },
-      { name: 'Workflow Management', icon: GitFork, path: '/workflows', disabled: true },
       { name: 'Task Monitoring', icon: KanbanSquare, path: '/tasks' },
       { name: 'Work Reports', icon: FileText, path: '/work-reports' },
       { name: 'Performance Analytics', icon: BarChart3, path: '/performance' },

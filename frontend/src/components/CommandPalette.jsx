@@ -42,7 +42,6 @@ const navigationItems = [
   { name: 'Agency Branch Management', path: '/branches', section: 'People', icon: Network },
   { name: 'Team Management', path: '/teams', section: 'People', icon: Award },
   { name: 'Project Management', path: '/projects', section: 'Operations', icon: Briefcase },
-  { name: 'Workflow Management', path: '/workflows', section: 'Operations', icon: GitFork },
   { name: 'Task Monitoring', path: '/tasks', section: 'Operations', icon: KanbanSquare },
   { name: 'Work Reports', path: '/work-reports', section: 'Operations', icon: FileText },
   { name: 'Performance Analytics', path: '/performance', section: 'Operations', icon: BarChart3 },

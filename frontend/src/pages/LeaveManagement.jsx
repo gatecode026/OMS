@@ -208,6 +208,12 @@ const LeaveManagement = () => {
       return;
     }
 
+    const today = new Date().toISOString().split('T')[0];
+    if (applyForm.startDate < today) {
+      addToast('warning', 'Start date cannot be before today.');
+      return;
+    }
+
     const start = new Date(applyForm.startDate);
     const end = new Date(start);
     end.setDate(start.getDate() + parseInt(applyForm.days) - 1);
@@ -299,7 +305,7 @@ const LeaveManagement = () => {
   }, [leaveRequests, currentUser, currentUserRole, employees]);
 
   useEffect(() => {
-    if (applyModalOpen && currentUserRole === 'employee' && currentUser) {
+    if (applyModalOpen && (currentUserRole === 'employee' || currentUserRole === 'manager') && currentUser) {
       setApplyForm(prev => ({ ...prev, employeeId: currentUser.id }));
     }
   }, [applyModalOpen, currentUserRole, currentUser]);
@@ -707,6 +713,12 @@ const LeaveManagement = () => {
     }
     if (!assignForm.customLeaveType || !assignForm.startDate || !assignForm.days) {
       addToast('warning', 'Please fill in all leave assignment fields.');
+      return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    if (assignForm.startDate < today) {
+      addToast('warning', 'Start date cannot be before today.');
       return;
     }
 
@@ -1379,6 +1391,25 @@ const LeaveManagement = () => {
         <div className="flex align-center gap-3">
           {currentUserRole !== 'employee' && (
             <>
+              {currentUserRole === 'manager' && (
+                <Button
+                  variant="primary"
+                  icon={Plus}
+                  onClick={() => {
+                    setEditingLeave(null);
+                    setApplyForm({
+                      employeeId: currentUser?.id || '',
+                      customLeaveType: 'CL',
+                      startDate: new Date().toISOString().split('T')[0],
+                      days: 1,
+                      reason: ''
+                    });
+                    setApplyModalOpen(true);
+                  }}
+                >
+                  Apply Leave
+                </Button>
+              )}
               <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('policies'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
                 Policy Controls
               </Button>
@@ -3040,6 +3071,7 @@ const LeaveManagement = () => {
               <input
                 type="date"
                 value={assignForm.startDate}
+                min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setAssignForm({ ...assignForm, startDate: e.target.value })}
                 required
               />
@@ -3087,6 +3119,7 @@ const LeaveManagement = () => {
               <input
                 type="date"
                 value={applyForm.startDate}
+                min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setApplyForm({ ...applyForm, startDate: e.target.value })}
                 required
               />
