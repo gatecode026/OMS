@@ -8,8 +8,9 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(9, 13, 22, 0.82);
+  background-color: rgba(8, 12, 21, 0.72);
   backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -17,30 +18,45 @@
   transition: all 0.3s ease;
 }
 
-:root.light-theme .welcome-modal-overlay {
-  background-color: rgba(241, 245, 249, 0.82);
+.welcome-modal-overlay.light-theme {
+  background-color: rgba(241, 245, 249, 0.65);
 }
 
 .welcome-modal-card {
   position: relative;
-  width: 100%;
-  max-width: 460px;
-  padding: 42px var(--spacing-6) 38px var(--spacing-6);
-  background: var(--bg-card);
-  border: 1px solid var(--border-color-dark);
+  width: 90%;
+  max-width: 440px;
+  padding: 40px var(--spacing-6) 36px var(--spacing-6);
+  background: rgba(17, 24, 39, 0.85); /* Glass card dark */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 24px;
-  box-shadow: var(--shadow-xl), 0 0 40px var(--color-primary-light);
+  box-shadow: 
+    var(--shadow-xl), 
+    0 10px 40px rgba(0, 0, 0, 0.3),
+    0 0 30px var(--color-primary-light);
   overflow: hidden;
   text-align: center;
   color: var(--text-primary);
-  transition: all 0.4s ease;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.welcome-modal-card.light-theme {
+  background: rgba(255, 255, 255, 0.82); /* Glass card light */
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 
+    0 20px 50px rgba(15, 23, 42, 0.08),
+    0 4px 20px rgba(15, 23, 42, 0.04),
+    0 0 30px var(--color-primary-light);
+  color: var(--text-primary);
 }
 
 /* Close Button style */
 .welcome-close-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 16px;
+  right: 16px;
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -49,8 +65,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   transition: all 0.2s ease;
 }
@@ -61,49 +77,48 @@
   transform: rotate(90deg);
 }
 
-/* Background gradient glows using dynamic dashboard accent */
+/* Background gradient glows using dynamic accent colors */
 .welcome-glow-1 {
   position: absolute;
-  top: -20%;
-  left: -20%;
-  width: 220px;
-  height: 220px;
+  top: -15%;
+  left: -15%;
+  width: 180px;
+  height: 180px;
   background: radial-gradient(circle, var(--color-primary-light) 0%, transparent 70%);
   z-index: 0;
   pointer-events: none;
+  opacity: 0.8;
 }
 
 .welcome-glow-2 {
   position: absolute;
-  bottom: -20%;
-  right: -20%;
-  width: 220px;
-  height: 220px;
+  bottom: -15%;
+  right: -15%;
+  width: 180px;
+  height: 180px;
   background: radial-gradient(circle, var(--color-primary-light) 0%, transparent 70%);
   z-index: 0;
   pointer-events: none;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 /* Sparkles details using dynamic dashboard accent */
 .sparkle-icon {
   position: absolute;
-  color: var(--color-primary-light);
+  color: var(--color-primary);
   pointer-events: none;
   animation: welcomeFloat 3s ease-in-out infinite alternate;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .sparkle-icon.top-left {
-  top: 30px;
-  left: 30px;
-  color: var(--color-primary);
+  top: 24px;
+  left: 24px;
 }
 
 .sparkle-icon.bottom-right {
-  bottom: 40px;
-  right: 40px;
-  color: var(--color-primary);
+  bottom: 32px;
+  right: 32px;
   animation-delay: 1.5s;
 }
 
@@ -118,72 +133,87 @@
 /* Avatar glowing pulse ring */
 .welcome-avatar-wrapper {
   position: relative;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  display: inline-block;
 }
 
 .avatar-pulse-ring {
   position: absolute;
-  top: -4px;
-  left: -4px;
-  right: -4px;
-  bottom: -4px;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
   border-radius: 50%;
-  border: 2px solid var(--color-primary-light);
-  animation: welcomePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  border: 2px dashed var(--color-primary);
+  animation: welcomeRotatePulse 10s linear infinite;
+  opacity: 0.7;
 }
 
 /* Header Text elements */
 .welcome-title {
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
-  color: var(--text-muted);
-  margin-bottom: 6px;
+  letter-spacing: 0.2em;
+  color: var(--color-primary);
+  margin-bottom: 8px;
 }
 
 .welcome-employee-name {
-  font-size: 2rem;
+  font-size: 2.25rem;
   font-weight: 800;
   color: var(--text-primary);
   margin-bottom: 12px;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--text-primary) 30%, var(--color-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.welcome-modal-card.light-theme .welcome-employee-name {
+  background: linear-gradient(135deg, var(--text-primary) 50%, var(--color-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .welcome-role-badge {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .welcome-role-badge span {
-  padding: 6px 14px;
-  font-size: 0.78rem;
+  padding: 6px 16px;
+  font-size: 0.75rem;
   letter-spacing: 0.05em;
   font-weight: 600;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover, var(--color-primary)));
+  color: #fff !important;
 }
 
 .welcome-divider {
-  width: 60px;
+  width: 80px;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--color-primary-light), transparent);
-  margin-bottom: 24px;
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  margin-bottom: 20px;
+  opacity: 0.6;
 }
 
 /* Message block style */
 .welcome-message-block {
-  padding: 0 10px;
+  padding: 0 12px;
 }
 
 .welcome-greeting-title {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 8px;
 }
 
 .welcome-greeting-desc {
-  font-size: 0.88rem;
-  line-height: 1.5;
+  font-size: 0.85rem;
+  line-height: 1.6;
   color: var(--text-secondary);
 }
 
@@ -193,14 +223,18 @@
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 4px;
+  height: 5px;
   background: rgba(255, 255, 255, 0.05);
+}
+
+.welcome-progress-bar.light-theme {
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .welcome-progress-fill {
   height: 100%;
   width: 100%;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
+  background: linear-gradient(90deg, var(--color-primary), var(--color-primary-light, var(--color-primary)));
   animation: welcomeProgressShrink 3s linear forwards;
 }
 
@@ -208,7 +242,7 @@
 @keyframes welcomeIn {
   from {
     opacity: 0;
-    transform: scale(0.9) translateY(20px);
+    transform: scale(0.95) translateY(30px);
   }
   to {
     opacity: 1;
@@ -217,22 +251,26 @@
 }
 
 .animate-welcome-in {
-  animation: welcomeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: welcomeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes welcomeFloat {
   from { transform: translateY(0px) rotate(0deg); }
-  to { transform: translateY(-8px) rotate(15deg); }
+  to { transform: translateY(-6px) rotate(12deg); }
 }
 
-@keyframes welcomePulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.5;
+@keyframes welcomeRotatePulse {
+  0% {
+    transform: rotate(0deg) scale(1);
+    border-color: var(--color-primary);
   }
   50% {
-    transform: scale(1.1);
-    opacity: 0;
+    transform: rotate(180deg) scale(1.04);
+    border-color: var(--color-primary-light, var(--color-primary));
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+    border-color: var(--color-primary);
   }
 }
 

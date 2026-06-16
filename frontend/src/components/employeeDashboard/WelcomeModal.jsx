@@ -107,7 +107,7 @@ const WelcomeModal = ({ currentUser, onClose }) => {
         </div>
 
         {/* 3-second shrinking progress bar */}
-        <div className="welcome-progress-bar">
+        <div className={`welcome-progress-bar ${isLight ? 'light-theme' : ''}`}>
           <div className="welcome-progress-fill"></div>
         </div>
       </div>

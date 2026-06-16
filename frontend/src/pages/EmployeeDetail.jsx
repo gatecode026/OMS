@@ -169,7 +169,7 @@ const EmployeeDetail = () => {
         </div>
         <div className="ed-profile-actions">
           <Button variant="primary" icon={Edit2} onClick={() => navigate(`/employees?edit=${emp.id}`)}>Edit Profile</Button>
-          <Button variant="secondary" icon={Settings} onClick={() => navigate(`/employees?edit=${emp.id}&step=7`)}>Profile Settings</Button>
+          <Button variant="secondary" icon={Settings} onClick={() => navigate('/my-profile')}>Profile Settings</Button>
           <Button variant="secondary" icon={CheckSquare} onClick={() => navigate('/tasks')}>Assign Task</Button>
           <Button variant="secondary" icon={Download} onClick={() => setShowIdCard(true)}>ID Card</Button>
           <Button variant="secondary" icon={FileText} onClick={() => navigate('/work-reports')}>View Reports</Button>
@@ -358,7 +358,7 @@ const EmployeeDetail = () => {
                 <div className="id-card-logo-area">
                   <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg>
                   <div className="id-card-company-title">{emp.companyName || 'OM ENTERPRISE'}</div>
-                  <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Office Management'}</div>
+                  <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Gatecode OMS'}</div>
                 </div>
                 <div className="id-card-photo-wrap"><Avatar name={emp.name} size="xl" className="id-card-photo-img" src={emp.avatar || emp.photoUrl} /></div>
                 <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(emp.name)}</h2><p className="id-card-emp-role">{emp.designation || emp.role}</p></div>

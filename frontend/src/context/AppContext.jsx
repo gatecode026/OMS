@@ -350,7 +350,7 @@ export const AppProvider = ({ children }) => {
   const [generalSettings, setGeneralSettingsState] = useState(() => {
     const saved = localStorage.getItem('saas_general_settings');
     return saved ? JSON.parse(saved) : {
-      companyName: 'Office Management Pvt. Ltd.',
+      companyName: 'Gatecode OMS',
       timezone: 'IST (UTC+5:30)',
       language: 'English (IN)',
       dateFormat: 'DD-MM-YYYY',
@@ -375,7 +375,7 @@ export const AppProvider = ({ children }) => {
           setGeneralSettingsState(prev => {
             const nextSettings = {
               ...prev,
-              companyName: data.companyName || prev.companyName || 'Office Management Pvt. Ltd.'
+              companyName: data.companyName || prev.companyName || 'Gatecode OMS'
             };
             // Sync to local storage as offline fallback
             localStorage.setItem('saas_general_settings', JSON.stringify(nextSettings));
@@ -689,7 +689,7 @@ export const AppProvider = ({ children }) => {
         // Merge companyProfile.companyName into generalSettings so the sidebar always reflects the saved name
         const mergedGeneral = {
           ...(data.generalSettings || {}),
-          companyName: data.companyProfile?.companyName || data.generalSettings?.companyName || 'Office Management Pvt. Ltd.'
+          companyName: data.companyProfile?.companyName || data.generalSettings?.companyName || 'Gatecode OMS'
         };
         setGeneralSettingsState(mergedGeneral);
         if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);
@@ -721,7 +721,7 @@ export const AppProvider = ({ children }) => {
         // Keep company name in sync across both companyProfile and generalSettings
         const mergedGeneral = {
           ...(data.generalSettings || {}),
-          companyName: data.companyProfile?.companyName || data.generalSettings?.companyName || 'Office Management Pvt. Ltd.'
+          companyName: data.companyProfile?.companyName || data.generalSettings?.companyName || 'Gatecode OMS'
         };
         setGeneralSettingsState(mergedGeneral);
         if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);

@@ -35,8 +35,9 @@ mongoose.Connection.prototype.model = function (name, schema, collection) {
 };
 
 mongoose.model = function (name, schema, collection) {
-  if (collection) {
-    modelCollectionMap.set(name, collection);
+  const customCollection = collection || schema?.options?.collection;
+  if (customCollection) {
+    modelCollectionMap.set(name, customCollection);
   }
 
   // 1. If it's a global platform model (like Company, Admin), compile normally on main connection

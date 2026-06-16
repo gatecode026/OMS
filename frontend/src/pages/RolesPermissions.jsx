@@ -171,7 +171,6 @@ const RolesPermissions = () => {
     { key: 'attendance_management', label: 'Attendance Management' },
     { key: 'leave_management', label: 'Leave Management' },
     { key: 'project_management', label: 'Project Management' },
-    { key: 'workflow_management', label: 'Workflow Management' },
     { key: 'task_monitoring', label: 'Task Monitoring' },
     { key: 'work_reports', label: 'Work Reports' },
     { key: 'performance_analytics', label: 'Performance Analytics' },
@@ -198,7 +197,6 @@ const RolesPermissions = () => {
         'attendance_management',
         'leave_management',
         'project_management',
-        'workflow_management',
         'task_monitoring',
         'work_reports',
         'performance_analytics',
@@ -1389,7 +1387,7 @@ const RolesPermissions = () => {
                           <div className="perm-module-icon font-bold" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Sliders size={14} className="text-muted" />
                             <span>{mod.label}</span>
-                            {!['dashboard', 'company_overview', 'employee_management', 'agency_branch_management', 'department_management', 'team_management', 'attendance_management', 'leave_management', 'project_management', 'workflow_management', 'task_monitoring', 'work_reports', 'performance_analytics', 'payroll_management', 'announcements', 'notifications', 'document_management', 'role_permission', 'system_settings', 'security_audit_logs', 'profile_settings'].includes(mod.key) && (
+                            {!['dashboard', 'company_overview', 'employee_management', 'agency_branch_management', 'department_management', 'team_management', 'attendance_management', 'leave_management', 'project_management', 'task_monitoring', 'work_reports', 'performance_analytics', 'payroll_management', 'announcements', 'notifications', 'document_management', 'role_permission', 'system_settings', 'security_audit_logs', 'profile_settings'].includes(mod.key) && (
                               <button
                                 type="button"
                                 className="icon-action-btn icon-action-danger"
