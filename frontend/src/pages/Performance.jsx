@@ -249,7 +249,7 @@ const Performance = () => {
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalForm, setGoalForm] = useState({
     title: '', description: '', type: 'Individual', startDate: '', dueDate: '',
-    targetValue: 100, currentProgress: 0, assignee: '', department: 'Engineering'
+    targetValue: 100, currentProgress: 0, assignee: '', department: ''
   });
 
   /* Appraisal Review form states */
@@ -375,7 +375,7 @@ const Performance = () => {
     // Reset goal form
     setGoalForm({
       title: '', description: '', type: 'Individual', startDate: '', dueDate: '',
-      targetValue: 100, currentProgress: 0, assignee: '', department: 'Engineering'
+      targetValue: 100, currentProgress: 0, assignee: '', department: ''
     });
     setShowGoalModal(false);
   };

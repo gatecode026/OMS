@@ -282,7 +282,7 @@ const Reports = () => {
       .map((e, idx) => ({
         rank: idx + 1,
         name: e.name,
-        dept: e.department || 'Engineering',
+        dept: e.department || '',
         score: e.productivityScore || 75,
         medal: idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '⭐'
       }));

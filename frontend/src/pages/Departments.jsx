@@ -56,7 +56,7 @@ const Departments = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingDeptId, setEditingDeptId] = useState(null);
   const [transferForm, setTransferForm] = useState({
-    employee: '', source: 'Sales', target: 'Engineering', reason: '', date: '2026-06-01'
+    employee: '', source: '', target: '', reason: '', date: '2026-06-01'
   });
   const [exportFormState, setExportFormState] = useState({
     report: 'Department Summary Report', format: 'PDF'
@@ -277,7 +277,7 @@ const Departments = () => {
     }
     setTransferOpen(false);
     if (addToast) addToast('success', `Transfer of ${transferForm.employee} initiated successfully.`);
-    setTransferForm({ employee: '', source: 'Sales', target: 'Engineering', reason: '', date: '2026-06-01' });
+    setTransferForm({ employee: '', source: '', target: '', reason: '', date: '2026-06-01' });
   };
 
   const handleExportSubmit = (e) => {

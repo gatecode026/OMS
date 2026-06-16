@@ -76,8 +76,8 @@ function reducer(state, action) {
             name: emp.name,
             email: emp.email || emp.workEmail || '',
             phone: emp.phone || '',
-            department: emp.department || 'Management',
-            branch: emp.branch || 'Head Office',
+            department: emp.department || '—',
+            branch: emp.branch || '—',
             designation: emp.designation || 'Manager',
             joiningDate: emp.joinDate || '2026-01-01',
             status: emp.status || 'Active',
@@ -397,15 +397,7 @@ const Managers = () => {
   const [form, setForm] = useState({ name:'',email:'',phone:'',department:'',branch:'',designation:'',joiningDate:'',status:'Active',successRate:90,productivity:90,clientSatisfaction:8.5 });
   const [formErr, setFormErr] = useState({});
 
-  useEffect(() => {
-    if (!editingPM) {
-      setForm(f => ({
-        ...f,
-        department: departments?.[0]?.name || '',
-        branch: branches?.[0]?.name || ''
-      }));
-    }
-  }, [departments, branches, editingPM]);
+  // No department/branch defaults needed for managers
 
   /* ── derived ──────────────────────────────────────────── */
   const summary = useMemo(()=>{
@@ -643,8 +635,8 @@ const Managers = () => {
         name: form.name,
         email: form.email,
         phone: form.phone,
-        department: form.department,
-        branch: form.branch,
+        department: '',
+        branch: '',
         designation: form.designation,
         status: form.status,
         productivityScore: form.productivity
@@ -656,8 +648,8 @@ const Managers = () => {
         name: form.name,
         email: form.email,
         phone: form.phone,
-        department: form.department,
-        branch: form.branch,
+        department: '',
+        branch: '',
         designation: form.designation,
         roleId: 'manager',
         role: 'Manager',
@@ -1669,22 +1661,7 @@ const Managers = () => {
           <div className="pm-form-group"><label htmlFor="f-name" className="pm-form-label">Full Name *</label><input id="f-name" type="text" placeholder="e.g. Rahul Sharma" className={formErr.name?'pm-form-input-err':''} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/>{formErr.name&&<span className="pm-form-err-text">{formErr.name}</span>}</div>
           <div className="pm-form-group"><label htmlFor="f-phone" className="pm-form-label">Contact Number *</label><input id="f-phone" type="tel" placeholder="+91-9876543210" className={formErr.phone?'pm-form-input-err':''} value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))}/>{formErr.phone&&<span className="pm-form-err-text">{formErr.phone}</span>}</div>
           <div className="pm-form-group"><label htmlFor="f-email" className="pm-form-label">Official Email *</label><input id="f-email" type="email" placeholder="name@enterprise.com" className={formErr.email?'pm-form-input-err':''} value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))}/>{formErr.email&&<span className="pm-form-err-text">{formErr.email}</span>}</div>
-          <div className="pm-form-group">
-            <label htmlFor="f-dept" className="pm-form-label">Department</label>
-            <select id="f-dept" value={form.department} onChange={e=>setForm(f=>({...f,department:e.target.value}))}>
-              {(departments || []).map(d => (
-                <option key={d.id || d.name} value={d.name}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="pm-form-group">
-            <label htmlFor="f-branch" className="pm-form-label">Branch / Agency</label>
-            <select id="f-branch" value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))}>
-              {(branches || []).map(b => (
-                <option key={b.id || b.name} value={b.name}>{b.name}</option>
-              ))}
-            </select>
-          </div>
+          {/* Department and Branch are not applicable for Managers */}
           <div className="pm-form-group"><label htmlFor="f-desig" className="pm-form-label">Designation *</label><input id="f-desig" type="text" placeholder="e.g. Senior Manager" className={formErr.designation?'pm-form-input-err':''} value={form.designation} onChange={e=>setForm(f=>({...f,designation:e.target.value}))}/>{formErr.designation&&<span className="pm-form-err-text">{formErr.designation}</span>}</div>
           <div className="pm-form-group"><label htmlFor="f-join" className="pm-form-label">Joining Date</label><input id="f-join" type="date" value={form.joiningDate} onChange={e=>setForm(f=>({...f,joiningDate:e.target.value}))}/></div>
           <div className="pm-form-group"><label htmlFor="f-status" className="pm-form-label">Status</label><select id="f-status" value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}><option>Active</option><option>On Leave</option><option>Training</option><option>Inactive</option><option>Suspended</option></select></div>

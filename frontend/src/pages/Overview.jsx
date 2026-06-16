@@ -320,7 +320,7 @@ const Overview = () => {
       name: `${p.name} Release Pipeline`,
       progress: p.progress,
       status: p.status === 'Completed' ? 'Completed' : 'Running',
-      department: p.department || 'Engineering',
+      department: p.department || '',
       branch: p.branch || 'Head Office',
       date: p.date
     }));
