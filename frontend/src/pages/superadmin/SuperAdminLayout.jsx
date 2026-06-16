@@ -1,7 +1,7 @@
 import React, { useState, Suspense } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
-import { Sparkles, LayoutDashboard, Building2, PlusCircle, LogOut, Menu } from 'lucide-react';
+import { Sparkles, LayoutDashboard, Building2, PlusCircle, LogOut, Menu, Sun, Moon } from 'lucide-react';
 import Avatar from '../../components/common/Avatar';
 import Skeleton from '../../components/common/Skeleton';
 import '../../components/AppShell.css';
@@ -9,7 +9,7 @@ import '../../components/Sidebar.css';
 import '../../components/Topbar.css';
 
 const SuperAdminLayout = () => {
-  const { currentUser, logout, sidebarCollapsed } = useApp();
+  const { currentUser, logout, sidebarCollapsed, theme, toggleTheme } = useApp();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const location = useLocation();
 
@@ -121,6 +121,13 @@ const SuperAdminLayout = () => {
           </div>
 
           <div className="topbar-right-side">
+            <button
+              className="theme-toggle-btn-sa"
+              onClick={toggleTheme}
+              title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             <div className="topbar-user-badge-sa">
               <span className="superadmin-badge">
                 Super Admin
@@ -129,6 +136,7 @@ const SuperAdminLayout = () => {
             </div>
           </div>
         </header>
+
 
         {/* Page Content Viewport */}
         <main className="app-shell-content">
