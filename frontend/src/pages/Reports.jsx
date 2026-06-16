@@ -166,9 +166,9 @@ const Reports = () => {
     (departments || []).forEach(d => {
       const deptEmps = (employees || []).filter(e => e.department === d.name);
       const deptTasks = (tasks || []).filter(t => t.department === d.name);
-      const avgProd = deptEmps.length > 0 ? Math.round(deptEmps.reduce((sum, e) => sum + (e.productivityScore || 75), 0) / deptEmps.length) : 85;
+      const avgProd = deptEmps.length > 0 ? Math.round(deptEmps.reduce((sum, e) => sum + (e.productivityScore ?? 0), 0) / deptEmps.length) : 0;
       const avgAtt = deptEmps.length > 0 ? Math.round(deptEmps.reduce((sum, e) => sum + (e.attendanceStatus === 'Present' || e.attendanceStatus === 'Late' ? 95 : 90), 0) / deptEmps.length) : 95;
-      const avgPerf = deptEmps.length > 0 ? Math.round(deptEmps.reduce((sum, e) => sum + (e.performanceScore?.overall || 80), 0) / deptEmps.length) : 85;
+      const avgPerf = deptEmps.length > 0 ? Math.round(deptEmps.reduce((sum, e) => sum + (e.performanceScore?.overall ?? 0), 0) / deptEmps.length) : 0;
       depts[d.name] = {
         dept: d.name,
         employees: deptEmps.length,
@@ -282,8 +282,8 @@ const Reports = () => {
       .map((e, idx) => ({
         rank: idx + 1,
         name: e.name,
-        dept: e.department || '',
-        score: e.productivityScore || 75,
+        dept: e.department || 'Engineering',
+        score: e.productivityScore ?? 0,
         medal: idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '⭐'
       }));
   }, [employees]);
@@ -304,8 +304,8 @@ const Reports = () => {
   const branchCompData = useMemo(() => {
     return (branches || []).map(b => {
       const branchEmps = (employees || []).filter(e => e.branch === b.name);
-      const avgProd = branchEmps.length > 0 ? Math.round(branchEmps.reduce((sum, e) => sum + (e.productivityScore || 75), 0) / branchEmps.length) : (b.productivity || 85);
-      const avgPerf = branchEmps.length > 0 ? Math.round(branchEmps.reduce((sum, e) => sum + (e.performanceScore?.overall || 80), 0) / branchEmps.length) : 85;
+      const avgProd = branchEmps.length > 0 ? Math.round(branchEmps.reduce((sum, e) => sum + (e.productivityScore ?? 0), 0) / branchEmps.length) : (b.productivity || 0);
+      const avgPerf = branchEmps.length > 0 ? Math.round(branchEmps.reduce((sum, e) => sum + (e.performanceScore?.overall ?? 0), 0) / branchEmps.length) : 0;
       const avgAtt = branchEmps.length > 0 ? Math.round(branchEmps.reduce((sum, e) => sum + (e.attendanceStatus === 'Present' || e.attendanceStatus === 'Late' ? 95 : 90), 0) / branchEmps.length) : 94;
       return {
         branch: b.name,
