@@ -28,7 +28,6 @@ export const ROUTE_PERMISSIONS = {
   // Team Leader and above
   '/leaves': ROLES.EMPLOYEE,
   '/projects': ROLES.EMPLOYEE,
-  '/workflows': ROLES.TEAM_LEADER,
   '/tasks': ROLES.EMPLOYEE,
   '/work-reports': ROLES.EMPLOYEE,
   '/performance': ROLES.TEAM_LEADER,
@@ -103,7 +102,6 @@ export const PATH_TO_MODULE = {
   '/attendance/webportal': 'attendance_management',
   '/leaves': 'leave_management',
   '/projects': 'project_management',
-  '/workflows': 'workflow_management',
   '/tasks': 'task_monitoring',
   '/work-reports': 'work_reports',
   '/performance': 'performance_analytics',

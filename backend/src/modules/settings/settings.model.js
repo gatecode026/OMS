@@ -10,7 +10,7 @@ const SystemSettingsSchema = new mongoose.Schema({
   companyProfile: {
     type: mongoose.Schema.Types.Mixed,
     default: {
-      companyName: 'Office Management Pvt. Ltd.',
+      companyName: 'Gatecode OMS',
       regNumber: 'U72200DL2026PTC394850',
       gstNumber: '07AAAAA1111A1Z1',
       panNumber: 'AAAAA1111A',
@@ -159,7 +159,7 @@ const SystemSettingsSchema = new mongoose.Schema({
   generalSettings: {
     type: mongoose.Schema.Types.Mixed,
     default: {
-      companyName: 'Office Management Pvt. Ltd.',
+      companyName: 'Gatecode OMS',
       timezone: 'IST (UTC+5:30)',
       language: 'English (IN)',
       dateFormat: 'DD-MM-YYYY',

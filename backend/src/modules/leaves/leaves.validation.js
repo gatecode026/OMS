@@ -8,6 +8,12 @@ export const createSchema = (data) => {
   if (!data || Object.keys(data).length === 0) {
     errors.push('Request payload body is empty');
   }
+  if (data && data.fromDate) {
+    const today = new Date().toISOString().split('T')[0];
+    if (data.fromDate < today) {
+      errors.push('Start date cannot be before today');
+    }
+  }
   return {
     isValid: errors.length === 0,
     errors

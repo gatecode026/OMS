@@ -7,7 +7,7 @@ import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
 import {
   User, Mail, Phone, MapPin, Briefcase, Shield, Clock,
-  Lock, Check, Download, Share2, Globe, Building, Cpu
+  Lock, Check, Download, Share2, Globe, Building, Cpu, Activity
 } from 'lucide-react';
 
 // ─── REDESIGNED SUB-COMPONENTS ─────────────────────────────────────────────
@@ -276,7 +276,14 @@ const MyProfile = () => {
   const {
     currentUser,
     currentUserRole,
-    addToast
+    addToast,
+    employees,
+    branches,
+    departments,
+    projectsList,
+    tasks,
+    leaveRequests,
+    activityLogs
   } = useApp();
 
   // Active Tab state for form panels
@@ -380,6 +387,113 @@ const MyProfile = () => {
   const permAddrObj = typeof currentUser.permanentAddress === 'object' ? currentUser.permanentAddress : null;
 
   const isSameAddress = currentUser.permanentAddress === currentUser.currentAddress;
+
+  if (currentUserRole === 'company_admin') {
+    // Get filtered recent activity logs for this tenant (first 6 logs)
+    const companyLogs = (activityLogs || []).slice(0, 6);
+
+    // Metrics calculation
+    const empCount = employees?.length || 0;
+    const branchCount = branches?.length || 0;
+    const deptCount = departments?.length || 0;
+    const projectCount = projectsList?.length || 0;
+    const taskCount = tasks?.length || 0;
+    const pendingLeaveCount = leaveRequests?.filter(r => r.status === 'Pending').length || 0;
+
+    return (
+      <div className="profile-settings-page animate-fade-in flex-column grid-gap">
+        {/* ==================== 1. HEADER ==================== */}
+        <div className="profile-page-header">
+          <div className="profile-header-title-section">
+            <div className="profile-header-title-row">
+              <h2>My Profile</h2>
+              <span className="security-badge">
+                <Lock size={12} /> Personal Account Management Center
+              </span>
+            </div>
+            <p className="profile-header-subtitle">
+              Manage your personal information, professional details, contact information, official documents, bank account details, and account preferences from a single secure profile management center.
+            </p>
+          </div>
+        </div>
+
+        {/* ==================== TWO-COLUMN LAYOUT ==================== */}
+        <div className="profile-columns-layout">
+          {/* LEFT COLUMN: HERO CARD & METRICS REPORT */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* HERO BOX */}
+            <div className="profile-hero-card" style={{ padding: '30px 24px' }}>
+              <div className="hero-card-banner" />
+              <div className="hero-card-content" style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                <div className="hero-avatar-glow" style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--color-primary, #6366f1), var(--color-secondary, #4f46e5))', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)' }}>
+                  <Shield size={36} style={{ color: '#fff' }} />
+                </div>
+                <div className="hero-primary-info" style={{ marginTop: 0 }}>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: 800 }}>{currentUser.name}</h3>
+                  <p className="hero-designation" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Company Administrator</p>
+                  <p className="hero-dept-tag" style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{currentUser.email}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* REPORT CARD */}
+            <div className="card" style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+              <h4 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                <Building size={16} /> Organization Metrics Report
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                {[
+                  { label: 'Total Employees', value: empCount, color: 'var(--color-primary)' },
+                  { label: 'Active Projects', value: projectCount, color: '#06b6d4' },
+                  { label: 'Pending Tasks', value: taskCount, color: '#f59e0b' },
+                  { label: 'Pending Leaves', value: pendingLeaveCount, color: '#ec4899' },
+                  { label: 'Agency Branches', value: branchCount, color: '#10b981' },
+                  { label: 'Departments', value: deptCount, color: '#8b5cf6' }
+                ].map((stat, idx) => (
+                  <div key={idx} style={{ padding: '16px', background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>{stat.label}</span>
+                    <strong style={{ fontSize: '1.5rem', color: stat.color }}>{stat.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: RECENT SYSTEM ACTIVITY LOGS */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="card" style={{ padding: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+              <h4 style={{ margin: '0 0 16px 0', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                <Activity size={16} /> Recent System Activity Logs
+              </h4>
+              {companyLogs.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {companyLogs.map((log, i) => (
+                    <div key={i} style={{ padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>{log.action || log.description}</span>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          background: log.status === 'success' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: log.status === 'success' ? 'var(--color-success)' : 'var(--color-danger)',
+                          padding: '2px 8px', borderRadius: '10px', fontWeight: 600
+                        }}>{log.status || 'success'}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <span>Module: {log.module || 'System'}</span>
+                        <span>{log.timestamp || new Date(log.createdAt).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No recent activity logs found.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="profile-settings-page">

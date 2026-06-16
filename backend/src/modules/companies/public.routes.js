@@ -19,7 +19,7 @@ router.get('/branding', asyncHandler(async (req, res) => {
 
   // Platform defaults fallback
   const defaultBranding = {
-    companyName: 'Office Management',
+    companyName: 'Gatecode OMS',
     logoUrl: '',
     primaryColor: '#d946ef',
     secondaryColor: '#1d4ed8',
@@ -56,7 +56,7 @@ router.get('/branding/:companyId', asyncHandler(async (req, res) => {
   const company = await Company.findOne({ id: companyId }).lean();
 
   const defaultBranding = {
-    companyName: 'Office Management',
+    companyName: 'Gatecode OMS',
     logoUrl: '',
     primaryColor: '#d946ef',
     secondaryColor: '#1d4ed8',

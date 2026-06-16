@@ -846,24 +846,35 @@ const Announcements = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {trackingLogs.map(log => (
-                      <tr key={log.employeeId}>
-                        <td className="font-semibold">{log.employeeName}</td>
-                        <td>{log.department}</td>
-                        <td className="text-muted font-xsmall">{log.viewTime}</td>
-                        <td>
-                          <Badge variant={log.readStatus === 'Viewed' ? 'success' : 'neutral'}>
-                            {log.readStatus}
-                          </Badge>
+                    {trackingLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="text-center py-4" style={{ background: 'transparent' }}>
+                          <div className="flex-column flex-center gap-1">
+                            <strong className="font-semibold text-primary font-small">No tracking logs registered</strong>
+                            <span className="text-muted font-xsmall">Logs will appear here automatically when employees read and acknowledge published notices.</span>
+                          </div>
                         </td>
-                        <td>
-                          <Badge variant={log.ackStatus === 'Acknowledged' ? 'success' : 'warning'}>
-                            {log.ackStatus}
-                          </Badge>
-                        </td>
-                        <td className="font-mono text-muted font-xsmall">{log.device}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      trackingLogs.map(log => (
+                        <tr key={log.employeeId}>
+                          <td className="font-semibold">{log.employeeName}</td>
+                          <td>{log.department}</td>
+                          <td className="text-muted font-xsmall">{log.viewTime}</td>
+                          <td>
+                            <Badge variant={log.readStatus === 'Viewed' ? 'success' : 'neutral'}>
+                              {log.readStatus}
+                            </Badge>
+                          </td>
+                          <td>
+                            <Badge variant={log.ackStatus === 'Acknowledged' ? 'success' : 'warning'}>
+                              {log.ackStatus}
+                            </Badge>
+                          </td>
+                          <td className="font-mono text-muted font-xsmall">{log.device}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -884,15 +895,26 @@ const Announcements = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {auditLogs.map(log => (
-                      <tr key={log.id}>
-                        <td className="font-semibold">{log.user}</td>
-                        <td>{log.action}</td>
-                        <td className="text-danger">{log.prevVal}</td>
-                        <td className="text-success">{log.newVal}</td>
-                        <td className="text-muted font-xsmall">{log.timestamp}</td>
+                    {auditLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-4" style={{ background: 'transparent' }}>
+                          <div className="flex-column flex-center gap-1">
+                            <strong className="font-semibold text-danger font-small">Audit trail empty</strong>
+                            <span className="text-muted font-xsmall">An audit log of all communications operations (creation, editing, pinning, and deletion) will be listed here.</span>
+                          </div>
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      auditLogs.map(log => (
+                        <tr key={log.id}>
+                          <td className="font-semibold">{log.user}</td>
+                          <td>{log.action}</td>
+                          <td className="text-danger">{log.prevVal}</td>
+                          <td className="text-success">{log.newVal}</td>
+                          <td className="text-muted font-xsmall">{log.timestamp}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

@@ -38,7 +38,6 @@ const Placeholder = lazy(() => import('./pages/Placeholder'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 
 // New completed modules
-const Workflows = lazy(() => import('./pages/Workflows'));
 const WorkReports = lazy(() => import('./pages/WorkReports'));
 const SecurityAudit = lazy(() => import('./pages/SecurityAudit'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
@@ -88,7 +87,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 {/* ── Operations ── */}
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/managers" element={<Managers />} />
-                <Route path="/workflows" element={<Workflows />} />
                 <Route path="/tasks" element={<TaskMonitoring />} />
                 <Route path="/work-reports" element={<WorkReports />} />
                 <Route path="/performance" element={<Performance />} />

@@ -37,7 +37,15 @@ const leaveSchema = new mongoose.Schema({
   },
   fromDate: {
     type: String,
-    required: function() { return !this.isPolicy; }
+    required: function() { return !this.isPolicy; },
+    validate: {
+      validator: function(v) {
+        if (this.isPolicy || !this.isNew) return true;
+        const today = new Date().toISOString().split('T')[0];
+        return v >= today;
+      },
+      message: props => `Start date (${props.value}) cannot be before today!`
+    }
   },
   toDate: {
     type: String,
