@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { getCompanies, getCompanyUsage, createTenant, updateTenantStatus, updateTenant, getOverview } from './admin.controller.js';
+import { getCompanies, getCompanyUsage, createTenant, updateTenantStatus, updateTenant, getOverview, getOverviewAnalytics } from './admin.controller.js';
 import { authenticate, restrictTo } from '../../middlewares/auth.middleware.js';
 
 const router = express.Router();
@@ -23,7 +23,11 @@ router.route('/companies/:id')
 router.route('/companies/:id/status')
   .patch(updateTenantStatus);
 
+router.route('/overview/analytics')
+  .get(getOverviewAnalytics);
+
 router.route('/overview')
   .get(getOverview);
+
 
 export default router;

@@ -1088,3 +1088,134 @@
 .table-responsive::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.15);
 }
+
+/* Theme Toggle Button */
+.theme-toggle-btn-sa {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle-btn-sa:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-white);
+  transform: scale(1.05);
+}
+
+/* Light Theme Variables & Overrides for Super Admin Console */
+.light-theme .theme-toggle-btn-sa {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: var(--text-secondary);
+}
+
+.light-theme .theme-toggle-btn-sa:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: var(--text-main);
+}
+
+.light-theme .superadmin-stat-card {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+.light-theme .superadmin-stat-card:hover {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.light-theme .stat-card-value {
+  color: #111827;
+}
+
+.light-theme .superadmin-chart-section,
+.light-theme .superadmin-detailed-table-section,
+.light-theme .superadmin-table-card,
+.light-theme .superadmin-filters-card {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+.light-theme .superadmin-diagnostic-table th {
+  background: rgba(243, 244, 246, 0.8);
+  color: #374151;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .superadmin-diagnostic-table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.light-theme .superadmin-diagnostic-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.light-theme .company-name-bold,
+.light-theme .count-main,
+.light-theme .storage-text,
+.light-theme .section-title {
+  color: #111827;
+}
+
+.light-theme .progress-bar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.02);
+}
+
+.light-theme .table-responsive::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.light-theme .table-responsive::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.light-theme .subdomain-tag {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.05);
+  color: #4b5563;
+}
+
+.light-theme .superadmin-search-wrapper .search-input {
+  background-color: #f9fafb;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #111827;
+}
+
+.light-theme .superadmin-search-wrapper .search-input:focus {
+  background-color: #ffffff;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 10px rgba(217, 70, 239, 0.1);
+}
+
+.light-theme .topbar-user-badge-sa {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+
+.light-theme .custom-chart-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.light-theme .tooltip-title {
+  color: #111827;
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+.light-theme .tooltip-value {
+  color: #111827;
+}
+
