@@ -217,7 +217,7 @@ const Reports = () => {
     (leaveRequests || []).forEach(r => {
       const t = r.type || 'Casual Leave';
       counts[t] = (counts[t] || 0) + 1;
-    });
+    });  
     const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
     const colors = ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
     const list = Object.entries(counts).map(([name, val], index) => ({
