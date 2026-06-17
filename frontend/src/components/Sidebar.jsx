@@ -450,7 +450,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
           )}
         </div>
 
-        {currentUserRole === 'employee' && !effectiveCollapsed && (
+        {currentUser && !effectiveCollapsed && (
           <div className="sidebar-employee-footer-row">
             <Link to="/my-profile" className="sidebar-footer-avatar-wrapper" title="View Profile">
               <Avatar name={currentUser?.name} className="emp-footer-avatar" size="md" src={currentUser?.avatar || currentUser?.photoUrl} />

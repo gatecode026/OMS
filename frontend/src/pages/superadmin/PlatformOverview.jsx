@@ -112,7 +112,7 @@ const PlatformOverview = () => {
           const usage = usageList.find(u => u.name === c.name) || {};
           return {
             ...c,
-            employees: usage.employees || 1,
+            employees: usage.employees !== undefined ? usage.employees : 0,
             activity: usage.activity || 0,
             storage: usage.storage || (c.databaseType === 'dedicated' ? 12.5 : 5.8)
           };
@@ -355,28 +355,6 @@ const PlatformOverview = () => {
           <div className="stat-card-desc">Unique logins inside the last 7 days</div>
         </div>
 
-        {/* KPI: Monthly Revenue (MRR) */}
-        <div className="superadmin-stat-card card-green">
-          <div className="stat-card-header">
-            <div className="stat-icon-wrapper icon-green">
-              <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#34d399' }}>$</span>
-            </div>
-            <div className="trend-wrapper">
-              <span className={`trend-badge ${kpis.mrr.trend}`}>
-                {kpis.mrr.trend === 'up' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                {kpis.mrr.change}%
-              </span>
-            </div>
-          </div>
-          <div className="stat-value-sparkline-row">
-            <div className="stat-card-value">${kpis.mrr.value.toLocaleString()}</div>
-            <div className="stat-sparkline">
-              <Sparkline data={kpis.mrr.sparkline} color="#10b981" />
-            </div>
-          </div>
-          <div className="stat-card-label">Monthly Revenue (MRR)</div>
-          <div className="stat-card-desc">Active monthly recurring subscription volume</div>
-        </div>
 
         {/* KPI: Dedicated DB Companies */}
         <div className="superadmin-stat-card card-purple">
@@ -718,7 +696,7 @@ const PlatformOverview = () => {
                   </td>
                   <td>
                     <div className="td-headcount">
-                      <span className="count-main">{c.employees || 1}</span>
+                      <span className="count-main">{c.employees ?? 0}</span>
                     </div>
                   </td>
                   <td>

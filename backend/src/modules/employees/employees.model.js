@@ -179,7 +179,7 @@ const employeeSchema = new mongoose.Schema({
   },
   productivityScore: {
     type: Number,
-    default: 75
+    default: 0
   },
   performanceRating: {
     type: String,
@@ -217,12 +217,12 @@ const employeeSchema = new mongoose.Schema({
   leaveHistory: [mongoose.Schema.Types.Mixed],
   taskHistory: [mongoose.Schema.Types.Mixed],
   performanceScore: {
-    overall: { type: Number, default: 75 },
-    attendance: { type: Number, default: 80 },
-    taskCompletion: { type: Number, default: 75 },
-    reportSubmission: { type: Number, default: 80 },
-    leaveDiscipline: { type: Number, default: 80 },
-    monthly: { type: [Number], default: [75, 75, 75, 75, 75, 75] }
+    overall: { type: Number, default: 0 },
+    attendance: { type: Number, default: 0 },
+    taskCompletion: { type: Number, default: 0 },
+    reportSubmission: { type: Number, default: 0 },
+    leaveDiscipline: { type: Number, default: 0 },
+    monthly: { type: [Number], default: [0, 0, 0, 0, 0, 0] }
   },
   activityLog: [mongoose.Schema.Types.Mixed],
   securityInfo: {

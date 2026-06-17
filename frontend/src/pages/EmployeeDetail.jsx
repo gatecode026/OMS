@@ -42,12 +42,19 @@ const renderName = (fullname) => {
   );
 };
 
-const getBranchAddress = (branchName) => {
+const getBranchAddress = (branchName, branchesList = []) => {
   const name = (branchName || '').toLowerCase().trim();
-  if (name.includes('delhi')) return 'Connaught Place, New Delhi - 110001';
-  if (name.includes('mumbai')) return 'Bandra Kurla Complex, Mumbai - 400051';
-  if (name.includes('bangalore') || name.includes('bengaluru')) return 'MG Road, Bangalore - 560001';
-  return 'Malviya Nagar, Jaipur, Rajasthan 302017';
+  const foundBranch = (branchesList || []).find(b => 
+    (b.name || '').toLowerCase().trim() === name ||
+    (b.id || '').toLowerCase().trim() === name ||
+    (b.code || '').toLowerCase().trim() === name ||
+    (b.branchCode || '').toLowerCase().trim() === name
+  );
+  if (foundBranch) {
+    const addr = [foundBranch.address, foundBranch.city, foundBranch.state, foundBranch.zipCode].filter(Boolean).join(', ');
+    if (addr) return addr;
+  }
+  return branchName || '—';
 };
 
 const TABS = [
@@ -78,7 +85,7 @@ const EmployeeDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee, token } = useApp();
+  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee, token, branches } = useApp();
 
   const [fullEmp, setFullEmp] = useState(null);
 
@@ -375,7 +382,7 @@ const EmployeeDetail = () => {
                 <div className="id-card-back-bullets">
                   <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {emp.companyName || 'OM Enterprise'} and must be returned on demand.</p></div>
                   <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div>
-                  <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {emp.branchAddress || getBranchAddress(emp.branch)}</p></div>
+                  <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {emp.branchAddress || getBranchAddress(emp.branch, branches)}</p></div>
                 </div>
                 <div className="id-card-back-middle">
                   <div className="id-card-back-dates">

@@ -939,7 +939,7 @@ const SystemSettings = () => {
                   onChange={v => setCompanyProfile(p => ({ ...p, officialEmail: v }))}
                   placeholder="info@yourcompany.com"
                   disabled={true}
-                />  
+                />
                 <SettingsInput
                   label="Official Contact Number"
                   value={companyProfile.officialPhone}
