@@ -472,12 +472,15 @@ const Dashboard = () => {
   // Dynamic Leaderboard data
   const employeeLeaderboard = React.useMemo(() => {
     return (employees || [])
-      .map(e => ({
-        name: e.name,
-        dept: e.department || '',
-        score: e.productivityScore || (e.performanceScore?.overall) || 75,
-        color: (e.productivityScore || 75) > 90 ? '#10b981' : (e.productivityScore || 75) > 80 ? '#3b82f6' : '#f59e0b'
-      }))
+      .map(e => {
+        const score = e.productivityScore ?? e.performanceScore?.overall ?? 0;
+        return {
+          name: e.name,
+          dept: e.department || 'Engineering',
+          score: score,
+          color: score > 90 ? '#10b981' : score > 80 ? '#3b82f6' : '#f59e0b'
+        };
+      })
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
   }, [employees]);
@@ -498,8 +501,8 @@ const Dashboard = () => {
       const deptTasks = tasks.filter(t => t.department === d.name);
       const colors = ['var(--color-primary)', '#f59e0b', '#10b981', '#8b5cf6', '#d946ef'];
       
-      const totalProd = deptEmployees.reduce((sum, e) => sum + (e.productivityScore || 75), 0);
-      const avgProd = deptEmployees.length > 0 ? Math.round(totalProd / deptEmployees.length) : 85;
+      const totalProd = deptEmployees.reduce((sum, e) => sum + (e.productivityScore ?? 0), 0);
+      const avgProd = deptEmployees.length > 0 ? Math.round(totalProd / deptEmployees.length) : 0;
 
       return {
         name: d.name,

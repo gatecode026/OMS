@@ -1924,7 +1924,7 @@ export const AppProvider = ({ children }) => {
       employmentHistory: newEmp.employmentHistory || [],
       securityInfo: newEmp.securityInfo || { lastLogin: '—', loginDevice: '—', loginLocation: '—', failedAttempts: 0, mfaStatus: 'Disabled' },
       payrollSummary: newEmp.payrollSummary || { salaryStatus: 'Pending', lastSalaryDate: '—', upcomingPayrollDate: '—', bonusHistory: [] },
-      productivityScore: newEmp.productivityScore || 75,
+      productivityScore: newEmp.productivityScore || 0,
       performanceRating: newEmp.performanceRating || 'Good',
       leaveBalance: newEmp.leaveBalance || 15,
       currentProjectsCount: newEmp.currentProjectsCount || 0,

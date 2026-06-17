@@ -9,9 +9,12 @@ import '../../components/Sidebar.css';
 import '../../components/Topbar.css';
 
 const SuperAdminLayout = () => {
-  const { currentUser, logout, sidebarCollapsed, theme, toggleTheme } = useApp();
+  const { currentUser, logout, sidebarCollapsed, setSidebarCollapsed, theme, toggleTheme } = useApp();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const location = useLocation();
+
+  const effectiveCollapsed = sidebarCollapsed && !isHovered;
 
   const handleLogout = (e) => {
     e.preventDefault();
@@ -41,20 +44,28 @@ const SuperAdminLayout = () => {
 
       {/* Super Admin Sidebar */}
       <aside
-        className={`app-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileSidebarOpen ? 'mobile-show' : ''}`}
+        className={`app-sidebar ${effectiveCollapsed ? 'collapsed' : ''} ${mobileSidebarOpen ? 'mobile-show' : ''}`}
+        onMouseEnter={() => {
+          if (sidebarCollapsed) {
+            setIsHovered(true);
+          }
+        }}
+        onMouseLeave={() => {
+          setIsHovered(false);
+        }}
       >
         <div className="sidebar-header">
           <Link to="/superadmin/overview" className="sidebar-logo-link" onClick={() => setMobileSidebarOpen(false)}>
             <div className="logo-icon-holder superadmin-logo-holder">
               <Sparkles size={18} className="logo-spark" style={{ color: '#ffffff' }} />
             </div>
-            {!sidebarCollapsed && <span className="sidebar-brand-name">Super Admin Console</span>}
+            {!effectiveCollapsed && <span className="sidebar-brand-name">Super Admin Console</span>}
           </Link>
         </div>
 
         <div className="sidebar-menu-container sidebar-scroll">
           <div className="sidebar-section">
-            {!sidebarCollapsed && <h5 className="sidebar-section-title">Platform</h5>}
+            {!effectiveCollapsed && <h5 className="sidebar-section-title">Platform</h5>}
             <div className="sidebar-section-items">
               {menuItems.map((item) => {
                 const Icon = item.icon;
@@ -64,14 +75,14 @@ const SuperAdminLayout = () => {
                     key={item.name}
                     to={item.path}
                     onClick={() => setMobileSidebarOpen(false)}
-                    className={`menu-link ${active ? 'active superadmin-active-link' : ''} ${sidebarCollapsed ? 'justify-center' : ''}`}
-                    title={sidebarCollapsed ? item.name : ''}
+                    className={`menu-link ${active ? 'active superadmin-active-link' : ''} ${effectiveCollapsed ? 'justify-center' : ''}`}
+                    title={effectiveCollapsed ? item.name : ''}
                   >
                     <div className="menu-item-content">
                       <Icon size={18} className="menu-icon" />
-                      {!sidebarCollapsed && <span className="menu-label-text">{item.name}</span>}
+                      {!effectiveCollapsed && <span className="menu-label-text">{item.name}</span>}
                     </div>
-                    {sidebarCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
+                    {effectiveCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
                   </Link>
                 );
               })}
@@ -80,10 +91,10 @@ const SuperAdminLayout = () => {
         </div>
 
         {/* Super Admin Sidebar Footer */}
-        {!sidebarCollapsed && (
+        {!effectiveCollapsed && (
           <div className="sidebar-employee-footer-row" style={{ borderTop: '1px solid var(--border-color)' }}>
             <div className="sidebar-footer-avatar-wrapper">
-              <Avatar name={currentUser?.name || 'Super Admin'} className="emp-footer-avatar" size="md" />
+              <Avatar name={currentUser?.name || 'Super Admin'} className="emp-footer-avatar" size="md" src={currentUser?.avatar || currentUser?.photoUrl} />
             </div>
             <button className="sidebar-footer-logout-btn" onClick={handleLogout} title="Logout">
               <LogOut size={16} />
@@ -91,7 +102,7 @@ const SuperAdminLayout = () => {
             </button>
           </div>
         )}
-        {sidebarCollapsed && (
+        {effectiveCollapsed && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0', borderTop: '1px solid var(--border-color)' }}>
             <button
               onClick={handleLogout}
@@ -107,20 +118,26 @@ const SuperAdminLayout = () => {
       {/* Main Content Area */}
       <div className={`app-shell-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         {/* Topbar */}
-        <header className="app-topbar">
-          <div className="topbar-left-side">
+        <header className={`app-topbar ${sidebarCollapsed ? 'expanded-width' : ''}`}>
+          <div className="topbar-left">
             <button
-              className="topbar-toggle-btn"
+              className="topbar-icon-btn menu-toggle-btn"
               onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
             >
               <Menu size={20} />
             </button>
-            <h1 className="topbar-page-title" style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)' }}>
+            <button
+              className="topbar-icon-btn desktop-collapse-btn"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              <Menu size={20} />
+            </button>
+            <h1 className="topbar-page-title" style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               Platform Control Center
             </h1>
           </div>
 
-          <div className="topbar-right-side">
+          <div className="topbar-right">
             <button
               className="theme-toggle-btn-sa"
               onClick={toggleTheme}
@@ -132,7 +149,7 @@ const SuperAdminLayout = () => {
               <span className="superadmin-badge">
                 Super Admin
               </span>
-              <Avatar name={currentUser?.name || 'Super Admin'} size="sm" />
+              <Avatar name={currentUser?.name || 'Super Admin'} size="sm" src={currentUser?.avatar || currentUser?.photoUrl} />
             </div>
           </div>
         </header>

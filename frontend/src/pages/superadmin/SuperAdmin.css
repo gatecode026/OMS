@@ -595,19 +595,19 @@
 
 .form-group-sa input,
 .form-group-sa select {
-  background-color: rgba(17, 24, 39, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 10px 14px;
-  color: var(--text-white);
+  color: var(--text-primary);
   transition: var(--transition-all);
 }
 
 .form-group-sa input:focus,
 .form-group-sa select:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 12px rgba(217, 70, 239, 0.15);
-  background-color: rgba(17, 24, 39, 0.85);
+  box-shadow: var(--shadow-focus);
+  background-color: var(--bg-card);
 }
 
 .status-modal-content {
@@ -652,19 +652,19 @@
 }
 
 .create-section-card {
-  background: rgba(17, 24, 39, 0.35);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-xl);
   overflow: hidden;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-md);
 }
 
 .card-sec-header {
   padding: var(--space-4) var(--space-5);
-  background: rgba(26, 33, 51, 0.25);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -673,7 +673,7 @@
 .card-sec-header h4 {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text-white);
+  color: var(--text-primary);
   letter-spacing: -0.01em;
 }
 
@@ -706,8 +706,8 @@
 .input-group-subdomain {
   display: flex;
   align-items: center;
-  background: rgba(17, 24, 39, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   overflow: hidden;
   transition: var(--transition-all);
@@ -715,8 +715,8 @@
 
 .input-group-subdomain:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 12px rgba(217, 70, 239, 0.15);
-  background: rgba(17, 24, 39, 0.8);
+  box-shadow: var(--shadow-focus);
+  background: var(--bg-card);
 }
 
 .input-group-subdomain .input-prefix {
@@ -731,11 +731,11 @@
   color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.8rem;
-  background: rgba(26, 33, 51, 0.4);
+  background: var(--bg-elevated);
   height: 40px;
   display: flex;
   align-items: center;
-  border-left: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 1px solid var(--border-color);
 }
 
 .input-group-subdomain input {
@@ -800,21 +800,21 @@
 
 /* Drag-drop branding Logo upload zone */
 .logo-upload-zone {
-  border: 2px dashed rgba(255, 255, 255, 0.08);
+  border: 2px dashed var(--border-color-dark);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.01);
+  background: var(--color-neutral-light);
   transition: var(--transition-all);
   min-height: 150px;
 }
 
 .logo-upload-zone:hover {
   border-color: var(--color-primary);
-  background: rgba(217, 70, 239, 0.02);
+  background: var(--color-primary-light);
 }
 
 .upload-placeholder {
@@ -854,7 +854,7 @@
   max-height: 90px;
   object-fit: contain;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-color);
   box-shadow: var(--shadow-md);
 }
 
@@ -933,13 +933,13 @@
 }
 
 .detail-card {
-  background: rgba(17, 24, 39, 0.35);
+  background: var(--bg-card);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
 }
@@ -951,7 +951,7 @@
   letter-spacing: 0.06em;
   color: var(--text-secondary);
   margin-bottom: var(--space-4);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 10px;
 }
 
@@ -966,7 +966,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.88rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 8px;
 }
 
@@ -982,7 +982,7 @@
 
 .info-value {
   font-weight: 600;
-  color: var(--text-white);
+  color: var(--text-primary);
 }
 
 /* Mini statistics in company details page */
@@ -994,8 +994,8 @@
 }
 
 .usage-stat-mini {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
   display: flex;
@@ -1005,15 +1005,15 @@
 }
 
 .usage-stat-mini:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border-color: var(--border-color-dark);
   transform: translateY(-2px);
 }
 
 .mini-count {
   font-size: 1.35rem;
   font-weight: 800;
-  color: var(--text-white);
+  color: var(--text-primary);
   line-height: 1.1;
   display: block;
 }
