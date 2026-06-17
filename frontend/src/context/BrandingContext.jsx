@@ -22,19 +22,19 @@ export const BrandingProvider = ({ children }) => {
         
         // Dev testing: check ?company= or ?subdomain= parameters first
         const queryCompany = searchParams.get('company') || searchParams.get('subdomain');
-        let url = 'http://localhost:5000/api/public/branding';
+        let url = (window.API_URL || 'http://localhost:5000') + '/api/public/branding';
 
         if (queryCompany) {
           if (queryCompany.startsWith('COMP-')) {
-            url = `http://localhost:5000/api/public/branding/${queryCompany}`;
+            url = `${window.API_URL || "http://localhost:5000"}/api/public/branding/${queryCompany}`;
           } else {
-            url = `http://localhost:5000/api/public/branding?subdomain=${encodeURIComponent(queryCompany)}`;
+            url = `${window.API_URL || "http://localhost:5000"}/api/public/branding?subdomain=${encodeURIComponent(queryCompany)}`;
           }
         } else if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
           // Standard production subdomain extraction
           const parts = hostname.split('.');
           if (parts.length > 2) {
-            url = `http://localhost:5000/api/public/branding?subdomain=${encodeURIComponent(parts[0])}`;
+            url = `${window.API_URL || "http://localhost:5000"}/api/public/branding?subdomain=${encodeURIComponent(parts[0])}`;
           }
         }
 

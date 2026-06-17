@@ -95,7 +95,7 @@ const EmployeeDetail = () => {
 
   useEffect(() => {
     if (!id || !token) return;
-    fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+    fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

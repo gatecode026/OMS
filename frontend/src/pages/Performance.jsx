@@ -195,7 +195,7 @@ const Performance = () => {
     if (!token) return;
     try {
       // Fetch goals
-      const goalsRes = await fetch('http://localhost:5000/api/v1/performance/goals', {
+      const goalsRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/performance/goals', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const goalsData = await goalsRes.json();
@@ -204,7 +204,7 @@ const Performance = () => {
       }
 
       // Fetch pips
-      const pipsRes = await fetch('http://localhost:5000/api/v1/performance/pips', {
+      const pipsRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/performance/pips', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const pipsData = await pipsRes.json();
@@ -352,7 +352,7 @@ const Performance = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/v1/performance/goals', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/performance/goals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -394,7 +394,7 @@ const Performance = () => {
 
     const targetId = goal._id || goal.id;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/performance/goals/${targetId}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/performance/goals/${targetId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -464,7 +464,7 @@ const Performance = () => {
   /* PIP Resolution actions */
   const resolvePip = async (pipId, name) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/performance/pips/${pipId}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/performance/pips/${pipId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -491,7 +491,7 @@ const Performance = () => {
   /* PIP Escalation logic */
   const escalatePip = async (pipId, name) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/performance/pips/${pipId}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/performance/pips/${pipId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -529,7 +529,7 @@ const Performance = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/v1/performance/pips', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/performance/pips', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

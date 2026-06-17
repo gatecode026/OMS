@@ -88,7 +88,7 @@ const CompanyCreate = () => {
         }
       };
 
-      const res = await fetch('http://localhost:5000/api/admin/companies', {
+      const res = await fetch((window.API_URL || 'http://localhost:5000') + '/api/admin/companies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

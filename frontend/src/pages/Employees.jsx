@@ -670,7 +670,7 @@ const Employees = () => {
       }
     } else if (editId) {
       if (!showFormPanel || formMode !== 'edit' || selectedEmployeeId !== editId) {
-        fetch(`http://localhost:5000/api/v1/employees/${editId}`, {
+        fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${editId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

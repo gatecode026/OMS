@@ -48,7 +48,7 @@ const CompanyDetail = () => {
   const fetchCompanyDetails = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${id}`, {
+      const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/admin/companies/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Company not found or unauthorized access.');
@@ -78,7 +78,7 @@ const CompanyDetail = () => {
     const currentStatus = data?.company?.status;
     const newStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${id}/status`, {
+      const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/admin/companies/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
