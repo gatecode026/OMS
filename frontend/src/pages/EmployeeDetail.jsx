@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import './EmployeeDetail.css';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useApp, normalizeEmployee } from '../context/AppContext';
+import { decodeEmployeeId } from '../utils/hashId';
 import Avatar from '../components/common/Avatar';
 import Button from '../components/common/Button';
 import {
@@ -82,10 +83,13 @@ const attDayClass = (s) => {
 // Unused charting and calendar components removed
 
 const EmployeeDetail = () => {
-  const { id } = useParams();
+  const { id: encodedId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee, token, branches } = useApp();
+
+  // Decode the obfuscated URL param back to the real employee ID
+  const id = encodedId ? decodeEmployeeId(encodedId) : null;
 
   const [fullEmp, setFullEmp] = useState(null);
 

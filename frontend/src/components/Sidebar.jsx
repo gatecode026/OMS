@@ -127,7 +127,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   // When compact sidebar setting is ON, keep the sidebar collapsed, but expand on hover
   const isCollapsedConfig = sidebarCollapsed || sidebarDense;
   const effectiveCollapsed = isCollapsedConfig && !isHovered;
-  const companyName = generalSettings?.companyName || 'SaaS Admin';
+  const rawCompanyName = generalSettings?.companyName || 'SaaS Admin';
+  const companyName = (rawCompanyName === 'Office Management Pvt. Ltd.' || rawCompanyName === 'Office Management') ? 'Gatecode OMS' : rawCompanyName;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 

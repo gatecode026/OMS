@@ -3,6 +3,7 @@ import './Attendance.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
 import { useNavigate } from 'react-router-dom';
+import { encodeEmployeeId } from '../utils/hashId';
 import TodayStatusCard from '../components/TodayStatusCard';
 import AttendanceDayCard from '../components/AttendanceDayCard';
 import AttendanceSummaryChart from '../components/AttendanceSummaryChart';
@@ -1066,7 +1067,7 @@ const Attendance = () => {
         render: (row) => (
           <span
             className="clickable-emp-name"
-            onClick={() => navigate(`/employees/${row.employeeId}?tab=attendance_punch`)}
+            onClick={() => navigate(`/employees/${encodeEmployeeId(row.employeeId)}?tab=attendance_punch`)}
             style={{ fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
           >
             {row.employeeId}
@@ -1080,7 +1081,7 @@ const Attendance = () => {
         render: (row) => (
           <div
             className="flex-center gap-3 justify-start clickable-emp-name"
-            onClick={() => navigate(`/employees/${row.employeeId}?tab=attendance_punch`)}
+            onClick={() => navigate(`/employees/${encodeEmployeeId(row.employeeId)}?tab=attendance_punch`)}
             style={{ cursor: 'pointer' }}
           >
             <Avatar name={row.employeeName} size="sm" />

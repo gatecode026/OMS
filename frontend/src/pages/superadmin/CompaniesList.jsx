@@ -61,7 +61,7 @@ const CompaniesList = () => {
       if (res.ok) {
         const result = await res.json();
         if (result.status === 'success') {
-          setOverviewStats(result.data || []);
+          setOverviewStats(result.data?.tenants || []);
         }
       }
     } catch (err) {
@@ -84,6 +84,7 @@ const CompaniesList = () => {
 
   // Merge Mongoose Company models with Analytics overview stats
   const mergedCompanies = useMemo(() => {
+    if (!Array.isArray(overviewStats)) return companies;
     return companies.map(c => {
       const stat = overviewStats.find(o => o.companyId === c.id) || {};
       return {
