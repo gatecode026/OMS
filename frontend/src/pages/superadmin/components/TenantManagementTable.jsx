@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { encodeCompanyId } from '../../../utils/hashId';
 import { 
   Building2, Eye, Ban, ShieldCheck, Edit3, Database,
   Search, ShieldAlert, CheckCircle2, AlertTriangle, AlertCircle
@@ -230,7 +231,7 @@ const TenantManagementTable = ({
                 <td align="right">
                   <div className="table-actions-row justify-end">
                     <button
-                      onClick={() => navigate(`/superadmin/companies/${row.companyId}`)}
+                      onClick={() => navigate(`/superadmin/companies/${encodeCompanyId(row.companyId)}`)}
                       className="action-btn-sa btn-view"
                       title="View Tenant"
                     >

@@ -10,9 +10,19 @@ import ConfirmDialog from './common/ConfirmDialog';
 import Skeleton from './common/Skeleton';
 import { useApp } from '../context/AppContext';
 import WelcomeModal from './employeeDashboard/WelcomeModal';
+import { Flame, ExternalLink, X } from 'lucide-react';
 
 const AppShell = () => {
-  const { sidebarCollapsed, confirmDialog, commandPaletteOpen, setCommandPaletteOpen, currentUser } = useApp();
+  const { 
+    sidebarCollapsed, 
+    confirmDialog, 
+    commandPaletteOpen, 
+    setCommandPaletteOpen, 
+    currentUser,
+    emergencyAlert,
+    triggerEmergencyAlert,
+    addToast
+  } = useApp();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
 
@@ -52,6 +62,37 @@ const AppShell = () => {
         }}
       >
         <Topbar onMenuToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)} />
+
+        {/* Global Emergency Flash Banner */}
+        {emergencyAlert && emergencyAlert.isActive && (
+          <div className="emergency-flash-banner animate-slide-up flex-center justify-between" style={{ margin: '16px 24px 0 24px' }}>
+            <div className="flex-center gap-3" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="emergency-icon-ring"><Flame size={20} className="text-danger" /></div>
+              <div>
+                <strong className="emergency-banner-title">{emergencyAlert.title}</strong>
+                <p className="emergency-banner-desc font-xsmall text-muted mb-0" style={{ margin: '3px 0 0 0', fontSize: '0.75rem' }}>
+                  {emergencyAlert.description} • {emergencyAlert.date}
+                </p>
+              </div>
+            </div>
+            <div className="flex-center gap-2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button 
+                className="flex-center gap-1 font-xsmall badge badge-danger py-1 cursor-pointer" 
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', padding: '4px 8px', borderRadius: '4px' }}
+                onClick={() => addToast('info', 'Karnataka Disaster Response SMS Broadcast completed.')}
+              >
+                <ExternalLink size={10} /> SMS Blast
+              </button>
+              <button 
+                className="action-circle-btn text-muted" 
+                style={{ cursor: 'pointer', background: 'transparent', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => triggerEmergencyAlert({ ...emergencyAlert, isActive: false })}
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable page viewport */}
         <main className="app-shell-content">

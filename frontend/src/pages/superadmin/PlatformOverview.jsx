@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { encodeCompanyId } from '../../utils/hashId';
 import {
   Building2, Users, CheckSquare, Activity, AlertCircle,
   TrendingUp, TrendingDown, Database, ShieldAlert,
@@ -712,7 +713,7 @@ const PlatformOverview = () => {
                     <td>
                       <div className="table-actions-row">
                         <button
-                          onClick={() => navigate(`/superadmin/companies/${c.id}`)}
+                          onClick={() => navigate(`/superadmin/companies/${encodeCompanyId(c.id)}`)}
                           className="action-btn-sa btn-view"
                           title="View Usage metrics"
                         >

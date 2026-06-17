@@ -337,6 +337,79 @@ const RolesPermissions = () => {
     }
   };
 
+  const isRowAllChecked = (moduleKey) => {
+    const perms = localPermissions[moduleKey] || {};
+    return operations.every(op => !!perms[op.key]);
+  };
+
+  const isColumnAllChecked = (opKey) => {
+    return modulesList.every(mod => {
+      const perms = localPermissions[mod.key] || {};
+      return !!perms[opKey];
+    });
+  };
+
+  const handleRowToggle = async (moduleKey) => {
+    if (selectedRoleId === 'super_admin') {
+      addToast('warning', 'Super Admin permissions are permanently locked.');
+      return;
+    }
+
+    const modulePerms = localPermissions[moduleKey] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
+    const allChecked = operations.every(op => !!modulePerms[op.key]);
+    const nextVal = !allChecked;
+
+    const updatedPermissions = {
+      ...localPermissions,
+      [moduleKey]: operations.reduce((acc, op) => {
+        acc[op.key] = nextVal;
+        return acc;
+      }, {})
+    };
+
+    setLocalPermissions(updatedPermissions);
+    setLocalRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, permissions: updatedPermissions } : r));
+
+    try {
+      await updatePermissions(selectedRoleId, updatedPermissions);
+    } catch (err) {
+      console.error('Failed to save row permissions:', err);
+      addToast('danger', 'Failed to save changes.');
+    }
+  };
+
+  const handleColumnToggle = async (opKey) => {
+    if (selectedRoleId === 'super_admin') {
+      addToast('warning', 'Super Admin permissions are permanently locked.');
+      return;
+    }
+
+    const allChecked = modulesList.every(mod => {
+      const perms = localPermissions[mod.key] || {};
+      return !!perms[opKey];
+    });
+    const nextVal = !allChecked;
+
+    const updatedPermissions = { ...localPermissions };
+    modulesList.forEach(mod => {
+      const perms = updatedPermissions[mod.key] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
+      updatedPermissions[mod.key] = {
+        ...perms,
+        [opKey]: nextVal
+      };
+    });
+
+    setLocalPermissions(updatedPermissions);
+    setLocalRoles(prev => prev.map(r => r.id === selectedRoleId ? { ...r, permissions: updatedPermissions } : r));
+
+    try {
+      await updatePermissions(selectedRoleId, updatedPermissions);
+    } catch (err) {
+      console.error('Failed to save column permissions:', err);
+      addToast('danger', 'Failed to save changes.');
+    }
+  };
+
   const handleSaveRolePermissions = () => {
     if (selectedRoleId === 'super_admin') {
       addToast('warning', 'Super Admin permissions are permanent and cannot be modified.');
@@ -1375,16 +1448,85 @@ const RolesPermissions = () => {
                   <thead>
                     <tr>
                       <th style={{ textAlign: 'left' }}>MODULE / COMPONENT</th>
-                      {operations.map(op => (
-                        <th key={op.key} className="text-center">{op.label}</th>
-                      ))}
+                      {operations.map(op => {
+                        const colAllChecked = isColumnAllChecked(op.key);
+                        return (
+                          <th key={op.key} className="text-center">
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                              <span>{op.label}</span>
+                              {selectedRoleId !== 'super_admin' && (
+                                <button
+                                  type="button"
+                                  className={`action-circle-btn ${colAllChecked ? 'success-btn' : ''}`}
+                                  title={colAllChecked ? `Deselect all for ${op.label}` : `Select all for ${op.label}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleColumnToggle(op.key);
+                                  }}
+                                  style={{
+                                    width: 18,
+                                    height: 18,
+                                    minWidth: 18,
+                                    padding: 0,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: colAllChecked ? 'rgba(16,185,129,0.2)' : 'var(--color-neutral-light)',
+                                    borderColor: colAllChecked ? '#10b981' : 'var(--border-color)',
+                                    color: colAllChecked ? '#10b981' : 'var(--text-primary)',
+                                    cursor: 'pointer',
+                                    borderRadius: '50%',
+                                    transition: 'all 0.2s',
+                                    marginTop: 4
+                                  }}
+                                >
+                                  <Check size={10} strokeWidth={colAllChecked ? 3 : 2} />
+                                </button>
+                              )}
+                            </div>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
                     {modulesList.map(mod => (
                       <tr key={mod.key}>
                         <td style={{ textAlign: 'left' }}>
-                          <div className="perm-module-icon font-bold" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div className="perm-module-icon font-bold" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {selectedRoleId !== 'super_admin' && (
+                              (() => {
+                                const rowAllChecked = isRowAllChecked(mod.key);
+                                return (
+                                  <button
+                                    type="button"
+                                    className={`action-circle-btn ${rowAllChecked ? 'success-btn' : ''}`}
+                                    title={rowAllChecked ? "Deselect all in row" : "Select all in row"}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRowToggle(mod.key);
+                                    }}
+                                    style={{
+                                      width: 22,
+                                      height: 22,
+                                      minWidth: 22,
+                                      padding: 0,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: rowAllChecked ? 'rgba(16,185,129,0.2)' : 'var(--color-neutral-light)',
+                                      borderColor: rowAllChecked ? '#10b981' : 'var(--border-color)',
+                                      color: rowAllChecked ? '#10b981' : 'var(--text-primary)',
+                                      cursor: 'pointer',
+                                      borderRadius: '50%',
+                                      transition: 'all 0.2s'
+                                    }}
+                                  >
+                                    <Check size={12} strokeWidth={rowAllChecked ? 3 : 2} />
+                                  </button>
+                                );
+                              })()
+                            )}
                             <Sliders size={14} className="text-muted" />
                             <span>{mod.label}</span>
                             {!['dashboard', 'company_overview', 'employee_management', 'agency_branch_management', 'department_management', 'team_management', 'attendance_management', 'leave_management', 'project_management', 'task_monitoring', 'work_reports', 'performance_analytics', 'payroll_management', 'announcements', 'notifications', 'document_management', 'role_permission', 'system_settings', 'security_audit_logs', 'profile_settings'].includes(mod.key) && (

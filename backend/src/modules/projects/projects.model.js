@@ -134,6 +134,10 @@ const projectSchema = new mongoose.Schema({
       type: String,
       default: 'To Do'
     },
+    assignedTo: {
+      type: [String],
+      default: []
+    },
     assigneeId: {
       type: String,
       default: ''
