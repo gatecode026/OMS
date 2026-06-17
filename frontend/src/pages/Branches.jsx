@@ -7,6 +7,7 @@ import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
 import { useNavigate } from 'react-router-dom';
+import { encodeEmployeeId } from '../utils/hashId';
 import {
   Network, Plus, Users, MapPin, Globe, TrendingUp, Search,
   Edit2, Trash2, Clock, BarChart3, Building2, Calendar,
@@ -1597,7 +1598,7 @@ const Branches = () => {
                           </td>
                           <td>
                             <button
-                              onClick={() => navigate(`/employees/${emp.id}`)}
+                              onClick={() => navigate(`/employees/${encodeEmployeeId(emp.id)}`)}
                               className="btn-view-profile"
                               title="Go to Employee Profile page"
                               type="button"

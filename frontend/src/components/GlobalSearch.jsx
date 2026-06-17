@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './GlobalSearch.css';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { encodeEmployeeId } from '../utils/hashId';
 import Avatar from './common/Avatar';
 import {
   Search, X, Users, Building2, Network, Briefcase,
@@ -158,7 +159,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
   const handleSelect = (cat, item) => {
     onClose();
     switch (cat) {
-      case 'employees': navigate(`/employees/${item.id}`); break;
+      case 'employees': navigate(`/employees/${encodeEmployeeId(item.id)}`); break;
       case 'departments': navigate('/departments'); break;
       case 'branches': navigate('/branches'); break;
       case 'teams': navigate('/teams'); break;

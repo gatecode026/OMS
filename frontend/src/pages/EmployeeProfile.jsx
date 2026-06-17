@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp, normalizeEmployee } from '../context/AppContext';
+import { decodeEmployeeId } from '../utils/hashId';
 import {
   ArrowLeft, User, Briefcase, Mail, Phone, Calendar, MapPin,
   Clock, CheckCircle, XCircle, AlertTriangle, TrendingUp,
@@ -16,15 +17,15 @@ import './EmployeeProfile.css';
 const fmtDob = (dateStr) => {
   if (!dateStr) return '15/08/1996';
   const d = new Date(dateStr);
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
 const calculateExpiry = (dateStr) => {
   if (!dateStr) return '31 Dec 2031';
   const d = new Date(dateStr);
   d.setFullYear(d.getFullYear() + 5);
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
 };
 
 const renderName = (fullname) => {
@@ -41,7 +42,7 @@ const renderName = (fullname) => {
 
 const getBranchAddress = (branchName, branchesList = []) => {
   const name = (branchName || '').toLowerCase().trim();
-  const foundBranch = (branchesList || []).find(b => 
+  const foundBranch = (branchesList || []).find(b =>
     (b.name || '').toLowerCase().trim() === name ||
     (b.id || '').toLowerCase().trim() === name ||
     (b.code || '').toLowerCase().trim() === name ||
@@ -69,10 +70,10 @@ const Avatar = ({ name = '', size = 72, src = '', className = '' }) => {
   return (
     <div className={`ep-avatar ${className}`} style={inlineStyle}>
       {src ? (
-        <img 
-          src={src} 
-          alt={name} 
-          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} 
+        <img
+          src={src}
+          alt={name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
           className="avatar-img"
         />
       ) : (
@@ -192,7 +193,7 @@ const CredentialItem = ({ label, value }) => {
     <div className="ep-credential-item">
       <div className="ep-cred-meta">
         <span className="ep-cred-label">{label}</span>
-        <button 
+        <button
           className="ep-cred-toggle-btn"
           onClick={() => setReveal(!reveal)}
           title={reveal ? "Hide credential" : "Show credential"}
@@ -209,12 +210,15 @@ const CredentialItem = ({ label, value }) => {
 
 // ─── Main EmployeeProfile Page ────────────────────────────────────────────────
 const EmployeeProfile = () => {
-  const { id } = useParams();
+  const { id: encodedId } = useParams();
   const navigate = useNavigate();
   const { employees, attendance, currentUserId, currentUserRole, addToast, token, tasks, dailyReports, branches } = useApp();
 
+  // Decode the obfuscated URL param back to the real employee ID
+  const decodedId = encodedId ? decodeEmployeeId(encodedId) : null;
+
   // Resolve which employee to show: regular employees can only see their own details
-  const empId = currentUserRole === 'employee' ? currentUserId : (id || currentUserId);
+  const empId = currentUserRole === 'employee' ? currentUserId : (decodedId || currentUserId);
   const empFromContext = useMemo(() => employees.find(e => e.id === empId), [employees, empId]);
 
   const [fullEmp, setFullEmp] = useState(null);
@@ -284,9 +288,9 @@ const EmployeeProfile = () => {
 
   // ── Stats ──
   const presentDays = empAttendance.filter(a => a.status === 'Present' || a.status === 'WFH').length;
-  const absentDays  = empAttendance.filter(a => a.status === 'Absent').length;
-  const lateDays    = empAttendance.filter(a => a.status === 'Late').length;
-  const avgHours    = empAttendance.length > 0
+  const absentDays = empAttendance.filter(a => a.status === 'Absent').length;
+  const lateDays = empAttendance.filter(a => a.status === 'Late').length;
+  const avgHours = empAttendance.length > 0
     ? (empAttendance.reduce((s, a) => s + (a.totalHours || 0), 0) / empAttendance.filter(a => a.totalHours > 0).length || 0).toFixed(1)
     : 0;
 
@@ -350,8 +354,8 @@ const EmployeeProfile = () => {
   const leaveHistory = emp?.leaveHistory || [];
   const leaveCounts = {
     casual: leaveHistory.filter(l => l.type === 'Casual Leave' && l.status === 'Approved').length,
-    sick:   leaveHistory.filter(l => l.type === 'Sick Leave'   && l.status === 'Approved').length,
-    earned: leaveHistory.filter(l => l.type === 'Paid Leave'   && l.status === 'Approved').length,
+    sick: leaveHistory.filter(l => l.type === 'Sick Leave' && l.status === 'Approved').length,
+    earned: leaveHistory.filter(l => l.type === 'Paid Leave' && l.status === 'Approved').length,
   };
 
   // ── Activity logs ──
@@ -375,11 +379,11 @@ const EmployeeProfile = () => {
     );
   }
 
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const fmtDate = (str) => {
     if (!str) return '—';
     const d = new Date(str);
-    return `${String(d.getDate()).padStart(2,'0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    return `${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   };
 
   return (
@@ -395,7 +399,7 @@ const EmployeeProfile = () => {
           <button onClick={() => navigate('/employees')} className="ep-bread-link">Employees</button>
         )}
         <ChevronRight size={13} className="ep-bread-sep" />
-        <span className="ep-bread-current">{loading ? '…' : emp?.id}</span>
+        <span className="ep-bread-current">{loading ? '…' : emp?.name}</span>
       </nav>
 
       {/* ── Hero Card ── */}
@@ -425,9 +429,9 @@ const EmployeeProfile = () => {
             <div className="ep-hero-stats">
               {[
                 { label: 'Present', value: presentDays, type: 'success' },
-                { label: 'Absent',  value: absentDays,  type: 'danger'  },
+                { label: 'Absent', value: absentDays, type: 'danger' },
                 { label: 'Avg Hrs', value: `${avgHours}h`, type: 'info' },
-                { label: 'Late',    value: lateDays,    type: 'warning' },
+                { label: 'Late', value: lateDays, type: 'warning' },
               ].map(s => (
                 <div key={s.label} className={`ep-stat-pill ep-pill-${s.type}`}>
                   <span className="ep-stat-num">{s.value}</span>
@@ -491,12 +495,12 @@ const EmployeeProfile = () => {
               ) : (
                 <div className="ep-card-body">
                   {[
-                    { icon: Building2, label: 'Department',        value: emp.department },
-                    { icon: Briefcase, label: 'Designation',       value: emp.designation || emp.role },
+                    { icon: Building2, label: 'Department', value: emp.department },
+                    { icon: Briefcase, label: 'Designation', value: emp.designation || emp.role },
                     { icon: UserCheck, label: 'Reporting Manager', value: emp.reportingManager || emp.teamLeader || '—' },
-                    { icon: Shield,    label: 'Employee ID',       value: emp.id },
-                    { icon: Clock,     label: 'Shift Timing',      value: emp.shiftTiming || '09:30 AM - 06:00 PM' },
-                    { icon: MapPin,    label: 'Work Mode',         value: emp.workMode || 'Work From Office' },
+                    { icon: Shield, label: 'Employee ID', value: emp.id },
+                    { icon: Clock, label: 'Shift Timing', value: emp.shiftTiming || '09:30 AM - 06:00 PM' },
+                    { icon: MapPin, label: 'Work Mode', value: emp.workMode || 'Work From Office' },
                   ].map(({ icon: Icon, label, value }) => (
                     <div key={label} className="ep-info-row">
                       <div className="ep-info-icon"><Icon size={13} /></div>
@@ -542,9 +546,9 @@ const EmployeeProfile = () => {
                     <div className="ep-perf-label">Overall Score / 100</div>
                     <div className="ep-perf-bars">
                       {[
-                        { label: 'Attendance',    val: attendanceRate },
-                        { label: 'Tasks',         val: taskCompletionRate },
-                        { label: 'Reports',       val: reportSubmissionRate },
+                        { label: 'Attendance', val: attendanceRate },
+                        { label: 'Tasks', val: taskCompletionRate },
+                        { label: 'Reports', val: reportSubmissionRate },
                       ].map(p => (
                         <div key={p.label} className="ep-perf-bar-row">
                           <span>{p.label}</span>
@@ -568,7 +572,7 @@ const EmployeeProfile = () => {
               <div className="ep-card-body">
                 {loading ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[1,2,3].map(i => <Skeleton key={i} height={32} />)}
+                    {[1, 2, 3].map(i => <Skeleton key={i} height={32} />)}
                   </div>
                 ) : (
                   <ActivityLog logs={activityLogs} />
@@ -755,7 +759,7 @@ const EmployeeProfile = () => {
               {/* Rows */}
               {loading ? (
                 <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {[1,2,3,4].map(i => <Skeleton key={i} height={40} />)}
+                  {[1, 2, 3, 4].map(i => <Skeleton key={i} height={40} />)}
                 </div>
               ) : filteredAttendance.length > 0 ? (
                 <div className="ep-att-rows">
@@ -806,9 +810,9 @@ const EmployeeProfile = () => {
                 <div className="ep-card-body"><Skeleton height={40} /><Skeleton height={40} /></div>
               ) : (
                 <div className="ep-card-body ep-leave-body">
-                  <LeaveBalanceBar label="Casual Leave"  used={leaveCounts.casual} total={12} variant="casual" />
-                  <LeaveBalanceBar label="Sick Leave"    used={leaveCounts.sick}   total={10} variant="sick" />
-                  <LeaveBalanceBar label="Earned Leave"  used={leaveCounts.earned} total={20} variant="earned" />
+                  <LeaveBalanceBar label="Casual Leave" used={leaveCounts.casual} total={12} variant="casual" />
+                  <LeaveBalanceBar label="Sick Leave" used={leaveCounts.sick} total={10} variant="sick" />
+                  <LeaveBalanceBar label="Earned Leave" used={leaveCounts.earned} total={20} variant="earned" />
                 </div>
               )}
             </div>
