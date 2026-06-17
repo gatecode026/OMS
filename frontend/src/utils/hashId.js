@@ -53,3 +53,45 @@ export function decodeEmployeeId(encoded) {
     return encoded;
   }
 }
+
+/**
+ * Encodes a company ID into a URL-safe obfuscated string.
+ * @param {string} id - The raw company ID (e.g. "COMP-001")
+ * @returns {string} URL-safe encoded string
+ */
+export function encodeCompanyId(id) {
+  if (!id) return '';
+  try {
+    const combined = `${id}::${SALT}`;
+    const encoded = btoa(combined)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    return encoded;
+  } catch {
+    return id;
+  }
+}
+
+/**
+ * Decodes a URL-safe obfuscated string back to the original company ID.
+ * @param {string} encoded - The encoded URL param
+ * @returns {string} The original company ID (e.g. "COMP-001"), or the input if decoding fails
+ */
+export function decodeCompanyId(encoded) {
+  if (!encoded) return '';
+  try {
+    const base64 = encoded
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+    const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4);
+    const decoded = atob(padded);
+    const saltMarker = `::${SALT}`;
+    if (decoded.endsWith(saltMarker)) {
+      return decoded.slice(0, decoded.length - saltMarker.length);
+    }
+    return encoded;
+  } catch {
+    return encoded;
+  }
+}

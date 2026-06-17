@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { encodeCompanyId } from '../../utils/hashId';
 import { Building2, Search, Plus, Eye, Ban, ShieldCheck, Edit3, Calendar, MoreVertical, AlertTriangle } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
@@ -269,7 +270,7 @@ const CompaniesList = () => {
       render: (row) => (
         <div className="table-actions-row">
           <button
-            onClick={() => navigate(`/superadmin/companies/${row.id}`)}
+            onClick={() => navigate(`/superadmin/companies/${encodeCompanyId(row.id)}`)}
             className="action-btn-sa btn-view"
             title="View usage details"
           >

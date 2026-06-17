@@ -134,7 +134,7 @@ const Topbar = ({ onMenuToggle }) => {
     logout(); // logout() itself does window.location.href = '/login'
   };
 
-  const isAdminRole = ['super_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
+  const isAdminRole = ['super_admin', 'company_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
 
   /**
    * Simple rule:
@@ -154,9 +154,9 @@ const Topbar = ({ onMenuToggle }) => {
         return recipientId === currentUser?.id;
       }
 
-      // Rule 2 — explicitly tagged as employee-only
-      if (recipientRole === 'employee') {
-        return currentUserRole === 'employee';
+      // Rule 2 — explicitly tagged as employee-only or staff
+      if (recipientRole === 'employee' || recipientRole === 'employees' || recipientRole === 'all employees' || recipientRole === 'staff') {
+        return ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
       }
 
       // Rule 3 — explicitly tagged as admin-only / super_admin / manager
@@ -166,7 +166,7 @@ const Topbar = ({ onMenuToggle }) => {
 
       // Rule 4 — global / broadcast notification (recipientRole is 'all', 'everyone', or empty)
       if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
-        // If it's an employee-personal message, only show it to employees
+        // If it's an employee-personal message, show to any non-super_admin staff user
         const isPersonalEmployeeMsg =
           msg.startsWith('your ') ||
           msg.includes('your leave') ||
@@ -179,7 +179,7 @@ const Topbar = ({ onMenuToggle }) => {
           msg.includes('note: rejected');
 
         if (isPersonalEmployeeMsg) {
-          return currentUserRole === 'employee';
+          return ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
         }
 
         // Broadcast / general notification → show to everyone

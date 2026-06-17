@@ -21,7 +21,46 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, addBranch, updateBranch, deleteBranch, updateEmployee, projectsList, hasPermission } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission } = useApp();
+
+  // Real employee counts by branch (from actual employees data)
+  const branchEmployeeCountMap = useMemo(() => {
+    const map = {};
+    (employees || []).forEach(emp => {
+      const b = (emp.branch || emp.branchAgency || '').trim();
+      if (b) {
+        map[b.toLowerCase()] = (map[b.toLowerCase()] || 0) + 1;
+      }
+    });
+    return map;
+  }, [employees]);
+
+  const getRealEmpCount = (branchName) => {
+    return branchEmployeeCountMap[(branchName || '').trim().toLowerCase()] || 0;
+  };
+
+  const generatedEmployeeId = useMemo(() => {
+    let prefix = "EMP-2026-";
+    let nextNum = (employees || []).length + 1;
+    if (employees && employees.length > 0) {
+      const sampleId = employees[0].id;
+      if (sampleId && sampleId.includes('-')) {
+        const parts = sampleId.split('-');
+        if (parts.length >= 2) {
+          parts.pop();
+          prefix = parts.join('-') + '-';
+        }
+      }
+      const seqs = employees.map(emp => {
+        const parts = (emp.id || '').split('-');
+        const last = parseInt(parts[parts.length - 1]);
+        return isNaN(last) ? 0 : last;
+      });
+      const maxSeq = Math.max(...seqs, 0);
+      nextNum = maxSeq + 1;
+    }
+    return `${prefix}${String(nextNum).padStart(3, '0')}`;
+  }, [employees]);
 
   const getBranchDepartments = (b) => {
     if (!b) return [];
@@ -59,11 +98,11 @@ const Branches = () => {
         rank: index + 1,
         id: b.id,
         name: b.name,
-        employees: b.employeeCount || 0,
+        employees: getRealEmpCount(b.name) || b.employeeCount || 0,
         attendance: b.attendance || 0,
         productivity: b.productivity || 0
       }));
-  }, [branches]);
+  }, [branches, branchEmployeeCountMap]);
 
   const dynamicAlerts = useMemo(() => {
     if (!branches || branches.length === 0) return [];
@@ -212,7 +251,7 @@ const Branches = () => {
   // Form states
   const [newBranch, setNewBranch] = useState({
     name: '', code: '', flag: '🇮🇳',
-    manager: '', managerPhone: '',
+    managerName: '', managerEmail: '', managerPassword: '', managerPhone: '',
     address: '', city: '', state: '', zipCode: '', phone: '', email: '',
     status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
     revenue: 500000, departments: [],
@@ -221,10 +260,11 @@ const Branches = () => {
   });
 
   const [transfer, setTransfer] = useState({
+    employeeId: '',
     employeeName: '',
-    fromBranchId: 'BR-001',
-    toBranchId: 'BR-002',
-    department: 'Sales'
+    fromBranchId: '',
+    toBranchId: '',
+    reason: ''
   });
 
   const [managerUpdate, setManagerUpdate] = useState({
@@ -410,12 +450,31 @@ const Branches = () => {
 
   const handleAddBranchSubmit = async (e) => {
     e.preventDefault();
-    
-    let managerName = newBranch.manager;
-    let managerPhone = newBranch.managerPhone;
 
-    if (!newBranch.name || !newBranch.code || !managerName) {
-      addToast('warning', 'Please fill in Name, Code, and select a valid Manager');
+    if (!newBranch.name || !newBranch.code || !newBranch.managerName || !newBranch.managerEmail || !newBranch.managerPassword) {
+      addToast('warning', 'Please fill in Name, Code, and Manager details (Name, Email, Password)');
+      return;
+    }
+
+    // Email and Phone validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^[0-9]{10}$/;
+
+    if (!emailRegex.test(newBranch.managerEmail)) {
+      addToast('warning', 'Please enter a valid Manager Email address');
+      return;
+    }
+    if (newBranch.email && !emailRegex.test(newBranch.email)) {
+      addToast('warning', 'Please enter a valid Branch Official Email address');
+      return;
+    }
+
+    if (!phoneRegex.test(newBranch.managerPhone)) {
+      addToast('warning', 'Please enter a valid Manager Phone number (exactly 10 digits)');
+      return;
+    }
+    if (newBranch.phone && !phoneRegex.test(newBranch.phone)) {
+      addToast('warning', 'Please enter a valid Branch Official Phone number (exactly 10 digits)');
       return;
     }
 
@@ -431,23 +490,45 @@ const Branches = () => {
       setNewDeptInput('');
     }
 
-    const empMatch = (employees || []).find(e => e.name.toLowerCase() === managerName.toLowerCase());
-    const managerId = empMatch ? empMatch.id : 'EMP-2026-' + String(combinedAvailableManagers.findIndex(m => m.name === managerName) + 1).padStart(3, '0');
+    // 1. Create the manager as an employee first
+    const newEmpData = {
+      id: generatedEmployeeId,
+      name: newBranch.managerName,
+      email: newBranch.managerEmail,
+      workEmail: newBranch.managerEmail,
+      personalEmail: newBranch.managerEmail,
+      password: newBranch.managerPassword,
+      phone: newBranch.managerPhone || '9999999999',
+      role: 'Manager',
+      roleId: 'manager',
+      designation: 'Manager',
+      branch: newBranch.name,
+      branchAgency: newBranch.name,
+      status: 'Active',
+      accountStatus: 'Active',
+      employmentStatus: 'Confirmed'
+    };
+
+    const savedEmp = await addEmployee(newEmpData);
+    if (!savedEmp) {
+      return;
+    }
 
     const newId = `BR-${Date.now().toString().slice(-4)}`;
-    const { country, ...restNewBranch } = newBranch;
+    const { country, managerName: mn, managerEmail: me, managerPassword: mp, managerPhone: mph, ...restNewBranch } = newBranch;
     const formattedBranch = {
       ...restNewBranch,
       id: newId,
-      manager: managerName,
-      managerPhone: managerPhone,
-      managerEmail: empMatch ? empMatch.email : (newBranch.managerEmail || ''),
-      managerId: managerId,
+      manager: savedEmp.name,
+      managerPhone: savedEmp.phone || '',
+      managerEmail: savedEmp.email || '',
+      managerId: savedEmp.id,
       departments: finalDepts,
       projects: { active: 3, completed: 5, delayed: 0, pending: 1 },
-      employeesOnLeave: 2,
-      teamLeaders: 3,
+      employeesOnLeave: 0,
+      teamLeaders: 0,
       projectManagers: 1,
+      employeeCount: 1, // Manager is the first employee
       documents: ['License.pdf'],
       color: ['#3b82f6', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b', '#ec489a'][branches.length % 6]
     };
@@ -465,36 +546,112 @@ const Branches = () => {
     e.preventDefault();
     if (!editBranch || !editBranch.id) return;
 
-    let managerName = editBranch.manager;
-    if (!editBranch.name || !editBranch.code || !managerName) {
-      addToast('warning', 'Please fill in Name, Code, and select a valid Manager');
+    if (!editBranch.name || !editBranch.code || !editBranch.manager || !editBranch.managerEmail) {
+      addToast('warning', 'Please fill in Name, Code, and Manager details (Name, Email)');
       return;
     }
 
-    const empMatch = (employees || []).find(e => e.name.toLowerCase() === managerName.toLowerCase());
-    const managerId = empMatch ? empMatch.id : editBranch.managerId;
-    const managerPhone = empMatch ? empMatch.phone : editBranch.managerPhone;
-    const managerEmail = empMatch ? empMatch.email : editBranch.managerEmail;
+    // Email and Phone validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^[0-9]{10}$/;
+
+    if (!emailRegex.test(editBranch.managerEmail)) {
+      addToast('warning', 'Please enter a valid Manager Email address');
+      return;
+    }
+    if (editBranch.email && !emailRegex.test(editBranch.email)) {
+      addToast('warning', 'Please enter a valid Branch Official Email address');
+      return;
+    }
+
+    if (editBranch.managerPhone && !phoneRegex.test(editBranch.managerPhone)) {
+      addToast('warning', 'Please enter a valid Manager Phone number (exactly 10 digits)');
+      return;
+    }
+    if (editBranch.phone && !phoneRegex.test(editBranch.phone)) {
+      addToast('warning', 'Please enter a valid Branch Official Phone number (exactly 10 digits)');
+      return;
+    }
+
+    let managerId = editBranch.managerId;
+    
+    // Check if the manager already exists in employees table, or create/update it
+    if (managerId) {
+      const managerUpdatePayload = {
+        name: editBranch.manager,
+        email: editBranch.managerEmail,
+        workEmail: editBranch.managerEmail,
+        phone: editBranch.managerPhone || ''
+      };
+      if (editBranch.managerPassword) {
+        managerUpdatePayload.password = editBranch.managerPassword;
+      }
+      await updateEmployee(managerId, managerUpdatePayload);
+    } else {
+      // Find by email, or create new employee
+      const match = (employees || []).find(emp => emp.email.toLowerCase() === editBranch.managerEmail.toLowerCase());
+      if (match) {
+        managerId = match.id;
+        const managerUpdatePayload = {
+          name: editBranch.manager,
+          phone: editBranch.managerPhone || '',
+          branch: editBranch.name,
+          branchAgency: editBranch.name,
+          role: 'Manager',
+          roleId: 'manager'
+        };
+        if (editBranch.managerPassword) {
+          managerUpdatePayload.password = editBranch.managerPassword;
+        }
+        await updateEmployee(managerId, managerUpdatePayload);
+      } else {
+        // Create new employee
+        const newEmpId = 'EMP-2026-' + String(employees.length + 1).padStart(3, '0');
+        const savedEmp = await addEmployee({
+          id: newEmpId,
+          name: editBranch.manager,
+          email: editBranch.managerEmail,
+          workEmail: editBranch.managerEmail,
+          personalEmail: editBranch.managerEmail,
+          password: editBranch.managerPassword || 'Password@123',
+          phone: editBranch.managerPhone || '9999999999',
+          role: 'Manager',
+          roleId: 'manager',
+          designation: 'Manager',
+          branch: editBranch.name,
+          branchAgency: editBranch.name,
+          status: 'Active',
+          accountStatus: 'Active',
+          employmentStatus: 'Confirmed'
+        });
+        if (savedEmp) {
+          managerId = savedEmp.id;
+        }
+      }
+    }
+
+    // Clean up temporary managerPassword from editBranch before saving to DB
+    const { managerPassword, ...restEditBranch } = editBranch;
 
     const updatedFields = {
-      name: editBranch.name,
-      code: editBranch.code,
-      established: editBranch.established,
-      address: editBranch.address,
-      city: editBranch.city,
-      state: editBranch.state,
-      zipCode: editBranch.zipCode || '',
-      phone: editBranch.phone || '',
-      email: editBranch.email || '',
-      timezone: editBranch.timezone || 'IST (UTC+5:30)',
-      manager: managerName,
-      managerId: managerId,
-      managerPhone: managerPhone || '',
-      managerEmail: managerEmail || '',
-      status: editBranch.status,
-      statusType: editBranch.statusType,
-      employeeCount: parseInt(editBranch.employeeCount) || 0,
-      departments: editBranch.departments || []
+      name: restEditBranch.name,
+      code: restEditBranch.code,
+      established: restEditBranch.established,
+      address: restEditBranch.address,
+      city: restEditBranch.city,
+      state: restEditBranch.state,
+      zipCode: restEditBranch.zipCode || '',
+      phone: restEditBranch.phone || '',
+      email: restEditBranch.email || '',
+      timezone: restEditBranch.timezone || 'IST (UTC+5:30)',
+      manager: restEditBranch.manager,
+      managerId: managerId || restEditBranch.managerId || '',
+      managerPhone: restEditBranch.managerPhone || '',
+      managerEmail: restEditBranch.managerEmail || '',
+      status: restEditBranch.status,
+      statusType: restEditBranch.statusType,
+      employeeCount: parseInt(restEditBranch.employeeCount) || 0,
+      departments: restEditBranch.departments || []
     };
 
     const result = await updateBranch(editBranch.id, updatedFields);
@@ -511,33 +668,39 @@ const Branches = () => {
 
   const handleTransferSubmit = async (e) => {
     e.preventDefault();
-    if (!transfer.employeeName) {
-      addToast('warning', 'Please enter employee name');
+    if (!transfer.employeeId) {
+      addToast('warning', 'Please select an employee to transfer');
       return;
     }
-    const fromBranch = branches.find(b => b.id === transfer.fromBranchId);
-    const toBranch = branches.find(b => b.id === transfer.toBranchId);
-
+    if (!transfer.toBranchId) {
+      addToast('warning', 'Please select a destination branch');
+      return;
+    }
     if (transfer.fromBranchId === transfer.toBranchId) {
       addToast('warning', 'Source and destination branches must be different');
       return;
     }
 
-    // Call updateBranch to persist on the server
-    const updatedFrom = await updateBranch(transfer.fromBranchId, { 
-      employeeCount: Math.max(0, fromBranch.employeeCount - 1) 
-    });
-    const updatedTo = await updateBranch(transfer.toBranchId, { 
-      employeeCount: toBranch.employeeCount + 1 
+    const toBranch = branches.find(b => b.id === transfer.toBranchId);
+    if (!toBranch) {
+      addToast('warning', 'Destination branch not found');
+      return;
+    }
+
+    // Actually update the employee's branch in the database
+    const updated = await updateEmployee(transfer.employeeId, {
+      branch: toBranch.name,
+      branchAgency: toBranch.name
     });
 
-    if (updatedFrom && updatedTo) {
+    if (updated !== false) {
       setActivities(prev => [
-        { id: Date.now(), text: `${transfer.employeeName} transferred from ${fromBranch.name} to ${toBranch.name}`, time: 'Just now', type: 'info' },
+        { id: Date.now(), text: `${transfer.employeeName} transferred to ${toBranch.name}`, time: 'Just now', type: 'info' },
         ...prev
       ]);
       addToast('success', `${transfer.employeeName} transferred to ${toBranch.name}!`);
       setShowTransferModal(false);
+      setTransfer({ employeeId: '', employeeName: '', fromBranchId: '', toBranchId: '', reason: '' });
     }
   };
 
@@ -672,22 +835,7 @@ const Branches = () => {
       );
     });
   }, [branchEmployees, localEmpSearch]);
-  
-  // Real employee counts by branch (from actual employees data)
-  const branchEmployeeCountMap = useMemo(() => {
-    const map = {};
-    (employees || []).forEach(emp => {
-      const b = (emp.branch || emp.branchAgency || '').trim();
-      if (b) {
-        map[b.toLowerCase()] = (map[b.toLowerCase()] || 0) + 1;
-      }
-    });
-    return map;
-  }, [employees]);
 
-  const getRealEmpCount = (branchName) => {
-    return branchEmployeeCountMap[(branchName || '').trim().toLowerCase()] || 0;
-  };
 
   const totalBranches = branches.length;
   const activeBranches = branches.filter(b => b.statusType === 'active').length;
@@ -830,27 +978,61 @@ const Branches = () => {
                     </div>
                   </div>
 
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Manager Employee ID (System Generated)</label>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={generatedEmployeeId} 
+                        style={{ background: 'var(--bg-card)', opacity: 0.7 }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Manager Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={newBranch.managerName} 
+                        onChange={e => setNewBranch({...newBranch, managerName: e.target.value})} 
+                        placeholder="Full name of manager" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Manager Email *</label>
+                      <input 
+                        type="email" 
+                        required 
+                        value={newBranch.managerEmail} 
+                        onChange={e => setNewBranch({...newBranch, managerEmail: e.target.value})} 
+                        placeholder="manager@saas.com" 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Manager Phone *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        maxLength={10}
+                        value={newBranch.managerPhone} 
+                        onChange={e => setNewBranch({...newBranch, managerPhone: e.target.value.replace(/[^0-9]/g, '')})} 
+                        placeholder="10-digit phone number" 
+                      />
+                    </div>
+                  </div>
+
                   <div className="form-group">
-                    <label>Manager Name *</label>
-                    <select
-                      value={newBranch.manager}
-                      onChange={e => {
-                        const val = e.target.value;
-                        const m = combinedAvailableManagers.find(x => x.name === val);
-                        setNewBranch(prev => ({
-                          ...prev,
-                          manager: val,
-                          managerEmail: m ? m.email : '',
-                          managerPhone: m ? m.phone : ''
-                        }));
-                      }}
-                      required
-                    >
-                      <option value="">Select Manager</option>
-                      {combinedAvailableManagers.map(m => (
-                        <option key={m.name} value={m.name}>{m.name}</option>
-                      ))}
-                    </select>
+                    <label>Manager Password *</label>
+                    <input 
+                      type="password" 
+                      required 
+                      value={newBranch.managerPassword} 
+                      onChange={e => setNewBranch({...newBranch, managerPassword: e.target.value})} 
+                      placeholder="Enter login password" 
+                    />
                   </div>
 
                   <div className="form-group">
@@ -983,7 +1165,13 @@ const Branches = () => {
                     </div>
                     <div className="form-group">
                       <label>Official Phone</label>
-                      <input type="text" value={editBranch.phone || ''} onChange={e => setEditBranch({...editBranch, phone: e.target.value})} placeholder="e.g. +91 40 1234 5678" />
+                      <input 
+                        type="text" 
+                        maxLength={10}
+                        value={editBranch.phone || ''} 
+                        onChange={e => setEditBranch({...editBranch, phone: e.target.value.replace(/[^0-9]/g, '')})} 
+                        placeholder="10-digit phone number" 
+                      />
                     </div>
                   </div>
 
@@ -992,27 +1180,60 @@ const Branches = () => {
                     <input type="email" value={editBranch.email || ''} onChange={e => setEditBranch({...editBranch, email: e.target.value})} placeholder="e.g. hyderabad@company.com" />
                   </div>
 
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Manager Employee ID (System Generated)</label>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={editBranch.managerId || 'Not Assigned'} 
+                        style={{ background: 'var(--bg-card)', opacity: 0.7 }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Manager Name *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={editBranch.manager || ''} 
+                        onChange={e => setEditBranch({...editBranch, manager: e.target.value})} 
+                        placeholder="Full name of manager" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group-row">
+                    <div className="form-group">
+                      <label>Manager Email *</label>
+                      <input 
+                        type="email" 
+                        required 
+                        value={editBranch.managerEmail || ''} 
+                        onChange={e => setEditBranch({...editBranch, managerEmail: e.target.value})} 
+                        placeholder="manager@saas.com" 
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Manager Phone *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        maxLength={10}
+                        value={editBranch.managerPhone || ''} 
+                        onChange={e => setEditBranch({...editBranch, managerPhone: e.target.value.replace(/[^0-9]/g, '')})} 
+                        placeholder="10-digit phone number" 
+                      />
+                    </div>
+                  </div>
+
                   <div className="form-group">
-                    <label>Manager Name *</label>
-                    <select
-                      value={editBranch.manager}
-                      onChange={e => {
-                        const val = e.target.value;
-                        const m = combinedAvailableManagers.find(x => x.name === val);
-                        setEditBranch(prev => ({
-                          ...prev,
-                          manager: val,
-                          managerEmail: m ? m.email : '',
-                          managerPhone: m ? m.phone : ''
-                        }));
-                      }}
-                      required
-                    >
-                      <option value="">Select Manager</option>
-                      {combinedAvailableManagers.map(m => (
-                        <option key={m.name} value={m.name}>{m.name}</option>
-                      ))}
-                    </select>
+                    <label>Manager Password (Optional)</label>
+                    <input 
+                      type="password" 
+                      value={editBranch.managerPassword || ''} 
+                      onChange={e => setEditBranch({...editBranch, managerPassword: e.target.value})} 
+                      placeholder="Leave blank to keep current password" 
+                    />
                   </div>
 
                   <div className="form-group">
@@ -1078,71 +1299,72 @@ const Branches = () => {
               <form onSubmit={handleTransferSubmit}>
                 <div className="modal-body">
                   <div className="form-group">
-                    <label>From Branch *</label>
-                    <select
-                      value={transfer.fromBranchId}
-                      onChange={e => setTransfer({...transfer, fromBranchId: e.target.value, employeeName: ''})}
-                    >
-                      {branches.map(b => (
-                        <option key={b.id} value={b.id}>{b.name} ({b.employeeCount} staff)</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label>Employee Name *</label>
+                    <label>Select Employee *</label>
                     <select
                       required
-                      value={transfer.employeeName}
-                      onChange={e => setTransfer({...transfer, employeeName: e.target.value})}
+                      value={transfer.employeeId}
+                      onChange={e => {
+                        const selectedEmp = (employees || []).find(em => em.id === e.target.value);
+                        const currentBranch = branches.find(b =>
+                          b.name && selectedEmp &&
+                          b.name.trim().toLowerCase() === (selectedEmp.branch || selectedEmp.branchAgency || '').trim().toLowerCase()
+                        );
+                        setTransfer(prev => ({
+                          ...prev,
+                          employeeId: e.target.value,
+                          employeeName: selectedEmp?.name || '',
+                          fromBranchId: currentBranch?.id || ''
+                        }));
+                      }}
                     >
                       <option value="">Select Employee</option>
-                      {(() => {
-                        const fromBranch = branches.find(b => b.id === transfer.fromBranchId);
-                        const fromBranchKeyword = fromBranch ? fromBranch.name.split(' ')[0].toLowerCase() : '';
-                        const branchEmps = fromBranchKeyword
-                          ? (employees || []).filter(emp => {
-                              const loc = (emp.workLocation || emp.branch || emp.branchAgency || '').toLowerCase();
-                              return loc.includes(fromBranchKeyword);
-                            })
-                          : (employees || []);
-                        const displayEmps = branchEmps.length > 0 ? branchEmps : (employees || []);
-                        return displayEmps.map(emp => (
-                          <option key={emp.id} value={emp.name}>
-                            {emp.name} — {emp.designation || 'Staff'} ({emp.id})
+                      {(employees || [])
+                        .filter(em => em.roleId !== 'company_admin' && em.roleId !== 'super_admin')
+                        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                        .map(emp => (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.name} — {emp.branch || emp.branchAgency || 'No Branch'} ({emp.id})
                           </option>
-                        ));
-                      })()}
+                        ))
+                      }
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label>To Target Branch *</label>
+                    <label>Current Branch (From)</label>
+                    <input
+                      type="text"
+                      readOnly
+                      className="form-control"
+                      style={{ background: 'var(--bg-card)', opacity: 0.7 }}
+                      value={branches.find(b => b.id === transfer.fromBranchId)?.name || 'Auto-detected from employee'}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Destination Branch *</label>
                     <select
+                      required
                       value={transfer.toBranchId}
-                      onChange={e => setTransfer({...transfer, toBranchId: e.target.value, department: ''})}
+                      onChange={e => setTransfer(prev => ({ ...prev, toBranchId: e.target.value }))}
                     >
+                      <option value="">Select Target Branch</option>
                       {branches.filter(b => b.id !== transfer.fromBranchId).map(b => (
-                        <option key={b.id} value={b.id}>{b.name} ({b.employeeCount} staff)</option>
+                        <option key={b.id} value={b.id}>{b.name} ({getRealEmpCount(b.name)} staff)</option>
                       ))}
                     </select>
                   </div>
 
                   <div className="form-group">
-                    <label>Target Department</label>
-                    <select
-                      value={transfer.department}
-                      onChange={e => setTransfer({...transfer, department: e.target.value})}
-                    >
-                      <option value="">Select Department</option>
-                      {(() => {
-                        const toBranch = branches.find(b => b.id === transfer.toBranchId);
-                        const depts = toBranch ? toBranch.departments : availableDepts;
-                        return depts.map(d => (
-                          <option key={d} value={d}>{d}</option>
-                        ));
-                      })()}
-                    </select>
+                    <label>Reason for Transfer</label>
+                    <textarea
+                      rows="2"
+                      className="form-control"
+                      placeholder="e.g. Project requirement, skills match..."
+                      value={transfer.reason || ''}
+                      onChange={e => setTransfer(prev => ({ ...prev, reason: e.target.value }))}
+                      style={{ resize: 'vertical' }}
+                    />
                   </div>
                 </div>
                 <div className="modal-footer">

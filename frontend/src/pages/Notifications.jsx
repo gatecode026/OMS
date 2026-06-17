@@ -246,8 +246,8 @@ const Notifications = () => {
           allowed = recipientId === currentUser?.id;
         }
         // 2. Role specific check
-        else if (recipientRole === 'employee' || recipientRole === 'all employees') {
-          allowed = true;
+        else if (recipientRole === 'employee' || recipientRole === 'employees' || recipientRole === 'all employees' || recipientRole === 'staff') {
+          allowed = ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
         }
         // 3. Broadcast check
         else if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
@@ -1021,7 +1021,7 @@ const Notifications = () => {
 
               <div className="today-feed-list">
                 {(() => {
-                  const isAdminRole = ['super_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
+                  const isAdminRole = ['super_admin', 'company_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
                   const myNotifications = notifications.filter(n => {
                     const recipientId   = n.recipientId || n.targetUserId || n.forUserId;
                     const recipientRole = (n.recipientRole || n.targetRole || n.recipientType || '').toLowerCase();
@@ -1030,15 +1030,17 @@ const Notifications = () => {
                     // Rule 1: specific user
                     if (recipientId) return recipientId === currentUser?.id;
 
-                    // Rule 2: employee-only
-                    if (recipientRole === 'employee') return currentUserRole === 'employee';
+                    // Rule 2 — explicitly tagged as employee-only or staff
+                    if (recipientRole === 'employee' || recipientRole === 'employees' || recipientRole === 'all employees' || recipientRole === 'staff') {
+                      return ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
+                    }
 
                     // Rule 3: admin-only
                     if (recipientRole === 'admin' || recipientRole === 'super_admin' || recipientRole === 'manager' || recipientRole === 'team_leader') return isAdminRole;
 
                     // Rule 4: global / broadcast notification (recipientRole is 'all', 'everyone', or empty)
                     if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
-                      // If it's an employee-personal message, only show it to employees
+                      // If it's an employee-personal message, show to any non-super_admin staff user
                       const isPersonalEmployeeMsg =
                         msg.startsWith('your ') ||
                         msg.includes('your leave') ||
@@ -1050,7 +1052,7 @@ const Notifications = () => {
                         msg.includes('note: rejected');
 
                       if (isPersonalEmployeeMsg) {
-                        return currentUserRole === 'employee';
+                        return ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
                       }
 
                       // Broadcast / general notification → show to everyone

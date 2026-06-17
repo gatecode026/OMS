@@ -3,11 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Clock, AlertTriangle, Play, Check } from 'lucide-react';
 import Badge from '../common/Badge';
 
+const getDisplayStatus = (statusVal) => {
+  if (!statusVal) return 'To Do';
+  switch (statusVal.toLowerCase()) {
+    case 'todo':
+    case 'assigned':
+    case 'to do':
+      return 'To Do';
+    case 'in progress':
+    case 'in_progress':
+      return 'In Progress';
+    case 'in review':
+    case 'under_review':
+    case 'review':
+      return 'In Review';
+    case 'done':
+    case 'completed':
+      return 'Done';
+    default:
+      return 'To Do';
+  }
+};
+
 const TodayTasksWidget = ({
   tasks = [],
   onUpdateStatus,
   onOpenUpdateModal,
-  timePeriod = 'today'
+  timePeriod = 'today',
+  addToast
 }) => {
   const navigate = useNavigate();
 
@@ -158,15 +181,53 @@ const TodayTasksWidget = ({
                     <td style={{ padding: '8px 12px', fontSize: '0.8rem' }}>{task.dueDate}</td>
                     <td style={{ padding: '8px 12px' }}>
                       <select
-                        value={task.status}
-                        onChange={(e) => onUpdateStatus(task.id, e.target.value)}
+                        value={getDisplayStatus(task.status)}
+                        disabled={getDisplayStatus(task.status) === 'Done'}
+                        onChange={(e) => {
+                          const currentDisp = getDisplayStatus(task.status);
+                          const nextDisp = e.target.value;
+                          
+                          // Enforce sequential transitions
+                          if (currentDisp === 'To Do' && nextDisp !== 'In Progress') {
+                            if (addToast) addToast('warning', 'Tasks in "To Do" must first move to "In Progress".');
+                            return;
+                          }
+                          if (currentDisp === 'In Progress' && nextDisp !== 'In Review') {
+                            if (addToast) addToast('warning', 'Tasks in "In Progress" must be submitted to "In Review".');
+                            return;
+                          }
+                          if (currentDisp === 'In Review' && nextDisp !== 'Done') {
+                            if (addToast) addToast('warning', 'Tasks in "In Review" must be approved/completed to move to "Done".');
+                            return;
+                          }
+                          if (currentDisp === 'Done') {
+                            if (addToast) addToast('warning', 'Completed tasks cannot be moved.');
+                            return;
+                          }
+
+                          // Map display status back to DB status key
+                          let statusVal = 'todo';
+                          let progressVal = 0;
+                          if (nextDisp === 'In Progress') {
+                            statusVal = 'in_progress';
+                            progressVal = 10;
+                          } else if (nextDisp === 'In Review') {
+                            statusVal = 'review';
+                            progressVal = 90;
+                          } else if (nextDisp === 'Done') {
+                            statusVal = 'done';
+                            progressVal = 100;
+                          }
+                          
+                          onUpdateStatus(task.id, statusVal, progressVal, task.remarks || '');
+                        }}
                         className="padding-1 rounded text-xs"
                         style={{ padding: '2px 4px', width: 'auto', background: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
                       >
-                        <option value="To Do">To Do</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="In Review">In Review</option>
-                        <option value="Done">Done</option>
+                        <option value="To Do" disabled={getDisplayStatus(task.status) !== 'To Do'}>To Do</option>
+                        <option value="In Progress" disabled={getDisplayStatus(task.status) !== 'To Do' && getDisplayStatus(task.status) !== 'In Progress'}>In Progress</option>
+                        <option value="In Review" disabled={getDisplayStatus(task.status) !== 'In Progress' && getDisplayStatus(task.status) !== 'In Review'}>In Review</option>
+                        <option value="Done" disabled={getDisplayStatus(task.status) !== 'In Review' && getDisplayStatus(task.status) !== 'Done'}>Done</option>
                       </select>
                     </td>
                     <td style={{ padding: '8px 12px', textAlign: 'right' }}>

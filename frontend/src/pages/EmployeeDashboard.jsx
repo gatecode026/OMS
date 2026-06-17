@@ -43,6 +43,7 @@ const EmployeeDashboard = () => {
     notifications,
     activityLogs,
     updateTaskStatus,
+    updateTaskProgress,
     projectsList,
     documentsList,
     addToast,
@@ -292,9 +293,10 @@ const EmployeeDashboard = () => {
           {/* Today's Tasks Widget */}
           <TodayTasksWidget
             tasks={displayTasks}
-            onUpdateStatus={updateTaskStatus}
+            onUpdateStatus={updateTaskProgress}
             onOpenUpdateModal={handleOpenTaskUpdate}
             timePeriod={timePeriod}
+            addToast={addToast}
           />
 
           {/* Active Projects Widget */}

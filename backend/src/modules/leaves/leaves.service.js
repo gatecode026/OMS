@@ -34,7 +34,7 @@ export const createRecord = async (data, currentUser) => {
         time: 'Just now',
         category: 'Leave',
         priority: 'High',
-        recipientType: 'super_admin',
+        recipientType: 'admin',
         sentBy: record.employeeName || 'System',
         sentDate: new Date().toISOString().split('T')[0],
         deliveryStatus: 'Delivered',

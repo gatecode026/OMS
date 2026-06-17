@@ -198,19 +198,19 @@ export const getCompanyUsage = asyncHandler(async (req, res) => {
   const attFilter = isCustomDb ? {} : { companyId: id };
   const leaveFilter = isCustomDb ? {} : { companyId: id };
 
-  const totalEmployees = await EmployeeModel.countDocuments(empFilter);
-  const totalProjects = await ProjectModel.countDocuments(projectFilter);
+  const totalEmployees = await EmployeeModel.countDocuments(empFilter).setOptions({ bypassTenantScoping: true });
+  const totalProjects = await ProjectModel.countDocuments(projectFilter).setOptions({ bypassTenantScoping: true });
 
   // Tasks are embedded in projects array
   const taskStats = await ProjectModel.aggregate([
     ...(isCustomDb ? [] : [{ $match: projectFilter }]),
     { $unwind: '$tasks' },
     { $group: { _id: null, count: { $sum: 1 } } }
-  ]);
+  ]).option({ bypassTenantScoping: true });
   const totalTasks = taskStats.length > 0 ? taskStats[0].count : 0;
 
-  const totalAttendance = await AttendanceModel.countDocuments(attFilter);
-  const totalLeaves = await LeaveModel.countDocuments(leaveFilter);
+  const totalAttendance = await AttendanceModel.countDocuments(attFilter).setOptions({ bypassTenantScoping: true });
+  const totalLeaves = await LeaveModel.countDocuments(leaveFilter).setOptions({ bypassTenantScoping: true });
 
   return successResponse(res, {
     company: {
@@ -298,7 +298,7 @@ export const getOverview = asyncHandler(async (req, res) => {
       const empMatch = isCustomDb ? {} : { companyId: company.id };
 
       console.log(`[DEBUG getOverview] Calling Employee.countDocuments() with filter:`, empMatch);
-      const empCount = await EmployeeModel.countDocuments(empMatch);
+      const empCount = await EmployeeModel.countDocuments(empMatch).setOptions({ bypassTenantScoping: true });
       console.log(`[DEBUG getOverview] Employee.countDocuments() result count: ${empCount}`);
 
       // Compile security models dynamically
@@ -308,8 +308,8 @@ export const getOverview = asyncHandler(async (req, res) => {
       const IpBlocklistModel = connection.models['IpBlocklist'] || connection.model('IpBlocklist', IpBlocklist.schema);
       const SecurityAlertModel = connection.models['SecurityAlert'] || connection.model('SecurityAlert', SecurityAlert.schema);
 
-      const blockCount = await IpBlocklistModel.countDocuments({});
-      const alertCount = await SecurityAlertModel.countDocuments({});
+      const blockCount = await IpBlocklistModel.countDocuments({}).setOptions({ bypassTenantScoping: true });
+      const alertCount = await SecurityAlertModel.countDocuments({}).setOptions({ bypassTenantScoping: true });
 
       // Aggregate stats
       const stats = await getCompanyStats(connection, company.id, isCustomDb);

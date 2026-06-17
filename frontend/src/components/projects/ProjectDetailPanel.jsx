@@ -33,9 +33,7 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
     }
   };
 
-  // Workflow tracking setup
-  const stages = ['Planning', 'Design', 'Development', 'Testing', 'Deployment'];
-  const currentStageIndex = stages.indexOf(project.workflowStage || 'Development');
+
 
   // Format currency
   const formatCurrency = (val) => {
@@ -120,52 +118,7 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
                 </div>
               </div>
 
-              {/* Workflow Pipeline */}
-              <div className={styles.detailSection}>
-                <h4 className={styles.sectionHeader}>Workflow Tracking</h4>
-                <div className={styles.pipelineContainer}>
-                  <div className={styles.pipelineLine} />
-                  <div
-                    className={styles.pipelineProgressLine}
-                    style={{
-                      width: `${(currentStageIndex / (stages.length - 1)) * 100}%`
-                    }}
-                  />
-                  {stages.map((stage, idx) => {
-                    const isActive = idx === currentStageIndex;
-                    const isCompleted = idx < currentStageIndex;
-                    return (
-                      <div key={stage} className={styles.pipelineStep}>
-                        <div
-                          className={`${styles.stepDot} ${isActive ? styles.active : ''} ${isCompleted ? styles.completed : ''}`}
-                        />
-                        <span
-                          className={`${styles.stepLabel} ${isActive ? styles.active : ''} ${isCompleted ? styles.completed : ''}`}
-                        >
-                          {stage}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
 
-                <div className={styles.workflowMetaRow}>
-                  <div className={styles.workflowMetaCell}>
-                    <span className={styles.workflowMetaLabel}>Pending Approvals</span>
-                    <span className={styles.workflowMetaVal}>{project.pendingApprovals || 2}</span>
-                  </div>
-                  <div className={styles.workflowMetaCell}>
-                    <span className={styles.workflowMetaLabel}>Completed Milestones</span>
-                    <span className={styles.workflowMetaVal}>{project.milestonesCompleted || 4}/{project.milestonesTotal || 6}</span>
-                  </div>
-                  <div className={styles.workflowMetaCell}>
-                    <span className={styles.workflowMetaLabel}>Delayed Activities</span>
-                    <span className={`${styles.workflowMetaVal} ${project.delayedActivities > 0 ? 'text-danger' : ''}`}>
-                      {project.delayedActivities || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
               {/* Delayed warnings */}
               {project.status === 'Delayed' && (
@@ -262,6 +215,12 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
                           <span style={{ color: task.priority === 'High' ? 'var(--color-danger)' : 'var(--text-muted)' }}>
                             {task.priority} Priority
                           </span>
+                          {((task.assignedTo && task.assignedTo.length > 0) || (task.assigneeName && task.assigneeName !== 'Unassigned')) && (
+                            <>
+                              <span>•</span>
+                              <span>Assigned: {task.assignedTo && task.assignedTo.length > 0 ? task.assignedTo.join(', ') : task.assigneeName}</span>
+                            </>
+                          )}
                           {task.overdue && !task.completed && (
                             <>
                               <span>•</span>

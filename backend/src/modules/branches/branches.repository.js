@@ -24,16 +24,75 @@ const enrichBranchWithManager = async (branch) => {
   return branchObj;
 };
 
+/**
+ * Compute live employee counts per branch name for a given companyId.
+ * Returns a Map of { branchName (lowercase) => { total, onLeave } }
+ */
+const computeBranchCounts = async (companyId) => {
+  try {
+    const rows = await Employee.aggregate([
+      { $match: { companyId } },
+      {
+        $group: {
+          _id: { $toLower: { $ifNull: ['$branch', ''] } },
+          total: { $sum: 1 },
+          onLeave: {
+            $sum: {
+              $cond: [
+                { $in: ['$attendanceStatus', ['On Leave', 'Leave', 'Half Day']] },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+    const map = new Map();
+    for (const r of rows) {
+      if (r._id) map.set(r._id, { total: r.total, onLeave: r.onLeave });
+    }
+    return map;
+  } catch (err) {
+    logger.error('BranchesRepository::computeBranchCounts aggregation error:', err);
+    return new Map();
+  }
+};
+
 export const find = async (query = {}) => {
   logger.info('BranchesRepository::find querying branches from database...');
   const branches = await Branch.find(query);
-  return Promise.all(branches.map(enrichBranchWithManager));
+  const enriched = await Promise.all(branches.map(enrichBranchWithManager));
+
+  // Determine companyId for the aggregation
+  const companyId = enriched.length > 0 ? enriched[0].companyId : null;
+  const countsMap = companyId ? await computeBranchCounts(companyId) : new Map();
+
+  return enriched.map(branch => {
+    const key = (branch.name || '').toLowerCase();
+    const liveData = countsMap.get(key);
+    return {
+      ...branch,
+      employeeCount: liveData ? liveData.total : (branch.employeeCount || 0),
+      employeesOnLeave: liveData ? liveData.onLeave : (branch.employeesOnLeave || 0)
+    };
+  });
 };
 
 export const findOne = async (id) => {
   logger.info(`BranchesRepository::findOne querying branch with ID: ${id}`);
   const branch = await Branch.findOne({ id });
-  return enrichBranchWithManager(branch);
+  const enriched = await enrichBranchWithManager(branch);
+  if (!enriched) return null;
+
+  const countsMap = enriched.companyId ? await computeBranchCounts(enriched.companyId) : new Map();
+  const key = (enriched.name || '').toLowerCase();
+  const liveData = countsMap.get(key);
+  return {
+    ...enriched,
+    employeeCount: liveData ? liveData.total : (enriched.employeeCount || 0),
+    employeesOnLeave: liveData ? liveData.onLeave : (enriched.employeesOnLeave || 0)
+  };
 };
 
 export const save = async (data) => {

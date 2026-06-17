@@ -10,6 +10,50 @@ import logger from '../../config/logger.js';
 import { processEmployeeAssets } from '../../utils/imagekit.js';
 
 /**
+ * Sync real-time employee counts back into Branch and Department stored fields.
+ * This is a passive sync that runs after employee create/update/delete.
+ * The primary accurate count comes from dynamic aggregation at query time.
+ * @param {String} companyId - The tenant/company ID
+ * @param {String[]} branchNames - Branch names whose count should be refreshed
+ * @param {String[]} deptNames - Department names whose count should be refreshed
+ */
+const syncBranchDeptCounts = async (companyId, branchNames = [], deptNames = []) => {
+  if (!companyId) return;
+  try {
+    const { default: Branch } = await import('../branches/branches.model.js');
+    const { default: Department } = await import('../departments/departments.model.js');
+
+    // Sync each unique branch name
+    const uniqueBranches = [...new Set(branchNames.filter(Boolean))];
+    for (const branchName of uniqueBranches) {
+      const count = await Employee.countDocuments({
+        companyId,
+        branch: { $regex: new RegExp(`^${branchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+      await Branch.findOneAndUpdate(
+        { companyId, name: { $regex: new RegExp(`^${branchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { $set: { employeeCount: count } }
+      );
+    }
+
+    // Sync each unique department name
+    const uniqueDepts = [...new Set(deptNames.filter(Boolean))];
+    for (const deptName of uniqueDepts) {
+      const count = await Employee.countDocuments({
+        companyId,
+        department: { $regex: new RegExp(`^${deptName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+      });
+      await Department.findOneAndUpdate(
+        { companyId, name: { $regex: new RegExp(`^${deptName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } },
+        { $set: { employeeCount: count } }
+      );
+    }
+  } catch (err) {
+    logger.error('EmployeesRepository::syncBranchDeptCounts error (non-critical):', err.message);
+  }
+};
+
+/**
  * Find all employees matching optional query filters
  * @param {Object} query - MongoDB query filters
  */
@@ -60,6 +104,8 @@ export const save = async (data) => {
   } catch (err) {
     logger.error('Error registering tenant user in registry:', err);
   }
+  // Passively sync stored branch/department counts
+  syncBranchDeptCounts(employee.companyId, [employee.branch], [employee.department]);
   return employee;
 };
 
@@ -126,6 +172,12 @@ export const update = async (id, data) => {
       updated.companyId = updated.id;
     }
   }
+  // Passively sync stored branch/department counts for old and new values
+  if (updated) {
+    const affectedBranches = [updated.branch, oldEmployee?.branch].filter(Boolean);
+    const affectedDepts = [updated.department, oldEmployee?.department].filter(Boolean);
+    syncBranchDeptCounts(updated.companyId, affectedBranches, affectedDepts);
+  }
   return updated;
 };
 
@@ -144,6 +196,10 @@ export const remove = async (id) => {
     } catch (err) {
       logger.error('Error unregistering tenant user in registry:', err);
     }
+  }
+  // Passively sync stored branch/department counts after deletion
+  if (employee) {
+    syncBranchDeptCounts(employee.companyId, [employee.branch], [employee.department]);
   }
   return deleted;
 };

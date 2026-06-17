@@ -446,12 +446,42 @@ const TaskMonitoring = () => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData('text/plain');
     if (taskId) {
+      const task = (tasks || []).find(t => t.id === taskId);
+      if (!task) return;
+      const currentStatus = getDisplayStatus(task.status);
+      
+      // Enforce sequential transitions
+      if (currentStatus === 'To Do' && targetCol !== 'In Progress') {
+        if (addToast) addToast('warning', 'Tasks in "To Do" must first move to "In Progress".');
+        return;
+      }
+      if (currentStatus === 'In Progress' && targetCol !== 'In Review') {
+        if (addToast) addToast('warning', 'Tasks in "In Progress" must be submitted to "In Review".');
+        return;
+      }
+      if (currentStatus === 'In Review' && targetCol !== 'Done') {
+        if (addToast) addToast('warning', 'Tasks in "In Review" must be approved/completed to move to "Done".');
+        return;
+      }
+      if (currentStatus === 'Done') {
+        if (addToast) addToast('warning', 'Completed tasks cannot be moved.');
+        return;
+      }
+      
       // Map display columns back to DB status keys
       let statusVal = 'todo';
-      if (targetCol === 'In Progress') statusVal = 'in_progress';
-      else if (targetCol === 'In Review') statusVal = 'review';
-      else if (targetCol === 'Done') statusVal = 'done';
-      await updateTaskStatus(taskId, statusVal);
+      let progressVal = 0;
+      if (targetCol === 'In Progress') {
+        statusVal = 'in_progress';
+        progressVal = 10;
+      } else if (targetCol === 'In Review') {
+        statusVal = 'review';
+        progressVal = 90;
+      } else if (targetCol === 'Done') {
+        statusVal = 'done';
+        progressVal = 100;
+      }
+      await updateTaskProgress(taskId, statusVal, progressVal, task.remarks || '');
     }
   };
 
@@ -716,10 +746,27 @@ const TaskMonitoring = () => {
                             value={task.progress || 0}
                             onChange={async (e) => {
                               const val = parseInt(e.target.value);
-                              let nextStatus = task.status;
-                              if (val === 100) nextStatus = 'done';
-                              else if (val > 0 && (task.status === 'todo' || task.status === 'To Do')) nextStatus = 'in_progress';
-                              await updateTaskProgress(task.id, nextStatus, val, task.remarks);
+                              const currentDisp = getDisplayStatus(task.status);
+                              
+                              if (currentDisp === 'To Do') {
+                                if (val > 30) {
+                                  if (addToast) addToast('warning', 'Task must first be started. Progress capped at 30% for In Progress.');
+                                  await updateTaskProgress(task.id, 'in_progress', 30, task.remarks);
+                                } else if (val > 0) {
+                                  await updateTaskProgress(task.id, 'in_progress', val, task.remarks);
+                                }
+                              } else if (currentDisp === 'In Progress') {
+                                if (val >= 90) {
+                                  if (addToast) addToast('info', 'Task submitted for review.');
+                                  await updateTaskProgress(task.id, 'review', 90, task.remarks);
+                                } else {
+                                  await updateTaskProgress(task.id, 'in_progress', Math.max(10, val), task.remarks);
+                                }
+                              } else if (currentDisp === 'In Review') {
+                                if (addToast) addToast('warning', 'Task is in review. Only reviewers can approve/complete it.');
+                              } else if (currentDisp === 'Done') {
+                                if (addToast) addToast('info', 'Completed tasks cannot be modified.');
+                              }
                             }}
                             className="task-progress-slider"
                           />
@@ -752,9 +799,6 @@ const TaskMonitoring = () => {
                           </Button>
                         )}
                         {getDisplayStatus(task.status) === 'In Review' && (
-                          <span className="pending-review-label">Pending Approval</span>
-                        )}
-                        {getDisplayStatus(task.status) !== 'Done' && getDisplayStatus(task.status) !== 'In Review' && (
                           <Button
                             variant="success"
                             size="sm"
@@ -1311,11 +1355,8 @@ const TaskMonitoring = () => {
                           {app.status}
                         </Badge>
                         {app.status === 'Pending' && (
-                          currentUserRole === 'super_admin' ||
-                          (app.level === 1 && (currentUser?.id === selectedTask.assigneeId || currentUser?.name === app.approver)) ||
-                          (app.level === 2 && (hasPermission('task_monitoring', 'approve') || currentUser?.name === app.approver)) ||
-                          (app.level === 3 && (hasPermission('task_monitoring', 'approve') || currentUser?.name === app.approver)) ||
-                          (app.level === 4 && currentUserRole === 'super_admin')
+                          (app.level === 1 && (currentUser?.id === selectedTask.assigneeId || currentUser?.name?.toLowerCase() === app.approver?.toLowerCase())) ||
+                          (app.level > 1 && currentUser?.name?.toLowerCase() === app.approver?.toLowerCase())
                         ) && (
                           <div className="flex-center gap-1">
                             <button className="action-circle-btn approve-btn" onClick={() => handleApproveLevel(app.level)} title="Approve">✓</button>

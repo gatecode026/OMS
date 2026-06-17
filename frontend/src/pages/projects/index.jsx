@@ -67,6 +67,7 @@ const Projects = () => {
   const [assignTeamForm, setAssignTeamForm] = useState({ projectId: '', memberName: '' });
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [addTaskForm, setAddTaskForm] = useState({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
+  const [selectedTaskEmployees, setSelectedTaskEmployees] = useState([]);
   const [uploadDocForm, setUploadDocForm] = useState({ projectId: '', docName: '', docType: 'pdf', docSize: '0.8 MB' });
   const [reportForm, setReportForm] = useState({ projectId: '', reportType: 'progress', format: 'pdf' });
 
@@ -90,14 +91,14 @@ const Projects = () => {
 
       // Dropdown and Search Filters
       const matchesSearch =
-        p.id.toLowerCase().includes(filters.search.toLowerCase()) ||
-        p.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        p.manager.toLowerCase().includes(filters.search.toLowerCase()) ||
-        p.leader.toLowerCase().includes(filters.search.toLowerCase());
+        (p.id || '').toLowerCase().includes((filters.search || '').toLowerCase()) ||
+        (p.name || '').toLowerCase().includes((filters.search || '').toLowerCase()) ||
+        (p.manager || '').toLowerCase().includes((filters.search || '').toLowerCase()) ||
+        (p.leader || '').toLowerCase().includes((filters.search || '').toLowerCase());
 
       const matchesStatus = filters.status === 'All' || p.status === filters.status;
       const matchesPriority = filters.priority === 'All' || p.priority === filters.priority;
-      const matchesDept = filters.department === 'All' || p.department.toLowerCase() === filters.department.toLowerCase();
+      const matchesDept = filters.department === 'All' || (p.department || '').toLowerCase() === (filters.department || '').toLowerCase();
 
       // Timeframe Filter
       let matchesTimeframe = true;
@@ -302,6 +303,16 @@ const Projects = () => {
     });
   };
 
+  const handleToggleTaskEmployee = (memberName) => {
+    setSelectedTaskEmployees(prev => {
+      if (prev.includes(memberName)) {
+        return prev.filter(m => m !== memberName);
+      } else {
+        return [...prev, memberName];
+      }
+    });
+  };
+
   // Assign Team Member Submit
   const handleAssignTeamSubmit = async (e) => {
     e.preventDefault();
@@ -331,7 +342,25 @@ const Projects = () => {
     if (!targetProj) return;
 
     const nextTaskId = `t-${projectId}-${targetProj.tasks.length + 1}`;
-    const newTasks = [...targetProj.tasks, { id: nextTaskId, title: title.trim(), completed: false, status: 'To Do', progress: 0, dueDate, priority }];
+    const firstEmpName = selectedTaskEmployees[0];
+    const firstEmp = (employees || []).find(e => (e.name || '').toLowerCase() === (firstEmpName || '').toLowerCase());
+    const assigneeId = firstEmp ? firstEmp.id : '';
+
+    const newTasks = [
+      ...targetProj.tasks,
+      {
+        id: nextTaskId,
+        title: title.trim(),
+        completed: false,
+        status: 'To Do',
+        progress: 0,
+        dueDate,
+        priority,
+        assignedTo: selectedTaskEmployees,
+        assigneeName: selectedTaskEmployees.length > 0 ? selectedTaskEmployees.join(', ') : 'Unassigned',
+        assigneeId
+      }
+    ];
     const tasksTotal = targetProj.tasksTotal + 1;
     const progress = Math.round((targetProj.tasksDone / tasksTotal) * 100);
 
@@ -621,7 +650,11 @@ const Projects = () => {
             <button className={styles.pageBtn} onClick={() => setActiveModal('assign')}>
               <Users size={14} /> Assign Team
             </button>
-            <button className={styles.pageBtn} onClick={() => setActiveModal('task')}>
+            <button className={styles.pageBtn} onClick={() => {
+              setAddTaskForm({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
+              setSelectedTaskEmployees([]);
+              setActiveModal('task');
+            }}>
               <CheckSquare size={14} /> Add Tasks
             </button>
             <button className={styles.pageBtn} onClick={() => setActiveModal('document')}>
@@ -1076,12 +1109,93 @@ const Projects = () => {
                     className={styles.filterSelect}
                     style={{ width: '100%' }}
                     value={addTaskForm.projectId}
-                    onChange={(e) => setAddTaskForm({ ...addTaskForm, projectId: e.target.value })}
+                    onChange={(e) => {
+                      setAddTaskForm({ ...addTaskForm, projectId: e.target.value });
+                      setSelectedTaskEmployees([]);
+                    }}
                   >
                     <option value="">Select a project...</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
                   </select>
                 </div>
+                {addTaskForm.projectId && (() => {
+                  const targetProj = projects.find(p => p.id === addTaskForm.projectId);
+                  const projectMembers = targetProj ? (targetProj.members || []) : [];
+                  
+                  if (projectMembers.length === 0) {
+                    return (
+                      <div className={styles.formGroup}>
+                        <label className={styles.formLabel}>Select Employees</label>
+                        <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem' }}>
+                          No team members found assigned to this project yet. Please assign team members first.
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const isAllSelected = projectMembers.length > 0 && projectMembers.every(name => selectedTaskEmployees.includes(name));
+
+                  const handleToggleAll = () => {
+                    if (isAllSelected) {
+                      setSelectedTaskEmployees([]);
+                    } else {
+                      setSelectedTaskEmployees([...projectMembers]);
+                    }
+                  };
+
+                  return (
+                    <div className={styles.formGroup}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className={styles.formLabel}>Select Employees</label>
+                        <button 
+                          type="button" 
+                          onClick={handleToggleAll}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-primary)',
+                            fontSize: '0.72rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--bg-elevated)'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                        >
+                          {isAllSelected ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div className={styles.employeeCheckboxList}>
+                        {projectMembers.map(memberName => {
+                          const isChecked = selectedTaskEmployees.includes(memberName);
+                          const emp = (employees || []).find(e => (e.name || '').toLowerCase() === (memberName || '').toLowerCase());
+                          return (
+                            <div 
+                              key={memberName} 
+                              className={styles.employeeCheckboxItem}
+                              onClick={() => handleToggleTaskEmployee(memberName)}
+                            >
+                              <input
+                                type="checkbox"
+                                className={styles.employeeCheckbox}
+                                checked={isChecked}
+                                readOnly
+                              />
+                              <div className={styles.employeeText}>
+                                <span className={styles.employeeName}>{memberName}</span>
+                                <span className={styles.employeeDetails}>
+                                  {emp ? `${emp.designation || emp.position || 'Staff'} (${emp.id})` : 'Staff'}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>Task Title</label>
                   <input

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import { decodeCompanyId } from '../../utils/hashId';
 import { ArrowLeft, Building2, Users, Layers, CheckSquare, CalendarDays, ShieldAlert, AlertTriangle, Ban, ShieldCheck } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 import Button from '../../components/common/Button';
@@ -31,9 +32,12 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const CompanyDetail = () => {
-  const { id } = useParams();
+  const { id: encodedId } = useParams();
   const navigate = useNavigate();
   const { token, addToast } = useApp();
+
+  // Decode URL parameter back to raw company ID
+  const id = encodedId ? decodeCompanyId(encodedId) : '';
 
   // State
   const [data, setData] = useState(null);

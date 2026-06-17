@@ -67,6 +67,7 @@ const Announcements = () => {
     showConfirm,
     currentUserRole,
     currentUserId,
+    currentUser,
     announcementsList: announcements,
     emergencyAlert: activeEmergencyAlert,
     announcementTrackingLogs: trackingLogs,
@@ -253,13 +254,15 @@ const Announcements = () => {
       if (a.status !== 'Published') return false;
       
       const matchesCat = boardCategory === 'All' ? true : a.category === boardCategory;
-      const matchesPerspective = perspective === 'employee'
-        ? (a.audienceType === 'All' || (a.audienceType === 'Department' && a.targetAudience === 'Operations'))
+      const matchesPerspective = (perspective === 'employee' || currentUserRole === 'employee')
+        ? (a.audienceType === 'All' || 
+           (a.audienceType === 'Department' && a.targetAudience?.toLowerCase() === currentUser?.department?.toLowerCase()) || 
+           (a.audienceType === 'Branch' && a.targetAudience?.toLowerCase() === currentUser?.branch?.toLowerCase()))
         : true;
 
       return matchesCat && matchesPerspective;
     });
-  }, [announcements, boardCategory, perspective]);
+  }, [announcements, boardCategory, perspective, currentUser, currentUserRole]);
 
   // Filter management center records
   const filteredManagementData = useMemo(() => {
@@ -358,7 +361,7 @@ const Announcements = () => {
   }
 
   return (
-    <div className="announcements-page flex-column grid-gap">
+    <div className="announcements-page flex-column grid-gap animate-fade-in">
       
       {/* Toast Alert Feed */}
       <div className="page-toast-container">
@@ -368,23 +371,6 @@ const Announcements = () => {
           </div>
         ))}
       </div>
-
-      {/* Emergency Flash Banner */}
-      {activeEmergencyAlert.isActive && (
-        <div className="emergency-flash-banner animate-slide-up flex-center justify-between">
-          <div className="flex-center gap-3">
-            <div className="emergency-icon-ring"><Flame size={20} className="text-danger" /></div>
-            <div>
-              <strong className="emergency-banner-title">{activeEmergencyAlert.title}</strong>
-              <p className="emergency-banner-desc font-xsmall text-muted mb-0">{activeEmergencyAlert.description} • {activeEmergencyAlert.date}</p>
-            </div>
-          </div>
-          <div className="flex-center gap-2">
-            <button className="flex-center gap-1 font-xsmall badge badge-danger py-1 cursor-pointer" onClick={() => addPageToast('info', 'Karnataka Disaster Response SMS Broadcast completed.')}><ExternalLink size={10} /> SMS Blast</button>
-            <button className="action-circle-btn text-muted" onClick={() => triggerEmergencyAlert({ ...activeEmergencyAlert, isActive: false })}><X size={14} /></button>
-          </div>
-        </div>
-      )}
 
       {/* Header */}
       <div className="page-header-row announcements-page-header">

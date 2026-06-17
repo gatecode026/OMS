@@ -29,14 +29,16 @@ const Departments = () => {
     branches = [], 
     departments: contextDepartments = [], 
     addDepartment, 
-    updateDepartment, 
+    updateDepartment,
+    updateEmployee,
     addToast, 
     showConfirm,
     teams: contextTeams = [],
     deleteTeam,
     updateTeam,
     addActivityLog,
-    hasPermission
+    hasPermission,
+    projectsList = []
   } = useApp() || {};
 
   // Tab State
@@ -156,10 +158,39 @@ const Departments = () => {
     setAddDeptOpen(true);
   };
 
-  const totalEmployees = departments.reduce((acc, d) => acc + (d.employeeCount || 0), 0);
+  // Use live employees array for accurate total count; fallback to summing department counts
+  const totalEmployees = employees.length > 0
+    ? employees.length
+    : departments.reduce((acc, d) => acc + (d.employeeCount || 0), 0);
+
+  // Map of department name (lowercase) -> real-time employee count from live employees array
+  const deptEmployeeCountMap = React.useMemo(() => {
+    const map = {};
+    (employees || []).forEach(emp => {
+      const dept = (emp.department || '').trim().toLowerCase();
+      if (dept) {
+        map[dept] = (map[dept] || 0) + 1;
+      }
+    });
+    return map;
+  }, [employees]);
+
+  const getLiveEmpCount = (deptName) => deptEmployeeCountMap[(deptName || '').trim().toLowerCase()] || 0;
+
+  const getLiveTeamsCount = (deptName) => {
+    if (!deptName) return 0;
+    return (contextTeams || []).filter(t => (t.department || '').trim().toLowerCase() === deptName.trim().toLowerCase() && t.status === 'Active').length;
+  };
+
+  const getLiveProjectsCount = (deptName) => {
+    if (!deptName) return 0;
+    return (projectsList || []).filter(p => (p.department || '').trim().toLowerCase() === deptName.trim().toLowerCase() && p.status !== 'Completed').length;
+  };
+
   const avgPerf = departments.length > 0 ? Math.round(departments.reduce((acc, d) => acc + (d.avgPerformance || 0), 0) / departments.length) : 0;
   const activeDepts = departments.filter(d => d.status === 'Active').length;
   const totalTeams = teams.length;
+
 
   const handleApplyFilter = (d) => {
     const matchesSearch = !search || 
@@ -260,24 +291,45 @@ const Departments = () => {
       if (addToast) addToast('error', 'Please fill in all transfer fields.');
       return;
     }
-    const sourceDept = departments.find(d => d.name === transferForm.source);
+    if (transferForm.source === transferForm.target) {
+      if (addToast) addToast('warning', 'Source and target departments must be different.');
+      return;
+    }
+
+    // Find the actual employee record by ID (transferForm.employee stores the ID)
+    const emp = employees.find(em => em.id === transferForm.employee || em.name === transferForm.employee);
+    if (!emp) {
+      if (addToast) addToast('error', 'Employee not found. Please select a valid employee.');
+      return;
+    }
+
+    // Find the target department to get the branch info if available
     const targetDept = departments.find(d => d.name === transferForm.target);
-    if (sourceDept && updateDepartment) {
-      updateDepartment(sourceDept.id, {
-        employeeCount: Math.max(0, (sourceDept.employeeCount || 0) - 1)
-      });
+
+    // Build the update payload — update the employee's department (and branch if dept has one)
+    const updatePayload = { department: transferForm.target };
+    if (targetDept && targetDept.branch) {
+      updatePayload.branch = targetDept.branch;
     }
-    if (targetDept && updateDepartment) {
-      updateDepartment(targetDept.id, {
-        employeeCount: (targetDept.employeeCount || 0) + 1
-      });
+
+    // Persist to database via updateEmployee
+    const updated = await updateEmployee(emp.id, updatePayload);
+    if (!updated && updated !== undefined) {
+      // updateEmployee shows its own error toast on failure
+      return;
     }
+
     if (addActivityLog) {
-      await addActivityLog(`Transferred ${transferForm.employee} from ${transferForm.source} to ${transferForm.target}`, 'Departments', 'assign');
+      await addActivityLog(
+        `Transferred ${emp.name} from ${transferForm.source} to ${transferForm.target}`,
+        'Departments',
+        'assign'
+      );
     }
+
     setTransferOpen(false);
-    if (addToast) addToast('success', `Transfer of ${transferForm.employee} initiated successfully.`);
-    setTransferForm({ employee: '', source: '', target: '', reason: '', date: '2026-06-01' });
+    if (addToast) addToast('success', `${emp.name} successfully transferred to ${transferForm.target}.`);
+    setTransferForm({ employee: '', source: '', target: '', reason: '', date: new Date().toISOString().split('T')[0] });
   };
 
   const handleExportSubmit = (e) => {
@@ -305,12 +357,12 @@ const Departments = () => {
     name: d.name || '',
     Productivity: d.avgPerformance || 0,
     Attendance: d.attendanceRate || 0,
-    Projects: (d.activeProjects || 0) * 20
+    Projects: (getLiveProjectsCount(d.name) || d.activeProjects || 0) * 20
   }));
 
   const employeeDistributionChartData = departments.map(d => ({
     name: d.name || '',
-    value: d.employeeCount || 0,
+    value: getLiveEmpCount(d.name) || d.employeeCount || 0,
     color: d.color || `#${Math.floor(Math.random()*16777215).toString(16)}`
   })).filter(item => item.value > 0);
 
@@ -512,7 +564,7 @@ const Departments = () => {
                           </div>
                         </td>
                         <td className="text-sm"><MapPin size={12} className="inline-icon" /> {dept.branch}</td>
-                        <td><Badge variant="neutral">{dept.employeeCount || 0} active</Badge></td>
+                        <td><Badge variant="neutral">{getLiveEmpCount(dept.name) || dept.employeeCount || 0} active</Badge></td>
                         <td>
                           <Badge variant={(dept.attendanceRate || 0) >= 92 ? 'success' : 'warning'}>
                             {dept.attendanceRate || 0}%
@@ -840,15 +892,32 @@ const Departments = () => {
         <form onSubmit={handleTransferSubmit} className="policy-form flex-column gap-4 py-2">
           <div className="form-group flex-column gap-1">
             <label htmlFor="transferEmpName">Employee Name *</label>
-            <input
+            <select
               id="transferEmpName"
-              type="text"
               required
               className="form-control"
-              placeholder="e.g. Suresh Kumar"
               value={transferForm.employee}
-              onChange={e => setTransferForm({ ...transferForm, employee: e.target.value })}
-            />
+              onChange={e => {
+                const selectedEmp = employees.find(em => em.id === e.target.value);
+                setTransferForm(prev => ({
+                  ...prev,
+                  employee: e.target.value,
+                  // Auto-fill source department from the selected employee's current department
+                  source: selectedEmp?.department || prev.source
+                }));
+              }}
+            >
+              <option value="">Select Employee...</option>
+              {employees
+                .filter(em => em.roleId !== 'company_admin' && em.roleId !== 'super_admin')
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                .map(em => (
+                  <option key={em.id} value={em.id}>
+                    {em.name} — {em.department || 'No Dept'} ({em.id})
+                  </option>
+                ))
+              }
+            </select>
           </div>
 
           <div className="form-group flex-column gap-1">
@@ -984,15 +1053,15 @@ const Departments = () => {
             <div className="dept-modal-stats-grid">
               <div className="dept-stat-tile">
                 <span className="dept-stat-label">Active Employees</span>
-                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.employeeCount || 0}</span>
+                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{getLiveEmpCount(selectedDept.name) || selectedDept.employeeCount || 0}</span>
               </div>
               <div className="dept-stat-tile">
                 <span className="dept-stat-label">Subteams Registered</span>
-                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.activeTeams || 0}</span>
+                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{getLiveTeamsCount(selectedDept.name) || selectedDept.activeTeams || 0}</span>
               </div>
               <div className="dept-stat-tile">
                 <span className="dept-stat-label">Active Projects</span>
-                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{selectedDept.activeProjects || 0}</span>
+                <span className="dept-stat-val" style={{ color: selectedDept.color }}>{getLiveProjectsCount(selectedDept.name) || selectedDept.activeProjects || 0}</span>
               </div>
               <div className="dept-stat-tile">
                 <span className="dept-stat-label">Performance Rating</span>

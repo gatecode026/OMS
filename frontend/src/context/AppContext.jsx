@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE } from '../permissions/permissions';
 
 
 const AppContext = createContext(undefined);
@@ -152,41 +153,7 @@ export const AppProvider = ({ children }) => {
   const [leavePolicyConfigs, setLeavePolicyConfigs] = useState([]);
   const [holidaysList, setHolidaysList] = useState([]);
   const [projectsList, setProjectsList] = useState([]);
-  const tasks = React.useMemo(() => {
-    if (!projectsList) return [];
-    const aggregatedTasks = [];
-    projectsList.forEach(proj => {
-      if (proj.tasks) {
-        proj.tasks.forEach(t => {
-          aggregatedTasks.push({
-            ...t,
-            project: proj.name,
-            projectId: proj.id,
-            projectName: proj.name,
-            department: proj.department || '',
-            assigneeId: t.assigneeId || 'EMP-2026-003',
-            assigneeName: t.assigneeName || proj.leader || 'Unassigned',
-            description: t.description || '',
-            estimatedHours: t.estimatedHours || 20,
-            status: t.completed ? 'Done' : (t.status === 'Done' || t.status === 'done' ? 'To Do' : t.status || 'To Do'),
-            progress: t.completed ? 100 : (t.progress !== undefined ? t.progress : 0),
-            comments: t.comments || [],
-            attachments: t.attachments || [],
-            approvals: t.approvals && t.approvals.length > 0 ? t.approvals : [
-              { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 4, role: 'Super Admin Approval', approver: 'Balram Suman', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
-            ],
-            activityLog: t.activityLog || [
-              { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
-            ]
-          });
-        });
-      }
-    });
-    return aggregatedTasks;
-  }, [projectsList]);
+
   const [payroll, setPayroll] = useState([]);
   const [payrollGrades, setPayrollGrades] = useState([]);
   const [payrollReimbursements, setPayrollReimbursements] = useState([]);
@@ -512,6 +479,53 @@ export const AppProvider = ({ children }) => {
       setCurrentUserId(defaultUser.id);
     }
   }, [currentUserRole, currentUserId, employees]);
+
+  const tasks = React.useMemo(() => {
+    if (!projectsList) return [];
+    const aggregatedTasks = [];
+    projectsList.forEach(proj => {
+      if (proj.tasks) {
+        proj.tasks.forEach(t => {
+          const isUserAssigned = t.assignedTo && currentUser && t.assignedTo.some(name => name.toLowerCase() === currentUser.name?.toLowerCase());
+          const resolvedAssigneeId = isUserAssigned ? currentUser.id : (t.assigneeId || 'EMP-2026-003');
+          const resolvedAssigneeName = t.assigneeName || (t.assignedTo && t.assignedTo.length > 0 ? t.assignedTo.join(', ') : proj.leader || 'Unassigned');
+          
+          aggregatedTasks.push({
+            ...t,
+            project: proj.name,
+            projectId: proj.id,
+            projectName: proj.name,
+            department: proj.department || '',
+            assigneeId: resolvedAssigneeId,
+            assigneeName: resolvedAssigneeName,
+            description: t.description || '',
+            estimatedHours: t.estimatedHours || 20,
+            status: t.completed
+              ? 'Done'
+              : (t.status === 'Done' || t.status === 'done'
+                ? 'To Do'
+                : (t.status === 'in_progress' || t.status === 'In Progress'
+                  ? 'In Progress'
+                  : (t.status === 'review' || t.status === 'In Review' || t.status === 'under_review'
+                    ? 'In Review'
+                    : t.status || 'To Do'))),
+            progress: t.completed ? 100 : (t.progress !== undefined ? t.progress : 0),
+            comments: t.comments || [],
+            attachments: t.attachments || [],
+            approvals: (t.approvals && t.approvals.length > 0 ? t.approvals : [
+              { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
+              { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
+              { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
+            ]).filter(app => app.level !== 4 && app.role !== 'Super Admin Approval'),
+            activityLog: t.activityLog || [
+              { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
+            ]
+          });
+        });
+      }
+    });
+    return aggregatedTasks;
+  }, [projectsList, currentUser, employees]);
 
   useEffect(() => {
     localStorage.setItem('saas_role', currentUserRole);
@@ -3091,8 +3105,7 @@ export const AppProvider = ({ children }) => {
       approvals: [
         { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
         { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 4, role: 'Super Admin Approval', approver: 'Balram Suman', status: 'Pending', timestamp: '', remarks: '' }
+        { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
@@ -4073,8 +4086,17 @@ export const AppProvider = ({ children }) => {
 
   // Check RBAC permission helper with Overrides support
   const hasPermission = (module, action) => {
+    const normalizedRole = (currentUserRole || '').toLowerCase();
+    
     // Super admin and company admin have permission for everything
-    if (currentUserRole === 'super_admin' || currentUserRole === 'company_admin') return true;
+    if (
+      normalizedRole === 'super_admin' || 
+      normalizedRole === 'company_admin' || 
+      normalizedRole.endsWith('_company_admin') || 
+      normalizedRole.endsWith('_super_admin')
+    ) {
+      return true;
+    }
 
     // 1. Check User Overrides first
     const activeUserId = currentUserId || currentUser?.id;
@@ -4135,20 +4157,59 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    const roleObj = roles.find(r => r.id === currentUserRole);
-    const permissions = roleObj?.permissions;
-    const res = permissions ? !!permissions[module]?.[action] : false;
-    console.log('hasPermission internal details:', {
-      module,
-      action,
-      currentUserRole,
-      hasRoleObj: !!roleObj,
-      hasPermissionsObj: !!permissions,
-      permissionVal: permissions ? permissions[module]?.[action] : undefined,
-      result: res
-    });
-    return res;
+    // Map frontend module keys to backend DB permission keys
+    const MODULE_MAPPING = {
+      'employee_management': 'employees',
+      'attendance_management': 'attendance',
+      'leave_management': 'leaves',
+      'payroll_management': 'payroll',
+      'department_management': 'departments',
+      'agency_branch_management': 'branches',
+      'project_management': 'projects',
+      'task_monitoring': 'tasks',
+      'team_management': 'teams',
+      'system_settings': 'settings',
+      'document_management': 'documents',
+      'notifications': 'notifications'
+    };
+
+    const dbKey = MODULE_MAPPING[module] || module;
+    const isDbBacked = Object.values(MODULE_MAPPING).includes(dbKey);
+
+    if (isDbBacked) {
+      const roleObj = roles.find(r => r.id === currentUserRole);
+      const permissions = roleObj?.permissions;
+      if (permissions && permissions[dbKey] !== undefined) {
+        const res = !!permissions[dbKey]?.[action];
+        console.log('hasPermission DB-backed details:', {
+          module,
+          dbKey,
+          action,
+          currentUserRole,
+          result: res
+        });
+        return res;
+      }
+    }
+
+    // Fallback: Resolve required role and use hierarchy check if module is not DB-backed or is not found in roles Obj
+    const route = Object.keys(PATH_TO_MODULE).find(key => PATH_TO_MODULE[key] === module);
+    if (route) {
+      const requiredRole = getRequiredRoleForPath(route);
+      const res = hasRoleAccess(currentUserRole, requiredRole);
+      console.log('hasPermission fallback hierarchy details:', {
+        module,
+        action,
+        currentUserRole,
+        requiredRole,
+        result: res
+      });
+      return res;
+    }
+
+    return true;
   };
+
 
   // Memoize the normalized employees array to prevent creating a new reference
   // on every render, which would cause all context consumers to re-render infinitely.
@@ -4180,6 +4241,34 @@ export const AppProvider = ({ children }) => {
       return normalized;
     });
   }, [employees, branches, departments]);
+
+  const memoizedCurrentUser = useMemo(() => {
+    if (!currentUser) return null;
+    const normalized = normalizeEmployee(currentUser);
+    if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager')) {
+      const hasNoBranch = !normalized.branch || normalized.branch === '—' || normalized.branch === '-';
+      if (hasNoBranch) {
+        const foundBranch = (branches || []).find(
+          b => (b.managerId && b.managerId === normalized.id) || (b.manager && b.manager.trim().toLowerCase() === normalized.name.trim().toLowerCase())
+        );
+        if (foundBranch) {
+          normalized.branch = foundBranch.name;
+          normalized.branchAgency = foundBranch.name;
+        }
+      }
+      const hasNoDept = !normalized.department || normalized.department === '—' || normalized.department === '-';
+      if (hasNoDept) {
+        const foundDept = (departments || []).find(
+          d => (d.headId && d.headId === normalized.id) || (d.head && d.head.trim().toLowerCase() === normalized.name.trim().toLowerCase())
+        );
+        if (foundDept) {
+          normalized.department = foundDept.name;
+        }
+      }
+    }
+    return normalized;
+  }, [currentUser, branches, departments]);
+
 
   return (
     <AppContext.Provider
@@ -4259,8 +4348,9 @@ export const AppProvider = ({ children }) => {
         commandPaletteOpen,
         currentUserRole,
         sidebarCollapsed,
-        currentUser,
+        currentUser: memoizedCurrentUser,
         setCurrentUserRole,
+
         setSidebarCollapsed,
         setCommandPaletteOpen,
         addToast,
