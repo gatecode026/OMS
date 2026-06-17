@@ -91,14 +91,14 @@ const PlatformOverview = () => {
       setLoading(true);
 
       // 1. Fetch rich metrics
-      const analyticsRes = await fetch('http://localhost:5000/api/admin/overview/analytics', {
+      const analyticsRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/admin/overview/analytics', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!analyticsRes.ok) throw new Error('Failed to fetch dashboard metrics.');
       const analyticsResult = await analyticsRes.json();
 
       // 2. Fetch basic companies list
-      const companiesRes = await fetch('http://localhost:5000/api/admin/companies?limit=100', {
+      const companiesRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/admin/companies?limit=100', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!companiesRes.ok) throw new Error('Failed to fetch companies list.');
@@ -165,7 +165,7 @@ const PlatformOverview = () => {
           }
         };
 
-        const res = await fetch(`http://localhost:5000/api/admin/companies/${selectedCompany.id}`, {
+        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/admin/companies/${selectedCompany.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -199,7 +199,7 @@ const PlatformOverview = () => {
     const handleStatusSubmit = async () => {
       try {
         setActionLoading(true);
-        const res = await fetch(`http://localhost:5000/api/admin/companies/${statusForm.id}/status`, {
+        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/admin/companies/${statusForm.id}/status`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

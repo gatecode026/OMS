@@ -230,7 +230,7 @@ const EmployeeProfile = () => {
 
   useEffect(() => {
     if (!empId || !token) return;
-    fetch(`http://localhost:5000/api/v1/employees/${empId}`, {
+    fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${empId}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

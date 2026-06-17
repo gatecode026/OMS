@@ -195,7 +195,7 @@ const SecurityAudit = () => {
     if (!token) return;
     try {
       // Allowed IPs
-      const wlRes = await fetch('http://localhost:5000/api/v1/security/whitelist', {
+      const wlRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/security/whitelist', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const wlData = await wlRes.json();
@@ -204,7 +204,7 @@ const SecurityAudit = () => {
       }
 
       // Blocked IPs
-      const blRes = await fetch('http://localhost:5000/api/v1/security/blocklist', {
+      const blRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/security/blocklist', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const blData = await blRes.json();
@@ -213,7 +213,7 @@ const SecurityAudit = () => {
       }
 
       // Devices
-      const devRes = await fetch('http://localhost:5000/api/v1/security/devices', {
+      const devRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/security/devices', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const devData = await devRes.json();
@@ -222,7 +222,7 @@ const SecurityAudit = () => {
       }
 
       // Sessions
-      const sesRes = await fetch('http://localhost:5000/api/v1/security/sessions', {
+      const sesRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/security/sessions', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const sesData = await sesRes.json();
@@ -231,7 +231,7 @@ const SecurityAudit = () => {
       }
 
       // Alerts
-      const altRes = await fetch('http://localhost:5000/api/v1/security/alerts', {
+      const altRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/security/alerts', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const altData = await altRes.json();
@@ -338,7 +338,7 @@ const SecurityAudit = () => {
     try {
       if (editingIpId) {
         // Update
-        const response = await fetch(`http://localhost:5000/api/v1/security/whitelist/${editingIpId}`, {
+        const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/whitelist/${editingIpId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -354,7 +354,7 @@ const SecurityAudit = () => {
         }
       } else {
         // Create
-        const response = await fetch('http://localhost:5000/api/v1/security/whitelist', {
+        const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/security/whitelist', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -393,7 +393,7 @@ const SecurityAudit = () => {
       `Are you sure you want to remove whitelisted IP "${label}"? Systems on this IP will be subject to standard rules.`,
       async () => {
         try {
-          const response = await fetch(`http://localhost:5000/api/v1/security/whitelist/${id}`, {
+          const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/whitelist/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -416,7 +416,7 @@ const SecurityAudit = () => {
       `Are you sure you want to unblock IP address "${ip}"?`,
       async () => {
         try {
-          const response = await fetch(`http://localhost:5000/api/v1/security/blocklist/${id}`, {
+          const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/blocklist/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -437,7 +437,7 @@ const SecurityAudit = () => {
   const handleToggleDeviceStatus = async (id, name, currentStatus) => {
     const nextStatus = currentStatus === 'Active' ? 'Blocked' : 'Active';
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/security/devices/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/devices/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -461,7 +461,7 @@ const SecurityAudit = () => {
       `Are you sure you want to remove the authorized device "${name}"? Access from this device will require re-registration.`,
       async () => {
         try {
-          const response = await fetch(`http://localhost:5000/api/v1/security/devices/${id}`, {
+          const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/devices/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -485,7 +485,7 @@ const SecurityAudit = () => {
       `Are you sure you want to immediately terminate the session for user "${userName}"? The user will be redirected to the login screen.`,
       async () => {
         try {
-          const response = await fetch(`http://localhost:5000/api/v1/security/sessions/${sessionId}`, {
+          const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/sessions/${sessionId}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -508,7 +508,7 @@ const SecurityAudit = () => {
       'WARNING: This will immediately terminate all active user sessions except for your current active session. Do you wish to proceed?',
       async () => {
         try {
-          const response = await fetch('http://localhost:5000/api/v1/security/sessions/terminate-others', {
+          const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/security/sessions/terminate-others', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -528,7 +528,7 @@ const SecurityAudit = () => {
   // Alert Resolution
   const handleResolveAlert = async (alertId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/security/alerts/${alertId}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/alerts/${alertId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -548,7 +548,7 @@ const SecurityAudit = () => {
 
   const handleDismissAlert = async (alertId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/security/alerts/${alertId}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/alerts/${alertId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -335,7 +335,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const fetchPublicSettings = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/v1/settings/public?_t=' + Date.now(), { cache: 'no-store' });
+        const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/settings/public?_t=' + Date.now(), { cache: 'no-store' });
         const result = await response.json();
         if (result.status === 'success' && result.data) {
           const data = result.data;
@@ -549,7 +549,7 @@ export const AppProvider = ({ children }) => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -621,7 +621,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/employees', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/employees', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -663,7 +663,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/payroll/all', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/all', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -692,7 +692,7 @@ export const AppProvider = ({ children }) => {
   const fetchSystemSettings = async () => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/settings', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/settings', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -721,7 +721,7 @@ export const AppProvider = ({ children }) => {
   const saveSystemSettings = async (payload) => {
     if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/settings', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -763,7 +763,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/branches', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/branches', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -788,7 +788,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/departments', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/departments', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -813,7 +813,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/teams', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/teams', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -838,7 +838,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/projects', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/projects', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -863,7 +863,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/attendance', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/attendance', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -884,7 +884,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/leaves', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/leaves', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -905,7 +905,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/leaves/policies', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/leaves/policies', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -926,7 +926,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/holidays', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/holidays', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -947,7 +947,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/notifications', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/notifications', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -968,7 +968,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/documents', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/documents', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -986,7 +986,7 @@ export const AppProvider = ({ children }) => {
   const addDocument = async (docData) => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/documents', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1012,7 +1012,7 @@ export const AppProvider = ({ children }) => {
   const deleteDocument = async (id) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/documents/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1036,7 +1036,7 @@ export const AppProvider = ({ children }) => {
   const addNotification = async (notifData) => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/notifications', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/notifications', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1117,7 +1117,7 @@ export const AppProvider = ({ children }) => {
   const updateNotification = async (id, updatedFields) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/notifications/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1138,7 +1138,7 @@ export const AppProvider = ({ children }) => {
   const deleteNotification = async (id) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/notifications/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1161,7 +1161,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/activity-logs', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/activity-logs', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1182,7 +1182,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/roles', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1203,7 +1203,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/roles/permissions-modules', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles/permissions-modules', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1221,7 +1221,7 @@ export const AppProvider = ({ children }) => {
   const addPermissionModule = async (name) => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/roles/permissions-modules', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles/permissions-modules', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1248,7 +1248,7 @@ export const AppProvider = ({ children }) => {
   const deletePermissionModule = async (key) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/roles/permissions-modules/${key}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/roles/permissions-modules/${key}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1273,7 +1273,7 @@ export const AppProvider = ({ children }) => {
   const addRole = async (roleData) => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/roles', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1299,7 +1299,7 @@ export const AppProvider = ({ children }) => {
   const updateRole = async (id, roleData) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/roles/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/roles/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1325,7 +1325,7 @@ export const AppProvider = ({ children }) => {
   const deleteRole = async (id) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/roles/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/roles/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1352,7 +1352,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/roles/overrides', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles/overrides', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1370,7 +1370,7 @@ export const AppProvider = ({ children }) => {
   const addUserOverride = async (overrideData) => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/roles/overrides', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles/overrides', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1396,7 +1396,7 @@ export const AppProvider = ({ children }) => {
   const deleteUserOverride = async (id) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/roles/overrides/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/roles/overrides/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1423,7 +1423,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/work-reports', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/work-reports', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1444,7 +1444,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/appraisal-reviews', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/appraisal-reviews', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1465,7 +1465,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/announcements', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/announcements', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1486,7 +1486,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/announcements/emergency', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/announcements/emergency', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1506,7 +1506,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/announcements/tracking', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/announcements/tracking', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1527,7 +1527,7 @@ export const AppProvider = ({ children }) => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/v1/announcements/audit-logs', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/announcements/audit-logs', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1545,7 +1545,7 @@ export const AppProvider = ({ children }) => {
   const createAnnouncement = async (annData) => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/announcements', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/announcements', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1572,7 +1572,7 @@ export const AppProvider = ({ children }) => {
   const updateAnnouncement = async (id, annData) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/announcements/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1594,7 +1594,7 @@ export const AppProvider = ({ children }) => {
   const deleteAnnouncement = async (id) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/announcements/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1614,7 +1614,7 @@ export const AppProvider = ({ children }) => {
   const acknowledgeAnnouncement = async (id) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/acknowledge`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/announcements/${id}/acknowledge`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1635,7 +1635,7 @@ export const AppProvider = ({ children }) => {
   const likeAnnouncement = async (id) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/like`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/announcements/${id}/like`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1654,7 +1654,7 @@ export const AppProvider = ({ children }) => {
   const addAnnouncementComment = async (id, commentText) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/comment`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/announcements/${id}/comment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1676,7 +1676,7 @@ export const AppProvider = ({ children }) => {
   const deleteAnnouncementComment = async (id, commentId) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/comment/${commentId}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/announcements/${id}/comment/${commentId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1696,7 +1696,7 @@ export const AppProvider = ({ children }) => {
   const triggerEmergencyAlert = async (alertData) => {
     if (!token) return;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/announcements/emergency', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/announcements/emergency', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1719,7 +1719,7 @@ export const AppProvider = ({ children }) => {
   const viewAnnouncement = async (id) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/announcements/${id}/view`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/announcements/${id}/view`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1745,7 +1745,7 @@ export const AppProvider = ({ children }) => {
         employeeId: emp ? emp.id : 'EMP-UNKNOWN'
       };
 
-      const response = await fetch('http://localhost:5000/api/v1/appraisal-reviews', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/appraisal-reviews', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1870,7 +1870,7 @@ export const AppProvider = ({ children }) => {
 
     if (token) {
       try {
-        await fetch('http://localhost:5000/api/v1/activity-logs', {
+        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/activity-logs', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1952,7 +1952,7 @@ export const AppProvider = ({ children }) => {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/v1/employees', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/employees', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1996,7 +1996,7 @@ export const AppProvider = ({ children }) => {
       email: updatedData.officialEmail || updatedData.email
     };
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2041,7 +2041,7 @@ export const AppProvider = ({ children }) => {
     if (!emp) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2079,7 +2079,7 @@ export const AppProvider = ({ children }) => {
     if (!emp) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2108,7 +2108,7 @@ export const AppProvider = ({ children }) => {
     const roleObj = roles.find(r => r.id === roleId);
     try {
       const updatePromises = Array.from(ids).map(async (id) => {
-        const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+        const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -2140,7 +2140,7 @@ export const AppProvider = ({ children }) => {
   const bulkTransferDept = async (ids, deptName) => {
     try {
       const updatePromises = Array.from(ids).map(async (id) => {
-        const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+        const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -2172,7 +2172,7 @@ export const AppProvider = ({ children }) => {
   const bulkUpdateStatus = async (ids, status) => {
     try {
       const updatePromises = Array.from(ids).map(async (id) => {
-        const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+        const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -2208,7 +2208,7 @@ export const AppProvider = ({ children }) => {
         const emp = employees.find(e => e.id === id);
         if (!emp) return null;
 
-        const response = await fetch(`http://localhost:5000/api/v1/employees/${id}`, {
+        const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -2269,7 +2269,7 @@ export const AppProvider = ({ children }) => {
         history: updatedHistory
       };
 
-      const response = await fetch(`http://localhost:5000/api/v1/leaves/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/leaves/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2285,7 +2285,7 @@ export const AppProvider = ({ children }) => {
         );
 
         // Update Employee Status in DB
-        await fetch(`http://localhost:5000/api/v1/employees/${leave.employeeId}`, {
+        await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${leave.employeeId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -2332,7 +2332,7 @@ export const AppProvider = ({ children }) => {
         history: updatedHistory
       };
 
-      const response = await fetch(`http://localhost:5000/api/v1/leaves/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/leaves/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2373,7 +2373,7 @@ export const AppProvider = ({ children }) => {
 
   const addLeaveRequest = async (newLeave) => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/leaves', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/leaves', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2389,7 +2389,7 @@ export const AppProvider = ({ children }) => {
         // If the leave is pre-approved (assigned directly by Admin), update employee status to 'On Leave'
         if (result.data.status === 'Approved') {
           try {
-            await fetch(`http://localhost:5000/api/v1/employees/${result.data.employeeId}`, {
+            await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${result.data.employeeId}`, {
               method: 'PUT',
               headers: {
                 'Content-Type': 'application/json',
@@ -2428,7 +2428,7 @@ export const AppProvider = ({ children }) => {
 
   const updateLeaveRequest = async (id, updatedLeave) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/leaves/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/leaves/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2456,7 +2456,7 @@ export const AppProvider = ({ children }) => {
 
   const addLeavePolicy = async (newPolicy) => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/leaves/policies', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/leaves/policies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2527,7 +2527,7 @@ export const AppProvider = ({ children }) => {
 
   const updateLeavePolicy = async (id, updatedPolicy) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/leaves/policies/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/leaves/policies/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2554,7 +2554,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteLeavePolicy = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/leaves/policies/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/leaves/policies/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2578,7 +2578,7 @@ export const AppProvider = ({ children }) => {
 
   const resetLeavePolicies = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/leaves/policies/reset', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/leaves/policies/reset', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2602,7 +2602,7 @@ export const AppProvider = ({ children }) => {
 
   const addHoliday = async (newHoliday) => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/holidays', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/holidays', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2627,7 +2627,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteHoliday = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/holidays/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/holidays/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2652,7 +2652,7 @@ export const AppProvider = ({ children }) => {
   // Branch CRUD Handlers
   const addBranch = async (newBranchData) => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/branches', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/branches', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2677,7 +2677,7 @@ export const AppProvider = ({ children }) => {
 
   const updateBranch = async (id, updatedFields) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/branches/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/branches/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2701,7 +2701,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteBranch = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/branches/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/branches/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2724,7 +2724,7 @@ export const AppProvider = ({ children }) => {
   // Department CRUD Handlers
   const addDepartment = async (newDeptData) => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/departments', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/departments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2749,7 +2749,7 @@ export const AppProvider = ({ children }) => {
 
   const updateDepartment = async (id, updatedFields) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/departments/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/departments/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2773,7 +2773,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteDepartment = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/departments/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/departments/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2796,7 +2796,7 @@ export const AppProvider = ({ children }) => {
   // Team CRUD Handlers
   const addTeam = async (newTeamData) => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/teams', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/teams', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2821,7 +2821,7 @@ export const AppProvider = ({ children }) => {
 
   const updateTeam = async (id, updatedFields) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/teams/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/teams/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2845,7 +2845,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteTeam = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/teams/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/teams/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2868,7 +2868,7 @@ export const AppProvider = ({ children }) => {
   // Project CRUD Handlers
   const addProject = async (newProjData) => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/projects', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/projects', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2893,7 +2893,7 @@ export const AppProvider = ({ children }) => {
 
   const updateProject = async (id, updatedFields) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/projects/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/projects/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -2919,7 +2919,7 @@ export const AppProvider = ({ children }) => {
 
   const deleteProject = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/projects/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/projects/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -2941,7 +2941,7 @@ export const AppProvider = ({ children }) => {
 
   const addAttendanceRecord = async (newRecord) => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/attendance', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/attendance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2984,7 +2984,7 @@ export const AppProvider = ({ children }) => {
 
   const updateAttendanceRecord = async (id, updatedData) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/attendance/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -3544,7 +3544,7 @@ export const AppProvider = ({ children }) => {
   const addOrUpdateSalaryGrade = async (gradeForm) => {
     if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/payroll/grades', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/grades', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3572,7 +3572,7 @@ export const AppProvider = ({ children }) => {
   const deleteSalaryGrade = async (id) => {
     if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/payroll/grades/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll/grades/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -3606,7 +3606,7 @@ export const AppProvider = ({ children }) => {
         progress: 0,
         status: 'Approved'
       };
-      const response = await fetch('http://localhost:5000/api/v1/payroll/loans-advances', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/loans-advances', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3642,7 +3642,7 @@ export const AppProvider = ({ children }) => {
         status: 'Pending',
         approvalFlow: ['TL Approved']
       };
-      const response = await fetch('http://localhost:5000/api/v1/payroll/bonuses', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/bonuses', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3670,7 +3670,7 @@ export const AppProvider = ({ children }) => {
   const updateReimbursementStatus = async (id, newStatus) => {
     if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/payroll/reimbursements/status/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll/reimbursements/status/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3698,7 +3698,7 @@ export const AppProvider = ({ children }) => {
   const updateBonusStatus = async (id, newStatus) => {
     if (!token) return false;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/payroll/bonuses/status/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll/bonuses/status/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3727,7 +3727,7 @@ export const AppProvider = ({ children }) => {
     if (!token) return false;
     try {
       const promises = calculatedData.map(payment => {
-        return fetch('http://localhost:5000/api/v1/payroll/payments', {
+        return fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/payments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3763,7 +3763,7 @@ export const AppProvider = ({ children }) => {
     try {
       // 1. First ensure all draft records are created in the database
       const promises = calculatedData.map(payment => {
-        return fetch('http://localhost:5000/api/v1/payroll/payments', {
+        return fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/payments', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -3780,7 +3780,7 @@ export const AppProvider = ({ children }) => {
       await Promise.all(promises);
 
       // 2. Call the bulk status update to align everything
-      const response = await fetch('http://localhost:5000/api/v1/payroll/payments/bulk-status', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/payments/bulk-status', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3808,7 +3808,7 @@ export const AppProvider = ({ children }) => {
   const updateSinglePayrollStatus = async (paymentObj, status) => {
     if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/payroll/payments', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3845,7 +3845,7 @@ export const AppProvider = ({ children }) => {
       [empId]: { ...current, regime: nextRegime }
     };
     try {
-      const response = await fetch('http://localhost:5000/api/v1/payroll/configs', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/configs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3889,7 +3889,7 @@ export const AppProvider = ({ children }) => {
       }
     };
     try {
-      const response = await fetch('http://localhost:5000/api/v1/payroll/configs', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/configs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3920,7 +3920,7 @@ export const AppProvider = ({ children }) => {
   const updatePayrollConfig = async (configs) => {
     if (!token) return false;
     try {
-      const response = await fetch('http://localhost:5000/api/v1/payroll/configs', {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/configs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3981,7 +3981,7 @@ export const AppProvider = ({ children }) => {
         approvalHistory: updatedHistory
       };
 
-      const response = await fetch(`http://localhost:5000/api/v1/work-reports/${id}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/work-reports/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4022,7 +4022,7 @@ export const AppProvider = ({ children }) => {
   const updatePermissions = async (roleId, updatedPermissions) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/v1/roles/${roleId}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/roles/${roleId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -4052,7 +4052,7 @@ export const AppProvider = ({ children }) => {
     try {
       const unread = notifications.filter(n => !n.read);
       await Promise.all(unread.map(n => {
-        return fetch(`http://localhost:5000/api/v1/notifications/${n.id}`, {
+        return fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${n.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -4070,7 +4070,7 @@ export const AppProvider = ({ children }) => {
   const markNotificationRead = async (id) => {
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
     try {
-      await fetch(`http://localhost:5000/api/v1/notifications/${id}`, {
+      await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

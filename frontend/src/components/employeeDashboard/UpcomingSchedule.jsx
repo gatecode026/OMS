@@ -23,7 +23,7 @@ const UpcomingSchedule = ({
     if (!token) return;
     const fetchTodayEvents = async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/events?from=${todayStr}&to=${todayStr}`, {
+        const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/events?from=${todayStr}&to=${todayStr}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

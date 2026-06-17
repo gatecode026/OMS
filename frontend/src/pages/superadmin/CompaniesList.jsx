@@ -35,7 +35,7 @@ const CompaniesList = () => {
   const fetchCompanies = async (page = 1, searchQuery = '') => {
     try {
       setLoading(true);
-      const url = `http://localhost:5000/api/admin/companies?page=${page}&limit=10&search=${encodeURIComponent(searchQuery)}`;
+      const url = `${window.API_URL || "http://localhost:5000"}/api/admin/companies?page=${page}&limit=10&search=${encodeURIComponent(searchQuery)}`;
       const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -56,7 +56,7 @@ const CompaniesList = () => {
   // Fetch Overview Stats to merge Employees, Active Users, Last Active
   const fetchOverviewStats = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/overview', {
+      const res = await fetch((window.API_URL || 'http://localhost:5000') + '/api/admin/overview', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -130,7 +130,7 @@ const CompaniesList = () => {
         }
       };
 
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${selectedCompany.id}`, {
+      const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/admin/companies/${selectedCompany.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -161,7 +161,7 @@ const CompaniesList = () => {
   // Submit Status Change
   const handleStatusChangeSubmit = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${statusForm.id}/status`, {
+      const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/admin/companies/${statusForm.id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

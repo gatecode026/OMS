@@ -229,7 +229,7 @@ export default function Calendar() {
     if (!token) return;
     try {
       const { from, to } = queryRange;
-      const response = await fetch(`http://localhost:5000/api/events?from=${from}&to=${to}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/events?from=${from}&to=${to}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -309,7 +309,7 @@ export default function Calendar() {
   const handleUpdateStatus = async (eventId, newStatus) => {
     if (!token) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/events/${eventId}`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/events/${eventId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -478,7 +478,7 @@ export default function Calendar() {
       let response;
       if (formState.id) {
         // Update
-        response = await fetch(`http://localhost:5000/api/events/${formState.id}`, {
+        response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/events/${formState.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -488,7 +488,7 @@ export default function Calendar() {
         });
       } else {
         // Create
-        response = await fetch('http://localhost:5000/api/events', {
+        response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/events', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -525,7 +525,7 @@ export default function Calendar() {
   const handleDeleteEvent = useCallback((id, title) => {
     showConfirm('Cancel Event', `Remove "${title}" from the calendar?`, async () => {
       try {
-        const response = await fetch(`http://localhost:5000/api/events/${id}`, {
+        const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/events/${id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`

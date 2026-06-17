@@ -37,7 +37,7 @@ export const useMyAttendance = (filters = {}) => {
       try {
         const fromVal = from || '';
         const toVal = to || '';
-        const res = await fetch(`http://localhost:5000/api/v1/attendance?employeeId=${currentUser.id}&from=${fromVal}&to=${toVal}`, { headers });
+        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance?employeeId=${currentUser.id}&from=${fromVal}&to=${toVal}`, { headers });
         const json = await res.json();
         if (json.status === 'success') {
           recordsData = json.data || [];
@@ -49,7 +49,7 @@ export const useMyAttendance = (filters = {}) => {
       // 2. Fetch today's record (with fallback)
       let todayData = null;
       try {
-        const res = await fetch(`http://localhost:5000/api/v1/attendance/today?employeeId=${currentUser.id}`, { headers });
+        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/today?employeeId=${currentUser.id}`, { headers });
         if (res.status === 404) throw new Error('Endpoint not found');
         const json = await res.json();
         if (json.status === 'success') {
@@ -65,7 +65,7 @@ export const useMyAttendance = (filters = {}) => {
       let summaryData = null;
       try {
         const monthVal = month || new Date().toISOString().substring(0, 7); // YYYY-MM
-        const res = await fetch(`http://localhost:5000/api/v1/attendance/summary?employeeId=${currentUser.id}&month=${monthVal}`, { headers });
+        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/summary?employeeId=${currentUser.id}&month=${monthVal}`, { headers });
         if (res.status === 404) throw new Error('Endpoint not found');
         const json = await res.json();
         if (json.status === 'success') {

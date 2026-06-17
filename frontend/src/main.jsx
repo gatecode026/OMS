@@ -1,5 +1,7 @@
 import React, { lazy } from 'react';
 import ReactDOM from 'react-dom/client';
+
+window.API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import { AppProvider } from './context/AppContext';

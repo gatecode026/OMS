@@ -95,7 +95,7 @@ const Topbar = ({ onMenuToggle }) => {
     if (!token) return;
     setLoadingEvents(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/events/upcoming?limit=10`, {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/events/upcoming?limit=10`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

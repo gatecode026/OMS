@@ -510,7 +510,7 @@ const SystemSettings = () => {
     if (!token) return;
     const loadFromDB = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/v1/settings', {
+        const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/settings', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await response.json();
@@ -543,7 +543,7 @@ const SystemSettings = () => {
     const fetchCompanyBranding = async () => {
       try {
         setIsBrandingLoading(true);
-        const res = await fetch(`http://localhost:5000/api/v1/companies/${currentUser.companyId}`, {
+        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/companies/${currentUser.companyId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await res.json();
@@ -582,7 +582,7 @@ const SystemSettings = () => {
         }
       };
 
-      const res = await fetch(`http://localhost:5000/api/v1/companies/${currentUser.companyId}`, {
+      const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/companies/${currentUser.companyId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
