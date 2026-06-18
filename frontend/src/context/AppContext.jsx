@@ -4315,6 +4315,7 @@ export const AppProvider = ({ children }) => {
         savePayrollSalaryRevision,
         updatePayrollConfig,
         token,
+        setToken,
         notifications,
         setNotifications,
         fetchNotifications,

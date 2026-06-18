@@ -2,10 +2,12 @@ import React, { lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 
 window.API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+window.SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import { AppProvider } from './context/AppContext';
 import { BrandingProvider } from './context/BrandingContext';
+import { ChatProvider } from './context/ChatContext';
 import AppShell from './components/AppShell';
 import { AuthGuard, RoleGuard } from './components/common/Guards';
 import { ToastContainer } from './components/Toast';
@@ -33,6 +35,7 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 // const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
 const Announcements = lazy(() => import('./pages/Announcements'));
 const Documents = lazy(() => import('./pages/Documents'));
+const ChatPage = lazy(() => import('./pages/chat/ChatPage'));
 const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 const MyProfile = lazy(() => import('./pages/MyProfile'));
 const Reports = lazy(() => import('./pages/Reports'));
@@ -59,6 +62,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrandingProvider>
       <AppProvider>
+        <ChatProvider>
         <BrowserRouter>
         <Routes>
           {/* Public Login Route - rendered outside AppShell */}
@@ -99,6 +103,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/announcements" element={<Announcements />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/documents" element={<Documents />} />
+                <Route path="/chat" element={<ChatPage />} />
 
                 {/* ── Administration & Security (Centralized Role Restricted) ── */}
                 <Route path="/permissions" element={<RolesPermissions />} />
@@ -137,8 +142,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           </Route>
         </Routes>
         <ToastContainer />
-      </BrowserRouter>
-    </AppProvider>
+        </BrowserRouter>
+        </ChatProvider>
+      </AppProvider>
     </BrandingProvider>
   </React.StrictMode>
 );

@@ -157,6 +157,19 @@ const employeeSchema = new mongoose.Schema({
     type: String,
     default: 'Offline'
   },
+  chatStatus: {
+    type: String,
+    enum: ['available', 'away', 'dnd', 'offline'],
+    default: 'available'
+  },
+  statusEmoji: {
+    type: String,
+    default: null
+  },
+  statusExpiry: {
+    type: Date,
+    default: null
+  },
   todayPunchIn: {
     type: String,
     default: null

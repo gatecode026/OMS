@@ -104,7 +104,74 @@ export const processEmployeeAssets = async (data) => {
   return processed;
 };
 
+/**
+ * Deletes a file from ImageKit by parsing its URL path and requesting deletion.
+ * @param {String} url - CDN URL of the file in ImageKit
+ */
+export const deleteFromImageKit = async (url) => {
+  if (!url || typeof url !== 'string' || !url.includes('imagekit.io')) return;
+
+  const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+  if (!privateKey || privateKey.includes('***')) {
+    logger.warn('[ImageKit] IMAGEKIT_PRIVATE_KEY is not defined. Skipping deletion from ImageKit.');
+    return;
+  }
+
+  try {
+    const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
+    
+    // Parse the path from the URL
+    // e.g. "https://ik.imagekit.io/zjd5xircoy/Office_managements/avatar_123.jpg" -> "Office_managements/avatar_123.jpg"
+    const urlParts = url.split('imagekit.io/')[1]?.split('/');
+    if (!urlParts || urlParts.length < 2) return;
+    urlParts.shift(); // remove the endpoint ID part
+    const filePath = urlParts.join('/');
+
+    logger.info(`[ImageKit] Searching for file to delete: ${filePath}`);
+
+    // 1. Search for the file to get its fileId
+    const listResponse = await fetch(`https://api.imagekit.io/v1/files?path=${encodeURIComponent(filePath)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': authHeader
+      }
+    });
+
+    if (!listResponse.ok) {
+      logger.warn(`[ImageKit] Failed to search file for deletion: status ${listResponse.status}`);
+      return;
+    }
+
+    const files = await listResponse.json();
+    if (!Array.isArray(files) || files.length === 0) {
+      logger.warn(`[ImageKit] No file found matching path ${filePath} for deletion`);
+      return;
+    }
+
+    const fileId = files[0].fileId;
+    logger.info(`[ImageKit] Found fileId: ${fileId}. Requesting deletion...`);
+
+    // 2. Delete the file by fileId
+    const deleteResponse = await fetch(`https://api.imagekit.io/v1/files/${fileId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': authHeader
+      }
+    });
+
+    if (deleteResponse.ok) {
+      logger.info(`[ImageKit] Successfully deleted file: ${filePath}`);
+    } else {
+      const errText = await deleteResponse.text();
+      logger.error(`[ImageKit] Failed to delete file: ${errText}`);
+    }
+  } catch (err) {
+    logger.error('[ImageKit] Error in deleteFromImageKit:', err);
+  }
+};
+
 export default {
   uploadToImageKit,
+  deleteFromImageKit,
   processEmployeeAssets
 };
