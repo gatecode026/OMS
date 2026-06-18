@@ -13,7 +13,7 @@
     "dev": "concurrently -n BACKEND,FRONTEND -c green,blue \"npm run backend\" \"npm run frontend\""
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^10.0.3"
   },
   "dependencies": {
     "date-fns": "^4.4.0",
