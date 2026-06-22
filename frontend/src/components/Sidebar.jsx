@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import './Sidebar.css';
 import { useApp } from '../context/AppContext';
+import { useChat } from '../context/ChatContext';
 import Avatar from './common/Avatar';
 import { filterMenuByRole } from '../permissions/permissions';
 import {
@@ -22,6 +23,7 @@ import {
   DollarSign,
   Megaphone,
   Bell,
+  MessageSquare,
   FolderClosed,
   ShieldAlert,
   Key,
@@ -86,6 +88,7 @@ const menuStructure = [
     items: [
       { name: 'Announcements', icon: Megaphone, path: '/announcements' },
       { name: 'Notifications', icon: Bell, path: '/notifications', badgeKey: 'notifications' },
+      { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat' },
       { name: 'Document Management', icon: FolderClosed, path: '/documents' }
     ]
   },
@@ -120,6 +123,7 @@ const menuStructure = [
 const Sidebar = ({ mobileOpen, setMobileOpen }) => {
   const navigate = useNavigate();
   const { sidebarCollapsed, setSidebarCollapsed, notifications, currentUserRole, logout, sidebarDense, generalSettings, hasPermission, currentUser } = useApp();
+  const { getTotalUnread } = useChat();
   const location = useLocation();
   const [expandedMenus, setExpandedMenus] = useState({});
   const [isHovered, setIsHovered] = useState(false);
@@ -339,6 +343,9 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
         {!effectiveCollapsed && item.badgeKey === 'notifications' && unreadCount > 0 && (
           <span className="sidebar-badge">{unreadCount}</span>
         )}
+        {!effectiveCollapsed && item.badgeKey === 'chat' && getTotalUnread() > 0 && (
+          <span className="sidebar-badge sidebar-badge-chat">{getTotalUnread() > 99 ? '99+' : getTotalUnread()}</span>
+        )}
         {effectiveCollapsed && <div className="collapsed-tooltip">{item.name}</div>}
       </Link>
     );
@@ -391,6 +398,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                   { name: 'My Tasks', icon: KanbanSquare, path: '/tasks' },
                   { name: 'My Projects', icon: Briefcase, path: '/projects' },
                   { name: 'Daily Work Reports', icon: FileText, path: '/work-reports' },
+                  { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat' },
                   { name: 'Payroll', icon: DollarSign, path: '/payroll' },
                   { name: 'Documents', icon: FolderClosed, path: '/documents' },
                   { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }

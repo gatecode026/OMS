@@ -1,8 +1,5 @@
-/**
- * @file src/modules/auth/auth.controller.js
- * @description Controllers for Auth module.
- */
-
+import jwt from 'jsonwebtoken';
+import env from '../../config/env.js';
 import service from './auth.service.js';
 import { successResponse } from '../../utils/response.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
@@ -30,6 +27,28 @@ export const login = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Authenticated successfully');
 });
 
+/**
+ * Silent JWT token refresh endpoint
+ */
+export const refreshToken = asyncHandler(async (req, res) => {
+  const { id, email, role, companyId } = req.user;
+  
+  const token = jwt.sign(
+    { 
+      id, 
+      email, 
+      role, 
+      roleId: role, 
+      companyId 
+    },
+    env.jwtSecret,
+    { expiresIn: env.jwtExpiresIn }
+  );
+
+  return successResponse(res, { token }, 'Token refreshed successfully');
+});
+
 export default {
-  login
+  login,
+  refreshToken
 };

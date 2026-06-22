@@ -184,6 +184,10 @@
   line-height: 1;
 }
 
+.sidebar-badge-chat {
+  background-color: #6366f1;
+}
+
 /* Submenu Wrapper with expand height animations */
 .submenu-wrapper {
   overflow: hidden;

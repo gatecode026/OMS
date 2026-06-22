@@ -43,9 +43,9 @@ const userDeviceSchema = new mongoose.Schema({
   registeredBy: { type: String, required: true },
   regDate: { type: String, required: true },
   lastLogin: { type: String, required: true },
+  pushToken: { type: String, default: null },
   status: { type: String, enum: ['Active', 'Blocked', 'Pending'], default: 'Active' }
 }, { timestamps: true });
-
 userDeviceSchema.plugin(tenantPlugin);
 export const UserDevice = mongoose.model('UserDevice', userDeviceSchema);
 
