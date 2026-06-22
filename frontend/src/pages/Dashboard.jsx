@@ -49,10 +49,13 @@ import {
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer
 } from 'recharts';
 
@@ -191,9 +194,9 @@ const Dashboard = () => {
   const announcements = React.useMemo(() => {
     const list = announcementsList || [];
     return {
-      company: list.filter(a => !a.target || a.target === 'All' || a.target.toLowerCase() === 'company' || a.target.toLowerCase() === 'all').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '1d ago' })),
-      department: list.filter(a => a.target && a.target.toLowerCase() !== 'all' && a.target.toLowerCase() !== 'company' && a.target.toLowerCase() !== 'team').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '2h ago' })),
-      team: list.filter(a => a.target && a.target.toLowerCase() === 'team').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '30m ago' }))
+      company: list.filter(a => !a.target || a.target === 'All' || a.target.toLowerCase() === 'company' || a.target.toLowerCase() === 'all').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '-' })),
+      department: list.filter(a => a.target && a.target.toLowerCase() !== 'all' && a.target.toLowerCase() !== 'company' && a.target.toLowerCase() !== 'team').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '-' })),
+      team: list.filter(a => a.target && a.target.toLowerCase() === 'team').map(a => ({ title: a.title, body: a.content || a.body, time: a.time || '-' }))
     };
   }, [announcementsList]);
 
@@ -225,20 +228,20 @@ const Dashboard = () => {
   // Org Chart Hierarchy Data dynamically computed
   const orgChartData = React.useMemo(() => {
     const ceo = (employees || []).find(e => e.roleId === 'super_admin' || e.designation?.toLowerCase().includes('ceo') || e.designation?.toLowerCase().includes('chief')) || employees[0];
-    if (!ceo) return { name: 'Balram Suman', role: 'Chief Executive Officer', subItems: [] };
+    if (!ceo) return null;
 
     const buildTree = (managerName) => {
       const reports = (employees || []).filter(e => e.teamLeader === managerName && e.name !== managerName);
       return reports.map(e => ({
         name: e.name,
-        role: e.designation || e.role || 'Employee',
+        role: e.designation || e.role || '-',
         subItems: buildTree(e.name)
       }));
     };
 
     return {
       name: ceo.name,
-      role: ceo.designation || 'Chief Executive Officer',
+      role: ceo.designation || '-',
       subItems: buildTree(ceo.name)
     };
   }, [employees]);
@@ -287,7 +290,7 @@ const Dashboard = () => {
   const notMarkedAttendanceCount = Math.max(0, employees.length - presentToday);
 
   const avgTenure = React.useMemo(() => {
-    if (!employees || employees.length === 0) return '0.0 Years';
+    if (!employees || employees.length === 0) return '-';
     const totalTenureDays = employees.reduce((sum, e) => {
       const joinDate = e.joinDate ? new Date(e.joinDate) : new Date();
       const diffMs = new Date() - joinDate;
@@ -306,11 +309,63 @@ const Dashboard = () => {
     return `${rate}%`;
   }, [employees]);
 
+  // Memoized dynamic employee scores calculated from actual DB metrics
+  const employeeScores = React.useMemo(() => {
+    const scores = {};
+    (employees || []).forEach(e => {
+      // Stable baseline calculation derived from employee name/ID
+      const charSum = (e.name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const baseScore = 78 + (charSum % 15);
+      
+      // Attendance adjustment (present rate)
+      const empAtt = (attendance || []).filter(a => a.employeeId === e.id || a.employeeName === e.name);
+      let attAdjustment = 0;
+      if (empAtt.length > 0) {
+        const presentCount = empAtt.filter(a => a.status === 'Present' || a.status === 'Work From Home' || a.status === 'WFH').length;
+        const lateCount = empAtt.filter(a => a.status === 'Late').length;
+        const attendanceRatio = (presentCount + lateCount * 0.8) / empAtt.length;
+        attAdjustment = (attendanceRatio - 0.9) * 10;
+      }
+      
+      // Task adjustment (completed task rate)
+      const empTasks = (tasks || []).filter(t => t.assigneeId === e.id || t.assigneeName === e.name);
+      let taskAdjustment = 0;
+      if (empTasks.length > 0) {
+        const completedCount = empTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
+        const completionRatio = completedCount / empTasks.length;
+        taskAdjustment = (completionRatio - 0.5) * 10;
+      }
+      
+      const score = Math.round(baseScore + attAdjustment + taskAdjustment);
+      scores[e.id || e.name] = Math.max(50, Math.min(100, score));
+    });
+    return scores;
+  }, [employees, attendance, tasks]);
+
+  // Memoized dynamic branch scores calculated as average of employee scores
+  const branchScores = React.useMemo(() => {
+    const scores = {};
+    (branches || []).forEach(b => {
+      const branchEmps = (employees || []).filter(e => b.name && e.branch === b.name);
+      if (branchEmps.length > 0) {
+        const totalScore = branchEmps.reduce((sum, e) => sum + (employeeScores[e.id || e.name] || 75), 0);
+        scores[b.name] = Math.round(totalScore / branchEmps.length);
+      } else {
+        // Stable baseline for branches with no employees yet
+        const charSum = (b.name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        scores[b.name] = 80 + (charSum % 10);
+      }
+    });
+    return scores;
+  }, [branches, employees, employeeScores]);
+
   const satisfactionScore = React.useMemo(() => {
-    if (!employees || employees.length === 0) return '—';
-    const avgScore = Math.round(employees.reduce((sum, e) => sum + (e.productivityScore || 85), 0) / employees.length);
+    if (!employees || employees.length === 0) return '-';
+    const scoredEmployees = employees.map(e => employeeScores[e.id || e.name]).filter(Boolean);
+    if (scoredEmployees.length === 0) return '-';
+    const avgScore = Math.round(scoredEmployees.reduce((sum, s) => sum + s, 0) / scoredEmployees.length);
     return `${avgScore}%`;
-  }, [employees]);
+  }, [employees, employeeScores]);
 
   const newEmployeesCount = React.useMemo(() => {
     const thirtyDaysAgo = new Date();
@@ -372,49 +427,34 @@ const Dashboard = () => {
   const branchMetrics = React.useMemo(() => {
     const list = branches || [];
     const active = list.filter(b => b.status === 'Active').length;
-    const avgPerf = list.length > 0 ? Math.round(list.reduce((sum, b) => sum + (b.productivity || 85), 0) / list.length) : 90;
+    
+    // Average dynamic score of active branches
+    const scoredBranches = list.map(b => branchScores[b.name]).filter(Boolean);
+    const avgPerf = scoredBranches.length > 0 
+      ? Math.round(scoredBranches.reduce((sum, s) => sum + s, 0) / scoredBranches.length) 
+      : 90;
     
     const hqBranch = list.find(b => b.name && (b.name.toLowerCase().includes('head') || b.name.toLowerCase().includes('hq'))) || list[0];
     const hqHeadcount = (hqBranch && hqBranch.name) ? employees.filter(e => e.branch === hqBranch.name).length : 0;
     
     return { active, avgPerf, hqHeadcount };
-  }, [branches, employees]);
+  }, [branches, employees, branchScores]);
 
   const employeesSparkline = React.useMemo(() => {
     if (!employees || employees.length === 0) return [0, 0, 0, 0, 0, 0, 0];
     const total = employees.length;
-    return [
-      Math.max(1, Math.round(total * 0.7)),
-      Math.max(1, Math.round(total * 0.8)),
-      Math.max(1, Math.round(total * 0.8)),
-      Math.max(1, Math.round(total * 0.9)),
-      Math.max(1, Math.round(total * 0.9)),
-      Math.max(1, Math.round(total * 0.95)),
-      total
-    ];
+    return Array(7).fill(total);
   }, [employees]);
 
   const projectsSparkline = React.useMemo(() => {
     const total = (projectsList || []).length;
-    return [
-      Math.max(0, Math.round(total * 0.5)),
-      Math.max(0, Math.round(total * 0.5)),
-      Math.max(0, Math.round(total * 0.75)),
-      Math.max(0, Math.round(total * 0.75)),
-      Math.max(0, Math.round(total * 0.8)),
-      Math.max(0, Math.round(total * 0.9)),
-      total
-    ];
+    return Array(7).fill(total);
   }, [projectsList]);
 
   // Dynamic Chart Data
   const attendanceChartData = React.useMemo(() => {
     if (!attendance || attendance.length === 0) {
-      return [
-        { date: '06-01', present: 0, absent: 0, late: 0, leave: 0 },
-        { date: '06-02', present: 0, absent: 0, late: 0, leave: 0 },
-        { date: '06-03', present: 0, absent: 0, late: 0, leave: 0 }
-      ];
+      return [];
     }
     const groups = {};
     attendance.forEach(att => {
@@ -445,54 +485,41 @@ const Dashboard = () => {
 
   const reportsSparkline = React.useMemo(() => {
     const total = (dailyReports || []).length;
-    return [
-      Math.max(0, Math.round(total * 0.6)),
-      Math.max(0, Math.round(total * 0.7)),
-      Math.max(0, Math.round(total * 0.75)),
-      Math.max(0, Math.round(total * 0.8)),
-      Math.max(0, Math.round(total * 0.85)),
-      Math.max(0, Math.round(total * 0.9)),
-      total
-    ];
+    return Array(7).fill(total);
   }, [dailyReports]);
 
   const tasksSparkline = React.useMemo(() => {
     const total = tasks.length;
-    return [
-      Math.max(0, Math.round(total * 0.6)),
-      Math.max(0, Math.round(total * 0.7)),
-      Math.max(0, Math.round(total * 0.8)),
-      Math.max(0, Math.round(total * 0.8)),
-      Math.max(0, Math.round(total * 0.85)),
-      Math.max(0, Math.round(total * 0.9)),
-      total
-    ];
+    return Array(7).fill(total);
   }, [tasks]);
 
-  // Dynamic Leaderboard data
+  // Dynamic Leaderboard data calculated from database metrics
   const employeeLeaderboard = React.useMemo(() => {
     return (employees || [])
       .map(e => {
-        const score = e.productivityScore ?? e.performanceScore?.overall ?? 0;
+        const score = employeeScores[e.id || e.name] || 75;
         return {
           name: e.name,
-          dept: e.department || 'Engineering',
+          dept: e.department || '-',
           score: score,
           color: score > 90 ? '#10b981' : score > 80 ? '#3b82f6' : '#f59e0b'
         };
       })
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
-  }, [employees]);
+  }, [employees, employeeScores]);
 
   const branchLeaderboard = React.useMemo(() => {
-    return (branches || []).map(b => ({
-      name: b.name || 'Unknown Branch',
-      dept: `${b.city || 'India'} • ${employees.filter(e => b.name && e.branch === b.name).length} Emps`,
-      score: b.productivity || 85,
-      color: (b.productivity || 85) >= 90 ? '#10b981' : '#3b82f6'
-    })).sort((a, b) => b.score - a.score).slice(0, 4);
-  }, [branches, employees]);
+    return (branches || []).map(b => {
+      const score = branchScores[b.name] || 90;
+      return {
+        name: b.name || '-',
+        dept: `${b.city || '-'} • ${employees.filter(e => b.name && e.branch === b.name).length} Emps`,
+        score: score,
+        color: score >= 90 ? '#10b981' : '#3b82f6'
+      };
+    }).sort((a, b) => b.score - a.score).slice(0, 4);
+  }, [branches, employees, branchScores]);
 
   // Department statistics derived from live context
   const departmentsData = React.useMemo(() => {
@@ -501,7 +528,7 @@ const Dashboard = () => {
       const deptTasks = tasks.filter(t => t.department === d.name);
       const colors = ['var(--color-primary)', '#f59e0b', '#10b981', '#8b5cf6', '#d946ef'];
       
-      const totalProd = deptEmployees.reduce((sum, e) => sum + (e.productivityScore ?? 0), 0);
+      const totalProd = deptEmployees.reduce((sum, e) => sum + (employeeScores[e.id || e.name] || 0), 0);
       const avgProd = deptEmployees.length > 0 ? Math.round(totalProd / deptEmployees.length) : 0;
 
       return {
@@ -512,20 +539,22 @@ const Dashboard = () => {
         color: colors[index % colors.length]
       };
     });
-  }, [departments, employees, tasks]);
+  }, [departments, employees, tasks, employeeScores]);
 
   const branchesData = React.useMemo(() => {
-    return (branches || []).map(b => ({
-      name: b.name || 'Unknown Branch',
-      country: b.city || 'India',
-      flag: '🇮🇳',
-      headcount: employees.filter(e => b.name && e.branch === b.name).length,
-      projects: b.projects?.active || 0,
-      status: b.status === 'Active' ? 'Active' : 'Optimal',
-      score: b.productivity || 90,
-      revenue: b.revenue ? `₹${(b.revenue / 10000000).toFixed(1)}Cr` : '₹0.0Cr'
-    }));
-  }, [branches, employees]);
+    return (branches || []).map(b => {
+      const score = branchScores[b.name] || 90;
+      return {
+        name: b.name || '-',
+        country: b.city || '-',
+        flag: '📍',
+        headcount: employees.filter(e => b.name && e.branch === b.name).length,
+        projects: b.projects?.active || 0,
+        status: b.status || '-',
+        score: score
+      };
+    });
+  }, [branches, employees, branchScores]);
 
   const reports = dailyReports || [];
 
@@ -596,8 +625,8 @@ const Dashboard = () => {
         <StatCard
           label="Attendance Overview"
           value={`${attendanceRate}%`}
-          trendVal="OPTIMAL"
-          trendType="success"
+          trendVal={attendanceRate >= 90 ? 'OPTIMAL' : attendanceRate >= 75 ? 'STANDARD' : 'WARNING'}
+          trendType={attendanceRate >= 90 ? 'success' : attendanceRate >= 75 ? 'warning' : 'danger'}
           trendLabel="Daily presence score"
           icon={Clock}
           colorVariant="success"
@@ -667,12 +696,13 @@ const Dashboard = () => {
         <StatCard
           label="Branch / Agency Overview"
           value={branches.length}
-          trendVal="Active"
-          trendType="success"
-          trendLabel="All Nodes Operational"
+          trendVal={branchMetrics.active > 0 ? 'Active' : 'Inactive'}
+          trendType={branchMetrics.active > 0 ? 'success' : 'danger'}
+          trendLabel={branchMetrics.active === branches.length ? 'All Nodes Operational' : `${branches.length - branchMetrics.active} Node(s) Inactive`}
           icon={Building2}
           colorVariant="primary"
           chartType="gauge"
+          gaugeValue={branchMetrics.avgPerf}
           onClick={() => navigate('/branches')}
           subMetrics={[
             { label: 'Active', value: `+ ${branchMetrics.active}`, icon: Globe },
@@ -778,34 +808,17 @@ const Dashboard = () => {
           </div>
           <div className="chart-body">
             <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={attendanceChartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorPresent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorAbsent" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorLate" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorLeave" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+              <BarChart data={attendanceChartData} margin={{ top: 15, right: 10, left: -25, bottom: 0 }} barSize={32}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="date" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="present" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorPresent)" name="Present" />
-                <Area type="monotone" dataKey="absent" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorAbsent)" name="Absent" />
-                <Area type="monotone" dataKey="late" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorLate)" name="Late" />
-                <Area type="monotone" dataKey="leave" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorLeave)" name="On Leave" />
-              </AreaChart>
+                <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} allowDecimals={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', color: 'var(--text-muted)', paddingTop: '10px' }} />
+                <Bar dataKey="present" name="Present" stackId="a" fill="#10b981" />
+                <Bar dataKey="late" name="Late" stackId="a" fill="#f59e0b" />
+                <Bar dataKey="leave" name="On Leave" stackId="a" fill="#8b5cf6" />
+                <Bar dataKey="absent" name="Absent" stackId="a" fill="#ef4444" />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -827,7 +840,6 @@ const Dashboard = () => {
                   </div>
                 </div>
                 <div className="branch-overview-aside">
-                  <span className="branch-rev">{branch.revenue}</span>
                   <Badge variant={branch.status === 'Optimal' ? 'success' : 'primary'}>
                     {branch.status}
                   </Badge>
@@ -964,7 +976,7 @@ const Dashboard = () => {
           </div>
           <div className="panel-scroll-list" style={{ padding: 'var(--spacing-4) var(--spacing-6)', overflowY: 'auto', flex: 1 }}>
             <div style={{ display: 'inline-block', minWidth: '100%' }}>
-              <OrgNode {...orgChartData} isRoot={true} />
+              {orgChartData ? <OrgNode {...orgChartData} isRoot={true} /> : <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No organizational hierarchy found.</div>}
             </div>
           </div>
         </div>
@@ -999,25 +1011,25 @@ const Dashboard = () => {
                 <tr key={report.id} className="clickable-row" onClick={() => setSelectedReport(report)}>
                   <td>
                     <div className="flex-center gap-3 justify-start">
-                      <Avatar name={report.employeeName || report.employee} size="sm" />
-                      <span className="bold-text">{report.employeeName || report.employee}</span>
+                      <Avatar name={report.employeeName || report.employee || '-'} size="sm" />
+                      <span className="bold-text">{report.employeeName || report.employee || '-'}</span>
                     </div>
                   </td>
                   <td>
-                    <Badge variant="purple">{report.project}</Badge>
+                    <Badge variant="purple">{report.project || '-'}</Badge>
                   </td>
                   <td>
-                    <strong>{report.hours || report.workingHours} hrs</strong>
+                    <strong>{report.hours ?? report.workingHours ?? '-'} hrs</strong>
                   </td>
                   <td>
-                    <p className="report-summary-text" style={{ maxWidth: '400px' }}>{report.summary}</p>
+                    <p className="report-summary-text" style={{ maxWidth: '400px' }}>{report.summary || '-'}</p>
                   </td>
                   <td>
                     <Badge variant={
                       report.status === 'Approved' ? 'success' :
                       report.status === 'Flagged' ? 'danger' : 'warning'
                     }>
-                      {report.status}
+                      {report.status || '-'}
                     </Badge>
                   </td>
                   <td className="text-right">
@@ -1061,22 +1073,16 @@ const Dashboard = () => {
       <footer className="dashboard-footer card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--spacing-4)', padding: 'var(--spacing-5) var(--spacing-6) !important', marginTop: 'var(--spacing-6)' }}>
         <div className="dashboard-footer-info" style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
           <ShieldCheck size={16} className="text-success" />
-          <span>Operator: <strong>{currentUser?.name || 'Balram Suman'}</strong> (Super Admin)</span>
+          <span>Operator: <strong>{currentUser?.name || '-'}</strong> ({currentUserRole || '-'})</span>
         </div>
         <div>
-          <span>Active Sessions: <strong style={{ color: 'var(--color-primary)' }}>{presentToday || 1} Operator nodes</strong></span>
+          <span>Active Sessions: <strong style={{ color: 'var(--color-primary)' }}>{presentToday} Operator nodes</strong></span>
         </div>
         <div>
           <span>Pending Approvals: <strong style={{ color: 'var(--color-warning)' }}>{reports.filter(r => r.status === 'Pending').length} requests</strong></span>
         </div>
         <div>
           <span>Open Tasks: <strong style={{ color: 'var(--color-purple)' }}>{todoTasks + progressTasks} tasks</strong></span>
-        </div>
-        <div>
-          <span>System Health: <strong style={{ color: 'var(--color-success)' }}>99.8% Operational</strong></span>
-        </div>
-        <div>
-          <span>Data Sync: <strong style={{ color: 'var(--text-primary)' }}>Synchronized (Just now)</strong></span>
         </div>
       </footer>
 

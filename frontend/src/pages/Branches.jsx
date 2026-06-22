@@ -80,6 +80,7 @@ const Branches = () => {
 
       return {
         ...branch,
+        departments: getBranchDepartments(branch),
         projects: {
           completed,
           active,
@@ -254,7 +255,7 @@ const Branches = () => {
     managerName: '', managerEmail: '', managerPassword: '', managerPhone: '',
     address: '', city: '', state: '', zipCode: '', phone: '', email: '',
     status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
-    revenue: 500000, departments: [],
+    revenue: 0, departments: [],
     attendance: 95, productivity: 90,
     employeeCount: 50,
   });
@@ -907,7 +908,7 @@ const Branches = () => {
   const totalDepartments = branches.reduce((acc, b) => acc + b.departments.length, 0);
   const totalActiveProjects = branches.reduce((acc, b) => acc + b.projects.active, 0);
   const avgProductivity = (branches.reduce((acc, b) => acc + b.productivity, 0) / branches.length).toFixed(1);
-  const totalRevenue = branches.reduce((acc, b) => acc + b.revenue, 0);
+
 
   const toggleNode = (nodeId) => {
     setExpandedNodes(prev => 
@@ -937,9 +938,9 @@ const Branches = () => {
   const handleExportCSV = () => {
     addToast('info', 'Compiling report...');
     setTimeout(() => {
-      const headers = ['ID','Code','Name','Manager','City','Status','Employees','Attendance','Productivity','Revenue'];
+      const headers = ['ID','Code','Name','Manager','City','Status','Employees','Attendance','Productivity'];
       const rows = branches.map(b => [
-        b.id, b.code, b.name, b.manager, b.city, b.status, b.employeeCount, b.attendance, b.productivity, b.revenue
+        b.id, b.code, b.name, b.manager, b.city, b.status, b.employeeCount, b.attendance, b.productivity
       ]);
       const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
@@ -1824,10 +1825,10 @@ const Branches = () => {
           <div className="stat-card card">
             <div className="stat-card-icon" style={{ background: '#f59e0b20', color: '#f59e0b' }}><Briefcase size={20} /></div>
             <div>
-              <h3>Financial & Projects</h3>
-              <p className="val">${(selectedBranch.revenue / 1000000).toFixed(2)}M YTD</p>
-              <p className="sub" style={{ color: selectedBranch.growthPositive ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                Growth: {selectedBranch.growth}
+              <h3>Projects Overview</h3>
+              <p className="val">{selectedBranch.projects?.active ?? 0} Active</p>
+              <p className="sub" style={{ color: 'var(--color-success)' }}>
+                {selectedBranch.projects?.completed ?? 0} Completed
               </p>
             </div>
           </div>
@@ -2091,7 +2092,7 @@ const Branches = () => {
                 managerName: '', managerEmail: '', managerPassword: '', managerPhone: '',
                 address: '', city: '', state: '', zipCode: '', phone: '', email: '',
                 status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
-                revenue: 500000, departments: [],
+                revenue: 0, departments: [],
                 attendance: 95, productivity: 90,
                 employeeCount: 50,
               });
@@ -2112,7 +2113,7 @@ const Branches = () => {
           { label: 'Active Departments', value: totalDepartments, sub: 'Across all branches', icon: Building2, color: '#8b5cf6' },
           { label: 'Active Projects', value: totalActiveProjects, sub: '+56 Completed', icon: Briefcase, color: '#f59e0b' },
           { label: 'Productivity Rate', value: `${avgProductivity}%`, sub: 'Overall performance', icon: Award, color: '#ef4444' },
-          { label: 'Total Revenue', value: `$${(totalRevenue / 1000000).toFixed(1)}M`, sub: 'YTD Growth +18%', icon: TrendingUp, color: '#06b6d4' }
+          { label: 'Avg Attendance', value: `${(branches.length > 0 ? (branches.reduce((acc,b) => acc + (b.attendance || 0), 0) / branches.length) : 0).toFixed(1)}%`, sub: 'Average across branches', icon: Clock, color: '#06b6d4' }
         ].map((s, i) => {
           const Icon = s.icon;
           return (
@@ -2315,7 +2316,7 @@ const Branches = () => {
                       managerName: '', managerEmail: '', managerPassword: '', managerPhone: '',
                       address: '', city: '', state: '', zipCode: '', phone: '', email: '',
                       status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
-                      revenue: 500000, departments: [],
+                      revenue: 0, departments: [],
                       attendance: 95, productivity: 90,
                       employeeCount: 50,
                     });

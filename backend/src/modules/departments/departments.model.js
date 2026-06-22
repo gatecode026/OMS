@@ -77,7 +77,7 @@ const departmentSchema = new mongoose.Schema({
   },
   attendanceRate: {
     type: Number,
-    default: 90
+    default: 0
   },
   wfhFilings: {
     type: Number,
@@ -117,7 +117,7 @@ departmentSchema.index({ companyId: 1, id: 1 }, { unique: true });
 departmentSchema.index({ companyId: 1, departmentCode: 1 }, { unique: true });
 
 // Pre-validate: generate company-scoped id and departmentCode if missing
-departmentSchema.pre('validate', async function(next) {
+departmentSchema.pre('validate', async function (next) {
   if (this.isNew) {
     try {
       const companyId = this.companyId || 'COMP-DEFAULT';
