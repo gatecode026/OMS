@@ -33,19 +33,33 @@ export const useDesktopNotifications = (activeConversationId, userChatStatus) =>
     }
   }, []);
 
-  // Soft notification sound
+  // Soft notification sound — generated via Web Audio API (no MP3 dependency)
   const playNotificationSound = useCallback(() => {
     try {
       const settingsStr = localStorage.getItem('oms_notification_settings');
       const settings = settingsStr ? JSON.parse(settingsStr) : { desktop: true, sound: true, preview: true };
 
-      if (settings.sound !== false) {
-        const audio = new Audio('/sounds/message-pop.mp3');
-        audio.volume = 0.4;
-        audio.play().catch(() => {}); // catch autoplay policy blocks silently
-      }
+      if (settings.sound === false) return;
+
+      // Generate a two-tone pleasant chime using Web Audio API
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration, vol = 0.18) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      playTone(880, ctx.currentTime, 0.15);        // A5
+      playTone(1108.73, ctx.currentTime + 0.12, 0.2); // C#6
     } catch (e) {
-      console.warn('[Notification Sound] Playback failed:', e);
+      console.warn('[Notification Sound] Web Audio playback failed:', e);
     }
   }, []);
 
@@ -84,8 +98,8 @@ export const useDesktopNotifications = (activeConversationId, userChatStatus) =>
       body: bodyText,
       icon: options.icon || '/favicon.ico',
       badge: '/favicon.ico',
-      tag: options.tag, // collapses duplicates from same conversation
-      renotify: false,  // don't buzz/sound repeatedly for collapsed alerts
+      tag: options.tag,    // collapses duplicates from same conversation
+      renotify: true,      // re-show & re-sound when same tag gets a new message
       silent: false,
       data: {
         conversationId: options.conversationId,

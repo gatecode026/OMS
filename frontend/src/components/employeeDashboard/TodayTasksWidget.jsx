@@ -187,6 +187,11 @@ const TodayTasksWidget = ({
                           const currentDisp = getDisplayStatus(task.status);
                           const nextDisp = e.target.value;
                           
+                          if (nextDisp === 'Done') {
+                            if (addToast) addToast('warning', 'Only management can approve and set task to "Done".');
+                            return;
+                          }
+                          
                           // Enforce sequential transitions
                           if (currentDisp === 'To Do' && nextDisp !== 'In Progress') {
                             if (addToast) addToast('warning', 'Tasks in "To Do" must first move to "In Progress".');
@@ -227,7 +232,7 @@ const TodayTasksWidget = ({
                         <option value="To Do" disabled={getDisplayStatus(task.status) !== 'To Do'}>To Do</option>
                         <option value="In Progress" disabled={getDisplayStatus(task.status) !== 'To Do' && getDisplayStatus(task.status) !== 'In Progress'}>In Progress</option>
                         <option value="In Review" disabled={getDisplayStatus(task.status) !== 'In Progress' && getDisplayStatus(task.status) !== 'In Review'}>In Review</option>
-                        <option value="Done" disabled={getDisplayStatus(task.status) !== 'In Review' && getDisplayStatus(task.status) !== 'Done'}>Done</option>
+                        <option value="Done" disabled={getDisplayStatus(task.status) !== 'Done'}>Done</option>
                       </select>
                     </td>
                     <td style={{ padding: '8px 12px', textAlign: 'right' }}>

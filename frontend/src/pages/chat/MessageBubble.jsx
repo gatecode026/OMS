@@ -4,12 +4,112 @@
  *   Supports: text, deleted, edited, reactions, right-click actions, inline edit.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import EmojiPicker from 'emoji-picker-react';
 import { BiCheck, BiCheckDouble } from 'react-icons/bi';
-import { Star, Pin, CornerUpLeft, Pencil, Trash2 } from 'lucide-react';
+import { Star, Pin, CornerUpLeft, Pencil, Trash2, Plus, CheckSquare } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import ImageLightbox from './ImageLightbox';
+import PDFPreviewModal from './PDFPreviewModal';
+import VoiceMessageBubble from './VoiceMessageBubble';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+const getFileIcon = (mimeType, fileName) => {
+  const name = (fileName || '').toLowerCase();
+  const mime = (mimeType || '').toLowerCase();
+  if (mime.includes('pdf') || name.endsWith('.pdf'))
+    return { icon: '📄', color: '#ef4444', label: 'PDF' };
+  if (mime.includes('word') || name.endsWith('.doc') || 
+      name.endsWith('.docx'))
+    return { icon: '📝', color: '#2563eb', label: 'DOC' };
+  if (mime.includes('excel') || name.endsWith('.xls') || 
+      name.endsWith('.xlsx'))
+    return { icon: '📊', color: '#16a34a', label: 'XLS' };
+  if (mime.includes('zip') || name.endsWith('.zip'))
+    return { icon: '🗜️', color: '#7c3aed', label: 'ZIP' };
+  return { icon: '📎', color: '#64748b', label: 'FILE' };
+};
+
+const triggerDirectDownload = async (url, fileName) => {
+  if (!url) return;
+
+  const fallbackDownload = (downloadUrl) => {
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = fileName || 'file';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  let blob = null;
+
+  // If base64 data URL, convert to Blob
+  if (url.startsWith('data:')) {
+    try {
+      const arr = url.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      blob = new Blob([u8arr], { type: mime });
+    } catch (e) {
+      console.warn('[Download] Base64 parsing error:', e);
+    }
+  }
+
+  // If remote URL, fetch as Blob
+  if (!blob && !url.startsWith('data:')) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        blob = await res.blob();
+      }
+    } catch (err) {
+      console.warn('[Download] Blob fetch error:', err);
+    }
+  }
+
+  // Use modern File System Access API if supported to prompt "Save As"
+  if (blob && window.showSaveFilePicker) {
+    try {
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: fileName || 'file'
+      });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('[Download] Save picker cancelled by user');
+        return;
+      }
+      console.warn('[Download] showSaveFilePicker failed, falling back:', err);
+    }
+  }
+
+  // Classic download fallback
+  if (blob) {
+    const localUrl = window.URL.createObjectURL(blob);
+    fallbackDownload(localUrl);
+    window.URL.revokeObjectURL(localUrl);
+  } else {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.download = fileName || 'file';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};
 
 const MessageStatus = ({ message: msg, conversation, onRetry }) => {
   if (msg.isDeleted || msg.type === 'system') return null;
@@ -126,8 +226,13 @@ const MessageBubble = ({
   onUnpin,
   onStar,
   onUnstar,
-  currentUser
+  currentUser,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelect,
+  onStartSelectMode
 }) => {
+  const { showConfirm } = useApp();
   const [showOptions, setShowOptions] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -135,9 +240,55 @@ const MessageBubble = ({
   const [showDeleteMenu, setShowDeleteMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [lightboxFileName, setLightboxFileName] = useState('');
+  const [pdfPreview, setPdfPreview] = useState(null);
+
   const bubbleRef = useRef(null);
   const editRef = useRef(null);
   const emojiRef = useRef(null);
+  const actionBarRef = useRef(null);
+
+  // After menu renders, clamp it inside the viewport
+  useLayoutEffect(() => {
+    if (!showOptions || !actionBarRef.current) return;
+    const el = actionBarRef.current;
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const MARGIN = 8;
+
+    let { left, top } = rect;
+
+    // Clamp horizontally
+    if (left + rect.width > vw - MARGIN) {
+      left = vw - rect.width - MARGIN;
+    }
+    if (left < MARGIN) left = MARGIN;
+
+    // Clamp vertically — flip below cursor if clipped at top
+    if (top < MARGIN) {
+      // Try to position below the original click point
+      top = menuPosition.y + rect.height + 10;
+      // If that also overflows bottom, pin to top margin
+      if (top + rect.height > vh - MARGIN) top = MARGIN;
+    }
+    if (top + rect.height > vh - MARGIN) {
+      top = vh - rect.height - MARGIN;
+    }
+
+    // Only update if meaningfully different (avoid infinite loop)
+    if (Math.abs(top - rect.top) > 1 || Math.abs(left - rect.left) > 1) {
+      setMenuPosition({ x: left, y: top });
+    }
+  }, [showOptions, menuPosition.x, menuPosition.y]);
+
+  // File type and preview variables
+  const fileInfo = msg.type === 'file' && msg.media ? getFileIcon(msg.media.mimeType || msg.media.fileType, msg.media.fileName) : null;
+  const isPDF = msg.type === 'file' && msg.media && (((msg.media.mimeType || msg.media.fileType || '').includes('pdf')) || (msg.media.fileName || '').endsWith('.pdf'));
+  const fileSizeKB = msg.type === 'file' && msg.media && msg.media.fileSize 
+    ? (msg.media.fileSize / 1024).toFixed(1) + ' KB' 
+    : '';
 
   // Close menus on click outside of action popups
   useEffect(() => {
@@ -160,7 +311,12 @@ const MessageBubble = ({
 
   // Close menus on scroll
   useEffect(() => {
-    const handleScroll = () => {
+    const handleScroll = (e) => {
+      if (e.target && typeof e.target.closest === 'function') {
+        if (e.target.closest('.msg-emoji-picker-popup') || e.target.closest('.msg-action-bar')) {
+          return;
+        }
+      }
       setShowOptions(false);
       setShowDeleteMenu(false);
       setShowEmojiPicker(false);
@@ -216,13 +372,86 @@ const MessageBubble = ({
     );
   }
 
+  // Call history message
+  if (msg.type === 'call') {
+    const isVideo = msg.content?.toLowerCase().includes('video');
+    const isMissed = msg.content?.toLowerCase().includes('missed');
+    const isDeclined = msg.content?.toLowerCase().includes('declined') || msg.content?.toLowerCase().includes('decline');
+    
+    return (
+      <div className="msg-system" style={{ margin: '12px 0' }}>
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          backgroundColor: 'var(--bg-card, #ffffff)',
+          border: '1px solid var(--chat-border, #e2e8f0)',
+          borderRadius: '20px',
+          padding: '8px 16px',
+          fontSize: '13px',
+          color: isMissed ? '#ef4444' : isDeclined ? '#6b7280' : 'var(--text-primary, #1e293b)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          fontWeight: '500'
+        }}>
+          <span style={{ fontSize: '15px', display: 'flex', alignItems: 'center' }}>
+            {isMissed ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5">
+                <line x1="1" y1="1" x2="23" y2="23"/>
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            ) : isVideo ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polygon points="23 7 16 12 23 17 23 7"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            )}
+          </span>
+          <span>{msg.content}</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted, #94a3b8)', marginLeft: '4px' }}>
+            {timeStr}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const isStarred = msg.starredBy?.includes(currentUser?.id);
 
   return (
     <div
-      className={`msg-row ${isOwn ? 'msg-row-own' : 'msg-row-other'}`}
+      className={`msg-row ${isOwn ? 'msg-row-own' : 'msg-row-other'} ${isSelectMode ? 'msg-row-select-mode' : ''} ${isSelected ? 'msg-row-selected' : ''}`}
       ref={bubbleRef}
+      onClick={() => {
+        if (isSelectMode) {
+          onToggleSelect(msg.id);
+        }
+      }}
+      style={{ cursor: isSelectMode ? 'pointer' : 'default' }}
     >
+      {isSelectMode && (
+        <div className="msg-select-checkbox-container" style={{ display: 'flex', alignItems: 'center', justifycontent: 'center', padding: '0 12px 0 4px', flexShrink: 0 }}>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            onChange={() => {
+              onToggleSelect(msg.id);
+            }}
+            style={{
+              width: '18px',
+              height: '18px',
+              cursor: 'pointer',
+              accentColor: 'var(--chat-primary, #6366f1)'
+            }}
+          />
+        </div>
+      )}
       {/* Sender avatar (others only) */}
       {!isOwn && (
         <div className="msg-sender-avatar">
@@ -237,29 +466,30 @@ const MessageBubble = ({
       <div 
         className={`msg-bubble-wrapper ${isOwn ? 'msg-bubble-wrapper-own' : ''}`}
         onContextMenu={(e) => {
+          if (isSelectMode) return;
           if (msg.isDeleted || msg.type === 'system') return;
           e.preventDefault();
 
           const mouseX = e.clientX;
           const mouseY = e.clientY;
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          const MARGIN = 8;
 
-          // Estimate menu dimensions to prevent offscreen rendering
-          // Menu has reactions (approx 200px) + actions (approx 180px)
-          const menuWidth = isOwn ? 385 : 325;
-          const menuHeight = 44;
+          // Conservative estimates — useLayoutEffect will fine-tune after render
+          const estWidth = 380;
+          const estHeight = 48;
 
-          let x = mouseX - 100; // Center around mouse click
-          if (x + menuWidth > window.innerWidth) {
-            x = window.innerWidth - menuWidth - 16;
-          }
-          if (x < 16) {
-            x = 16;
-          }
+          // Prefer above cursor; fall back to below if too close to top
+          let y = mouseY - estHeight - 10;
+          if (y < MARGIN) y = mouseY + 15;
+          // If still goes off bottom, clamp
+          if (y + estHeight > vh - MARGIN) y = vh - estHeight - MARGIN;
 
-          let y = mouseY - menuHeight - 10; // Position above cursor
-          if (y < 16) {
-            y = mouseY + 15; // Fallback to below cursor
-          }
+          // Center horizontally around click, then clamp
+          let x = mouseX - estWidth / 2;
+          if (x + estWidth > vw - MARGIN) x = vw - estWidth - MARGIN;
+          if (x < MARGIN) x = MARGIN;
 
           setMenuPosition({ x, y });
           setShowOptions(true);
@@ -314,13 +544,149 @@ const MessageBubble = ({
           ) : (
             <>
               {/* Content */}
-              {msg.type === 'image' && msg.media ? (
-                <img src={msg.media.url} alt="Image" className="msg-image" />
+              {msg.type === 'audio' ? (
+                <VoiceMessageBubble message={msg} isOwn={isOwn} />
+              ) : msg.type === 'image' && msg.media ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <img
+                    src={msg.media?.url || msg.content}
+                    alt={msg.media?.fileName || 'Image'}
+                    style={{ 
+                      maxWidth: '240px', maxHeight: '200px',
+                      objectFit: 'cover', borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'opacity 0.2s'
+                    }}
+                    onClick={() => {
+                      setLightboxSrc(msg.media?.url || msg.content);
+                      setLightboxFileName(msg.media?.fileName || 'Image');
+                    }}
+                    onMouseEnter={e => e.target.style.opacity = '0.85'}
+                    onMouseLeave={e => e.target.style.opacity = '1'}
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerDirectDownload(msg.media?.url || msg.content, msg.media?.fileName || 'image');
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      background: 'rgba(0,0,0,0.06)',
+                      border: 'none',
+                      color: 'var(--text-primary, #fff)',
+                      borderRadius: '6px',
+                      padding: '6px 12px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      width: 'fit-content',
+                      alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.12)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.06)'}
+                    title="Download Image"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" 
+                      fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download
+                  </button>
+                </div>
               ) : msg.type === 'file' && msg.media ? (
-                <a href={msg.media.url} target="_blank" rel="noreferrer" className="msg-file-link">
-                  <span className="msg-file-icon">📎</span>
-                  <span className="msg-file-name">{msg.media.fileName}</span>
-                </a>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  background: 'var(--bg-elevated, rgba(0,0,0,0.1))',
+                  borderRadius: '10px', padding: '10px 14px',
+                  minWidth: '200px', maxWidth: '280px'
+                }}>
+                  {/* File type badge */}
+                  <div style={{
+                    width: '40px', height: '40px', borderRadius: '8px',
+                    background: fileInfo.color + '20',
+                    border: '1px solid ' + fileInfo.color + '40',
+                    display: 'flex', alignItems: 'center', 
+                    justifyContent: 'center', flexShrink: 0,
+                    fontSize: '20px'
+                  }}>
+                    {fileInfo.icon}
+                  </div>
+                  
+                  {/* File name + size */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: '13px', fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', 
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {msg.media?.fileName || 'File'}
+                    </div>
+                    <div style={{ 
+                      fontSize: '11px', 
+                      color: 'var(--text-muted)', 
+                      marginTop: '2px' 
+                    }}>
+                      {fileInfo.label}
+                      {fileSizeKB && ` · ${fileSizeKB}`}
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                    {/* Preview (PDF only) */}
+                    {isPDF && (
+                      <button
+                        onClick={() => setPdfPreview({
+                          src: msg.media?.url || msg.content,
+                          fileName: msg.media?.fileName
+                        })}
+                        style={{
+                          background: 'var(--color-primary, #6366f1)',
+                          border: 'none', color: '#fff',
+                          borderRadius: '6px', padding: '6px',
+                          cursor: 'pointer', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center'
+                        }}
+                        title="Preview PDF"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" 
+                          fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                      </button>
+                    )}
+                    {/* Download */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        triggerDirectDownload(msg.media?.url || msg.content, msg.media?.fileName || 'file');
+                      }}
+                      style={{
+                        background: 'rgba(0,0,0,0.15)',
+                        border: 'none', color: 'var(--text-primary)',
+                        borderRadius: '6px', padding: '6px',
+                        cursor: 'pointer', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center'
+                      }}
+                      title="Download"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" 
+                        fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <p className="msg-text">{msg.content}</p>
               )}
@@ -387,8 +753,9 @@ const MessageBubble = ({
       </div>
 
       {/* ── Context Action Bar (Right-Click Action Bar) ────────────────────────── */}
-      {showOptions && !isEditing && (
+      {showOptions && !isEditing && createPortal(
         <div 
+          ref={actionBarRef}
           className={`msg-action-bar ${isOwn ? 'msg-action-bar-own' : 'msg-action-bar-other'}`}
           style={{
             position: 'fixed',
@@ -396,136 +763,171 @@ const MessageBubble = ({
             top: `${menuPosition.y}px`,
             right: 'auto',
             margin: 0,
+            zIndex: 99999
           }}
         >
-          {/* Quick emoji reactions */}
-          {QUICK_EMOJIS.map(emoji => (
-            <button
-              key={emoji}
-              className="msg-action-emoji"
-              onClick={() => {
-                onReact(msg.id, emoji);
-                setShowOptions(false);
-              }}
-              title={`React ${emoji}`}
-            >
-              {emoji}
-            </button>
-          ))}
+          {/* ── Row 1: Emoji Reactions ───────────────────────────── */}
+          <div className="msg-action-row">
+            {QUICK_EMOJIS.map(emoji => (
+              <button
+                key={emoji}
+                className="msg-action-emoji"
+                onClick={() => {
+                  onReact(msg.id, emoji);
+                  setShowOptions(false);
+                }}
+                title={`React ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
 
-          {/* Full emoji picker */}
-          <div className="msg-action-emoji-picker-wrap" ref={emojiRef}>
-            <button
-              className="msg-action-btn"
-              onClick={() => setShowEmojiPicker(p => !p)}
-              title="More reactions"
-            >
-              😊
-            </button>
-            {showEmojiPicker && (
-              <div className={`msg-emoji-picker-popup ${isOwn ? 'msg-emoji-picker-own' : ''}`}>
-                <EmojiPicker
-                  onEmojiClick={handleEmojiClick}
-                  width={300}
-                  height={380}
-                  previewConfig={{ showPreview: false }}
-                />
-              </div>
-            )}
+            {/* Full emoji picker */}
+            <div className="msg-action-emoji-picker-wrap" ref={emojiRef}>
+              <button
+                className="msg-action-btn"
+                onClick={() => setShowEmojiPicker(p => !p)}
+                title="More reactions"
+              >
+                <Plus size={16} strokeWidth={2.5} />
+              </button>
+              {showEmojiPicker && (
+                <div className={`msg-emoji-picker-popup ${isOwn ? 'msg-emoji-picker-own' : ''}`}>
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiClick}
+                    width={300}
+                    height={380}
+                    previewConfig={{ showPreview: false }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Vertical Divider separating Reactions from Actions */}
-          <div 
-            className="msg-action-divider" 
-            style={{ 
-              width: '1px', 
-              height: '16px', 
-              backgroundColor: 'var(--chat-border, #e2e8f0)', 
-              margin: '0 8px',
-              display: 'inline-block'
-            }} 
-          />
+          {/* ── Divider ──────────────────────────────────────────── */}
+          <div className="msg-action-row-divider" />
 
-          {/* Star / Highlight Action */}
-          <button 
-            className="msg-action-btn" 
-            onClick={() => {
-              if (isStarred) onUnstar(msg.id, conversation.id);
-              else onStar(msg.id, conversation.id);
-              setShowOptions(false);
-            }} 
-            title={isStarred ? "Remove Star" : "Star Message"}
-            style={{ color: isStarred ? '#f59e0b' : 'inherit' }}
-          >
-            <Star 
-              size={16} 
-              fill={isStarred ? "#f59e0b" : "none"} 
-              color={isStarred ? "#f59e0b" : "currentColor"} 
-              strokeWidth={2} 
-            />
-          </button>
-
-          {/* Pin Message Action */}
-          <button 
-            className="msg-action-btn" 
-            onClick={() => {
-              if (msg.isPinned) onUnpin(msg.id, conversation.id);
-              else onPin(msg.id, conversation.id);
-              setShowOptions(false);
-            }} 
-            title={msg.isPinned ? "Unpin Message" : "Pin Message"}
-            style={{ color: msg.isPinned ? 'var(--chat-primary, #6366f1)' : 'inherit' }}
-          >
-            <Pin 
-              size={16} 
-              fill={msg.isPinned ? "var(--chat-primary, #6366f1)" : "none"} 
-              color={msg.isPinned ? "var(--chat-primary, #6366f1)" : "currentColor"} 
-              strokeWidth={2} 
-            />
-          </button>
-
-          {/* Reply */}
-          <button 
-            className="msg-action-btn" 
-            onClick={() => {
-              onReply(msg);
-              setShowOptions(false);
-            }} 
-            title="Reply"
-          >
-            <CornerUpLeft size={16} strokeWidth={2} />
-          </button>
-
-          {/* Edit (own messages only) */}
-          {isOwn && msg.type === 'text' && (
-            <button className="msg-action-btn" onClick={() => setIsEditing(true)} title="Edit">
-              <Pencil size={16} strokeWidth={2} />
+          {/* ── Row 2: Action Buttons ────────────────────────────── */}
+          <div className="msg-action-row">
+            {/* Reply */}
+            <button
+              className="msg-action-btn"
+              onClick={() => { onReply(msg); setShowOptions(false); }}
+              title="Reply"
+            >
+              <CornerUpLeft size={16} strokeWidth={2} />
             </button>
-          )}
 
-          {/* Delete (own messages only) */}
-          {isOwn && (
+            {/* Star */}
+            <button
+              className="msg-action-btn"
+              onClick={() => {
+                if (isStarred) onUnstar(msg.id, conversation.id);
+                else onStar(msg.id, conversation.id);
+                setShowOptions(false);
+              }}
+              title={isStarred ? 'Remove Star' : 'Star Message'}
+              style={{ color: isStarred ? '#f59e0b' : 'inherit' }}
+            >
+              <Star size={16} fill={isStarred ? '#f59e0b' : 'none'} color={isStarred ? '#f59e0b' : 'currentColor'} strokeWidth={2} />
+            </button>
+
+            {/* Pin */}
+            <button
+              className="msg-action-btn"
+              onClick={() => {
+                if (msg.isPinned) onUnpin(msg.id, conversation.id);
+                else onPin(msg.id, conversation.id);
+                setShowOptions(false);
+              }}
+              title={msg.isPinned ? 'Unpin Message' : 'Pin Message'}
+              style={{ color: msg.isPinned ? 'var(--chat-primary, #6366f1)' : 'inherit' }}
+            >
+              <Pin size={16} fill={msg.isPinned ? 'var(--chat-primary, #6366f1)' : 'none'} color={msg.isPinned ? 'var(--chat-primary, #6366f1)' : 'currentColor'} strokeWidth={2} />
+            </button>
+
+            {/* Select */}
+            <button
+              className="msg-action-btn"
+              onClick={() => { onStartSelectMode(msg.id); setShowOptions(false); }}
+              title="Select Messages"
+            >
+              <CheckSquare size={16} strokeWidth={2} />
+            </button>
+
+            {/* Edit (own text only) */}
+            {isOwn && msg.type === 'text' && (
+              <button className="msg-action-btn" onClick={() => setIsEditing(true)} title="Edit">
+                <Pencil size={16} strokeWidth={2} />
+              </button>
+            )}
+
+            {/* Delete */}
             <div className="msg-delete-wrap">
               <button
                 className="msg-action-btn msg-action-delete"
-                onClick={() => setShowDeleteMenu(p => !p)}
+                onClick={() => {
+                  if (isOwn) {
+                    setShowDeleteMenu(p => !p);
+                  } else {
+                    showConfirm(
+                      'Delete Message',
+                      'Are you sure you want to delete this message for yourself?',
+                      () => { onDelete(msg.id, false); setShowOptions(false); },
+                      'danger'
+                    );
+                  }
+                }}
                 title="Delete"
               >
                 <Trash2 size={16} strokeWidth={2} />
               </button>
-              {showDeleteMenu && (
+              {isOwn && showDeleteMenu && (
                 <div className="msg-delete-menu">
-                  <button onClick={() => { onDelete(msg.id, false); setShowDeleteMenu(false); setShowOptions(false); }}>
+                  <button onClick={() => {
+                    showConfirm(
+                      'Delete Message',
+                      'Are you sure you want to delete this message for yourself?',
+                      () => { onDelete(msg.id, false); setShowDeleteMenu(false); setShowOptions(false); },
+                      'danger'
+                    );
+                  }}>
                     Delete for me
                   </button>
-                  <button onClick={() => { onDelete(msg.id, true); setShowDeleteMenu(false); setShowOptions(false); }}>
+                  <button onClick={() => {
+                    showConfirm(
+                      'Delete Message for Everyone',
+                      'Are you sure you want to delete this message for everyone? This will replace the message content with a deletion notice.',
+                      () => { onDelete(msg.id, true); setShowDeleteMenu(false); setShowOptions(false); },
+                      'danger'
+                    );
+                  }}>
                     Delete for everyone
                   </button>
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {lightboxSrc && createPortal(
+        <ImageLightbox
+          src={lightboxSrc}
+          fileName={lightboxFileName}
+          onClose={() => { setLightboxSrc(null); setLightboxFileName(''); }}
+        />,
+        document.body
+      )}
+
+      {pdfPreview && createPortal(
+        <PDFPreviewModal
+          src={pdfPreview.src}
+          fileName={pdfPreview.fileName}
+          onClose={() => setPdfPreview(null)}
+        />,
+        document.body
       )}
     </div>
   );

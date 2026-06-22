@@ -3,8 +3,9 @@
  * @description Left sidebar — all conversations with search + New Chat button.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
+import { useCall } from '../../context/CallContext';
 import ConversationItem from './ConversationItem';
 import NewChatModal from './NewChatModal';
 import CreateGroupModal from './CreateGroupModal';
@@ -39,33 +40,90 @@ export const formatTime = (timestamp) => {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const ConversationsList = ({ currentUser, onSelectConversation }) => {
+  const { initiateCall, callState } = useCall();
   const {
     conversations, activeConvId, isLoadingConvs,
     unreadCounts, isUserOnline, mutedConversations,
     currentUserStatus, presenceMap, setUserStatus,
-    pinConversation, unpinConversation, muteConversation, unmuteConversation
+    pinConversation, unpinConversation, muteConversation, unmuteConversation,
+    apiFetch, startDirectChat
   } = useChat();
+
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'calls'
+  const [callLogs, setCallLogs] = useState([]);
+  const [isLoadingCalls, setIsLoadingCalls] = useState(false);
+
+  const fetchCallLogs = useCallback(async () => {
+    setIsLoadingCalls(true);
+    try {
+      const res = await apiFetch('/chat/calls/history');
+      if (res.status === 'success') {
+        setCallLogs(res.data || []);
+      }
+    } catch (err) {
+      console.error('[Chat] Failed to fetch call logs:', err);
+    } finally {
+      setIsLoadingCalls(false);
+    }
+  }, [apiFetch]);
+
+  useEffect(() => {
+    if (activeTab === 'calls') {
+      fetchCallLogs();
+    }
+  }, [activeTab, fetchCallLogs]);
+
+  const handleCallLogClick = async (targetEmployeeId) => {
+    try {
+      const conv = await startDirectChat(targetEmployeeId);
+      if (onSelectConversation) {
+        onSelectConversation(conv.id);
+      }
+    } catch (err) {
+      console.error('[CallLogs] Failed to open conversation:', err);
+    }
+  };
+
+  const handleRedial = async (e, otherUser, callType) => {
+    e.stopPropagation();
+    try {
+      const conv = await startDirectChat(otherUser.id);
+      initiateCall(otherUser, callType, conv.id);
+    } catch (err) {
+      console.error('[CallLogs] Redial error:', err);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
 
-  // Filter conversations by search query
+  // Filter conversations/calls by search query
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
-    const q = searchQuery.toLowerCase();
-    return conversations.filter(conv => {
-      if (conv.type === 'group') {
-        return conv.name?.toLowerCase().includes(q);
-      }
-      const other = getOtherParticipant(conv, currentUser?.id);
-      return other?.name?.toLowerCase().includes(q);
-    });
-  }, [conversations, searchQuery, currentUser?.id]);
+    if (activeTab === 'chats') {
+      if (!searchQuery.trim()) return conversations;
+      const q = searchQuery.toLowerCase();
+      return conversations.filter(conv => {
+        if (conv.type === 'group') {
+          return conv.name?.toLowerCase().includes(q);
+        }
+        const other = getOtherParticipant(conv, currentUser?.id);
+        return other?.name?.toLowerCase().includes(q);
+      });
+    } else {
+      if (!searchQuery.trim()) return callLogs;
+      const q = searchQuery.toLowerCase();
+      return callLogs.filter(call => {
+        const otherName = call.callerId === currentUser?.id ? call.calleeName : call.callerName;
+        return otherName?.toLowerCase().includes(q);
+      });
+    }
+  }, [conversations, callLogs, searchQuery, activeTab, currentUser?.id]);
 
-  // Sort: Pinned chats first, then by last activity time
+  // Sort: Pinned chats first, then by last activity time (chats tab only)
   const sorted = useMemo(() => {
+    if (activeTab === 'calls') return filtered;
     let list = [...filtered];
     return list.sort((a, b) => {
       const aPinned = a.pinnedBy?.some(p => p.employeeId === currentUser?.id);
@@ -82,7 +140,7 @@ const ConversationsList = ({ currentUser, onSelectConversation }) => {
 
       return new Date(b.lastActivityAt || b.createdAt) - new Date(a.lastActivityAt || a.createdAt);
     });
-  }, [filtered, currentUser?.id]);
+  }, [filtered, activeTab, currentUser?.id]);
 
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
 
@@ -163,6 +221,51 @@ const ConversationsList = ({ currentUser, onSelectConversation }) => {
           </div>
         </div>
 
+        {/* Tabs for Chats vs Calls */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '1px solid var(--chat-border, #e2e8f0)',
+          margin: '10px 0',
+          padding: '2px 0'
+        }}>
+          <button
+            onClick={() => setActiveTab('chats')}
+            style={{
+              flex: 1,
+              padding: '8px 0',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'chats' ? '2.5px solid var(--chat-primary, #6366f1)' : '2.5px solid transparent',
+              color: activeTab === 'chats' ? 'var(--chat-primary, #6366f1)' : 'var(--text-secondary, #64748b)',
+              fontWeight: '600',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              textAlign: 'center'
+            }}
+          >
+            Chats
+          </button>
+          <button
+            onClick={() => setActiveTab('calls')}
+            style={{
+              flex: 1,
+              padding: '8px 0',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'calls' ? '2.5px solid var(--chat-primary, #6366f1)' : '2.5px solid transparent',
+              color: activeTab === 'calls' ? 'var(--chat-primary, #6366f1)' : 'var(--text-secondary, #64748b)',
+              fontWeight: '600',
+              fontSize: '14px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              textAlign: 'center'
+            }}
+          >
+            Call Logs
+          </button>
+        </div>
+
         {/* Search */}
         <div className="conv-search-wrapper">
           <svg className="conv-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -183,60 +286,205 @@ const ConversationsList = ({ currentUser, onSelectConversation }) => {
 
       {/* ── List ─────────────────────────────────────────────── */}
       <div className="conv-list-items">
-        {isLoadingConvs ? (
-          <div className="conv-list-loading">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="conv-skeleton">
-                <div className="conv-skeleton-avatar" />
-                <div className="conv-skeleton-lines">
-                  <div className="conv-skeleton-line conv-skeleton-name" />
-                  <div className="conv-skeleton-line conv-skeleton-msg" />
+        {activeTab === 'chats' ? (
+          isLoadingConvs ? (
+            <div className="conv-list-loading">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="conv-skeleton">
+                  <div className="conv-skeleton-avatar" />
+                  <div className="conv-skeleton-lines">
+                    <div className="conv-skeleton-line conv-skeleton-name" />
+                    <div className="conv-skeleton-line conv-skeleton-msg" />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="conv-list-empty">
-            {searchQuery ? (
-              <>
-                <div className="conv-empty-icon">🔍</div>
-                <p>No conversations match "<strong>{searchQuery}</strong>"</p>
-              </>
-            ) : (
-              <>
-                <div className="conv-empty-icon">💬</div>
-                <p>No conversations yet</p>
-                <button className="conv-start-btn" onClick={() => setShowNewChat(true)}>
-                  Start a Chat
-                </button>
-              </>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="conv-list-empty">
+              {searchQuery ? (
+                <>
+                  <div className="conv-empty-icon">🔍</div>
+                  <p>No conversations match "<strong>{searchQuery}</strong>"</p>
+                </>
+              ) : (
+                <>
+                  <div className="conv-empty-icon">💬</div>
+                  <p>No conversations yet</p>
+                  <button className="conv-start-btn" onClick={() => setShowNewChat(true)}>
+                    Start a Chat
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            sorted.map(conv => {
+              const other = getOtherParticipant(conv, currentUser?.id);
+              const isOnline = conv.type === 'direct' ? isUserOnline(other?.employeeId) : false;
+              const otherStatus = other ? (presenceMap?.get(other.employeeId)?.status || 'offline') : 'offline';
+              return (
+                <ConversationItem
+                  key={conv.id}
+                  conversation={conv}
+                  isActive={activeConvId === conv.id}
+                  onClick={() => onSelectConversation(conv.id)}
+                  unreadCount={unreadCounts[conv.id] || 0}
+                  isOnline={isOnline}
+                  otherStatus={otherStatus}
+                  isMuted={mutedConversations?.has(conv.id)}
+                  formatTime={formatTime}
+                  getOtherParticipant={(c) => getOtherParticipant(c, currentUser?.id)}
+                  currentUser={currentUser}
+                  onPin={pinConversation}
+                  onUnpin={unpinConversation}
+                  onMute={muteConversation}
+                  onUnmute={unmuteConversation}
+                />
+              );
+            })
+          )
         ) : (
-          sorted.map(conv => {
-            const other = getOtherParticipant(conv, currentUser?.id);
-            const isOnline = conv.type === 'direct' ? isUserOnline(other?.employeeId) : false;
-            const otherStatus = other ? (presenceMap?.get(other.employeeId)?.status || 'offline') : 'offline';
-            return (
-              <ConversationItem
-                key={conv.id}
-                conversation={conv}
-                isActive={activeConvId === conv.id}
-                onClick={() => onSelectConversation(conv.id)}
-                unreadCount={unreadCounts[conv.id] || 0}
-                isOnline={isOnline}
-                otherStatus={otherStatus}
-                isMuted={mutedConversations?.has(conv.id)}
-                formatTime={formatTime}
-                getOtherParticipant={(c) => getOtherParticipant(c, currentUser?.id)}
-                currentUser={currentUser}
-                onPin={pinConversation}
-                onUnpin={unpinConversation}
-                onMute={muteConversation}
-                onUnmute={unmuteConversation}
-              />
-            );
-          })
+          isLoadingCalls ? (
+            <div className="conv-list-loading">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="conv-skeleton">
+                  <div className="conv-skeleton-avatar" />
+                  <div className="conv-skeleton-lines">
+                    <div className="conv-skeleton-line conv-skeleton-name" />
+                    <div className="conv-skeleton-line conv-skeleton-msg" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="conv-list-empty">
+              <div className="conv-empty-icon">📞</div>
+              <p>{searchQuery ? 'No calls matched your search' : 'No call history yet'}</p>
+            </div>
+          ) : (
+            filtered.map(call => {
+              const isOutgoing = call.callerId === currentUser?.id;
+              const otherId = isOutgoing ? call.calleeId : call.callerId;
+              const otherName = isOutgoing ? call.calleeName : call.callerName;
+              const otherAvatar = isOutgoing ? call.calleeAvatar : call.callerAvatar;
+              const isVideo = call.callType === 'video';
+              const isMissed = call.status === 'missed';
+              const isRejected = call.status === 'rejected';
+              
+              // Format duration
+              const minutes = Math.floor(call.duration / 60);
+              const seconds = call.duration % 60;
+              const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+              return (
+                <div
+                  key={call.id}
+                  onClick={() => handleCallLogClick(otherId)}
+                  className="conv-item"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '12px 16px',
+                    borderBottom: '1px solid var(--chat-border, #f1f5f9)',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Avatar */}
+                  <div style={{ position: 'relative', width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--color-primary-light, #f0f4ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'var(--color-primary, #6366f1)', marginRight: '12px', flexShrink: 0, overflow: 'hidden' }}>
+                    {otherAvatar ? (
+                      <img src={otherAvatar} alt={otherName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      otherName?.charAt(0).toUpperCase()
+                    )}
+                  </div>
+
+                  {/* Call Info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3px' }}>
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: 'var(--text-primary, #1e293b)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {otherName}
+                      </h4>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted, #94a3b8)', flexShrink: 0 }}>
+                        {formatTime(call.createdAt)}
+                      </span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: isMissed ? '#ef4444' : 'var(--text-muted, #64748b)' }}>
+                      {/* Direction Icon */}
+                      {isOutgoing ? (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--chat-primary, #6366f1)" strokeWidth="3" style={{ flexShrink: 0 }}>
+                          <line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>
+                        </svg>
+                      ) : (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={isMissed ? '#ef4444' : '#22c55e'} strokeWidth="3" style={{ flexShrink: 0 }}>
+                          <line x1="17" y1="7" x2="7" y2="17"/><polyline points="17 17 7 17 7 7"/>
+                        </svg>
+                      )}
+                      
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {isVideo ? 'Video' : 'Voice'} Call · {isMissed ? 'Missed' : isRejected ? 'Declined' : `Ended (${durationStr})`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Quick Call Action Buttons */}
+                  <div style={{ display: 'flex', gap: '8px', marginLeft: '12px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    {/* Voice Call Redial */}
+                    <button
+                      onClick={(e) => handleRedial(e, { id: otherId, name: otherName, avatar: otherAvatar }, 'audio')}
+                      disabled={callState !== 'idle'}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '6px',
+                        borderRadius: '50%',
+                        cursor: callState !== 'idle' ? 'not-allowed' : 'pointer',
+                        color: 'var(--text-muted, #64748b)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'background 0.2s, color 0.2s'
+                      }}
+                      onMouseEnter={e => { if (callState === 'idle') { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'; e.currentTarget.style.color = 'var(--chat-primary, #6366f1)'; } }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted, #64748b)'; }}
+                      title="Voice Call"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                      </svg>
+                    </button>
+
+                    {/* Video Call Redial */}
+                    <button
+                      onClick={(e) => handleRedial(e, { id: otherId, name: otherName, avatar: otherAvatar }, 'video')}
+                      disabled={callState !== 'idle'}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '6px',
+                        borderRadius: '50%',
+                        cursor: callState !== 'idle' ? 'not-allowed' : 'pointer',
+                        color: 'var(--text-muted, #64748b)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'background 0.2s, color 0.2s'
+                      }}
+                      onMouseEnter={e => { if (callState === 'idle') { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'; e.currentTarget.style.color = 'var(--chat-primary, #6366f1)'; } }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted, #64748b)'; }}
+                      title="Video Call"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )
         )}
       </div>
 

@@ -5,6 +5,7 @@
 
 import express from 'express';
 import controller from './notifications.controller.js';
+import * as pushNotificationController from './pushNotificationController.js';
 import validation from './notifications.validation.js';
 import { validateRequest } from '../../middlewares/validation.middleware.js';
 import { authenticate, restrictTo } from '../../middlewares/auth.middleware.js';
@@ -16,6 +17,11 @@ router.get('/public', controller.getPublicData);
 
 // Secured routes boundary
 router.use(authenticate);
+
+// ─── WEB PUSH NOTIFICATIONS ──────────────────────────────────────────────────
+router.get('/push/key', pushNotificationController.getPublicKey);
+router.post('/push/subscribe', pushNotificationController.subscribe);
+router.post('/push/unsubscribe', pushNotificationController.unsubscribe);
 
 router.route('/')
   .get(controller.getAll)

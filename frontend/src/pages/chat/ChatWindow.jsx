@@ -5,6 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useChat } from '../../context/ChatContext';
+import { useApp } from '../../context/AppContext';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import ChatSidebar from './ChatSidebar';
@@ -12,18 +13,96 @@ import GroupInfoPanel from './GroupInfoPanel';
 import { getOtherParticipant } from './ConversationsList';
 import StatusDot from './StatusDot';
 import { Pin } from 'lucide-react';
+import { useCall } from '../../context/CallContext';
+
+const getFirstUnreadMessage = (msgs, currentUserId, unreadCount) => {
+  if (!msgs || msgs.length === 0) return null;
+  
+  // Method 1: direct readBy check
+  for (let i = 0; i < msgs.length; i++) {
+    const msg = msgs[i];
+    if (msg.senderId !== currentUserId) {
+      const hasRead = msg.readBy?.some(r => r.employeeId === currentUserId);
+      if (!hasRead) {
+        return msg;
+      }
+    }
+  }
+
+  // Method 2: fallback to unread count
+  if (unreadCount > 0 && msgs.length >= unreadCount) {
+    return msgs[msgs.length - unreadCount];
+  }
+  
+  return null;
+};
 
 const ChatWindow = ({ currentUser, onBack }) => {
   const {
     conversations, activeConvId, messages,
     typingUsers, isLoadingMsgs, hasMoreMessages,
     loadMoreMessages, sendMessage, retryMessage, deleteMessage,
-    editMessage, addReaction, isUserOnline,
+    deleteMessagesBulk, editMessage, addReaction, isUserOnline,
     handleTypingStart, handleTypingStop,
     mutedConversations, muteConversation, unmuteConversation,
     socket, isConnected, presenceMap,
-    pinMessage, unpinMessage, starMessage, unstarMessage
+    pinMessage, unpinMessage, starMessage, unstarMessage,
+    unreadCountOnOpen
   } = useChat();
+
+  const { initiateCall, callState } = useCall();
+
+  const { showConfirm, addToast } = useApp();
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState(new Set());
+
+  // Reset select mode when conversation changes
+  useEffect(() => {
+    setIsSelectMode(false);
+    setSelectedMessageIds(new Set());
+  }, [activeConvId]);
+
+  const handleStartSelectMode = (msgId) => {
+    setIsSelectMode(true);
+    setSelectedMessageIds(new Set([msgId]));
+  };
+
+  const handleToggleSelect = (msgId) => {
+    setSelectedMessageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(msgId)) {
+        next.delete(msgId);
+      } else {
+        next.add(msgId);
+      }
+      return next;
+    });
+  };
+
+  const handleCancelSelectMode = () => {
+    setIsSelectMode(false);
+    setSelectedMessageIds(new Set());
+  };
+
+  const handleBulkDelete = () => {
+    const count = selectedMessageIds.size;
+    if (count === 0) return;
+
+    showConfirm(
+      'Delete Messages',
+      `Are you sure you want to delete the ${count} selected messages for yourself?`,
+      async () => {
+        const success = await deleteMessagesBulk(Array.from(selectedMessageIds), activeConvId);
+        if (success) {
+          addToast('success', `${count} messages deleted successfully`);
+          handleCancelSelectMode();
+        } else {
+          addToast('error', 'Failed to delete selected messages');
+        }
+      },
+      'danger'
+    );
+  };
 
   useEffect(() => {
     if (!activeConvId || !socket || !isConnected) return;
@@ -45,22 +124,89 @@ const ChatWindow = ({ currentUser, onBack }) => {
 
   const [showSidebar, setShowSidebar] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [unreadScrollCount, setUnreadScrollCount] = useState(0);
+  const [unreadCountForBanner, setUnreadCountForBanner] = useState(0);
+  // ID of the first unread message — used to place the separator
+  // We capture it only once on open, and clear it when banner is dismissed
+  const [firstUnreadMsgId, setFirstUnreadMsgId] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
+
+  const showScrollBtnRef = useRef(false);
+  const initialScrollDoneRef = useRef({});
+  const lastActiveConvIdRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const prevMsgLengthRef = useRef(0);
   const isLoadingMoreRef = useRef(false);
+  
+  const [unreadSeparatorEl, setUnreadSeparatorEl] = useState(null);
+  const unreadSeparatorRef = useCallback((node) => {
+    setUnreadSeparatorEl(node);
+  }, []);
+
+  // Initialize unread count for banner AND capture the first-unread message id
+  useEffect(() => {
+    const count = unreadCountOnOpen[activeConvId] || 0;
+    setUnreadCountForBanner(count);
+    if (count > 0) {
+      // Find the first unread message id right now and lock it in
+      const msgs = messages[activeConvId] || [];
+      const firstUnread = getFirstUnreadMessage(msgs, currentUser?.id, count);
+      setFirstUnreadMsgId(firstUnread?.id || null);
+    } else {
+      // No unread messages — never show the separator
+      setFirstUnreadMsgId(null);
+    }
+  }, [activeConvId]); // Only re-run when conversation changes, NOT on every messages update
+
+  // Helper to dismiss the banner + separator completely
+  const dismissUnreadBanner = useCallback(() => {
+    setUnreadCountForBanner(0);
+    setUnreadScrollCount(0);
+    setFirstUnreadMsgId(null);
+  }, []);
+
+  // IntersectionObserver: clear banner when separator scrolls into view
+  useEffect(() => {
+    if (!unreadCountForBanner || !unreadSeparatorEl) return;
+
+    let timer;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            timer = setTimeout(() => {
+              dismissUnreadBanner();
+            }, 800);
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(unreadSeparatorEl);
+    return () => {
+      if (timer) clearTimeout(timer);
+      observer.unobserve(unreadSeparatorEl);
+      observer.disconnect();
+    };
+  }, [unreadCountForBanner, unreadSeparatorEl, dismissUnreadBanner]);
 
   // Current conversation
   const conv = conversations.find(c => c.id === activeConvId);
   const convMessages = messages[activeConvId] || [];
   const typing = typingUsers[activeConvId] || [];
 
+  // No longer compute firstUnreadMsg from msg.readBy (which never updates client-side).
+  // We use firstUnreadMsgId which is captured once when the conversation opens.
+
   // Other user for direct chat
   const other = conv ? getOtherParticipant(conv, currentUser?.id) : null;
   const isDirect = conv?.type === 'direct';
-  const otherStatus = other ? (presenceMap?.get(other.employeeId)?.status || 'offline') : 'offline';
+  const otherPresence = other ? presenceMap?.get(other.employeeId) : null;
+  const otherStatus = otherPresence?.status || 'offline';
+  const otherIsOnChatScreen = otherPresence?.isOnChatScreen || false;
 
   const displayName = isDirect
     ? (other?.name || 'Chat')
@@ -71,26 +217,83 @@ const ChatWindow = ({ currentUser, onBack }) => {
   const isOnline = isDirect ? isUserOnline(other?.employeeId) : false;
   const participantCount = conv?.participants?.length || 0;
 
-  // Auto-scroll to bottom when new messages arrive
+  // Track last activeConvId and reset initialScrollDone when it changes
+  useEffect(() => {
+    if (activeConvId !== lastActiveConvIdRef.current) {
+      lastActiveConvIdRef.current = activeConvId;
+      setUnreadScrollCount(0);
+      setShowScrollBtn(false);
+      showScrollBtnRef.current = false;
+      if (activeConvId) {
+        initialScrollDoneRef.current[activeConvId] = false;
+      }
+    }
+  }, [activeConvId]);
+
+  // Unified Initial Scroll when switching to a conversation
+  useEffect(() => {
+    if (!activeConvId) return;
+
+    if (!isLoadingMsgs && initialScrollDoneRef.current[activeConvId] === false) {
+      initialScrollDoneRef.current[activeConvId] = true;
+      prevMsgLengthRef.current = convMessages.length;
+
+      if (convMessages.length > 0) {
+        const countOnOpen = unreadCountOnOpen[activeConvId] || 0;
+        const firstUnread = getFirstUnreadMessage(convMessages, currentUser?.id, countOnOpen);
+
+        if (firstUnread) {
+          const el = document.getElementById(`msg-${firstUnread.id}`);
+          if (el) {
+            requestAnimationFrame(() => {
+              el.scrollIntoView({ behavior: 'auto', block: 'center' });
+            });
+            return;
+          }
+        }
+      }
+
+      // Default fallback: scroll to bottom
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      });
+    }
+  }, [activeConvId, convMessages, isLoadingMsgs, unreadCountOnOpen, currentUser?.id]);
+
+  // Auto-scroll or badge increment when new messages arrive
   useEffect(() => {
     const newLen = convMessages.length;
-    if (newLen > prevMsgLengthRef.current) {
+    // Only handle if we have done the initial scroll for this conversation
+    if (initialScrollDoneRef.current[activeConvId] && newLen > prevMsgLengthRef.current) {
       const lastMsg = convMessages[newLen - 1];
-      // Only auto-scroll if the message is fresh (less than 5s old) or from current user
       const isRecent = lastMsg && (Date.now() - new Date(lastMsg.createdAt)) < 5000;
       const isOwn = lastMsg?.senderId === currentUser?.id;
-      if (isRecent || isOwn) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+
+      if (isRecent) {
+        if (isOwn) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          setUnreadScrollCount(0);
+        } else if (showScrollBtnRef.current) {
+          // Scrolled up and someone else sent a message: increment unread scroll count badge
+          setUnreadScrollCount(prev => prev + 1);
+        } else {
+          // At bottom and someone else sent a message: auto-scroll to show it
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          setUnreadScrollCount(0);
+        }
       }
     }
     prevMsgLengthRef.current = newLen;
-  }, [convMessages.length]);
+  }, [convMessages.length, activeConvId, currentUser?.id]);
 
-  // Scroll to bottom when switching conversations
+  // Scroll to bottom when typing status changes to keep typing indicator in view
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-    prevMsgLengthRef.current = 0;
-  }, [activeConvId]);
+    if (typing.length > 0 && !showScrollBtnRef.current) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
+  }, [typing.length]);
 
   // Scroll handler — load more + show scroll btn
   const handleScroll = useCallback(async () => {
@@ -100,7 +303,14 @@ const ChatWindow = ({ currentUser, onBack }) => {
     const { scrollTop, scrollHeight, clientHeight } = container;
 
     // Show scroll-to-bottom btn if not at bottom
-    setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 150);
+    const isUp = scrollHeight - scrollTop - clientHeight > 150;
+    setShowScrollBtn(isUp);
+    showScrollBtnRef.current = isUp;
+
+    // Reset unread counts + hide separator if we are at the bottom
+    if (!isUp) {
+      dismissUnreadBanner();
+    }
 
     // Load more when scrolled near top
     if (scrollTop < 80 && hasMoreMessages[activeConvId] && !isLoadingMoreRef.current) {
@@ -137,18 +347,70 @@ const ChatWindow = ({ currentUser, onBack }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleWindowClick = useCallback(() => {
+    if (unreadCountForBanner > 0 || unreadScrollCount > 0) {
+      dismissUnreadBanner();
+    }
+  }, [unreadCountForBanner, unreadScrollCount, dismissUnreadBanner]);
+
   if (!conv) return null;
 
   return (
-    <div className="chat-window">
+    <div className="chat-window" onClick={handleWindowClick}>
       {/* ── HEADER ──────────────────────────────────────────────── */}
-      <div className="chat-win-header">
-        {/* Back button (mobile) */}
-        <button className="chat-win-back-btn" onClick={onBack}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m15 18-6-6 6-6"/>
-          </svg>
-        </button>
+      {isSelectMode ? (
+        <div className="chat-win-header" style={{ backgroundColor: 'var(--chat-primary, #6366f1)', color: '#ffffff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button
+              onClick={handleCancelSelectMode}
+              style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '6px', borderRadius: '50%' }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+            <span style={{ fontWeight: '600', fontSize: '15.5px' }}>{selectedMessageIds.size} selected</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={handleBulkDelete}
+              disabled={selectedMessageIds.size === 0}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: selectedMessageIds.size === 0 ? 'rgba(255,255,255,0.4)' : '#ffffff',
+                cursor: selectedMessageIds.size === 0 ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontWeight: '600',
+                fontSize: '14.5px',
+                transition: 'background 0.2s',
+                backgroundColor: selectedMessageIds.size === 0 ? 'transparent' : 'rgba(255, 255, 255, 0.1)'
+              }}
+              onMouseEnter={e => { if (selectedMessageIds.size > 0) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'; }}
+              onMouseLeave={e => { if (selectedMessageIds.size > 0) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              </svg>
+              Delete Selected
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="chat-win-header">
+          {/* Back button (mobile) */}
+          <button className="chat-win-back-btn" onClick={onBack}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6"/>
+            </svg>
+          </button>
 
         {/* Avatar */}
         <div className="chat-win-avatar-wrap">
@@ -180,7 +442,15 @@ const ChatWindow = ({ currentUser, onBack }) => {
             {typing.length > 0
               ? `${typing.map(u => u.name.split(' ')[0]).join(', ')} ${typing.length === 1 ? 'is' : 'are'} typing...`
               : isDirect
-                ? otherStatus === 'offline' ? 'Offline' : otherStatus.charAt(0).toUpperCase() + otherStatus.slice(1)
+                ? otherStatus === 'offline'
+                  ? 'Offline'
+                  : otherStatus === 'available'
+                    ? otherIsOnChatScreen
+                      ? 'Online'
+                      : 'Available and ready to take call'
+                    : otherStatus === 'dnd'
+                      ? 'Do Not Disturb'
+                      : otherStatus.charAt(0).toUpperCase() + otherStatus.slice(1)
                 : `${participantCount} member${participantCount !== 1 ? 's' : ''}`
             }
           </p>
@@ -188,6 +458,73 @@ const ChatWindow = ({ currentUser, onBack }) => {
 
         {/* Actions */}
         <div className="chat-win-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {isDirect && other && (
+            <>
+              {/* Voice Call */}
+              <button
+                className="chat-win-action-btn"
+                onClick={() => initiateCall(
+                  { 
+                    id: other.employeeId,
+                    name: other.name,
+                    avatar: other.avatar
+                  },
+                  'audio',
+                  activeConvId
+                )}
+                disabled={callState !== 'idle'}
+                title="Voice Call"
+                style={{
+                  opacity: callState !== 'idle' ? 0.5 : 1,
+                  cursor: callState !== 'idle' 
+                    ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <svg width="20" height="20" 
+                  viewBox="0 0 24 24" fill="none" 
+                  stroke="currentColor" strokeWidth="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 
+                    19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 
+                    0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 
+                    3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 
+                    1.72c.127.96.361 1.903.7 2.81a2 2 0 0 
+                    1-.45 2.11L7.91 8.91a16 16 0 0 0 6 
+                    6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 
+                    1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+              </button>
+
+              {/* Video Call */}
+              <button
+                className="chat-win-action-btn"
+                onClick={() => initiateCall(
+                  {
+                    id: other.employeeId,
+                    name: other.name,
+                    avatar: other.avatar
+                  },
+                  'video',
+                  activeConvId
+                )}
+                disabled={callState !== 'idle'}
+                title="Video Call"
+                style={{
+                  opacity: callState !== 'idle' ? 0.5 : 1,
+                  cursor: callState !== 'idle' 
+                    ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <svg width="20" height="20" 
+                  viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2">
+                  <polygon points="23 7 16 12 23 17 23 7"/>
+                  <rect x="1" y="5" width="15" height="14" 
+                    rx="2" ry="2"/>
+                </svg>
+              </button>
+            </>
+          )}
+
           <button
             className={`chat-win-action-btn ${isMuted ? 'muted' : ''}`}
             onClick={toggleMute}
@@ -221,6 +558,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
           </button>
         </div>
       </div>
+      )}
 
       {/* Pinned message banner */}
       {(() => {
@@ -363,6 +701,12 @@ const ChatWindow = ({ currentUser, onBack }) => {
                   </span>
                 </div>
               )}
+              {/* New Messages separator — only shown while banner is active */}
+              {firstUnreadMsgId && unreadCountForBanner > 0 && msg.id === firstUnreadMsgId && (
+                <div className="chat-unread-separator" ref={unreadSeparatorRef}>
+                  <span>New Messages</span>
+                </div>
+              )}
               <MessageBubble
                 message={msg}
                 isOwn={isOwn}
@@ -377,6 +721,10 @@ const ChatWindow = ({ currentUser, onBack }) => {
                 onStar={starMessage}
                 onUnstar={unstarMessage}
                 currentUser={currentUser}
+                isSelectMode={isSelectMode}
+                isSelected={selectedMessageIds.has(msg.id)}
+                onToggleSelect={handleToggleSelect}
+                onStartSelectMode={handleStartSelectMode}
               />
             </React.Fragment>
           );
@@ -406,6 +754,9 @@ const ChatWindow = ({ currentUser, onBack }) => {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="m6 9 6 6 6-6"/>
           </svg>
+          {unreadScrollCount > 0 && (
+            <span className="chat-scroll-badge">{unreadScrollCount}</span>
+          )}
         </button>
       )}
 
@@ -427,6 +778,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
 
       {/* ── MESSAGE INPUT ────────────────────────────────────────── */}
       <MessageInput
+        activeConvId={activeConvId}
         onSend={handleSend}
         onTypingStart={() => handleTypingStart(activeConvId)}
         onTypingStop={() => handleTypingStop(activeConvId)}

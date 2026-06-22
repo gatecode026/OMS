@@ -66,8 +66,8 @@ app.use('/api', generalLimiter);
 app.use('/api/v1/auth', authLimiter);
 
 // ─── REQUEST PARSING ─────────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ extended: true, limit: '500mb' }));
 
 // ─── REQUEST LOGGING ─────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'development') {

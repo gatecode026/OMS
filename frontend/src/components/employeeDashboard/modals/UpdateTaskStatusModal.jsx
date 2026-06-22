@@ -29,7 +29,7 @@ const UpdateTaskStatusModal = ({
   onClose,
   task = {}
 }) => {
-  const { updateTaskProgress, addToast } = useApp();
+  const { updateTaskProgress, addToast, currentUserRole } = useApp();
   const [status, setStatus] = useState('To Do');
   const [progress, setProgress] = useState(0);
   const [remarks, setRemarks] = useState('');
@@ -58,6 +58,11 @@ const UpdateTaskStatusModal = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    if (status === 'Done' && currentUserRole === 'employee') {
+      if (addToast) addToast('warning', 'Only management can approve and set task to "Done".');
+      return;
+    }
     
     // Map display status back to DB status key
     let dbStatus = 'todo';
@@ -94,7 +99,7 @@ const UpdateTaskStatusModal = ({
             <option value="To Do" disabled={currentDisp !== 'To Do'}>To Do</option>
             <option value="In Progress" disabled={currentDisp !== 'To Do' && currentDisp !== 'In Progress'}>In Progress</option>
             <option value="In Review" disabled={currentDisp !== 'In Progress' && currentDisp !== 'In Review'}>In Review</option>
-            <option value="Done" disabled={currentDisp !== 'In Review' && currentDisp !== 'Done'}>Done</option>
+            <option value="Done" disabled={currentUserRole === 'employee' || (currentDisp !== 'In Review' && currentDisp !== 'Done')}>Done</option>
           </select>
         </div>
 

@@ -14,7 +14,7 @@ const tenantScopedModelNames = new Set([
   'UserDevice', 'UserSession', 'SecurityAlert', 'Task', 'Workflow', 
   'SystemSettings',
   // Chat module — tenant-scoped per company database
-  'Conversation', 'Message'
+  'Conversation', 'Message', 'Call', 'PushSubscription'
 ]);
 
 // Keep original mongoose.model compilation reference

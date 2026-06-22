@@ -20,6 +20,9 @@ import Conversation from './conversation.model.js';
 import Message from './message.model.js';
 import { UserDevice } from '../security/security.model.js';
 import { uploadToImageKit } from '../../utils/imagekit.js';
+import Call from './call.model.js';
+import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
+import * as pushNotificationService from '../notifications/pushNotificationService.js';
 
 // ─── IN-MEMORY ONLINE USERS STORE ────────────────────────────────────────────
 // Structure: Map<companyId, Map<employeeId, { socketId, name, avatar, onlineAt }>>
@@ -30,6 +33,9 @@ const offlineDebounceTimers = new Map();
 
 // Map<employeeId, { timer, conversationIds: Set<conversationId> }>
 const pendingPushNotifications = new Map();
+
+// Map<socketId, { callId, targetUserId, companyId, role }>
+const socketActiveCalls = new Map();
 
 // ─── ACTIVE WRITES TRACKING (For Graceful Shutdown) ─────────────────────────
 let activeWrites = 0;
@@ -103,25 +109,18 @@ export const triggerPushNotificationJob = async (userId, companyId) => {
           ? lastMsg.content
           : `📎 ${lastMsg.type}`;
 
-        const payload = {
-          notification: {
-            title,
-            body
-          },
+        const webPushPayload = {
+          title,
+          body,
+          tag: conv.id,
+          type: 'new_message',
           data: {
-            conversationId: conv.id
+            conversationId: conv.id,
+            type: 'new_message'
           }
         };
 
-        const activeDevicesWithToken = devices.filter(d => d.pushToken);
-
-        if (activeDevicesWithToken.length === 0) {
-          logger.info(`[Push Notification Simulation] No registered push tokens for user ${userId}. (Mocking push delivery) -> Title: "${title}", Body: "${body}", Data: ${JSON.stringify(payload.data)}`);
-        } else {
-          activeDevicesWithToken.forEach(device => {
-            logger.info(`[Push Notification] Sent push to device ${device.name} (${device.type}) for user ${userId} using token ${device.pushToken}: Title: "${title}", Body: "${body}", Data: ${JSON.stringify(payload.data)}`);
-          });
-        }
+        await pushNotificationService.sendNotificationToUser(userId, webPushPayload);
       }
     } catch (err) {
       logger.error(`[Push Notification] Job execution failed for user ${userId}:`, err);
@@ -165,6 +164,83 @@ const getCompanyOnlineUsers = (companyId) => {
     onlineUsers.set(companyId, new Map());
   }
   return onlineUsers.get(companyId);
+};
+
+const updateUserChatScreenPresence = async (userId, companyId, io) => {
+  try {
+    const userSockets = await io.in(`user:${userId}`).fetchSockets();
+    const isOnChatScreen = userSockets.some(s => s.isOnChatScreen === true);
+
+    const companyUsers = getCompanyOnlineUsers(companyId);
+    const userCache = companyUsers.get(userId);
+    if (userCache) {
+      userCache.isOnChatScreen = isOnChatScreen;
+      companyUsers.set(userId, userCache);
+    }
+
+    if (redis.isAvailable) {
+      const ttlMs = io.opts?.pingTimeout + 10000 || 50000;
+      const cached = await redis.get(`presence::${userId}`).catch(() => null);
+      if (cached) {
+        const data = JSON.parse(cached);
+        data.isOnChatScreen = isOnChatScreen;
+        await redis.set(`presence::${userId}`, JSON.stringify(data), 'PX', ttlMs).catch(() => {});
+      }
+    }
+
+    io.to(`company:${companyId}`).emit('user_chatscreen_changed', {
+      employeeId: userId,
+      isOnChatScreen
+    });
+  } catch (err) {
+    logger.error(`[Chat] Error in updateUserChatScreenPresence for user ${userId}:`, err);
+  }
+};
+
+const createCallHistoryMessage = async (callRecord, companyId, io) => {
+  try {
+    const isVideo = callRecord.callType === 'video';
+    const callerId = callRecord.callerId;
+    
+    let statusText = '';
+    if (callRecord.status === 'ended') {
+      const minutes = Math.floor(callRecord.duration / 60);
+      const seconds = callRecord.duration % 60;
+      const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+      statusText = `${isVideo ? 'Video' : 'Voice'} Call · Ended (${durationStr})`;
+    } else if (callRecord.status === 'rejected') {
+      statusText = `${isVideo ? 'Video' : 'Voice'} Call · Declined`;
+    } else if (callRecord.status === 'missed') {
+      statusText = `Missed ${isVideo ? 'Video' : 'Voice'} Call`;
+    } else {
+      return;
+    }
+
+    const savedMessage = await chatService.saveMessage({
+      conversationId: callRecord.conversationId,
+      senderId: callerId,
+      senderName: callRecord.callerName,
+      senderAvatar: callRecord.callerAvatar || null,
+      senderRole: 'employee',
+      content: statusText,
+      type: 'call'
+    }, companyId);
+
+    io.to(`conv:${callRecord.conversationId}`).emit('new_message', {
+      id: savedMessage.id,
+      conversationId: callRecord.conversationId,
+      senderId: callerId,
+      senderName: callRecord.callerName,
+      senderAvatar: callRecord.callerAvatar || null,
+      preview: statusText,
+      type: 'call',
+      content: statusText,
+      createdAt: savedMessage.createdAt
+    });
+
+  } catch (err) {
+    logger.error('[Chat] Failed to create call history message:', err);
+  }
 };
 
 // ─── MAIN HANDLER REGISTRATION ───────────────────────────────────────────────
@@ -257,6 +333,8 @@ export const registerChatSocketHandlers = (io) => {
         logger.info(`[Push Notification] Cancelled pending push notification job for user ${userId} due to reconnection`);
       }
 
+      socket.isOnChatScreen = false;
+
       const companyUsers = getCompanyOnlineUsers(companyId);
       companyUsers.set(userId, {
         socketId: socket.id,
@@ -264,7 +342,8 @@ export const registerChatSocketHandlers = (io) => {
         avatar,
         onlineAt: new Date(),
         chatStatus: chatStatus || 'available',
-        statusEmoji: statusEmoji || null
+        statusEmoji: statusEmoji || null,
+        isOnChatScreen: false
       });
 
       // Update employee workStatus in DB
@@ -288,11 +367,14 @@ export const registerChatSocketHandlers = (io) => {
         onlineAt: new Date(),
         socketId: socket.id,
         chatStatus: chatStatus || 'available',
-        statusEmoji: statusEmoji || null
+        statusEmoji: statusEmoji || null,
+        isOnChatScreen: false
       };
-      await redis.set(`presence::${userId}`, JSON.stringify(presenceData), 'PX', ttlMs).catch(err => {
-        logger.error('[Redis] Failed to set presence on connect:', err);
-      });
+      if (redis.isAvailable) {
+        await redis.set(`presence::${userId}`, JSON.stringify(presenceData), 'PX', ttlMs).catch(err => {
+          logger.warn('[Redis] Failed to set presence on connect:', err.message);
+        });
+      }
 
       // Status Expiry Helper
       const checkStatusExpiry = async () => {
@@ -315,12 +397,14 @@ export const registerChatSocketHandlers = (io) => {
                   companyUsers.set(userId, userCache);
                 }
 
-                const cached = await redis.get(`presence::${userId}`);
-                if (cached) {
-                  const data = JSON.parse(cached);
-                  data.chatStatus = 'available';
-                  data.statusEmoji = null;
-                  await redis.set(`presence::${userId}`, JSON.stringify(data), 'PX', ttlMs);
+                if (redis.isAvailable) {
+                  const cached = await redis.get(`presence::${userId}`).catch(() => null);
+                  if (cached) {
+                    const data = JSON.parse(cached);
+                    data.chatStatus = 'available';
+                    data.statusEmoji = null;
+                    await redis.set(`presence::${userId}`, JSON.stringify(data), 'PX', ttlMs).catch(() => {});
+                  }
                 }
 
                 io.to(`company:${companyId}`).emit('user_status_changed', {
@@ -345,10 +429,12 @@ export const registerChatSocketHandlers = (io) => {
       // Reset TTL on Engine.io ping heartbeat
       socket.conn.on('ping', async () => {
         try {
-          await redis.pexpire(`presence::${userId}`, ttlMs);
+          if (redis.isAvailable) {
+            await redis.pexpire(`presence::${userId}`, ttlMs).catch(() => {});
+          }
           await checkStatusExpiry();
         } catch (err) {
-          logger.error(`[Redis] Failed to reset TTL on heartbeat for user ${userId}:`, err);
+          logger.warn(`[Redis] Failed to reset TTL on heartbeat for user ${userId}:`, err.message);
         }
       });
 
@@ -359,11 +445,12 @@ export const registerChatSocketHandlers = (io) => {
         avatar,
         onlineAt: new Date(),
         chatStatus: chatStatus || 'available',
-        statusEmoji: statusEmoji || null
+        statusEmoji: statusEmoji || null,
+        isOnChatScreen: false
       });
 
-      // Retrieve online users list from Redis (multi-instance / crash safe)
-      const keys = await redis.keys('presence::*').catch(() => []);
+      // Retrieve online users list — prefer Redis (multi-instance safe), fall back to in-memory Map
+      const keys = redis.isAvailable ? await redis.keys('presence::*').catch(() => []) : [];
       const onlineList = [];
       if (keys.length > 0) {
         const values = await redis.mget(keys).catch(() => []);
@@ -375,12 +462,12 @@ export const registerChatSocketHandlers = (io) => {
                 onlineList.push(data);
               }
             } catch (e) {
-              logger.error('[Redis] Failed to parse presence data:', e);
+              logger.warn('[Redis] Failed to parse presence data:', e.message);
             }
           }
         });
       } else {
-        // Fallback to local cache if Redis is empty/errors
+        // Fallback to local in-memory cache (single-server mode or Redis unavailable)
         onlineList.push(...Array.from(companyUsers.entries()).map(([id, data]) => ({ userId: id, ...data })));
       }
 
@@ -523,15 +610,18 @@ export const registerChatSocketHandlers = (io) => {
           companyUsers.set(userId, userCache);
         }
 
-        // Update Redis
-        const ttlMs = socket.server.opts.pingTimeout + 10000;
-        const cached = await redis.get(`presence::${userId}`);
-        if (cached) {
-          const data = JSON.parse(cached);
-          data.chatStatus = status;
-          data.statusEmoji = emoji || null;
-          await redis.set(`presence::${userId}`, JSON.stringify(data), 'PX', ttlMs);
+        // Update Redis presence with new status
+        if (redis.isAvailable) {
+          const ttlMs = socket.server.opts.pingTimeout + 10000;
+          const cached = await redis.get(`presence::${userId}`).catch(() => null);
+          if (cached) {
+            const data = JSON.parse(cached);
+            data.chatStatus = status;
+            data.statusEmoji = emoji || null;
+            await redis.set(`presence::${userId}`, JSON.stringify(data), 'PX', ttlMs).catch(() => {});
+          }
         }
+
 
         // Broadcast to company room
         io.to(`company:${companyId}`).emit('user_status_changed', {
@@ -547,6 +637,15 @@ export const registerChatSocketHandlers = (io) => {
       } catch (err) {
         logger.error('[Chat] set_status error:', err);
         socket.emit('error', { event: 'set_status', message: 'Failed to set status' });
+      }
+    });
+
+    socket.on('user_chatscreen_status', async ({ isOnChatScreen }) => {
+      try {
+        socket.isOnChatScreen = !!isOnChatScreen;
+        await updateUserChatScreenPresence(userId, companyId, io);
+      } catch (err) {
+        logger.error('[Chat] user_chatscreen_status error:', err);
       }
     });
 
@@ -1030,12 +1129,347 @@ export const registerChatSocketHandlers = (io) => {
       ).map(([id, data]) => ({ userId: id, ...data }));
       socket.emit('online_users_list', onlineList);
     });
+    // ── EVENT: WebRTC CALLING ────────────────────────────────────────────────
+    socket.on('call:initiate', async ({ targetUserId, callType, conversationId }) => {
+      try {
+        if (!targetUserId || !callType || !conversationId) {
+          socket.emit('call:error', { message: 'Missing call parameters' });
+          return;
+        }
+
+        const companyUsers = getCompanyOnlineUsers(companyId);
+        const targetOnlineUser = companyUsers.get(targetUserId);
+
+        let targetInfo;
+        if (targetOnlineUser) {
+          targetInfo = {
+            name: targetOnlineUser.name,
+            avatar: targetOnlineUser.avatar
+          };
+        } else {
+          // Fetch callee details from database to allow offline calling
+          const conn = await getTenantConnection(companyId);
+          const employee = await conn.collection('employees').findOne(
+            { id: targetUserId },
+            { projection: { id: 1, name: 1, avatar: 1 } }
+          );
+          if (!employee) {
+            socket.emit('call:error', { message: 'User not found' });
+            return;
+          }
+          targetInfo = {
+            name: employee.name,
+            avatar: employee.avatar || null
+          };
+        }
+
+        const callId = await generateCompanyUniqueId(companyId, 'calls');
+
+        await runTrackedWrite(() =>
+          runWithTenant(companyId, async () => {
+            await Call.create({
+              id: callId,
+              companyId,
+              conversationId,
+              callerId: userId,
+              callerName: name,
+              callerAvatar: avatar || null,
+              calleeId: targetUserId,
+              calleeName: targetInfo.name,
+              calleeAvatar: targetInfo.avatar || null,
+              callType,
+              status: 'ringing'
+            });
+          })
+        );
+
+        socketActiveCalls.set(socket.id, { callId, targetUserId, companyId, role: 'caller' });
+        socket.emit('call:ringing', { callId, callType });
+
+        if (targetOnlineUser) {
+          io.to(`user:${targetUserId}`).emit('call:incoming', {
+            callId,
+            callerId: userId,
+            callerName: name,
+            callerAvatar: avatar || null,
+            callType,
+            conversationId
+          });
+        }
+
+        // Always dispatch Web Push Call Notification immediately (to wake up background/offline devices)
+        const pushPayload = {
+          title: `📞 Incoming Call`,
+          body: `${name} is calling you...`,
+          type: 'incoming_call',
+          tag: `call-${callId}`,
+          data: {
+            callId,
+            callerId: userId,
+            callerName: name,
+            callerAvatar: avatar || null,
+            callType,
+            conversationId,
+            companyId,
+            type: 'incoming_call'
+          }
+        };
+        pushNotificationService.sendNotificationToUser(targetUserId, pushPayload);
+
+        const ringingTimeout = setTimeout(async () => {
+          try {
+            await runWithTenant(companyId, async () => {
+              const currentCall = await Call.findOne({ id: callId, status: 'ringing' });
+              if (currentCall) {
+                currentCall.status = 'missed';
+                await currentCall.save();
+                io.to(`user:${userId}`).emit('call:missed', { callId, callerName: name, reason: 'no_answer' });
+                io.to(`user:${targetUserId}`).emit('call:missed', { callId, callerName: name, reason: 'no_answer' });
+                socketActiveCalls.delete(socket.id);
+                await createCallHistoryMessage(currentCall, companyId, io);
+
+                // Dispatch missed call Web Push notification
+                const missedPushPayload = {
+                  title: `📞 Missed Call`,
+                  body: `You missed a call from ${name}`,
+                  type: 'missed_call',
+                  tag: `call-${callId}`,
+                  data: {
+                    callId,
+                    callerName: name,
+                    type: 'missed_call'
+                  }
+                };
+                pushNotificationService.sendNotificationToUser(targetUserId, missedPushPayload);
+              }
+            });
+          } catch (err) {
+            logger.error('[Chat] Call ringing timeout error:', err);
+          }
+        }, 45000);
+
+        socket.ringingTimeout = ringingTimeout;
+
+      } catch (err) {
+        logger.error('[Chat] call:initiate error:', err);
+        socket.emit('call:error', { message: 'Failed to initiate call' });
+      }
+    });
+
+    socket.on('call:accept', async ({ callId }) => {
+      try {
+        if (socket.ringingTimeout) clearTimeout(socket.ringingTimeout);
+
+        await runTrackedWrite(() =>
+          runWithTenant(companyId, async () => {
+            const callRecord = await Call.findOneAndUpdate(
+              { id: callId, status: 'ringing' },
+              { status: 'active', startedAt: new Date() },
+              { new: true }
+            );
+
+            if (!callRecord) return;
+
+            socketActiveCalls.set(socket.id, { callId, targetUserId: callRecord.callerId, companyId, role: 'callee' });
+
+            const acceptPayload = {
+              callId,
+              calleeId: userId,
+              calleeName: name,
+              calleeAvatar: avatar || null,
+              acceptedBySocketId: socket.id
+            };
+
+            io.to(`user:${callRecord.callerId}`).emit('call:accepted', acceptPayload);
+            io.to(`user:${callRecord.calleeId}`).emit('call:accepted', acceptPayload);
+          })
+        );
+      } catch (err) {
+        logger.error('[Chat] call:accept error:', err);
+        socket.emit('call:error', { message: 'Failed to accept call' });
+      }
+    });
+
+    socket.on('call:reject', async ({ callId, reason }) => {
+      try {
+        if (socket.ringingTimeout) clearTimeout(socket.ringingTimeout);
+
+        await runTrackedWrite(() =>
+          runWithTenant(companyId, async () => {
+            const callRecord = await Call.findOneAndUpdate(
+              { id: callId, status: 'ringing' },
+              { status: 'rejected', endedAt: new Date() },
+              { new: true }
+            );
+
+            if (!callRecord) return;
+
+            const rejectPayload = {
+              callId,
+              reason,
+              calleeName: name,
+              calleeId: callRecord.calleeId,
+              callerId: callRecord.callerId,
+              rejectedBySocketId: socket.id
+            };
+
+            io.to(`user:${callRecord.callerId}`).emit('call:rejected', rejectPayload);
+            io.to(`user:${callRecord.calleeId}`).emit('call:rejected', rejectPayload);
+
+            // Clean up socketActiveCalls entries for this callId
+            for (const [sid, callData] of socketActiveCalls.entries()) {
+              if (callData.callId === callId) {
+                socketActiveCalls.delete(sid);
+              }
+            }
+
+            await createCallHistoryMessage(callRecord, companyId, io);
+          })
+        );
+      } catch (err) {
+        logger.error('[Chat] call:reject error:', err);
+      }
+    });
+
+    socket.on('call:end', async ({ callId }) => {
+      try {
+        if (socket.ringingTimeout) clearTimeout(socket.ringingTimeout);
+
+        await runTrackedWrite(() =>
+          runWithTenant(companyId, async () => {
+            const callRecord = await Call.findOne({ id: callId });
+            if (!callRecord) return;
+
+            const otherPartyId = callRecord.callerId === userId ? callRecord.calleeId : callRecord.callerId;
+
+            if (callRecord.status === 'ringing') {
+              // Call cancelled by caller before it was accepted
+              const updatedCall = await Call.findOneAndUpdate(
+                { id: callId },
+                { status: 'missed', endedAt: new Date() },
+                { new: true }
+              );
+
+              io.to(`user:${otherPartyId}`).emit('call:missed', {
+                callId,
+                callerName: callRecord.callerName,
+                reason: 'cancelled'
+              });
+
+              // Dispatch cancelled call Push notification to dismiss incoming call alert
+              const cancelPushPayload = {
+                title: `Call Cancelled`,
+                body: `Call cancelled by caller`,
+                type: 'call_cancelled',
+                tag: `call-${callId}`,
+                data: {
+                  callId,
+                  type: 'call_cancelled'
+                }
+              };
+              pushNotificationService.sendNotificationToUser(otherPartyId, cancelPushPayload);
+
+              // Clean up socketActiveCalls entries for this callId
+              for (const [sid, callData] of socketActiveCalls.entries()) {
+                if (callData.callId === callId) {
+                  socketActiveCalls.delete(sid);
+                }
+              }
+
+              await createCallHistoryMessage(updatedCall, companyId, io);
+            } else if (callRecord.status === 'active') {
+              const endedAt = new Date();
+              const startedAt = callRecord.startedAt || callRecord.createdAt;
+              const duration = Math.round((endedAt - startedAt) / 1000);
+
+              const updatedCall = await Call.findOneAndUpdate(
+                { id: callId },
+                { status: 'ended', endedAt, duration },
+                { new: true }
+              );
+
+              io.to(`user:${otherPartyId}`).emit('call:ended', {
+                callId,
+                duration,
+                endedBy: userId
+              });
+
+              // Clean up socketActiveCalls entries for this callId
+              for (const [sid, callData] of socketActiveCalls.entries()) {
+                if (callData.callId === callId) {
+                  socketActiveCalls.delete(sid);
+                }
+              }
+
+              await createCallHistoryMessage(updatedCall, companyId, io);
+            }
+          })
+        );
+      } catch (err) {
+        logger.error('[Chat] call:end error:', err);
+      }
+    });
+
+    socket.on('call:signal:offer', ({ callId, signal, targetUserId }) => {
+      io.to(`user:${targetUserId}`).emit('call:signal:offer', { callId, signal, senderId: userId });
+    });
+
+    socket.on('call:signal:answer', ({ callId, signal, targetUserId }) => {
+      io.to(`user:${targetUserId}`).emit('call:signal:answer', { callId, signal, senderId: userId });
+    });
+
+    socket.on('call:signal:ice', ({ callId, candidate, targetUserId }) => {
+      io.to(`user:${targetUserId}`).emit('call:signal:ice', { callId, candidate, senderId: userId });
+    });
 
     // ── EVENT: DISCONNECT ───────────────────────────────────────────────────
     socket.on('disconnect', async (reason) => {
       logger.info(
         `[Chat] Disconnected: ${name} (${userId}) — Reason: ${reason}`
       );
+
+      // Clean up chatscreen status on disconnect
+      try {
+        await updateUserChatScreenPresence(userId, companyId, io);
+      } catch (err) {
+        logger.error('[Chat] Disconnect chatscreen cleanup error:', err);
+      }
+
+      // Clean up call if in progress on disconnect
+      const activeCall = socketActiveCalls.get(socket.id);
+      if (activeCall) {
+        const { callId, targetUserId, companyId: activeCompanyId } = activeCall;
+        if (socket.ringingTimeout) clearTimeout(socket.ringingTimeout);
+        
+        runTrackedWrite(() =>
+          runWithTenant(activeCompanyId, async () => {
+            const callRecord = await Call.findOne({ id: callId });
+            if (callRecord && (callRecord.status === 'ringing' || callRecord.status === 'active')) {
+              const endedAt = new Date();
+              const status = callRecord.status === 'ringing' ? 'missed' : 'ended';
+              const startedAt = callRecord.startedAt || callRecord.createdAt;
+              const duration = status === 'ended' ? Math.round((endedAt - startedAt) / 1000) : 0;
+
+              const updatedCall = await Call.findOneAndUpdate(
+                { id: callId },
+                { status, endedAt, duration },
+                { new: true }
+              );
+
+              io.to(`user:${targetUserId}`).emit(status === 'ended' ? 'call:ended' : 'call:missed', {
+                callId,
+                duration,
+                endedBy: userId
+              });
+
+              if (updatedCall) {
+                await createCallHistoryMessage(updatedCall, activeCompanyId, io);
+              }
+            }
+          })
+        ).catch(err => logger.error('[Chat] Disconnect call cleanup error:', err));
+        socketActiveCalls.delete(socket.id);
+      }
 
       if (expiryTimeout) {
         clearTimeout(expiryTimeout);
@@ -1078,10 +1512,12 @@ export const registerChatSocketHandlers = (io) => {
                   })
                 );
 
-                // Delete presence key from Redis
-                await redis.del(`presence::${userId}`).catch(err => {
-                  logger.error('[Redis] Failed to delete presence on disconnect:', err);
-                });
+                // Delete presence key from Redis (no-op if Redis is unavailable)
+                if (redis.isAvailable) {
+                  await redis.del(`presence::${userId}`).catch(err => {
+                    logger.warn('[Redis] Failed to delete presence on disconnect:', err.message);
+                  });
+                }
 
                 // Notify rest of the company (using io.to to ensure delivery)
                 io.to(`company:${companyId}`).emit('user_offline', {

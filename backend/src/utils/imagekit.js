@@ -170,8 +170,99 @@ export const deleteFromImageKit = async (url) => {
   }
 };
 
+/**
+ * Uploads a base64 encoded file string directly to ImageKit, returning detailed metadata.
+ * @param {String} base64Str - The raw base64 string
+ * @param {String} fileName - The desired name of the file
+ * @returns {Promise<Object>} - `{ url, fileId, filePath }` if successful, otherwise `{ url: base64Str, fileId: null, filePath: null }`
+ */
+export const uploadToImageKitDetailed = async (base64Str, fileName) => {
+  const publicKey = process.env.IMAGEKIT_PUBLIC_KEY || 'public_CpBAKCTW3cCxoXfv';
+  const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+  
+  if (!privateKey || privateKey.includes('***')) {
+    logger.warn('[ImageKit] IMAGEKIT_PRIVATE_KEY is not defined. Skipping detailed upload.');
+    return { url: base64Str, fileId: null, filePath: null };
+  }
+
+  try {
+    const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
+    const name = fileName || `file_${Date.now()}`;
+    const formData = new FormData();
+    formData.append('file', base64Str);
+    formData.append('fileName', name);
+    formData.append('folder', 'Office_managements');
+    formData.append('useUniqueFileName', 'true');
+
+    const response = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`ImageKit API Error (Status ${response.status}): ${errorText}`);
+    }
+
+    const result = await response.json();
+    return {
+      url: result.url,
+      fileId: result.fileId,
+      filePath: result.filePath
+    };
+  } catch (err) {
+    logger.error('[ImageKit] Failed to upload detailed file to ImageKit:', err);
+    return { url: base64Str, fileId: null, filePath: null };
+  }
+};
+
+/**
+ * Deletes a file directly from ImageKit by its unique file ID.
+ * @param {String} fileId - The ImageKit fileId
+ * @returns {Promise<Boolean>} - Success status
+ */
+export const deleteFileFromImageKitById = async (fileId) => {
+  if (!fileId || typeof fileId !== 'string') return false;
+
+  const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+  if (!privateKey || privateKey.includes('***')) {
+    logger.warn('[ImageKit] IMAGEKIT_PRIVATE_KEY is not defined. Skipping deletion by ID.');
+    return false;
+  }
+
+  try {
+    const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
+    logger.info(`[ImageKit] Requesting deletion for fileId: ${fileId}`);
+
+    const deleteResponse = await fetch(`https://api.imagekit.io/v1/files/${fileId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': authHeader
+      }
+    });
+
+    // Note: ImageKit returns 204 No Content on successful deletion
+    if (deleteResponse.ok || deleteResponse.status === 204) {
+      logger.info(`[ImageKit] Successfully deleted file by ID: ${fileId}`);
+      return true;
+    } else {
+      const errText = await deleteResponse.text();
+      logger.error(`[ImageKit] Failed to delete file by ID ${fileId}: ${errText}`);
+      return false;
+    }
+  } catch (err) {
+    logger.error('[ImageKit] Error in deleteFileFromImageKitById:', err);
+    return false;
+  }
+};
+
 export default {
   uploadToImageKit,
+  uploadToImageKitDetailed,
   deleteFromImageKit,
+  deleteFileFromImageKitById,
   processEmployeeAssets
 };

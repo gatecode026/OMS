@@ -16,12 +16,15 @@ import { io } from 'socket.io-client';
 import { useApp } from './AppContext';
 import { useDesktopNotifications } from '../hooks/useDesktopNotifications';
 import NotificationPermissionBanner from '../components/chat/NotificationPermissionBanner';
+import { usePushNotifications } from '../hooks/pushNotificationHook';
+import { notificationService } from '../utils/notificationService';
+import { callSounds } from '../utils/callSounds';
 
 const ChatContext = createContext(null);
 
-// Use window.API_URL and window.SOCKET_URL set by main.jsx, fallback to localhost
-const API_URL = window.API_URL || 'http://localhost:5000';
-const SOCKET_URL = window.SOCKET_URL || 'http://localhost:5001';
+// Use window.API_URL and window.SOCKET_URL set by main.jsx dynamically to avoid ES module hoisting issues
+const getApiUrl = () => window.API_URL || window.location.origin;
+const getSocketUrl = () => window.SOCKET_URL || window.location.origin;
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
@@ -94,6 +97,8 @@ export const ChatProvider = ({ children }) => {
   // { convId: [{ userId, name }] }
   const [unreadCounts, setUnreadCounts]     = useState({});
   // { convId: number }
+  const [unreadCountOnOpen, setUnreadCountOnOpen] = useState({});
+  // { convId: number }
   const [isLoadingConvs, setIsLoadingConvs] = useState(false);
   const [isLoadingMsgs, setIsLoadingMsgs]   = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState({});
@@ -131,10 +136,88 @@ export const ChatProvider = ({ children }) => {
   // Desktop notification hook
   const { permission, requestPermission, sendNotification } = useDesktopNotifications(activeConvId, currentUserStatus?.status);
 
+  // Synthesized angenehmer chime (WhatsApp message tone)
+  const playNotificationChime = useCallback(() => {
+    try {
+      const settingsStr = localStorage.getItem('oms_notification_settings');
+      const settings = settingsStr ? JSON.parse(settingsStr) : { desktop: true, sound: true, preview: true };
+      if (settings.sound === false) return;
+
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration, vol = 0.15) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      playTone(1046.50, ctx.currentTime, 0.15); // C6
+      playTone(1318.51, ctx.currentTime + 0.08, 0.2); // E6
+    } catch (err) {
+      console.warn('[ChatContext] Failed to play chime:', err);
+    }
+  }, []);
+
+  // Web Push Notifications Hook
+  const push = usePushNotifications(currentUser);
+
+  // Sync token to Cache Storage and auto-subscribe if permission is granted
+  useEffect(() => {
+    if (token && currentUser) {
+      notificationService.syncAuthToken(token);
+      if (push.permission === 'granted' && !push.isSubscribed && !push.loading) {
+        push.subscribe().catch(err => console.error('[ChatContext] Auto-subscribe failed:', err));
+      }
+    } else {
+      notificationService.clearAuthToken();
+    }
+  }, [token, currentUser, push.permission, push.isSubscribed, push.loading, push.subscribe]);
+
+  // Listen for background service worker postMessage events
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleSWMessage = (event) => {
+      if (event.data && event.data.type === 'PLAY_SOUND') {
+        console.log('[ChatContext] Sound trigger from Service Worker:', event.data);
+        if (event.data.notificationType === 'incoming_call') {
+          callSounds.startIncomingRing();
+        } else {
+          playNotificationChime();
+        }
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+    };
+  }, [playNotificationChime]);
+
+  // Wrap permission request to also subscribe to Web Push
+  const wrappedRequestPermission = useCallback(async () => {
+    try {
+      const result = await requestPermission();
+      if (result === 'granted') {
+        await push.subscribe();
+      }
+      return result;
+    } catch (err) {
+      console.error('[ChatContext] wrappedRequestPermission error:', err);
+      return Notification.permission;
+    }
+  }, [requestPermission, push]);
+
   // ── API Helper ────────────────────────────────────────────────────────────
   const apiFetch = useCallback(async (path, options = {}) => {
     if (!token) return { status: 'error', message: 'Not authenticated' };
-    const res = await fetch(`${API_URL}/api/v1${path}`, {
+    const res = await fetch(`${getApiUrl()}/api/v1${path}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -240,6 +323,10 @@ export const ChatProvider = ({ children }) => {
 
   // ── OPEN CONVERSATION ─────────────────────────────────────────────────────
   const openConversation = useCallback(async (convId) => {
+    // Capture unread count before we clear it
+    const currentUnread = unreadCounts[convId] || 0;
+    setUnreadCountOnOpen(prev => ({ ...prev, [convId]: currentUnread }));
+
     setUnreadCounts(prev => ({ ...prev, [convId]: 0 }));
     setActiveConvId(convId);
     socketRef.current?.emit('join_conversation', convId);
@@ -252,7 +339,7 @@ export const ChatProvider = ({ children }) => {
     // Mark as read via REST + socket
     await apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' });
     socketRef.current?.emit('mark_read', { conversationId: convId });
-  }, [messages, fetchMessages, apiFetch]);
+  }, [messages, fetchMessages, apiFetch, unreadCounts]);
 
   // ── SEND MESSAGE ──────────────────────────────────────────────────────────
   const sendMessage = useCallback((convId, content,
@@ -468,6 +555,83 @@ export const ChatProvider = ({ children }) => {
     });
   }, []);
 
+  // ── CLEAR CHAT ────────────────────────────────────────────────────────────
+  const clearChat = useCallback(async (convId) => {
+    try {
+      const data = await apiFetch(`/chat/conversations/${convId}/clear`, {
+        method: 'POST'
+      });
+      if (data.status === 'success') {
+        setMessages(prev => ({
+          ...prev,
+          [convId]: []
+        }));
+        setHasMoreMessages(prev => ({ ...prev, [convId]: false }));
+        setMessageCursors(prev => ({ ...prev, [convId]: null }));
+        setConversations(prev => prev.map(c => {
+          if (c.id === convId) {
+            return {
+              ...c,
+              lastMessage: {
+                messageId: null,
+                content: null,
+                type: 'text',
+                senderId: null,
+                senderName: null,
+                sentAt: null
+              }
+            };
+          }
+          return c;
+        }));
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] clearChat error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  // ── DELETE MESSAGES BULK ───────────────────────────────────────────────────
+  const deleteMessagesBulk = useCallback(async (messageIds, convId) => {
+    try {
+      const data = await apiFetch('/chat/messages/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify({ messageIds })
+      });
+      if (data.status === 'success') {
+        setMessages(prev => {
+          const list = prev[convId] || [];
+          const filtered = list.filter(m => !messageIds.includes(m.id));
+          return {
+            ...prev,
+            [convId]: filtered
+          };
+        });
+        setConversations(prev => prev.map(c => {
+          if (c.id === convId && messageIds.includes(c.lastMessage?.messageId)) {
+            return {
+              ...c,
+              lastMessage: {
+                messageId: null,
+                content: 'Messages deleted',
+                type: 'text',
+                senderId: null,
+                senderName: null,
+                sentAt: null
+              }
+            };
+          }
+          return c;
+        }));
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] deleteMessagesBulk error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
   // ── EDIT MESSAGE ──────────────────────────────────────────────────────────
   const editMessage = useCallback((messageId, convId, newContent) => {
     socketRef.current?.emit('edit_message', {
@@ -533,7 +697,7 @@ export const ChatProvider = ({ children }) => {
       return;
     }
 
-    const socket = io(SOCKET_URL, {
+    const socket = io(getSocketUrl(), {
       auth: (cb) => {
         cb({
           token: socketToken,
@@ -554,6 +718,9 @@ export const ChatProvider = ({ children }) => {
       console.log('[Chat] Socket connected:', socket.id);
       setIsConnected(true);
       fetchConversations(); // refresh on reconnect
+      if (activeConvIdRef.current) {
+        socket.emit('join_conversation', activeConvIdRef.current);
+      }
       if (currentUser?.id) {
         localStorage.setItem('chat_last_sync_' + currentUser.id, new Date().toISOString());
       }
@@ -740,24 +907,26 @@ export const ChatProvider = ({ children }) => {
         users.forEach(u => {
           next.set(u.userId, {
             status: u.chatStatus || 'available',
-            emoji: u.statusEmoji || null
+            emoji: u.statusEmoji || null,
+            isOnChatScreen: u.isOnChatScreen || false
           });
         });
         return next;
       });
     });
 
-    socket.on('user_online', ({ userId, name, avatar, onlineAt, chatStatus, statusEmoji }) => {
+    socket.on('user_online', ({ userId, name, avatar, onlineAt, chatStatus, statusEmoji, isOnChatScreen }) => {
       setOnlineUsers(prev => {
         const next = new Map(prev);
-        next.set(userId, { name, avatar, onlineAt, chatStatus, statusEmoji });
+        next.set(userId, { name, avatar, onlineAt, chatStatus, statusEmoji, isOnChatScreen });
         return next;
       });
       setPresenceMap(prev => {
         const next = new Map(prev);
         next.set(userId, {
           status: chatStatus || 'available',
-          emoji: statusEmoji || null
+          emoji: statusEmoji || null,
+          isOnChatScreen: isOnChatScreen || false
         });
         return next;
       });
@@ -771,7 +940,7 @@ export const ChatProvider = ({ children }) => {
       });
       setPresenceMap(prev => {
         const next = new Map(prev);
-        next.set(userId, { status: 'offline', emoji: null });
+        next.set(userId, { status: 'offline', emoji: null, isOnChatScreen: false });
         return next;
       });
     });
@@ -779,12 +948,38 @@ export const ChatProvider = ({ children }) => {
     socket.on('user_status_changed', ({ employeeId, status, emoji, expiresAt }) => {
       setPresenceMap(prev => {
         const next = new Map(prev);
-        next.set(employeeId, { status, emoji });
+        const existing = next.get(employeeId);
+        next.set(employeeId, {
+          status,
+          emoji,
+          isOnChatScreen: existing?.isOnChatScreen || false
+        });
         return next;
       });
       if (employeeId === currentUser?.id) {
         setCurrentUserStatus({ status, emoji });
       }
+    });
+
+    socket.on('user_chatscreen_changed', ({ employeeId, isOnChatScreen }) => {
+      setOnlineUsers(prev => {
+        const next = new Map(prev);
+        const existing = next.get(employeeId);
+        if (existing) {
+          next.set(employeeId, { ...existing, isOnChatScreen });
+        }
+        return next;
+      });
+      setPresenceMap(prev => {
+        const next = new Map(prev);
+        const existing = next.get(employeeId);
+        if (existing) {
+          next.set(employeeId, { ...existing, isOnChatScreen });
+        } else {
+          next.set(employeeId, { status: 'available', emoji: null, isOnChatScreen });
+        }
+        return next;
+      });
     });
 
     // ── New Message ───────────────────────────────────────────────────────
@@ -892,10 +1087,15 @@ export const ChatProvider = ({ children }) => {
           pathname: window.location.pathname
         });
 
-        // Trigger desktop push notification if the current conversation is active but the tab/window is inactive/unfocused
+        // Trigger desktop push notification for any unread message from others
+        // Fires when:
+        //  1. Tab is not focused / not visible (user switched away), OR
+        //  2. User is on a different conversation / page (isCurrentActive is false)
         const isTabInactive = !isTabVisible || !document.hasFocus();
         const isMuted = mutedConversationsRef.current.has(convId);
-        if (isCurrentActive && isTabInactive && !isMuted) {
+        const shouldNotify = !isMuted && (!isCurrentActive || isTabInactive);
+
+        if (shouldNotify) {
           const conv = conversationsRef.current.find(c => c.id === convId);
           const title = conv?.type === 'group'
             ? (conv?.name || 'Group Chat')
@@ -911,7 +1111,7 @@ export const ChatProvider = ({ children }) => {
 
           sendNotification(title, {
             body,
-            icon: fullMessage.senderAvatar || '/favicon.ico',
+            icon: fullMessage.senderAvatar || conv?.avatar || '/favicon.ico',
             tag: convId,
             conversationId: convId,
             onClickCallback: (targetConvId) => {
@@ -936,6 +1136,7 @@ export const ChatProvider = ({ children }) => {
             [convId]: (prev[convId] || 0) + 1
           }));
         }
+
       }
       if (me?.id) {
         localStorage.setItem('chat_last_sync_' + me.id, new Date().toISOString());
@@ -944,6 +1145,7 @@ export const ChatProvider = ({ children }) => {
 
     // ── Notification for conversations not open ───────────────────────────
     socket.on('new_message_notification', (notification) => {
+      // Update conversation preview in sidebar list
       setConversations(prev => prev.map(conv => {
         if (conv.id !== notification.conversationId) return conv;
         return {
@@ -953,19 +1155,41 @@ export const ChatProvider = ({ children }) => {
             senderId: notification.senderId,
             senderName: notification.senderName,
             sentAt: notification.sentAt
-          }
+          },
+          lastActivityAt: notification.sentAt || new Date().toISOString()
         };
       }));
 
-      // In-app toast banner currently shows for any new_message_notification.
-      // Suppress toast entirely on client if the conversation is muted.
-      if (addToast && !mutedConversationsRef.current.has(notification.conversationId)) {
-        addToast('info', `New message from ${notification.senderName}: "${notification.preview}"`);
+      // Increment unread count for this conversation only if not active and visible
+      const isMuted = mutedConversationsRef.current.has(notification.conversationId);
+      const isChatPage = window.location.pathname.startsWith('/chat');
+      const isTabVisible = document.visibilityState === 'visible';
+      const isMobile = window.innerWidth <= 480;
+      const isLookingAtChat = !isMobile || !showMobileListRef.current;
+      const isCurrentActive = isChatPage && isLookingAtChat && activeConvIdRef.current === notification.conversationId;
+
+      if (!isMuted) {
+        if (isCurrentActive && isTabVisible) {
+          setUnreadCounts(prev => ({
+            ...prev,
+            [notification.conversationId]: 0
+          }));
+          socket.emit('mark_read', { conversationId: notification.conversationId });
+          apiFetch(`/chat/conversations/${notification.conversationId}/read`, { method: 'PATCH' }).catch(err => {
+            console.error('[Chat] Auto-mark read error in notification:', err);
+          });
+          // Refresh messages for the active chat window to display the new message
+          fetchMessages(notification.conversationId, null);
+        } else {
+          setUnreadCounts(prev => ({
+            ...prev,
+            [notification.conversationId]: (prev[notification.conversationId] || 0) + 1
+          }));
+        }
       }
 
-      // Desktop notification
+      // Desktop notification (only fires when Notification.permission === 'granted' and app is not focused)
       const isCurrentConv = activeConvIdRef.current === notification.conversationId;
-      const isMuted = mutedConversationsRef.current.has(notification.conversationId);
       
       if (!isCurrentConv && !isMuted) {
         const title = notification.conversationType === 'group'
@@ -989,6 +1213,7 @@ export const ChatProvider = ({ children }) => {
         });
       }
     });
+
 
     // ── Typing ────────────────────────────────────────────────────────────
     socket.on('user_typing', ({ userId, name, conversationId }) => {
@@ -1018,6 +1243,11 @@ export const ChatProvider = ({ children }) => {
         readByArray = readBy;
       } else if (typeof readBy === 'string') {
         readByArray = [{ employeeId: readBy, name: readByName || 'Someone', readAt: readAt || new Date().toISOString() }];
+      }
+
+      // If we are the ones who read the messages, clear the unread count locally
+      if (readByArray.some(r => r.employeeId === me?.id)) {
+        setUnreadCounts(prev => ({ ...prev, [conversationId]: 0 }));
       }
 
       setMessages(prev => {
@@ -1317,7 +1547,7 @@ export const ChatProvider = ({ children }) => {
       socketRef.current = null;
       setIsConnected(false);
     };
-  }, [socketToken, fetchConversations, currentUser]);
+  }, [socketToken, fetchConversations, currentUser, fetchMessages]);
 
   // ── AUTO-MARK READ ON VISIBILITY / FOCUS CHANGE ───────────────────────────
   useEffect(() => {
@@ -1355,6 +1585,13 @@ export const ChatProvider = ({ children }) => {
     };
   }, [apiFetch]);
 
+  const enterChatScreen = useCallback(() => {
+    socketRef.current?.emit('user_chatscreen_status', { isOnChatScreen: true });
+  }, []);
+
+  const leaveChatScreen = useCallback(() => {
+    socketRef.current?.emit('user_chatscreen_status', { isOnChatScreen: false });
+  }, []);
 
   // ── Context value ─────────────────────────────────────────────────────────
   const value = {
@@ -1369,6 +1606,7 @@ export const ChatProvider = ({ children }) => {
     onlineUsers,
     typingUsers,
     unreadCounts,
+    unreadCountOnOpen,
     showMobileList,
     setShowMobileList,
     currentUserStatus,
@@ -1391,6 +1629,8 @@ export const ChatProvider = ({ children }) => {
     removeMemberFromGroup,
     leaveGroup,
     deleteMessage,
+    clearChat,
+    deleteMessagesBulk,
     editMessage,
     addReaction,
     loadMoreMessages,
@@ -1398,6 +1638,8 @@ export const ChatProvider = ({ children }) => {
     handleTypingStart,
     handleTypingStop,
     setUserStatus,
+    enterChatScreen,
+    leaveChatScreen,
     pinConversation,
     unpinConversation,
     pinMessage,
@@ -1406,6 +1648,7 @@ export const ChatProvider = ({ children }) => {
     unstarMessage,
 
     // Helpers
+    apiFetch,
     isUserOnline: (userId) => onlineUsers.has(userId),
     getOnlineUser: (userId) => onlineUsers.get(userId),
     getTotalUnread: () =>
@@ -1418,7 +1661,7 @@ export const ChatProvider = ({ children }) => {
 
     // Notifications
     permission,
-    requestPermission,
+    requestPermission: wrappedRequestPermission,
     sendNotification
   };
 

@@ -1,37 +1,65 @@
 /**
  * @file src/config/socket.js
- * @description Socket.io server initialization and global io instance manager.
+ * @description Socket.io server initialization.
+ *   Uses Redis pub/sub adapter when Redis is available.
+ *   Falls back to the built-in in-memory adapter when Redis is unavailable
+ *   (single-server dev mode — all chat features still work normally).
  */
 
 import { Server } from 'socket.io';
-import { createAdapter } from '@socket.io/redis-adapter';
 import redis from './redis.js';
 import corsOptions from './cors.js';
 import logger from './logger.js';
 import { socketAuthMiddleware } from '../middlewares/socketAuth.middleware.js';
 import { registerChatSocketHandlers } from '../modules/chat/chat.socket.js';
-
 import env from './env.js';
 
 let io = null;
 
-export const initSocket = (httpServer) => {
-  const subClient = redis.duplicate();
-
+export const initSocket = async (httpServer) => {
   io = new Server(httpServer, {
     cors: {
       origin: env.nodeEnv === 'production'
         ? env.clientUrl
-        : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+        : '*', // Allow all origins in development for local network devices
       methods: ['GET', 'POST'],
       credentials: true
     },
     pingTimeout: 30000,
     pingInterval: 20000,
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    maxHttpBufferSize: 1e9 // 1 GB (allows transferring large files/archives)
   });
 
-  io.adapter(createAdapter(redis, subClient));
+  // ── Redis adapter (optional) ───────────────────────────────────────────────
+  // Wait up to 3 s for Redis to become ready; if it's not available, proceed
+  // with the default in-memory adapter (single-node mode).
+  const redisReady = await new Promise((resolve) => {
+    if (redis.isAvailable) {
+      resolve(true);
+      return;
+    }
+    const timeout = setTimeout(() => resolve(false), 3000);
+    redis.once('ready', () => { clearTimeout(timeout); resolve(true); });
+    redis.once('end',   () => { clearTimeout(timeout); resolve(false); });
+  });
+
+  if (redisReady && redis.isAvailable) {
+    try {
+      const { createAdapter } = await import('@socket.io/redis-adapter');
+      const subClient = redis.duplicate();
+      io.adapter(createAdapter(redis, subClient));
+      logger.info('[Socket.io] Using Redis pub/sub adapter (multi-instance mode)');
+    } catch (err) {
+      logger.warn('[Socket.io] Failed to set up Redis adapter — using in-memory adapter:', err.message);
+    }
+  } else {
+    logger.warn(
+      '[Socket.io] Redis unavailable — using in-memory adapter. ' +
+      'Chat fully functional on single server. ' +
+      'For multi-server deployments, start a Redis instance.'
+    );
+  }
 
   // Reject new connections during graceful shutdown
   io.use((socket, next) => {
@@ -47,7 +75,7 @@ export const initSocket = (httpServer) => {
   // Register all chat event handlers
   registerChatSocketHandlers(io);
 
-  logger.info('[Socket.io] Server initialized with Redis adapter + JWT auth + Chat handlers');
+  logger.info('[Socket.io] Server initialized with JWT auth + Chat handlers');
   return io;
 };
 

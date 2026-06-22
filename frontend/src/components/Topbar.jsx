@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import './Topbar.css';
 import { useApp } from '../context/AppContext';
+import { useChat } from '../context/ChatContext';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import Avatar from './common/Avatar';
 import Badge from './common/Badge';
@@ -82,6 +83,9 @@ const Topbar = ({ onMenuToggle }) => {
     logout,
     token
   } = useApp();
+
+  const { getTotalUnread } = useChat();
+  const chatUnreadCount = getTotalUnread();
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -389,13 +393,36 @@ const Topbar = ({ onMenuToggle }) => {
         {/* Messages Dropdown */}
         <div className="topbar-dropdown-wrapper" ref={msgRef}>
           <button 
-            className={`topbar-icon-btn ${unreadMsgCount > 0 ? 'bell-unread' : ''}`}
+            className={`topbar-icon-btn ${(unreadMsgCount > 0 || chatUnreadCount > 0) ? 'bell-unread' : ''}`}
             onClick={() => setMsgOpen(!msgOpen)}
-            title="Messages"
+            title={`Messages${chatUnreadCount > 0 ? ` (${chatUnreadCount} unread chat)` : ''}`}
           >
             <MessageSquare size={20} />
-            {unreadMsgCount > 0 && <span className="bell-badge-dot"></span>}
+            {chatUnreadCount > 0 && (
+              <span className="bell-badge-count" style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-6px',
+                background: 'var(--color-danger, #ef4444)',
+                color: '#fff',
+                borderRadius: '999px',
+                fontSize: '0.6rem',
+                fontWeight: 700,
+                minWidth: '16px',
+                height: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 3px',
+                lineHeight: 1,
+                boxShadow: '0 0 0 2px var(--bg-base)'
+              }}>
+                {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+              </span>
+            )}
+            {chatUnreadCount === 0 && unreadMsgCount > 0 && <span className="bell-badge-dot"></span>}
           </button>
+
 
           {msgOpen && (
             <div className="topbar-dropdown-panel notifications-panel animate-slide-up">

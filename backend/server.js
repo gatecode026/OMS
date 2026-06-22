@@ -11,6 +11,7 @@ import logger from './src/config/logger.js';
 import database from './src/config/database.js';
 import { startEventScheduler } from './src/modules/events/event.scheduler.js';
 import { startConnectionCleanupJob } from './src/jobs/connectionCleanup.job.js';
+import { startImageKitCleanupJob } from './src/jobs/imagekitCleanup.job.js';
 import { closeAllConnections } from './src/utils/multidbConnection.js';
 import { initSocket, getIO } from './src/config/socket.js';
 import { getActiveWrites } from './src/modules/chat/chat.socket.js';
@@ -35,6 +36,9 @@ const bootstrap = async () => {
     // Start background multi-db connection cleanup checks
     startConnectionCleanupJob();
 
+    // Background ImageKit cleanup sweep disabled as per user instruction
+    // startImageKitCleanupJob();
+
     const httpServer = createServer(app);
     const server = httpServer.listen(PORT, () => {
       logger.info(`  REST API Server running in [${NODE_ENV}] mode on port ${PORT}`);
@@ -44,7 +48,7 @@ const bootstrap = async () => {
     // Run Socket.io on dedicated port 5001
     const socketPort = process.env.SOCKET_PORT || 5001;
     const socketHttpServer = createServer();
-    initSocket(socketHttpServer);
+    await initSocket(socketHttpServer);
     const socketServer = socketHttpServer.listen(socketPort, () => {
       logger.info(`  Socket.io Server running on dedicated port ${socketPort}`);
     });

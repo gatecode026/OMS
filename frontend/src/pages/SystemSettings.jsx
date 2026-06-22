@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import './Settings.css';
 import { useApp } from '../context/AppContext';
 import Button from '../components/common/Button';
+import NotificationSettings from '../components/chat/NotificationSettings';
 import {
   Settings, Bell, Shield, Globe, Palette, Database, Mail,
   Smartphone, Lock, Users, Save, RefreshCw, Check, ChevronRight,
@@ -1922,6 +1923,14 @@ const SystemSettings = () => {
                 label="Project Milestones Alerts"
                 desc="Notify managers when milestone deadlines are near"
               />
+            </div>
+
+            <div className="settings-group">
+              <h4 className="settings-group-title">Browser & Chat Notifications</h4>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '-4px 0 12px' }}>
+                Manage desktop push alerts, message sound chimes, and content preview for real-time chat.
+              </p>
+              <NotificationSettings />
             </div>
           </div>
         );

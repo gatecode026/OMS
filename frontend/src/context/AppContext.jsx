@@ -76,30 +76,58 @@ export const normalizeEmployee = (emp) => {
   normalized.employmentStatus = est;
 
   // Address Parsing
+  const isSameAddrString = typeof normalized.permanentAddress === 'string' &&
+                           typeof normalized.currentAddress === 'string' &&
+                           normalized.permanentAddress.trim() === normalized.currentAddress.trim();
+
   if (typeof normalized.currentAddress === 'string') {
     const parts = normalized.currentAddress.split(', ');
     normalized.currentAddress = {
-      line1: parts[0] || normalized.currentAddress,
-      city: parts[1] || '',
-      state: parts[2] ? parts[2].split(' - ')[0] : '',
-      country: '',
-      pincode: parts[2] ? parts[2].split(' - ')[1] : ''
+      line1: parts[0] || normalized.currentAddress || '',
+      city: parts[1] || normalized.city || '',
+      state: parts[2] ? parts[2].split(' - ')[0] : (normalized.state || ''),
+      country: normalized.country || 'India',
+      pincode: parts[2] ? parts[2].split(' - ')[1] : (normalized.zipCode || normalized.pincode || '')
     };
   } else if (!normalized.currentAddress) {
-    normalized.currentAddress = { line1: '', city: '', state: '', country: '', pincode: '' };
+    normalized.currentAddress = {
+      line1: '',
+      city: normalized.city || '',
+      state: normalized.state || '',
+      country: normalized.country || 'India',
+      pincode: normalized.zipCode || normalized.pincode || ''
+    };
+  } else if (typeof normalized.currentAddress === 'object') {
+    normalized.currentAddress = {
+      line1: normalized.currentAddress.line1 || '',
+      city: normalized.currentAddress.city || normalized.city || '',
+      state: normalized.currentAddress.state || normalized.state || '',
+      country: normalized.currentAddress.country || normalized.country || 'India',
+      pincode: normalized.currentAddress.pincode || normalized.currentAddress.zipCode || normalized.zipCode || normalized.pincode || ''
+    };
   }
 
-  if (typeof normalized.permanentAddress === 'string') {
+  if (isSameAddrString) {
+    normalized.permanentAddress = { ...normalized.currentAddress };
+  } else if (typeof normalized.permanentAddress === 'string') {
     const parts = normalized.permanentAddress.split(', ');
     normalized.permanentAddress = {
-      line1: parts[0] || normalized.permanentAddress,
+      line1: parts[0] || normalized.permanentAddress || '',
       city: parts[1] || '',
       state: parts[2] ? parts[2].split(' - ')[0] : '',
-      country: '',
+      country: 'India',
       pincode: parts[2] ? parts[2].split(' - ')[1] : ''
     };
   } else if (!normalized.permanentAddress) {
-    normalized.permanentAddress = { line1: '', city: '', state: '', country: '', pincode: '' };
+    normalized.permanentAddress = { line1: '', city: '', state: '', country: 'India', pincode: '' };
+  } else if (typeof normalized.permanentAddress === 'object') {
+    normalized.permanentAddress = {
+      line1: normalized.permanentAddress.line1 || '',
+      city: normalized.permanentAddress.city || '',
+      state: normalized.permanentAddress.state || '',
+      country: normalized.permanentAddress.country || 'India',
+      pincode: normalized.permanentAddress.pincode || normalized.permanentAddress.zipCode || ''
+    };
   }
 
   // Emergency Contact
@@ -2483,6 +2511,11 @@ export const AppProvider = ({ children }) => {
   const updateTaskProgress = async (id, status, progress, remarks) => {
     const project = projectsList.find(p => p.tasks.some(t => t.id === id));
     if (!project) return;
+
+    if ((status === 'Done' || status === 'done' || status === 'completed' || Number(progress) === 100) && currentUserRole === 'employee') {
+      addToast('error', 'Only management can approve and set task status to "Done".');
+      return;
+    }
 
     const updatedTasks = project.tasks.map(t => {
       if (t.id === id) {

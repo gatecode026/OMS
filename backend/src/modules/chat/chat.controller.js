@@ -9,6 +9,12 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { successResponse } from '../../utils/response.js';
 import { getTenantConnection } from '../../utils/multidbConnection.js';
 import { getIO } from '../../config/socket.js';
+import Call from './call.model.js';
+import logger from '../../config/logger.js';
+import crypto from 'crypto';
+import Message from './message.model.js';
+import Conversation from './conversation.model.js';
+import ImageKitCleanupLog from './cleanupLog.model.js';
 
 // ─── HELPER ──────────────────────────────────────────────────────────────────
 
@@ -180,6 +186,17 @@ export const deleteMsg = asyncHandler(async (req, res) => {
   return successResponse(res, result, 'Message deleted');
 });
 
+// POST /api/v1/chat/conversations/:id/clear
+export const clearChat = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: employeeId, companyId } = req.user;
+
+  const result = await chatService.clearConversationMessages(
+    conversationId, employeeId, companyId
+  );
+  return successResponse(res, result, 'Chat cleared successfully');
+});
+
 // PATCH /api/v1/chat/messages/:id/edit
 export const editMsg = asyncHandler(async (req, res) => {
   const { id: messageId } = req.params;
@@ -334,3 +351,282 @@ export const updateGroupDetails = asyncHandler(async (req, res) => {
 
   return successResponse(res, conversation, 'Group details updated');
 });
+
+// POST /api/v1/chat/messages/bulk-delete
+export const deleteMessagesBulk = asyncHandler(async (req, res) => {
+  const { messageIds } = req.body;
+  const { id: employeeId, companyId } = req.user;
+
+  if (!messageIds?.length) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'messageIds array is required'
+    });
+  }
+
+  const result = await chatService.deleteMessagesBulk(
+    messageIds, employeeId, companyId
+  );
+  return successResponse(res, result, 'Messages deleted in bulk');
+});
+
+// GET /api/v1/chat/calls/history
+export const getCallHistory = asyncHandler(async (req, res) => {
+  const { id: employeeId } = req.user;
+  const calls = await Call.find({
+    $or: [
+      { callerId: employeeId },
+      { calleeId: employeeId }
+    ]
+  }).sort({ createdAt: -1 }).limit(50).lean();
+
+  return successResponse(res, calls, 'Call history fetched');
+});
+
+// POST /api/v1/chat/calls/:callId/reject
+export const rejectCall = asyncHandler(async (req, res) => {
+  const { callId } = req.params;
+  const { id: employeeId, companyId } = req.user;
+
+  const callRecord = await Call.findOneAndUpdate(
+    { id: callId, status: 'ringing' },
+    { status: 'rejected', endedAt: new Date() },
+    { new: true }
+  );
+
+  if (!callRecord) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Active call record not found or already processed'
+    });
+  }
+
+  const otherPartyId = callRecord.callerId === employeeId ? callRecord.calleeId : callRecord.callerId;
+
+  try {
+    const io = getIO();
+    const rejectPayload = {
+      callId,
+      reason: 'rejected',
+      calleeName: req.user.name,
+      calleeId: callRecord.calleeId,
+      callerId: callRecord.callerId
+    };
+    io.to(`user:${callRecord.callerId}`).emit('call:rejected', rejectPayload);
+    io.to(`user:${callRecord.calleeId}`).emit('call:rejected', rejectPayload);
+
+    // Write call history message
+    const isVideo = callRecord.callType === 'video';
+    const statusText = `${isVideo ? 'Video' : 'Voice'} Call · Declined`;
+
+    const savedMessage = await chatService.saveMessage({
+      conversationId: callRecord.conversationId,
+      senderId: callRecord.callerId,
+      senderName: callRecord.callerName,
+      senderAvatar: callRecord.callerAvatar || null,
+      senderRole: 'employee',
+      content: statusText,
+      type: 'call'
+    }, companyId);
+
+    io.to(`conv:${callRecord.conversationId}`).emit('new_message', {
+      id: savedMessage.id,
+      conversationId: callRecord.conversationId,
+      senderId: callRecord.callerId,
+      senderName: callRecord.callerName,
+      senderAvatar: callRecord.callerAvatar || null,
+      preview: statusText,
+      type: 'call',
+      content: statusText,
+      createdAt: savedMessage.createdAt
+    });
+  } catch (socketErr) {
+    logger.warn('[Chat Controller] Socket notification failed for call reject:', socketErr.message);
+  }
+
+  return successResponse(res, callRecord, 'Call rejected successfully');
+});
+
+// GET /api/v1/chat/imagekit/auth
+export const getImageKitAuth = asyncHandler(async (req, res) => {
+  const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+  if (!privateKey) {
+    return res.status(500).json({
+      status: 'error',
+      message: 'ImageKit private key is not configured on the server'
+    });
+  }
+
+  const token = req.query.token || crypto.randomBytes(16).toString('hex');
+  // Expire in 1 hour (3600 seconds)
+  const expire = req.query.expire || Math.floor(Date.now() / 1000) + 3600;
+
+  const signature = crypto
+    .createHmac('sha1', privateKey)
+    .update(token + expire)
+    .digest('hex');
+
+  return successResponse(res, {
+    token,
+    expire,
+    signature,
+    publicKey: process.env.IMAGEKIT_PUBLIC_KEY || 'public_CpBAKCTW3cCxoXfv'
+  }, 'ImageKit authentication parameters generated successfully');
+});
+
+// DELETE /api/v1/chat/messages/:id/permanent
+export const deleteMsgPermanent = asyncHandler(async (req, res) => {
+  const { id: messageId } = req.params;
+  const { id: employeeId, companyId, role } = req.user;
+
+  // Authorization check: Only sender or company admin / super admin can permanently delete
+  const message = await Message.findOne({ id: messageId });
+  if (!message) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Message not found'
+    });
+  }
+
+  if (message.senderId !== employeeId && role !== 'admin' && role !== 'super_admin') {
+    return res.status(403).json({
+      status: 'fail',
+      message: 'Access denied: Only sender or administrator can permanently delete message'
+    });
+  }
+
+  const result = await chatService.deleteMessagePermanently(messageId, companyId);
+  return successResponse(res, result, 'Message permanently deleted');
+});
+
+// DELETE /api/v1/chat/conversations/:id
+export const deleteConversationPermanent = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: employeeId, companyId, role } = req.user;
+
+  // Authorization check: Only participant or admin / super admin can delete conversation
+  const conv = await Conversation.findOne({ id: conversationId });
+  if (!conv) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Conversation not found'
+    });
+  }
+
+  const isParticipant = conv.participants.some(p => p.employeeId === employeeId);
+  if (!isParticipant && role !== 'admin' && role !== 'super_admin') {
+    return res.status(403).json({
+      status: 'fail',
+      message: 'Access denied: You are not authorized to delete this conversation'
+    });
+  }
+
+  const result = await chatService.deleteConversationPermanently(conversationId, companyId);
+  return successResponse(res, result, 'Conversation permanently deleted');
+});
+
+// GET /api/v1/chat/admin/cleanup/stats
+export const getCleanupStats = asyncHandler(async (req, res) => {
+  const { companyId } = req.user;
+
+  // 1. Query active attachment counts and sizes in MongoDB
+  const activeMessagesCount = await Message.countDocuments({
+    companyId,
+    isDeleted: false,
+    'media.url': { $ne: null }
+  });
+
+  const activeMessagesSizeResult = await Message.aggregate([
+    { $match: { companyId, isDeleted: false, 'media.url': { $ne: null } } },
+    { $group: { _id: null, totalSize: { $sum: '$media.fileSize' } } }
+  ]);
+  const activeMessagesSize = activeMessagesSizeResult[0]?.totalSize || 0;
+
+  // 2. Query soft-deleted attachment counts and sizes in MongoDB
+  const softDeletedCount = await Message.countDocuments({
+    companyId,
+    isDeleted: true,
+    'media.imageKitFileId': { $ne: null }
+  });
+
+  const softDeletedSizeResult = await Message.aggregate([
+    { $match: { companyId, isDeleted: true, 'media.imageKitFileId': { $ne: null } } },
+    { $group: { _id: null, totalSize: { $sum: '$media.fileSize' } } }
+  ]);
+  const softDeletedSize = softDeletedSizeResult[0]?.totalSize || 0;
+
+  // 3. Fetch cleanup logs
+  const logs = await ImageKitCleanupLog.find({ companyId })
+    .sort({ runDate: -1 })
+    .limit(10)
+    .lean();
+
+  // 4. Summarize logs stats
+  const totalLogsCount = await ImageKitCleanupLog.countDocuments({ companyId });
+  const totalSpaceReclaimedResult = await ImageKitCleanupLog.aggregate([
+    { $match: { companyId, status: 'success' } },
+    { $group: { _id: null, totalReclaimed: { $sum: '$spaceReclaimed' }, totalDeleted: { $sum: '$filesDeleted' } } }
+  ]);
+  const totalSpaceReclaimed = totalSpaceReclaimedResult[0]?.totalReclaimed || 0;
+  const totalFilesDeleted = totalSpaceReclaimedResult[0]?.totalDeleted || 0;
+
+  // 5. Try calling ImageKit list files to get actual storage stats (catch errors)
+  let ikTotalFiles = 0;
+  let ikTotalSize = 0;
+  let ikConnected = false;
+  try {
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    if (privateKey && !privateKey.includes('***')) {
+      const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
+      const response = await fetch('https://api.imagekit.io/v1/files?limit=1000', {
+        method: 'GET',
+        headers: { 'Authorization': authHeader }
+      });
+      if (response.ok) {
+        const files = await response.json();
+        ikConnected = true;
+        ikTotalFiles = files.length;
+        ikTotalSize = files.reduce((acc, f) => acc + (f.size || 0), 0);
+      }
+    }
+  } catch (err) {
+    logger.error('[Chat Admin] Failed to fetch stats from ImageKit API:', err);
+  }
+
+  return successResponse(res, {
+    dbStats: {
+      activeAttachmentsCount: activeMessagesCount,
+      activeAttachmentsSize: activeMessagesSize,
+      softDeletedAttachmentsCount: softDeletedCount,
+      softDeletedAttachmentsSize: softDeletedSize
+    },
+    imageKitStats: {
+      connected: ikConnected,
+      totalFiles: ikTotalFiles,
+      totalSize: ikTotalSize
+    },
+    cleanupStats: {
+      totalRuns: totalLogsCount,
+      totalSpaceReclaimed,
+      totalFilesDeleted,
+      logs
+    }
+  }, 'Cleanup stats retrieved successfully');
+});
+
+// POST /api/v1/chat/admin/cleanup/trigger
+export const triggerCleanupManual = asyncHandler(async (req, res) => {
+  const { cleanImageKitFiles } = await import('../../jobs/imagekitCleanup.job.js');
+  
+  const result = await cleanImageKitFiles();
+  
+  if (result.status === 'failed') {
+    return res.status(500).json({
+      status: 'fail',
+      message: result.error || 'Cleanup job failed'
+    });
+  }
+
+  return successResponse(res, result, 'ImageKit manual cleanup completed successfully');
+});
+

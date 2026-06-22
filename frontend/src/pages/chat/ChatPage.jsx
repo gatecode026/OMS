@@ -14,9 +14,18 @@ import './Chat.css';
 const ChatPage = () => {
   const {
     conversations, activeConvId, openConversation, isConnected,
-    showMobileList: showList, setShowMobileList: setShowList
+    showMobileList: showList, setShowMobileList: setShowList,
+    enterChatScreen, leaveChatScreen
   } = useChat();
   const { currentUser } = useApp();
+
+  // Notify server of chat screen visibility
+  useEffect(() => {
+    enterChatScreen?.();
+    return () => {
+      leaveChatScreen?.();
+    };
+  }, [enterChatScreen, leaveChatScreen]);
 
   // Auto-select first conversation on load
   useEffect(() => {

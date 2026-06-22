@@ -1,13 +1,18 @@
+import './polyfill';
 import React, { lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 
-window.API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-window.SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5001';
+window.API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+window.SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+import { notificationService } from './utils/notificationService';
+notificationService.register();
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import { AppProvider } from './context/AppContext';
 import { BrandingProvider } from './context/BrandingContext';
 import { ChatProvider } from './context/ChatContext';
+import { CallProvider } from './context/CallContext';
+import CallScreen from './pages/chat/CallScreen';
 import AppShell from './components/AppShell';
 import { AuthGuard, RoleGuard } from './components/common/Guards';
 import { ToastContainer } from './components/Toast';
@@ -63,7 +68,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrandingProvider>
       <AppProvider>
         <ChatProvider>
-        <BrowserRouter>
+          <CallProvider>
+            <BrowserRouter>
         <Routes>
           {/* Public Login Route - rendered outside AppShell */}
           <Route path="/login" element={<Login />} />
@@ -141,8 +147,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             </Route>
           </Route>
         </Routes>
-        <ToastContainer />
-        </BrowserRouter>
+            <ToastContainer />
+            </BrowserRouter>
+            <CallScreen />
+          </CallProvider>
         </ChatProvider>
       </AppProvider>
     </BrandingProvider>

@@ -11,7 +11,8 @@ import Message from './message.model.js';
 import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
 import { runWithTenant } from '../../utils/tenantContext.js';
 import { getIO } from '../../config/socket.js';
-import { uploadToImageKit, deleteFromImageKit } from '../../utils/imagekit.js';
+import { uploadToImageKit, deleteFromImageKit, uploadToImageKitDetailed, deleteFileFromImageKitById } from '../../utils/imagekit.js';
+import logger from '../../config/logger.js';
 
 // ─── CONVERSATIONS ────────────────────────────────────────────────────────────
 
@@ -72,9 +73,12 @@ export const createGroupConversation = async (
     const convId = await generateCompanyUniqueId(companyId, 'conversations');
 
     let avatarUrl = groupData.avatar || null;
+    let avatarFileId = null;
     if (avatarUrl && avatarUrl.startsWith('data:') && avatarUrl.includes(';base64,')) {
       try {
-        avatarUrl = await uploadToImageKit(avatarUrl, `group_avatar_${convId}_${Date.now()}.jpg`);
+        const uploadResult = await uploadToImageKitDetailed(avatarUrl, `group_avatar_${convId}_${Date.now()}.jpg`);
+        avatarUrl = uploadResult.url;
+        avatarFileId = uploadResult.fileId;
       } catch (err) {
         logger.error('[Chat] Group avatar upload failed:', err);
       }
@@ -111,6 +115,7 @@ export const createGroupConversation = async (
       name: groupData.name.trim(),
       description: groupData.description || null,
       avatar: avatarUrl,
+      avatarImageKitFileId: avatarFileId,
       createdBy: creatorUser.id,
       participants,
       lastActivityAt: new Date(),
@@ -385,6 +390,21 @@ export const deleteMessage = async (
         throw new Error('Cannot delete message after 60 hours');
       }
 
+      // Delete from ImageKit immediately if media exists
+      if (message.media) {
+        if (message.media.imageKitFileId) {
+          logger.info(`[ImageKit] Immediate deletion on Delete for Everyone. FileID: ${message.media.imageKitFileId}`);
+          deleteFileFromImageKitById(message.media.imageKitFileId).catch(err => {
+            logger.error(`[ImageKit] Failed to delete fileId ${message.media.imageKitFileId} immediately:`, err);
+          });
+        } else if (message.media.url && message.media.url.includes('imagekit.io')) {
+          logger.info(`[ImageKit] Immediate deletion on Delete for Everyone. URL: ${message.media.url}`);
+          deleteFromImageKit(message.media.url).catch(err => {
+            logger.error(`[ImageKit] Failed to delete URL ${message.media.url} immediately:`, err);
+          });
+        }
+      }
+
       await Message.findOneAndUpdate(
         { id: messageId },
         {
@@ -409,6 +429,38 @@ export const deleteMessage = async (
     return { success: true, deleteForEveryone };
   });
 };
+
+/**
+ * Clear all messages in a conversation for a specific employee (soft delete for this user)
+ */
+export const clearConversationMessages = async (conversationId, employeeId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    // Verify participant
+    const conv = await Conversation.findOne({
+      id: conversationId,
+      'participants.employeeId': employeeId
+    });
+    if (!conv) throw new Error('Conversation not found or access denied');
+
+    const now = new Date();
+
+    // Push { employeeId, deletedAt } to all messages of this conversation where it's not already deleted
+    await Message.updateMany(
+      {
+        conversationId,
+        'deletedFor.employeeId': { $ne: employeeId }
+      },
+      {
+        $push: {
+          deletedFor: { employeeId, deletedAt: now }
+        }
+      }
+    );
+
+    return { success: true };
+  });
+};
+
 
 /**
  * Add reaction to message (WhatsApp emoji reactions)
@@ -760,14 +812,27 @@ export const updateGroupDetails = async (conversationId, adminId, groupData, com
     // 3. Avatar update with ImageKit old file deletion
     if (groupData.avatar !== undefined && groupData.avatar !== conv.avatar) {
       let newAvatarUrl = groupData.avatar || null;
+      let newAvatarFileId = null;
       if (newAvatarUrl && newAvatarUrl.startsWith('data:') && newAvatarUrl.includes(';base64,')) {
-        newAvatarUrl = await uploadToImageKit(newAvatarUrl, `group_avatar_${conversationId}_${Date.now()}.jpg`);
+        try {
+          const uploadResult = await uploadToImageKitDetailed(newAvatarUrl, `group_avatar_${conversationId}_${Date.now()}.jpg`);
+          newAvatarUrl = uploadResult.url;
+          newAvatarFileId = uploadResult.fileId;
+        } catch (err) {
+          logger.error('[Chat] Group avatar upload failed:', err);
+        }
       }
 
+      const oldAvatarId = conv.avatarImageKitFileId;
       const oldAvatar = conv.avatar;
       updates.avatar = newAvatarUrl;
+      updates.avatarImageKitFileId = newAvatarFileId;
 
-      if (oldAvatar && oldAvatar.includes('imagekit.io')) {
+      if (oldAvatarId) {
+        deleteFileFromImageKitById(oldAvatarId).catch(err => {
+          logger.error('[ImageKit] Failed to delete old avatar by ID:', err);
+        });
+      } else if (oldAvatar && oldAvatar.includes('imagekit.io')) {
         deleteFromImageKit(oldAvatar).catch(err => {
           logger.error('[ImageKit] Failed to delete old avatar:', err);
         });
@@ -906,4 +971,182 @@ export const unstarMessage = async (messageId, employeeId, companyId) => {
     );
   });
 };
+
+/**
+ * Bulk delete messages (soft delete for a specific user)
+ */
+export const deleteMessagesBulk = async (messageIds, employeeId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    const now = new Date();
+
+    await Message.updateMany(
+      {
+        id: { $in: messageIds },
+        'deletedFor.employeeId': { $ne: employeeId }
+      },
+      {
+        $push: {
+          deletedFor: { employeeId, deletedAt: now }
+        }
+      }
+    );
+
+    return { success: true };
+  });
+};
+
+/**
+ * Permanent Delete Message
+ * Fetches message, deletes attachment from ImageKit by fileId (or fallback url),
+ * updates conversation lastMessage preview if necessary, and deletes MongoDB document.
+ */
+export const deleteMessagePermanently = async (messageId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    const message = await Message.findOne({ id: messageId });
+    if (!message) throw new Error('Message not found');
+
+    // 1. Delete attachment from ImageKit
+    if (message.media) {
+      if (message.media.imageKitFileId) {
+        logger.info(`[Chat] Deleting message attachment by file ID: ${message.media.imageKitFileId}`);
+        await deleteFileFromImageKitById(message.media.imageKitFileId);
+      } else if (message.media.url && message.media.url.includes('imagekit.io')) {
+        logger.info(`[Chat] Deleting message attachment by URL: ${message.media.url}`);
+        await deleteFromImageKit(message.media.url);
+      }
+    }
+
+    // 2. Update conversation lastMessage preview if this message was the latest one
+    const conv = await Conversation.findOne({ id: message.conversationId });
+    if (conv && conv.lastMessage?.messageId === messageId) {
+      const nextLatest = await Message.findOne({
+        conversationId: message.conversationId,
+        id: { $ne: messageId }
+      }).sort({ createdAt: -1 });
+
+      if (nextLatest) {
+        const previewContent = nextLatest.isDeleted
+          ? null
+          : nextLatest.type === 'text'
+            ? nextLatest.content
+            : `📎 ${nextLatest.media?.fileName || nextLatest.type}`;
+
+        await Conversation.findOneAndUpdate(
+          { id: message.conversationId },
+          {
+            $set: {
+              lastMessage: {
+                messageId: nextLatest.id,
+                content: previewContent,
+                type: nextLatest.type,
+                senderId: nextLatest.senderId,
+                senderName: nextLatest.senderName,
+                sentAt: nextLatest.createdAt
+              }
+            }
+          }
+        );
+      } else {
+        await Conversation.findOneAndUpdate(
+          { id: message.conversationId },
+          { $set: { lastMessage: null } }
+        );
+      }
+    }
+
+    // 3. Remove message record from MongoDB
+    await Message.deleteOne({ id: messageId });
+    logger.info(`[Chat] Permanently deleted message messageId: ${messageId}`);
+
+    return { success: true };
+  });
+};
+
+/**
+ * Permanent Delete Conversation
+ * Fetches all conversation messages, collects and deletes all attachment files
+ * from ImageKit in parallel/batches, deletes all messages & conversation from MongoDB,
+ * and emits a socket event.
+ */
+export const deleteConversationPermanently = async (conversationId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    const conv = await Conversation.findOne({ id: conversationId });
+    if (!conv) throw new Error('Conversation not found');
+
+    // 1. Gather all messages in conversation
+    const messages = await Message.find({ conversationId }).lean();
+
+    // 2. Collect unique ImageKit File IDs and URLs to delete
+    const fileIdsToDelete = new Set();
+    const urlsToDelete = new Set();
+
+    if (conv.avatarImageKitFileId) {
+      fileIdsToDelete.add(conv.avatarImageKitFileId);
+    } else if (conv.avatar && conv.avatar.includes('imagekit.io')) {
+      urlsToDelete.add(conv.avatar);
+    }
+
+    for (const msg of messages) {
+      if (msg.media) {
+        if (msg.media.imageKitFileId) {
+          fileIdsToDelete.add(msg.media.imageKitFileId);
+        } else if (msg.media.url && msg.media.url.includes('imagekit.io')) {
+          urlsToDelete.add(msg.media.url);
+        }
+      }
+    }
+
+    // 3. Delete files from ImageKit in batches of 10
+    const fileIdsArray = Array.from(fileIdsToDelete);
+    const urlsArray = Array.from(urlsToDelete);
+
+    logger.info(`[Chat] Permanent cleanup for conversation ${conversationId}: Deleting ${fileIdsArray.length} files by ID and ${urlsArray.length} files by URL...`);
+
+    const BATCH_SIZE = 10;
+    
+    // Delete fileIds
+    for (let i = 0; i < fileIdsArray.length; i += BATCH_SIZE) {
+      const batch = fileIdsArray.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(fileId => 
+        deleteFileFromImageKitById(fileId).catch(err => 
+          logger.error(`[Chat] Failed to delete fileId ${fileId} during conversation cleanup:`, err)
+        )
+      ));
+    }
+
+    // Delete urls
+    for (let i = 0; i < urlsArray.length; i += BATCH_SIZE) {
+      const batch = urlsArray.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(url => 
+        deleteFromImageKit(url).catch(err => 
+          logger.error(`[Chat] Failed to delete url ${url} during conversation cleanup:`, err)
+        )
+      ));
+    }
+
+    // 4. Delete all messages from MongoDB
+    await Message.deleteMany({ conversationId });
+
+    // 5. Delete conversation from MongoDB
+    await Conversation.deleteOne({ id: conversationId });
+
+    logger.info(`[Chat] Permanently deleted conversation conversationId: ${conversationId} and all associated records.`);
+
+    // 6. Broadcast socket deletion event
+    try {
+      const io = getIO();
+      io.to(`conv:${conversationId}`).emit('conversation_deleted', { conversationId });
+      
+      // Also notify each participant directly so their UI updates
+      for (const participant of conv.participants) {
+        io.to(`user:${participant.employeeId}`).emit('conversation_deleted', { conversationId });
+      }
+    } catch (socketErr) {
+      logger.error('[Chat] Socket emission of conversation_deleted failed:', socketErr);
+    }
+
+    return { success: true };
+  });
+};
+
 

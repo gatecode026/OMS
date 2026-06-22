@@ -459,6 +459,10 @@ const TaskMonitoring = () => {
         if (addToast) addToast('warning', 'Tasks in "In Progress" must be submitted to "In Review".');
         return;
       }
+      if (targetCol === 'Done' && currentUserRole === 'employee') {
+        if (addToast) addToast('warning', 'Only management can approve and set task to "Done".');
+        return;
+      }
       if (currentStatus === 'In Review' && targetCol !== 'Done') {
         if (addToast) addToast('warning', 'Tasks in "In Review" must be approved/completed to move to "Done".');
         return;
@@ -796,16 +800,6 @@ const TaskMonitoring = () => {
                             icon={UserCheck}
                           >
                             Review
-                          </Button>
-                        )}
-                        {getDisplayStatus(task.status) === 'In Review' && (
-                          <Button
-                            variant="success"
-                            size="sm"
-                            onClick={async () => await updateTaskProgress(task.id, 'done', 100, '')}
-                            icon={Check}
-                          >
-                            Complete
                           </Button>
                         )}
                         <Button

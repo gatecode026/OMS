@@ -39,7 +39,7 @@ const messageSchema = new mongoose.Schema({
   content: { type: String, default: '' },
   type: {
     type: String,
-    enum: ['text', 'image', 'file', 'audio', 'system', 'emoji'],
+    enum: ['text', 'image', 'file', 'audio', 'system', 'emoji', 'call'],
     default: 'text',
     index: true
   },
@@ -52,7 +52,9 @@ const messageSchema = new mongoose.Schema({
     mimeType: { type: String, default: null },
     width: { type: Number, default: null },
     height: { type: Number, default: null },
-    duration: { type: Number, default: null }
+    duration: { type: Number, default: null },
+    imageKitFileId: { type: String, default: null },
+    imageKitFilePath: { type: String, default: null }
   },
 
   // Reply feature (WhatsApp style)
