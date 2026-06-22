@@ -692,7 +692,7 @@ export const registerChatSocketHandlers = (io) => {
           if (type === 'text' && !content?.trim()) {
             socket.emit('error', {
               event: 'send_message',
-              message: 'Content cannot be empty'  
+              message: 'Content cannot be empty'
             });
             return;
           }
