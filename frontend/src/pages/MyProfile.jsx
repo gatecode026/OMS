@@ -5,9 +5,11 @@ import usePageLoading from '../hooks/usePageLoading';
 import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
+import Modal from '../components/common/Modal';
 import {
   User, Mail, Phone, MapPin, Briefcase, Shield, Clock,
-  Lock, Check, Download, Share2, Globe, Building, Cpu, Activity
+  Lock, Check, Download, Share2, Globe, Building, Cpu, Activity,
+  FileText, FileCode, File
 } from 'lucide-react';
 
 // ─── REDESIGNED SUB-COMPONENTS ─────────────────────────────────────────────
@@ -288,6 +290,7 @@ const MyProfile = () => {
 
   // Active Tab state for form panels
   const [activeTab, setActiveTab] = useState('personal'); // personal, contact
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   // Profile completeness calculation items
   const profileCompletionItems = useMemo(() => {
@@ -356,6 +359,231 @@ const MyProfile = () => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     addToast('success', 'Profile data JSON exported successfully.');
+    setShowDownloadModal(false);
+  };
+
+  const handleDownloadPDF = () => {
+    if (!currentUser) return;
+    
+    const getAddressString = (addr) => {
+      if (!addr) return '—';
+      if (typeof addr === 'string') return addr;
+      if (typeof addr === 'object') {
+        const parts = [addr.line1, addr.city, addr.state].filter(Boolean);
+        const base = parts.join(', ');
+        return addr.pincode ? `${base} - ${addr.pincode}` : (base || '—');
+      }
+      return String(addr);
+    };
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addToast('error', 'Popup blocked. Please allow popups to export PDF.');
+      return;
+    }
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${currentUser.name} - Profile Report</title>
+          <style>
+            body { font-family: 'Inter', system-ui, -apple-system, sans-serif; padding: 40px; color: #1e293b; background: #fff; line-height: 1.5; }
+            .header-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
+            .header-cell { vertical-align: middle; }
+            h1 { margin: 0; color: #0f172a; font-size: 24px; font-weight: 800; }
+            .subtitle { color: #64748b; font-size: 13px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+            .section { margin-bottom: 25px; }
+            .section-title { font-size: 14px; font-weight: 700; color: #4f46e5; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.05em; }
+            .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px 30px; }
+            .field { display: flex; flex-direction: column; }
+            .label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 3px; letter-spacing: 0.5px; }
+            .value { font-size: 13px; color: #0f172a; font-weight: 500; }
+            .full-width { grid-column: span 2; }
+            .footer { margin-top: 50px; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 11px; color: #94a3b8; text-align: center; }
+            @media print {
+              body { padding: 20px; }
+            }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td class="header-cell">
+                <h1>${currentUser.name}</h1>
+                <div class="subtitle">Employee Profile Report — ID: ${currentUser.employeeId || currentUser.id || '—'}</div>
+              </td>
+            </tr>
+          </table>
+          
+          <div class="section">
+            <div class="section-title">Professional Placement</div>
+            <div class="grid">
+              <div class="field"><span class="label">Designation</span><span class="value">${currentUser.designation || '—'}</span></div>
+              <div class="field"><span class="label">Department</span><span class="value">${currentUser.department || '—'}</span></div>
+              <div class="field"><span class="label">Office Location</span><span class="value">${currentUser.branch || '—'}</span></div>
+              <div class="field"><span class="label">Employment Type</span><span class="value">${currentUser.employeeType || '—'}</span></div>
+              <div class="field"><span class="label">Joining Date</span><span class="value">${currentUser.joinDate || '—'}</span></div>
+              <div class="field"><span class="label">Shift Timing</span><span class="value">${currentUser.shift || currentUser.shiftTiming || '—'}</span></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Personal Details</div>
+            <div class="grid">
+              <div class="field"><span class="label">Gender</span><span class="value">${currentUser.gender || '—'}</span></div>
+              <div class="field"><span class="label">Date of Birth</span><span class="value">${currentUser.dob ? new Date(currentUser.dob).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</span></div>
+              <div class="field"><span class="label">Marital Status</span><span class="value">${currentUser.maritalStatus || '—'}</span></div>
+              <div class="field"><span class="label">Blood Group</span><span class="value">${currentUser.bloodGroup || '—'}</span></div>
+              <div class="field"><span class="label">Nationality</span><span class="value">${currentUser.nationality || '—'}</span></div>
+              <div class="field"><span class="label">Aadhaar Number</span><span class="value">${currentUser.aadhaarNumber ? `•••• •••• ${currentUser.aadhaarNumber.slice(-4)}` : '—'}</span></div>
+              <div class="field"><span class="label">PAN Number</span><span class="value">${currentUser.panNumber ? `••••••${currentUser.panNumber.slice(-4)}` : '—'}</span></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Contact & Addresses</div>
+            <div class="grid">
+              <div class="field"><span class="label">Official Email</span><span class="value">${currentUser.officialEmail || currentUser.email || '—'}</span></div>
+              <div class="field"><span class="label">Official Mobile</span><span class="value">${currentUser.officialMobile || currentUser.phone || '—'}</span></div>
+              <div class="field"><span class="label">Personal Email</span><span class="value">${currentUser.personalEmail || '—'}</span></div>
+              <div class="field"><span class="label">Personal Mobile</span><span class="value">${currentUser.phone || currentUser.personalMobile || '—'}</span></div>
+              <div class="field full-width"><span class="label">Current Address</span><span class="value">${getAddressString(currentUser.currentAddress)}</span></div>
+              <div class="field full-width"><span class="label">Permanent Address</span><span class="value">${getAddressString(currentUser.permanentAddress)}</span></div>
+            </div>
+          </div>
+
+          <div class="footer">
+            Gatecode Office Management System (OMS) • Confidential Document • Generated on ${new Date().toLocaleDateString()}
+          </div>
+          
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    addToast('success', 'Profile PDF report generated.');
+    setShowDownloadModal(false);
+  };
+
+  const handleDownloadWord = () => {
+    if (!currentUser) return;
+
+    const getAddressString = (addr) => {
+      if (!addr) return '—';
+      if (typeof addr === 'string') return addr;
+      if (typeof addr === 'object') {
+        const parts = [addr.line1, addr.city, addr.state].filter(Boolean);
+        const base = parts.join(', ');
+        return addr.pincode ? `${base} - ${addr.pincode}` : (base || '—');
+      }
+      return String(addr);
+    };
+
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <title>${currentUser.name} - Profile Report</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #333333; }
+            h1 { color: #000000; font-size: 22px; border-bottom: 2px solid #4f46e5; padding-bottom: 8px; margin-bottom: 20px; }
+            .section { margin-bottom: 25px; }
+            .section-title { font-size: 14px; font-weight: bold; color: #4f46e5; border-bottom: 1px solid #cccccc; padding-bottom: 4px; margin-bottom: 15px; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            td { padding: 6px; vertical-align: top; width: 50%; }
+            .label { font-size: 10px; color: #666666; font-weight: bold; text-transform: uppercase; display: block; margin-bottom: 2px; }
+            .value { font-size: 13px; color: #000000; }
+          </style>
+        </head>
+        <body>
+          <h1>${currentUser.name}</h1>
+          <p><strong>Employee ID:</strong> ${currentUser.employeeId || currentUser.id || '—'}</p>
+          
+          <div class="section">
+            <div class="section-title">Professional Placement</div>
+            <table>
+              <tr>
+                <td><span class="label">Designation</span><span class="value">${currentUser.designation || '—'}</span></td>
+                <td><span class="label">Department</span><span class="value">${currentUser.department || '—'}</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Office Location</span><span class="value">${currentUser.branch || '—'}</span></td>
+                <td><span class="label">Employment Type</span><span class="value">${currentUser.employeeType || '—'}</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Joining Date</span><span class="value">${currentUser.joinDate || '—'}</span></td>
+                <td><span class="label">Shift Timing</span><span class="value">${currentUser.shift || currentUser.shiftTiming || '—'}</span></td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Personal Details</div>
+            <table>
+              <tr>
+                <td><span class="label">Gender</span><span class="value">${currentUser.gender || '—'}</span></td>
+                <td><span class="label">Date of Birth</span><span class="value">${currentUser.dob ? new Date(currentUser.dob).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Marital Status</span><span class="value">${currentUser.maritalStatus || '—'}</span></td>
+                <td><span class="label">Blood Group</span><span class="value">${currentUser.bloodGroup || '—'}</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Nationality</span><span class="value">${currentUser.nationality || '—'}</span></td>
+                <td><span class="label">Aadhaar Number</span><span class="value">${currentUser.aadhaarNumber ? `•••• •••• ${currentUser.aadhaarNumber.slice(-4)}` : '—'}</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">PAN Number</span><span class="value">${currentUser.panNumber ? `••••••${currentUser.panNumber.slice(-4)}` : '—'}</span></td>
+                <td></td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Contact & Addresses</div>
+            <table>
+              <tr>
+                <td><span class="label">Official Email</span><span class="value">${currentUser.officialEmail || currentUser.email || '—'}</span></td>
+                <td><span class="label">Official Mobile</span><span class="value">${currentUser.officialMobile || currentUser.phone || '—'}</span></td>
+              </tr>
+              <tr>
+                <td><span class="label">Personal Email</span><span class="value">${currentUser.personalEmail || '—'}</span></td>
+                <td><span class="label">Personal Mobile</span><span class="value">${currentUser.phone || currentUser.personalMobile || '—'}</span></td>
+              </tr>
+              <tr>
+                <td colspan="2"><span class="label">Current Address</span><span class="value">${getAddressString(currentUser.currentAddress)}</span></td>
+              </tr>
+              <tr>
+                <td colspan="2"><span class="label">Permanent Address</span><span class="value">${getAddressString(currentUser.permanentAddress)}</span></td>
+              </tr>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `profile_report_${currentUser.employeeId}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    addToast('success', 'Profile data Word Document exported successfully.');
+    setShowDownloadModal(false);
   };
 
   const handleShareProfile = () => {
@@ -386,7 +614,13 @@ const MyProfile = () => {
   const permAddrFallback = typeof currentUser.permanentAddress === 'string' ? currentUser.permanentAddress : '';
   const permAddrObj = typeof currentUser.permanentAddress === 'object' ? currentUser.permanentAddress : null;
 
-  const isSameAddress = currentUser.permanentAddress === currentUser.currentAddress;
+  const isSameAddress = (currentUser.permanentAddress === currentUser.currentAddress) || (
+    currentAddrObj && permAddrObj &&
+    currentAddrObj.line1 === permAddrObj.line1 &&
+    currentAddrObj.city === permAddrObj.city &&
+    currentAddrObj.state === permAddrObj.state &&
+    currentAddrObj.pincode === permAddrObj.pincode
+  );
 
   if (currentUserRole === 'company_admin') {
     // Get filtered recent activity logs for this tenant (first 6 logs)
@@ -511,7 +745,7 @@ const MyProfile = () => {
           </p>
         </div>
         <div className="profile-header-actions">
-          <Button variant="secondary" icon={Download} onClick={handleDownloadDataJSON}>
+          <Button variant="secondary" icon={Download} onClick={() => setShowDownloadModal(true)}>
             Download Data
           </Button>
           {currentUserRole === 'super_admin' && (
@@ -720,6 +954,54 @@ const MyProfile = () => {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={showDownloadModal}
+        onClose={() => setShowDownloadModal(false)}
+        title="Choose Export Format"
+        size="md"
+      >
+        <div className="export-options-grid">
+          <div className="export-option-card" onClick={handleDownloadDataJSON}>
+            <div className="export-option-icon json-icon">
+              <FileCode size={24} />
+            </div>
+            <div className="export-option-details">
+              <h4>JSON Data Format</h4>
+              <p>Raw profile structure. Perfect for developer exports, backups, or machine readability.</p>
+            </div>
+            <div className="export-option-action">
+              <Download size={16} />
+            </div>
+          </div>
+
+          <div className="export-option-card" onClick={handleDownloadPDF}>
+            <div className="export-option-icon pdf-icon">
+              <FileText size={24} />
+            </div>
+            <div className="export-option-details">
+              <h4>PDF Document</h4>
+              <p>Print-ready, beautifully styled report layout. Ideal for printing or official archives.</p>
+            </div>
+            <div className="export-option-action">
+              <Download size={16} />
+            </div>
+          </div>
+
+          <div className="export-option-card" onClick={handleDownloadWord}>
+            <div className="export-option-icon word-icon">
+              <File size={24} />
+            </div>
+            <div className="export-option-details">
+              <h4>MS Word Document</h4>
+              <p>Microsoft Word compatible document (.doc). Ideal for offline editing and documentation.</p>
+            </div>
+            <div className="export-option-action">
+              <Download size={16} />
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

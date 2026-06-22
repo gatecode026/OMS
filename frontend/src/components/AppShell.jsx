@@ -10,6 +10,7 @@ import ConfirmDialog from './common/ConfirmDialog';
 import Skeleton from './common/Skeleton';
 import { useApp } from '../context/AppContext';
 import WelcomeModal from './employeeDashboard/WelcomeModal';
+import { useTitleWithUnread } from '../hooks/useTitleWithUnread';
 import { Flame, ExternalLink, X } from 'lucide-react';
 
 const AppShell = () => {
@@ -25,6 +26,9 @@ const AppShell = () => {
   } = useApp();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+
+  // Dynamic tab title: "(N) Gatecode OMS" when unread messages exist
+  useTitleWithUnread();
 
   // Show welcome modal for ALL roles on first login
   useEffect(() => {

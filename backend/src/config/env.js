@@ -24,7 +24,9 @@ export const env = {
   imagekitUrlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT || 'https://ik.imagekit.io/zjd5xircoy',
   imagekitPrivateKey: process.env.IMAGEKIT_PRIVATE_KEY,
   multidbMaxPoolSize: parseInt(process.env.MULTIDB_MAX_POOL_SIZE || '5', 10),
-  multidbMaxTotalConnections: parseInt(process.env.MULTIDB_MAX_TOTAL_CONNECTIONS || '50', 10)
+  multidbMaxTotalConnections: parseInt(process.env.MULTIDB_MAX_TOTAL_CONNECTIONS || '50', 10),
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY,
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY
 };
 
 export default env;

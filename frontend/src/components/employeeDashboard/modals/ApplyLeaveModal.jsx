@@ -109,6 +109,7 @@ const ApplyLeaveModal = ({
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               required
+              min={new Date().toISOString().split('T')[0]}
               className="padding-2 border-border"
             />
           </div>
@@ -120,6 +121,7 @@ const ApplyLeaveModal = ({
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               required
+              min={startDate || new Date().toISOString().split('T')[0]}
               className="padding-2 border-border"
             />
           </div>

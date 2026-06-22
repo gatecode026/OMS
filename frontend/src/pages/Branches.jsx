@@ -259,6 +259,17 @@ const Branches = () => {
     employeeCount: 50,
   });
 
+  const [addManagerSelection, setAddManagerSelection] = useState('new');
+  const [editManagerSelection, setEditManagerSelection] = useState('new');
+
+  const existingManagers = useMemo(() => {
+    return (employees || []).filter(emp => 
+      emp.roleId === 'manager' || 
+      (emp.role && emp.role.toLowerCase().includes('manager')) || 
+      (emp.designation && emp.designation.toLowerCase().includes('manager'))
+    );
+  }, [employees]);
+
   const [transfer, setTransfer] = useState({
     employeeId: '',
     employeeName: '',
@@ -451,31 +462,90 @@ const Branches = () => {
   const handleAddBranchSubmit = async (e) => {
     e.preventDefault();
 
-    if (!newBranch.name || !newBranch.code || !newBranch.managerName || !newBranch.managerEmail || !newBranch.managerPassword) {
-      addToast('warning', 'Please fill in Name, Code, and Manager details (Name, Email, Password)');
-      return;
-    }
+    let savedEmp = null;
 
-    // Email and Phone validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /^[0-9]{10}$/;
+    if (addManagerSelection === 'new') {
+      if (!newBranch.name || !newBranch.code || !newBranch.managerName || !newBranch.managerEmail || !newBranch.managerPassword) {
+        addToast('warning', 'Please fill in Name, Code, and Manager details (Name, Email, Password)');
+        return;
+      }
 
-    if (!emailRegex.test(newBranch.managerEmail)) {
-      addToast('warning', 'Please enter a valid Manager Email address');
-      return;
-    }
-    if (newBranch.email && !emailRegex.test(newBranch.email)) {
-      addToast('warning', 'Please enter a valid Branch Official Email address');
-      return;
-    }
+      // Email and Phone validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const phoneRegex = /^[0-9]{10}$/;
 
-    if (!phoneRegex.test(newBranch.managerPhone)) {
-      addToast('warning', 'Please enter a valid Manager Phone number (exactly 10 digits)');
-      return;
-    }
-    if (newBranch.phone && !phoneRegex.test(newBranch.phone)) {
-      addToast('warning', 'Please enter a valid Branch Official Phone number (exactly 10 digits)');
-      return;
+      if (!emailRegex.test(newBranch.managerEmail)) {
+        addToast('warning', 'Please enter a valid Manager Email address');
+        return;
+      }
+      if (newBranch.email && !emailRegex.test(newBranch.email)) {
+        addToast('warning', 'Please enter a valid Branch Official Email address');
+        return;
+      }
+
+      if (!phoneRegex.test(newBranch.managerPhone)) {
+        addToast('warning', 'Please enter a valid Manager Phone number (exactly 10 digits)');
+        return;
+      }
+      if (newBranch.phone && !phoneRegex.test(newBranch.phone)) {
+        addToast('warning', 'Please enter a valid Branch Official Phone number (exactly 10 digits)');
+        return;
+      }
+
+      // Create new manager employee
+      const newEmpData = {
+        id: generatedEmployeeId,
+        name: newBranch.managerName,
+        email: newBranch.managerEmail,
+        workEmail: newBranch.managerEmail,
+        personalEmail: newBranch.managerEmail,
+        password: newBranch.managerPassword,
+        phone: newBranch.managerPhone || '9999999999',
+        role: 'Manager',
+        roleId: 'manager',
+        designation: 'Manager',
+        branch: newBranch.name,
+        branchAgency: newBranch.name,
+        status: 'Active',
+        accountStatus: 'Active',
+        employmentStatus: 'Confirmed'
+      };
+
+      savedEmp = await addEmployee(newEmpData);
+      if (!savedEmp) {
+        return;
+      }
+    } else {
+      if (!newBranch.name || !newBranch.code) {
+        addToast('warning', 'Please fill in Name and Code');
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const phoneRegex = /^[0-9]{10}$/;
+
+      if (newBranch.email && !emailRegex.test(newBranch.email)) {
+        addToast('warning', 'Please enter a valid Branch Official Email address');
+        return;
+      }
+      if (newBranch.phone && !phoneRegex.test(newBranch.phone)) {
+        addToast('warning', 'Please enter a valid Branch Official Phone number (exactly 10 digits)');
+        return;
+      }
+
+      const selectedEmp = (employees || []).find(emp => emp.id === addManagerSelection);
+      if (!selectedEmp) {
+        addToast('error', 'Selected manager not found');
+        return;
+      }
+      savedEmp = selectedEmp;
+
+      // Update the existing employee's branch
+      const managerUpdatePayload = {
+        branch: newBranch.name,
+        branchAgency: newBranch.name
+      };
+      await updateEmployee(savedEmp.id, managerUpdatePayload);
     }
 
     let finalDepts = [...newBranch.departments];
@@ -488,30 +558,6 @@ const Branches = () => {
         finalDepts.push(deptName);
       }
       setNewDeptInput('');
-    }
-
-    // 1. Create the manager as an employee first
-    const newEmpData = {
-      id: generatedEmployeeId,
-      name: newBranch.managerName,
-      email: newBranch.managerEmail,
-      workEmail: newBranch.managerEmail,
-      personalEmail: newBranch.managerEmail,
-      password: newBranch.managerPassword,
-      phone: newBranch.managerPhone || '9999999999',
-      role: 'Manager',
-      roleId: 'manager',
-      designation: 'Manager',
-      branch: newBranch.name,
-      branchAgency: newBranch.name,
-      status: 'Active',
-      accountStatus: 'Active',
-      employmentStatus: 'Confirmed'
-    };
-
-    const savedEmp = await addEmployee(newEmpData);
-    if (!savedEmp) {
-      return;
     }
 
     const newId = `BR-${Date.now().toString().slice(-4)}`;
@@ -546,8 +592,8 @@ const Branches = () => {
     e.preventDefault();
     if (!editBranch || !editBranch.id) return;
 
-    if (!editBranch.name || !editBranch.code || !editBranch.manager || !editBranch.managerEmail) {
-      addToast('warning', 'Please fill in Name, Code, and Manager details (Name, Email)');
+    if (!editBranch.name || !editBranch.code) {
+      addToast('warning', 'Please fill in Name and Code');
       return;
     }
 
@@ -555,17 +601,8 @@ const Branches = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[0-9]{10}$/;
 
-    if (!emailRegex.test(editBranch.managerEmail)) {
-      addToast('warning', 'Please enter a valid Manager Email address');
-      return;
-    }
     if (editBranch.email && !emailRegex.test(editBranch.email)) {
       addToast('warning', 'Please enter a valid Branch Official Email address');
-      return;
-    }
-
-    if (editBranch.managerPhone && !phoneRegex.test(editBranch.managerPhone)) {
-      addToast('warning', 'Please enter a valid Manager Phone number (exactly 10 digits)');
       return;
     }
     if (editBranch.phone && !phoneRegex.test(editBranch.phone)) {
@@ -573,22 +610,28 @@ const Branches = () => {
       return;
     }
 
-    let managerId = editBranch.managerId;
-    
-    // Check if the manager already exists in employees table, or create/update it
-    if (managerId) {
-      const managerUpdatePayload = {
-        name: editBranch.manager,
-        email: editBranch.managerEmail,
-        workEmail: editBranch.managerEmail,
-        phone: editBranch.managerPhone || ''
-      };
-      if (editBranch.managerPassword) {
-        managerUpdatePayload.password = editBranch.managerPassword;
+    let managerId = '';
+    let managerName = '';
+    let managerEmail = '';
+    let managerPhone = '';
+
+    if (editManagerSelection === 'new') {
+      if (!editBranch.manager || !editBranch.managerEmail) {
+        addToast('warning', 'Please fill in Manager details (Name, Email)');
+        return;
       }
-      await updateEmployee(managerId, managerUpdatePayload);
-    } else {
-      // Find by email, or create new employee
+
+      if (!emailRegex.test(editBranch.managerEmail)) {
+        addToast('warning', 'Please enter a valid Manager Email address');
+        return;
+      }
+
+      if (editBranch.managerPhone && !phoneRegex.test(editBranch.managerPhone)) {
+        addToast('warning', 'Please enter a valid Manager Phone number (exactly 10 digits)');
+        return;
+      }
+
+      // Check if employee with manager email already exists
       const match = (employees || []).find(emp => emp.email.toLowerCase() === editBranch.managerEmail.toLowerCase());
       if (match) {
         managerId = match.id;
@@ -604,6 +647,9 @@ const Branches = () => {
           managerUpdatePayload.password = editBranch.managerPassword;
         }
         await updateEmployee(managerId, managerUpdatePayload);
+        managerName = editBranch.manager;
+        managerEmail = editBranch.managerEmail;
+        managerPhone = editBranch.managerPhone || '';
       } else {
         // Create new employee
         const newEmpId = 'EMP-2026-' + String(employees.length + 1).padStart(3, '0');
@@ -626,32 +672,50 @@ const Branches = () => {
         });
         if (savedEmp) {
           managerId = savedEmp.id;
+          managerName = savedEmp.name;
+          managerEmail = savedEmp.email;
+          managerPhone = savedEmp.phone;
         }
       }
+    } else {
+      // Existing manager selection
+      const selectedEmp = (employees || []).find(emp => emp.id === editManagerSelection);
+      if (!selectedEmp) {
+        addToast('error', 'Selected manager not found');
+        return;
+      }
+      managerId = selectedEmp.id;
+      managerName = selectedEmp.name;
+      managerEmail = selectedEmp.email;
+      managerPhone = selectedEmp.phone;
+
+      // Update the existing employee's branch
+      const managerUpdatePayload = {
+        branch: editBranch.name,
+        branchAgency: editBranch.name
+      };
+      await updateEmployee(managerId, managerUpdatePayload);
     }
 
-    // Clean up temporary managerPassword from editBranch before saving to DB
-    const { managerPassword, ...restEditBranch } = editBranch;
-
     const updatedFields = {
-      name: restEditBranch.name,
-      code: restEditBranch.code,
-      established: restEditBranch.established,
-      address: restEditBranch.address,
-      city: restEditBranch.city,
-      state: restEditBranch.state,
-      zipCode: restEditBranch.zipCode || '',
-      phone: restEditBranch.phone || '',
-      email: restEditBranch.email || '',
-      timezone: restEditBranch.timezone || 'IST (UTC+5:30)',
-      manager: restEditBranch.manager,
-      managerId: managerId || restEditBranch.managerId || '',
-      managerPhone: restEditBranch.managerPhone || '',
-      managerEmail: restEditBranch.managerEmail || '',
-      status: restEditBranch.status,
-      statusType: restEditBranch.statusType,
-      employeeCount: parseInt(restEditBranch.employeeCount) || 0,
-      departments: restEditBranch.departments || []
+      name: editBranch.name,
+      code: editBranch.code,
+      established: editBranch.established,
+      address: editBranch.address,
+      city: editBranch.city,
+      state: editBranch.state,
+      zipCode: editBranch.zipCode || '',
+      phone: editBranch.phone || '',
+      email: editBranch.email || '',
+      timezone: editBranch.timezone || 'IST (UTC+5:30)',
+      manager: managerName,
+      managerId: managerId,
+      managerPhone: managerPhone || '',
+      managerEmail: managerEmail || '',
+      status: editBranch.status,
+      statusType: editBranch.statusType,
+      employeeCount: parseInt(editBranch.employeeCount) || 0,
+      departments: editBranch.departments || []
     };
 
     const result = await updateBranch(editBranch.id, updatedFields);
@@ -978,62 +1042,121 @@ const Branches = () => {
                     </div>
                   </div>
 
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Manager Employee ID (System Generated)</label>
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={generatedEmployeeId} 
-                        style={{ background: 'var(--bg-card)', opacity: 0.7 }}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Manager Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={newBranch.managerName} 
-                        onChange={e => setNewBranch({...newBranch, managerName: e.target.value})} 
-                        placeholder="Full name of manager" 
-                      />
-                    </div>
+                  <div className="form-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px' }}>
+                    <label>Manager Assignment *</label>
+                    <select
+                      value={addManagerSelection}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setAddManagerSelection(val);
+                        if (val !== 'new') {
+                          const emp = (employees || []).find(x => x.id === val);
+                          if (emp) {
+                            setNewBranch(prev => ({
+                              ...prev,
+                              managerName: emp.name,
+                              managerEmail: emp.email,
+                              managerPhone: emp.phone || '',
+                              managerId: emp.id
+                            }));
+                          }
+                        } else {
+                          setNewBranch(prev => ({
+                            ...prev,
+                            managerName: '',
+                            managerEmail: '',
+                            managerPassword: '',
+                            managerPhone: '',
+                            managerId: ''
+                          }));
+                        }
+                      }}
+                    >
+                      <option value="new">+ Create New Manager</option>
+                      {existingManagers.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.id}) — {m.designation || m.role || 'Manager'}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Manager Email *</label>
-                      <input 
-                        type="email" 
-                        required 
-                        value={newBranch.managerEmail} 
-                        onChange={e => setNewBranch({...newBranch, managerEmail: e.target.value})} 
-                        placeholder="manager@saas.com" 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Manager Phone *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        maxLength={10}
-                        value={newBranch.managerPhone} 
-                        onChange={e => setNewBranch({...newBranch, managerPhone: e.target.value.replace(/[^0-9]/g, '')})} 
-                        placeholder="10-digit phone number" 
-                      />
-                    </div>
-                  </div>
+                  {addManagerSelection !== 'new' && (() => {
+                    const m = (employees || []).find(x => x.id === addManagerSelection);
+                    if (!m) return null;
+                    return (
+                      <div className="selected-manager-preview" style={{ background: 'var(--bg-elevated)', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '12px', marginBottom: '16px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Selected Manager Details</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: '0.8rem' }}>
+                          <div>Name: <strong style={{ color: 'var(--text-primary)' }}>{m.name}</strong></div>
+                          <div>ID: <strong style={{ color: 'var(--text-primary)' }}>{m.id}</strong></div>
+                          <div>Email: <strong style={{ color: 'var(--text-primary)' }}>{m.email}</strong></div>
+                          <div>Phone: <strong style={{ color: 'var(--text-primary)' }}>{m.phone || '—'}</strong></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-                  <div className="form-group">
-                    <label>Manager Password *</label>
-                    <input 
-                      type="password" 
-                      required 
-                      value={newBranch.managerPassword} 
-                      onChange={e => setNewBranch({...newBranch, managerPassword: e.target.value})} 
-                      placeholder="Enter login password" 
-                    />
-                  </div>
+                  {addManagerSelection === 'new' && (
+                    <>
+                      <div className="form-group-row">
+                        <div className="form-group">
+                          <label>Manager Employee ID (System Generated)</label>
+                          <input 
+                            type="text" 
+                            readOnly 
+                            value={generatedEmployeeId} 
+                            style={{ background: 'var(--bg-card)', opacity: 0.7 }}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Manager Name *</label>
+                          <input 
+                            type="text" 
+                            required 
+                            value={newBranch.managerName} 
+                            onChange={e => setNewBranch({...newBranch, managerName: e.target.value})} 
+                            placeholder="Full name of manager" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group-row">
+                        <div className="form-group">
+                          <label>Manager Email *</label>
+                          <input 
+                            type="email" 
+                            required 
+                            value={newBranch.managerEmail} 
+                            onChange={e => setNewBranch({...newBranch, managerEmail: e.target.value})} 
+                            placeholder="manager@saas.com" 
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Manager Phone *</label>
+                          <input 
+                            type="text" 
+                            required 
+                            maxLength={10}
+                            value={newBranch.managerPhone} 
+                            onChange={e => setNewBranch({...newBranch, managerPhone: e.target.value.replace(/[^0-9]/g, '')})} 
+                            placeholder="10-digit phone number" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Manager Password *</label>
+                        <input 
+                          type="password" 
+                          required 
+                          value={newBranch.managerPassword} 
+                          onChange={e => setNewBranch({...newBranch, managerPassword: e.target.value})} 
+                          placeholder="Enter login password" 
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div className="form-group">
                     <label>Status Type</label>
@@ -1180,61 +1303,120 @@ const Branches = () => {
                     <input type="email" value={editBranch.email || ''} onChange={e => setEditBranch({...editBranch, email: e.target.value})} placeholder="e.g. hyderabad@company.com" />
                   </div>
 
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Manager Employee ID (System Generated)</label>
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={editBranch.managerId || 'Not Assigned'} 
-                        style={{ background: 'var(--bg-card)', opacity: 0.7 }}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Manager Name *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={editBranch.manager || ''} 
-                        onChange={e => setEditBranch({...editBranch, manager: e.target.value})} 
-                        placeholder="Full name of manager" 
-                      />
-                    </div>
+                  <div className="form-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', marginTop: '16px' }}>
+                    <label>Manager Assignment *</label>
+                    <select
+                      value={editManagerSelection}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setEditManagerSelection(val);
+                        if (val !== 'new') {
+                          const emp = (employees || []).find(x => x.id === val);
+                          if (emp) {
+                            setEditBranch(prev => ({
+                              ...prev,
+                              manager: emp.name,
+                              managerEmail: emp.email,
+                              managerPhone: emp.phone || '',
+                              managerId: emp.id
+                            }));
+                          }
+                        } else {
+                          setEditBranch(prev => ({
+                            ...prev,
+                            manager: '',
+                            managerEmail: '',
+                            managerPassword: '',
+                            managerPhone: '',
+                            managerId: ''
+                          }));
+                        }
+                      }}
+                    >
+                      <option value="new">+ Create New Manager</option>
+                      {existingManagers.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.id}) — {m.designation || m.role || 'Manager'}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="form-group-row">
-                    <div className="form-group">
-                      <label>Manager Email *</label>
-                      <input 
-                        type="email" 
-                        required 
-                        value={editBranch.managerEmail || ''} 
-                        onChange={e => setEditBranch({...editBranch, managerEmail: e.target.value})} 
-                        placeholder="manager@saas.com" 
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Manager Phone *</label>
-                      <input 
-                        type="text" 
-                        required 
-                        maxLength={10}
-                        value={editBranch.managerPhone || ''} 
-                        onChange={e => setEditBranch({...editBranch, managerPhone: e.target.value.replace(/[^0-9]/g, '')})} 
-                        placeholder="10-digit phone number" 
-                      />
-                    </div>
-                  </div>
+                  {editManagerSelection !== 'new' && (() => {
+                    const m = (employees || []).find(x => x.id === editManagerSelection);
+                    if (!m) return null;
+                    return (
+                      <div className="selected-manager-preview" style={{ background: 'var(--bg-elevated)', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginTop: '12px', marginBottom: '16px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Selected Manager Details</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: '0.8rem' }}>
+                          <div>Name: <strong style={{ color: 'var(--text-primary)' }}>{m.name}</strong></div>
+                          <div>ID: <strong style={{ color: 'var(--text-primary)' }}>{m.id}</strong></div>
+                          <div>Email: <strong style={{ color: 'var(--text-primary)' }}>{m.email}</strong></div>
+                          <div>Phone: <strong style={{ color: 'var(--text-primary)' }}>{m.phone || '—'}</strong></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-                  <div className="form-group">
-                    <label>Manager Password (Optional)</label>
-                    <input 
-                      type="password" 
-                      value={editBranch.managerPassword || ''} 
-                      onChange={e => setEditBranch({...editBranch, managerPassword: e.target.value})} 
-                      placeholder="Leave blank to keep current password" 
-                    />
-                  </div>
+                  {editManagerSelection === 'new' && (
+                    <>
+                      <div className="form-group-row">
+                        <div className="form-group">
+                          <label>Manager Employee ID (System Generated)</label>
+                          <input 
+                            type="text" 
+                            readOnly 
+                            value={editBranch.managerId || 'Not Assigned'} 
+                            style={{ background: 'var(--bg-card)', opacity: 0.7 }}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Manager Name *</label>
+                          <input 
+                            type="text" 
+                            required 
+                            value={editBranch.manager || ''} 
+                            onChange={e => setEditBranch({...editBranch, manager: e.target.value})} 
+                            placeholder="Full name of manager" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group-row">
+                        <div className="form-group">
+                          <label>Manager Email *</label>
+                          <input 
+                            type="email" 
+                            required 
+                            value={editBranch.managerEmail || ''} 
+                            onChange={e => setEditBranch({...editBranch, managerEmail: e.target.value})} 
+                            placeholder="manager@saas.com" 
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Manager Phone *</label>
+                          <input 
+                            type="text" 
+                            required 
+                            maxLength={10}
+                            value={editBranch.managerPhone || ''} 
+                            onChange={e => setEditBranch({...editBranch, managerPhone: e.target.value.replace(/[^0-9]/g, '')})} 
+                            placeholder="10-digit phone number" 
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Manager Password (Optional)</label>
+                        <input 
+                          type="password" 
+                          value={editBranch.managerPassword || ''} 
+                          onChange={e => setEditBranch({...editBranch, managerPassword: e.target.value})} 
+                          placeholder="Leave blank to keep current password" 
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div className="form-group">
                     <label>Status Type</label>
@@ -1903,16 +2085,17 @@ const Branches = () => {
             </Button>
           )}
           {hasPermission('agency_branch_management', 'create') && (
-            <Button variant="primary" icon={Plus} onClick={() => {
+            <Button variant="primary" size="sm" onClick={() => {
               setNewBranch({
                 name: '', code: '', flag: '🇮🇳',
-                manager: '', managerPhone: '',
+                managerName: '', managerEmail: '', managerPassword: '', managerPhone: '',
                 address: '', city: '', state: '', zipCode: '', phone: '', email: '',
                 status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
                 revenue: 500000, departments: [],
                 attendance: 95, productivity: 90,
                 employeeCount: 50,
               });
+              setAddManagerSelection('new');
               setShowAddModal(true);
             }}>
               Add New Branch
@@ -2024,6 +2207,10 @@ const Branches = () => {
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditBranch({ ...branch });
+                          const selectedManagerId = branch.managerId && (employees || []).some(emp => emp.id === branch.managerId)
+                            ? branch.managerId
+                            : 'new';
+                          setEditManagerSelection(selectedManagerId);
                           setShowEditModal(true);
                         }}
                         title="Edit Branch"
@@ -2125,13 +2312,14 @@ const Branches = () => {
                   <button className="quick-action-btn-item" onClick={() => {
                     setNewBranch({
                       name: '', code: '', flag: '🇮🇳',
-                      manager: '', managerPhone: '',
+                      managerName: '', managerEmail: '', managerPassword: '', managerPhone: '',
                       address: '', city: '', state: '', zipCode: '', phone: '', email: '',
                       status: 'Active', statusType: 'active', established: new Date().toISOString().split('T')[0],
                       revenue: 500000, departments: [],
                       attendance: 95, productivity: 90,
                       employeeCount: 50,
                     });
+                    setAddManagerSelection('new');
                     setShowAddModal(true);
                   }}>
                     <Plus size={14} /> Add Branch

@@ -219,6 +219,11 @@ const LeaveManagement = () => {
     end.setDate(start.getDate() + parseInt(applyForm.days) - 1);
     const endDateStr = end.toISOString().split('T')[0];
 
+    // Privileged roles (managers and admins) get auto-approved leave
+    const isPrivilegedRole = ['manager', 'dept_admin', 'branch_admin', 'super_admin'].includes(currentUserRole);
+    const autoStatus = isPrivilegedRole ? 'Approved' : 'Pending';
+    const historyComment = isPrivilegedRole ? 'Leave registered by manager (self-approved)' : 'Applied by employee';
+
     if (editingLeave) {
       const updatedRequest = {
         ...editingLeave,
@@ -242,14 +247,15 @@ const LeaveManagement = () => {
         toDate: endDateStr,
         days: parseInt(applyForm.days),
         reason: applyForm.reason || '',
-        status: 'Pending',
+        status: autoStatus,
         appliedDate: new Date().toISOString().split('T')[0],
+        approverNotes: isPrivilegedRole ? 'Self-registered by manager' : '',
         history: [
-          { date: new Date().toISOString().split('T')[0], status: 'Pending', comment: 'Applied by employee' }
+          { date: new Date().toISOString().split('T')[0], status: autoStatus, comment: historyComment }
         ]
       };
       addLeaveRequest(newRequest);
-      addToast('success', 'Leave request submitted successfully.');
+      addToast('success', isPrivilegedRole ? 'Leave registered and approved successfully.' : 'Leave request submitted successfully.');
     }
 
     setApplyModalOpen(false);
@@ -281,7 +287,31 @@ const LeaveManagement = () => {
   const [exportProgress, setExportProgress] = useState(0);
 
   // Active Date selection in calendars
-  const [calendarMonth, setCalendarMonth] = useState('June 2026');
+  const calendarMonthOptions = useMemo(() => {
+    const options = [];
+    const date = new Date();
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    for (let i = -2; i <= 3; i++) {
+      const d = new Date(date.getFullYear(), date.getMonth() + i, 1);
+      options.push(`${months[d.getMonth()]} ${d.getFullYear()}`);
+    }
+    if (!options.includes('June 2026')) options.push('June 2026');
+    if (!options.includes('July 2026')) options.push('July 2026');
+    return [...new Set(options)].sort((a, b) => {
+      const [mA, yA] = a.split(' ');
+      const [mB, yB] = b.split(' ');
+      const dateA = new Date(parseInt(yA, 10), months.indexOf(mA), 1);
+      const dateB = new Date(parseInt(yB, 10), months.indexOf(mB), 1);
+      return dateA - dateB;
+    });
+  }, []);
+
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const date = new Date();
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const currentStr = `${months[date.getMonth()]} ${date.getFullYear()}`;
+    return calendarMonthOptions.includes(currentStr) ? currentStr : 'June 2026';
+  });
 
 
   useEffect(() => {
@@ -441,37 +471,78 @@ const LeaveManagement = () => {
     active: config.isActive
   }));
 
-  // Calendar Schedule Data for June 2026
-  const calendarDays = Array.from({ length: 30 }, (_, i) => {
-    const dayNum = i + 1;
-    const dateStr = `2026-06-${String(dayNum).padStart(2, '0')}`;
-    let leaves = [];
-    let availability = 100;
+  // Get today's local date string YYYY-MM-DD
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
 
-    if (dayNum === 2) {
-      leaves = [{ name: 'Suresh Kumar', type: 'CL', color: 'orange' }];
-      availability = 85;
-    } else if (dayNum === 15 || dayNum === 16) {
-      leaves = [{ name: 'Arjun Mehta', type: 'PL', color: 'green' }];
-      availability = 85;
-    } else if (dayNum === 28) {
-      leaves = [
-        { name: 'Neha Verma', type: 'SL', color: 'pink' },
-        { name: 'Vikram Singh', type: 'PL', color: 'green' }
-      ];
-      availability = 70;
-    }
+  // Calendar Schedule Data dynamically calculated from the database
+  const calendarDays = useMemo(() => {
+    if (!calendarMonth) return [];
+    const [monthName, yearStr] = calendarMonth.split(' ');
+    const year = parseInt(yearStr, 10);
+    const monthsMap = {
+      'January': 0, 'February': 1, 'March': 2, 'April': 3, 'May': 4, 'June': 5,
+      'July': 6, 'August': 7, 'September': 8, 'October': 9, 'November': 10, 'December': 11
+    };
+    const monthIndex = monthsMap[monthName] ?? 5; // default June
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
 
-    return { dayNum, dateStr, leaves, availability };
-  });
+    const activeEmployeesCount = (employees || []).filter(e => e.status === 'Active' || e.status === 'active' || !e.status).length || 10;
+
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const dayNum = i + 1;
+      const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      
+      // Filter approved leaves overlapping this day
+      const dailyLeaves = (leavesList || []).filter(l => {
+        return l.status === 'Approved' && l.fromDate <= dateStr && l.toDate >= dateStr;
+      });
+
+      const leaves = dailyLeaves.map(l => {
+        const typeColors = {
+          'CL': 'orange',
+          'Casual Leave': 'orange',
+          'SL': 'pink',
+          'Sick Leave': 'pink',
+          'PL': 'green',
+          'Paid Leave': 'green',
+          'Annual Leave': 'green',
+          'ML': 'pink',
+          'Maternity Leave': 'pink'
+        };
+        const color = typeColors[l.type] || 'orange';
+        return {
+          name: l.employeeName || 'Employee',
+          type: l.type,
+          color
+        };
+      });
+
+      const uniqueEmployeesOnLeave = new Set(dailyLeaves.map(l => l.employeeId || l.employeeName)).size;
+      const availability = Math.max(0, Math.round(((activeEmployeesCount - uniqueEmployeesOnLeave) / activeEmployeesCount) * 100));
+
+      return { dayNum, dateStr, leaves, availability };
+    });
+  }, [calendarMonth, leavesList, employees]);
 
   // Calculate top KPI numbers dynamically based on leaves list
   const totalRequestsCount = leavesList.length;
   const approvedRequestsCount = leavesList.filter(l => l.status === 'Approved').length;
   const rejectedRequestsCount = leavesList.filter(l => l.status === 'Rejected').length;
   const pendingRequestsCount = leavesList.filter(l => l.status === 'Pending').length;
-  const onLeaveTodayCount = leavesList.filter(l => l.status === 'Approved' && l.fromDate <= '2026-06-02' && l.toDate >= '2026-06-02').length;
-  const leaveUtilizationRate = '88%';
+  const onLeaveTodayCount = leavesList.filter(l => l.status === 'Approved' && l.fromDate <= todayStr && l.toDate >= todayStr).length;
+
+  const leaveUtilizationRate = useMemo(() => {
+    const activeEmployeesCount = (employees || []).filter(e => e.status === 'Active' || e.status === 'active' || !e.status).length || 1;
+    const totalQuota = (leavePolicyConfigs || []).reduce((acc, p) => acc + (p.defaultDays || 0), 0) * activeEmployeesCount;
+    const totalApprovedDays = leavesList.filter(l => l.status === 'Approved').reduce((acc, curr) => acc + (curr.days || 0), 0);
+    return totalQuota > 0 ? Math.min(100, Math.round((totalApprovedDays / totalQuota) * 100)) + '%' : '0%';
+  }, [leavesList, leavePolicyConfigs, employees]);
 
   // Filters calculation
   const getFilteredLeaves = () => {
@@ -489,7 +560,7 @@ const LeaveManagement = () => {
       if (statusTab === 'All') {
         matchesStatus = true;
       } else if (statusTab === 'OnLeaveToday') {
-        matchesStatus = req.status === 'Approved' && req.fromDate <= '2026-06-02' && req.toDate >= '2026-06-02';
+        matchesStatus = req.status === 'Approved' && req.fromDate <= todayStr && req.toDate >= todayStr;
       } else {
         matchesStatus = req.status === statusTab;
       }
@@ -1611,7 +1682,7 @@ const LeaveManagement = () => {
                     { key: 'Pending', label: 'Pending Requests', count: leavesList.filter(l => l.status === 'Pending').length, color: 'warning' },
                     { key: 'Approved', label: 'Approved Leaves', count: leavesList.filter(l => l.status === 'Approved').length, color: 'success' },
                     { key: 'Rejected', label: 'Rejected Filings', count: leavesList.filter(l => l.status === 'Rejected').length, color: 'danger' },
-                    { key: 'OnLeaveToday', label: 'On Leave Today', count: leavesList.filter(l => l.status === 'Approved' && l.fromDate <= '2026-06-02' && l.toDate >= '2026-06-02').length, color: 'purple' },
+                    { key: 'OnLeaveToday', label: 'On Leave Today', count: onLeaveTodayCount, color: 'purple' },
                     { key: 'All', label: 'Full Leave Directory', count: leavesList.length, color: 'neutral' }
                   ].map(statusItem => (
                     <button
@@ -1786,8 +1857,9 @@ const LeaveManagement = () => {
                     onChange={(e) => setCalendarMonth(e.target.value)}
                     className="calendar-month-select"
                   >
-                    <option value="June 2026">June 2026</option>
-                    <option value="July 2026">July 2026</option>
+                    {calendarMonthOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -3090,12 +3162,28 @@ const LeaveManagement = () => {
         </form>
       </Modal>
 
-      {/* Apply Leave Modal */}
-      <Modal isOpen={applyModalOpen} onClose={() => setApplyModalOpen(false)} title={editingLeave ? "Edit Leave Request" : "Apply for Leave"} size="md"
+      {/* Apply Leave Modal — managers register directly (auto-approved), employees submit for approval */}
+      <Modal
+        isOpen={applyModalOpen}
+        onClose={() => setApplyModalOpen(false)}
+        title={
+          editingLeave
+            ? 'Edit Leave Request'
+            : ['manager', 'dept_admin', 'branch_admin', 'super_admin'].includes(currentUserRole)
+            ? 'Register Leave'
+            : 'Apply for Leave'
+        }
+        size="md"
         footer={
           <div className="modal-actions-wrapper">
             <Button variant="secondary" onClick={() => setApplyModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleApplySubmit}>{editingLeave ? "Update Request" : "Submit Request"}</Button>
+            <Button variant="primary" onClick={handleApplySubmit}>
+              {editingLeave
+                ? 'Update Request'
+                : ['manager', 'dept_admin', 'branch_admin', 'super_admin'].includes(currentUserRole)
+                ? 'Register Leave'
+                : 'Submit Request'}
+            </Button>
           </div>
         }
       >
