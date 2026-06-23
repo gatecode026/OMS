@@ -284,7 +284,7 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves } = useApp();
   const location = useLocation();
 
   const getLocalDateString = () => {
@@ -735,6 +735,20 @@ const Employees = () => {
     document.addEventListener('keydown', handleKey);
     document.addEventListener('mousedown', handleClick);
     return () => { document.removeEventListener('keydown', handleKey); document.removeEventListener('mousedown', handleClick); };
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchAttendance();
+    fetchLeaves();
+
+    const interval = setInterval(() => {
+      fetchEmployees();
+      fetchAttendance();
+      fetchLeaves();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleSort = (key) => {
@@ -1225,10 +1239,21 @@ const Employees = () => {
     const status = getTodayStatus(e);
     return ['On Leave', 'Leave'].includes(status);
   }).length;
-  const topPerformers = employees.filter(e => (e.performanceScore?.overall || 0) >= 85).length;
-  const needsAttention = employees.filter(e => (e.performanceScore?.overall || 0) < 60).length;
-  const avgTaskCompletion = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.taskCompletion || 70), 0) / Math.max(employees.length, 1));
-  const avgRating = Math.round(employees.reduce((s, e) => s + (e.performanceScore?.overall || 70), 0) / Math.max(employees.length, 1));
+  const topPerformers = employees.filter(e => (e.productivityScore || e.performanceScore?.overall || 0) >= 85).length;
+  const needsAttention = employees.filter(e => {
+    const score = e.productivityScore || e.performanceScore?.overall || 0;
+    return score > 0 && score < 60;
+  }).length;
+  const avgTaskCompletion = (() => {
+    const withData = employees.filter(e => (e.performanceScore?.taskCompletion || 0) > 0 || (e.productivityScore || 0) > 0);
+    if (withData.length === 0) return 0;
+    return Math.round(withData.reduce((s, e) => s + (e.performanceScore?.taskCompletion || e.productivityScore || 0), 0) / withData.length);
+  })();
+  const avgRating = (() => {
+    const withData = employees.filter(e => (e.productivityScore || e.performanceScore?.overall || 0) > 0);
+    if (withData.length === 0) return 0;
+    return Math.round(withData.reduce((s, e) => s + (e.productivityScore || e.performanceScore?.overall || 0), 0) / withData.length);
+  })();
 
   const ratingToScore = (rating) => {
     switch(rating?.toLowerCase()) {
@@ -1286,24 +1311,25 @@ const Employees = () => {
   let maternityUsed = 0, maternityTotal = employees.filter(e => e.gender === 'Female').length * 180;
   let unpaidUsed = 0, unpaidTotal = employees.length * 30;
 
-  employees.forEach(emp => {
-    const history = emp.leaveHistory || [];
-    history.forEach(l => {
-      if (l.status === 'Approved') {
-        approvedCount++;
-        const days = l.days || 0;
-        if (l.type === 'Casual Leave') casualUsed += days;
-        else if (l.type === 'Sick Leave') sickUsed += days;
-        else if (l.type === 'Annual Leave' || l.type === 'Earned Leave' || l.type === 'Paid Leave') earnedUsed += days;
-        else if (l.type === 'Maternity Leave') maternityUsed += days;
-        else if (l.type === 'Emergency Leave' || l.type === 'Unpaid Leave') unpaidUsed += days;
-      } else if (l.status === 'Rejected') {
-        rejectedCount++;
+  (leaveRequests || []).forEach(l => {
+    if (l.status === 'Approved') {
+      const days = l.days || 0;
+      const typeLower = (l.type || '').toLowerCase().trim();
+      if (typeLower === 'cl' || typeLower === 'casual' || typeLower === 'casual leave') {
+        casualUsed += days;
+      } else if (typeLower === 'sl' || typeLower === 'sick' || typeLower === 'sick leave') {
+        sickUsed += days;
+      } else if (typeLower === 'pl' || typeLower === 'earned' || typeLower === 'earned leave' || typeLower === 'paid leave' || typeLower === 'annual leave') {
+        earnedUsed += days;
+      } else if (typeLower === 'ml' || typeLower === 'maternity' || typeLower === 'maternity leave') {
+        maternityUsed += days;
+      } else if (typeLower === 'ul' || typeLower === 'unpaid' || typeLower === 'unpaid leave' || typeLower === 'emergency leave') {
+        unpaidUsed += days;
       }
-    });
+    }
   });
 
-  const totalBalanceDays = employees.reduce((sum, e) => sum + (e.leaveBalance || 18), 0);
+  const totalBalanceDays = employees.reduce((sum, e) => sum + (e.leaveBalance || 0), 0);
 
   const renderTH = (col, label, sortable = false, style = undefined) => (
     <th style={style} onClick={sortable ? () => handleSort(col) : undefined}
@@ -1500,67 +1526,6 @@ const Employees = () => {
             </div>
             <div className="widget-total">Total: <strong>{totalEmp}</strong> employees</div>
           </div>
-
-          {/* Leave Management Card */}
-          <div className="card emp-widget-card">
-            <div className="widget-header">
-              <span className="widget-title">Leave Management Summary</span>
-              <span className="live-dot-badge">Active balances</span>
-            </div>
-            <div className="leave-highlights-grid">
-              <div className="leave-highlight-box balance-box">
-                <span className="leave-highlight-label">Total Balance</span>
-                <strong className="leave-highlight-value">{totalBalanceDays} days</strong>
-              </div>
-              <div className="leave-highlight-box pending-box">
-                <span className="leave-highlight-label">Pending Requests</span>
-                <strong className="leave-highlight-value">
-                  {pendingApprovalsCount} {pendingApprovalsCount === 1 ? 'approval' : 'approvals'}
-                </strong>
-              </div>
-            </div>
-
-            <div className="leave-progress-list">
-              {[
-                { name: 'Casual Leave', key: 'casual', used: casualUsed, total: casualTotal },
-                { name: 'Sick Leave', key: 'sick', used: sickUsed, total: sickTotal },
-                { name: 'Earned Leave', key: 'earned', used: earnedUsed, total: earnedTotal },
-                { name: 'Maternity Leave', key: 'maternity', used: maternityUsed, total: maternityTotal },
-                { name: 'Unpaid Leave', key: 'unpaid', used: unpaidUsed, total: unpaidTotal }
-              ].map((item, idx) => {
-                const percentage = item.total > 0 ? Math.min(100, Math.round((item.used / item.total) * 100)) : 0;
-                return (
-                  <div key={idx} className="leave-progress-item">
-                    <div className="leave-progress-labels">
-                      <span className="leave-type-name">{item.name}</span>
-                      <span className="leave-type-numbers">
-                        <strong>{item.used}d</strong> / {item.total}d
-                      </span>
-                    </div>
-                    <div className="leave-progress-bar-track">
-                      <div 
-                        className={`leave-progress-bar-fill pb-${item.key}`} 
-                        style={{ width: `${percentage}%` }}
-                        title={`${percentage}% used`}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="leave-footer">
-              <span className="leave-footer-badge approved">
-                <CheckCircle size={13} className="badge-icon" />
-                Approved: <strong>{approvedCount}</strong>
-              </span>
-              <span className="leave-footer-badge rejected">
-                <XCircle size={13} className="badge-icon" />
-                Rejected: <strong>{rejectedCount}</strong>
-              </span>
-            </div>
-          </div>
-
           {/* Productivity Overview */}
           <div className="card emp-widget-card">
             <div className="widget-header">
@@ -1588,14 +1553,57 @@ const Employees = () => {
                 <span className="prod-label">Avg Performance</span>
                 <span className="prod-value gold-val">{avgRating}/100</span>
               </div>
-              <div style={{ marginTop: 'var(--spacing-4)', paddingTop: 'var(--spacing-3)', borderTop: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                <div>Workload: <strong style={{ color: 'var(--color-success)' }}>Optimal (85%)</strong></div>
-                <div>Completion Trend: <strong style={{ color: 'var(--color-success)' }}>+3%</strong></div>
-                <div>Overdue Tasks: <strong style={{ color: 'var(--color-danger)' }}>3 Tasks</strong></div>
-                <div>High Priority: <strong style={{ color: 'var(--color-warning)' }}>7 Tasks</strong></div>
-                <div>Efficiency: <strong style={{ color: 'var(--text-primary)' }}>91.4% Avg</strong></div>
-                <div>Top Dept: <strong style={{ color: 'var(--color-primary)' }}>IT (92%)</strong></div>
-              </div>
+              {(() => {
+                const allTasks = tasks || [];
+                const openTasks = allTasks.filter(t => t.status !== 'Done' && t.status !== 'Completed');
+                const doneTasks = allTasks.filter(t => t.status === 'Done' || t.status === 'Completed');
+                const workloadPct = allTasks.length > 0 ? Math.round((openTasks.length / allTasks.length) * 100) : 0;
+                const workloadLabel = workloadPct <= 40 ? 'Optimal' : workloadPct <= 70 ? 'Moderate' : 'Heavy';
+                const workloadColor = workloadPct <= 40 ? 'var(--color-success)' : workloadPct <= 70 ? 'var(--color-warning)' : 'var(--color-danger)';
+
+                const now = new Date();
+                const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const doneThisMonth = doneTasks.filter(t => t.completedAt && new Date(t.completedAt) >= thisMonthStart).length;
+                const doneLastMonth = doneTasks.filter(t => t.completedAt && new Date(t.completedAt) >= lastMonthStart && new Date(t.completedAt) < thisMonthStart).length;
+                const trendDelta = doneThisMonth - doneLastMonth;
+                const trendLabel = trendDelta >= 0 ? `+${trendDelta}` : `${trendDelta}`;
+                const trendColor = trendDelta >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+
+                const overdueTasks = openTasks.filter(t => t.dueDate && new Date(t.dueDate) < now).length;
+                const highPriorityTasks = openTasks.filter(t => t.priority === 'High' || t.priority === 'Critical' || t.priority === 'Urgent').length;
+
+                const avgEfficiency = employees.length > 0
+                  ? Math.round(employees.reduce((s, e) => s + (e.productivityScore || e.performanceScore?.overall || 0), 0) / employees.length)
+                  : 0;
+
+                // Top department by avg productivity
+                const deptGroups = {};
+                employees.forEach(e => {
+                  const dept = e.department;
+                  if (!dept) return;
+                  if (!deptGroups[dept]) deptGroups[dept] = { total: 0, count: 0 };
+                  deptGroups[dept].total += e.productivityScore || e.performanceScore?.overall || 0;
+                  deptGroups[dept].count += 1;
+                });
+                let topDeptName = '—';
+                let topDeptScore = 0;
+                Object.entries(deptGroups).forEach(([name, { total, count }]) => {
+                  const avg = count > 0 ? Math.round(total / count) : 0;
+                  if (avg > topDeptScore) { topDeptScore = avg; topDeptName = name; }
+                });
+
+                return (
+                  <div style={{ marginTop: 'var(--spacing-4)', paddingTop: 'var(--spacing-3)', borderTop: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    <div>Workload: <strong style={{ color: workloadColor }}>{workloadLabel} ({workloadPct}%)</strong></div>
+                    <div>Completion Trend: <strong style={{ color: trendColor }}>{trendLabel} this month</strong></div>
+                    <div>Overdue Tasks: <strong style={{ color: 'var(--color-danger)' }}>{overdueTasks} {overdueTasks === 1 ? 'Task' : 'Tasks'}</strong></div>
+                    <div>High Priority: <strong style={{ color: 'var(--color-warning)' }}>{highPriorityTasks} {highPriorityTasks === 1 ? 'Task' : 'Tasks'}</strong></div>
+                    <div>Efficiency: <strong style={{ color: 'var(--text-primary)' }}>{avgEfficiency}% Avg</strong></div>
+                    <div>Top Dept: <strong style={{ color: 'var(--color-primary)' }}>{topDeptName}{topDeptScore > 0 ? ` (${topDeptScore}%)` : ''}</strong></div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1902,10 +1910,10 @@ const Employees = () => {
                     )}
                     {colVis.id && <td><span className="emp-id-mono emp-id-link" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${row.id}`); }} title="Open Profile">{row.id}</span></td>}
                     {colVis.designation && <td><span className="text-secondary-sm">{row.designation || row.role}</span></td>}
-                    {colVis.department && <td><span className="dept-text">{row.department}</span></td>}
-                    {colVis.branch && <td><span className="text-secondary-sm">{row.branch}</span></td>}
-                    {colVis.teamLeader && <td><span className="text-secondary-sm">{row.teamLeader || '—'}</span></td>}
-                    {colVis.projectManager && <td><span className="text-secondary-sm">{row.projectManager || '—'}</span></td>}
+                    {colVis.department && <td><span className="dept-text">{row.department || '-'}</span></td>}
+                    {colVis.branch && <td><span className="text-secondary-sm">{row.branch || '-'}</span></td>}
+                    {colVis.teamLeader && <td><span className="text-secondary-sm">{row.teamLeader || '-'}</span></td>}
+                    {colVis.projectManager && <td><span className="text-secondary-sm">{row.projectManager || '-'}</span></td>}
                     {colVis.phone && <td><CopyCell value={row.phone} icon={Phone} /></td>}
                     {colVis.workEmail && <td><CopyCell value={row.workEmail || row.email} icon={Mail} truncate={22} underline /></td>}
                     {colVis.joinDate && (
@@ -1917,14 +1925,14 @@ const Employees = () => {
                         </div>
                       </td>
                     )}
-                    {colVis.employeeType && <td><span className="text-secondary-sm">{row.employeeType || 'Full Time'}</span></td>}
-                    {colVis.shift && <td><span className="text-secondary-sm">{row.shift || '09:00 AM - 06:00 PM'}</span></td>}
-                    {colVis.experience && <td><span className="text-secondary-sm">{row.experience || '2.4 Yrs'}</span></td>}
-                    {colVis.lastLogin && <td><span className="text-secondary-sm" style={{ fontSize: '0.75rem' }}>{row.securityInfo?.lastLogin || '—'}</span></td>}
-                    {colVis.currentProjects && <td><span className="bold-text font-mono text-primary" style={{ paddingLeft: '8px' }}>{row.currentProjectsCount || 0}</span></td>}
-                    {colVis.leaveBalance && <td><span className="bold-text font-mono text-warning">{row.leaveBalance || 18} days</span></td>}
-                    {colVis.productivityScore && <td><span className="bold-text font-mono text-success" style={{ fontWeight: 600 }}>{row.productivityScore || 85}%</span></td>}
-                    {colVis.performanceRating && <td><Badge variant={(row.performanceRating || 90) >= 90 ? 'success' : (row.performanceRating || 90) >= 75 ? 'primary' : 'warning'}>{row.performanceRating || 90}</Badge></td>}
+                    {colVis.employeeType && <td><span className="text-secondary-sm">{row.employeeType || '-'}</span></td>}
+                    {colVis.shift && <td><span className="text-secondary-sm">{row.shift || '-'}</span></td>}
+                    {colVis.experience && <td><span className="text-secondary-sm">{row.experience || '-'}</span></td>}
+                    {colVis.lastLogin && <td><span className="text-secondary-sm" style={{ fontSize: '0.75rem' }}>{row.securityInfo?.lastLogin || '-'}</span></td>}
+                    {colVis.currentProjects && <td><span className="bold-text font-mono text-primary" style={{ paddingLeft: '8px' }}>{row.currentProjectsCount !== undefined && row.currentProjectsCount !== null ? row.currentProjectsCount : '-'}</span></td>}
+                    {colVis.leaveBalance && <td><span className="bold-text font-mono text-warning">{row.leaveBalance !== undefined && row.leaveBalance !== null ? `${row.leaveBalance} days` : '-'}</span></td>}
+                    {colVis.productivityScore && <td><span className="bold-text font-mono text-success" style={{ fontWeight: 600 }}>{row.productivityScore ? `${row.productivityScore}%` : '-'}</span></td>}
+                    {colVis.performanceRating && <td>{row.performanceRating ? <Badge variant={row.performanceRating >= 90 ? 'success' : row.performanceRating >= 75 ? 'primary' : 'warning'}>{row.performanceRating}</Badge> : '-'}</td>}
                     {colVis.todayPunchIn && (
                       <td>
                         <span className="punch-time-mono">
@@ -1955,7 +1963,7 @@ const Employees = () => {
                             const hours = (att && att.totalHours !== undefined && att.totalHours !== null) ? att.totalHours : row.todayWorkingHours;
                             const hasPunchedIn = (att && att.punchIn && att.punchIn !== '--:--') || row.todayPunchIn;
                             if (!hasPunchedIn) return '-';
-                            return hours ? fmtHoursTo60(hours) : '0h 00m';
+                            return hours ? fmtHoursTo60(hours) : '-';
                           })()}
                         </span>
                       </td>
@@ -1965,7 +1973,7 @@ const Employees = () => {
                         <AttBadge status={row.attendanceStatus || getTodayStatus(row)} />
                       </td>
                     )}
-                    {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '—'}</span></td>}
+                    {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '-'}</span></td>}
                     {colVis.workStatus && <td><WorkStatusDot status={row.workStatus} /></td>}
                     {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
                     <td className="col-actions">

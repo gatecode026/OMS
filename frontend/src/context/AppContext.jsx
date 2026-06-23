@@ -1968,7 +1968,7 @@ export const AppProvider = ({ children }) => {
       payrollSummary: newEmp.payrollSummary || { salaryStatus: 'Pending', lastSalaryDate: '—', upcomingPayrollDate: '—', bonusHistory: [] },
       productivityScore: newEmp.productivityScore || 0,
       performanceRating: newEmp.performanceRating || 'Good',
-      leaveBalance: newEmp.leaveBalance || 15,
+      leaveBalance: newEmp.leaveBalance || 0,
       currentProjectsCount: newEmp.currentProjectsCount || 0,
       experience: newEmp.experience || 0,
       shift: newEmp.shift || 'Morning (09:00 AM - 06:00 PM)',
@@ -4207,13 +4207,17 @@ export const AppProvider = ({ children }) => {
     };
 
     const dbKey = MODULE_MAPPING[module] || module;
-    const isDbBacked = Object.values(MODULE_MAPPING).includes(dbKey);
+    const isDbBacked = Object.values(MODULE_MAPPING).includes(dbKey) || Object.keys(MODULE_MAPPING).includes(module);
 
     if (isDbBacked) {
       const roleObj = roles.find(r => r.id === currentUserRole);
       const permissions = roleObj?.permissions;
-      if (permissions && permissions[dbKey] !== undefined) {
-        const res = !!permissions[dbKey]?.[action];
+      const dbPermission = permissions
+        ? (permissions[module] !== undefined ? permissions[module] : permissions[dbKey])
+        : undefined;
+
+      if (dbPermission !== undefined) {
+        const res = !!dbPermission?.[action];
         console.log('hasPermission DB-backed details:', {
           module,
           dbKey,
@@ -4261,15 +4265,6 @@ export const AppProvider = ({ children }) => {
             normalized.branchAgency = foundBranch.name;
           }
         }
-        const hasNoDept = !normalized.department || normalized.department === '—' || normalized.department === '-';
-        if (hasNoDept) {
-          const foundDept = (departments || []).find(
-            d => (d.headId && d.headId === normalized.id) || (d.head && d.head.trim().toLowerCase() === normalized.name.trim().toLowerCase())
-          );
-          if (foundDept) {
-            normalized.department = foundDept.name;
-          }
-        }
       }
       return normalized;
     });
@@ -4287,15 +4282,6 @@ export const AppProvider = ({ children }) => {
         if (foundBranch) {
           normalized.branch = foundBranch.name;
           normalized.branchAgency = foundBranch.name;
-        }
-      }
-      const hasNoDept = !normalized.department || normalized.department === '—' || normalized.department === '-';
-      if (hasNoDept) {
-        const foundDept = (departments || []).find(
-          d => (d.headId && d.headId === normalized.id) || (d.head && d.head.trim().toLowerCase() === normalized.name.trim().toLowerCase())
-        );
-        if (foundDept) {
-          normalized.department = foundDept.name;
         }
       }
     }

@@ -102,44 +102,134 @@ const Overview = () => {
   const announcements = announcementsList || [];
 
   const branchesMapped = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
     return branches.map(b => {
-      const branchEmployees = employees.filter(emp => 
-        (emp.branch || '').trim().toLowerCase() === (b.name || '').trim().toLowerCase()
+      const bName = (b.name || '').trim().toLowerCase();
+
+      // Employees in this branch
+      const branchEmployees = employees.filter(emp =>
+        (emp.branch || '').trim().toLowerCase() === bName
       );
-      const count = branchEmployees.length > 0 ? branchEmployees.length : (b.employeeCount || b.employeesCount || b.headcount || 0);
+      const count = branchEmployees.length > 0
+        ? branchEmployees.length
+        : (b.employeeCount || b.employeesCount || b.headcount || 0);
+
+      // ── Real Productivity: avg of employee performanceScore.overall, fallback productivityScore ──
+      const empWithScores = branchEmployees.filter(e =>
+        (e.performanceScore?.overall > 0) || (e.productivityScore > 0)
+      );
+      const calculatedProductivity = empWithScores.length > 0
+        ? Math.round(
+            empWithScores.reduce((sum, e) =>
+              sum + (e.performanceScore?.overall || e.productivityScore || 0), 0
+            ) / empWithScores.length
+          )
+        : 0;
+
+      // ── Real Attendance: filter attendance records directly by branch name ──
+      const branchAttToday = (attendance || []).filter(a =>
+        (a.branch || '').trim().toLowerCase() === bName && a.date === today
+      );
+      let calculatedAttendance = 0;
+      if (branchAttToday.length > 0) {
+        const present = branchAttToday.filter(a =>
+          a.status === 'Present' || a.status === 'Late' ||
+          a.status === 'Work From Home' || a.status === 'WFH' || a.status === 'Overtime'
+        ).length;
+        calculatedAttendance = Math.round((present / branchAttToday.length) * 100);
+      }
+      // Note: no fallback to employee.attendanceStatus — that field defaults to 'Present' for everyone
+      // and would give fake 100%. Show 0% if no real attendance records exist today.
+
+      // ── Active Projects: aggregate via departments that have employees in this branch ──
+      const branchDepts = new Set(
+        branchEmployees.map(e => (e.department || '').trim().toLowerCase()).filter(Boolean)
+      );
+      const activeProjectsCount = (projectsList || []).filter(p =>
+        branchDepts.has((p.department || '').trim().toLowerCase()) &&
+        (p.status === 'In Progress' || p.status === 'Active' || p.status === 'Running')
+      ).length;
+
+      // ── Status from real data ──
+      const derivedStatus = calculatedProductivity >= 90
+        ? 'Optimal'
+        : calculatedProductivity >= 75
+          ? 'High Load'
+          : calculatedProductivity > 0
+            ? 'Critical'
+            : (b.status || 'Active');
+
       return {
         ...b,
         type: 'branch',
         employeesCount: count,
-        productivity: b.productivity || 92,
-        attendance: b.attendance || 95,
+        productivity: calculatedProductivity,
+        attendance: calculatedAttendance,
+        activeProjects: activeProjectsCount,
         country: b.country || 'India',
-        status: b.status || 'Optimal'
+        status: derivedStatus
       };
     });
-  }, [branches, employees]);
+  }, [branches, employees, attendance, projectsList]);
 
   const departmentsMapped = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
     return departments.map(d => {
-      const deptEmployees = employees.filter(emp => 
-        (emp.department || '').trim().toLowerCase() === (d.name || '').trim().toLowerCase()
+      const dName = (d.name || '').trim().toLowerCase();
+
+      const deptEmployees = employees.filter(emp =>
+        (emp.department || '').trim().toLowerCase() === dName
       );
       const count = deptEmployees.length > 0 ? deptEmployees.length : (d.employeeCount || 0);
+
+      // ── Real Productivity: avg of employee performanceScore.overall, fallback productivityScore ──
+      const empWithScores = deptEmployees.filter(e =>
+        (e.performanceScore?.overall > 0) || (e.productivityScore > 0)
+      );
+      const calculatedProductivity = empWithScores.length > 0
+        ? Math.round(
+            empWithScores.reduce((sum, e) =>
+              sum + (e.performanceScore?.overall || e.productivityScore || 0), 0
+            ) / empWithScores.length
+          )
+        : 0;
+
+      // ── Real Attendance: filter attendance collection directly by department name ──
+      const deptAttToday = (attendance || []).filter(a =>
+        (a.department || '').trim().toLowerCase() === dName && a.date === today
+      );
+      let calculatedAttendance = 0;
+      if (deptAttToday.length > 0) {
+        const present = deptAttToday.filter(a =>
+          a.status === 'Present' || a.status === 'Late' ||
+          a.status === 'Work From Home' || a.status === 'WFH' || a.status === 'Overtime'
+        ).length;
+        calculatedAttendance = Math.round((present / deptAttToday.length) * 100);
+      }
+      // No fallback to employee.attendanceStatus (defaults to 'Present' for all = fake 100%)
+
+      // ── Active Projects: direct department match ──
+      const activeProjectsCount = (projectsList || []).filter(p =>
+        (p.department || '').trim().toLowerCase() === dName &&
+        (p.status === 'In Progress' || p.status === 'Active' || p.status === 'Running')
+      ).length;
+
       return {
         ...d,
         type: 'department',
         count: count,
-        productivity: d.avgPerformance || 90,
-        attendance: d.attendanceRate || 95
+        productivity: calculatedProductivity,
+        attendance: calculatedAttendance,
+        activeProjects: activeProjectsCount
       };
     });
-  }, [departments, employees]);
+  }, [departments, employees, attendance, projectsList]);
 
   const projectsMapped = useMemo(() => {
     return (projectsList || []).map(p => ({
       ...p,
-      productivity: p.productivity || 88,
-      date: p.date || p.startDate || '2026-05-30'
+      productivity: p.productivity || 0,
+      date: p.date || p.startDate || p.createdAt?.split('T')[0] || ''
     }));
   }, [projectsList]);
 
@@ -155,7 +245,7 @@ const Overview = () => {
   const announcementsMapped = useMemo(() => {
     return (announcements || []).map(ann => ({
       ...ann,
-      date: ann.date || ann.createdAt?.split('T')[0] || '2026-05-30'
+      date: ann.date || ann.createdAt?.split('T')[0] || ''
     }));
   }, [announcements]);
 
@@ -291,7 +381,7 @@ const Overview = () => {
     // 4. Date Filter Match
     if (dateFilter !== 'All' && item.date) {
       const itemDate = new Date(item.date);
-      const now = new Date('2026-05-30'); // System Date
+      const now = new Date(); // Use real current date
       const diffTime = Math.abs(now - itemDate);
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
@@ -374,7 +464,353 @@ const Overview = () => {
 
   const handleExportSubmit = () => {
     setShowReportsModal(false);
-    addToast('success', `Generating & Downloading ${reportConfig.type} in ${reportConfig.format} format...`);
+    
+    // Filter employees based on branch and department selections
+    let filteredEmployeesList = [...employees];
+    if (reportConfig.branch !== 'All') {
+      filteredEmployeesList = filteredEmployeesList.filter(e => e.branch === reportConfig.branch);
+    }
+    if (reportConfig.dept !== 'All') {
+      filteredEmployeesList = filteredEmployeesList.filter(e => e.department === reportConfig.dept);
+    }
+
+    let headers = [];
+    let rows = [];
+
+    if (reportConfig.type === 'Employee Analytics') {
+      headers = ['Employee ID', 'Employee Name', 'Role/Designation', 'Department', 'Branch', 'Productivity Score', 'Status'];
+      rows = filteredEmployeesList.map(e => [
+        e.id || '-',
+        e.name || '-',
+        e.designation || e.role || '-',
+        e.department || '-',
+        e.branch || '-',
+        `${e.productivityScore ?? 75}%`,
+        e.status || 'Active'
+      ]);
+    } else if (reportConfig.type === 'Attendance') {
+      headers = ['Date', 'Employee ID', 'Employee Name', 'Branch', 'Department', 'Status', 'Punch In', 'Punch Out'];
+      let filteredAttendance = [...attendance];
+      if (reportConfig.fromDate) {
+        filteredAttendance = filteredAttendance.filter(a => a.date >= reportConfig.fromDate);
+      }
+      if (reportConfig.toDate) {
+        filteredAttendance = filteredAttendance.filter(a => a.date <= reportConfig.toDate);
+      }
+      if (reportConfig.branch !== 'All') {
+        filteredAttendance = filteredAttendance.filter(a => {
+          const emp = employees.find(e => e.id === a.employeeId) || {};
+          return (emp.branch || a.branch || '') === reportConfig.branch;
+        });
+      }
+      if (reportConfig.dept !== 'All') {
+        filteredAttendance = filteredAttendance.filter(a => {
+          const emp = employees.find(e => e.id === a.employeeId) || {};
+          return (emp.department || a.department || '') === reportConfig.dept;
+        });
+      }
+      rows = filteredAttendance.map(a => {
+        const emp = employees.find(e => e.id === a.employeeId) || {};
+        return [
+          a.date || '-',
+          a.employeeId || '-',
+          a.employeeName || emp.name || '-',
+          emp.branch || a.branch || '-',
+          emp.department || a.department || '-',
+          a.status || '-',
+          a.punchIn || '-',
+          a.punchOut || '-'
+        ];
+      });
+    } else if (reportConfig.type === 'Branch Productivity') {
+      headers = ['Branch Name', 'City', 'Employees Count', 'Status', 'Productivity Score', 'Attendance Score'];
+      let filteredBranchesList = branchesMapped;
+      if (reportConfig.branch !== 'All') {
+        filteredBranchesList = filteredBranchesList.filter(b => b.name === reportConfig.branch);
+      }
+      rows = filteredBranchesList.map(b => [
+        b.name || '-',
+        b.city || '-',
+        b.employeesCount || 0,
+        b.status || '-',
+        `${b.productivity || 90}%`,
+        `${b.attendance || 95}%`
+      ]);
+    } else if (reportConfig.type === 'Company Performance') {
+      let targetEmployees = [...employees];
+      if (reportConfig.branch !== 'All') {
+        targetEmployees = targetEmployees.filter(e => e.branch === reportConfig.branch);
+      }
+      if (reportConfig.dept !== 'All') {
+        targetEmployees = targetEmployees.filter(e => e.department === reportConfig.dept);
+      }
+
+      let targetBranches = branchesMapped;
+      if (reportConfig.branch !== 'All') {
+        targetBranches = targetBranches.filter(b => b.name === reportConfig.branch);
+      }
+
+      let targetProjects = [...projectsList];
+      if (reportConfig.branch !== 'All') {
+        targetProjects = targetProjects.filter(p => p.branch === reportConfig.branch);
+      }
+      if (reportConfig.dept !== 'All') {
+        targetProjects = targetProjects.filter(p => p.department === reportConfig.dept);
+      }
+
+      const avgProd = targetEmployees.length > 0 
+        ? Math.round(targetEmployees.reduce((acc, e) => acc + (e.productivityScore ?? 75), 0) / targetEmployees.length)
+        : (targetBranches.length > 0 ? Math.round(targetBranches.reduce((acc, b) => acc + b.productivity, 0) / targetBranches.length) : 90);
+
+      const avgAtt = targetBranches.length > 0
+        ? Math.round(targetBranches.reduce((acc, b) => acc + b.attendance, 0) / targetBranches.length)
+        : 95;
+
+      headers = ['Metric', 'Value'];
+      rows = [
+        ['Target Scope - Office', reportConfig.branch === 'All' ? 'All Branches' : reportConfig.branch],
+        ['Target Scope - Division', reportConfig.dept === 'All' ? 'All Departments' : reportConfig.dept],
+        ['Total Branches Under Scope', targetBranches.length],
+        ['Total Employees Under Scope', targetEmployees.length],
+        ['Average Attendance Rate', `${avgAtt}%`],
+        ['Average Productivity Score', `${avgProd}%`],
+        ['Running Projects Under Scope', targetProjects.filter(p => p.status === 'In Progress' || p.status === 'Active').length]
+      ];
+    } else {
+      // Workflow Operational Speed
+      headers = ['Workflow Name', 'Department', 'Branch', 'Progress', 'Status'];
+      let filteredProjects = [...projectsList];
+      if (reportConfig.branch !== 'All') {
+        filteredProjects = filteredProjects.filter(p => p.branch === reportConfig.branch);
+      }
+      if (reportConfig.dept !== 'All') {
+        filteredProjects = filteredProjects.filter(p => p.department === reportConfig.dept);
+      }
+      rows = filteredProjects.map(p => [
+        p.name || '-',
+        p.department || '-',
+        p.branch || '-',
+        `${p.progress ?? 0}%`,
+        p.status || '-'
+      ]);
+    }
+
+    if (reportConfig.format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        addToast('danger', 'Pop-up blocked. Please enable pop-ups to print/download PDF reports.');
+        return;
+      }
+      
+      const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+      const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${reportConfig.type} Report</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+            <style>
+              body {
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                color: #1e293b;
+                padding: 40px;
+                line-height: 1.5;
+                background: #fff;
+                margin: 0;
+              }
+              .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                border-bottom: 2px solid #e2e8f0;
+                padding-bottom: 24px;
+                margin-bottom: 30px;
+              }
+              .title-area h1 {
+                font-size: 26px;
+                font-weight: 800;
+                color: #0f172a;
+                margin: 0 0 6px 0;
+                letter-spacing: -0.02em;
+              }
+              .title-area .meta-line {
+                font-size: 13px;
+                color: #64748b;
+                margin: 3px 0;
+              }
+              .logo {
+                font-size: 20px;
+                font-weight: 800;
+                color: #7c3aed;
+                letter-spacing: -0.01em;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+              }
+              .logo-dot {
+                width: 8px;
+                height: 8px;
+                background: #7c3aed;
+                border-radius: 50%;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 30px;
+              }
+              th {
+                background-color: #f8fafc;
+                text-align: left;
+                padding: 12px 16px;
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                color: #475569;
+                border-bottom: 2px solid #e2e8f0;
+                letter-spacing: 0.05em;
+              }
+              td {
+                padding: 14px 16px;
+                font-size: 13px;
+                border-bottom: 1px solid #e2e8f0;
+                color: #334155;
+              }
+              tr:nth-child(even) td {
+                background-color: #f8fafc;
+              }
+              .footer {
+                margin-top: 80px;
+                text-align: center;
+                font-size: 11px;
+                color: #94a3b8;
+                border-top: 1px solid #e2e8f0;
+                padding-top: 24px;
+              }
+              @media print {
+                body { padding: 20px; }
+                .footer { position: fixed; bottom: 0; left: 0; right: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title-area">
+                <h1>${reportConfig.type} Report</h1>
+                <div class="meta-line"><strong>Scope:</strong> Office: ${reportConfig.branch} | Division: ${reportConfig.dept}</div>
+                ${reportConfig.fromDate ? `<div class="meta-line"><strong>Date Range:</strong> ${reportConfig.fromDate} to ${reportConfig.toDate || 'Present'}</div>` : ''}
+                <div class="meta-line"><strong>Generated On:</strong> ${new Date().toLocaleString()}</div>
+              </div>
+              <div class="logo">
+                <div class="logo-dot"></div>
+                <span>OMS Enterprise</span>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>${tableHeadersHTML}</tr>
+              </thead>
+              <tbody>
+                ${tableRowsHTML}
+              </tbody>
+            </table>
+            <div class="footer">
+              OMS Office Management System • Confidential Enterprise Report
+            </div>
+            <script>
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  setTimeout(function() { window.close(); }, 500);
+                }, 300);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      addToast('success', `${reportConfig.type} Report opened in print window.`);
+    } else if (reportConfig.format === 'Excel') {
+      const filename = `${reportConfig.type.replace(/\s+/g, '_')}_Report_${new Date().toISOString().split('T')[0]}.xls`;
+      
+      const tableHeadersHTML = headers.map(h => `<th style="background-color: #7c3aed; color: #ffffff; font-weight: bold; border: 1px solid #cbd5e1; padding: 10px; text-align: left; font-family: Arial, sans-serif; font-size: 13px;">${h}</th>`).join('');
+      const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td style="border: 1px solid #cbd5e1; padding: 8px; font-family: Arial, sans-serif; color: #334155; font-size: 12px;">${val}</td>`).join('')}</tr>`).join('');
+
+      const excelContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+          <!--[if gte mso 9]>
+          <xml>
+            <x:ExcelWorkbook>
+              <x:ExcelWorksheets>
+                <x:ExcelWorksheet>
+                  <x:Name>${reportConfig.type.substring(0, 30)}</x:Name>
+                  <x:WorksheetOptions>
+                    <x:DisplayGridlines/>
+                  </x:WorksheetOptions>
+                </x:ExcelWorksheet>
+              </x:ExcelWorksheets>
+            </x:ExcelWorkbook>
+          </xml>
+          <![endif]-->
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+          <style>
+            table { border-collapse: collapse; width: 100%; }
+          </style>
+        </head>
+        <body>
+          <h2 style="font-family: Arial, sans-serif; color: #1e293b; margin-bottom: 5px;">${reportConfig.type} Report</h2>
+          <p style="font-family: Arial, sans-serif; color: #64748b; font-size: 12px; margin-top: 0; margin-bottom: 20px;">
+            <strong>Generated On:</strong> ${new Date().toLocaleString()}<br/>
+            <strong>Scope:</strong> Office: ${reportConfig.branch} | Division: ${reportConfig.dept}<br/>
+            ${reportConfig.fromDate ? `<strong>Date Range:</strong> ${reportConfig.fromDate} to ${reportConfig.toDate || 'Present'}` : ''}
+          </p>
+          <table>
+            <thead>
+              <tr>${tableHeadersHTML}</tr>
+            </thead>
+            <tbody>
+              ${tableRowsHTML}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      addToast('success', `Successfully downloaded "${filename}".`);
+    } else {
+      // CSV Format
+      const filename = `${reportConfig.type.replace(/\s+/g, '_')}_Report_${new Date().toISOString().split('T')[0]}.csv`;
+      const csvContent = "\ufeff" + [
+        headers.join(','),
+        ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      addToast('success', `Successfully downloaded "${filename}".`);
+    }
   };
 
   const handleCreateAnnouncement = async () => {
@@ -542,42 +978,65 @@ const Overview = () => {
   }, [attendance, averageAttendance]);
 
   const growthData = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const currentYear = 2026;
-    
-    const employeesByMonth = months.map((month, idx) => {
-      let count = 0;
-      employees.forEach(emp => {
-        if (!emp.joinDate) {
-          count++;
-          return;
-        }
-        const join = new Date(emp.joinDate);
-        const joinYear = join.getFullYear();
-        const joinMonth = join.getMonth();
-        
-        if (joinYear < currentYear || (joinYear === currentYear && joinMonth <= idx)) {
-          count++;
-        }
-      });
-      return count;
+    // Build last 6 calendar months dynamically from today
+    const now = new Date();
+    const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      return { label: monthLabels[d.getMonth()], year: d.getFullYear(), month: d.getMonth() };
     });
 
-    const currentProjects = totalProjectsCount || 0;
-    const currentProductivity = averageProductivity || 0;
-    const currentDepts = filteredDepts.length || 0;
+    return months.map(({ label, year, month }) => {
+      // ── Employees: cumulative count who had joined by end of this month ──
+      const monthEnd = new Date(year, month + 1, 0); // last day of month
+      const empCount = employees.filter(emp => {
+        if (!emp.joinDate) return true; // no joinDate = assume existing before window
+        const join = new Date(emp.joinDate);
+        return join <= monthEnd;
+      }).length;
 
-    return months.map((month, idx) => {
-      const monthEmployees = employeesByMonth[idx] || 0;
+      // ── Projects: count created/started within or before this month ──
+      const projCount = (projectsList || []).filter(p => {
+        const dateStr = p.startDate || p.createdAt;
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        return d.getFullYear() < year || (d.getFullYear() === year && d.getMonth() <= month);
+      }).length;
+
+      // ── Productivity: avg performanceScore.overall (or productivityScore) of employees ──
+      //    of employees who joined by this month
+      const joinedEmps = employees.filter(emp => {
+        if (!emp.joinDate) return true;
+        return new Date(emp.joinDate) <= monthEnd;
+      });
+      const empWithScore = joinedEmps.filter(e =>
+        (e.performanceScore?.overall > 0) || (e.productivityScore > 0)
+      );
+      const avgProd = empWithScore.length > 0
+        ? Math.round(
+            empWithScore.reduce((sum, e) =>
+              sum + (e.performanceScore?.overall || e.productivityScore || 0), 0
+            ) / empWithScore.length
+          )
+        : 0;
+
+      // ── Departments: count active departments created by this month ──
+      const deptCount = departments.filter(d => {
+        if (!d.createdAt) return true; // no date = assume existing
+        const created = new Date(d.createdAt);
+        return created.getFullYear() < year || (created.getFullYear() === year && created.getMonth() <= month);
+      }).length;
+
       return {
-        month,
-        employees: monthEmployees,
-        projects: currentProjects,
-        productivity: currentProductivity,
-        departments: currentDepts
+        month: label,
+        employees: empCount,
+        projects: projCount,
+        productivity: avgProd,
+        departments: deptCount
       };
     });
-  }, [employees, totalEmployees, totalProjectsCount, averageProductivity, filteredDepts.length]);
+  }, [employees, projectsList, departments, totalProjectsCount, averageProductivity]);
+
 
   const shiftData = useMemo(() => {
     let morning = 0;
@@ -627,9 +1086,6 @@ const Overview = () => {
           <p className="subtitle">Monitor and manage complete organizational performance, company operations, and global operational metrics.</p>
         </div>
         <div className="overview-header-actions">
-          <Button variant="secondary" onClick={() => setIsAlertsOpen(true)} icon={Bell} className="alerts-toggle-btn">
-            Alerts ({filteredAlerts.length})
-          </Button>
           <Button variant="primary" onClick={() => setShowReportsModal(true)} icon={FileText}>
             Generate Reports
           </Button>
@@ -794,7 +1250,7 @@ const Overview = () => {
               </div>
               <div className="depts-list">
                 {filteredDepts.map((dept) => {
-                  const percentage = totalEmployees > 0 ? Math.round((dept.count / 1250) * 100) : 0;
+                  const percentage = totalEmployees > 0 ? Math.round((dept.count / totalEmployees) * 100) : 0;
                   return (
                     <div key={dept.name} className="dept-progress-item">
                       <div className="dept-progress-info">
@@ -885,22 +1341,30 @@ const Overview = () => {
                       </div>
                       <div className="branch-meta-item">
                         <span className="meta-label">Productivity Index</span>
-                        <span className="meta-val text-success">{selectedBranch.productivity || 92}%</span>
+                        <span className="meta-val text-success">{selectedBranch.productivity}%</span>
                       </div>
                       <div className="branch-meta-item">
                         <span className="meta-label">Attendance Index</span>
-                        <span className="meta-val text-info">{selectedBranch.attendance || 95}%</span>
+                        <span className="meta-val text-info">{selectedBranch.attendance}%</span>
                       </div>
                       <div className="branch-meta-item span-all">
-                        <span className="meta-label">Coordinates</span>
+                        <span className="meta-label">Location</span>
                         <span className="meta-val code-val">
-                          {selectedBranch.lat || '26.9124° N'}, {selectedBranch.lng || '75.7873° E'}
+                          {[selectedBranch.city, selectedBranch.state, selectedBranch.zipCode].filter(Boolean).join(', ') || '—'}
                         </span>
                       </div>
+                      {selectedBranch.phone || selectedBranch.email ? (
+                        <div className="branch-meta-item span-all">
+                          <span className="meta-label">Contact</span>
+                          <span className="meta-val">
+                            {[selectedBranch.phone, selectedBranch.email].filter(Boolean).join(' • ')}
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="branch-meta-item span-all">
                         <span className="meta-label">Physical Address</span>
                         <span className="meta-val address-val">
-                          {selectedBranch.address}
+                          {selectedBranch.address || '—'}
                         </span>
                       </div>
                     </div>
@@ -908,7 +1372,14 @@ const Overview = () => {
                     <div className="branch-status-box">
                       <CheckCircle size={16} className="status-box-icon" />
                       <p>
-                        Branch is operational with high connectivity. Automated payroll, leave sync, and timesheet reports are fully integrated.
+                        {selectedBranch.status === 'Optimal'
+                          ? `${selectedBranch.name} is operating at full capacity. Productivity at ${selectedBranch.productivity}%, attendance at ${selectedBranch.attendance}% — all systems nominal.`
+                          : selectedBranch.status === 'High Load'
+                            ? `${selectedBranch.name} is under high operational load. ${selectedBranch.employeesCount} employees active with ${selectedBranch.activeProjects} running project${selectedBranch.activeProjects !== 1 ? 's' : ''}. Monitor resource allocation.`
+                            : selectedBranch.status === 'Critical'
+                              ? `${selectedBranch.name} requires immediate attention. Productivity is at ${selectedBranch.productivity}%. Review staffing and project distribution.`
+                              : `${selectedBranch.name} is ${selectedBranch.status?.toLowerCase() || 'active'}. ${selectedBranch.employeesCount || 0} employees assigned across ${selectedBranch.departments?.length || 0} department${(selectedBranch.departments?.length || 0) !== 1 ? 's' : ''}.`
+                        }
                       </p>
                     </div>
                   </div>

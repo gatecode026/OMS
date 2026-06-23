@@ -270,7 +270,6 @@ const Reports = () => {
       { metric: 'Attendance', jaipur: 94, delhi: 92, mumbai: 90, bangalore: 91 },
       { metric: 'Performance', jaipur: 95, delhi: 93, mumbai: 91, bangalore: 92 },
       { metric: 'Task Completion', jaipur: 97, delhi: 95, mumbai: 93, bangalore: 94 },
-      { metric: 'Revenue', jaipur: 90, delhi: 85, mumbai: 82, bangalore: 78 },
     ];
   }, []);
 
@@ -312,8 +311,7 @@ const Reports = () => {
         employees: branchEmps.length,
         productivity: `${avgProd}%`,
         performance: `${avgPerf}%`,
-        attendance: `${avgAtt}%`,
-        revenue: b.revenue ? `₹${(b.revenue / 10000000).toFixed(1)}Cr` : '₹0.0Cr'
+        attendance: `${avgAtt}%`
       };
     });
   }, [branches, employees]);
@@ -1008,7 +1006,7 @@ const Reports = () => {
             <div className="table-responsive">
               <table className="payroll-data-table">
                 <thead>
-                  <tr><th>Branch</th><th>Employees</th><th>Productivity</th><th>Performance</th><th>Attendance</th><th>Revenue Contribution</th><th>Actions</th></tr>
+                  <tr><th>Branch</th><th>Employees</th><th>Productivity</th><th>Performance</th><th>Attendance</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {branchCompData.map((b, i) => (
@@ -1018,7 +1016,6 @@ const Reports = () => {
                       <td><span className="rpt-pct-badge primary">{b.productivity}</span></td>
                       <td><span className="rpt-pct-badge success">{b.performance}</span></td>
                       <td><span className="rpt-pct-badge purple">{b.attendance}</span></td>
-                      <td><span className="rpt-pct-badge warning">{b.revenue}</span></td>
                       <td><button className="rpt-action-btn" onClick={() => addPageToast('success', `Generating ${b.branch} report...`)}><Download size={13} /></button></td>
                     </tr>
                   ))}
@@ -1042,15 +1039,15 @@ const Reports = () => {
                 </RadarChart>
               </ResponsiveContainer>
             </ChartCard>
-            <ChartCard title="Branch Revenue Contribution">
+            <ChartCard title="Branch Attendance Overview">
               <ResponsiveContainer width="100%" height={260}>
-                <RechartsPie>
-                  <Pie data={[{name:'Jaipur HQ',value:45},{name:'Delhi Branch',value:28},{name:'Mumbai Branch',value:18},{name:'Bangalore Branch',value:9}]} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={3} dataKey="value">
-                    {['#3b82f6','#10b981','#f59e0b','#8b5cf6'].map((c,i)=><Cell key={i} fill={c} />)}
-                  </Pie>
-                  <Tooltip contentStyle={TooltipStyle} formatter={v=>[`${v}%`,'Revenue Share']} />
-                  <Legend />
-                </RechartsPie>
+                <BarChart data={branchCompData.map(b => ({ name: b.branch, attendance: parseInt(b.attendance) }))} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
+                  <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} domain={[0, 100]} />
+                  <Tooltip contentStyle={TooltipStyle} formatter={v => [`${v}%`, 'Attendance']} />
+                  <Bar dataKey="attendance" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </ChartCard>
           </div>

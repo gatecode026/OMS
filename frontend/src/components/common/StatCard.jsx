@@ -32,12 +32,14 @@ const StatCard = ({
   description,
   icon: Icon,
   colorVariant = 'primary', // 'primary', 'success', 'warning', 'danger', 'purple'
-  sparklineData = [10, 12, 8, 15, 11, 14, 18],
+  sparklineData = null,
   onClick,
   subMetrics = [],
   variant = 'default',
   chartType = 'sparkline',
-  sparklinePoints = false
+  sparklinePoints = false,
+  gaugeValue = 0,
+  gaugeLabel = 'Avg Perf'
 }) => {
   const displayLabel = label || title || '';
   const displayTrendVal = trendVal || trend;
@@ -201,13 +203,13 @@ const StatCard = ({
                   strokeWidth="7"
                   strokeLinecap="round"
                   strokeDasharray="100.53"
-                  strokeDashoffset={100.53 * (1 - 0.91)}
+                  strokeDashoffset={100.53 * (1 - (gaugeValue || 0) / 100)}
                 />
                 <text x="50" y="37" textAnchor="middle" className="gauge-val-text" style={{ fill: 'var(--text-primary)', fontSize: '13px', fontWeight: '800' }}>
-                  91%
+                  {gaugeValue || 0}%
                 </text>
                 <text x="50" y="45" textAnchor="middle" className="gauge-lbl-text" style={{ fill: 'var(--text-muted)', fontSize: '6.5px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Avg Perf
+                  {gaugeLabel}
                 </text>
               </svg>
             </div>
