@@ -14,6 +14,42 @@ import { getIO } from '../../config/socket.js';
 import { uploadToImageKit, deleteFromImageKit, uploadToImageKitDetailed, deleteFileFromImageKitById } from '../../utils/imagekit.js';
 import logger from '../../config/logger.js';
 
+/**
+ * Detects if a text content contains Markdown syntax.
+ */
+export const detectMarkdown = (content) => {
+  if (!content || typeof content !== 'string') return 'plain';
+
+  // 1. Code blocks (``` or ~~~)
+  if (content.includes('```') || content.includes('~~~')) return 'markdown';
+
+  // 2. Inline code (`inline`)
+  if (/`[^`\n]+`/.test(content)) return 'markdown';
+
+  // 3. Bold (**text** or *text*)
+  if (/\*\*[^*]+\*\*/.test(content) || /(?<!\*)\*(?!\*)[^*]+\*/.test(content)) return 'markdown';
+
+  // 4. Underscores (__bold__ or _italic_)
+  if (/__[^_]+__/.test(content) || /(?<!_)_(?!_)[^_]+_/.test(content)) return 'markdown';
+
+  // 5. Strikethrough (~text~)
+  if (/(?<!~)~(?!~)[^~]+~/.test(content) || /~~[^~]+~~/.test(content)) return 'markdown';
+
+  // 6. Blockquote (> text at the start of string or newlines)
+  if (/(^|\n)\s*>\s+\S/.test(content)) return 'markdown';
+
+  // 7. Bullet lists (*, -, + followed by whitespace at beginning of string or after a newline)
+  if (/(^|\n)\s*[\*\-+]\s+\S/.test(content)) return 'markdown';
+
+  // 8. Numbered lists (digits followed by dot and whitespace)
+  if (/(^|\n)\s*\d+\.\s+\S/.test(content)) return 'markdown';
+
+  // 9. Horizontal rule (--- or *** or ___ alone on a line)
+  if (/(^|\n)\s*(-{3,}|\*{3,}|_{3,})\s*($|\n)/.test(content)) return 'markdown';
+
+  return 'plain';
+};
+
 // ─── CONVERSATIONS ────────────────────────────────────────────────────────────
 
 /**
@@ -210,6 +246,75 @@ export const getMessages = async (
       .limit(limit)
       .lean();
 
+    // Fetch and populate poll details for poll messages
+    const pollIds = messages.filter(m => m.type === 'poll' && m.pollId).map(m => m.pollId);
+    if (pollIds.length > 0) {
+      const Poll = mongoose.model('Poll');
+      const polls = await Poll.find({ _id: { $in: pollIds } }).lean();
+
+      // Auto-expire check on fetch
+      const now = new Date();
+      const expiredPollIds = [];
+      const updatedPolls = polls.map(p => {
+        if (!p.isClosed && p.expiresAt && new Date(p.expiresAt) <= now) {
+          p.isClosed = true;
+          expiredPollIds.push(p._id);
+        }
+        return p;
+      });
+
+      if (expiredPollIds.length > 0) {
+        await Poll.updateMany(
+          { _id: { $in: expiredPollIds } },
+          { $set: { isClosed: true } }
+        );
+      }
+
+      const pollMap = updatedPolls.reduce((acc, p) => {
+        if (p.isAnonymous) {
+          p = {
+            ...p,
+            options: p.options.map(opt => ({
+              optionId: opt.optionId,
+              text: opt.text,
+              votesCount: opt.votes.length,
+              votes: [] // Strip voter identities for privacy
+            }))
+          };
+        }
+        acc[p._id.toString()] = p;
+        return acc;
+      }, {});
+
+      messages.forEach(m => {
+        if (m.type === 'poll' && m.pollId && pollMap[m.pollId.toString()]) {
+          m.pollId = pollMap[m.pollId.toString()];
+        }
+      });
+    }
+
+    // Populate thread details for messages having a threadId
+    const threadIds = messages.filter(m => m.threadId).map(m => m.threadId);
+    if (threadIds.length > 0) {
+      const Thread = mongoose.model('Thread');
+      const threads = await Thread.find({ _id: { $in: threadIds } }).lean();
+      const threadMap = threads.reduce((acc, t) => {
+        acc[t._id.toString()] = {
+          replyCount: t.replyCount,
+          lastReplyAt: t.lastReplyAt,
+          status: t.status,
+          participants: t.participants
+        };
+        return acc;
+      }, {});
+
+      messages.forEach(m => {
+        if (m.threadId && threadMap[m.threadId.toString()]) {
+          m.threadDetails = threadMap[m.threadId.toString()];
+        }
+      });
+    }
+
     // Reverse for chronological order (newest last — WhatsApp style)
     messages.reverse();
 
@@ -256,6 +361,30 @@ export const getMessageDetail = async (messageId, employeeId, companyId) => {
     });
     if (!conv) throw new Error('Access denied');
 
+    if (message.type === 'poll' && message.pollId) {
+      const Poll = mongoose.model('Poll');
+      let poll = await Poll.findById(message.pollId).lean();
+      if (poll) {
+        const now = new Date();
+        if (!poll.isClosed && poll.expiresAt && new Date(poll.expiresAt) <= now) {
+          poll.isClosed = true;
+          await Poll.findByIdAndUpdate(poll._id, { $set: { isClosed: true } });
+        }
+        if (poll.isAnonymous) {
+          poll = {
+            ...poll,
+            options: poll.options.map(opt => ({
+              optionId: opt.optionId,
+              text: opt.text,
+              votesCount: opt.votes.length,
+              votes: []
+            }))
+          };
+        }
+        message.pollId = poll;
+      }
+    }
+
     return message;
   });
 };
@@ -295,10 +424,13 @@ export const saveMessage = async (messageData, companyId) => {
       replyToObject = messageData.replyTo;
     }
 
+    const contentType = messageData.type === 'text' ? detectMarkdown(messageData.content) : 'plain';
+
     const message = await Message.create({
       id: msgId,
       companyId,
       ...messageData,
+      contentType: messageData.contentType || contentType,
       replyTo: replyToObject
     });
 
@@ -508,10 +640,12 @@ export const editMessage = async (
     if (message.type !== 'text')
       throw new Error('Only text messages can be edited');
 
+    const contentType = detectMarkdown(newContent);
     await Message.findOneAndUpdate(
       { id: messageId },
       {
         content: newContent,
+        contentType,
         isEdited: true,
         editedAt: new Date(),
         $push: {
@@ -1146,6 +1280,112 @@ export const deleteConversationPermanently = async (conversationId, companyId) =
     }
 
     return { success: true };
+  });
+};
+
+/**
+ * Forward message to multiple target conversations
+ */
+export const forwardMessage = async (messageId, targetConversationIds, forwardingUser, companyId) => {
+  return runWithTenant(companyId, async () => {
+    // 1. Validate source message exists
+    const sourceMessage = await Message.findOne({ id: messageId });
+    if (!sourceMessage) {
+      throw new Error('Message not found');
+    }
+
+    // 2. Validate user has access to source conversation
+    const sourceConv = await Conversation.findOne({
+      id: sourceMessage.conversationId,
+      'participants.employeeId': forwardingUser.id
+    });
+    if (!sourceConv) {
+      throw new Error('Access denied: You do not belong to the source conversation');
+    }
+
+    // 3. Validate user belongs to target conversations
+    const targetConvs = await Conversation.find({
+      id: { $in: targetConversationIds },
+      'participants.employeeId': forwardingUser.id
+    });
+    if (targetConvs.length !== targetConversationIds.length) {
+      throw new Error('Access denied: You are not a participant in all selected conversations');
+    }
+
+    // 4. Increment forwardedCount on source message
+    await Message.findOneAndUpdate(
+      { id: sourceMessage.id },
+      { $inc: { forwardedCount: targetConversationIds.length } }
+    );
+
+    const createdMessages = [];
+
+    // 5. Create new messages copies
+    for (const targetConv of targetConvs) {
+      const newMsgId = await generateCompanyUniqueId(companyId, 'messages');
+
+      let mediaObj = null;
+      if (sourceMessage.media) {
+        mediaObj = {
+          url: sourceMessage.media.url,
+          fileName: sourceMessage.media.fileName,
+          fileSize: sourceMessage.media.fileSize,
+          mimeType: sourceMessage.media.mimeType || sourceMessage.media.fileType,
+          width: sourceMessage.media.width,
+          height: sourceMessage.media.height,
+          duration: sourceMessage.media.duration,
+          imageKitFileId: sourceMessage.media.imageKitFileId,
+          imageKitFilePath: sourceMessage.media.imageKitFilePath
+        };
+      }
+
+      const newMsg = await Message.create({
+        id: newMsgId,
+        companyId,
+        conversationId: targetConv.id,
+        senderId: forwardingUser.id,
+        senderName: forwardingUser.name,
+        senderAvatar: forwardingUser.avatar || null,
+        senderRole: forwardingUser.role || 'employee',
+        content: sourceMessage.content || '',
+        type: sourceMessage.type || 'text',
+        contentType: sourceMessage.contentType || 'plain',
+        contentVersion: sourceMessage.contentVersion || 1,
+        media: mediaObj,
+        isForwarded: true,
+        forwardedCount: (sourceMessage.forwardedCount || 0) + 1,
+        forwardedFrom: {
+          conversationId: sourceMessage.conversationId,
+          messageId: sourceMessage.id,
+          senderId: sourceMessage.senderId,
+          senderName: sourceMessage.senderName
+        }
+      });
+
+      // Update conversation lastMessage + lastActivityAt
+      const previewText = newMsg.type === 'text'
+        ? newMsg.content
+        : `📎 ${newMsg.media?.fileName || newMsg.type}`;
+
+      await Conversation.findOneAndUpdate(
+        { id: targetConv.id },
+        {
+          lastMessage: {
+            messageId: newMsg.id,
+            content: previewText,
+            type: newMsg.type,
+            senderId: forwardingUser.id,
+            senderName: forwardingUser.name,
+            sentAt: new Date()
+          },
+          lastActivityAt: new Date()
+        }
+      );
+
+      createdMessages.push(newMsg);
+    }
+
+    return createdMessages;
   });
 };
 

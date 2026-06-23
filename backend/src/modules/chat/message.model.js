@@ -39,9 +39,18 @@ const messageSchema = new mongoose.Schema({
   content: { type: String, default: '' },
   type: {
     type: String,
-    enum: ['text', 'image', 'file', 'audio', 'system', 'emoji', 'call'],
+    enum: ['text', 'image', 'file', 'audio', 'system', 'emoji', 'call', 'poll'],
     default: 'text',
     index: true
+  },
+  contentType: {
+    type: String,
+    enum: ['plain', 'markdown'],
+    default: 'plain'
+  },
+  contentVersion: {
+    type: Number,
+    default: 1
   },
 
   // Media/File details
@@ -111,8 +120,42 @@ const messageSchema = new mongoose.Schema({
   // Pinning (WhatsApp style)
   isPinned: { type: Boolean, default: false },
   pinnedBy: { type: String, default: null },
-  pinnedAt: { type: Date, default: null }
+  pinnedAt: { type: Date, default: null },
 
+  // Forwarding (WhatsApp style)
+  isForwarded: {
+    type: Boolean,
+    default: false
+  },
+  forwardedCount: {
+    type: Number,
+    default: 0
+  },
+  forwardedFrom: {
+    conversationId: { type: String, default: null },
+    messageId: { type: String, default: null },
+    senderId: { type: String, default: null },
+    senderName: { type: String, default: null }
+  },
+
+  // Threading System
+  threadId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Thread',
+    default: null,
+    index: true
+  },
+  isThreadReply: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  pollId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Poll',
+    default: null,
+    index: true
+  }
 }, {
   timestamps: true,
   collection: 'messages'
@@ -129,6 +172,10 @@ messageSchema.index({
   isDeleted: 1,
   createdAt: -1
 });
+
+// Pinned messages indexes for high-performance sorting and querying
+messageSchema.index({ conversationId: 1, isPinned: 1, isDeleted: 1, pinnedAt: -1 });
+messageSchema.index({ conversationId: 1, isPinned: 1, isDeleted: 1, createdAt: -1 });
 
 messageSchema.plugin(tenantPlugin);
 const Message = mongoose.model('Message', messageSchema);

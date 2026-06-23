@@ -69,6 +69,9 @@ const CommandPalette = () => {
   useEffect(() => {
     const handleGlobalKeys = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        if (window.location.pathname.startsWith('/chat')) {
+          return;
+        }
         e.preventDefault();
         setCommandPaletteOpen(true);
       }

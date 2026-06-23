@@ -7,6 +7,23 @@ import React, { useState, useRef, useEffect } from 'react';
 import StatusDot from './StatusDot';
 import { Pin, Bell, BellOff } from 'lucide-react';
 
+const stripMarkdown = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/```[\s\S]*?```/g, '[Code Block]')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/~([^~]+)~/g, '$1')
+    .replace(/^\s*>\s+/gm, '')
+    .replace(/^\s*[\*\-+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+};
+
 const ConversationItem = ({
   conversation: conv,
   isActive,
@@ -63,11 +80,12 @@ const ConversationItem = ({
 
   // Last message preview
   const lastMsg = conv.lastMessage;
+  const rawPreview = lastMsg ? (lastMsg.content ? stripMarkdown(lastMsg.content) : null) : null;
   const preview = lastMsg
-    ? lastMsg.content
-      ? lastMsg.content.length > 48
-        ? lastMsg.content.substring(0, 48) + '...'
-        : lastMsg.content
+    ? rawPreview
+      ? rawPreview.length > 48
+        ? rawPreview.substring(0, 48) + '...'
+        : rawPreview
       : '📎 Attachment'
     : 'No messages yet';
 

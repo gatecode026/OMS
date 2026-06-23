@@ -253,55 +253,64 @@ const CallScreen = () => {
     return (
       <div style={{
         position: 'fixed', inset: 0, zIndex: 99999,
-        background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+        background: 'radial-gradient(circle at center, #1b1c2b 0%, #0c0d18 100%)',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif"
       }}>
-        {/* Ripple animation */}
+        {/* Glowing animations */}
         <style>{`
           @keyframes ripple {
-            0% { transform: scale(1); opacity: 0.4; }
-            100% { transform: scale(2.5); opacity: 0; }
+            0% { transform: scale(1); opacity: 0.5; }
+            100% { transform: scale(2.4); opacity: 0; }
           }
-          @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(34,197,94,0.3); }
-            50% { box-shadow: 0 0 40px rgba(34,197,94,0.6); }
+          @keyframes accept-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45), 0 8px 24px rgba(16, 185, 129, 0.35); }
+            70% { box-shadow: 0 0 0 16px rgba(16, 185, 129, 0), 0 8px 24px rgba(16, 185, 129, 0.2); }
+          }
+          @keyframes decline-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.25), 0 8px 24px rgba(234, 67, 53, 0.2); }
+            70% { box-shadow: 0 0 0 12px rgba(234, 67, 53, 0), 0 8px 24px rgba(234, 67, 53, 0.1); }
           }
           @keyframes slide-up {
             from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
           }
+          @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+          }
         `}</style>
 
-        {/* Ripple rings behind avatar */}
-        <div style={{ position: 'relative', marginBottom: '32px' }}>
+        {/* Floating Ripple rings behind avatar */}
+        <div style={{ position: 'relative', marginBottom: '40px', animation: 'float 4s ease-in-out infinite' }}>
           <div style={{
-            position: 'absolute', inset: '-20px',
+            position: 'absolute', inset: '-12px',
             borderRadius: '50%',
-            border: '2px solid rgba(34,197,94,0.3)',
-            animation: 'ripple 2s ease-out infinite'
+            border: '2px solid rgba(139, 92, 246, 0.2)',
+            animation: 'ripple 2.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite'
           }} />
           <div style={{
-            position: 'absolute', inset: '-20px',
+            position: 'absolute', inset: '-12px',
             borderRadius: '50%',
-            border: '2px solid rgba(34,197,94,0.3)',
-            animation: 'ripple 2s ease-out infinite 0.6s'
+            border: '2px solid rgba(139, 92, 246, 0.2)',
+            animation: 'ripple 2.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite 0.8s'
           }} />
           <div style={{
-            position: 'absolute', inset: '-20px',
+            position: 'absolute', inset: '-12px',
             borderRadius: '50%',
-            border: '2px solid rgba(34,197,94,0.3)',
-            animation: 'ripple 2s ease-out infinite 1.2s'
+            border: '2px solid rgba(139, 92, 246, 0.2)',
+            animation: 'ripple 2.5s cubic-bezier(0.1, 0.8, 0.3, 1) infinite 1.6s'
           }} />
           <div style={{
-            width: '100px', height: '100px',
+            width: '110px', height: '110px',
             borderRadius: '50%',
-            background: 'rgba(255,255,255,0.12)',
+            background: 'rgba(255,255,255,0.06)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '42px', fontWeight: 700,
+            fontSize: '44px', fontWeight: 700,
             color: '#fff', overflow: 'hidden',
-            border: '3px solid rgba(255,255,255,0.25)',
+            border: '4px solid rgba(255,255,255,0.15)',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.5)',
             position: 'relative', zIndex: 2
           }}>
             {callerAvatar ? (
@@ -313,35 +322,47 @@ const CallScreen = () => {
 
         {/* Caller info */}
         <h2 style={{
-          color: '#fff', fontSize: '26px', fontWeight: 700,
-          margin: '0 0 6px', textAlign: 'center',
-          animation: 'slide-up 0.4s ease-out'
+          color: '#fff', fontSize: '28px', fontWeight: 700,
+          margin: '0 0 8px', textAlign: 'center',
+          letterSpacing: '-0.02em',
+          animation: 'slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1)'
         }}>{callerName}</h2>
         <p style={{
-          color: 'rgba(255,255,255,0.6)', fontSize: '15px',
-          margin: '0 0 48px', letterSpacing: '0.5px',
-          animation: 'slide-up 0.4s ease-out 0.1s both'
+          color: 'rgba(255,255,255,0.65)', fontSize: '15px',
+          margin: '0 0 54px', letterSpacing: '0.02em',
+          animation: 'slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both'
         }}>
           Incoming {isVideo ? 'video' : 'voice'} call...
         </p>
 
         {/* Accept / Reject buttons */}
         <div style={{
-          display: 'flex', gap: '48px', alignItems: 'center',
-          animation: 'slide-up 0.4s ease-out 0.2s both'
+          display: 'flex', gap: '56px', alignItems: 'center',
+          animation: 'slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both'
         }}>
           <div style={{ textAlign: 'center' }}>
-            <CallBtn onClick={() => rejectCall('declined')} color="#ef4444" size={64} title="Decline">
-              <PhoneOff />
+            <CallBtn 
+              onClick={() => rejectCall('declined')} 
+              color="#ea4335" 
+              size={64} 
+              title="Decline"
+              extraStyle={{ animation: 'decline-pulse 2s infinite' }}
+            >
+              <PhoneHangup />
             </CallBtn>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '10px' }}>Decline</p>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: 500, marginTop: '12px', letterSpacing: '0.02em' }}>Decline</p>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <CallBtn onClick={acceptCall} color="#22c55e" size={64} title="Accept"
-              extraStyle={{ animation: 'pulse-glow 1.5s ease-in-out infinite' }}>
+            <CallBtn 
+              onClick={acceptCall} 
+              color="#10b981" 
+              size={64} 
+              title="Accept"
+              extraStyle={{ animation: 'accept-pulse 2s infinite' }}
+            >
               {isVideo ? <VideoIcon /> : <PhoneIcon />}
             </CallBtn>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '10px' }}>Accept</p>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: 500, marginTop: '12px', letterSpacing: '0.02em' }}>Accept</p>
           </div>
         </div>
       </div>
@@ -817,19 +838,20 @@ const CallScreen = () => {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(28, 28, 30, 0.85)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: '28px',
-            padding: '10px 16px',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.4)'
+            gap: '10px',
+            background: 'rgba(20, 20, 22, 0.85)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            borderRadius: '32px',
+            padding: '12px 20px',
+            border: '1px solid rgba(255,255,255,0.12)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15)'
           }}>
             {/* Mute */}
             <BottomBtn
               onClick={toggleMute}
               active={isMuted}
+              activeColor="#ea4335"
               label={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted ? <MicOff /> : <MicIcon />}
@@ -840,6 +862,7 @@ const CallScreen = () => {
               <BottomBtn
                 onClick={toggleVideo}
                 active={isVideoOff}
+                activeColor="#ea4335"
                 label={isVideoOff ? 'Camera On' : 'Camera Off'}
               >
                 {isVideoOff ? <VideoOffIcon /> : <VideoIcon />}
@@ -857,6 +880,7 @@ const CallScreen = () => {
             <BottomBtn
               onClick={toggleSpeaker}
               active={isSpeakerOn}
+              activeColor="#10b981"
               label={isSpeakerOn ? 'Earpiece' : 'Speaker'}
             >
               {isSpeakerOn ? <SpeakerLoudIcon /> : <SpeakerIcon />}
@@ -867,7 +891,7 @@ const CallScreen = () => {
               <BottomBtn
                 onClick={toggleScreenShare}
                 active={isScreenSharing}
-                activeColor="#6366f1"
+                activeColor="#d946ef"
                 label={isScreenSharing ? 'Stop Share' : 'Share'}
               >
                 <ScreenShareIcon />
@@ -878,7 +902,7 @@ const CallScreen = () => {
             <BottomBtn
               onClick={() => setIsSettingsOpen(prev => !prev)}
               active={isSettingsOpen}
-              activeColor="rgba(59, 130, 246, 0.25)"
+              activeColor="#8b5cf6"
               label="Device Settings"
             >
               <SettingsIcon />
@@ -886,9 +910,10 @@ const CallScreen = () => {
 
             {/* Separator */}
             <div style={{
-              width: '1px', height: '28px',
-              background: 'rgba(255,255,255,0.12)',
-              margin: '0 4px'
+              width: '1px',
+              height: '28px',
+              background: 'rgba(255,255,255,0.15)',
+              margin: '0 6px'
             }} />
 
             {/* End Call — prominent red */}
@@ -896,22 +921,32 @@ const CallScreen = () => {
               onClick={endCall}
               title="End call"
               style={{
-                width: '56px', height: '48px',
+                width: '56px',
+                height: '48px',
                 borderRadius: '24px',
                 border: 'none',
-                background: '#ef4444',
+                background: '#ea4335',
                 color: '#fff',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                transition: 'transform 0.15s, background 0.2s',
-                flexShrink: 0
+                transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.2s ease',
+                flexShrink: 0,
+                boxShadow: '0 4px 14px rgba(234, 67, 53, 0.35)'
               }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.06)'; e.currentTarget.style.background = '#dc2626'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.background = '#ef4444'; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'scale(1.08)';
+                e.currentTarget.style.backgroundColor = '#dc2626';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(220, 38, 38, 0.45)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.backgroundColor = '#ea4335';
+                e.currentTarget.style.boxShadow = '0 4px 14px rgba(234, 67, 53, 0.35)';
+              }}
             >
-              <PhoneOff />
+              <PhoneHangup />
             </button>
           </div>
         </div>
@@ -1177,24 +1212,31 @@ const BottomBtn = ({ onClick, active, activeColor, label, children }) => (
     borderRadius: '50%',
     border: 'none',
     background: active
-      ? (activeColor || 'rgba(255, 59, 48, 0.25)')
-      : 'rgba(255,255,255,0.1)',
-    color: active ? (activeColor ? '#fff' : '#ff6b6b') : '#fff',
+      ? (activeColor || '#ea4335')
+      : 'rgba(255,255,255,0.08)',
+    color: '#fff',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'transform 0.15s, background 0.2s',
+    transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, box-shadow 0.2s ease',
     flexShrink: 0,
-    position: 'relative'
+    position: 'relative',
+    boxShadow: active ? `0 4px 14px ${activeColor || '#ea4335'}45` : 'none'
   }}
     onMouseEnter={e => {
       e.currentTarget.style.transform = 'scale(1.08)';
-      if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+      if (!active) {
+        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.18)';
+        e.currentTarget.style.boxShadow = '0 4px 12px rgba(255,255,255,0.08)';
+      }
     }}
     onMouseLeave={e => {
       e.currentTarget.style.transform = 'scale(1)';
-      if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+      if (!active) {
+        e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)';
+        e.currentTarget.style.boxShadow = 'none';
+      }
     }}
   >
     {children}
@@ -1307,22 +1349,27 @@ const VideoOffIcon = () => (
 );
 
 const ScreenShareIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M13 3l3 3-3 3"/>
-    <path d="M6 14v1a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/>
-    <rect x="2" y="14" width="8" height="6" rx="1"/>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+    <line x1="8" y1="21" x2="16" y2="21" />
+    <line x1="12" y1="17" x2="12" y2="21" />
+    <path d="M12 13V7M12 7l-3 3M12 7l3 3" />
   </svg>
 );
 
 const FlipCameraIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24"
-    fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/>
-    <path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5"/>
-    <circle cx="12" cy="12" r="3"/>
-    <path d="M17 1l3 3-3 3"/>
-    <path d="M7 23l-3-3 3-3"/>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 16V8a2 2 0 0 0-2-2h-3.17l-1.24-1.86A2 2 0 0 0 12.93 3H11.07a2 2 0 0 0-1.66.86L8.17 6H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z" />
+    <path d="M9.5 12a2.5 2.5 0 0 1 4.5-1.5" />
+    <polyline points="14 8 14 10.5 11.5 10.5" />
+    <path d="M14.5 12a2.5 2.5 0 0 1-4.5 1.5" />
+    <polyline points="10 16 10 13.5 12.5 13.5" />
+  </svg>
+);
+
+const PhoneHangup = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'rotate(135deg)' }}>
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
   </svg>
 );
 

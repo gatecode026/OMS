@@ -125,7 +125,8 @@ const TaskMonitoring = () => {
     projectId: '',
     title: '',
     dueDate: new Date().toISOString().split('T')[0],
-    priority: 'Medium'
+    priority: 'Medium',
+    assigneeId: ''
   });
 
   // When projectsList loads, default the select option
@@ -376,7 +377,8 @@ const TaskMonitoring = () => {
       projectId: projectsList[0]?.id || '',
       title: '',
       dueDate: new Date().toISOString().split('T')[0],
-      priority: 'Medium'
+      priority: 'Medium',
+      assigneeId: ''
     });
   };
 
@@ -1485,6 +1487,18 @@ const TaskMonitoring = () => {
               <option value="Medium">Medium</option>
               <option value="High">High</option>
               <option value="Critical">Critical</option>
+            </select>
+          </div>
+          <div className="form-field">
+            <label>Assign To</label>
+            <select
+              value={createForm.assigneeId}
+              onChange={e => setCreateForm(prev => ({ ...prev, assigneeId: e.target.value }))}
+            >
+              <option value="">Unassigned</option>
+              {(scopedEmployees || []).map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+              ))}
             </select>
           </div>
         </div>
