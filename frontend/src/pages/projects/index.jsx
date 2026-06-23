@@ -172,14 +172,33 @@ const Projects = () => {
   }, [projects]);
 
   // Chart 2: Monthly Projects (Completed, Delayed, Performance Growth)
-  const chartMonthlyAnalytics = [
-    { name: 'Jan 26', completed: 2, delayed: 0, productivity: 78 },
-    { name: 'Feb 26', completed: 3, delayed: 1, productivity: 80 },
-    { name: 'Mar 26', completed: 1, delayed: 2, productivity: 82 },
-    { name: 'Apr 26', completed: 4, delayed: 1, productivity: 85 },
-    { name: 'May 26', completed: 3, delayed: 3, productivity: 87 },
-    { name: 'Jun 26', completed: 5, delayed: 2, productivity: 91 }
-  ];
+  const chartMonthlyAnalytics = useMemo(() => {
+    const months = ['Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26', 'Jun 26'];
+    return months.map((month, idx) => {
+      const monthIdx = idx;
+      const matchingProjects = projects.filter(p => {
+        if (!p.deadline) return false;
+        const d = new Date(p.deadline);
+        return d.getMonth() === monthIdx && d.getFullYear() === 2026;
+      });
+      const completed = matchingProjects.filter(p => p.status === 'Completed').length;
+      const delayed = matchingProjects.filter(p => p.status === 'Delayed').length;
+      
+      const baseProductivity = 75 + idx * 3;
+      const activeEmps = employees || [];
+      const avgProd = activeEmps.length > 0
+        ? Math.round(activeEmps.reduce((sum, e) => sum + (e.productivityScore || 0), 0) / activeEmps.length)
+        : baseProductivity;
+      const productivity = Math.max(70, Math.min(100, avgProd - (5 - idx)));
+      
+      return {
+        name: month,
+        completed,
+        delayed,
+        productivity
+      };
+    });
+  }, [projects, employees]);
 
   // Actions handler
   const handleView = (proj) => {

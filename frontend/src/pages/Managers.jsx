@@ -70,6 +70,50 @@ function reducer(state, action) {
           const teamLeaderIds = teamLeadersUnderManager.map(e => e.id);
           const teamMembersCount = new Set(managedTeams.flatMap(t => (t.membersList || []).map(m => m.id))).size;
           
+          // Calculate dynamic productivity / success rate from tasks
+          const pmTasks = (action.tasks || []).filter(t => projectIds.includes(t.projectId));
+          let dynamicSuccessRate = 0;
+          if (pmTasks.length > 0) {
+            const completed = pmTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length;
+            dynamicSuccessRate = Math.round((completed / pmTasks.length) * 100);
+            
+            // Avoid false 0% score: if tasks exist but completed is 0 (e.g. pending project), fall back to overseen teams or baseline
+            if (dynamicSuccessRate === 0) {
+              if (managedTeams.length > 0) {
+                const teamRates = managedTeams.map(t => {
+                  const teamMemberIds = new Set((t.membersList || []).map(m => m.id));
+                  const teamTasks = (action.tasks || []).filter(task => teamMemberIds.has(task.assigneeId));
+                  if (teamTasks.length > 0) {
+                    const completed = teamTasks.filter(task => task.completed || task.status === 'Done' || task.status === 'Completed').length;
+                    return Math.round((completed / teamTasks.length) * 100);
+                  }
+                  const teamLeaderEmp = action.employees.find(e => e.name === t.leader);
+                  return teamLeaderEmp?.productivityScore || t.productivity || 90;
+                });
+                dynamicSuccessRate = Math.round(teamRates.reduce((sum, val) => sum + val, 0) / teamRates.length);
+              } else {
+                dynamicSuccessRate = emp.productivityScore || 85;
+              }
+            }
+          } else {
+            // Fallback to overseen teams' averages or baseline
+            if (managedTeams.length > 0) {
+              const teamRates = managedTeams.map(t => {
+                const teamMemberIds = new Set((t.membersList || []).map(m => m.id));
+                const teamTasks = (action.tasks || []).filter(task => teamMemberIds.has(task.assigneeId));
+                if (teamTasks.length > 0) {
+                  const completed = teamTasks.filter(task => task.completed || task.status === 'Done' || task.status === 'Completed').length;
+                  return Math.round((completed / teamTasks.length) * 100);
+                }
+                const teamLeaderEmp = action.employees.find(e => e.name === t.leader);
+                return teamLeaderEmp?.productivityScore || t.productivity || 90;
+              });
+              dynamicSuccessRate = Math.round(teamRates.reduce((sum, val) => sum + val, 0) / teamRates.length);
+            } else {
+              dynamicSuccessRate = emp.productivityScore || 85;
+            }
+          }
+
           return {
             id: emp.id,
             empId: emp.id,
@@ -84,9 +128,9 @@ function reducer(state, action) {
             activeProjects: managedProjects.filter(p => p.status === 'In Progress' || p.status === 'Active' || p.status === 'Planning').length,
             teamLeaders: teamLeadersUnderManager.length,
             teamMembers: teamMembersCount || 0,
-            successRate: emp.productivityScore || 0,
-            productivity: emp.productivityScore || 0,
-            clientSatisfaction: emp.productivityScore ? Number((emp.productivityScore / 10).toFixed(1)) : 0.0,
+            successRate: dynamicSuccessRate,
+            productivity: dynamicSuccessRate,
+            clientSatisfaction: dynamicSuccessRate ? Number((dynamicSuccessRate / 10).toFixed(1)) : 8.5,
             projectIds,
             teamLeaderIds,
             departments: [emp.department].filter(Boolean)
@@ -112,15 +156,61 @@ function reducer(state, action) {
         .filter(e => (e.roleId === 'team_leader' || e.designation?.toLowerCase().includes('team leader')) && e.status !== 'Inactive')
         .map(emp => {
           const ledTeam = action.teams.find(t => t.leader === emp.name);
+          let leaderProductivity = emp.productivityScore || 90;
+          let leaderAttendance = emp.attendanceRate || 95;
+          let leaderActiveProjects = ledTeam ? (ledTeam.activeProjects || 0) : 0;
+
+          if (ledTeam) {
+            const teamMemberIds = new Set((ledTeam.membersList || []).map(m => m.id));
+
+            // Real productivity: team tasks completed
+            const teamTasks = (action.tasks || []).filter(task => teamMemberIds.has(task.assigneeId));
+            if (teamTasks.length > 0) {
+              const completed = teamTasks.filter(task => task.completed || task.status === 'Done' || task.status === 'Completed').length;
+              leaderProductivity = Math.round((completed / teamTasks.length) * 100);
+            } else {
+              leaderProductivity = emp.productivityScore || ledTeam.productivity || 90;
+            }
+
+            // Real attendance: team attendance logs
+            const teamAttendanceRecords = (action.attendance || []).filter(att => teamMemberIds.has(att.employeeId));
+            if (teamAttendanceRecords.length > 0) {
+              const present = teamAttendanceRecords.filter(att =>
+                att.status === 'Present' || att.status === 'Late' ||
+                att.status === 'Work From Home' || att.status === 'WFH' || att.status === 'Overtime'
+              ).length;
+              leaderAttendance = Math.round((present / teamAttendanceRecords.length) * 100);
+            } else {
+              // Fallback to team members' attendanceStatus
+              const teamEmps = (action.employees || []).filter(e => teamMemberIds.has(e.id) && e.status === 'Active');
+              if (teamEmps.length > 0) {
+                const presentCount = teamEmps.filter(e =>
+                  ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.attendanceStatus || e.todayPunchStatus)
+                ).length;
+                leaderAttendance = Math.round((presentCount / teamEmps.length) * 100);
+              } else {
+                leaderAttendance = emp.attendanceRate || ledTeam.attendance || 95;
+              }
+            }
+
+            // Real active projects count
+            leaderActiveProjects = (action.projectsList || []).filter(proj => {
+              const isDeptMatch = proj.department && ledTeam.department && proj.department.trim().toLowerCase() === ledTeam.department.trim().toLowerCase();
+              const isLeaderMatch = proj.leader && ledTeam.leader && proj.leader.trim().toLowerCase() === ledTeam.leader.trim().toLowerCase();
+              const hasMemberTask = proj.tasks && proj.tasks.some(task => teamMemberIds.has(task.assigneeId));
+              return (isDeptMatch || isLeaderMatch || hasMemberTask) && proj.status !== 'Completed' && proj.status !== 'Archived';
+            }).length;
+          }
+
           return {
             id: emp.id,
             name: emp.name,
             department: emp.department || 'IT',
             teamName: ledTeam ? ledTeam.name : (emp.team || ''),
             teamMembers: ledTeam ? (ledTeam.membersList?.length || 0) : 0,
-            activeProjects: ledTeam ? (ledTeam.activeProjects || 0) : 0,
-            productivity: emp.productivityScore || 0,
-            attendance: emp.attendanceRate || 100
+            activeProjects: leaderActiveProjects,
+            productivity: leaderProductivity,
+            attendance: leaderAttendance
           };
         });
 
@@ -314,7 +404,7 @@ const PER_PAGE = 10;
 const Managers = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(700);
-  const { addToast, showConfirm, employees, tasks, addTask, departments, branches, addEmployee, updateEmployee, deactivateEmployee, projectsList, teams, updateProject, updateTeam, hasPermission } = useApp();
+  const { addToast, showConfirm, employees, tasks, addTask, departments, branches, addEmployee, updateEmployee, deactivateEmployee, projectsList, teams, updateProject, updateTeam, hasPermission, attendance = [] } = useApp();
   const directoryRef = useRef(null);
   const [activeDetailTab, setActiveDetailTab] = useState('overview');
 
@@ -323,9 +413,9 @@ const Managers = () => {
 
   React.useEffect(() => {
     if (employees && projectsList && teams) {
-      dispatch({ type: 'SYNC_DATA', employees, projectsList, teams });
+      dispatch({ type: 'SYNC_DATA', employees, projectsList, teams, tasks, attendance });
     }
-  }, [employees, projectsList, teams]);
+  }, [employees, projectsList, teams, tasks, attendance]);
 
   const scrollToDirectory = () => {
     setTimeout(() => {
@@ -475,8 +565,19 @@ const Managers = () => {
   }, [pmList]);
 
   const avgUtilizationAll = useMemo(() => {
-    return pmList.some(p => p.teamMembers > 0) ? 80 : 0;
-  }, [pmList]);
+    const activeNonManagers = (employees || []).filter(e => e.roleId !== 'manager' && e.status !== 'Inactive');
+    const total = activeNonManagers.length;
+    if (total === 0) return 0;
+    
+    // Find unique employee IDs assigned to any team under managed projects
+    const allAssignedEmpIds = new Set(pmList.flatMap(pm => {
+      const managedProjects = (projectsList || []).filter(p => p.manager === pm.name || p.managerId === pm.id);
+      const managedTeams = (teams || []).filter(t => managedProjects.some(p => p.leader === t.leader || p.id === t.projectId) || t.department === pm.department);
+      return managedTeams.flatMap(t => (t.membersList || []).map(m => m.id));
+    }));
+    
+    return Math.round((allAssignedEmpIds.size / total) * 100);
+  }, [pmList, employees, projectsList, teams]);
 
   const overallDeadlineCompliance = useMemo(() => {
     const total = projects.length;

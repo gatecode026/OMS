@@ -30,7 +30,7 @@ export const ROUTE_PERMISSIONS = {
   '/projects': ROLES.EMPLOYEE,
   '/tasks': ROLES.EMPLOYEE,
   '/work-reports': ROLES.EMPLOYEE,
-  '/performance': ROLES.TEAM_LEADER,
+  '/performance': ROLES.EMPLOYEE,
   '/calendar': ROLES.EMPLOYEE,
 
   // Employee and above (General Access)

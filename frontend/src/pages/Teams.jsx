@@ -31,7 +31,7 @@ const initialActivities = [];
 const Teams = () => {
   const navigate = useNavigate();
   const isLoading = usePageLoading(600);
-  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments: rawDepartments, addTeam, updateTeam, deleteTeam, projectsList, hasPermission } = useApp();
+  const { addToast, showConfirm, employees, updateEmployee, teams: dbTeams, branches, departments: rawDepartments, addTeam, updateTeam, deleteTeam, projectsList, hasPermission, tasks = [], attendance = [] } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // Recharts Chart Data (Dynamic useMemos)
@@ -118,14 +118,89 @@ const Teams = () => {
   const [schedulerFormState, setSchedulerFormState] = useState({ title: '', date: '', time: '', teamId: '', description: '' });
 
   // Core Team List State
-  const [teams, setTeams] = useState([]);
+  const [rawTeams, setRawTeams] = useState([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
 
   React.useEffect(() => {
     if (dbTeams) {
-      setTeams(dbTeams);
+      setRawTeams(dbTeams);
     }
   }, [dbTeams]);
+
+  // Dynamically compute productivity and attendance for each team based on members, tasks and attendance
+  const teams = useMemo(() => {
+    return (rawTeams || []).map(t => {
+      // Find all employees belonging to this team
+      const teamMemberIds = new Set((t.membersList || []).map(m => m.id));
+
+      // Map membersList with real individual productivity & attendance
+      const updatedMembersList = (t.membersList || []).map(m => {
+        const empTasks = (tasks || []).filter(task => task.assigneeId === m.id);
+        let empProd = 0;
+        if (empTasks.length > 0) {
+          const empCompleted = empTasks.filter(task => task.completed || task.status === 'Done' || task.status === 'Completed').length;
+          empProd = Math.round((empCompleted / empTasks.length) * 100);
+        } else {
+          const empObj = (employees || []).find(e => e.id === m.id);
+          empProd = empObj?.productivityScore || m.productivity || 90;
+        }
+
+        const empAtts = (attendance || []).filter(att => att.employeeId === m.id);
+        let empAtt = 0;
+        if (empAtts.length > 0) {
+          const empPresent = empAtts.filter(att =>
+            att.status === 'Present' || att.status === 'Late' ||
+            att.status === 'Work From Home' || att.status === 'WFH' || att.status === 'Overtime'
+          ).length;
+          empAtt = Math.round((empPresent / empAtts.length) * 100);
+        } else {
+          const empObj = (employees || []).find(e => e.id === m.id);
+          if (empObj) {
+            empAtt = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(empObj.attendanceStatus || empObj.todayPunchStatus) ? 100 : 0;
+          } else {
+            empAtt = m.attendance || 95;
+          }
+        }
+
+        return {
+          ...m,
+          productivity: empProd,
+          attendance: empAtt
+        };
+      });
+
+      const calculatedProductivity = updatedMembersList.length > 0
+        ? Math.round(updatedMembersList.reduce((acc, m) => acc + m.productivity, 0) / updatedMembersList.length)
+        : (t.productivity || 90);
+
+      const calculatedAttendance = updatedMembersList.length > 0
+        ? Math.round(updatedMembersList.reduce((acc, m) => acc + m.attendance, 0) / updatedMembersList.length)
+        : (t.attendance || 95);
+
+      // Calculate real completed tasks
+      const teamTasks = (tasks || []).filter(task => teamMemberIds.has(task.assigneeId));
+      const completedTasksCount = teamTasks.length > 0
+        ? teamTasks.filter(task => task.completed || task.status === 'Done' || task.status === 'Completed').length
+        : t.completedTasks || 0;
+
+      // Calculate real active projects for the team
+      const teamActiveProjects = (projectsList || []).filter(proj => {
+        const isDeptMatch = proj.department && t.department && proj.department.trim().toLowerCase() === t.department.trim().toLowerCase();
+        const isLeaderMatch = proj.leader && t.leader && proj.leader.trim().toLowerCase() === t.leader.trim().toLowerCase();
+        const hasMemberTask = proj.tasks && proj.tasks.some(task => teamMemberIds.has(task.assigneeId));
+        return (isDeptMatch || isLeaderMatch || hasMemberTask) && proj.status !== 'Completed' && proj.status !== 'Archived';
+      }).length;
+
+      return {
+        ...t,
+        activeProjects: teamActiveProjects,
+        productivity: calculatedProductivity,
+        attendance: calculatedAttendance,
+        completedTasks: completedTasksCount,
+        membersList: updatedMembersList
+      };
+    });
+  }, [rawTeams, tasks, attendance, projectsList, employees]);
 
   // Dynamic KPI calculations for team management cards
   const totalTeamsCount = teams.length;
@@ -228,6 +303,46 @@ const Teams = () => {
 
   // Validation state
   const [formErrors, setFormErrors] = useState({});
+
+  // Calc task stats for selectedTeam dynamically
+  const selectedTeamTasks = useMemo(() => {
+    if (!selectedTeam) return [];
+    const teamMemberIds = new Set((selectedTeam.membersList || []).map(m => m.id));
+    return (tasks || []).filter(task => teamMemberIds.has(task.assigneeId));
+  }, [selectedTeam, tasks]);
+
+  const selectedTeamTaskStats = useMemo(() => {
+    const total = selectedTeamTasks.length;
+    const completed = selectedTeamTasks.filter(task => task.completed || task.status === 'Done' || task.status === 'Completed').length;
+    const pending = total - completed;
+    const overdue = selectedTeamTasks.filter(task => {
+      if (task.completed || task.status === 'Done' || task.status === 'Completed') return false;
+      const dueDate = task.dueDate;
+      if (!dueDate) return false;
+      return new Date(dueDate) < new Date();
+    }).length;
+    const rate = total > 0 ? Math.round((completed / total) * 100) : (selectedTeam?.productivity || 0);
+
+    return { total, completed, pending, overdue, rate };
+  }, [selectedTeamTasks, selectedTeam]);
+
+  // Compute real project stats for the selected team from projectsList
+  const selectedTeamProjectStats = useMemo(() => {
+    if (!selectedTeam) return { active: 0, completed: 0, pending: 0, delayed: 0 };
+    const teamMemberIds = new Set((selectedTeam.membersList || []).map(m => m.id));
+    // Filter projects that belong to this team by department, leader, or member assignment
+    const teamProjects = (projectsList || []).filter(proj => {
+      const isDeptMatch = proj.department && selectedTeam.department && proj.department.trim().toLowerCase() === selectedTeam.department.trim().toLowerCase();
+      const isLeaderMatch = proj.leader && selectedTeam.leader && proj.leader.trim().toLowerCase() === selectedTeam.leader.trim().toLowerCase();
+      const hasMemberTask = proj.tasks && proj.tasks.some(task => teamMemberIds.has(task.assigneeId));
+      return isDeptMatch || isLeaderMatch || hasMemberTask;
+    });
+    const active = teamProjects.filter(p => p.status === 'In Progress' || p.status === 'Active').length;
+    const completed = teamProjects.filter(p => p.status === 'Completed').length;
+    const pending = teamProjects.filter(p => p.status === 'Pending' || p.status === 'On Hold' || p.status === 'Planning' || p.status === 'Not Started').length;
+    const delayed = teamProjects.filter(p => p.status === 'Delayed' || p.status === 'Overdue').length;
+    return { active, completed, pending, delayed };
+  }, [selectedTeam, projectsList]);
 
   React.useEffect(() => {
     setSelectedMemberIds([]);
@@ -416,17 +531,94 @@ const Teams = () => {
 
   const handleExport = (format) => {
     addToast('info', `Exporting data as ${format}...`);
+    const headers = ['Team ID', 'Team Name', 'Team Leader', 'Department', 'Member Count', 'Active Projects', 'Productivity Rate (%)', 'Attendance Rate (%)', 'Status'];
+    const rows = teams.map(t => [
+      t.id || '',
+      t.name || '',
+      t.leader || '',
+      t.department || '',
+      t.memberCount || 0,
+      t.activeProjects || 0,
+      t.productivityRate || 0,
+      t.attendanceRate || 0,
+      t.status || 'Active'
+    ]);
+
+    if (format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+        const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Teams Directory</title>
+              <style>
+                body { font-family: sans-serif; padding: 20px; color: #334155; }
+                h1 { color: #0f172a; margin-bottom: 5px; }
+                p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                tr:nth-child(even) td { background-color: #f8fafc; }
+              </style>
+            </head>
+            <body>
+              <h1>Teams Directory</h1>
+              <p>Generated on: ${new Date().toLocaleString()}</p>
+              <table>
+                <thead><tr>${tableHeadersHTML}</tr></thead>
+                <tbody>${tableRowsHTML}</tbody>
+              </table>
+              <script>
+                window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    } else {
+      const csvContent = "\ufeff" + [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `teams_directory_${Date.now()}.${format === 'Excel' ? 'xls' : 'csv'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast('success', 'Teams list downloaded successfully.');
+    }
   };
 
   const handleGenerateAnalyticsReport = () => {
     addToast('info', 'Compiling team performance analytics report...');
     setTimeout(() => {
-      const reportContent = `TEAM PERFORMANCE AUDIT REPORT\nDate: ${new Date().toLocaleDateString()}\nActive Teams: ${teams.length}\n`;
-      const blob = new Blob([reportContent], { type: 'text/plain' });
+      const headers = ['Team ID', 'Team Name', 'Department', 'Member Count', 'Productivity Score (%)', 'Attendance Score (%)'];
+      const rows = teams.map(t => [
+        t.id || '',
+        t.name || '',
+        t.department || '',
+        t.memberCount || 0,
+        t.productivityRate || 0,
+        t.attendanceRate || 0
+      ]);
+
+      const csvContent = "\ufeff" + [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `teams_analytics_report_${Date.now()}.txt`;
+      a.download = `teams_analytics_report_${Date.now()}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -437,32 +629,148 @@ const Teams = () => {
 
   const handleExportFormSubmit = (e) => {
     e.preventDefault();
-    addToast('success', `Exported ${exportFormState.type} successfully as ${exportFormState.format}!`);
+    addToast('info', `Compiling ${exportFormState.type} in ${exportFormState.format} format...`);
+    const format = exportFormState.format;
+    const includeInactive = exportFormState.includeInactive;
+    const filteredTeams = includeInactive ? teams : teams.filter(t => t.status === 'Active');
+    
+    const headers = ['Team ID', 'Team Name', 'Team Leader', 'Department', 'Member Count', 'Active Projects', 'Productivity Rate (%)', 'Attendance Rate (%)', 'Status'];
+    const rows = filteredTeams.map(t => [
+      t.id || '',
+      t.name || '',
+      t.leader || '',
+      t.department || '',
+      t.memberCount || 0,
+      t.activeProjects || 0,
+      t.productivityRate || 0,
+      t.attendanceRate || 0,
+      t.status || 'Active'
+    ]);
+
+    if (format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+        const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${exportFormState.type}</title>
+              <style>
+                body { font-family: sans-serif; padding: 20px; color: #334155; }
+                h1 { color: #0f172a; margin-bottom: 5px; }
+                p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                tr:nth-child(even) td { background-color: #f8fafc; }
+              </style>
+            </head>
+            <body>
+              <h1>${exportFormState.type}</h1>
+              <p>Generated on: ${new Date().toLocaleString()}</p>
+              <table>
+                <thead><tr>${tableHeadersHTML}</tr></thead>
+                <tbody>${tableRowsHTML}</tbody>
+              </table>
+              <script>
+                window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    } else {
+      const csvContent = "\ufeff" + [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${exportFormState.type.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.${format === 'Excel' ? 'xls' : 'csv'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast('success', `${exportFormState.type} exported successfully as ${format}.`);
+    }
     setShowExportModal(false);
   };
 
   const handleReportFormSubmit = (e) => {
     e.preventDefault();
     addToast('info', `Compiling ${reportFormState.type} report...`);
-    setTimeout(() => {
-      const reportContent = `TEAM ANALYTICS REPORT: ${reportFormState.type.toUpperCase()}
-Date Generated: ${new Date().toLocaleString()}
-Date Range: ${reportFormState.dateRange}
-Target Department: ${reportFormState.targetDepartment}
-Active Teams Mapped: ${teams.length}
-`;
-      const blob = new Blob([reportContent], { type: 'text/plain' });
+    const format = exportFormat;
+    const dept = reportFormState.targetDepartment;
+    const filteredTeams = dept === 'All' ? teams : teams.filter(t => t.department === dept);
+
+    const headers = ['Team Name', 'Team Leader', 'Department', 'Member Count', 'Active Projects', 'Productivity Rate (%)', 'Attendance Rate (%)'];
+    const rows = filteredTeams.map(t => [
+      t.name || '',
+      t.leader || '',
+      t.department || '',
+      t.memberCount || 0,
+      t.activeProjects || 0,
+      t.productivityRate || 0,
+      t.attendanceRate || 0
+    ]);
+
+    if (format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+        const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${reportFormState.type} Report</title>
+              <style>
+                body { font-family: sans-serif; padding: 20px; color: #334155; }
+                h1 { color: #0f172a; margin-bottom: 5px; }
+                p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                tr:nth-child(even) td { background-color: #f8fafc; }
+              </style>
+            </head>
+            <body>
+              <h1>${reportFormState.type} Report</h1>
+              <p>Department: ${dept} | Range: ${reportFormState.dateRange}<br/>Generated on: ${new Date().toLocaleString()}</p>
+              <table>
+                <thead><tr>${tableHeadersHTML}</tr></thead>
+                <tbody>${tableRowsHTML}</tbody>
+              </table>
+              <script>
+                window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    } else {
+      const csvContent = "\ufeff" + [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${reportFormState.type.toLowerCase().replace(/\s+/g, '_')}_report.txt`;
+      a.download = `${reportFormState.type.toLowerCase().replace(/\s+/g, '_')}_report_${Date.now()}.${format === 'Excel' ? 'xls' : 'csv'}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      addToast('success', 'Report Generated & Downloaded Successfully!');
-      setShowReportModal(false);
-    }, 800);
+      addToast('success', `${reportFormState.type} report downloaded successfully.`);
+    }
+    setShowReportModal(false);
   };
 
   const handlePostAlertSubmit = (e) => {
@@ -758,12 +1066,12 @@ Active Teams Mapped: ${teams.length}
             {showSummary && (
               <div className="teams-top-cards">
                 {[
-                  { label: 'Total Teams', desc: 'Active organizational groups', value: totalTeamsCount, trend: '↑ 4.2% this month', icon: Users, colorClass: 'teams-top-icon-blue' },
-                  { label: 'Active Teams', desc: 'Teams with active task pipelines', value: activeTeamsCount, trend: '↑ 2.1% this month', icon: CheckCircle2, colorClass: 'teams-top-icon-green' },
-                  { label: 'Team Leaders', desc: 'Designated team commanders', value: teamLeadersCount, trend: '↑ 1.8% this month', icon: Award, colorClass: 'teams-top-icon-purple' },
-                  { label: 'Total Members', desc: 'Employees assigned to groups', value: totalMembersCount.toLocaleString(), trend: '↑ 6.3% this month', icon: Users, colorClass: 'teams-top-icon-amber' },
-                  { label: 'Active Projects', desc: 'Ongoing deliverables mapped', value: activeProjectsCount, trend: '↑ 3.5% this month', icon: Briefcase, colorClass: 'teams-top-icon-coral' },
-                  { label: 'Productivity Rate', desc: 'Average velocity rating', value: `${averageProductivity}%`, trend: '↑ 1.2% this month', icon: BarChart2, colorClass: 'teams-top-icon-teal' }
+                  { label: 'Total Teams', desc: 'Active organizational groups', value: totalTeamsCount, trend: 'Active', icon: Users, colorClass: 'teams-top-icon-blue' },
+                  { label: 'Active Teams', desc: 'Teams with active task pipelines', value: activeTeamsCount, trend: '100% operational', icon: CheckCircle2, colorClass: 'teams-top-icon-green' },
+                  { label: 'Team Leaders', desc: 'Designated team commanders', value: teamLeadersCount, trend: 'Assigned', icon: Award, colorClass: 'teams-top-icon-purple' },
+                  { label: 'Total Members', desc: 'Employees assigned to groups', value: totalMembersCount.toLocaleString(), trend: 'Active', icon: Users, colorClass: 'teams-top-icon-amber' },
+                  { label: 'Active Projects', desc: 'Ongoing deliverables mapped', value: activeProjectsCount, trend: 'Ongoing', icon: Briefcase, colorClass: 'teams-top-icon-coral' },
+                  { label: 'Productivity Rate', desc: 'Average velocity rating', value: `${averageProductivity}%`, trend: 'Based on tasks', icon: BarChart2, colorClass: 'teams-top-icon-teal' }
                 ].map((c, i) => {
                   const Icon = c.icon;
                   return (
@@ -1771,10 +2079,10 @@ Active Teams Mapped: ${teams.length}
                   <div className="teams-slideover-section-title">Project Allocation Status</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     {[
-                      { label: 'Active Projects', value: selectedTeam.activeProjects, color: '#3b82f6' },
-                      { label: 'Completed Projects', value: selectedTeam.completedTasks, color: '#10b981' },
-                      { label: 'Pending Projects', value: 3, color: '#f59e0b' },
-                      { label: 'Delayed Projects', value: 1, color: '#ef4444' }
+                      { label: 'Active Projects', value: selectedTeamProjectStats.active, color: '#3b82f6' },
+                      { label: 'Completed Projects', value: selectedTeamProjectStats.completed, color: '#10b981' },
+                      { label: 'Pending Projects', value: selectedTeamProjectStats.pending, color: '#f59e0b' },
+                      { label: 'Delayed Projects', value: selectedTeamProjectStats.delayed, color: '#ef4444' }
                     ].map((proj, idx) => (
                       <div key={idx} className="teams-mini-score-card" style={{ borderLeft: `3px solid ${proj.color}`, padding: 12, textAlign: 'left' }}>
                         <span className="teams-mini-score-val" style={{ color: proj.color }}>{proj.value}</span>
@@ -1790,14 +2098,14 @@ Active Teams Mapped: ${teams.length}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div className="teams-slideover-section-title">Task Completion Metrics</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div><strong>Total Assigned:</strong> {selectedTeam.completedTasks + 15}</div>
-                    <div><strong>Completed Tasks:</strong> {selectedTeam.completedTasks}</div>
-                    <div><strong>Pending Tasks:</strong> 12</div>
-                    <div><strong>Overdue Tasks:</strong> 3</div>
+                    <div><strong>Total Assigned:</strong> {selectedTeamTaskStats.total}</div>
+                    <div><strong>Completed Tasks:</strong> {selectedTeamTaskStats.completed}</div>
+                    <div><strong>Pending Tasks:</strong> {selectedTeamTaskStats.pending}</div>
+                    <div><strong>Overdue Tasks:</strong> {selectedTeamTaskStats.overdue}</div>
                     <div style={{ gridColumn: 'span 2', marginTop: 10 }}>
-                      <div className="teams-filter-label" style={{ marginBottom: 4 }}>Completion rate: {Math.round((selectedTeam.completedTasks / (selectedTeam.completedTasks + 15)) * 100)}%</div>
+                      <div className="teams-filter-label" style={{ marginBottom: 4 }}>Completion rate: {selectedTeamTaskStats.rate}%</div>
                       <div className="dept-budget-bar-bg" style={{ height: 6 }}>
-                        <div className="dept-budget-bar-fill" style={{ width: `${Math.round((selectedTeam.completedTasks / (selectedTeam.completedTasks + 15)) * 100)}%`, background: '#8b5cf6' }} />
+                        <div className="dept-budget-bar-fill" style={{ width: `${selectedTeamTaskStats.rate}%`, background: '#8b5cf6' }} />
                       </div>
                     </div>
                   </div>
@@ -1809,9 +2117,9 @@ Active Teams Mapped: ${teams.length}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div className="teams-slideover-section-title">Roster Daily Attendance Overview</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div><strong>Present Members:</strong> {selectedTeam.membersList ? selectedTeam.membersList.length : 4}</div>
-                    <div><strong>Absent Members:</strong> 0</div>
-                    <div><strong>On Leave:</strong> 0</div>
+                    <div><strong>Present Members:</strong> {selectedTeam.membersList ? selectedTeam.membersList.filter(m => m.attendance === 100).length : 0}</div>
+                    <div><strong>Absent/Other Members:</strong> {selectedTeam.membersList ? selectedTeam.membersList.filter(m => m.attendance !== 100).length : 0}</div>
+                    <div><strong>Total Roster Size:</strong> {selectedTeam.membersList ? selectedTeam.membersList.length : 0}</div>
                     <div><strong>Attendance Rate:</strong> {selectedTeam.attendance}%</div>
                   </div>
                 </div>

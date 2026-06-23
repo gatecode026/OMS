@@ -1245,7 +1245,12 @@ export const registerChatSocketHandlers = (io) => {
                 await currentCall.save();
                 io.to(`user:${userId}`).emit('call:missed', { callId, callerName: name, reason: 'no_answer' });
                 io.to(`user:${targetUserId}`).emit('call:missed', { callId, callerName: name, reason: 'no_answer' });
-                socketActiveCalls.delete(socket.id);
+                // Clean up socketActiveCalls entries for this callId
+                for (const [sid, callData] of socketActiveCalls.entries()) {
+                  if (callData.callId === callId) {
+                    socketActiveCalls.delete(sid);
+                  }
+                }
                 await createCallHistoryMessage(currentCall, companyId, io);
 
                 // Dispatch missed call Web Push notification
@@ -1488,7 +1493,13 @@ export const registerChatSocketHandlers = (io) => {
             }
           })
         ).catch(err => logger.error('[Chat] Disconnect call cleanup error:', err));
-        socketActiveCalls.delete(socket.id);
+        
+        // Clean up socketActiveCalls entries for this callId
+        for (const [sid, callData] of socketActiveCalls.entries()) {
+          if (callData.callId === callId) {
+            socketActiveCalls.delete(sid);
+          }
+        }
       }
 
       if (expiryTimeout) {

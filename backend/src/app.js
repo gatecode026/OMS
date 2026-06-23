@@ -30,6 +30,8 @@ import publicRouter from './modules/companies/public.routes.js';
 
 const app = express();
 
+// Configure trust proxy for correct client IP detection under reverse proxies (essential for express-rate-limit)
+app.set('trust proxy', 1);
 
 // ─── SECURITY MIDDLEWARES ────────────────────────────────────────────────────
 app.use(helmet());

@@ -610,9 +610,34 @@ const Notifications = () => {
   // Export report trigger
   const handleExportData = () => {
     addPageToast('info', 'Generating notification delivery audit report...');
-    setTimeout(() => {
-      addPageToast('success', 'Notification_Audit_June_2026.pdf successfully downloaded.');
-    }, 1200);
+    const headers = ['Notification ID', 'Title', 'Message', 'Category', 'Priority', 'Recipients Count', 'Sent By', 'Sent Date', 'Delivery Status', 'Read Status'];
+    const rows = filteredNotifications.map(n => [
+      n.id || '',
+      n.title || '',
+      n.message || '',
+      n.category || '',
+      n.priority || '',
+      n.recipients || 0,
+      n.sentBy || '',
+      n.sentDate || '',
+      n.deliveryStatus || '',
+      n.readStatus || ''
+    ]);
+
+    const csvContent = "\ufeff" + [
+      headers.join(','),
+      ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `notifications_audit_report_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    addPageToast('success', 'Notification delivery audit report downloaded.');
   };
 
   // --- Recharts Analytics Data ---

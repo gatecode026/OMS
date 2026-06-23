@@ -308,6 +308,7 @@ employeeSchema.plugin(tenantPlugin);
 // Compound unique indexes: scoped per company (allows same id/email across different companies)
 employeeSchema.index({ companyId: 1, id: 1 }, { unique: true });
 employeeSchema.index({ companyId: 1, email: 1 }, { unique: true });
+employeeSchema.index({ companyId: 1, phone: 1 }, { sparse: true });
 
 employeeSchema.index({ companyId: 1, employeeCode: 1 }, { unique: true, sparse: true });
 

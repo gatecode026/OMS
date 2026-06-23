@@ -1435,7 +1435,7 @@ Routes defined inside `frontend/src/main.jsx`:
 * `/leaves` ➡️ [LeaveManagement.jsx](file:///r:/OMS/frontend/src/pages/LeaveManagement.jsx) (Leave requests, policies)
 * `/departments` ➡️ [Departments.jsx](file:///r:/OMS/frontend/src/pages/Departments.jsx) (Departments list and scopes)
 * `/branches` ➡️ [Branches.jsx](file:///r:/OMS/frontend/src/pages/Branches.jsx) (Offices location configs)
-* `/teams` ➡️ [Teams.jsx](file:///r:/OMS/frontend/src/pages/Teams.jsx) (Teams list boards)
+* `/teams` ➡️ [Teams.jsx](file:///r:/OMS/frontend/src/pages/Teas.jsx) (Teams list boards)
 * `/teams/leaders` ➡️ [TeamLeaders.jsx](file:///r:/OMS/frontend/src/pages/TeamLeaders.jsx) (Leaders tracking views)
 * `/projects` ➡️ [Projects.jsx](file:///r:/OMS/frontend/src/pages/projects/index.jsx) (Active projects boards)
 * `/managers` ➡️ [Managers.jsx](file:///r:/OMS/frontend/src/pages/Managers.jsx) (Managers list views)

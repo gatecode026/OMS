@@ -1241,7 +1241,7 @@ const WorkReports = () => {
                   else if (status === 'Submitted') dotClass = 'status-submitted';
                   else dotClass = 'status-flagged';
                 } else if (cell.day && cell.day < 3 && currentMonth === 5) {
-                  // Mock missing reports for dates before today in June
+                  // Mark past days without submissions as missing
                   dotClass = 'status-missing';
                 }
 

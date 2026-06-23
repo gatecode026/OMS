@@ -127,6 +127,7 @@ const leaveSchema = new mongoose.Schema({
 });
 
 leaveSchema.plugin(tenantPlugin);
+leaveSchema.index({ companyId: 1, id: 1 }, { unique: true });
 leaveSchema.index({ companyId: 1, leaveCode: 1 }, { unique: true, sparse: true });
 
 leaveSchema.pre('save', async function(next) {

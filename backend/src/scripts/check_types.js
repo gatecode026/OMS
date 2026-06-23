@@ -9,15 +9,13 @@ const dbUri = process.env.DB_URI;
 
 async function check() {
   await mongoose.connect(dbUri);
-  console.log('Connected to Main DB');
-  
   const connection = await getTenantConnection('COMP-001');
-  const Project = connection.models['Project'] || connection.model('Project', new mongoose.Schema({}, { strict: false }));
+  const Employee = connection.models['Employee'] || connection.model('Employee', new mongoose.Schema({}, { strict: false }));
   
-  const projects = await Project.find({}).lean();
-  console.log('Projects in database:');
-  console.log(JSON.stringify(projects, null, 2));
-  
+  const employees = await Employee.find({}).lean();
+  employees.forEach(e => {
+    console.log(`Name: ${e.name} | productivityScore: ${e.productivityScore} (${typeof e.productivityScore})`);
+  });
   await mongoose.disconnect();
 }
 

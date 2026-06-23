@@ -80,6 +80,9 @@ const attendanceSchema = new mongoose.Schema({
 });
 
 attendanceSchema.plugin(tenantPlugin);
+attendanceSchema.index({ companyId: 1, id: 1 }, { unique: true });
+attendanceSchema.index({ companyId: 1, employeeId: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ companyId: 1, date: 1 });
 
 const Attendance = mongoose.model('Attendance', attendanceSchema);
 

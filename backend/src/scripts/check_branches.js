@@ -1,32 +1,12 @@
-import dotenv from 'dotenv';
-dotenv.config();
-import { setServers } from 'dns';
-setServers(['1.1.1.1']);
-import mongoose from 'mongoose';
-import { getTenantConnection } from '../utils/multidbConnection.js';
+import fs from 'fs';
 
-const dbUri = process.env.DB_URI;
+const content = fs.readFileSync('c:/Users/anime/OneDrive/Desktop/Desktop/GateCode(All Folders)/OMS/frontend/src/pages/Branches.jsx', 'utf8');
+const lines = content.split('\n');
 
-async function check() {
-  await mongoose.connect(dbUri);
-  console.log('Connected to Main DB');
-  
-  const connection = await getTenantConnection('COMP-001');
-  
-  // Let's list the models to see what models exist
-  console.log('Registered Models:', Object.keys(connection.models));
-  
-  // Check if Branch and Department models exist
-  const Branch = connection.models['Branch'] || connection.model('Branch', new mongoose.Schema({}, { strict: false }));
-  const Department = connection.models['Department'] || connection.model('Department', new mongoose.Schema({}, { strict: false }));
-  
-  const branches = await Branch.find({}).lean();
-  const departments = await Department.find({}).lean();
-  
-  console.log('Branches in database:', branches);
-  console.log('Departments in database:', departments);
-  
-  await mongoose.disconnect();
+console.log('Searching for fallback, mock, or hardcoded markers in Branches.jsx...');
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i];
+  if (line.includes('Delhi') || line.includes('Jaipur') || line.includes('Mumbai') || line.includes('dummy') || line.includes('mock') || line.includes('fallback') || line.includes('static')) {
+    console.log(`Line ${i + 1}: ${line.trim()}`);
+  }
 }
-
-check().catch(console.error);

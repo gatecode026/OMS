@@ -149,7 +149,8 @@ export const getCompanies = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, search = '' } = req.query;
   const filter = {};
   if (search) {
-    filter.name = new RegExp(search.trim(), 'i');
+    const escapedSearch = search.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    filter.name = new RegExp(escapedSearch, 'i');
   }
 
   const parsedPage = Math.max(1, parseInt(page));

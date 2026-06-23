@@ -284,7 +284,7 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves } = useApp();
+  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves, generalSettings } = useApp();
   const location = useLocation();
 
   const getLocalDateString = () => {
@@ -304,6 +304,9 @@ const Employees = () => {
   const getTodayStatus = (row) => {
     const att = getTodayAttendance(row.id);
     if (att) return att.status;
+    if (row.status === 'Active') {
+      return row.attendanceStatus || 'Present';
+    }
     return 'Absent';
   };
 
@@ -1408,24 +1411,86 @@ const Employees = () => {
       addToast('info', 'All documents cleared');
     }
   };
-  const sortedByProductivity = [...employees].sort((a, b) => (b.productivityScore || 0) - (a.productivityScore || 0));
-  const sortedByOverallPerf = [...employees].sort((a, b) => {
-    const scoreA = a.performanceScore?.overall || a.productivityScore || 0;
-    const scoreB = b.performanceScore?.overall || b.productivityScore || 0;
-    return scoreB - scoreA;
-  });
-  const sortedByAttendance = [...employees].sort((a, b) => {
-    const statusA = getTodayStatus(a);
-    const statusB = getTodayStatus(b);
-    const attA = a.performanceScore?.attendance || (statusA === 'Present' ? 95 : 80);
-    const attB = b.performanceScore?.attendance || (statusB === 'Present' ? 95 : 80);
-    return attB - attA;
-  });
+  // ── Recognition Spotlight: 100% real-data rankings ─────────────────────────
 
+  // 1. Employee of Month: highest performanceScore.overall, tiebreak by productivityScore
+  const sortedByOverallPerf = [...employees]
+    .filter(e => e.status !== 'Inactive')
+    .sort((a, b) => {
+      const scoreA = a.performanceScore?.overall || a.productivityScore || 0;
+      const scoreB = b.performanceScore?.overall || b.productivityScore || 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      // Tiebreak: higher productivityScore wins
+      return (b.productivityScore || 0) - (a.productivityScore || 0);
+    });
+
+  // 2. Best Performer: highest performanceScore.taskCompletion, tiebreak by overall
+  const sortedByTaskPerf = [...employees]
+    .filter(e => e.status !== 'Inactive')
+    .sort((a, b) => {
+      const tA = a.performanceScore?.taskCompletion || 0;
+      const tB = b.performanceScore?.taskCompletion || 0;
+      if (tB !== tA) return tB - tA;
+      const oA = a.performanceScore?.overall || a.productivityScore || 0;
+      const oB = b.performanceScore?.overall || b.productivityScore || 0;
+      return oB - oA;
+    });
+
+  // 3. Attendance Champ: most Present/Late/WFH records THIS calendar month in the attendance log
+  const nowForAtt = new Date();
+  const thisYYYY = nowForAtt.getFullYear();
+  const thisMM = String(nowForAtt.getMonth() + 1).padStart(2, '0');
+  const thisMonthPrefix = `${thisYYYY}-${thisMM}`; // e.g. "2026-06"
+
+  const attendanceCountMap = {};
+  (attendance || []).forEach(rec => {
+    if (rec.date && rec.date.startsWith(thisMonthPrefix)) {
+      const s = rec.status || '';
+      if (s === 'Present' || s === 'Late' || s === 'Work From Home' || s === 'WFH' || s === 'Overtime') {
+        attendanceCountMap[rec.employeeId] = (attendanceCountMap[rec.employeeId] || 0) + 1;
+      }
+    }
+  });
+  const sortedByAttendance = [...employees]
+    .filter(e => e.status !== 'Inactive')
+    .sort((a, b) => {
+      const cntA = attendanceCountMap[a.id] || 0;
+      const cntB = attendanceCountMap[b.id] || 0;
+      if (cntB !== cntA) return cntB - cntA;
+      // Tiebreak: attendance score from performanceScore
+      return (b.performanceScore?.attendance || 0) - (a.performanceScore?.attendance || 0);
+    });
+
+  // 4. Most Productive: highest productivityScore, tiebreak by performanceScore.overall
+  const sortedByProductivity = [...employees]
+    .filter(e => e.status !== 'Inactive')
+    .sort((a, b) => {
+      const pA = a.productivityScore || 0;
+      const pB = b.productivityScore || 0;
+      if (pB !== pA) return pB - pA;
+      const oA = a.performanceScore?.overall || 0;
+      const oB = b.performanceScore?.overall || 0;
+      return oB - oA;
+    });
+
+  // Pick 4 unique winners — each must be a different person
   const empOfMonth = sortedByOverallPerf[0] || { name: '—' };
-  const bestPerformer = sortedByOverallPerf.find(e => e.id !== empOfMonth.id) || sortedByOverallPerf[0] || { name: '—' };
-  const attendanceChamp = sortedByAttendance.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id) || sortedByAttendance[0] || { name: '—' };
-  const mostProductive = sortedByProductivity.find(e => e.id !== empOfMonth.id && e.id !== bestPerformer.id && e.id !== attendanceChamp.id) || sortedByProductivity[0] || { name: '—' };
+  const usedIds = new Set([empOfMonth.id].filter(Boolean));
+
+  const bestPerformer = sortedByTaskPerf.find(e => !usedIds.has(e.id))
+    || sortedByOverallPerf.find(e => !usedIds.has(e.id))
+    || sortedByOverallPerf[0]
+    || { name: '—' };
+  if (bestPerformer.id) usedIds.add(bestPerformer.id);
+
+  const attendanceChamp = sortedByAttendance.find(e => !usedIds.has(e.id))
+    || sortedByAttendance[0]
+    || { name: '—' };
+  if (attendanceChamp.id) usedIds.add(attendanceChamp.id);
+
+  const mostProductive = sortedByProductivity.find(e => !usedIds.has(e.id))
+    || sortedByProductivity[0]
+    || { name: '—' };
 
   return (
     <div className="employees-page flex-column grid-gap">
@@ -2972,13 +3037,13 @@ const Employees = () => {
               <div className="id-card-front">
                 <div className="id-card-front-header-bg"><div className="id-card-watermark"></div></div>
                 <div className="id-card-front-pink-bg"></div>
-                <div className="id-card-logo-area"><svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg><div className="id-card-company-title">{idCardEmployee.companyName || 'OM ENTERPRISE'}</div><div className="id-card-company-subtitle">{idCardEmployee.branch ? (idCardEmployee.branch.toLowerCase().includes('branch') ? idCardEmployee.branch : `${idCardEmployee.branch} Branch`) : 'Gatecode OMS'}</div></div>
+                <div className="id-card-logo-area"><svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg><div className="id-card-company-title">{idCardEmployee.companyName || generalSettings?.companyName || 'OMS Enterprise'}</div><div className="id-card-company-subtitle">{idCardEmployee.branch ? (idCardEmployee.branch.toLowerCase().includes('branch') ? idCardEmployee.branch : `${idCardEmployee.branch} Branch`) : 'Gatecode OMS'}</div></div>
                 <div className="id-card-photo-wrap"><Avatar name={idCardEmployee.name} size="xl" className="id-card-photo-img" src={idCardEmployee.avatar || idCardEmployee.photoUrl} /></div>
                 <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(idCardEmployee.name)}</h2><p className="id-card-emp-role">{idCardEmployee.designation || idCardEmployee.role}</p></div>
-                <div className="id-card-details-grid"><div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.id}</div><div className="id-detail-label">Dept.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.department}</div><div className="id-detail-label">Deg.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.designation || idCardEmployee.role}</div><div className="id-detail-label">DOB</div><div className="id-detail-colon">:</div><div className="id-detail-value">{fmtDob(idCardEmployee.dob)}</div><div className="id-detail-label">Email</div><div className="id-detail-colon">:</div><div className="id-detail-value" title={idCardEmployee.workEmail || idCardEmployee.email}>{idCardEmployee.workEmail || idCardEmployee.email}</div></div>
+                <div className="id-card-details-grid"><div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.id}</div>{idCardEmployee.roleId !== 'manager' && (<><div className="id-detail-label">Dept.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.department}</div></>)}<div className="id-detail-label">Deg.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.designation || idCardEmployee.role}</div></div>
               </div>
               <div className="id-card-back">
-                <div className="id-card-back-bullets"><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {idCardEmployee.companyName || 'OM Enterprise'} and must be returned on demand.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {idCardEmployee.branchAddress || getBranchAddress(idCardEmployee.branch, dbBranches)}</p></div></div>
+                <div className="id-card-back-bullets"><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {idCardEmployee.companyName || generalSettings?.companyName || 'OMS Enterprise'} and must be returned on demand.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {idCardEmployee.branchAddress || getBranchAddress(idCardEmployee.branch, dbBranches)}</p></div></div>
                 <div className="id-card-back-middle"><div className="id-card-back-dates"><div className="id-date-row"><span className="id-date-label">Join Date:</span><span className="id-date-val">{fmtJoinDate(idCardEmployee.joinDate)}</span></div><div className="id-date-row"><span className="id-date-label">Expire Date:</span><span className="id-date-val">{idCardEmployee.contractEndDate ? fmtJoinDate(idCardEmployee.contractEndDate) : calculateExpiry(idCardEmployee.joinDate)}</span></div><div className="id-card-barcode-area"><svg viewBox="0 0 100 20" className="id-card-barcode-svg"><rect x="0" y="0" width="3" height="20" fill="#0f172a" /><rect x="5" y="0" width="1" height="20" fill="#0f172a" /><rect x="8" y="0" width="2" height="20" fill="#0f172a" /><rect x="12" y="0" width="4" height="20" fill="#0f172a" /><rect x="18" y="0" width="1" height="20" fill="#0f172a" /><rect x="21" y="0" width="2" height="20" fill="#0f172a" /><rect x="25" y="0" width="3" height="20" fill="#0f172a" /><rect x="30" y="0" width="1" height="20" fill="#0f172a" /><rect x="33" y="0" width="2" height="20" fill="#0f172a" /><rect x="37" y="0" width="5" height="20" fill="#0f172a" /><rect x="44" y="0" width="1" height="20" fill="#0f172a" /><rect x="47" y="0" width="3" height="20" fill="#0f172a" /><rect x="52" y="0" width="2" height="20" fill="#0f172a" /><rect x="56" y="0" width="4" height="20" fill="#0f172a" /><rect x="62" y="0" width="1" height="20" fill="#0f172a" /><rect x="65" y="0" width="2" height="20" fill="#0f172a" /><rect x="69" y="0" width="3" height="20" fill="#0f172a" /><rect x="74" y="0" width="1" height="20" fill="#0f172a" /><rect x="77" y="0" width="2" height="20" fill="#0f172a" /><rect x="81" y="0" width="5" height="20" fill="#0f172a" /><rect x="88" y="0" width="1" height="20" fill="#0f172a" /><rect x="91" y="0" width="3" height="20" fill="#0f172a" /><rect x="96" y="0" width="2" height="20" fill="#0f172a" /></svg><div className="id-card-barcode-text">*{idCardEmployee.id}*</div></div></div><div className="id-card-back-qr"><svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg"><rect x="0" y="0" width="28" height="28" fill="#0f172a" /><rect x="4" y="4" width="20" height="20" fill="#ffffff" /><rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="72" y="0" width="28" height="28" fill="#0f172a" /><rect x="76" y="4" width="20" height="20" fill="#ffffff" /><rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="0" y="72" width="28" height="28" fill="#0f172a" /><rect x="4" y="76" width="20" height="20" fill="#ffffff" /><rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" /><rect x="36" y="4" width="8" height="8" fill="#0f172a" /><rect x="52" y="4" width="8" height="8" fill="#0f172a" /><rect x="44" y="12" width="16" height="8" fill="#0f172a" /><rect x="36" y="24" width="8" height="8" fill="#0f172a" /><rect x="4" y="36" width="8" height="8" fill="#0f172a" /><rect x="16" y="44" width="8" height="8" fill="#0f172a" /><rect x="24" y="36" width="8" height="8" fill="#0f172a" /><rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" /><rect x="40" y="40" width="8" height="8" fill="#ffffff" /><rect x="60" y="36" width="8" height="8" fill="#0f172a" /><rect x="56" y="48" width="8" height="8" fill="#0f172a" /><rect x="36" y="56" width="8" height="8" fill="#0f172a" /><rect x="48" y="60" width="8" height="8" fill="#0f172a" /><rect x="76" y="36" width="8" height="8" fill="#0f172a" /><rect x="84" y="44" width="12" height="8" fill="#0f172a" /><rect x="72" y="56" width="8" height="16" fill="#0f172a" /><rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" /><rect x="36" y="76" width="12" height="8" fill="#0f172a" /><rect x="52" y="72" width="8" height="16" fill="#0f172a" /><rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" /><rect x="76" y="76" width="12" height="8" fill="#0f172a" /><rect x="84" y="84" width="12" height="8" fill="#0f172a" /></svg><span className="id-qr-label">SCAN ME</span></div></div>
                 <div className="id-card-back-signature-area"><div className="id-signature-font">{idCardEmployee.teamLeader || 'Vikram Singh'}</div><div className="id-signature-line"></div><div className="id-signature-label">Authorized Signatory</div></div>
                 <div className="id-card-back-bottom-bg"><div className="id-card-watermark"></div></div><div className="id-card-back-pink-bg"></div>

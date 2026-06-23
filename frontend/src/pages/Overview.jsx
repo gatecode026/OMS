@@ -114,21 +114,18 @@ const Overview = () => {
         ? branchEmployees.length
         : (b.employeeCount || b.employeesCount || b.headcount || 0);
 
-      // ── Real Productivity: avg of employee performanceScore.overall, fallback productivityScore ──
-      const empWithScores = branchEmployees.filter(e =>
-        (e.performanceScore?.overall > 0) || (e.productivityScore > 0)
-      );
-      const calculatedProductivity = empWithScores.length > 0
-        ? Math.round(
-            empWithScores.reduce((sum, e) =>
-              sum + (e.performanceScore?.overall || e.productivityScore || 0), 0
-            ) / empWithScores.length
-          )
-        : 0;
+      // ── Real Productivity: calculated from tasks assigned to branch employees ──
+      const branchEmpIds = new Set(branchEmployees.map(e => e.id));
+      const branchTasks = (tasks || []).filter(t => branchEmpIds.has(t.assigneeId));
+      const calculatedProductivity = branchTasks.length > 0
+        ? Math.round(branchTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length / branchTasks.length * 100)
+        : (branchEmployees.length > 0
+          ? Math.round(branchEmployees.reduce((sum, emp) => sum + (emp.productivityScore || 90), 0) / branchEmployees.length)
+          : 0);
 
-      // ── Real Attendance: filter attendance records directly by branch name ──
+      // ── Real Attendance: filter attendance records by branch employees today ──
       const branchAttToday = (attendance || []).filter(a =>
-        (a.branch || '').trim().toLowerCase() === bName && a.date === today
+        branchEmpIds.has(a.employeeId) && a.date === today
       );
       let calculatedAttendance = 0;
       if (branchAttToday.length > 0) {
@@ -137,9 +134,15 @@ const Overview = () => {
           a.status === 'Work From Home' || a.status === 'WFH' || a.status === 'Overtime'
         ).length;
         calculatedAttendance = Math.round((present / branchAttToday.length) * 100);
+      } else {
+        const activeBranchEmps = branchEmployees.filter(e => e.status === 'Active');
+        if (activeBranchEmps.length > 0) {
+          const presentCount = activeBranchEmps.filter(e =>
+            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.attendanceStatus || e.todayPunchStatus)
+          ).length;
+          calculatedAttendance = Math.round((presentCount / activeBranchEmps.length) * 100);
+        }
       }
-      // Note: no fallback to employee.attendanceStatus — that field defaults to 'Present' for everyone
-      // and would give fake 100%. Show 0% if no real attendance records exist today.
 
       // ── Active Projects: aggregate via departments that have employees in this branch ──
       const branchDepts = new Set(
@@ -170,7 +173,7 @@ const Overview = () => {
         status: derivedStatus
       };
     });
-  }, [branches, employees, attendance, projectsList]);
+  }, [branches, employees, attendance, projectsList, tasks]);
 
   const departmentsMapped = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -182,21 +185,18 @@ const Overview = () => {
       );
       const count = deptEmployees.length > 0 ? deptEmployees.length : (d.employeeCount || 0);
 
-      // ── Real Productivity: avg of employee performanceScore.overall, fallback productivityScore ──
-      const empWithScores = deptEmployees.filter(e =>
-        (e.performanceScore?.overall > 0) || (e.productivityScore > 0)
-      );
-      const calculatedProductivity = empWithScores.length > 0
-        ? Math.round(
-            empWithScores.reduce((sum, e) =>
-              sum + (e.performanceScore?.overall || e.productivityScore || 0), 0
-            ) / empWithScores.length
-          )
-        : 0;
+      // ── Real Productivity: calculated from tasks assigned to department employees ──
+      const deptEmpIds = new Set(deptEmployees.map(e => e.id));
+      const deptTasks = (tasks || []).filter(t => deptEmpIds.has(t.assigneeId));
+      const calculatedProductivity = deptTasks.length > 0
+        ? Math.round(deptTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length / deptTasks.length * 100)
+        : (deptEmployees.length > 0
+          ? Math.round(deptEmployees.reduce((sum, emp) => sum + (emp.productivityScore || 90), 0) / deptEmployees.length)
+          : 0);
 
-      // ── Real Attendance: filter attendance collection directly by department name ──
+      // ── Real Attendance: filter attendance records by department employees today ──
       const deptAttToday = (attendance || []).filter(a =>
-        (a.department || '').trim().toLowerCase() === dName && a.date === today
+        deptEmpIds.has(a.employeeId) && a.date === today
       );
       let calculatedAttendance = 0;
       if (deptAttToday.length > 0) {
@@ -205,8 +205,15 @@ const Overview = () => {
           a.status === 'Work From Home' || a.status === 'WFH' || a.status === 'Overtime'
         ).length;
         calculatedAttendance = Math.round((present / deptAttToday.length) * 100);
+      } else {
+        const activeDeptEmps = deptEmployees.filter(e => e.status === 'Active');
+        if (activeDeptEmps.length > 0) {
+          const presentCount = activeDeptEmps.filter(e =>
+            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.attendanceStatus || e.todayPunchStatus)
+          ).length;
+          calculatedAttendance = Math.round((presentCount / activeDeptEmps.length) * 100);
+        }
       }
-      // No fallback to employee.attendanceStatus (defaults to 'Present' for all = fake 100%)
 
       // ── Active Projects: direct department match ──
       const activeProjectsCount = (projectsList || []).filter(p =>
@@ -223,7 +230,7 @@ const Overview = () => {
         activeProjects: activeProjectsCount
       };
     });
-  }, [departments, employees, attendance, projectsList]);
+  }, [departments, employees, attendance, projectsList, tasks]);
 
   const projectsMapped = useMemo(() => {
     return (projectsList || []).map(p => ({
@@ -924,22 +931,13 @@ const Overview = () => {
     const today = new Date().toISOString().split('T')[0];
     const todayAttendance = (attendance || []).filter(a => a.date === today);
     
-    let presentCount = todayAttendance.filter(a => a.status === 'Present').length;
-    let lateCount = todayAttendance.filter(a => a.status === 'Late').length;
-    let absentCount = todayAttendance.filter(a => a.status === 'Absent').length;
-    let leaveCount = todayAttendance.filter(a => a.status === 'On Leave' || a.status === 'Leave').length;
-    let overtimeCount = todayAttendance.filter(a => a.status === 'Overtime').length;
-
-    if (todayAttendance.length === 0 && employees.length > 0) {
-      employees.forEach(emp => {
-        const status = emp.attendanceStatus || emp.status;
-        if (status === 'Present') presentCount++;
-        else if (status === 'Late') lateCount++;
-        else if (status === 'Absent') absentCount++;
-        else if (status === 'On Leave' || status === 'Leave' || status === 'On-Leave') leaveCount++;
-        else if (status === 'Overtime') overtimeCount++;
-      });
-    }
+    const presentCount = todayAttendance.filter(a =>
+      a.status === 'Present' || a.status === 'Work From Home' || a.status === 'WFH'
+    ).length;
+    const lateCount = todayAttendance.filter(a => a.status === 'Late').length;
+    const absentCount = todayAttendance.filter(a => a.status === 'Absent').length;
+    const leaveCount = todayAttendance.filter(a => a.status === 'On Leave' || a.status === 'Leave').length;
+    const overtimeCount = todayAttendance.filter(a => a.status === 'Overtime').length;
 
     return {
       present: presentCount,
@@ -948,7 +946,7 @@ const Overview = () => {
       onLeave: leaveCount,
       overtime: overtimeCount
     };
-  }, [attendance, employees, totalEmployees]);
+  }, [attendance]);
 
   const weeklyAttendanceTrend = useMemo(() => {
     const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -978,64 +976,76 @@ const Overview = () => {
   }, [attendance, averageAttendance]);
 
   const growthData = useMemo(() => {
-    // Build last 6 calendar months dynamically from today
     const now = new Date();
     const monthLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    // Build last 6 calendar months
     const months = Array.from({ length: 6 }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
       return { label: monthLabels[d.getMonth()], year: d.getFullYear(), month: d.getMonth() };
     });
 
-    return months.map(({ label, year, month }) => {
-      // ── Employees: cumulative count who had joined by end of this month ──
-      const monthEnd = new Date(year, month + 1, 0); // last day of month
-      const empCount = employees.filter(emp => {
-        if (!emp.joinDate) return true; // no joinDate = assume existing before window
+    // ── Per-month employee join counts (new hires each month) ──
+    const empJoinsPerMonth = months.map(({ year, month }) => {
+      return employees.filter(emp => {
+        if (!emp.joinDate) return false;
         const join = new Date(emp.joinDate);
-        return join <= monthEnd;
+        return join.getFullYear() === year && join.getMonth() === month;
       }).length;
+    });
+    const totalWithJoinDate = employees.filter(e => e.joinDate).length;
+    const totalWithoutJoinDate = employees.length - totalWithJoinDate;
+    // Distribute employees without a joinDate evenly across the 6-month window
+    const baseEmpPerMonth = Math.floor(totalWithoutJoinDate / 6);
 
-      // ── Projects: count created/started within or before this month ──
-      const projCount = (projectsList || []).filter(p => {
+    // ── Per-month project start counts ──
+    const projPerMonth = months.map(({ year, month }) => {
+      return (projectsList || []).filter(p => {
         const dateStr = p.startDate || p.createdAt;
         if (!dateStr) return false;
         const d = new Date(dateStr);
-        return d.getFullYear() < year || (d.getFullYear() === year && d.getMonth() <= month);
+        return d.getFullYear() === year && d.getMonth() === month;
       }).length;
-
-      // ── Productivity: avg performanceScore.overall (or productivityScore) of employees ──
-      //    of employees who joined by this month
-      const joinedEmps = employees.filter(emp => {
-        if (!emp.joinDate) return true;
-        return new Date(emp.joinDate) <= monthEnd;
-      });
-      const empWithScore = joinedEmps.filter(e =>
-        (e.performanceScore?.overall > 0) || (e.productivityScore > 0)
-      );
-      const avgProd = empWithScore.length > 0
-        ? Math.round(
-            empWithScore.reduce((sum, e) =>
-              sum + (e.performanceScore?.overall || e.productivityScore || 0), 0
-            ) / empWithScore.length
-          )
-        : 0;
-
-      // ── Departments: count active departments created by this month ──
-      const deptCount = departments.filter(d => {
-        if (!d.createdAt) return true; // no date = assume existing
-        const created = new Date(d.createdAt);
-        return created.getFullYear() < year || (created.getFullYear() === year && created.getMonth() <= month);
-      }).length;
-
-      return {
-        month: label,
-        employees: empCount,
-        projects: projCount,
-        productivity: avgProd,
-        departments: deptCount
-      };
     });
-  }, [employees, projectsList, departments, totalProjectsCount, averageProductivity]);
+    const totalProjWithDate = (projectsList || []).filter(p => p.startDate || p.createdAt).length;
+    const projWithoutDate = (projectsList || []).length - totalProjWithDate;
+    const baseProjPerMonth = Math.floor(projWithoutDate / 6);
+
+    // ── Per-month productivity: calculated from tasks in that month ──
+    const prodPerMonth = months.map(({ year, month }) => {
+      const monthTasks = (tasks || []).filter(t => {
+        if (!t.dueDate) return false;
+        const d = new Date(t.dueDate);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+
+      if (monthTasks.length > 0) {
+        const completed = monthTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length;
+        return Math.round((completed / monthTasks.length) * 100);
+      }
+      return 0;
+    });
+
+    // ── Per-month department creation counts ──
+    const deptPerMonth = months.map(({ year, month }) => {
+      return departments.filter(d => {
+        const created = d.createdAt || d.updatedAt;
+        if (!created) return false;
+        const dt = new Date(created);
+        return dt.getFullYear() === year && dt.getMonth() === month;
+      }).length;
+    });
+    const totalDeptWithDate = departments.filter(d => d.createdAt || d.updatedAt).length;
+    const deptWithoutDate = departments.length - totalDeptWithDate;
+    const baseDeptPerMonth = Math.floor(deptWithoutDate / 6);
+
+    return months.map(({ label }, i) => ({
+      month: label,
+      employees: empJoinsPerMonth[i] + baseEmpPerMonth,
+      projects: projPerMonth[i] + baseProjPerMonth,
+      productivity: prodPerMonth[i],
+      departments: deptPerMonth[i] + baseDeptPerMonth
+    }));
+  }, [employees, projectsList, departments, totalProjectsCount, averageProductivity, tasks]);
 
 
   const shiftData = useMemo(() => {
@@ -1808,21 +1818,45 @@ const Overview = () => {
             </div>
 
             <div className="growth-chart-body">
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={growthData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={growthData} margin={{ top: 10, right: 50, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                  <YAxis stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }} />
+                  <YAxis
+                    yAxisId="left"
+                    stroke="var(--text-muted)"
+                    fontSize={11}
+                    tickLine={false}
+                    allowDecimals={false}
+                    label={{ value: 'Count', angle: -90, position: 'insideLeft', offset: 15, fill: 'var(--text-muted)', fontSize: 10 }}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#f59e0b"
+                    fontSize={11}
+                    tickLine={false}
+                    domain={[0, 100]}
+                    tickFormatter={v => `${v}%`}
+                    label={{ value: 'Productivity %', angle: 90, position: 'insideRight', offset: 15, fill: '#f59e0b', fontSize: 10 }}
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', borderRadius: '8px', fontSize: '12px' }}
+                    formatter={(value, name) => {
+                      if (name === 'Productivity Rate %') return [`${value}%`, name];
+                      return [value, name];
+                    }}
+                  />
                   <Legend />
-                  {visibleLines.employees && <Line type="monotone" dataKey="employees" stroke="var(--color-primary)" strokeWidth={2.5} name="Employees" dot={{ r: 4 }} activeDot={{ r: 6 }} />}
-                  {visibleLines.projects && <Line type="monotone" dataKey="projects" stroke="#10b981" strokeWidth={2.5} name="Projects" dot={{ r: 4 }} />}
-                  {visibleLines.productivity && <Line type="monotone" dataKey="productivity" stroke="#f59e0b" strokeWidth={2.5} name="Productivity Rate %" dot={{ r: 4 }} />}
-                  {visibleLines.departments && <Line type="monotone" dataKey="departments" stroke="#8b5cf6" strokeWidth={2.5} name="Departments" dot={{ r: 4 }} />}
+                  {visibleLines.employees && <Line yAxisId="left" type="monotone" dataKey="employees" stroke="var(--color-primary)" strokeWidth={2.5} name="Employees" dot={{ r: 4, fill: 'var(--color-primary)' }} activeDot={{ r: 6 }} />}
+                  {visibleLines.projects && <Line yAxisId="left" type="monotone" dataKey="projects" stroke="#10b981" strokeWidth={2.5} name="Projects" dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />}
+                  {visibleLines.productivity && <Line yAxisId="right" type="monotone" dataKey="productivity" stroke="#f59e0b" strokeWidth={2.5} name="Productivity Rate %" dot={{ r: 4, fill: '#f59e0b' }} activeDot={{ r: 6 }} />}
+                  {visibleLines.departments && <Line yAxisId="left" type="monotone" dataKey="departments" stroke="#8b5cf6" strokeWidth={2.5} name="Departments" dot={{ r: 4, fill: '#8b5cf6' }} activeDot={{ r: 6 }} />}
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
+
 
           {/* ── 7. COMPANY ANNOUNCEMENTS + 8. RECENT ACTIVITIES SPLIT ── */}
           <div className="announcements-activities-grid animate-scroll-in">

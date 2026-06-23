@@ -28,6 +28,7 @@ const Departments = () => {
     employees = [], 
     branches = [], 
     departments: contextDepartments = [], 
+    attendance = [],
     addDepartment, 
     updateDepartment,
     updateEmployee,
@@ -38,7 +39,8 @@ const Departments = () => {
     updateTeam,
     addActivityLog,
     hasPermission,
-    projectsList = []
+    projectsList = [],
+    tasks = []
   } = useApp() || {};
 
   // Tab State
@@ -66,19 +68,120 @@ const Departments = () => {
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
 
-  const departments = Array.isArray(contextDepartments) ? contextDepartments : [];
+  const departments = useMemo(() => {
+    const rawDepts = Array.isArray(contextDepartments) ? contextDepartments : [];
+    
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+
+    return rawDepts.map(dept => {
+      const nameLower = (dept.name || '').trim().toLowerCase();
+      
+      // Real workforce count of active employees in department
+      const deptActiveEmps = (employees || []).filter(emp => 
+        emp && 
+        (emp.department || '').trim().toLowerCase() === nameLower && 
+        emp.status !== 'Inactive'
+      );
+
+      // Real productivity rate for the department
+      const deptActiveEmpIds = new Set(deptActiveEmps.map(emp => emp.id));
+      const deptTasks = (tasks || []).filter(t => deptActiveEmpIds.has(t.assigneeId));
+      const deptProductivity = deptTasks.length > 0
+        ? Math.round(deptTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length / deptTasks.length * 100)
+        : (deptActiveEmps.length > 0
+          ? Math.round(deptActiveEmps.reduce((sum, emp) => sum + (emp.productivityScore || 90), 0) / deptActiveEmps.length)
+          : 0);
+
+      // Real attendance rate for the department today
+      const deptPresentToday = deptActiveEmps.filter(emp => {
+        const hasTodayRecord = (attendance || []).some(record => 
+          record.employeeId === emp.id && 
+          record.date === todayStr
+        );
+        if (hasTodayRecord) {
+          return (attendance || []).some(record => 
+            record.employeeId === emp.id && 
+            record.date === todayStr && 
+            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Half Day', 'Half-Day'].includes(record.status)
+          );
+        }
+        return ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(emp.attendanceStatus || emp.todayPunchStatus);
+      }).length;
+
+      const deptAttendance = deptActiveEmps.length > 0
+        ? Math.round((deptPresentToday / deptActiveEmps.length) * 100)
+        : 0;
+
+      // Real active teams count
+      const liveTeamsCount = (contextTeams || []).filter(t => 
+        (t.department || '').trim().toLowerCase() === nameLower && 
+        t.status === 'Active'
+      ).length;
+
+      // Real active projects count
+      const liveProjectsCount = (projectsList || []).filter(p => 
+        (p.department || '').trim().toLowerCase() === nameLower && 
+        p.status !== 'Completed'
+      ).length;
+
+      // Real WFH filings count
+      const deptWfhFilings = deptActiveEmps.filter(emp => {
+        return (attendance || []).some(record => 
+          record.employeeId === emp.id && 
+          ['Work From Home', 'WFH'].includes(record.status)
+        );
+      }).length;
+
+      // Real tasks completed and in progress counts
+      const deptEmpIds = new Set(deptActiveEmps.map(e => e.id));
+      let tasksCompleted = 0;
+      let tasksInProgress = 0;
+      (projectsList || []).forEach(project => {
+        if (project.tasks) {
+          project.tasks.forEach(task => {
+            if (deptEmpIds.has(task.assigneeId)) {
+              if (task.completed || task.status === 'Done' || task.status === 'done') {
+                tasksCompleted++;
+              } else if (task.status === 'In Progress' || task.status === 'in_progress') {
+                tasksInProgress++;
+              }
+            }
+          });
+        }
+      });
+
+      return {
+        ...dept,
+        employeeCount: deptActiveEmps.length,
+        attendanceRate: deptAttendance,
+        avgPerformance: deptProductivity,
+        activeTeams: liveTeamsCount,
+        activeProjects: liveProjectsCount,
+        wfhFilings: deptWfhFilings,
+        tasksCompleted,
+        tasksInProgress
+      };
+    });
+  }, [contextDepartments, employees, attendance, contextTeams, projectsList, tasks]);
+
   const teams = Array.isArray(contextTeams) ? contextTeams : [];
 
   useEffect(() => {
     if (branches && branches.length > 0) {
       setBranchOptions(branches.map(b => b.name));
     } else {
-      setBranchOptions(['Delhi Head Office', 'Jaipur Office', 'Mumbai Agency']);
+      setBranchOptions([]);
     }
   }, [branches]);
 
   const defaultBranch = useMemo(() => {
-    return branches.length > 0 ? branches[0].name : 'Delhi Head Office';
+    return branches.length > 0 ? branches[0].name : '';
   }, [branches]);
 
   const [newDeptForm, setNewDeptForm] = useState({
@@ -160,7 +263,7 @@ const Departments = () => {
 
   // Use live employees array for accurate total count; fallback to summing department counts
   const totalEmployees = employees.length > 0
-    ? employees.length
+    ? employees.filter(e => e.status !== 'Inactive').length
     : departments.reduce((acc, d) => acc + (d.employeeCount || 0), 0);
 
   // Map of department name (lowercase) -> real-time employee count from live employees array
@@ -337,20 +440,104 @@ const Departments = () => {
     setExporting(true);
     setExportProgress(0);
 
+    let progress = 0;
     const interval = setInterval(() => {
-      setExportProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setExporting(false);
-            setExportOpen(false);
-            if (addToast) addToast('success', `${exportFormState.report} exported successfully as ${exportFormState.format}.`);
-          }, 400);
-          return 100;
-        }
-        return prev + 20;
-      });
-    }, 250);
+      progress += 25;
+      setExportProgress(progress);
+      if (progress >= 100) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setExporting(false);
+          setExportOpen(false);
+
+          const headers = [
+            'Department ID',
+            'Department Name',
+            'Department Code',
+            'Department Head',
+            'Branch/Location',
+            'Description',
+            'Status',
+            'Workforce Count',
+            'Attendance Rate Today (%)',
+            'Productivity Score (%)',
+            'Active Teams',
+            'Active Projects',
+            'WFH Filings Today'
+          ];
+          const rows = departments.map(d => [
+            d.id || '',
+            d.name || '',
+            d.code || '',
+            d.head || '',
+            d.branch || '',
+            d.description || '',
+            d.status || 'Active',
+            d.employeeCount || 0,
+            d.attendanceRate || 0,
+            d.avgPerformance || 0,
+            d.activeTeams || 0,
+            d.activeProjects || 0,
+            d.wfhFilings || 0
+          ]);
+
+          if (exportFormState.format === 'PDF') {
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+              const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+              const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+              printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                  <head>
+                    <title>${exportFormState.report}</title>
+                    <style>
+                      body { font-family: sans-serif; padding: 20px; color: #334155; }
+                      h1 { color: #0f172a; margin-bottom: 5px; }
+                      p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                      table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                      th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                      td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                      tr:nth-child(even) td { background-color: #f8fafc; }
+                    </style>
+                  </head>
+                  <body>
+                    <h1>${exportFormState.report}</h1>
+                    <p>Generated on: ${new Date().toLocaleString()}</p>
+                    <table>
+                      <thead><tr>${tableHeadersHTML}</tr></thead>
+                      <tbody>${tableRowsHTML}</tbody>
+                    </table>
+                    <script>
+                      window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+                    </script>
+                  </body>
+                </html>
+              `);
+              printWindow.document.close();
+              if (addToast) addToast('success', 'PDF Print window opened.');
+            } else {
+              if (addToast) addToast('error', 'Pop-up blocked. Please allow popups.');
+            }
+          } else {
+            const csvContent = "\ufeff" + [
+              headers.join(','),
+              ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+            ].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `departments_${exportFormState.report.toLowerCase().replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.${exportFormState.format === 'Excel' ? 'xls' : 'csv'}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            if (addToast) addToast('success', `${exportFormState.report} downloaded successfully.`);
+          }
+        }, 400);
+      }
+    }, 100);
   };
 
   const performanceTrendData = departments.map(d => ({

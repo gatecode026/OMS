@@ -574,8 +574,8 @@ export const AppProvider = ({ children }) => {
             estimatedHours: t.estimatedHours || 20,
             status: t.completed
               ? 'Done'
-              : (t.status === 'Done' || t.status === 'done'
-                ? 'To Do'
+              : (t.status === 'Done' || t.status === 'done' || t.status === 'Completed' || t.status === 'completed'
+                ? 'Done'
                 : (t.status === 'in_progress' || t.status === 'In Progress'
                   ? 'In Progress'
                   : (t.status === 'review' || t.status === 'In Review' || t.status === 'under_review'

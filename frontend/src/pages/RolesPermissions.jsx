@@ -518,7 +518,7 @@ const RolesPermissions = () => {
 
   // Dynamic MFA Adoption Rate
   const mfaAdoptionRate = useMemo(() => {
-    if (!employees || employees.length === 0) return '98.2'; // default fallback
+    if (!employees || employees.length === 0) return '0.0';
     const mfaAdoptedCount = employees.filter(e => {
       const mfa = e.securityInfo?.mfaStatus || 'Disabled';
       return mfa === 'Enabled' || mfa === 'Enforced';
@@ -538,33 +538,33 @@ const RolesPermissions = () => {
 
   // Dynamic Dept Administrators Count
   const deptAdminsCount = useMemo(() => {
-    if (!employees || employees.length === 0) return 12; // default fallback
+    if (!employees || employees.length === 0) return 0;
     return employees.filter(e => e.roleId === 'dept_admin' || e.roleId === 'project_manager' || e.roleId === 'manager').length;
   }, [employees]);
 
   // Unique Departments Count
   const uniqueDepartmentsCount = useMemo(() => {
-    if (!employees || employees.length === 0) return 6; // default fallback
+    if (!employees || employees.length === 0) return 0;
     const depts = employees.map(e => e.department).filter(Boolean);
-    return new Set(depts).size || 6;
+    return new Set(depts).size || 0;
   }, [employees]);
 
   // Dynamic Branch Administrators Count
   const branchAdminsCount = useMemo(() => {
-    if (!employees || employees.length === 0) return 8; // default fallback
+    if (!employees || employees.length === 0) return 0;
     return employees.filter(e => e.roleId === 'branch_admin').length;
   }, [employees]);
 
   // Unique Branches Count
   const uniqueBranchesCount = useMemo(() => {
-    if (!employees || employees.length === 0) return 4; // default fallback
+    if (!employees || employees.length === 0) return 0;
     const branches = employees.map(e => e.branch).filter(Boolean);
-    return new Set(branches).size || 4;
+    return new Set(branches).size || 0;
   }, [employees]);
 
   // Dynamic total employees count (for distribution percentages)
   const totalEmployeesCount = useMemo(() => {
-    return employees?.length || 65; // fallback to 65 (sum of mockup roles) if empty
+    return employees?.length || 0;
   }, [employees]);
 
   // Recharts Dynamic Data derived from database
@@ -865,18 +865,124 @@ const RolesPermissions = () => {
 
   const handleExportReportSubmit = (e) => {
     e.preventDefault();
-    addToast('info', `Compiling report. Download starting...`);
-    setTimeout(() => {
-      addToast('success', `Success: Permissions Audit report downloaded in ${exportForm.format} format.`);
-    }, 1200);
+    const type = exportForm.reportType;
+    const format = exportForm.format;
+    handleExportReportDirect(type, format);
     setShowExportModal(false);
   };
 
   const handleExportReportDirect = (reportName, format) => {
     addToast('info', `Exporting ${reportName} in ${format} format...`);
-    setTimeout(() => {
-      addToast('success', `Successfully downloaded: ${reportName}.${format.toLowerCase()}`);
-    }, 1500);
+    
+    let headers = [];
+    let rows = [];
+    let title = reportName.replace(/_/g, ' ').toUpperCase();
+
+    if (reportName.includes('user_permissions')) {
+      headers = ['Employee ID', 'Employee Name', 'Role Assigned', 'Department', 'Branch', 'Overrides Mapped', 'MFA Status'];
+      rows = employees.map(emp => {
+        const overrides = userOverrides.filter(o => o.userId === emp.id).length;
+        const mfa = emp.securityInfo?.mfaStatus || 'Disabled';
+        return [
+          emp.id || '',
+          emp.name || '',
+          emp.role || '',
+          emp.department || '',
+          emp.branch || '',
+          overrides,
+          mfa
+        ];
+      });
+    } else if (reportName.includes('roles_auth_matrix')) {
+      headers = ['Role Name', 'Module Name', 'Create', 'Read', 'Update', 'Delete', 'Approve', 'Export'];
+      rows = [];
+      localRoles.forEach(r => {
+        Object.entries(r.permissions || {}).forEach(([modKey, perm]) => {
+          const mod = modulesList.find(m => m.key === modKey)?.name || modKey;
+          rows.push([
+            r.name,
+            mod,
+            perm.create ? 'Yes' : 'No',
+            Array.isArray(perm.read) ? perm.read.join(', ') : (perm.read ? 'Yes' : 'No'),
+            perm.update ? 'Yes' : 'No',
+            perm.delete ? 'Yes' : 'No',
+            perm.approve ? 'Yes' : 'No',
+            perm.export ? 'Yes' : 'No'
+          ]);
+        });
+      });
+    } else if (reportName.includes('audit_log_history')) {
+      headers = ['Log ID', 'Timestamp', 'Operator', 'Action Performed', 'Target Module', 'IP Address', 'Severity'];
+      rows = filteredAuditLogs.map(log => [
+        log.id || '',
+        log.timestamp || '',
+        log.changedBy || log.user || '',
+        log.action || '',
+        log.module || '',
+        log.ipAddress || log.ip || '',
+        log.severity || ''
+      ]);
+    } else {
+      headers = ['Security Control Area', 'Control Description', 'Current Status', 'Verification Code'];
+      rows = securityFeatures.map(sec => [
+        sec.title || '',
+        sec.desc || '',
+        sec.status || '',
+        sec.variant || ''
+      ]);
+    }
+
+    if (format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+        const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${title}</title>
+              <style>
+                body { font-family: sans-serif; padding: 20px; color: #334155; }
+                h1 { color: #0f172a; margin-bottom: 5px; }
+                p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                tr:nth-child(even) td { background-color: #f8fafc; }
+              </style>
+            </head>
+            <body>
+              <h1>${title}</h1>
+              <p>Generated on: ${new Date().toLocaleString()} | Security Level: Classified Enterprise</p>
+              <table>
+                <thead><tr>${tableHeadersHTML}</tr></thead>
+                <tbody>${tableRowsHTML}</tbody>
+              </table>
+              <script>
+                window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    } else {
+      const csvContent = "\ufeff" + [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${reportName.toLowerCase()}_${Date.now()}.${format === 'Excel' ? 'xls' : 'csv'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast('success', `${title} downloaded successfully.`);
+    }
   };
 
   // Filter lists

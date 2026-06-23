@@ -12,11 +12,16 @@ async function check() {
   console.log('Connected to Main DB');
   
   const connection = await getTenantConnection('COMP-001');
-  const Project = connection.models['Project'] || connection.model('Project', new mongoose.Schema({}, { strict: false }));
   
-  const projects = await Project.find({}).lean();
-  console.log('Projects in database:');
-  console.log(JSON.stringify(projects, null, 2));
+  for (const modelName of ['Employee', 'Project', 'Team', 'Task', 'Attendance', 'Department', 'Branch']) {
+    const Model = connection.models[modelName] || connection.model(modelName, new mongoose.Schema({}, { strict: false }));
+    const count = await Model.countDocuments({});
+    console.log(`${modelName} count:`, count);
+    if (count > 0) {
+      const sample = await Model.findOne({}).lean();
+      console.log(`Sample ${modelName}:`, sample);
+    }
+  }
   
   await mongoose.disconnect();
 }
