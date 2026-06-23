@@ -185,7 +185,7 @@ p  { line-height: 1.5; color: var(--text-secondary); }
 input, select, textarea {
   font-family: inherit;
   font-size: 0.875rem;
-  color: var(--text-primary);
+  color: #ffffff;
   background-color: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -193,6 +193,12 @@ input, select, textarea {
   outline: none;
   transition: var(--transition-all);
   width: 100%;
+}
+
+:root.light-theme input,
+:root.light-theme select,
+:root.light-theme textarea {
+  color: #000000;
 }
 input:focus, select:focus, textarea:focus {
   border-color: var(--color-primary);

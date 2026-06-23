@@ -511,11 +511,55 @@ export const AppProvider = ({ children }) => {
   const tasks = React.useMemo(() => {
     if (!projectsList) return [];
     const aggregatedTasks = [];
+    
+    const normalizeName = (name) => {
+      if (!name) return '';
+      return name.trim().replace(/\s+/g, ' ').toLowerCase();
+    };
+
     projectsList.forEach(proj => {
       if (proj.tasks) {
         proj.tasks.forEach(t => {
-          const isUserAssigned = t.assignedTo && currentUser && t.assignedTo.some(name => name.toLowerCase() === currentUser.name?.toLowerCase());
-          const resolvedAssigneeId = isUserAssigned ? currentUser.id : (t.assigneeId || 'EMP-2026-003');
+          let resolvedAssigneeId = t.assigneeId;
+
+          // 1. Try finding by assigneeId
+          let matchedEmp = null;
+          if (t.assigneeId) {
+            matchedEmp = (employees || []).find(e => e.id === t.assigneeId);
+          }
+
+          // 2. Try finding by assigneeName
+          if (!matchedEmp && t.assigneeName && t.assigneeName !== 'Unassigned') {
+            const firstAssignee = t.assigneeName.split(',')[0];
+            const normAssignee = normalizeName(firstAssignee);
+            matchedEmp = (employees || []).find(e => normalizeName(e.name) === normAssignee);
+          }
+
+          // 3. Try finding by assignedTo names
+          if (!matchedEmp && t.assignedTo && t.assignedTo.length > 0) {
+            const normAssignedNames = t.assignedTo.map(normalizeName);
+            matchedEmp = (employees || []).find(e => normAssignedNames.includes(normalizeName(e.name)));
+          }
+
+          if (matchedEmp) {
+            resolvedAssigneeId = matchedEmp.id;
+          }
+
+          // 4. Fallback: check if currently logged in user is assigned
+          const normCurrentUserName = normalizeName(currentUser?.name);
+          const isCurrentUserAssigned = (t.assignedTo && t.assignedTo.map(normalizeName).includes(normCurrentUserName)) ||
+                                         (t.assigneeName && normalizeName(t.assigneeName).includes(normCurrentUserName)) ||
+                                         (t.assigneeId && currentUser && t.assigneeId === currentUser.id);
+
+          if (!resolvedAssigneeId && isCurrentUserAssigned) {
+            resolvedAssigneeId = currentUser.id;
+          }
+
+          // Default fallback
+          if (!resolvedAssigneeId) {
+            resolvedAssigneeId = 'EMP-2026-003';
+          }
+
           const resolvedAssigneeName = t.assigneeName || (t.assignedTo && t.assignedTo.length > 0 ? t.assignedTo.join(', ') : proj.leader || 'Unassigned');
           
           aggregatedTasks.push({

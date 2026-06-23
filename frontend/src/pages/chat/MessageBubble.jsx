@@ -4,15 +4,19 @@
  *   Supports: text, deleted, edited, reactions, right-click actions, inline edit.
  */
 
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import EmojiPicker from 'emoji-picker-react';
 import { BiCheck, BiCheckDouble } from 'react-icons/bi';
-import { Star, Pin, CornerUpLeft, Pencil, Trash2, Plus, CheckSquare } from 'lucide-react';
+import { Star, Pin, CornerUpLeft, Pencil, Trash2, Plus, CheckSquare, Forward, MessageSquare, ClipboardList } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useChat } from '../../context/ChatContext';
 import ImageLightbox from './ImageLightbox';
 import PDFPreviewModal from './PDFPreviewModal';
 import VoiceMessageBubble from './VoiceMessageBubble';
+import PollBubble from '../../components/PollBubble';
+import MarkdownRenderer from '../../components/MarkdownRenderer';
+import { formatTime } from './ConversationsList';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
@@ -30,6 +34,26 @@ const getFileIcon = (mimeType, fileName) => {
   if (mime.includes('zip') || name.endsWith('.zip'))
     return { icon: '🗜️', color: '#7c3aed', label: 'ZIP' };
   return { icon: '📎', color: '#64748b', label: 'FILE' };
+};
+
+const getVideoPoster = (url) => {
+  if (url && url.includes('imagekit.io')) {
+    const queryIdx = url.indexOf('?');
+    if (queryIdx !== -1) {
+      const basePath = url.substring(0, queryIdx);
+      const queryParams = url.substring(queryIdx);
+      return `${basePath}/ik-thumbnail.jpg${queryParams}`;
+    }
+    return url + '/ik-thumbnail.jpg';
+  }
+  return null;
+};
+
+const formatVideoDuration = (sec) => {
+  if (!sec) return '';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
 };
 
 const triggerDirectDownload = async (url, fileName) => {
@@ -127,19 +151,20 @@ const MessageStatus = ({ message: msg, conversation, onRetry }) => {
   }
 
   const isGroup = conversation?.type === 'group';
-  const readers = msg.readBy || [];
+  const readers = (msg.readBy || []).filter(r => r.employeeId !== msg.senderId);
   const seenCount = readers.length;
+  const deliveries = (msg.deliveredTo || []).filter(d => d.employeeId !== msg.senderId);
 
   let status = 'sent';
   if (isGroup) {
     if (seenCount > 0) {
       status = 'seen';
-    } else if (msg.deliveredTo?.length > 0 || msg._deliveryStatus === 'delivered') {
+    } else if (deliveries.length > 0 || msg._deliveryStatus === 'delivered') {
       status = 'delivered';
     }
   } else {
-    const isSeen = msg.readBy?.length > 0 || msg._deliveryStatus === 'read';
-    const isDelivered = !isSeen && (msg.deliveredTo?.length > 0 || msg._deliveryStatus === 'delivered');
+    const isSeen = seenCount > 0 || msg._deliveryStatus === 'read';
+    const isDelivered = !isSeen && (deliveries.length > 0 || msg._deliveryStatus === 'delivered');
     if (isSeen) {
       status = 'seen';
     } else if (isDelivered) {
@@ -230,7 +255,8 @@ const MessageBubble = ({
   isSelectMode = false,
   isSelected = false,
   onToggleSelect,
-  onStartSelectMode
+  onStartSelectMode,
+  onForward
 }) => {
   const { showConfirm } = useApp();
   const [showOptions, setShowOptions] = useState(false);
@@ -243,11 +269,30 @@ const MessageBubble = ({
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [lightboxFileName, setLightboxFileName] = useState('');
   const [pdfPreview, setPdfPreview] = useState(null);
+  const [videoError, setVideoError] = useState(false);
 
   const bubbleRef = useRef(null);
   const editRef = useRef(null);
   const emojiRef = useRef(null);
   const actionBarRef = useRef(null);
+
+  const { highlightedMessageId, setHighlightedMessageId, openThread } = useChat();
+
+  // Scroll to and flash message when it's highlighted from search
+  useEffect(() => {
+    if (highlightedMessageId && msg.id === highlightedMessageId) {
+      const targetEl = document.getElementById(`msg-${msg.id}`);
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetEl.classList.add('msg-bubble-highlight');
+        const timer = setTimeout(() => {
+          targetEl.classList.remove('msg-bubble-highlight');
+          setHighlightedMessageId(null);
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [highlightedMessageId, msg.id, setHighlightedMessageId]);
 
   // After menu renders, clamp it inside the viewport
   useLayoutEffect(() => {
@@ -284,11 +329,15 @@ const MessageBubble = ({
   }, [showOptions, menuPosition.x, menuPosition.y]);
 
   // File type and preview variables
-  const fileInfo = msg.type === 'file' && msg.media ? getFileIcon(msg.media.mimeType || msg.media.fileType, msg.media.fileName) : null;
+  const fileInfo = (msg.type === 'file' || msg.type === 'video') && msg.media ? getFileIcon(msg.media.mimeType || msg.media.fileType, msg.media.fileName) : null;
   const isPDF = msg.type === 'file' && msg.media && (((msg.media.mimeType || msg.media.fileType || '').includes('pdf')) || (msg.media.fileName || '').endsWith('.pdf'));
-  const fileSizeKB = msg.type === 'file' && msg.media && msg.media.fileSize 
+  const fileSizeKB = (msg.type === 'file' || msg.type === 'video') && msg.media && msg.media.fileSize 
     ? (msg.media.fileSize / 1024).toFixed(1) + ' KB' 
     : '';
+  const mime = (msg.media?.mimeType || msg.media?.fileType || '').toLowerCase();
+  const isVideo = (msg.type === 'file' || msg.type === 'video') && 
+                  msg.media && 
+                  (mime.startsWith('video/') || ['video/mp4', 'video/webm', 'video/ogg'].includes(mime));
 
   // Close menus on click outside of action popups
   useEffect(() => {
@@ -523,6 +572,23 @@ const MessageBubble = ({
 
         {/* Bubble */}
         <div id={`msg-${msg.id}`} className={`msg-bubble ${isOwn ? 'msg-bubble-own' : 'msg-bubble-other'} ${isStarred ? 'msg-bubble-starred' : ''}`}>
+          {/* Hover Actions */}
+          {!msg.isDeleted && msg.type !== 'system' && !isEditing && (
+            <div className={`msg-bubble-hover-actions ${isOwn ? 'hover-own' : 'hover-other'}`}>
+              <button 
+                className="msg-bubble-hover-action-btn" 
+                onClick={(e) => { e.stopPropagation(); openThread(msg.id); }}
+                title="Reply in Thread"
+              >
+                <MessageSquare size={14} />
+              </button>
+            </div>
+          )}
+          {msg.isForwarded && (
+            <div className="msg-forwarded-indicator" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: isOwn ? 'rgba(255, 255, 255, 0.75)' : 'var(--text-muted, #64748b)', marginBottom: '4px', fontStyle: 'italic' }}>
+              <span>{msg.forwardedCount >= 2 ? '➡️ Forwarded many times' : '➡️ Forwarded'}</span>
+            </div>
+          )}
           {isEditing ? (
             <div className="msg-edit-area">
               <textarea
@@ -543,8 +609,9 @@ const MessageBubble = ({
             </div>
           ) : (
             <>
-              {/* Content */}
-              {msg.type === 'audio' ? (
+              {msg.type === 'poll' ? (
+                <PollBubble message={msg} isOwn={isOwn} />
+              ) : msg.type === 'audio' ? (
                 <VoiceMessageBubble message={msg} isOwn={isOwn} />
               ) : msg.type === 'image' && msg.media ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -599,7 +666,75 @@ const MessageBubble = ({
                     Download
                   </button>
                 </div>
-              ) : msg.type === 'file' && msg.media ? (
+              ) : isVideo && !videoError ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ position: 'relative', width: 'fit-content' }}>
+                    <video
+                      src={msg.media?.url}
+                      poster={getVideoPoster(msg.media?.url)}
+                      controls
+                      muted
+                      playsInline
+                      onError={() => setVideoError(true)}
+                      style={{ 
+                        maxWidth: '240px', maxHeight: '200px',
+                        borderRadius: '8px', display: 'block'
+                      }}
+                    />
+                    {msg.media?.duration && (
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '8px',
+                        left: '8px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                        color: '#fff',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        zIndex: 2,
+                        pointerEvents: 'none'
+                      }}>
+                        {formatVideoDuration(msg.media.duration)}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerDirectDownload(msg.media?.url, msg.media?.fileName || 'video');
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      background: 'rgba(0,0,0,0.06)',
+                      border: 'none',
+                      color: 'var(--text-primary, #fff)',
+                      borderRadius: '6px',
+                      padding: '6px 12px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      width: 'fit-content',
+                      alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.12)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.06)'}
+                    title="Download Video"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" 
+                      fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/>
+                      <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download
+                  </button>
+                </div>
+              ) : (msg.type === 'file' || msg.type === 'video') && msg.media ? (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   background: 'var(--bg-elevated, rgba(0,0,0,0.1))',
@@ -688,7 +823,11 @@ const MessageBubble = ({
                   </div>
                 </div>
               ) : (
-                <p className="msg-text">{msg.content}</p>
+                msg.contentType === 'markdown' ? (
+                  <MarkdownRenderer content={msg.content} className="msg-markdown-content" />
+                ) : (
+                  <p className="msg-text">{msg.content}</p>
+                )
               )}
 
               {/* Edited tag */}
@@ -745,6 +884,56 @@ const MessageBubble = ({
                 {emoji} {count > 1 && <span>{count}</span>}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Thread Summary Footer */}
+        {msg.threadId && (
+          <div 
+            className={`msg-thread-footer ${isOwn ? 'thread-own' : 'thread-other'}`}
+            onClick={(e) => { e.stopPropagation(); openThread(msg.id); }}
+            style={{ cursor: 'pointer' }}
+          >
+            {msg.threadDetails && msg.threadDetails.replyCount > 0 ? (
+              <>
+                <div className="thread-footer-avatars">
+                  {(msg.threadDetails.participants || []).slice(0, 3).map(pId => {
+                    const participant = conversation?.participants?.find(p => p.employeeId === pId);
+                    const name = participant?.name || 'User';
+                    const avatar = participant?.avatar || null;
+                    return (
+                      <div key={pId} className="thread-footer-avatar" title={name}>
+                        {avatar ? (
+                          <img src={avatar} alt={name} />
+                        ) : (
+                          <span>{name.charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {(msg.threadDetails.participants || []).length > 3 && (
+                    <div className="thread-footer-avatar-more">
+                      +{msg.threadDetails.participants.length - 3}
+                    </div>
+                  )}
+                </div>
+                <span className="thread-footer-text">
+                  {msg.threadDetails.replyCount} {msg.threadDetails.replyCount === 1 ? 'reply' : 'replies'}
+                </span>
+                {msg.threadDetails.lastReplyAt && (
+                  <span className="thread-footer-time">
+                    Last reply {formatTime(msg.threadDetails.lastReplyAt)}
+                  </span>
+                )}
+                {msg.threadDetails.status && msg.threadDetails.status !== 'open' && (
+                  <span className={`thread-footer-status status-${msg.threadDetails.status}`}>
+                    {msg.threadDetails.status === 'resolved' ? '✓ Resolved' : '🔒 Closed'}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="thread-footer-view-link">View Thread</span>
+            )}
           </div>
         )}
 
@@ -818,6 +1007,24 @@ const MessageBubble = ({
               <CornerUpLeft size={16} strokeWidth={2} />
             </button>
 
+            {/* Reply in Thread */}
+            <button
+              className="msg-action-btn"
+              onClick={() => { openThread(msg.id); setShowOptions(false); }}
+              title="Reply in Thread"
+            >
+              <MessageSquare size={16} strokeWidth={2} />
+            </button>
+
+            {/* Forward */}
+            <button
+              className="msg-action-btn"
+              onClick={() => { onForward && onForward(msg); setShowOptions(false); }}
+              title="Forward"
+            >
+              <Forward size={16} strokeWidth={2} />
+            </button>
+
             {/* Star */}
             <button
               className="msg-action-btn"
@@ -855,6 +1062,18 @@ const MessageBubble = ({
               <CheckSquare size={16} strokeWidth={2} />
             </button>
 
+            {/* Create Task */}
+            <button
+              className="msg-action-btn"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('create-task-from-message', { detail: msg }));
+                setShowOptions(false);
+              }}
+              title="Create Task from Message"
+            >
+              <ClipboardList size={16} strokeWidth={2} />
+            </button>
+
             {/* Edit (own text only) */}
             {isOwn && msg.type === 'text' && (
               <button className="msg-action-btn" onClick={() => setIsEditing(true)} title="Edit">
@@ -870,10 +1089,11 @@ const MessageBubble = ({
                   if (isOwn) {
                     setShowDeleteMenu(p => !p);
                   } else {
+                    setShowOptions(false);
                     showConfirm(
                       'Delete Message',
                       'Are you sure you want to delete this message for yourself?',
-                      () => { onDelete(msg.id, false); setShowOptions(false); },
+                      () => { onDelete(msg.id, false); },
                       'danger'
                     );
                   }
@@ -885,20 +1105,24 @@ const MessageBubble = ({
               {isOwn && showDeleteMenu && (
                 <div className="msg-delete-menu">
                   <button onClick={() => {
+                    setShowDeleteMenu(false);
+                    setShowOptions(false);
                     showConfirm(
                       'Delete Message',
                       'Are you sure you want to delete this message for yourself?',
-                      () => { onDelete(msg.id, false); setShowDeleteMenu(false); setShowOptions(false); },
+                      () => { onDelete(msg.id, false); },
                       'danger'
                     );
                   }}>
                     Delete for me
                   </button>
                   <button onClick={() => {
+                    setShowDeleteMenu(false);
+                    setShowOptions(false);
                     showConfirm(
                       'Delete Message for Everyone',
                       'Are you sure you want to delete this message for everyone? This will replace the message content with a deletion notice.',
-                      () => { onDelete(msg.id, true); setShowDeleteMenu(false); setShowOptions(false); },
+                      () => { onDelete(msg.id, true); },
                       'danger'
                     );
                   }}>

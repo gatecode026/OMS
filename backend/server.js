@@ -12,6 +12,7 @@ import database from './src/config/database.js';
 import { startEventScheduler } from './src/modules/events/event.scheduler.js';
 import { startConnectionCleanupJob } from './src/jobs/connectionCleanup.job.js';
 import { startImageKitCleanupJob } from './src/jobs/imagekitCleanup.job.js';
+import { startPollExpiryJob } from './src/jobs/pollExpiry.job.js';
 import { closeAllConnections } from './src/utils/multidbConnection.js';
 import { initSocket, getIO } from './src/config/socket.js';
 import { getActiveWrites } from './src/modules/chat/chat.socket.js';
@@ -35,6 +36,9 @@ const bootstrap = async () => {
 
     // Start background multi-db connection cleanup checks
     startConnectionCleanupJob();
+
+    // Start background poll expiry checks
+    startPollExpiryJob();
 
     // Background ImageKit cleanup sweep disabled as per user instruction
     // startImageKitCleanupJob();

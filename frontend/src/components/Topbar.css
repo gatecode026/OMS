@@ -440,8 +440,8 @@
 }
 
 .profile-logout-btn:hover {
-  background-color: var(--color-danger, #ef4444);
-  color: #ffffff !important;
+  background-color: transparent !important;
+  color: #000000 !important;
 }
 
 /* ==========================================================================

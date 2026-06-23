@@ -13,6 +13,7 @@ import React, {
   useRef, useState, useCallback
 } from 'react';
 import { io } from 'socket.io-client';
+import { ImageKitUploadService } from '../services/imagekitUploadService';
 import { useApp } from './AppContext';
 import { useDesktopNotifications } from '../hooks/useDesktopNotifications';
 import NotificationPermissionBanner from '../components/chat/NotificationPermissionBanner';
@@ -101,13 +102,31 @@ export const ChatProvider = ({ children }) => {
   // { convId: number }
   const [isLoadingConvs, setIsLoadingConvs] = useState(false);
   const [isLoadingMsgs, setIsLoadingMsgs]   = useState(false);
+  const [pinnedMessages, setPinnedMessages] = useState([]);
+  const [totalPinned, setTotalPinned] = useState(0);
+  const [pinnedPagination, setPinnedPagination] = useState({});
+  const [isLoadingPinned, setIsLoadingPinned] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState({});
   // { convId: boolean }
   const [messageCursors, setMessageCursors]   = useState({});
   // { convId: string }
   const [showMobileList, setShowMobileList] = useState(true);
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
   const showMobileListRef = useRef(true);
   useEffect(() => { showMobileListRef.current = showMobileList; }, [showMobileList]);
+
+  // ── Threading States ──────────────────────────────────────────────────────
+  const [activeThread, setActiveThread] = useState(null);
+  const [activeThreadReplies, setActiveThreadReplies] = useState([]);
+  const [isLoadingThreadReplies, setIsLoadingThreadReplies] = useState(false);
+  const [threadActivityList, setThreadActivityList] = useState([]);
+  const [isLoadingThreadActivity, setIsLoadingThreadActivity] = useState(false);
+  const [threadUnreadCounts, setThreadUnreadCounts] = useState({});
+
+  const activeThreadRef = useRef(null);
+  useEffect(() => {
+    activeThreadRef.current = activeThread;
+  }, [activeThread]);
 
   // Stable ref for activeConvId (avoids stale closures in socket handlers)
   const activeConvIdRef = useRef(null);
@@ -669,6 +688,48 @@ export const ChatProvider = ({ children }) => {
     socketRef.current?.emit('unpin_message', { messageId, conversationId: convId });
   }, []);
 
+  const loadPinnedMessages = useCallback(async (convId, params = {}) => {
+    if (!convId) return;
+    setIsLoadingPinned(true);
+    try {
+      const query = new URLSearchParams();
+      if (params.page) query.append('page', params.page);
+      if (params.limit) query.append('limit', params.limit);
+      if (params.search) query.append('search', params.search);
+      if (params.filter) query.append('filter', params.filter);
+      if (params.sortBy) query.append('sortBy', params.sortBy);
+
+      const data = await apiFetch(`/chat/conversations/${convId}/pinned?${query.toString()}`);
+      if (data.status === 'success') {
+        if (params.page && params.page > 1) {
+          setPinnedMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.messageId));
+            const newMsgs = data.data.messages.filter(m => !existingIds.has(m.messageId));
+            return [...prev, ...newMsgs];
+          });
+        } else {
+          setPinnedMessages(data.data.messages);
+        }
+        setTotalPinned(data.data.totalPinned);
+        setPinnedPagination(data.data.pagination);
+      }
+    } catch (err) {
+      console.error('[ChatContext] Error loading pinned messages:', err);
+    } finally {
+      setIsLoadingPinned(false);
+    }
+  }, [apiFetch]);
+
+  useEffect(() => {
+    if (activeConvId) {
+      loadPinnedMessages(activeConvId, { page: 1, limit: 10 });
+    } else {
+      setPinnedMessages([]);
+      setTotalPinned(0);
+      setPinnedPagination({});
+    }
+  }, [activeConvId, loadPinnedMessages]);
+
   // ── STAR / UNSTAR MESSAGE (HIGHLIGHT) ─────────────────────────────────────
   const starMessage = useCallback((messageId, convId) => {
     socketRef.current?.emit('star_message', { messageId, conversationId: convId });
@@ -685,6 +746,352 @@ export const ChatProvider = ({ children }) => {
     );
     return data.status === 'success' ? data.data : [];
   }, [apiFetch]);
+  // ── FORWARD MESSAGE ────────────────────────────────────────────────────────
+  const forwardMessage = useCallback(async (messageId, targetConversationIds) => {
+    try {
+      const data = await apiFetch(`/chat/messages/${messageId}/forward`, {
+        method: 'POST',
+        body: JSON.stringify({ targetConversationIds })
+      });
+      if (data.status === 'success') {
+        addToast?.('success', 'Message forwarded successfully');
+        return true;
+      }
+      addToast?.('error', data.message || 'Failed to forward message');
+      return false;
+    } catch (err) {
+      console.error('[Chat] forwardMessage error:', err);
+      addToast?.('error', 'Failed to forward message');
+      return false;
+    }
+  }, [apiFetch, addToast]);
+
+  // ── THREADING OPERATIONS ───────────────────────────────────────────────────
+  const fetchThreadReplies = useCallback(async (threadId, cursor = null) => {
+    setIsLoadingThreadReplies(true);
+    try {
+      const url = cursor
+        ? `/chat/threads/${threadId}/messages?cursor=${cursor}&limit=30`
+        : `/chat/threads/${threadId}/messages?limit=30`;
+      const data = await apiFetch(url);
+      if (data.status === 'success') {
+        const { replies } = data.data;
+        setActiveThreadReplies(prev => {
+          if (!cursor) return replies;
+          const existingIds = new Set(prev.map(r => r.id));
+          const filteredNew = replies.filter(r => !existingIds.has(r.id));
+          return [...prev, ...filteredNew];
+        });
+      }
+    } catch (err) {
+      console.error('[Chat] fetchThreadReplies error:', err);
+    } finally {
+      setIsLoadingThreadReplies(false);
+    }
+  }, [apiFetch]);
+
+  const openThread = useCallback(async (rootMessageId) => {
+    try {
+      const data = await apiFetch('/chat/threads', {
+        method: 'POST',
+        body: JSON.stringify({ rootMessageId })
+      });
+      if (data.status === 'success') {
+        const thread = data.data;
+        setActiveThread(thread);
+        setThreadUnreadCounts(prev => ({ ...prev, [thread._id]: 0 }));
+        
+        // Join socket room
+        socketRef.current?.emit('join_thread', { threadId: thread._id });
+
+        // Mark read
+        apiFetch(`/chat/threads/${thread._id}/read`, { method: 'POST' }).catch(() => {});
+
+        // Load replies
+        await fetchThreadReplies(thread._id, null);
+      }
+    } catch (err) {
+      console.error('[Chat] openThread error:', err);
+    }
+  }, [apiFetch, fetchThreadReplies]);
+
+  const closeThread = useCallback(() => {
+    if (activeThreadRef.current) {
+      socketRef.current?.emit('leave_thread', { threadId: activeThreadRef.current._id });
+    }
+    setActiveThread(null);
+    setActiveThreadReplies([]);
+  }, []);
+
+  const sendThreadReply = useCallback(async (content, type = 'text', media = null) => {
+    const thread = activeThreadRef.current;
+    if (!thread) return false;
+
+    const tempId = `temp_reply_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const tempReply = {
+      id: tempId,
+      tempId,
+      conversationId: thread.conversationId,
+      senderId: currentUser?.id,
+      senderName: currentUser?.name,
+      senderAvatar: currentUser?.avatar || null,
+      senderRole: currentUser?.role || 'employee',
+      content,
+      type,
+      media,
+      threadId: thread._id,
+      isThreadReply: true,
+      createdAt: new Date().toISOString(),
+      _deliveryStatus: 'sending'
+    };
+
+    setActiveThreadReplies(prev => [...prev, tempReply]);
+
+    try {
+      const data = await apiFetch(`/chat/threads/${thread._id}/reply`, {
+        method: 'POST',
+        body: JSON.stringify({ content, type, media, tempId })
+      });
+
+      if (data.status === 'success') {
+        const savedReply = data.data;
+        setActiveThreadReplies(prev =>
+          prev.map(r => r.id === tempId ? { ...savedReply, _deliveryStatus: 'delivered' } : r)
+        );
+
+        // Optimistically increment reply count
+        setActiveThread(prev => prev ? { ...prev, replyCount: prev.replyCount + 1 } : null);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[Chat] sendThreadReply error:', err);
+      setActiveThreadReplies(prev =>
+        prev.map(r => r.id === tempId ? { ...r, _deliveryStatus: 'failed' } : r)
+      );
+      return false;
+    }
+  }, [apiFetch, currentUser]);
+
+  const followThread = useCallback(async (threadId) => {
+    try {
+      const data = await apiFetch(`/chat/threads/${threadId}/follow`, { method: 'POST' });
+      if (data.status === 'success') {
+        if (activeThreadRef.current?._id === threadId) {
+          setActiveThread(data.data);
+        }
+        addToast?.('success', 'Following thread');
+      }
+    } catch (err) {
+      console.error('[Chat] followThread error:', err);
+    }
+  }, [apiFetch, addToast]);
+
+  const unfollowThread = useCallback(async (threadId) => {
+    try {
+      const data = await apiFetch(`/chat/threads/${threadId}/unfollow`, { method: 'POST' });
+      if (data.status === 'success') {
+        if (activeThreadRef.current?._id === threadId) {
+          setActiveThread(data.data);
+        }
+        addToast?.('info', 'Unfollowed thread');
+      }
+    } catch (err) {
+      console.error('[Chat] unfollowThread error:', err);
+    }
+  }, [apiFetch, addToast]);
+
+  const updateThreadStatus = useCallback(async (threadId, status) => {
+    try {
+      const data = await apiFetch(`/chat/threads/${threadId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+      });
+      if (data.status === 'success') {
+        if (activeThreadRef.current?._id === threadId) {
+          setActiveThread(data.data);
+        }
+        addToast?.('success', `Thread marked as ${status}`);
+      }
+    } catch (err) {
+      console.error('[Chat] updateThreadStatus error:', err);
+      addToast?.('error', err.message || 'Failed to update thread status');
+    }
+  }, [apiFetch, addToast]);
+
+  const fetchThreadActivity = useCallback(async () => {
+    setIsLoadingThreadActivity(true);
+    try {
+      const data = await apiFetch('/chat/threads/activity');
+      if (data.status === 'success') {
+        setThreadActivityList(data.data || []);
+        
+        // Calculate unread counts dictionary
+        const counts = {};
+        (data.data || []).forEach(t => {
+          counts[t.threadId] = t.unreadCount || 0;
+        });
+        setThreadUnreadCounts(counts);
+      }
+    } catch (err) {
+      console.error('[Chat] fetchThreadActivity error:', err);
+    } finally {
+      setIsLoadingThreadActivity(false);
+    }
+  }, [apiFetch]);
+
+  const markThreadAsRead = useCallback(async (threadId) => {
+    try {
+      const data = await apiFetch(`/chat/threads/${threadId}/read`, { method: 'POST' });
+      if (data.status === 'success') {
+        setThreadUnreadCounts(prev => ({ ...prev, [threadId]: 0 }));
+        
+        // Update local activity list count
+        setThreadActivityList(prev => prev.map(t => t.threadId === threadId ? { ...t, unreadCount: 0 } : t));
+      }
+    } catch (err) {
+      console.error('[Chat] markThreadAsRead error:', err);
+    }
+  }, [apiFetch]);
+
+  // ── FILE UPLOADS GLOBAL STATE ────────────────────────────────────────────────
+  const [uploadQueue, setUploadQueue] = useState([]);
+  const uploadQueueRef = useRef([]);
+  useEffect(() => {
+    uploadQueueRef.current = uploadQueue;
+  }, [uploadQueue]);
+
+  const updateUploadItem = useCallback((id, updates) => {
+    setUploadQueue(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+  }, []);
+
+  const removeUploadItem = useCallback((id) => {
+    setUploadQueue(prev => prev.filter(item => item.id !== id));
+  }, []);
+
+  const uploadProcess = useCallback(async (item) => {
+    const { id, file } = item;
+    const controller = new AbortController();
+    
+    updateUploadItem(id, { controller, status: 'uploading', error: null, progress: 0 });
+
+    try {
+      // 1. Fetch ImageKit upload authentication details from the backend
+      const authParams = await ImageKitUploadService.fetchAuthParams(token);
+      
+      // 2. Perform direct upload to ImageKit
+      const result = await ImageKitUploadService.upload(
+        file,
+        authParams,
+        (progressData) => {
+          updateUploadItem(id, {
+            progress: progressData.percentage,
+            speed: progressData.speed,
+            eta: progressData.eta
+          });
+        },
+        controller.signal
+      );
+
+      // 3. Record successful response
+      updateUploadItem(id, {
+        status: 'success',
+        progress: 100,
+        result: {
+          url: result.url,
+          thumbnailUrl: result.thumbnailUrl || result.url,
+          fileName: result.name,
+          fileSize: result.size,
+          mimeType: file.type,
+          fileType: file.type,
+          imageKitFileId: result.fileId,
+          imageKitFilePath: result.filePath
+        }
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('[ChatContext] Upload aborted for:', file.name);
+        return;
+      }
+      console.error('[ChatContext] Upload failed:', err);
+      updateUploadItem(id, {
+        status: 'failed',
+        error: err.message || 'Upload failed'
+      });
+    }
+  }, [token, updateUploadItem]);
+
+  const startFileUpload = useCallback((file, convId) => {
+    if (!file) return;
+
+    // Check for duplicate file in the active queue for this conversation
+    const currentQueue = uploadQueueRef.current;
+    const isDuplicate = currentQueue.some(
+      item => item.convId === convId && item.name === file.name && item.size === file.size && item.status !== 'failed'
+    );
+    
+    if (isDuplicate) {
+      addToast?.('warning', `File "${file.name}" is already uploading or uploaded.`);
+      return;
+    }
+
+    const id = `${file.name}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const newItem = {
+      id,
+      convId,
+      file,
+      name: file.name,
+      size: file.size,
+      progress: 0,
+      speed: 0,
+      eta: 0,
+      status: 'uploading',
+      error: null,
+      result: null,
+      controller: null
+    };
+
+    setUploadQueue(prev => [...prev, newItem]);
+    
+    setTimeout(() => {
+      uploadProcess(newItem);
+    }, 0);
+  }, [addToast, uploadProcess]);
+
+  const cancelFileUpload = useCallback((id) => {
+    const item = uploadQueueRef.current.find(i => i.id === id);
+    if (item) {
+      if (item.controller) {
+        item.controller.abort();
+      }
+      removeUploadItem(id);
+    }
+  }, [removeUploadItem]);
+
+  const retryFileUpload = useCallback((id) => {
+    const item = uploadQueueRef.current.find(i => i.id === id);
+    if (item && item.status === 'failed') {
+      updateUploadItem(id, {
+        status: 'uploading',
+        progress: 0,
+        speed: 0,
+        eta: 0,
+        error: null
+      });
+      uploadProcess(item);
+    }
+  }, [updateUploadItem, uploadProcess]);
+
+  const clearFileUploads = useCallback((convId) => {
+    uploadQueueRef.current.forEach(item => {
+      if (item.convId === convId) {
+        if (item.controller) {
+          item.controller.abort();
+        }
+      }
+    });
+    setUploadQueue(prev => prev.filter(item => item.convId !== convId));
+  }, []);
 
   // ── SOCKET SETUP (reactive on socketToken change) ─────────────────────────────────────────────
   useEffect(() => {
@@ -1494,6 +1901,10 @@ export const ChatProvider = ({ children }) => {
           )
         };
       });
+
+      if (conversationId === activeConvIdRef.current) {
+        loadPinnedMessages(conversationId, { page: 1, limit: 10 });
+      }
     });
 
     socket.on('message_unpinned', ({ messageId, conversationId }) => {
@@ -1508,6 +1919,11 @@ export const ChatProvider = ({ children }) => {
           )
         };
       });
+
+      if (conversationId === activeConvIdRef.current) {
+        setPinnedMessages(prev => prev.filter(m => m.messageId !== messageId));
+        setTotalPinned(prev => Math.max(0, prev - 1));
+      }
     });
 
     // ── Star / Highlight Message ───────────────────────────────────────────
@@ -1539,15 +1955,186 @@ export const ChatProvider = ({ children }) => {
       });
     });
 
+    // ── Thread Socket Events ────────────────────────────────────────────────
+    socket.on('thread:reply:new', ({ threadId, reply, tempId }) => {
+      const me = currentUser;
+      
+      // 1. If it's our own optimistic message, replace/update it
+      if (tempId && reply.senderId === me?.id) {
+        setActiveThreadReplies(prev => {
+          const index = prev.findIndex(m => m.id === tempId || m.id === reply.id);
+          if (index > -1) {
+            const next = [...prev];
+            next[index] = { ...reply, _deliveryStatus: 'delivered' };
+            return next;
+          }
+          return [...prev, reply];
+        });
+        return;
+      }
+
+      // 2. If activeThread is this thread, append and mark read
+      if (activeThreadRef.current && activeThreadRef.current._id === threadId) {
+        setActiveThreadReplies(prev => {
+          if (prev.some(m => m.id === reply.id)) return prev;
+          return [...prev, reply];
+        });
+        
+        if (document.visibilityState === 'visible') {
+          apiFetch(`/chat/threads/${threadId}/read`, { method: 'POST' }).catch(() => {});
+          socket.emit('mark_read_thread', { threadId });
+        }
+      } else {
+        // Play chime and increment unread badge count
+        playNotificationChime();
+        setThreadUnreadCounts(prev => ({
+          ...prev,
+          [threadId]: (prev[threadId] || 0) + 1
+        }));
+      }
+
+      // 3. Dynamically update the root message's thread footer count in messages list
+      setMessages(prev => {
+        const convId = reply.conversationId;
+        const convMsgs = prev[convId] || [];
+        const next = convMsgs.map(msg => {
+          if (msg.threadId === threadId || msg.id === activeThreadRef.current?.rootMessageId) {
+            return {
+              ...msg,
+              threadId: threadId,
+              threadDetails: {
+                replyCount: (msg.threadDetails?.replyCount || 0) + 1,
+                lastReplyAt: reply.createdAt,
+                participants: Array.from(new Set([...(msg.threadDetails?.participants || []), reply.senderId]))
+              }
+            };
+          }
+          return msg;
+        });
+        return { ...prev, [convId]: next };
+      });
+
+      // 4. Refresh My Threads list
+      fetchThreadActivity();
+    });
+
+    socket.on('thread:updated', (updatedThread) => {
+      if (activeThreadRef.current && activeThreadRef.current._id === updatedThread.threadId) {
+        setActiveThread(prev => prev ? { ...prev, ...updatedThread } : null);
+      }
+
+      // Update root message details in messages list
+      setMessages(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(convId => {
+          next[convId] = (next[convId] || []).map(msg => {
+            if (msg.threadId === updatedThread.threadId || msg.id === updatedThread.rootMessageId) {
+              return {
+                ...msg,
+                threadId: updatedThread.threadId,
+                threadDetails: {
+                  replyCount: updatedThread.replyCount,
+                  lastReplyAt: updatedThread.lastReplyAt,
+                  status: updatedThread.status,
+                  participants: updatedThread.participants
+                }
+              };
+            }
+            return msg;
+          });
+        });
+        return next;
+      });
+    });
+
+    socket.on('thread:read', ({ threadId }) => {
+      setThreadUnreadCounts(prev => ({
+        ...prev,
+        [threadId]: 0
+      }));
+      setThreadActivityList(prev => prev.map(t => t.threadId === threadId ? { ...t, unreadCount: 0 } : t));
+    });
+
+    socket.on('thread:mention', ({ threadId, senderName, preview }) => {
+      if (addToast) {
+        addToast('info', `@${senderName} mentioned you in a thread: "${preview}"`);
+      }
+    });
+
+    // ── Poll Socket Events ───────────────────────────────────────────────
+    socket.on('poll:updated', (updatedPoll) => {
+      const convId = updatedPoll.conversationId;
+      const pollIdStr = updatedPoll._id?.toString();
+      if (!pollIdStr) return;
+
+      setMessages(prev => {
+        const list = prev[convId] || [];
+        return {
+          ...prev,
+          [convId]: list.map(m => {
+            if (m.type === 'poll' && m.pollId) {
+              const mPollId = typeof m.pollId === 'object' ? m.pollId._id : m.pollId;
+              if (mPollId?.toString() === pollIdStr) {
+                return { ...m, pollId: updatedPoll };
+              }
+            }
+            return m;
+          })
+        };
+      });
+
+      setActiveThreadReplies(prev =>
+        prev.map(r => {
+          if (r.type === 'poll' && r.pollId) {
+            const rPollId = typeof r.pollId === 'object' ? r.pollId._id : r.pollId;
+            if (rPollId?.toString() === pollIdStr) {
+              return { ...r, pollId: updatedPoll };
+            }
+          }
+          return r;
+        })
+      );
+    });
+
+    socket.on('poll:deleted', ({ pollId }) => {
+      const pollIdStr = pollId?.toString();
+      if (!pollIdStr) return;
+
+      setMessages(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(convId => {
+          next[convId] = (next[convId] || []).filter(m => {
+            if (m.type === 'poll' && m.pollId) {
+              const mPollId = typeof m.pollId === 'object' ? m.pollId._id : m.pollId;
+              return mPollId?.toString() !== pollIdStr;
+            }
+            return true;
+          });
+        });
+        return next;
+      });
+
+      setActiveThreadReplies(prev =>
+        prev.filter(r => {
+          if (r.type === 'poll' && r.pollId) {
+            const rPollId = typeof r.pollId === 'object' ? r.pollId._id : r.pollId;
+            return rPollId?.toString() !== pollIdStr;
+          }
+          return true;
+        })
+      );
+    });
+
     // Initial load
     fetchConversations();
+    fetchThreadActivity();
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
       setIsConnected(false);
     };
-  }, [socketToken, fetchConversations, currentUser, fetchMessages]);
+  }, [socketToken, fetchConversations, currentUser, fetchMessages, apiFetch, playNotificationChime, addToast, fetchThreadActivity]);
 
   // ── AUTO-MARK READ ON VISIBILITY / FOCUS CHANGE ───────────────────────────
   useEffect(() => {
@@ -1611,10 +2198,16 @@ export const ChatProvider = ({ children }) => {
     setShowMobileList,
     currentUserStatus,
     presenceMap,
+    highlightedMessageId,
+    setHighlightedMessageId,
+    pinnedMessages,
+    totalPinned,
+    pinnedPagination,
 
     // Loading states
     isLoadingConvs,
     isLoadingMsgs,
+    isLoadingPinned,
     hasMoreMessages,
 
     // Actions
@@ -1629,6 +2222,7 @@ export const ChatProvider = ({ children }) => {
     removeMemberFromGroup,
     leaveGroup,
     deleteMessage,
+    forwardMessage,
     clearChat,
     deleteMessagesBulk,
     editMessage,
@@ -1644,8 +2238,34 @@ export const ChatProvider = ({ children }) => {
     unpinConversation,
     pinMessage,
     unpinMessage,
+    loadPinnedMessages,
     starMessage,
     unstarMessage,
+
+    // Threading
+    activeThread,
+    activeThreadReplies,
+    isLoadingThreadReplies,
+    threadActivityList,
+    isLoadingThreadActivity,
+    threadUnreadCounts,
+    openThread,
+    closeThread,
+    fetchThreadReplies,
+    sendThreadReply,
+    followThread,
+    unfollowThread,
+    updateThreadStatus,
+    fetchThreadActivity,
+    markThreadAsRead,
+
+    // File Uploads
+    uploadQueue,
+    startFileUpload,
+    cancelFileUpload,
+    retryFileUpload,
+    removeUploadItem,
+    clearFileUploads,
 
     // Helpers
     apiFetch,

@@ -630,3 +630,149 @@ export const triggerCleanupManual = asyncHandler(async (req, res) => {
   return successResponse(res, result, 'ImageKit manual cleanup completed successfully');
 });
 
+// POST /api/v1/chat/messages/:messageId/forward
+export const forwardMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const { targetConversationIds } = req.body;
+  const { id: userId, name: userName, companyId, role } = req.user;
+
+  // 1. Validate forward limit (max 5 conversations)
+  if (!targetConversationIds || !Array.isArray(targetConversationIds) || targetConversationIds.length === 0) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'targetConversationIds array is required'
+    });
+  }
+
+  if (targetConversationIds.length > 5) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Cannot forward to more than 5 conversations'
+    });
+  }
+
+  // Fetch sender info for user context
+  const forwardingUser = await getEmployeeInfo(userId, companyId);
+  if (!forwardingUser) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'User not found'
+    });
+  }
+
+  // Call service to perform forwarding DB operations
+  let newMessages;
+  try {
+    newMessages = await chatService.forwardMessage(
+      messageId,
+      targetConversationIds,
+      {
+        id: userId,
+        name: forwardingUser.name || userName,
+        avatar: forwardingUser.avatar || null,
+        role: forwardingUser.roleId || role
+      },
+      companyId
+    );
+  } catch (error) {
+    return res.status(400).json({
+      status: 'fail',
+      message: error.message || 'Failed to forward message'
+    });
+  }
+
+  // Emit socket events and trigger notifications
+  try {
+    const io = getIO();
+    const { queuePushNotification } = await import('./chat.socket.js');
+    const conn = await getTenantConnection(companyId);
+
+    for (const newMsg of newMessages) {
+      const convId = newMsg.conversationId;
+      const previewText = newMsg.type === 'text'
+        ? newMsg.content
+        : `📎 ${newMsg.media?.fileName || newMsg.type}`;
+
+      // Emit new_message and message:new socket events to conversation room
+      io.to(`conv:${convId}`).emit('new_message', {
+        id: newMsg.id,
+        conversationId: convId,
+        senderId: userId,
+        senderName: forwardingUser.name || userName,
+        senderAvatar: forwardingUser.avatar || null,
+        preview: previewText,
+        type: newMsg.type,
+        createdAt: newMsg.createdAt,
+        _isOptimized: true,
+        isForwarded: true,
+        forwardedCount: newMsg.forwardedCount,
+        forwardedFrom: newMsg.forwardedFrom
+      });
+
+      io.to(`conv:${convId}`).emit('message:new', newMsg);
+
+      // Handle receipts + offline push notifications
+      const conv = await Conversation.findOne({ id: convId }).lean();
+      if (conv) {
+        const otherParticipants = conv.participants.filter(
+          p => p.employeeId !== userId
+        );
+
+        const otherParticipantIds = otherParticipants.map(p => p.employeeId);
+        const employeesInfo = await conn.collection('employees').find(
+          { id: { $in: otherParticipantIds } },
+          { projection: { id: 1, chatStatus: 1 } }
+        ).toArray();
+
+        const employeeStatusMap = new Map(employeesInfo.map(e => [e.id, e.chatStatus]));
+
+        // Fetch all socket IDs currently in the conversation room
+        const roomSockets = await io
+          .in(`conv:${convId}`)
+          .fetchSockets();
+        const usersInRoom = new Set(
+          roomSockets.map(s => s.user?.id).filter(Boolean)
+        );
+
+        for (const participant of otherParticipants) {
+          // Mark as delivered in DB
+          await Message.updateOne(
+            { id: newMsg.id },
+            {
+              $push: {
+                deliveredTo: {
+                  employeeId: participant.employeeId,
+                  deliveredAt: new Date()
+                }
+              }
+            }
+          );
+
+          // If not in room — send personal notification
+          if (!usersInRoom.has(participant.employeeId)) {
+            const targetSockets = await io.in(`user:${participant.employeeId}`).fetchSockets();
+            if (targetSockets.length === 0) {
+              const chatStatus = employeeStatusMap.get(participant.employeeId) || 'available';
+              if (chatStatus !== 'dnd') {
+                queuePushNotification(participant.employeeId, convId, companyId);
+              }
+            } else {
+              // Emit notification alert for online user not in room
+              io.to(`user:${participant.employeeId}`).emit('new_message_notification', {
+                conversationId: convId,
+                messageId: newMsg.id,
+                senderName: forwardingUser.name || userName,
+                preview: previewText
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logger.error('[Chat Controller] Socket/notification dispatch failed for forward:', err.message);
+  }
+
+  return successResponse(res, newMessages, 'Messages forwarded successfully');
+});
+
