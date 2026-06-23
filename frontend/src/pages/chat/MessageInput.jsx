@@ -3,12 +3,15 @@
  * @description Message compose bar with direct ImageKit uploads, progress view, drag-and-drop, and Send validation.
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import VoiceRecorder from './VoiceRecorder';
 import useFileUpload from '../../hooks/useFileUpload';
-import UploadProgress from '../../components/chat/UploadProgress';
+import AttachmentCard from '../../components/AttachmentCard';
+import FormattingToolbar from '../../components/FormattingToolbar';
+import MarkdownPreview from '../../components/MarkdownPreview';
+import { FileText, Image, Headphones, BarChart2, Calendar, CheckSquare } from 'lucide-react';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB Large File Support
 
@@ -17,16 +20,22 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
   const [isDragOver, setIsDragOver] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [showToolbar, setShowToolbar] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
 
   const fileInputRef = useRef(null);
+  const docInputRef = useRef(null);
+  const mediaInputRef = useRef(null);
+  const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const plusMenuRef = useRef(null);
 
   // Hook for client-side uploads directly to ImageKit
   const {
-    queue,
-    isUploading,
+    queue: allQueue,
     startUpload,
     cancelUpload,
     retryUpload,
@@ -34,10 +43,9 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
     removeQueueItem
   } = useFileUpload();
 
-  // Clear pending/completed uploads when conversation changes or input unmounts
-  useEffect(() => {
-    clearQueue();
-  }, [activeConvId, clearQueue]);
+  // Filter queue for active conversation
+  const queue = allQueue.filter(item => item.convId === activeConvId);
+  const isUploading = queue.some(item => item.status === 'uploading');
 
   // Auto-resize textarea
   const resizeTextarea = useCallback(() => {
@@ -52,6 +60,11 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
       if (emojiPickerRef.current && 
           !emojiPickerRef.current.contains(e.target)) {
         setShowEmojiPicker(false);
+      }
+      if (plusMenuRef.current && 
+          !plusMenuRef.current.contains(e.target) && 
+          !e.target.closest('.plus-trigger-btn')) {
+        setShowPlusMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -91,6 +104,31 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
     }, 2500);
   };
 
+  const handleFormat = useCallback((prefix, suffix) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = message;
+    const selectedText = text.substring(start, end);
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+
+    const replacement = prefix + selectedText + suffix;
+    const newValue = before + replacement + after;
+    
+    setMessage(newValue);
+
+    setTimeout(() => {
+      ta.focus();
+      const newCursorStart = start + prefix.length;
+      const newCursorEnd = start + prefix.length + selectedText.length;
+      ta.setSelectionRange(newCursorStart, newCursorEnd);
+      resizeTextarea();
+    }, 10);
+  }, [message, resizeTextarea]);
+
   const handleSend = useCallback(() => {
     // Prevent sending while uploads are in progress
     if (isUploading) return;
@@ -101,6 +139,7 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
     if (trimmedText) {
       onSend(trimmedText, 'text');
       setMessage('');
+      setIsPreviewMode(false); // Reset preview mode
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -123,14 +162,45 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
       });
     });
 
-    // 3. Clear the upload queue
-    clearQueue();
+    // 3. Clear the upload queue for this conversation
+    clearQueue(activeConvId);
 
     onTypingStop?.();
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-  }, [message, queue, isUploading, onSend, onTypingStop, clearQueue]);
+  }, [message, queue, isUploading, onSend, onTypingStop, clearQueue, activeConvId]);
 
   const handleKeyDown = (e) => {
+    // 1. Check for formatting keyboard shortcuts
+    if (e.ctrlKey || e.metaKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'b') {
+        e.preventDefault();
+        handleFormat('**', '**');
+        return;
+      }
+      if (key === 'i') {
+        e.preventDefault();
+        handleFormat('*', '*');
+        return;
+      }
+      if (key === 'e') {
+        e.preventDefault();
+        handleFormat('`', '`');
+        return;
+      }
+      if (e.shiftKey && key === 'x') {
+        e.preventDefault();
+        handleFormat('~', '~');
+        return;
+      }
+      if (e.shiftKey && key === 'c') {
+        e.preventDefault();
+        handleFormat('```\n', '\n```');
+        return;
+      }
+    }
+
+    // 2. Original enter key handler
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       // Ensure we don't send if button is disabled
@@ -149,7 +219,7 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
         alert(`File "${file.name}" is too large. Maximum 500 MB allowed.`);
         return;
       }
-      startUpload(file);
+      startUpload(file, activeConvId);
     });
     e.target.value = '';
   };
@@ -164,7 +234,7 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
         alert(`File "${file.name}" is too large. Maximum 500 MB allowed.`);
         return;
       }
-      startUpload(file);
+      startUpload(file, activeConvId);
     });
   };
 
@@ -197,18 +267,18 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
       {/* ── Attachment Preview / Upload Progress Container ── */}
       {queue.length > 0 && (
         <div className="msg-input-uploads-container" style={{
-          padding: '8px 16px',
+          padding: '10px 16px',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
+          flexDirection: 'row',
+          gap: '10px',
           borderBottom: '1px solid var(--border-color, #e2e8f0)',
-          maxHeight: '240px',
-          overflowY: 'auto',
+          overflowX: 'auto',
           width: '100%',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          scrollbarWidth: 'thin'
         }}>
           {queue.map(item => (
-            <UploadProgress
+            <AttachmentCard
               key={item.id}
               item={item}
               onCancel={cancelUpload}
@@ -217,6 +287,16 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
             />
           ))}
         </div>
+      )}
+
+      {/* ── Rich Text Formatting Toolbar ── */}
+      {showToolbar && (
+        <FormattingToolbar
+          onFormat={handleFormat}
+          onTogglePreview={() => setIsPreviewMode(prev => !prev)}
+          isPreviewMode={isPreviewMode}
+          visibleMode={showToolbar}
+        />
       )}
 
       {/* Input composition row */}
@@ -232,21 +312,129 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
         {/* ── Normal compose bar (hidden while recording) ─────── */}
         {!isRecording && (
           <>
-            {/* ── Attachment button ────────────────────────────────── */}
-            <button
-              className="msg-input-attach-btn"
-              onClick={() => fileInputRef.current?.click()}
-              title="Attach files"
-              type="button"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-              </svg>
-            </button>
+            {/* ── Plus Actions Menu Button ────────────────── */}
+            <div className="plus-menu-container">
+              <style>{`
+                .plus-menu-container {
+                  position: relative;
+                  display: inline-block;
+                }
+                .plus-actions-menu {
+                  position: absolute;
+                  bottom: 56px;
+                  left: 0;
+                  background: #182229;
+                  border-radius: 16px;
+                  padding: 8px;
+                  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+                  display: flex;
+                  flex-direction: column;
+                  gap: 2px;
+                  z-index: 1001;
+                  min-width: 210px;
+                  animation: menu-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+                }
+                @keyframes menu-fade-in {
+                  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+                  to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                .plus-action-item {
+                  display: flex;
+                  align-items: center;
+                  gap: 12px;
+                  padding: 8px 12px;
+                  color: #e9edef;
+                  font-size: 14.5px;
+                  font-weight: 500;
+                  cursor: pointer;
+                  border-radius: 10px;
+                  background: transparent;
+                  border: none;
+                  width: 100%;
+                  text-align: left;
+                  transition: background 0.15s;
+                }
+                .plus-action-item:hover {
+                  background: rgba(255, 255, 255, 0.08);
+                }
+                .plus-icon-circle {
+                  width: 32px;
+                  height: 32px;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: #fff;
+                  flex-shrink: 0;
+                }
+              `}</style>
+
+              <button
+                className={`msg-input-attach-btn plus-trigger-btn ${showPlusMenu ? 'active' : ''}`}
+                onClick={() => setShowPlusMenu(prev => !prev)}
+                title="Attach (+)"
+                type="button"
+                style={{
+                  color: showPlusMenu ? 'var(--color-primary, #6366f1)' : 'inherit',
+                  fontWeight: 'bold',
+                  fontSize: '20px',
+                  lineHeight: '1'
+                }}
+              >
+                +
+              </button>
+
+              {showPlusMenu && (
+                <div className="plus-actions-menu" ref={plusMenuRef}>
+                  <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); docInputRef.current?.click(); }}>
+                    <div className="plus-icon-circle" style={{ backgroundColor: '#7f5af0' }}><FileText size={16} /></div>
+                    Document
+                  </button>
+                  <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); mediaInputRef.current?.click(); }}>
+                    <div className="plus-icon-circle" style={{ backgroundColor: '#005af0' }}><Image size={16} /></div>
+                    Photos & videos
+                  </button>
+                  <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); audioInputRef.current?.click(); }}>
+                    <div className="plus-icon-circle" style={{ backgroundColor: '#f97316' }}><Headphones size={16} /></div>
+                    Audio
+                  </button>
+                  <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('open-create-poll')); }}>
+                    <div className="plus-icon-circle" style={{ backgroundColor: '#eab308' }}><BarChart2 size={16} /></div>
+                    Poll
+                  </button>
+                  <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('create-task-from-message', { detail: {} })); }}>
+                    <div className="plus-icon-circle" style={{ backgroundColor: '#10b981' }}><CheckSquare size={16} /></div>
+                    Assign Task
+                  </button>
+                  <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); alert('Create Event simulation.'); }}>
+                    <div className="plus-icon-circle" style={{ backgroundColor: '#e11d48' }}><Calendar size={16} /></div>
+                    Event
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Hidden native input file selectors */}
             <input
-              ref={fileInputRef}
+              ref={docInputRef}
               type="file"
-              accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z"
+              style={{ display: 'none' }}
+              onChange={handleFileChange}
+              multiple
+            />
+            <input
+              ref={mediaInputRef}
+              type="file"
+              accept="image/*,video/*"
+              style={{ display: 'none' }}
+              onChange={handleFileChange}
+              multiple
+            />
+            <input
+              ref={audioInputRef}
+              type="file"
+              accept="audio/*"
               style={{ display: 'none' }}
               onChange={handleFileChange}
               multiple
@@ -300,15 +488,23 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
               )}
             </div>
 
-            <textarea
-              ref={textareaRef}
-              className="msg-input-textarea"
-              placeholder="Type a message..."
-              value={message}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              rows={1}
-            />
+            {isPreviewMode ? (
+              <div className="msg-input-preview-wrap" style={{ flex: 1, minHeight: '38px', boxSizing: 'border-box' }}>
+                <MarkdownPreview content={message} />
+              </div>
+            ) : (
+              <textarea
+                ref={textareaRef}
+                className="msg-input-textarea"
+                placeholder="Type a message..."
+                value={message}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setShowToolbar(true)}
+                onClick={() => setShowToolbar(true)}
+                rows={1}
+              />
+            )}
 
             {/* ── Mic button (show when nothing typed and no files attached) ─────────────── */}
             {!showSendButton && (
@@ -354,5 +550,4 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
     </div>
   );
 };
-
 export default MessageInput;

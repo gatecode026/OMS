@@ -14,6 +14,29 @@ import { getOtherParticipant } from './ConversationsList';
 import StatusDot from './StatusDot';
 import { Pin } from 'lucide-react';
 import { useCall } from '../../context/CallContext';
+import ForwardMessageModal from '../../components/ForwardMessageModal';
+import CreateTaskFromMessageModal from '../../components/CreateTaskFromMessageModal';
+import ChatHeader from '../../components/ChatHeader';
+import PinBoardDrawer from '../../components/PinBoardDrawer';
+import ThreadPanel from '../../components/ThreadPanel';
+import CreatePollModal from '../../components/CreatePollModal';
+
+const stripMarkdown = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/```[\s\S]*?```/g, '[Code Block]')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/~([^~]+)~/g, '$1')
+    .replace(/^\s*>\s+/gm, '')
+    .replace(/^\s*[\*\-+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+};
 
 const getFirstUnreadMessage = (msgs, currentUserId, unreadCount) => {
   if (!msgs || msgs.length === 0) return null;
@@ -47,7 +70,10 @@ const ChatWindow = ({ currentUser, onBack }) => {
     mutedConversations, muteConversation, unmuteConversation,
     socket, isConnected, presenceMap,
     pinMessage, unpinMessage, starMessage, unstarMessage,
-    unreadCountOnOpen
+    unreadCountOnOpen,
+    highlightedMessageId, setHighlightedMessageId,
+    pinnedMessages, totalPinned, loadPinnedMessages,
+    activeThread, closeThread
   } = useChat();
 
   const { initiateCall, callState } = useCall();
@@ -55,6 +81,9 @@ const ChatWindow = ({ currentUser, onBack }) => {
   const { showConfirm, addToast } = useApp();
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState(new Set());
+  const [showPinBoard, setShowPinBoard] = useState(false);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [showCreatePoll, setShowCreatePoll] = useState(false);
 
   // Reset select mode when conversation changes
   useEffect(() => {
@@ -130,6 +159,8 @@ const ChatWindow = ({ currentUser, onBack }) => {
   // We capture it only once on open, and clear it when banner is dismissed
   const [firstUnreadMsgId, setFirstUnreadMsgId] = useState(null);
   const [replyTo, setReplyTo] = useState(null);
+  const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [taskMessage, setTaskMessage] = useState(null);
 
   const showScrollBtnRef = useRef(false);
   const initialScrollDoneRef = useRef({});
@@ -189,9 +220,24 @@ const ChatWindow = ({ currentUser, onBack }) => {
     return () => {
       if (timer) clearTimeout(timer);
       observer.unobserve(unreadSeparatorEl);
-      observer.disconnect();
     };
   }, [unreadCountForBanner, unreadSeparatorEl, dismissUnreadBanner]);
+
+  // Wire up listener for creating task from message
+  useEffect(() => {
+    const handleCreateTask = (e) => {
+      setTaskMessage(e.detail);
+    };
+    const handleOpenCreatePoll = () => {
+      setShowCreatePoll(true);
+    };
+    window.addEventListener('create-task-from-message', handleCreateTask);
+    window.addEventListener('open-create-poll', handleOpenCreatePoll);
+    return () => {
+      window.removeEventListener('create-task-from-message', handleCreateTask);
+      window.removeEventListener('open-create-poll', handleOpenCreatePoll);
+    };
+  }, []);
 
   // Current conversation
   const conv = conversations.find(c => c.id === activeConvId);
@@ -229,6 +275,18 @@ const ChatWindow = ({ currentUser, onBack }) => {
       }
     }
   }, [activeConvId]);
+
+  // Reset carouselIndex on activeConvId or pinnedMessages length changes
+  useEffect(() => {
+    setCarouselIndex(0);
+  }, [activeConvId, pinnedMessages?.length]);
+
+  // Clamp carouselIndex to length of pinnedMessages
+  useEffect(() => {
+    if (pinnedMessages && carouselIndex >= pinnedMessages.length) {
+      setCarouselIndex(Math.max(0, pinnedMessages.length - 1));
+    }
+  }, [pinnedMessages?.length, carouselIndex]);
 
   // Unified Initial Scroll when switching to a conversation
   useEffect(() => {
@@ -295,6 +353,24 @@ const ChatWindow = ({ currentUser, onBack }) => {
     }
   }, [typing.length]);
 
+  // Auto-paginate/load older messages if search clicked an older message
+  useEffect(() => {
+    if (!highlightedMessageId || !activeConvId) return;
+
+    // Check if message is currently in the active conversation message list
+    const hasMsg = convMessages.some(m => m.id === highlightedMessageId);
+    if (!hasMsg) {
+      if (hasMoreMessages[activeConvId] && !isLoadingMsgs) {
+        // Load next page of older messages
+        loadMoreMessages(activeConvId);
+      } else if (!hasMoreMessages[activeConvId] && !isLoadingMsgs) {
+        // We've loaded all messages and the target is still not found
+        console.warn(`[ChatWindow] Target message ${highlightedMessageId} not found in history`);
+        setHighlightedMessageId(null);
+      }
+    }
+  }, [highlightedMessageId, activeConvId, convMessages, hasMoreMessages, isLoadingMsgs, loadMoreMessages, setHighlightedMessageId]);
+
   // Scroll handler — load more + show scroll btn
   const handleScroll = useCallback(async () => {
     const container = messagesContainerRef.current;
@@ -356,8 +432,9 @@ const ChatWindow = ({ currentUser, onBack }) => {
   if (!conv) return null;
 
   return (
-    <div className="chat-window" onClick={handleWindowClick}>
-      {/* ── HEADER ──────────────────────────────────────────────── */}
+    <div className={`chat-window-container-split ${activeThread ? 'thread-open' : ''}`}>
+      <div className="chat-window" onClick={handleWindowClick}>
+        {/* ── HEADER ──────────────────────────────────────────────── */}
       {isSelectMode ? (
         <div className="chat-win-header" style={{ backgroundColor: 'var(--chat-primary, #6366f1)', color: '#ffffff' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -404,228 +481,137 @@ const ChatWindow = ({ currentUser, onBack }) => {
           </div>
         </div>
       ) : (
-        <div className="chat-win-header">
-          {/* Back button (mobile) */}
-          <button className="chat-win-back-btn" onClick={onBack}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m15 18-6-6 6-6"/>
-            </svg>
-          </button>
-
-        {/* Avatar */}
-        <div className="chat-win-avatar-wrap">
-          {avatarSrc ? (
-            <img src={avatarSrc} alt={displayName} className="chat-win-avatar-img" />
-          ) : (
-            <div className="chat-win-avatar-letter">
-              {avatarLetter}
-            </div>
-          )}
-          {isDirect && (
-            <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', border: '2px solid var(--bg-card, #fff)', borderRadius: '50%' }}>
-              <StatusDot status={otherStatus} size={10} />
-            </div>
-          )}
-        </div>
-
-        {/* Name + Status */}
-        <div 
-          className="chat-win-info"
-          style={{ cursor: !isDirect ? 'pointer' : 'default' }}
-          onClick={() => { if (!isDirect) setShowSidebar(true); }}
-        >
-          <h3 className="chat-win-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {displayName}
-            {isDirect && <StatusDot status={otherStatus} size={10} />}
-          </h3>
-          <p className="chat-win-status">
-            {typing.length > 0
-              ? `${typing.map(u => u.name.split(' ')[0]).join(', ')} ${typing.length === 1 ? 'is' : 'are'} typing...`
-              : isDirect
-                ? otherStatus === 'offline'
-                  ? 'Offline'
-                  : otherStatus === 'available'
-                    ? otherIsOnChatScreen
-                      ? 'Online'
-                      : 'Available and ready to take call'
-                    : otherStatus === 'dnd'
-                      ? 'Do Not Disturb'
-                      : otherStatus.charAt(0).toUpperCase() + otherStatus.slice(1)
-                : `${participantCount} member${participantCount !== 1 ? 's' : ''}`
-            }
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="chat-win-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {isDirect && other && (
-            <>
-              {/* Voice Call */}
-              <button
-                className="chat-win-action-btn"
-                onClick={() => initiateCall(
-                  { 
-                    id: other.employeeId,
-                    name: other.name,
-                    avatar: other.avatar
-                  },
-                  'audio',
-                  activeConvId
-                )}
-                disabled={callState !== 'idle'}
-                title="Voice Call"
-                style={{
-                  opacity: callState !== 'idle' ? 0.5 : 1,
-                  cursor: callState !== 'idle' 
-                    ? 'not-allowed' : 'pointer'
-                }}
-              >
-                <svg width="20" height="20" 
-                  viewBox="0 0 24 24" fill="none" 
-                  stroke="currentColor" strokeWidth="2">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 
-                    19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 
-                    0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 
-                    3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 
-                    1.72c.127.96.361 1.903.7 2.81a2 2 0 0 
-                    1-.45 2.11L7.91 8.91a16 16 0 0 0 6 
-                    6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 
-                    1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-                </svg>
-              </button>
-
-              {/* Video Call */}
-              <button
-                className="chat-win-action-btn"
-                onClick={() => initiateCall(
-                  {
-                    id: other.employeeId,
-                    name: other.name,
-                    avatar: other.avatar
-                  },
-                  'video',
-                  activeConvId
-                )}
-                disabled={callState !== 'idle'}
-                title="Video Call"
-                style={{
-                  opacity: callState !== 'idle' ? 0.5 : 1,
-                  cursor: callState !== 'idle' 
-                    ? 'not-allowed' : 'pointer'
-                }}
-              >
-                <svg width="20" height="20" 
-                  viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2">
-                  <polygon points="23 7 16 12 23 17 23 7"/>
-                  <rect x="1" y="5" width="15" height="14" 
-                    rx="2" ry="2"/>
-                </svg>
-              </button>
-            </>
-          )}
-
-          <button
-            className={`chat-win-action-btn ${isMuted ? 'muted' : ''}`}
-            onClick={toggleMute}
-            title={isMuted ? 'Unmute Conversation' : 'Mute Conversation'}
-            style={{ color: isMuted ? 'var(--text-muted, #888)' : 'inherit' }}
-          >
-            {isMuted ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m13.73 21a2 2 0 0 1-3.46 0" />
-                <path d="M18.63 13A17.89 17.89 0 0 1 18 8" />
-                <path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14" />
-                <path d="M18 8a6 6 0 0 0-9.33-5" />
-                <line x1="1" y1="1" x2="23" y2="23" />
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-            )}
-          </button>
-
-          <button
-            className="chat-win-action-btn"
-            onClick={() => setShowSidebar(true)}
-            title="Conversation Info"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
-            </svg>
-          </button>
-        </div>
-      </div>
+        <ChatHeader
+          displayName={displayName}
+          isDirect={isDirect}
+          other={other}
+          otherStatus={otherStatus}
+          otherIsOnChatScreen={otherIsOnChatScreen}
+          avatarSrc={avatarSrc}
+          avatarLetter={avatarLetter}
+          participantCount={participantCount}
+          typing={typing}
+          onBack={onBack}
+          isMuted={isMuted}
+          toggleMute={toggleMute}
+          setShowSidebar={setShowSidebar}
+          setShowPinBoard={setShowPinBoard}
+          initiateCall={initiateCall}
+          callState={callState}
+        />
       )}
 
-      {/* Pinned message banner */}
-      {(() => {
-        const pinnedMsg = convMessages.find(m => m.isPinned);
-        if (!pinnedMsg) return null;
-        return (
+      {/* Pinned message banner (Carousel) */}
+      {pinnedMessages && pinnedMessages.length > 0 && (
+        <div 
+          style={{
+            background: 'var(--bg-card, #ffffff)',
+            borderBottom: '1px solid var(--chat-border, #e2e8f0)',
+            padding: '10px 16px',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            zIndex: 5,
+            color: 'var(--text-secondary, #475569)'
+          }}
+        >
           <div 
-            style={{
-              background: 'var(--bg-card, #ffffff)',
-              borderBottom: '1px solid var(--chat-border, #e2e8f0)',
-              padding: '10px 16px',
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              zIndex: 5,
-              color: 'var(--text-secondary, #475569)'
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minWidth: 0, flex: 1 }} 
+            onClick={() => {
+              const currentPin = pinnedMessages[carouselIndex];
+              if (currentPin) {
+                setHighlightedMessageId(currentPin.messageId);
+              }
             }}
           >
-            <div 
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minWidth: 0, flex: 1 }} 
-              onClick={() => {
-                const el = document.getElementById(`msg-${pinnedMsg.id}`);
-                if (el) {
-                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  el.classList.add('msg-bubble-highlight');
-                  setTimeout(() => {
-                    el.classList.remove('msg-bubble-highlight');
-                  }, 2000);
-                }
+            <Pin 
+              size={14} 
+              fill="var(--chat-primary, #6366f1)" 
+              color="var(--chat-primary, #6366f1)" 
+              strokeWidth={2} 
+              style={{ 
+                transform: 'rotate(45deg)', 
+                flexShrink: 0 
               }}
-            >
-              <Pin 
-                size={14} 
-                fill="var(--chat-primary, #6366f1)" 
-                color="var(--chat-primary, #6366f1)" 
-                strokeWidth={2} 
-                style={{ 
-                  transform: 'rotate(45deg)', 
-                  flexShrink: 0 
+            />
+            <span style={{ fontWeight: '600', color: 'var(--chat-primary, #6366f1)' }}>
+              📌 {pinnedMessages[carouselIndex]?.senderName}:
+            </span>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, marginLeft: '4px' }}>
+              {pinnedMessages[carouselIndex]?.text ? stripMarkdown(pinnedMessages[carouselIndex].text) : (pinnedMessages[carouselIndex]?.messageType === 'image' ? '📷 Image' : '📎 Attachment')}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '12px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted, #94a3b8)', whiteSpace: 'nowrap' }}>
+              {carouselIndex + 1} of {totalPinned}
+            </span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCarouselIndex(prev => (prev - 1 + pinnedMessages.length) % pinnedMessages.length);
                 }}
-              />
-              <span style={{ fontWeight: '600', color: 'var(--chat-primary, #6366f1)' }}>Pinned message:</span>
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
-                {pinnedMsg.senderName}: {pinnedMsg.content || (pinnedMsg.type === 'image' ? '📷 Image' : '📎 Attachment')}
-              </span>
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary, #475569)',
+                  padding: '4px 6px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontWeight: 'bold'
+                }}
+                title="Previous Pinned Message"
+              >
+                ←
+              </button>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCarouselIndex(prev => (prev + 1) % pinnedMessages.length);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-secondary, #475569)',
+                  padding: '4px 6px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontWeight: 'bold'
+                }}
+                title="Next Pinned Message"
+              >
+                →
+              </button>
             </div>
+
             <button 
-              onClick={() => unpinMessage(pinnedMsg.id, activeConvId)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPinBoard(true);
+              }}
               style={{
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: 'var(--text-muted, #94a3b8)',
+                color: 'var(--chat-primary, #6366f1)',
                 fontSize: '12px',
+                fontWeight: '600',
                 padding: '4px 8px',
-                borderRadius: '6px',
-                marginLeft: '8px'
+                borderRadius: '6px'
               }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--chat-hover, #f8fafc)'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'none'}
+              title="Open PinBoard"
             >
-              Unpin
+              Open PinBoard
             </button>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* ── MESSAGES AREA ───────────────────────────────────────── */}
       <div
@@ -725,6 +711,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
                 isSelected={selectedMessageIds.has(msg.id)}
                 onToggleSelect={handleToggleSelect}
                 onStartSelectMode={handleStartSelectMode}
+                onForward={setForwardingMessage}
               />
             </React.Fragment>
           );
@@ -799,6 +786,45 @@ const ChatWindow = ({ currentUser, onBack }) => {
             onClose={() => setShowSidebar(false)}
           />
         )
+      )}
+
+      {/* ── PINBOARD DRAWER ────────────────────────────────────── */}
+      {showPinBoard && (
+        <PinBoardDrawer
+          conversation={conv}
+          currentUser={currentUser}
+          onClose={() => setShowPinBoard(false)}
+        />
+      )}
+
+      {/* Forward message modal */}
+      {forwardingMessage && (
+        <ForwardMessageModal
+          message={forwardingMessage}
+          currentUser={currentUser}
+          onClose={() => setForwardingMessage(null)}
+        />
+      )}
+
+      {/* Create Task From Message Modal */}
+      {taskMessage && (
+        <CreateTaskFromMessageModal
+          message={taskMessage}
+          onClose={() => setTaskMessage(null)}
+        />
+      )}
+
+      {/* Create Poll Modal */}
+      {showCreatePoll && (
+        <CreatePollModal
+          conversationId={activeConvId}
+          threadId={activeThread?._id}
+          onClose={() => setShowCreatePoll(false)}
+        />
+      )}
+      </div>
+      {activeThread && (
+        <ThreadPanel onClose={closeThread} />
       )}
     </div>
   );

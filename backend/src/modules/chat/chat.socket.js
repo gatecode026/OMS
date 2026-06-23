@@ -580,6 +580,28 @@ export const registerChatSocketHandlers = (io) => {
       }
     });
 
+    // ── EVENT: JOIN SPECIFIC THREAD ────────────────────────────────────────
+    socket.on('join_thread', async ({ threadId }) => {
+      try {
+        socket.join(`thread:${threadId}`);
+        socket.emit('joined_thread', { threadId });
+        logger.info(`[Chat] ${name} joined thread room: thread:${threadId}`);
+      } catch (err) {
+        logger.error('[Chat] join_thread error:', err);
+      }
+    });
+
+    // ── EVENT: LEAVE SPECIFIC THREAD ───────────────────────────────────────
+    socket.on('leave_thread', async ({ threadId }) => {
+      try {
+        socket.leave(`thread:${threadId}`);
+        socket.emit('left_thread', { threadId });
+        logger.info(`[Chat] ${name} left thread room: thread:${threadId}`);
+      } catch (err) {
+        logger.error('[Chat] leave_thread error:', err);
+      }
+    });
+
     // ── EVENT: SET STATUS ────────────────────────────────────────────────────
     socket.on('set_status', async ({ status, emoji, expiresInMinutes }) => {
       try {
@@ -696,8 +718,6 @@ export const registerChatSocketHandlers = (io) => {
             });
             return;
           }
-
-          // Handle ImageKit upload if media is a base64 string
           let uploadedMedia = media;
           if (media && media.url && media.url.startsWith('data:') && media.url.includes(';base64,')) {
             try {
