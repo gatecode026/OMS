@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const readReceiptSchema = new mongoose.Schema({
+  userId: { type: String },
   employeeId: { type: String, required: true },
   name: { type: String },
   readAt: { type: Date, default: Date.now }
@@ -79,6 +80,12 @@ const messageSchema = new mongoose.Schema({
   // Delivery & Read receipts (WhatsApp double tick system)
   deliveredTo: [deliveryReceiptSchema],
   readBy: [readReceiptSchema],
+  deliveryStatus: {
+    type: String,
+    enum: ['sent', 'delivered', 'read'],
+    default: 'sent',
+    index: true
+  },
 
   // Reactions (WhatsApp emoji reactions)
   reactions: [reactionSchema],
@@ -98,6 +105,7 @@ const messageSchema = new mongoose.Schema({
     employeeId: String,
     deletedAt: Date
   }],
+  conversationDeleted: { type: Boolean, default: false },
 
   // System messages (e.g., "John added Sarah to the group")
   systemMeta: {
@@ -180,3 +188,4 @@ messageSchema.index({ conversationId: 1, isPinned: 1, isDeleted: 1, createdAt: -
 messageSchema.plugin(tenantPlugin);
 const Message = mongoose.model('Message', messageSchema);
 export default Message;
+

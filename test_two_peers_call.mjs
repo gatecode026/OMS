@@ -55,19 +55,19 @@ async function run() {
 
     // Login A
     console.log('[Caller] Logging in as Geeta...');
-    await pageA.goto('https://localhost:5173/login', { waitUntil: 'networkidle2' });
+    await pageA.goto('http://localhost:5173/login', { waitUntil: 'networkidle2' });
     await pageA.type('input[type="email"]', 'geeta@gmail.com');
-    await pageA.type('input[type="password"]', 'password');
+    await pageA.type('input[type="password"]', 'password123');
     await Promise.all([
       pageA.click('button[type="submit"]'),
       pageA.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {})
     ]);
     console.log('[Caller] Navigating to /chat...');
-    await pageA.goto('https://localhost:5173/chat', { waitUntil: 'networkidle2' });
+    await pageA.goto('http://localhost:5173/chat', { waitUntil: 'networkidle2' });
 
     // Login B
     console.log('[Callee] Logging in as Rahul...');
-    await pageB.goto('https://localhost:5173/login', { waitUntil: 'networkidle2' });
+    await pageB.goto('http://localhost:5173/login', { waitUntil: 'networkidle2' });
     await pageB.type('input[type="email"]', 'rahul@gatexpay.co.in');
     await pageB.type('input[type="password"]', 'password');
     await Promise.all([
@@ -75,7 +75,7 @@ async function run() {
       pageB.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 }).catch(() => {})
     ]);
     console.log('[Callee] Navigating to /chat...');
-    await pageB.goto('https://localhost:5173/chat', { waitUntil: 'networkidle2' });
+    await pageB.goto('http://localhost:5173/chat', { waitUntil: 'networkidle2' });
 
     // Wait for the conversation items to load
     console.log('Waiting for chat rosters...');

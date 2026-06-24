@@ -226,7 +226,7 @@ const createCallHistoryMessage = async (callRecord, companyId, io) => {
       type: 'call'
     }, companyId);
 
-    io.to(`conv:${callRecord.conversationId}`).emit('new_message', {
+    const callMsgPayload = {
       id: savedMessage.id,
       conversationId: callRecord.conversationId,
       senderId: callerId,
@@ -236,7 +236,9 @@ const createCallHistoryMessage = async (callRecord, companyId, io) => {
       type: 'call',
       content: statusText,
       createdAt: savedMessage.createdAt
-    });
+    };
+    io.to(`conv:${callRecord.conversationId}`).emit('new_message', callMsgPayload);
+    io.to(`conv:${callRecord.conversationId}`).emit('message:new', callMsgPayload);
 
   } catch (err) {
     logger.error('[Chat] Failed to create call history message:', err);
@@ -439,7 +441,7 @@ export const registerChatSocketHandlers = (io) => {
       });
 
       // Broadcast to the rest of the company — this user is online
-      socket.to(`company:${companyId}`).emit('user_online', {
+      const onlinePayload = {
         userId,
         name,
         avatar,
@@ -447,7 +449,9 @@ export const registerChatSocketHandlers = (io) => {
         chatStatus: chatStatus || 'available',
         statusEmoji: statusEmoji || null,
         isOnChatScreen: false
-      });
+      };
+      socket.to(`company:${companyId}`).emit('user_online', onlinePayload);
+      socket.to(`company:${companyId}`).emit('user:online', onlinePayload);
 
       // Retrieve online users list — prefer Redis (multi-instance safe), fall back to in-memory Map
       const keys = redis.isAvailable ? await redis.keys('presence::*').catch(() => []) : [];
@@ -757,7 +761,7 @@ export const registerChatSocketHandlers = (io) => {
             ? savedMessage.content
             : `📎 ${savedMessage.media?.fileName || savedMessage.type}`;
 
-          io.to(`conv:${conversationId}`).emit('new_message', {
+          const msgPayload = {
             id: savedMessage.id,
             conversationId,
             senderId: userId,
@@ -767,9 +771,11 @@ export const registerChatSocketHandlers = (io) => {
             type: savedMessage.type,
             createdAt: savedMessage.createdAt,
             _isOptimized: true,
-            tempId, // Include tempId in the broadcasted event
+            tempId,
             replyTo: savedMessage.replyTo
-          });
+          };
+          io.to(`conv:${conversationId}`).emit('new_message', msgPayload);
+          io.to(`conv:${conversationId}`).emit('message:new', msgPayload);
 
           // Handle delivery receipts + notifications for offline participants
           await runWithTenant(companyId, async () => {
@@ -874,20 +880,24 @@ export const registerChatSocketHandlers = (io) => {
       }
       socket.lastTypingAt = now;
 
-      socket.to(`conv:${conversationId}`).emit('user_typing', {
+      const typingStartPayload = {
         userId,
         name,
         avatar,
         conversationId
-      });
+      };
+      socket.to(`conv:${conversationId}`).emit('user_typing', typingStartPayload);
+      socket.to(`conv:${conversationId}`).emit('typing:start', typingStartPayload);
     });
 
     socket.on('typing_stop', ({ conversationId }) => {
       if (!conversationId) return;
-      socket.to(`conv:${conversationId}`).emit('user_stopped_typing', {
+      const typingStopPayload = {
         userId,
         conversationId
-      });
+      };
+      socket.to(`conv:${conversationId}`).emit('user_stopped_typing', typingStopPayload);
+      socket.to(`conv:${conversationId}`).emit('typing:stop', typingStopPayload);
     });
 
     // ── EVENT: MARK MESSAGES AS READ (WhatsApp blue tick) ──────────────────
@@ -929,14 +939,16 @@ export const registerChatSocketHandlers = (io) => {
           )
         );
 
-        io.to(`conv:${conversationId}`).emit('reaction_added', {
+        const reactionPayload = {
           messageId,
           conversationId,
           employeeId: userId,
           name,
           emoji,
           reactedAt: new Date()
-        });
+        };
+        io.to(`conv:${conversationId}`).emit('reaction_added', reactionPayload);
+        io.to(`conv:${conversationId}`).emit('reaction:updated', reactionPayload);
 
       } catch (err) {
         logger.error('[Chat] add_reaction error:', err);
@@ -1121,7 +1133,7 @@ export const registerChatSocketHandlers = (io) => {
         await runTrackedWrite(() =>
           chatService.starMessage(messageId, userId, companyId)
         );
-        socket.emit('message_starred', { messageId, conversationId, starredBy: userId });
+        io.to(`conv:${conversationId}`).emit('message_starred', { messageId, conversationId, starredBy: userId });
       } catch (err) {
         logger.error('[Chat] star_message error:', err);
         socket.emit('error', { event: 'star_message', message: err.message });
@@ -1135,7 +1147,7 @@ export const registerChatSocketHandlers = (io) => {
         await runTrackedWrite(() =>
           chatService.unstarMessage(messageId, userId, companyId)
         );
-        socket.emit('message_unstarred', { messageId, conversationId, unstarredBy: userId });
+        io.to(`conv:${conversationId}`).emit('message_unstarred', { messageId, conversationId, unstarredBy: userId });
       } catch (err) {
         logger.error('[Chat] unstar_message error:', err);
         socket.emit('error', { event: 'unstar_message', message: err.message });
@@ -1551,11 +1563,13 @@ export const registerChatSocketHandlers = (io) => {
                 }
 
                 // Notify rest of the company (using io.to to ensure delivery)
-                io.to(`company:${companyId}`).emit('user_offline', {
+                const offlinePayload = {
                   userId,
                   name,
                   lastSeen
-                });
+                };
+                io.to(`company:${companyId}`).emit('user_offline', offlinePayload);
+                io.to(`company:${companyId}`).emit('user:offline', offlinePayload);
 
                 logger.info(`[Chat] User ${name} (${userId}) marked offline after 3s debounce`);
               }

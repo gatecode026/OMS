@@ -24,7 +24,8 @@ const ChatHeader = ({
   setShowSidebar,
   setShowPinBoard,
   initiateCall,
-  callState
+  callState,
+  conversationId
 }) => {
   const getAvatarBg = (str) => {
     const colors = [
@@ -100,7 +101,8 @@ const ChatHeader = ({
                   name: other.name,
                   avatar: other.avatar
                 },
-                'audio'
+                'audio',
+                conversationId
               )}
               disabled={callState !== 'idle'}
               title="Voice Call"
@@ -123,7 +125,8 @@ const ChatHeader = ({
                   name: other.name,
                   avatar: other.avatar
                 },
-                'video'
+                'video',
+                conversationId
               )}
               disabled={callState !== 'idle'}
               title="Video Call"

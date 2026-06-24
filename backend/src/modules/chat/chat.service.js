@@ -183,34 +183,73 @@ export const createGroupConversation = async (
 };
 
 /**
+ * Helper to enrich conversation with user-specific unread counts and dynamic last message
+ */
+const enrichConversationForUser = async (conv, employeeId) => {
+  const participant = conv.participants.find(
+    p => p.employeeId === employeeId
+  );
+  const lastReadAt = participant?.lastReadAt || new Date(0);
+
+  const deleteEntry = conv.deletedBy?.find(d => d.userId?.toString() === employeeId?.toString());
+  const minCreatedAt = deleteEntry ? deleteEntry.deletedAt : new Date(0);
+  const unreadAfter = new Date(Math.max(new Date(lastReadAt).getTime(), new Date(minCreatedAt).getTime()));
+
+  const unreadCount = await Message.countDocuments({
+    conversationId: conv.id,
+    senderId: { $ne: employeeId },
+    isDeleted: false,
+    createdAt: { $gt: unreadAfter }
+  });
+
+  // Find the actual last message that is NOT deleted or cleared for this user
+  const query = {
+    conversationId: conv.id,
+    $nor: [{ 'deletedFor.employeeId': employeeId }]
+  };
+  if (deleteEntry) {
+    query.createdAt = { $gt: deleteEntry.deletedAt };
+  }
+
+  const latestMsg = await Message.findOne(query)
+    .sort({ createdAt: -1 })
+    .lean();
+
+  let lastMessage = null;
+  if (latestMsg) {
+    lastMessage = {
+      messageId: latestMsg.id,
+      content: latestMsg.content,
+      type: latestMsg.type,
+      senderId: latestMsg.senderId,
+      senderName: latestMsg.senderName,
+      sentAt: latestMsg.createdAt,
+      isDeleted: latestMsg.isDeleted
+    };
+  }
+
+  return { ...conv, unreadCount, lastMessage };
+};
+
+/**
  * Get all conversations for a user (WhatsApp style — sorted by last activity)
  */
 export const getUserConversations = async (employeeId, companyId) => {
   return runWithTenant(companyId, async () => {
     const conversations = await Conversation.find({
       'participants.employeeId': employeeId,
-      isActive: true
+      isActive: true,
+      isDeleted: { $ne: true },
+      hiddenBy: { $not: { $elemMatch: { userId: employeeId } } },
+      archivedBy: { $not: { $elemMatch: { userId: employeeId } } },
+      deletedBy: { $not: { $elemMatch: { userId: employeeId, clearHistory: false } } }
     })
       .sort({ lastActivityAt: -1 })
       .lean();
 
-    // Add unread count for each conversation
+    // Add unread count and compute dynamic lastMessage for each conversation
     const convsWithUnread = await Promise.all(
-      conversations.map(async (conv) => {
-        const participant = conv.participants.find(
-          p => p.employeeId === employeeId
-        );
-        const lastReadAt = participant?.lastReadAt || new Date(0);
-
-        const unreadCount = await Message.countDocuments({
-          conversationId: conv.id,
-          senderId: { $ne: employeeId },
-          isDeleted: false,
-          createdAt: { $gt: lastReadAt }
-        });
-
-        return { ...conv, unreadCount };
-      })
+      conversations.map(conv => enrichConversationForUser(conv, employeeId))
     );
 
     return convsWithUnread;
@@ -236,6 +275,11 @@ export const getMessages = async (
       conversationId,
       $nor: [{ 'deletedFor.employeeId': employeeId }]
     };
+
+    const deleteEntry = conv.deletedBy?.find(d => d.userId?.toString() === employeeId?.toString());
+    if (deleteEntry) {
+      query.createdAt = { $gt: deleteEntry.deletedAt };
+    }
 
     if (cursor && mongoose.isValidObjectId(cursor)) {
       query._id = { $lt: new mongoose.Types.ObjectId(cursor) };
@@ -452,7 +496,9 @@ export const saveMessage = async (messageData, companyId) => {
           senderName: messageData.senderName,
           sentAt: new Date()
         },
-        lastActivityAt: new Date()
+        lastActivityAt: new Date(),
+        hiddenBy: [],
+        archivedBy: []
       }
     );
 
@@ -1386,6 +1432,52 @@ export const forwardMessage = async (messageId, targetConversationIds, forwardin
     }
 
     return createdMessages;
+  });
+};
+
+/**
+ * Get all archived conversations for a user
+ */
+export const getArchivedConversations = async (employeeId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    const conversations = await Conversation.find({
+      'participants.employeeId': employeeId,
+      isActive: true,
+      isDeleted: { $ne: true },
+      archivedBy: { $elemMatch: { userId: employeeId } }
+    })
+      .sort({ lastActivityAt: -1 })
+      .lean();
+
+    // Add unread count and compute dynamic lastMessage for each conversation
+    const convsWithUnread = await Promise.all(
+      conversations.map(conv => enrichConversationForUser(conv, employeeId))
+    );
+
+    return convsWithUnread;
+  });
+};
+
+/**
+ * Get all hidden conversations for a user
+ */
+export const getHiddenConversations = async (employeeId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    const conversations = await Conversation.find({
+      'participants.employeeId': employeeId,
+      isActive: true,
+      isDeleted: { $ne: true },
+      hiddenBy: { $elemMatch: { userId: employeeId } }
+    })
+      .sort({ lastActivityAt: -1 })
+      .lean();
+
+    // Add unread count and compute dynamic lastMessage for each conversation
+    const convsWithUnread = await Promise.all(
+      conversations.map(conv => enrichConversationForUser(conv, employeeId))
+    );
+
+    return convsWithUnread;
   });
 };
 

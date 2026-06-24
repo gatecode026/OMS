@@ -28,13 +28,13 @@ async function run() {
     });
 
     console.log('Navigating to login page...');
-    await page.goto('https://localhost:5173/login', { waitUntil: 'networkidle2' });
+    await page.goto('http://localhost:5173/login', { waitUntil: 'networkidle2' });
 
     console.log('Filling login form...');
     // Type email
     await page.type('input[type="email"]', 'geeta@gmail.com');
     // Type password
-    await page.type('input[type="password"]', 'password');
+    await page.type('input[type="password"]', 'password123');
 
     console.log('Clicking Sign In...');
     await Promise.all([
@@ -45,7 +45,7 @@ async function run() {
     console.log('Navigated to:', page.url());
 
     console.log('Navigating explicitly to /chat...');
-    await page.goto('https://localhost:5173/chat', { waitUntil: 'networkidle2' });
+    await page.goto('http://localhost:5173/chat', { waitUntil: 'networkidle2' });
 
     console.log('Current URL:', page.url());
     

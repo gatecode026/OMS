@@ -9,6 +9,8 @@ import { useChat } from '../../context/ChatContext';
 import { useApp } from '../../context/AppContext';
 import ConversationsList from './ConversationsList';
 import ChatWindow from './ChatWindow';
+import ArchivedChats from './ArchivedChats';
+import HiddenChats from './HiddenChats';
 import './Chat.css';
 
 const ChatPage = () => {
@@ -18,6 +20,7 @@ const ChatPage = () => {
     enterChatScreen, leaveChatScreen
   } = useChat();
   const { currentUser } = useApp();
+  const [leftPanel, setLeftPanel] = useState('list'); // 'list' | 'archived' | 'hidden'
 
   // Notify server of chat screen visibility
   useEffect(() => {
@@ -53,10 +56,28 @@ const ChatPage = () => {
       <div className="chat-layout">
         {/* ── LEFT: Conversations List ──────────────────────────── */}
         <div className={`chat-left-panel ${!showList ? 'chat-panel-hidden-mobile' : ''}`}>
-          <ConversationsList
-            currentUser={currentUser}
-            onSelectConversation={handleSelectConversation}
-          />
+          {leftPanel === 'list' && (
+            <ConversationsList
+              currentUser={currentUser}
+              onSelectConversation={handleSelectConversation}
+              onShowArchived={() => setLeftPanel('archived')}
+              onShowHidden={() => setLeftPanel('hidden')}
+            />
+          )}
+          {leftPanel === 'archived' && (
+            <ArchivedChats
+              currentUser={currentUser}
+              onBack={() => setLeftPanel('list')}
+              onSelectConversation={handleSelectConversation}
+            />
+          )}
+          {leftPanel === 'hidden' && (
+            <HiddenChats
+              currentUser={currentUser}
+              onBack={() => setLeftPanel('list')}
+              onSelectConversation={handleSelectConversation}
+            />
+          )}
         </div>
 
         {/* ── RIGHT: Chat Window ────────────────────────────────── */}

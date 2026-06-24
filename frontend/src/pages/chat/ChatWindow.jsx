@@ -498,6 +498,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
           setShowPinBoard={setShowPinBoard}
           initiateCall={initiateCall}
           callState={callState}
+          conversationId={activeConvId}
         />
       )}
 

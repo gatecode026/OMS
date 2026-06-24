@@ -28,8 +28,14 @@ export const getPinnedMessages = async (conversationId, employeeId, companyId, q
     const query = {
       conversationId,
       isPinned: true,
-      isDeleted: { $ne: true }
+      isDeleted: { $ne: true },
+      $nor: [{ 'deletedFor.employeeId': employeeId }]
     };
+
+    const deleteEntry = conv.deletedBy?.find(d => d.userId?.toString() === employeeId?.toString());
+    if (deleteEntry) {
+      query.createdAt = { $gt: deleteEntry.deletedAt };
+    }
 
     // Apply Search
     if (queryOptions.search) {

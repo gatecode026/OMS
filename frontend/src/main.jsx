@@ -41,6 +41,7 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const Announcements = lazy(() => import('./pages/Announcements'));
 const Documents = lazy(() => import('./pages/Documents'));
 const ChatPage = lazy(() => import('./pages/chat/ChatPage'));
+const ChatPrivacySettings = lazy(() => import('./pages/chat/ChatPrivacySettings'));
 const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 const MyProfile = lazy(() => import('./pages/MyProfile'));
 const Reports = lazy(() => import('./pages/Reports'));
@@ -110,6 +111,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/documents" element={<Documents />} />
                 <Route path="/chat" element={<ChatPage />} />
+                <Route path="/chat/privacy" element={<ChatPrivacySettings />} />
 
                 {/* ── Administration & Security (Centralized Role Restricted) ── */}
                 <Route path="/permissions" element={<RolesPermissions />} />
