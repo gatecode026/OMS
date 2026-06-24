@@ -11,10 +11,11 @@ async function check() {
   await mongoose.connect(dbUri);
   const connection = await getTenantConnection('COMP-001');
   const Employee = connection.models['Employee'] || connection.model('Employee', new mongoose.Schema({}, { strict: false }));
-  
   const employees = await Employee.find({}).lean();
   employees.forEach(e => {
-    console.log(`Name: ${e.name} | RoleId: ${e.roleId} | Email: ${e.email} | WorkEmail: ${e.workEmail} | Username: ${e.username}`);
+    console.log(`Name: ${e.name}`);
+    console.log(`  attendanceHistory length: ${e.attendanceHistory ? e.attendanceHistory.length : 0}`);
+    console.log(`  performanceScore: ${JSON.stringify(e.performanceScore)}`);
   });
   await mongoose.disconnect();
 }

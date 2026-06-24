@@ -42,7 +42,7 @@ export const authenticate = async (req, res, next) => {
         name: decoded.name || 'Offline User'
       };
       logger.debug(`User authenticated offline successfully: ${req.user.name} (${req.user.role})`);
-      return runWithTenant(req.user.companyId, next);
+      return await runWithTenant(req.user.companyId, next);
     }
 
     // Retrieve associated active account from matching collection
@@ -56,7 +56,11 @@ export const authenticate = async (req, res, next) => {
         user.companyId = user.id;
       }
     } else {
-      user = await Employee.findOne({ id: decoded.id }).select('id name email roleId status companyId').lean();
+      // For employees, resolve the correct database connection before querying the model
+      const companyId = decoded.companyId || 'COMP-DEFAULT';
+      user = await runWithTenant(companyId, async () => {
+        return await Employee.findOne({ id: decoded.id }).select('id name email roleId status companyId').lean();
+      });
     }
 
     if (!user) {
@@ -84,13 +88,16 @@ export const authenticate = async (req, res, next) => {
 
     const isSuperAdmin = user.roleId === 'super_admin';
     logger.debug(`User authenticated successfully: ${req.user.name} (${req.user.role})`);
-    runWithTenant(req.user.companyId, next, isSuperAdmin);
+    await runWithTenant(req.user.companyId, next, isSuperAdmin);
   } catch (error) {
     logger.error('Authentication Middleware Error:', error);
-    return res.status(401).json({
-      status: 'fail',
-      message: 'Authentication failed. Expired or malformed session token.',
-    });
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        status: 'fail',
+        message: 'Authentication failed. Expired or malformed session token.',
+      });
+    }
+    next(error);
   }
 };
 

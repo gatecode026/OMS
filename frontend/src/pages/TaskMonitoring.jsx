@@ -383,7 +383,108 @@ const TaskMonitoring = () => {
   };
 
   const handleExport = () => {
-    addToast('success', `${exportOptions.reportType} generated successfully in ${exportOptions.format} format.`);
+    const reportType = exportOptions.reportType;
+    const format = exportOptions.format;
+    
+    let headers = [];
+    let rows = [];
+    let filename = `tasks_${reportType.toLowerCase().replace(/\s+/g, '_')}`;
+
+    if (reportType === 'Task Report') {
+      headers = ['Task ID', 'Title', 'Project', 'Assignee Name', 'Department', 'Due Date', 'Priority', 'Progress (%)', 'Status', 'Overdue'];
+      rows = filteredTasks.map(t => [
+        t.id || '',
+        t.title || '',
+        t.project || '',
+        t.assigneeName || '',
+        t.department || '',
+        t.dueDate || '',
+        t.priority || '',
+        t.progress || 0,
+        getDisplayStatus(t.status),
+        isTaskOverdue(t) ? 'Yes' : 'No'
+      ]);
+    } else if (reportType === 'Employee Report') {
+      headers = ['Employee ID', 'Employee Name', 'Department', 'Branch', 'Total Tasks', 'Completed', 'Pending', 'Overdue', 'Productivity Score (%)', 'Performance Rating'];
+      rows = employeeSummaries.map(emp => [
+        emp.id || '',
+        emp.name || '',
+        emp.department || '',
+        emp.branch || '',
+        emp.total || 0,
+        emp.completed || 0,
+        emp.pending || 0,
+        emp.overdue || 0,
+        emp.productivity || 0,
+        emp.rating || ''
+      ]);
+    } else {
+      // Team Report
+      headers = ['Team Name', 'Team Leader', 'Department', 'Member Count', 'Active Projects', 'Productivity Score (%)', 'Attendance Score (%)'];
+      rows = teamRankings.map(t => [
+        t.name || '',
+        t.leader || '',
+        t.department || '',
+        t.memberCount || 0,
+        t.activeProjects || 0,
+        t.productivity || 0,
+        t.attendance || 0
+      ]);
+    }
+
+    if (format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+        const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${reportType} Report</title>
+              <style>
+                body { font-family: sans-serif; padding: 20px; color: #334155; }
+                h1 { color: #0f172a; margin-bottom: 5px; }
+                p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                tr:nth-child(even) td { background-color: #f8fafc; }
+              </style>
+            </head>
+            <body>
+              <h1>${reportType} Report</h1>
+              <p>Generated on: ${new Date().toLocaleString()} | Scope: ${exportOptions.dateRange}</p>
+              <table>
+                <thead><tr>${tableHeadersHTML}</tr></thead>
+                <tbody>${tableRowsHTML}</tbody>
+              </table>
+              <script>
+                window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        addToast('success', 'PDF Print window opened.');
+      }
+    } else {
+      const csvContent = "\ufeff" + [
+        headers.join(','),
+        ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}_${Date.now()}.${format === 'Excel' ? 'xls' : 'csv'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addToast('success', `${reportType} downloaded successfully as ${format}.`);
+    }
+
     setIsExportOpen(false);
   };
 

@@ -236,7 +236,7 @@ const WorkReports = () => {
     const deptMap = {};
     reports.forEach(r => {
       const dept = r.department || 'Operations';
-      const score = r.productivityScore || 80;
+      const score = r.productivityScore ?? 80;
       const assigned = r.tasksAssigned || 0;
       const completed = r.tasksCompleted || 0;
       
@@ -344,7 +344,7 @@ const WorkReports = () => {
     const empStats = {};
     reports.forEach(r => {
       const name = r.employeeName;
-      const score = r.productivityScore || 80;
+      const score = r.productivityScore ?? 80;
       if (!empStats[name]) {
         empStats[name] = { name, totalScore: 0, count: 0 };
       }
@@ -628,7 +628,7 @@ const WorkReports = () => {
     const rejected = reports.filter(r => r.status === 'Rejected' || r.status === 'Changes Requested').length;
     
     const activeReporting = new Set(reports.map(r => r.employeeId)).size;
-    const avgProductivity = total > 0 ? Math.round(reports.reduce((s, r) => s + (r.productivityScore || 80), 0) / total) : 0;
+    const avgProductivity = total > 0 ? Math.round(reports.reduce((s, r) => s + (r.productivityScore ?? 80), 0) / total) : 0;
     
     return { total, pending, approved, rejected, activeReporting, avgProductivity };
   }, [reports]);
@@ -1241,7 +1241,7 @@ const WorkReports = () => {
                   else if (status === 'Submitted') dotClass = 'status-submitted';
                   else dotClass = 'status-flagged';
                 } else if (cell.day && cell.day < 3 && currentMonth === 5) {
-                  // Mock missing reports for dates before today in June
+                  // Mark past days without submissions as missing
                   dotClass = 'status-missing';
                 }
 

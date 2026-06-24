@@ -1,18 +1,9 @@
-import mongoose from 'mongoose';
-import dns from 'dns';
-dns.setServers(['1.1.1.1']);
+import fs from 'fs';
 
-const dbUri = 'mongodb+srv://gatecode026:tBNyNzO68BNn3Zkn@cluster0.1meot8l.mongodb.net/office-management';
+const content = fs.readFileSync('c:/Users/anime/OneDrive/Desktop/Desktop/GateCode(All Folders)/OMS/frontend/src/pages/Branches.jsx', 'utf8');
+const lines = content.split('\n');
 
-const run = async () => {
-  try {
-    await mongoose.connect(dbUri);
-    const branches = await mongoose.connection.db.collection('branches').find({}).toArray();
-    console.log(branches.map(x => ({ name: x.name, revenue: x.revenue, id: x.id })));
-  } catch (e) {
-    console.error(e);
-  } finally {
-    await mongoose.disconnect();
-  }
-};
-run();
+console.log('Printing lines 201 to 400 of Branches.jsx...');
+for (let i = 200; i < 400; i++) {
+  console.log(`${i + 1}: ${lines[i]}`);
+}

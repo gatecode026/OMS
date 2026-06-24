@@ -14,7 +14,8 @@ export const find = async (query = {}) => {
   if (query.status) filters.status = query.status;
 
   if (query.search) {
-    const regex = new RegExp(query.search, 'i');
+    const escapedSearch = query.search.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(escapedSearch, 'i');
     filters.$or = [
       { title: regex },
       { description: regex },

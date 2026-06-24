@@ -48,6 +48,7 @@ export const login = async (email, password, options = {}) => {
   logger.info(`AuthService::login [Database Mode] Verifying credentials for: ${resolvedEmail}`);
 
   const prefix = resolvedEmail.split('@')[0];
+  const escapedPrefix = prefix.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 
   // Resolve company via tenant registry lookup first, falling back to subdomain / companyCode parameters
   const { getTenantIdByEmail } = await import('../../utils/tenantRegistry.js');
@@ -73,8 +74,8 @@ export const login = async (email, password, options = {}) => {
   let user = await Admin.findOne({
     $or: [
       { email: resolvedEmail },
-      { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
-      { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
+      { email: new RegExp('^' + escapedPrefix + '(@|.*)', 'i') },
+      { name: new RegExp('^' + escapedPrefix + '($|\\s)', 'i') }
     ]
   }).select('+password');
 
@@ -91,8 +92,8 @@ export const login = async (email, password, options = {}) => {
           user = await Employee.findOne({
             $or: [
               { username: prefix },
-              { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
-              { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
+              { email: new RegExp('^' + escapedPrefix + '(@|.*)', 'i') },
+              { name: new RegExp('^' + escapedPrefix + '($|\\s)', 'i') }
             ]
           }).select('+password');
         }
@@ -111,8 +112,8 @@ export const login = async (email, password, options = {}) => {
         user = await Employee.findOne({
           $or: [
             { username: prefix },
-            { email: new RegExp('^' + prefix + '(@|.*)', 'i') },
-            { name: new RegExp('^' + prefix + '($|\\s)', 'i') }
+            { email: new RegExp('^' + escapedPrefix + '(@|.*)', 'i') },
+            { name: new RegExp('^' + escapedPrefix + '($|\\s)', 'i') }
           ],
           companyId: resolvedCompany.id
         }).select('+password');

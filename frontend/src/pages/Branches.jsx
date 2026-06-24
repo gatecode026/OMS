@@ -21,7 +21,7 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission } = useApp();
 
   // Real employee counts by branch (from actual employees data)
   const branchEmployeeCountMap = useMemo(() => {
@@ -69,6 +69,15 @@ const Branches = () => {
 
   const branches = useMemo(() => {
     if (!originalBranches) return [];
+
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+
     return originalBranches.map(branch => {
       const branchDepts = getBranchDepartments(branch).map(d => d.toLowerCase());
       const branchProjects = (projectsList || []).filter(p => p.department && branchDepts.includes(p.department.toLowerCase()));
@@ -78,9 +87,39 @@ const Branches = () => {
       const pending = branchProjects.filter(p => p.status === 'Pending' || p.status === 'Planning' || p.status === 'On Hold').length;
       const delayed = branchProjects.filter(p => p.status === 'Delayed').length;
 
+      // Real computed branch productivity
+      const branchNameLower = (branch.name || '').trim().toLowerCase();
+      const branchEmployeesList = (employees || []).filter(emp => {
+        if (!emp) return false;
+        const empBranch = (emp.branch || emp.branchAgency || '').trim().toLowerCase();
+        return empBranch === branchNameLower || (empBranch && branchNameLower.includes(empBranch) && empBranch.length > 3);
+      });
+      const branchActiveEmps = branchEmployeesList.filter(e => e.status !== 'Inactive');
+
+      const branchProductivity = branchActiveEmps.length > 0
+        ? Math.round(branchActiveEmps.reduce((sum, emp) => sum + (emp.productivityScore || 0), 0) / branchActiveEmps.length)
+        : (branch.productivity !== undefined ? branch.productivity : 0);
+
+      const branchPresentToday = branchActiveEmps.filter(emp => {
+        return (attendance || []).some(record => 
+          record.employeeId === emp.id && 
+          record.date === todayStr && 
+          ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Half Day', 'Half-Day'].includes(record.status)
+        );
+      }).length;
+
+      const branchAttendance = branchActiveEmps.length > 0
+        ? Math.round((branchPresentToday / branchActiveEmps.length) * 100)
+        : (branch.attendance !== undefined ? branch.attendance : 0);
+
       return {
         ...branch,
+        attendance: branchAttendance,
+        productivity: branchProductivity,
         departments: getBranchDepartments(branch),
+        employeeCount: branchActiveEmps.length,
+        teamLeaders: branchActiveEmps.filter(emp => emp.role === 'Team Leader' || emp.roleId === 'team_leader').length,
+        projectManagers: branchActiveEmps.filter(emp => emp.role === 'Manager' || emp.roleId === 'manager').length,
         projects: {
           completed,
           active,
@@ -89,7 +128,7 @@ const Branches = () => {
         }
       };
     });
-  }, [originalBranches, projectsList, departments]);
+  }, [originalBranches, projectsList, departments, employees, attendance]);
 
   const branchRanking = useMemo(() => {
     if (!branches || branches.length === 0) return [];
@@ -138,11 +177,11 @@ const Branches = () => {
       }
 
       // 3. Staffing Shortage
-      if (b.employeeCount < 110) {
+      if (b.employeeCount < 3) {
         generatedAlerts.push({
           id: `alert-staff-${b.id}`,
           type: 'warning',
-          text: `Staffing Shortage: ${b.name}`,
+          text: `Staffing Shortage: ${b.name} (${b.employeeCount} employees)`,
           icon: 'warning'
         });
       }
@@ -216,13 +255,21 @@ const Branches = () => {
   const fileInputRef = useRef(null);
 
   const handleDownloadDocument = (docName) => {
-    // Generate a simple mock content representing a PDF/Text compliance doc
-    const mockContent = `%PDF-1.4\n%...\n%%EOF\nThis is a mock PDF compliance document download for: ${docName}`;
-    const blob = new Blob([mockContent], { type: 'application/pdf' });
+    const extMatch = docName.match(/\.[0-9a-z]+$/i);
+    const extension = extMatch ? extMatch[0].toLowerCase() : '.pdf';
+    let mimeType = 'application/pdf';
+    if (extension === '.txt') mimeType = 'text/plain';
+    else if (extension === '.docx') mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    else if (extension === '.xlsx') mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    else if (extension === '.png') mimeType = 'image/png';
+    else if (extension === '.jpg' || extension === '.jpeg') mimeType = 'image/jpeg';
+
+    const mockContent = `This is a compliance document download for: ${docName}`;
+    const blob = new Blob([mockContent], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = docName.endsWith('.pdf') ? docName : `${docName}.pdf`;
+    a.download = docName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -296,7 +343,7 @@ const Branches = () => {
   const unassignedEmployees = useMemo(() => {
     if (!employees) return [];
     return employees.filter(emp => {
-      if (emp.roleId === 'manager' || emp.role === 'Manager') return false;
+      if (emp.roleId === 'super_admin' || emp.roleId === 'company_admin' || emp.role === 'Super Admin' || emp.role === 'Company Admin') return false;
       const b = (emp.branch || emp.branchAgency || '').trim();
       return !b || b === '' || b === '-' || b === 'N/A';
     });
@@ -904,10 +951,42 @@ const Branches = () => {
 
   const totalBranches = branches.length;
   const activeBranches = branches.filter(b => b.statusType === 'active').length;
-  const totalEmployees = (employees || []).length;
-  const totalDepartments = branches.reduce((acc, b) => acc + b.departments.length, 0);
-  const totalActiveProjects = branches.reduce((acc, b) => acc + b.projects.active, 0);
-  const avgProductivity = (branches.reduce((acc, b) => acc + b.productivity, 0) / branches.length).toFixed(1);
+
+  const activeEmployees = useMemo(() => {
+    return (employees || []).filter(e => e.status !== 'Inactive');
+  }, [employees]);
+  const totalEmployees = activeEmployees.length;
+
+  const totalDepartments = (departments || []).filter(d => d.status === 'Active').length;
+  const totalActiveProjects = branches.reduce((acc, b) => acc + (b.projects?.active || 0), 0);
+  const totalCompletedProjects = branches.reduce((acc, b) => acc + (b.projects?.completed || 0), 0);
+
+  const avgProductivity = useMemo(() => {
+    if (!activeEmployees.length) return '0.0';
+    const sum = activeEmployees.reduce((acc, e) => acc + (e.productivityScore || 0), 0);
+    return (sum / activeEmployees.length).toFixed(1);
+  }, [activeEmployees]);
+
+  const avgAttendance = useMemo(() => {
+    if (!activeEmployees.length) return '0.0';
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+    const activeEmpIds = new Set(activeEmployees.map(e => e.id));
+    const presentTodaySet = new Set();
+    (attendance || []).forEach(record => {
+      if (record.date === todayStr && activeEmpIds.has(record.employeeId)) {
+        if (['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Half Day', 'Half-Day'].includes(record.status)) {
+          presentTodaySet.add(record.employeeId);
+        }
+      }
+    });
+    return ((presentTodaySet.size / activeEmployees.length) * 100).toFixed(1);
+  }, [attendance, activeEmployees]);
 
 
   const toggleNode = (nodeId) => {
@@ -2109,11 +2188,11 @@ const Branches = () => {
       <div className="branches-summary">
         {[
           { label: 'Total Branches', value: totalBranches, sub: `${activeBranches} Active`, icon: Network, color: '#3b82f6' },
-          { label: 'Total Employees', value: totalEmployees, sub: 'Across all branches', icon: Users, color: '#10b981' },
+          { label: 'Total Employees', value: totalEmployees, sub: 'Active employees', icon: Users, color: '#10b981' },
           { label: 'Active Departments', value: totalDepartments, sub: 'Across all branches', icon: Building2, color: '#8b5cf6' },
-          { label: 'Active Projects', value: totalActiveProjects, sub: '+56 Completed', icon: Briefcase, color: '#f59e0b' },
+          { label: 'Active Projects', value: totalActiveProjects, sub: `${totalCompletedProjects} Completed`, icon: Briefcase, color: '#f59e0b' },
           { label: 'Productivity Rate', value: `${avgProductivity}%`, sub: 'Overall performance', icon: Award, color: '#ef4444' },
-          { label: 'Avg Attendance', value: `${(branches.length > 0 ? (branches.reduce((acc,b) => acc + (b.attendance || 0), 0) / branches.length) : 0).toFixed(1)}%`, sub: 'Average across branches', icon: Clock, color: '#06b6d4' }
+          { label: 'Avg Attendance', value: `${avgAttendance}%`, sub: 'Average across branches', icon: Clock, color: '#06b6d4' }
         ].map((s, i) => {
           const Icon = s.icon;
           return (

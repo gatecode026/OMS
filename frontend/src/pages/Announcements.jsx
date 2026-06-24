@@ -64,6 +64,7 @@ const Announcements = () => {
   const {
     employees,
     departments,
+    branches,
     showConfirm,
     currentUserRole,
     currentUserId,
@@ -110,8 +111,8 @@ const Announcements = () => {
   });
 
   const branchesList = useMemo(() => {
-    return [...new Set((employees || []).map(e => e.branch).filter(Boolean))];
-  }, [employees]);
+    return (branches || []).map(b => b.name);
+  }, [branches]);
 
   // Selected announcement for detail view & comments
   const [selectedAnn, setSelectedAnn] = useState(null);
@@ -325,22 +326,15 @@ const Announcements = () => {
   }, [departments, employees, trackingLogs]);
 
   const branchReachData = useMemo(() => {
-    const branches = [...new Set(employees.map(e => e.branch).filter(Boolean))];
-    if (branches.length === 0) {
-      return [
-        { name: 'Delhi HQ', value: 240 },
-        { name: 'Bangalore Office', value: 120 },
-        { name: 'Mumbai Branch', value: 90 }
-      ];
-    }
-    return branches.map(br => {
-      const count = employees.filter(e => e.branch === br).length;
+    const branchesList = (branches || []).map(b => b.name);
+    return branchesList.map(br => {
+      const count = (employees || []).filter(e => e.branch === br).length;
       return {
         name: br,
         value: count
       };
     });
-  }, [employees]);
+  }, [branches, employees]);
 
   const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
 
@@ -969,8 +963,8 @@ const Announcements = () => {
                       if (type === 'Department') {
                         targetVal = departments[0]?.name || '';
                       } else if (type === 'Branch') {
-                        const branches = [...new Set((employees || []).map(e => e.branch).filter(Boolean))];
-                        targetVal = branches[0] || 'Delhi HQ';
+                        const branchesList = (branches || []).map(b => b.name);
+                        targetVal = branchesList[0] || '';
                       }
                       setCreateForm(prev => ({ ...prev, audienceType: type, targetAudience: targetVal }));
                     }}
@@ -998,7 +992,7 @@ const Announcements = () => {
                         <option key={d.id || d.name} value={d.name}>{d.name}</option>
                       ))
                     ) : (
-                      (branchesList.length > 0 ? branchesList : ['Delhi HQ', 'Bangalore Office', 'Mumbai Branch']).map(b => (
+                      branchesList.map(b => (
                         <option key={b} value={b}>{b}</option>
                       ))
                     )}

@@ -86,7 +86,7 @@ const EmployeeDetail = () => {
   const { id: encodedId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee, token, branches } = useApp();
+  const { employees, showConfirm, deactivateEmployee, activateEmployee, addToast, updateEmployee, token, branches, generalSettings } = useApp();
 
   // Decode the obfuscated URL param back to the real employee ID
   const id = encodedId ? decodeEmployeeId(encodedId) : null;
@@ -170,7 +170,9 @@ const EmployeeDetail = () => {
             <h1 className="ed-name">{emp.name}</h1>
             <p className="ed-designation">{emp.designation || emp.role}</p>
             <div className="ed-badges">
-              <span className="preview-dept-badge">{emp.department}</span>
+              {emp.roleId !== 'manager' && emp.role !== 'Manager' && (
+                <span className="preview-dept-badge">{emp.department}</span>
+              )}
               <span className="preview-branch-badge">{emp.branch}</span>
               <span className={`acc-badge ${emp.accountStatus === 'Active' ? 'acc-active' : emp.accountStatus === 'Disabled' ? 'acc-disabled' : 'acc-suspended'}`}>
                 {emp.accountStatus || 'Active'}
@@ -226,7 +228,6 @@ const EmployeeDetail = () => {
                   ['Employee ID', emp.id],
                   ['First Name', emp.firstName || emp.name?.split(' ')[0] || '—'],
                   ['Last Name', emp.lastName || emp.name?.split(' ').slice(1).join(' ') || '—'],
-                  ['Date of Birth', fmtDate(emp.dob)],
                   ['Gender', emp.gender || '—'],
                   ['Marital Status', emp.maritalStatus || '—'],
                   ['Nationality', emp.nationality || '—'],
@@ -236,10 +237,6 @@ const EmployeeDetail = () => {
                     <span className="info-item-value">{val || '—'}</span>
                   </div>
                 ))}
-                <div className="info-card-item">
-                  <span className="info-item-label">Blood Group</span>
-                  <span className="info-item-value highlight-blood">{emp.bloodGroup || 'Not Provided'}</span>
-                </div>
               </div>
             </div>
 
@@ -309,8 +306,6 @@ const EmployeeDetail = () => {
               </div>
               <div className="info-card-grid">
                 {[
-                  ['Personal Email', emp.personalEmail],
-                  ['Official Email', emp.workEmail || emp.email],
                   ['Phone Number', emp.phone],
                   ['Alternate Phone', emp.alternatePhone],
                 ].map(([label, val]) => (
@@ -358,63 +353,85 @@ const EmployeeDetail = () => {
       </div>
 
       {/* ── ID Card Modal ── */}
-      {showIdCard && (
-        <div className="id-card-overlay" onClick={() => setShowIdCard(false)}>
-          <div className="id-card-modal" onClick={e => e.stopPropagation()}>
-            <button className="id-card-close" onClick={() => setShowIdCard(false)}>✕</button>
-            <div className="id-card-render-wrapper" ref={idCardRef}>
-              <div className="id-card-front">
-                <div className="id-card-front-header-bg"><div className="id-card-watermark"></div></div>
-                <div className="id-card-front-pink-bg"></div>
-                <div className="id-card-logo-area">
-                  <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg>
-                  <div className="id-card-company-title">{emp.companyName || 'OM ENTERPRISE'}</div>
-                  <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Gatecode OMS'}</div>
+      {showIdCard && (() => {
+        // Resolve a dynamic authorized signatory name from the employee's reporting manager or branch manager
+        let signatoryName = 'Authorized Signatory';
+        if (emp.reportingManager) {
+          signatoryName = emp.reportingManager;
+        } else if (emp.teamLeader && emp.teamLeader !== 'Unassigned') {
+          signatoryName = emp.teamLeader;
+        } else {
+          const empBranch = (emp.branch || '').toLowerCase().trim();
+          if (empBranch && branches) {
+            const foundBranch = branches.find(b => (b.name || '').toLowerCase().trim() === empBranch);
+            if (foundBranch && foundBranch.manager && foundBranch.manager !== 'Not Assigned') {
+              signatoryName = foundBranch.manager;
+            }
+          }
+          if (signatoryName === 'Authorized Signatory' && empBranch && employees) {
+            const branchManager = employees.find(e => 
+              (e.roleId === 'manager' || e.role === 'Manager') &&
+              (e.branch || '').toLowerCase().trim() === empBranch
+            );
+            if (branchManager) signatoryName = branchManager.name;
+          }
+        }
+
+        return (
+          <div className="id-card-overlay" onClick={() => setShowIdCard(false)}>
+            <div className="id-card-modal" onClick={e => e.stopPropagation()}>
+              <button className="id-card-close" onClick={() => setShowIdCard(false)}>✕</button>
+              <div className="id-card-render-wrapper" ref={idCardRef}>
+                <div className="id-card-front">
+                  <div className="id-card-front-header-bg"><div className="id-card-watermark"></div></div>
+                  <div className="id-card-front-pink-bg"></div>
+                  <div className="id-card-logo-area">
+                    <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg>
+                    <div className="id-card-company-title">{emp.companyName || generalSettings?.companyName || 'OMS Enterprise'}</div>
+                    <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Gatecode OMS'}</div>
+                  </div>
+                  <div className="id-card-photo-wrap"><Avatar name={emp.name} size="xl" className="id-card-photo-img" src={emp.avatar || emp.photoUrl} /></div>
+                  <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(emp.name)}</h2><p className="id-card-emp-role">{emp.designation || emp.role}</p></div>
+                  <div className="id-card-details-grid">
+                    <div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.id}</div>
+                    {emp.roleId !== 'manager' && (<><div className="id-detail-label">Dept.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.department}</div></>)}
+                    <div className="id-detail-label">Deg.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.designation || emp.role}</div>
+                  </div>
                 </div>
-                <div className="id-card-photo-wrap"><Avatar name={emp.name} size="xl" className="id-card-photo-img" src={emp.avatar || emp.photoUrl} /></div>
-                <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(emp.name)}</h2><p className="id-card-emp-role">{emp.designation || emp.role}</p></div>
-                <div className="id-card-details-grid">
-                  <div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.id}</div>
-                  <div className="id-detail-label">Dept.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.department}</div>
-                  <div className="id-detail-label">Deg.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.designation || emp.role}</div>
-                  <div className="id-detail-label">DOB</div><div className="id-detail-colon">:</div><div className="id-detail-value">{fmtDob(emp.dob)}</div>
-                  <div className="id-detail-label">Blood</div><div className="id-detail-colon">:</div><div className="id-detail-value">{emp.bloodGroup || '—'}</div>
-                  <div className="id-detail-label">Email</div><div className="id-detail-colon">:</div><div className="id-detail-value" title={emp.workEmail || emp.email}>{emp.workEmail || emp.email}</div>
-                </div>
-              </div>
-              <div className="id-card-back">
-                <div className="id-card-back-bullets">
-                  <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {emp.companyName || 'OM Enterprise'} and must be returned on demand.</p></div>
-                  <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div>
-                  <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {emp.branchAddress || getBranchAddress(emp.branch, branches)}</p></div>
-                </div>
-                <div className="id-card-back-middle">
-                  <div className="id-card-back-dates">
-                    <div className="id-date-row"><span className="id-date-label">Join Date:</span><span className="id-date-val">{fmtDate(emp.joinDate)}</span></div>
-                    <div className="id-date-row"><span className="id-date-label">Expire Date:</span><span className="id-date-val">{emp.contractEndDate ? fmtDate(emp.contractEndDate) : calculateExpiry(emp.joinDate)}</span></div>
-                    <div className="id-card-barcode-area">
-                      <svg viewBox="0 0 100 20" className="id-card-barcode-svg"><rect x="0" y="0" width="3" height="20" fill="#0f172a" /><rect x="5" y="0" width="1" height="20" fill="#0f172a" /><rect x="8" y="0" width="2" height="20" fill="#0f172a" /><rect x="12" y="0" width="4" height="20" fill="#0f172a" /><rect x="18" y="0" width="1" height="20" fill="#0f172a" /><rect x="21" y="0" width="2" height="20" fill="#0f172a" /><rect x="25" y="0" width="3" height="20" fill="#0f172a" /><rect x="30" y="0" width="1" height="20" fill="#0f172a" /><rect x="33" y="0" width="2" height="20" fill="#0f172a" /><rect x="37" y="0" width="5" height="20" fill="#0f172a" /><rect x="44" y="0" width="1" height="20" fill="#0f172a" /><rect x="47" y="0" width="3" height="20" fill="#0f172a" /><rect x="52" y="0" width="2" height="20" fill="#0f172a" /><rect x="56" y="0" width="4" height="20" fill="#0f172a" /><rect x="62" y="0" width="1" height="20" fill="#0f172a" /><rect x="65" y="0" width="2" height="20" fill="#0f172a" /><rect x="69" y="0" width="3" height="20" fill="#0f172a" /><rect x="74" y="0" width="1" height="20" fill="#0f172a" /><rect x="77" y="0" width="2" height="20" fill="#0f172a" /><rect x="81" y="0" width="5" height="20" fill="#0f172a" /><rect x="88" y="0" width="1" height="20" fill="#0f172a" /><rect x="91" y="0" width="3" height="20" fill="#0f172a" /><rect x="96" y="0" width="2" height="20" fill="#0f172a" /></svg>
-                      <div className="id-card-barcode-text">*{emp.id}*</div>
+                <div className="id-card-back">
+                  <div className="id-card-back-bullets">
+                    <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {emp.companyName || generalSettings?.companyName || 'OMS Enterprise'} and must be returned on demand.</p></div>
+                    <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div>
+                    <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {emp.branchAddress || getBranchAddress(emp.branch, branches)}</p></div>
+                  </div>
+                  <div className="id-card-back-middle">
+                    <div className="id-card-back-dates">
+                      <div className="id-date-row"><span className="id-date-label">Join Date:</span><span className="id-date-val">{fmtDate(emp.joinDate)}</span></div>
+                      <div className="id-date-row"><span className="id-date-label">Expire Date:</span><span className="id-date-val">{emp.contractEndDate ? fmtDate(emp.contractEndDate) : calculateExpiry(emp.joinDate)}</span></div>
+                      <div className="id-card-barcode-area">
+                        <svg viewBox="0 0 100 20" className="id-card-barcode-svg"><rect x="0" y="0" width="3" height="20" fill="#0f172a" /><rect x="5" y="0" width="1" height="20" fill="#0f172a" /><rect x="8" y="0" width="2" height="20" fill="#0f172a" /><rect x="12" y="0" width="4" height="20" fill="#0f172a" /><rect x="18" y="0" width="1" height="20" fill="#0f172a" /><rect x="21" y="0" width="2" height="20" fill="#0f172a" /><rect x="25" y="0" width="3" height="20" fill="#0f172a" /><rect x="30" y="0" width="1" height="20" fill="#0f172a" /><rect x="33" y="0" width="2" height="20" fill="#0f172a" /><rect x="37" y="0" width="5" height="20" fill="#0f172a" /><rect x="44" y="0" width="1" height="20" fill="#0f172a" /><rect x="47" y="0" width="3" height="20" fill="#0f172a" /><rect x="52" y="0" width="2" height="20" fill="#0f172a" /><rect x="56" y="0" width="4" height="20" fill="#0f172a" /><rect x="62" y="0" width="1" height="20" fill="#0f172a" /><rect x="65" y="0" width="2" height="20" fill="#0f172a" /><rect x="69" y="0" width="3" height="20" fill="#0f172a" /><rect x="74" y="0" width="1" height="20" fill="#0f172a" /><rect x="77" y="0" width="2" height="20" fill="#0f172a" /><rect x="81" y="0" width="5" height="20" fill="#0f172a" /><rect x="88" y="0" width="1" height="20" fill="#0f172a" /><rect x="91" y="0" width="3" height="20" fill="#0f172a" /><rect x="96" y="0" width="2" height="20" fill="#0f172a" /></svg>
+                        <div className="id-card-barcode-text">*{emp.id}*</div>
+                      </div>
+                    </div>
+                    <div className="id-card-back-qr">
+                      <svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg"><rect x="0" y="0" width="28" height="28" fill="#0f172a" /><rect x="4" y="4" width="20" height="20" fill="#ffffff" /><rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="72" y="0" width="28" height="28" fill="#0f172a" /><rect x="76" y="4" width="20" height="20" fill="#ffffff" /><rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="0" y="72" width="28" height="28" fill="#0f172a" /><rect x="4" y="76" width="20" height="20" fill="#ffffff" /><rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" /><rect x="36" y="4" width="8" height="8" fill="#0f172a" /><rect x="52" y="4" width="8" height="8" fill="#0f172a" /><rect x="44" y="12" width="16" height="8" fill="#0f172a" /><rect x="36" y="24" width="8" height="8" fill="#0f172a" /><rect x="4" y="36" width="8" height="8" fill="#0f172a" /><rect x="16" y="44" width="8" height="8" fill="#0f172a" /><rect x="24" y="36" width="8" height="8" fill="#0f172a" /><rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" /><rect x="40" y="40" width="8" height="8" fill="#ffffff" /><rect x="60" y="36" width="8" height="8" fill="#0f172a" /><rect x="56" y="48" width="8" height="8" fill="#0f172a" /><rect x="36" y="56" width="8" height="8" fill="#0f172a" /><rect x="48" y="60" width="8" height="8" fill="#0f172a" /><rect x="76" y="36" width="8" height="8" fill="#0f172a" /><rect x="84" y="44" width="12" height="8" fill="#0f172a" /><rect x="72" y="56" width="8" height="16" fill="#0f172a" /><rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" /><rect x="36" y="76" width="12" height="8" fill="#0f172a" /><rect x="52" y="72" width="8" height="16" fill="#0f172a" /><rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" /><rect x="76" y="76" width="12" height="8" fill="#0f172a" /><rect x="84" y="84" width="12" height="8" fill="#0f172a" /></svg>
+                      <span className="id-qr-label">SCAN ME</span>
                     </div>
                   </div>
-                  <div className="id-card-back-qr">
-                    <svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg"><rect x="0" y="0" width="28" height="28" fill="#0f172a" /><rect x="4" y="4" width="20" height="20" fill="#ffffff" /><rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="72" y="0" width="28" height="28" fill="#0f172a" /><rect x="76" y="4" width="20" height="20" fill="#ffffff" /><rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="0" y="72" width="28" height="28" fill="#0f172a" /><rect x="4" y="76" width="20" height="20" fill="#ffffff" /><rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" /><rect x="36" y="4" width="8" height="8" fill="#0f172a" /><rect x="52" y="4" width="8" height="8" fill="#0f172a" /><rect x="44" y="12" width="16" height="8" fill="#0f172a" /><rect x="36" y="24" width="8" height="8" fill="#0f172a" /><rect x="4" y="36" width="8" height="8" fill="#0f172a" /><rect x="16" y="44" width="8" height="8" fill="#0f172a" /><rect x="24" y="36" width="8" height="8" fill="#0f172a" /><rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" /><rect x="40" y="40" width="8" height="8" fill="#ffffff" /><rect x="60" y="36" width="8" height="8" fill="#0f172a" /><rect x="56" y="48" width="8" height="8" fill="#0f172a" /><rect x="36" y="56" width="8" height="8" fill="#0f172a" /><rect x="48" y="60" width="8" height="8" fill="#0f172a" /><rect x="76" y="36" width="8" height="8" fill="#0f172a" /><rect x="84" y="44" width="12" height="8" fill="#0f172a" /><rect x="72" y="56" width="8" height="16" fill="#0f172a" /><rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" /><rect x="36" y="76" width="12" height="8" fill="#0f172a" /><rect x="52" y="72" width="8" height="16" fill="#0f172a" /><rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" /><rect x="76" y="76" width="12" height="8" fill="#0f172a" /><rect x="84" y="84" width="12" height="8" fill="#0f172a" /></svg>
-                    <span className="id-qr-label">SCAN ME</span>
+                  <div className="id-card-back-signature-area">
+                    <div className="id-signature-font">{signatoryName}</div>
+                    <div className="id-signature-line"></div>
+                    <div className="id-signature-label">Authorized Signatory</div>
                   </div>
+                  <div className="id-card-back-bottom-bg"><div className="id-card-watermark"></div></div>
+                  <div className="id-card-back-pink-bg"></div>
                 </div>
-                <div className="id-card-back-signature-area">
-                  <div className="id-signature-font">{emp.reportingManager || emp.teamLeader || 'Vikram Singh'}</div>
-                  <div className="id-signature-line"></div>
-                  <div className="id-signature-label">Authorized Signatory</div>
-                </div>
-                <div className="id-card-back-bottom-bg"><div className="id-card-watermark"></div></div>
-                <div className="id-card-back-pink-bg"></div>
               </div>
+              <button className="id-card-download-btn" onClick={downloadIdCard}><Download size={16} /> Download ID Cards</button>
             </div>
-            <button className="id-card-download-btn" onClick={downloadIdCard}><Download size={16} /> Download ID Cards</button>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

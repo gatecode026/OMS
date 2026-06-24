@@ -12,7 +12,8 @@ export const find = async (query = {}) => {
   if (query.type) filters.type = query.type;
   
   if (query.search) {
-    const regex = new RegExp(query.search, 'i');
+    const escapedSearch = query.search.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(escapedSearch, 'i');
     filters.$or = [
       { name: regex },
       { description: regex }

@@ -19,7 +19,8 @@ export const find = async (query = {}) => {
   if (query.department) filters.department = query.department;
   if (query.status) filters.status = query.status;
   if (query.search) {
-    const regex = new RegExp(query.search, 'i');
+    const escapedSearch = query.search.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(escapedSearch, 'i');
     filters.$or = [
       { employeeName: regex },
       { employeeId: regex },

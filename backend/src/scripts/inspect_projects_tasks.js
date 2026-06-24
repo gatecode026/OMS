@@ -9,14 +9,21 @@ const dbUri = process.env.DB_URI;
 
 async function check() {
   await mongoose.connect(dbUri);
-  console.log('Connected to Main DB');
+  console.log('Connected to DB');
   
   const connection = await getTenantConnection('COMP-001');
   const Project = connection.models['Project'] || connection.model('Project', new mongoose.Schema({}, { strict: false }));
   
   const projects = await Project.find({}).lean();
-  console.log('Projects in database:');
-  console.log(JSON.stringify(projects, null, 2));
+  console.log('\n--- Projects Details ---');
+  projects.forEach(p => {
+    console.log(`Name: ${p.name} | ID: ${p.id} | Tasks Count: ${p.tasks ? p.tasks.length : 0}`);
+    if (p.tasks && p.tasks.length > 0) {
+      p.tasks.forEach(t => {
+        console.log(`  Task Title: "${t.title}" | Status: "${t.status}" | AssigneeId: "${t.assigneeId}" | AssigneeName: "${t.assigneeName}"`);
+      });
+    }
+  });
   
   await mongoose.disconnect();
 }

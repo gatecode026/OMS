@@ -15,7 +15,7 @@ import {
   Award, Search, User, Mail, Users, CheckCircle2, Clock, ArrowUpRight, Lock, Shield, Plus, Check, Percent
 } from 'lucide-react';
 
-const mockPerformanceHistory = [
+const performanceHistoryBaseline = [
   { month: 'Jan', rating: 88 },
   { month: 'Feb', rating: 90 },
   { month: 'Mar', rating: 91 },
@@ -67,7 +67,7 @@ const TeamLeaders = () => {
           teamId: ledTeam ? ledTeam.id : null,
           dept: emp.department || 'IT',
           exp: emp.experience || '—',
-          score: emp.productivityScore || 90
+          score: emp.productivityScore ?? 90
         };
       });
   }, [employees, teams]);
@@ -105,7 +105,7 @@ const TeamLeaders = () => {
       department: newLeader.dept,
       team: newLeader.team,
       experience: newLeader.exp,
-      productivityScore: parseInt(newLeader.score) || 90,
+      productivityScore: parseInt(newLeader.score) ?? 90,
       roleId: 'team_leader',
       role: 'Team Leader',
       status: 'Active',
@@ -607,13 +607,13 @@ const TeamLeaders = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div className="leader-perf-chart-box">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockPerformanceHistory.map(h => ({ ...h, rating: h.month === 'Jun' ? activeLeader.score : h.rating - (98 - activeLeader.score) }))}>
+                <BarChart data={performanceHistoryBaseline.map(h => ({ ...h, rating: h.month === 'Jun' ? activeLeader.score : h.rating - (98 - activeLeader.score) }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
                   <YAxis domain={[70, 100]} stroke="var(--text-muted)" fontSize={11} tickLine={false} />
                   <Tooltip contentStyle={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }} />
                   <Bar dataKey="rating" fill="var(--color-primary)" radius={[4, 4, 0, 0]} barSize={25}>
-                    {mockPerformanceHistory.map((entry, index) => (
+                    {performanceHistoryBaseline.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={index === 5 ? '#10b981' : '#8b5cf6'} />
                     ))}
                   </Bar>
