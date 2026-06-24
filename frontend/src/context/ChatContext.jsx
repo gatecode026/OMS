@@ -12,7 +12,7 @@ import React, {
   createContext, useContext, useEffect,
   useRef, useState, useCallback
 } from 'react';
-import { io } from 'socket.io-client';
+import { getSocket } from '../lib/socketManager';
 import { ImageKitUploadService } from '../services/imagekitUploadService';
 import { useApp } from './AppContext';
 import { useDesktopNotifications } from '../hooks/useDesktopNotifications';
@@ -23,9 +23,8 @@ import { callSounds } from '../utils/callSounds';
 
 const ChatContext = createContext(null);
 
-// Use window.API_URL and window.SOCKET_URL set by main.jsx dynamically to avoid ES module hoisting issues
+// Use window.API_URL set by main.jsx dynamically to avoid ES module hoisting issues
 const getApiUrl = () => window.API_URL || window.location.origin;
-const getSocketUrl = () => window.SOCKET_URL || window.location.origin;
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
@@ -88,12 +87,18 @@ export const ChatProvider = ({ children }) => {
   const [isConnected, setIsConnected]       = useState(false);
   const [conversations, setConversations]   = useState([]);
   const [activeConvId, setActiveConvId]     = useState(null);
+  const [archivedConversations, setArchivedConversations] = useState([]);
+  const [isLoadingArchived, setIsLoadingArchived] = useState(false);
+  const [hiddenConversations, setHiddenConversations] = useState([]);
+  const [isLoadingHidden, setIsLoadingHidden] = useState(false);
   const [messages, setMessages]             = useState({});
   // { convId: Message[] }
   const [onlineUsers, setOnlineUsers]       = useState(new Map());
   // Map<userId, { name, avatar, onlineAt }>
   const [currentUserStatus, setCurrentUserStatus] = useState({ status: 'available', emoji: null });
   const [presenceMap, setPresenceMap]       = useState(new Map());
+  const [blockedUsers, setBlockedUsers]     = useState([]);
+  const [blockedByUsers, setBlockedByUsers] = useState([]);
   const [typingUsers, setTypingUsers]       = useState({});
   // { convId: [{ userId, name }] }
   const [unreadCounts, setUnreadCounts]     = useState({});
@@ -137,15 +142,24 @@ export const ChatProvider = ({ children }) => {
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
 
   const isRefreshingRef = useRef(false);
-  const [socketToken, setSocketToken] = useState(token);
 
-  useEffect(() => {
-    if (isRefreshingRef.current) {
-      isRefreshingRef.current = false;
-    } else {
-      setSocketToken(token);
-    }
-  }, [token]);
+  // ── Stable refs for socket callback dependencies (prevents stale closures) ──
+  const currentUserRef = useRef(currentUser);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+
+  const apiFetchRef = useRef(null);
+
+  const addToastRef = useRef(addToast);
+  useEffect(() => { addToastRef.current = addToast; }, [addToast]);
+
+  // These refs are assigned after their useCallback definitions below.
+  // Declared here so they exist at the time the socket useEffect runs.
+  const fetchConversationsRef = useRef(null);
+  const fetchMessagesRef = useRef(null);
+  const fetchThreadActivityRef = useRef(null);
+  const playNotificationChimeRef = useRef(null);
+  const sendNotificationRef = useRef(null);
+  const loadPinnedMessagesRef = useRef(null);
 
   // Typing debounce timers
   const typingTimerRef = useRef({});
@@ -182,6 +196,8 @@ export const ChatProvider = ({ children }) => {
       console.warn('[ChatContext] Failed to play chime:', err);
     }
   }, []);
+  useEffect(() => { playNotificationChimeRef.current = playNotificationChime; }, [playNotificationChime]);
+  useEffect(() => { sendNotificationRef.current = sendNotification; }, [sendNotification]);
 
   // Web Push Notifications Hook
   const push = usePushNotifications(currentUser);
@@ -247,6 +263,20 @@ export const ChatProvider = ({ children }) => {
     return res.json();
   }, [token]);
 
+  useEffect(() => { apiFetchRef.current = apiFetch; }, [apiFetch]);
+
+  const fetchBlockedUsers = useCallback(async () => {
+    try {
+      const res = await apiFetch('/chat/users/blocked');
+      if (res.status === 'success') {
+        setBlockedUsers(res.data.blockedUsers || []);
+        setBlockedByUsers(res.data.blockedByUsers || []);
+      }
+    } catch (err) {
+      console.error('[Chat] fetchBlockedUsers error:', err);
+    }
+  }, [apiFetch]);
+
   // ── FETCH CONVERSATIONS ───────────────────────────────────────────────────
   const fetchConversations = useCallback(async () => {
     setIsLoadingConvs(true);
@@ -266,6 +296,236 @@ export const ChatProvider = ({ children }) => {
     } finally {
       setIsLoadingConvs(false);
     }
+  }, [apiFetch]);
+  useEffect(() => { fetchConversationsRef.current = fetchConversations; }, [fetchConversations]);
+
+  const fetchArchivedConversations = useCallback(async () => {
+    setIsLoadingArchived(true);
+    try {
+      const data = await apiFetch('/chat/conversations/archived');
+      if (data.status === 'success') {
+        setArchivedConversations(data.data || []);
+      }
+    } catch (err) {
+      console.error('[Chat] fetchArchivedConversations error:', err);
+    } finally {
+      setIsLoadingArchived(false);
+    }
+  }, [apiFetch]);
+
+  const fetchHiddenConversations = useCallback(async () => {
+    setIsLoadingHidden(true);
+    try {
+      const data = await apiFetch('/chat/conversations/hidden');
+      if (data.status === 'success') {
+        setHiddenConversations(data.data || []);
+      }
+    } catch (err) {
+      console.error('[Chat] fetchHiddenConversations error:', err);
+    } finally {
+      setIsLoadingHidden(false);
+    }
+  }, [apiFetch]);
+
+  useEffect(() => {
+    if (token) {
+      fetchBlockedUsers();
+    } else {
+      setBlockedUsers([]);
+      setBlockedByUsers([]);
+    }
+  }, [token, fetchBlockedUsers]);
+
+  const blockUser = useCallback(async (targetUserId) => {
+    try {
+      const res = await apiFetch(`/chat/users/${targetUserId}/block`, {
+        method: 'POST'
+      });
+      if (res.status === 'success') {
+        setBlockedUsers(prev => [...new Set([...prev, targetUserId])]);
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] blockUser error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  const unblockUser = useCallback(async (targetUserId) => {
+    try {
+      const res = await apiFetch(`/chat/users/${targetUserId}/unblock`, {
+        method: 'POST'
+      });
+      if (res.status === 'success') {
+        setBlockedUsers(prev => prev.filter(id => id !== targetUserId));
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] unblockUser error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  const archiveConversation = useCallback(async (convId) => {
+    try {
+      const res = await apiFetch(`/chat/conversations/${convId}/archive`, {
+        method: 'POST'
+      });
+      if (res.status === 'success') {
+        setConversations(prev => {
+          const convToArchive = prev.find(c => c.id === convId);
+          if (convToArchive) {
+            const updated = { ...convToArchive, isArchived: true };
+            setArchivedConversations(prevArchived => [updated, ...prevArchived]);
+          }
+          return prev.filter(c => c.id !== convId);
+        });
+        setHiddenConversations(prev => prev.filter(c => c.id !== convId));
+        if (activeConvIdRef.current === convId) {
+          setActiveConvId(null);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] archiveConversation error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  const unarchiveConversation = useCallback(async (convId) => {
+    try {
+      const res = await apiFetch(`/chat/conversations/${convId}/unarchive`, {
+        method: 'POST'
+      });
+      if (res.status === 'success') {
+        setArchivedConversations(prev => {
+          const convToRestore = prev.find(c => c.id === convId);
+          if (convToRestore) {
+            const updated = { ...convToRestore, isArchived: false };
+            setConversations(prevList => [updated, ...prevList]);
+          }
+          return prev.filter(c => c.id !== convId);
+        });
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] unarchiveConversation error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  const hideConversation = useCallback(async (convId) => {
+    try {
+      const res = await apiFetch(`/chat/conversations/${convId}/hide`, {
+        method: 'POST'
+      });
+      if (res.status === 'success') {
+        setConversations(prev => {
+          const convToHide = prev.find(c => c.id === convId);
+          if (convToHide) {
+            setHiddenConversations(prevHidden => [convToHide, ...prevHidden]);
+          }
+          return prev.filter(c => c.id !== convId);
+        });
+        if (activeConvIdRef.current === convId) {
+          setActiveConvId(null);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] hideConversation error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  const unhideConversation = useCallback(async (convId) => {
+    try {
+      const res = await apiFetch(`/chat/conversations/${convId}/unhide`, {
+        method: 'POST'
+      });
+      if (res.status === 'success') {
+        setHiddenConversations(prev => {
+          const convToRestore = prev.find(c => c.id === convId);
+          if (convToRestore) {
+            setConversations(prevList => [convToRestore, ...prevList]);
+          } else {
+            fetchConversations();
+          }
+          return prev.filter(c => c.id !== convId);
+        });
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] unhideConversation error:', err);
+    }
+    return false;
+  }, [apiFetch, fetchConversations]);
+
+  const markConversationAsRead = useCallback(async (convId) => {
+    try {
+      const res = await apiFetch(`/chat/conversations/${convId}/read`, {
+        method: 'PATCH'
+      });
+      if (res.status === 'success') {
+        setUnreadCounts(prev => ({ ...prev, [convId]: 0 }));
+        socketRef.current?.emit('mark_read', { conversationId: convId });
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] markConversationAsRead error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  const markConversationAsUnread = useCallback(async (convId) => {
+    try {
+      const res = await apiFetch(`/chat/conversations/${convId}/unread`, {
+        method: 'PATCH'
+      });
+      if (res.status === 'success') {
+        setUnreadCounts(prev => ({ ...prev, [convId]: (prev[convId] || 0) + 1 }));
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] markConversationAsUnread error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  const deleteConversationForMe = useCallback(async (convId) => {
+    try {
+      const res = await apiFetch(`/chat/conversations/${convId}/me`, {
+        method: 'DELETE'
+      });
+      if (res.status === 'success') {
+        setConversations(prev => prev.filter(c => c.id !== convId));
+        if (activeConvIdRef.current === convId) {
+          setActiveConvId(null);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] deleteConversationForMe error:', err);
+    }
+    return false;
+  }, [apiFetch]);
+
+  const deleteGroup = useCallback(async (convId) => {
+    try {
+      const res = await apiFetch(`/chat/conversations/${convId}`, {
+        method: 'DELETE'
+      });
+      if (res.status === 'success') {
+        setConversations(prev => prev.filter(c => c.id !== convId));
+        if (activeConvIdRef.current === convId) {
+          setActiveConvId(null);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.error('[Chat] deleteGroup error:', err);
+    }
+    return false;
   }, [apiFetch]);
   // Helper to fetch failed messages from localStorage for a conversation
   const getFailedMessagesForConv = useCallback((convId) => {
@@ -331,7 +591,7 @@ export const ChatProvider = ({ children }) => {
       setIsLoadingMsgs(false);
     }
   }, [apiFetch, getFailedMessagesForConv]);
-
+  useEffect(() => { fetchMessagesRef.current = fetchMessages; }, [fetchMessages]);
   // ── LOAD MORE (scroll up) ─────────────────────────────────────────────────
   const loadMoreMessages = useCallback(async (convId) => {
     if (!hasMoreMessages[convId] || isLoadingMsgs) return;
@@ -591,18 +851,16 @@ export const ChatProvider = ({ children }) => {
           if (c.id === convId) {
             return {
               ...c,
-              lastMessage: {
-                messageId: null,
-                content: null,
-                type: 'text',
-                senderId: null,
-                senderName: null,
-                sentAt: null
-              }
+              lastMessage: null
             };
           }
           return c;
         }));
+        if (activeConvIdRef.current === convId) {
+          setPinnedMessages([]);
+          setTotalPinned(0);
+          setPinnedPagination({});
+        }
         return true;
       }
     } catch (err) {
@@ -719,7 +977,7 @@ export const ChatProvider = ({ children }) => {
       setIsLoadingPinned(false);
     }
   }, [apiFetch]);
-
+  useEffect(() => { loadPinnedMessagesRef.current = loadPinnedMessages; }, [loadPinnedMessages]);
   useEffect(() => {
     if (activeConvId) {
       loadPinnedMessages(activeConvId, { page: 1, limit: 10 });
@@ -939,7 +1197,7 @@ export const ChatProvider = ({ children }) => {
       setIsLoadingThreadActivity(false);
     }
   }, [apiFetch]);
-
+  useEffect(() => { fetchThreadActivityRef.current = fetchThreadActivity; }, [fetchThreadActivity]);
   const markThreadAsRead = useCallback(async (threadId) => {
     try {
       const data = await apiFetch(`/chat/threads/${threadId}/read`, { method: 'POST' });
@@ -1093,51 +1351,45 @@ export const ChatProvider = ({ children }) => {
     setUploadQueue(prev => prev.filter(item => item.convId !== convId));
   }, []);
 
-  // ── SOCKET SETUP (reactive on socketToken change) ─────────────────────────────────────────────
+  // ── SOCKET SETUP — runs ONCE, never re-registers ───────────────────────────
+  // The socket singleton is managed by socketManager.js.
+  // AppContext calls connectSocket() on login and disconnectSocket() on logout.
+  // ChatContext only attaches/removes listeners — it NEVER creates or destroys the socket.
   useEffect(() => {
-    if (!socketToken) {
-      setIsConnected(false);
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-      return;
-    }
-
-    const socket = io(getSocketUrl(), {
-      auth: (cb) => {
-        cb({
-          token: socketToken,
-          lastSyncTime: localStorage.getItem('chat_last_sync_' + currentUser?.id) || new Date().toISOString()
-        });
-      },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000
-    });
-
+    const socket = getSocket();
     socketRef.current = socket;
+
+    // If already connected (e.g. AppContext connected before ChatContext mounted),
+    // set state immediately.
+    if (socket.connected) {
+      setIsConnected(true);
+      fetchConversationsRef.current?.();
+      fetchThreadActivityRef.current?.();
+      if (activeConvIdRef.current) {
+        socket.emit('join_conversation', activeConvIdRef.current);
+      }
+    }
 
     // ── Connection lifecycle ───────────────────────────────────────────────
     socket.on('connect', () => {
       console.log('[Chat] Socket connected:', socket.id);
       setIsConnected(true);
-      fetchConversations(); // refresh on reconnect
+      fetchConversationsRef.current?.(); // refresh on reconnect
       if (activeConvIdRef.current) {
         socket.emit('join_conversation', activeConvIdRef.current);
       }
-      if (currentUser?.id) {
-        localStorage.setItem('chat_last_sync_' + currentUser.id, new Date().toISOString());
+      const me = currentUserRef.current;
+      if (me?.id) {
+        localStorage.setItem('chat_last_sync_' + me.id, new Date().toISOString());
       }
     });
 
     socket.on('disconnect', (reason) => {
       console.log('[Chat] Socket disconnected:', reason);
       setIsConnected(false);
-      if (currentUser?.id) {
-        localStorage.setItem('chat_last_sync_' + currentUser.id, new Date().toISOString());
+      const me = currentUserRef.current;
+      if (me?.id) {
+        localStorage.setItem('chat_last_sync_' + me.id, new Date().toISOString());
       }
     });
 
@@ -1150,7 +1402,7 @@ export const ChatProvider = ({ children }) => {
       console.log('[Chat] Socket token expiring in 60s. Initiating silent refresh...');
       try {
         isRefreshingRef.current = true;
-        const response = await apiFetch('/auth/refresh', { method: 'POST' });
+        const response = await apiFetchRef.current('/auth/refresh', { method: 'POST' });
         if (response.status === 'success' && response.data?.token) {
           const newToken = response.data.token;
           localStorage.setItem('saas_token', newToken);
@@ -1175,7 +1427,7 @@ export const ChatProvider = ({ children }) => {
 
     // ── Reconnection State Recovery ─────────────────────────────────────────
     socket.on('missed_events', ({ messages: missedMessages = [], readReceipts = [], presenceChanges = [] }) => {
-      const me = currentUser;
+      const me = currentUserRef.current;
       console.log('[Chat] Received missed_events:', {
         messagesCount: missedMessages.length,
         readReceiptsCount: readReceipts.length,
@@ -1236,7 +1488,7 @@ export const ChatProvider = ({ children }) => {
 
             if (isChatPage && isTabVisible && isLookingAtChat && activeConvIdRef.current === convId) {
               socket.emit('mark_read', { conversationId: convId });
-              apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
+              apiFetchRef.current(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
                 console.error('[Chat] Auto-mark read error in missed_events:', err);
               });
               setUnreadCounts(prev => ({ ...prev, [convId]: 0 }));
@@ -1392,7 +1644,7 @@ export const ChatProvider = ({ children }) => {
     // ── New Message ───────────────────────────────────────────────────────
     socket.on('new_message', async (message) => {
       const convId = message.conversationId;
-      const me = currentUser;
+      const me = currentUserRef.current;
 
       // Clear timeout and remove from localStorage if this is our own message
       if (message.tempId && message.senderId === me?.id) {
@@ -1414,7 +1666,7 @@ export const ChatProvider = ({ children }) => {
         if (isCurrentActive) {
           // Hydrate full message details for the active conversation
           try {
-            const data = await apiFetch(`/chat/messages/${message.id}`);
+            const data = await apiFetchRef.current(`/chat/messages/${message.id}`);
             if (data.status === 'success') {
               fullMessage = data.data;
             } else {
@@ -1516,7 +1768,7 @@ export const ChatProvider = ({ children }) => {
             ? `${fullMessage.senderName || 'Someone'}: ${messageBody}`
             : messageBody;
 
-          sendNotification(title, {
+          sendNotificationRef.current?.(title, {
             body,
             icon: fullMessage.senderAvatar || conv?.avatar || '/favicon.ico',
             tag: convId,
@@ -1533,7 +1785,7 @@ export const ChatProvider = ({ children }) => {
           console.log('[Chat] Auto-marking message as read inside new_message');
           // Auto-mark as read if the conversation is currently active and user is looking at it
           socket.emit('mark_read', { conversationId: convId });
-          apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
+          apiFetchRef.current(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
             console.error('[Chat] Auto-mark read error:', err);
           });
           setUnreadCounts(prev => ({ ...prev, [convId]: 0 }));
@@ -1582,11 +1834,11 @@ export const ChatProvider = ({ children }) => {
             [notification.conversationId]: 0
           }));
           socket.emit('mark_read', { conversationId: notification.conversationId });
-          apiFetch(`/chat/conversations/${notification.conversationId}/read`, { method: 'PATCH' }).catch(err => {
+          apiFetchRef.current(`/chat/conversations/${notification.conversationId}/read`, { method: 'PATCH' }).catch(err => {
             console.error('[Chat] Auto-mark read error in notification:', err);
           });
           // Refresh messages for the active chat window to display the new message
-          fetchMessages(notification.conversationId, null);
+          fetchMessagesRef.current?.(notification.conversationId, null);
         } else {
           setUnreadCounts(prev => ({
             ...prev,
@@ -1607,7 +1859,7 @@ export const ChatProvider = ({ children }) => {
           ? `${notification.senderName}: ${notification.preview}`
           : notification.preview;
 
-        sendNotification(title, {
+        sendNotificationRef.current?.(title, {
           body,
           icon: notification.senderAvatar || '/favicon.ico',
           tag: notification.conversationId,
@@ -1644,7 +1896,7 @@ export const ChatProvider = ({ children }) => {
 
     // ── Read Receipts (blue tick) ─────────────────────────────────────────
     socket.on('messages_read', ({ conversationId, readBy, readAt, readByName }) => {
-      const me = currentUser;
+      const me = currentUserRef.current;
       let readByArray = [];
       if (Array.isArray(readBy)) {
         readByArray = readBy;
@@ -1689,7 +1941,7 @@ export const ChatProvider = ({ children }) => {
           clearTimeout(sendingTimeoutsRef.current[tempId]);
           delete sendingTimeoutsRef.current[tempId];
         }
-        localStorage.removeItem(`chat_failed_msg_${currentUser?.id}_${tempId}`);
+        localStorage.removeItem(`chat_failed_msg_${currentUserRef.current?.id}_${tempId}`);
       }
 
       setMessages(prev => {
@@ -1730,7 +1982,7 @@ export const ChatProvider = ({ children }) => {
               tempId,
               createdAt: updated[msgIndex].createdAt
             };
-            localStorage.setItem(`chat_failed_msg_${currentUser?.id}_${tempId}`, JSON.stringify(failedMsg));
+            localStorage.setItem(`chat_failed_msg_${currentUserRef.current?.id}_${tempId}`, JSON.stringify(failedMsg));
             
             return { ...prev, [activeConvIdRef.current]: updated };
           }
@@ -1741,6 +1993,30 @@ export const ChatProvider = ({ children }) => {
 
     socket.on('message_error', handleSendError);
     socket.on('message_upload_error', handleSendError);
+
+    // ── Conversation Cleared ──────────────────────────────────────────────
+    socket.on('conversation:cleared', ({ conversationId }) => {
+      setMessages(prev => ({
+        ...prev,
+        [conversationId]: []
+      }));
+      setHasMoreMessages(prev => ({ ...prev, [conversationId]: false }));
+      setMessageCursors(prev => ({ ...prev, [conversationId]: null }));
+      setConversations(prev => prev.map(c => {
+        if (c.id === conversationId) {
+          return {
+            ...c,
+            lastMessage: null
+          };
+        }
+        return c;
+      }));
+      if (activeConvIdRef.current === conversationId) {
+        setPinnedMessages([]);
+        setTotalPinned(0);
+        setPinnedPagination({});
+      }
+    });
 
     // ── Message Deleted ───────────────────────────────────────────────────
     socket.on('message_deleted', ({ messageId, conversationId, deleteForEveryone }) => {
@@ -1820,11 +2096,11 @@ export const ChatProvider = ({ children }) => {
     });
 
     socket.on('member_removed', ({ conversationId, employeeId, participants }) => {
-      if (employeeId === currentUser?.id) {
+      if (employeeId === currentUserRef.current?.id) {
         setConversations(prev => {
           const conv = prev.find(c => c.id === conversationId);
-          if (conv && conv.type === 'group' && addToast) {
-            addToast('info', `You were removed from ${conv.name || 'group'}`);
+          if (conv && conv.type === 'group' && addToastRef.current) {
+            addToastRef.current('info', `You were removed from ${conv.name || 'group'}`);
           }
           if (activeConvIdRef.current === conversationId) {
             setActiveConvId(null);
@@ -1844,8 +2120,8 @@ export const ChatProvider = ({ children }) => {
     socket.on('conversation_removed', ({ conversationId }) => {
       setConversations(prev => {
         const conv = prev.find(c => c.id === conversationId);
-        if (conv && conv.type === 'group' && addToast) {
-          addToast('info', `You were removed from ${conv.name || 'group'}`);
+        if (conv && conv.type === 'group' && addToastRef.current) {
+          addToastRef.current('info', `You were removed from ${conv.name || 'group'}`);
         }
         if (activeConvIdRef.current === conversationId) {
           setActiveConvId(null);
@@ -1903,7 +2179,7 @@ export const ChatProvider = ({ children }) => {
       });
 
       if (conversationId === activeConvIdRef.current) {
-        loadPinnedMessages(conversationId, { page: 1, limit: 10 });
+        loadPinnedMessagesRef.current?.(conversationId, { page: 1, limit: 10 });
       }
     });
 
@@ -1957,7 +2233,7 @@ export const ChatProvider = ({ children }) => {
 
     // ── Thread Socket Events ────────────────────────────────────────────────
     socket.on('thread:reply:new', ({ threadId, reply, tempId }) => {
-      const me = currentUser;
+      const me = currentUserRef.current;
       
       // 1. If it's our own optimistic message, replace/update it
       if (tempId && reply.senderId === me?.id) {
@@ -1981,12 +2257,12 @@ export const ChatProvider = ({ children }) => {
         });
         
         if (document.visibilityState === 'visible') {
-          apiFetch(`/chat/threads/${threadId}/read`, { method: 'POST' }).catch(() => {});
+          apiFetchRef.current(`/chat/threads/${threadId}/read`, { method: 'POST' }).catch(() => {});
           socket.emit('mark_read_thread', { threadId });
         }
       } else {
         // Play chime and increment unread badge count
-        playNotificationChime();
+        playNotificationChimeRef.current?.();
         setThreadUnreadCounts(prev => ({
           ...prev,
           [threadId]: (prev[threadId] || 0) + 1
@@ -2015,7 +2291,7 @@ export const ChatProvider = ({ children }) => {
       });
 
       // 4. Refresh My Threads list
-      fetchThreadActivity();
+      fetchThreadActivityRef.current?.();
     });
 
     socket.on('thread:updated', (updatedThread) => {
@@ -2056,8 +2332,8 @@ export const ChatProvider = ({ children }) => {
     });
 
     socket.on('thread:mention', ({ threadId, senderName, preview }) => {
-      if (addToast) {
-        addToast('info', `@${senderName} mentioned you in a thread: "${preview}"`);
+      if (addToastRef.current) {
+        addToastRef.current('info', `@${senderName} mentioned you in a thread: "${preview}"`);
       }
     });
 
@@ -2125,16 +2401,35 @@ export const ChatProvider = ({ children }) => {
       );
     });
 
-    // Initial load
-    fetchConversations();
-    fetchThreadActivity();
+    socket.on('user:blocked', ({ userId, blockedByMe }) => {
+      if (blockedByMe) {
+        setBlockedUsers(prev => [...new Set([...prev, userId])]);
+      } else {
+        setBlockedByUsers(prev => [...new Set([...prev, userId])]);
+      }
+    });
 
+    socket.on('user:unblocked', ({ userId, blockedByMe }) => {
+      if (blockedByMe) {
+        setBlockedUsers(prev => prev.filter(id => id !== userId));
+      } else {
+        setBlockedByUsers(prev => prev.filter(id => id !== userId));
+      }
+    });
+
+    // Initial load (use refs so they always call the latest version)
+    fetchConversationsRef.current?.();
+    fetchThreadActivityRef.current?.();
+
+    // Cleanup: remove listeners only — NEVER disconnect.
+    // The socket connection lifecycle is managed exclusively by AppContext
+    // (connectSocket on login, disconnectSocket on logout).
     return () => {
-      socket.disconnect();
+      socket.removeAllListeners();
       socketRef.current = null;
-      setIsConnected(false);
     };
-  }, [socketToken, fetchConversations, currentUser, fetchMessages, apiFetch, playNotificationChime, addToast, fetchThreadActivity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── AUTO-MARK READ ON VISIBILITY / FOCUS CHANGE ───────────────────────────
   useEffect(() => {
@@ -2157,7 +2452,7 @@ export const ChatProvider = ({ children }) => {
         const convId = activeConvIdRef.current;
         console.log('[Chat] Visibility handler marking active conversation as read:', convId);
         socketRef.current?.emit('mark_read', { conversationId: convId });
-        apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
+        apiFetchRef.current(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
           console.error('[Chat] Visibility mark read error:', err);
         });
         setUnreadCounts(prev => ({ ...prev, [convId]: 0 }));
@@ -2170,7 +2465,8 @@ export const ChatProvider = ({ children }) => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, [apiFetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const enterChatScreen = useCallback(() => {
     socketRef.current?.emit('user_chatscreen_status', { isOnChatScreen: true });
@@ -2198,6 +2494,8 @@ export const ChatProvider = ({ children }) => {
     setShowMobileList,
     currentUserStatus,
     presenceMap,
+    blockedUsers,
+    blockedByUsers,
     highlightedMessageId,
     setHighlightedMessageId,
     pinnedMessages,
@@ -2241,6 +2539,22 @@ export const ChatProvider = ({ children }) => {
     loadPinnedMessages,
     starMessage,
     unstarMessage,
+    blockUser,
+    unblockUser,
+    archiveConversation,
+    unarchiveConversation,
+    hideConversation,
+    unhideConversation,
+    markConversationAsRead,
+    markConversationAsUnread,
+    deleteConversationForMe,
+    deleteGroup,
+    archivedConversations,
+    isLoadingArchived,
+    fetchArchivedConversations,
+    hiddenConversations,
+    isLoadingHidden,
+    fetchHiddenConversations,
 
     // Threading
     activeThread,

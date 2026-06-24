@@ -82,6 +82,16 @@ export const database = {
         logger.error(`Database runtime connection error: ${err}`);
       });
 
+      mongoose.connection.on('connected', () => {
+        logger.info('Database connection established.');
+        isDatabaseConnected = true;
+      });
+
+      mongoose.connection.on('reconnected', () => {
+        logger.info('Database reconnected.');
+        isDatabaseConnected = true;
+      });
+
       mongoose.connection.on('disconnected', () => {
         logger.warn('Database connection lost.');
         isDatabaseConnected = false;

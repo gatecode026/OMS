@@ -421,6 +421,22 @@ mark.search-highlight, .search-highlight {
   flex-shrink: 0;
 }
 
+.conv-item-more-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s, background 0.2s, color 0.2s;
+}
+
+.conv-item:hover .conv-item-more-btn,
+.conv-item-more-btn:focus {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .conv-item-more-btn {
+    opacity: 1;
+  }
+}
+
 /* ── ChatWindow ─────────────────────────────────────────────── */
 .chat-window {
   display: flex;
@@ -1608,14 +1624,99 @@ mark.search-highlight, .search-highlight {
 
 /* Own bubble (light theme) */
 :root.light-theme .msg-bubble-own.msg-bubble-starred {
+  background-color: #fef3c7 !important; /* amber-100 */
   border: 1.5px solid #f59e0b !important;
   box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+  color: #1e293b !important;
 }
 
 /* Own bubble (dark theme - default) */
 .msg-bubble-own.msg-bubble-starred {
+  background-color: #2e220f !important; /* dark warm gold/amber */
   border: 1.5px solid #f59e0b !important;
   box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+  color: #fef3c7 !important;
+}
+
+/* ── Pinned message styling ────────────────────────────────────── */
+.msg-bubble.msg-bubble-pinned {
+  transition: all 0.25s ease;
+}
+
+/* Other person's bubble (light theme) */
+:root.light-theme .msg-bubble-other.msg-bubble-pinned {
+  background-color: #eef2ff !important; /* indigo-50 */
+  border: 1px solid rgba(99, 102, 241, 0.4) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
+  color: #1e293b !important;
+}
+
+/* Other person's bubble (dark theme - default) */
+.msg-bubble-other.msg-bubble-pinned {
+  background-color: #1e1b4b !important; /* dark indigo */
+  border: 1px solid rgba(165, 180, 252, 0.5) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+  color: #e0e7ff !important;
+}
+
+/* Own bubble (light theme) */
+:root.light-theme .msg-bubble-own.msg-bubble-pinned {
+  background-color: #eef2ff !important; /* indigo-50 */
+  border: 1.5px solid #818cf8 !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+  color: #1e293b !important;
+}
+
+/* Own bubble (dark theme - default) */
+.msg-bubble-own.msg-bubble-pinned {
+  background-color: #1e1b4b !important; /* dark indigo */
+  border: 1.5px solid #a5b4fc !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
+  color: #e0e7ff !important;
+}
+
+/* ── Icon Highlighting Contrast Overrides ──────────────────────── */
+.msg-pin-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 2px;
+}
+.msg-star-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 2px;
+}
+
+/* Own bubble default icons (purple background) */
+.msg-bubble-own .msg-pin-icon {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.msg-bubble-own .msg-star-icon {
+  color: #fbbf24 !important; /* bright amber */
+}
+
+/* Other's bubble default icons */
+.msg-bubble-other .msg-pin-icon {
+  color: var(--chat-primary, #6366f1) !important;
+}
+.msg-bubble-other .msg-star-icon {
+  color: #f59e0b !important;
+}
+
+/* Pinned bubble icon (lavender in dark theme, primary in light) */
+.msg-bubble-other.msg-bubble-pinned .msg-pin-icon,
+.msg-bubble-own.msg-bubble-pinned .msg-pin-icon {
+  color: #a5b4fc !important; /* indigo-300 */
+}
+:root.light-theme .msg-bubble-other.msg-bubble-pinned .msg-pin-icon,
+:root.light-theme .msg-bubble-own.msg-bubble-pinned .msg-pin-icon {
+  color: var(--chat-primary, #6366f1) !important;
+}
+
+/* Starred bubble icon */
+.msg-bubble-other.msg-bubble-starred .msg-star-icon,
+.msg-bubble-own.msg-bubble-starred .msg-star-icon {
+  color: #fbbf24 !important;
 }
 
 /* ── Notification Permission Banner ──────────────────────────── */
@@ -2626,6 +2727,27 @@ input:checked + .notif-slider:before {
   background-color: var(--chat-active-bg, #eef2ff);
   border-color: var(--chat-primary, #6366f1);
   color: var(--chat-primary, #6366f1);
+}
+
+.formatting-tool-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.formatting-tool-close-btn:hover {
+  background-color: var(--chat-hover, #f1f5f9);
+  color: #ef4444;
 }
 
 /* ── Live Preview ── */

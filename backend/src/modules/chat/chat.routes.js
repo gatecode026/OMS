@@ -7,6 +7,7 @@
 import express from 'express';
 import { authenticate, restrictTo } from '../../middlewares/auth.middleware.js';
 import * as controller from './chat.controller.js';
+import * as userController from './controllers/userController.js';
 import searchRouter from './routes/searchRoutes.js';
 import pinnedRouter from './routes/pinnedRoutes.js';
 import threadRouter from './routes/threadRoutes.js';
@@ -31,16 +32,36 @@ router.use('/conversations', pinnedRouter);
 
 // ─── CONVERSATIONS ────────────────────────────────────────────────────────────
 router.get('/conversations',                  controller.getConversations);
+router.get('/conversations/archived',         controller.getArchivedConversations);
+router.get('/conversations/hidden',           controller.getHiddenConversations);
 router.post('/conversations/direct',          controller.startDirectChat);
 router.post('/conversations/group',           controller.createGroup);
 router.get('/conversations/:id/messages',     controller.getMessages);
 router.patch('/conversations/:id/read',       controller.markRead);
-router.post('/conversations/:id/clear',       controller.clearChat);
-router.delete('/conversations/:id',          controller.deleteConversationPermanent);
-router.patch('/conversations/:id',            controller.updateGroupDetails);
-router.get('/conversations/:id/search',       controller.searchInConversation);
-router.post('/conversations/:id/members',     controller.addMembers);
+router.patch('/conversations/:id/unread',     controller.markUnread);
+
+// Hide / Unhide
+router.post('/conversations/:id/hide',         controller.hideConversation);
+router.post('/conversations/:id/unhide',       controller.unhideConversation);
+
+// Archive / Unarchive
+router.post('/conversations/:id/archive',      controller.archiveConversation);
+router.post('/conversations/:id/unarchive',    controller.unarchiveConversation);
+
+// Delete / Clear
+router.delete('/conversations/:id/me',         controller.deleteConversationForMe);
+router.post('/conversations/:id/clear',        controller.clearChatHistory);
+
+router.delete('/conversations/:id',            controller.deleteGroup);
+router.patch('/conversations/:id',             controller.updateGroupDetails);
+router.get('/conversations/:id/search',        controller.searchInConversation);
+router.post('/conversations/:id/members',      controller.addMembers);
 router.delete('/conversations/:id/members/:memberId', controller.removeMember);
+
+// Block / Unblock Users
+router.post('/users/:id/block',                userController.blockUser);
+router.post('/users/:id/unblock',              userController.unblockUser);
+router.get('/users/blocked',                  userController.getBlockedUsers);
 
 // ─── MESSAGES ────────────────────────────────────────────────────────────────
 router.post('/messages/bulk-delete',         controller.deleteMessagesBulk);

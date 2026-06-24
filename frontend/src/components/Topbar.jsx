@@ -89,7 +89,6 @@ const Topbar = ({ onMenuToggle }) => {
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [msgOpen, setMsgOpen] = useState(false);
   const [meetingsOpen, setMeetingsOpen] = useState(false);
 
   const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -128,7 +127,6 @@ const Topbar = ({ onMenuToggle }) => {
   
   const notifRef = useRef(null);
   const profileRef = useRef(null);
-  const msgRef = useRef(null);
   const meetingsRef = useRef(null);
   const location = useLocation();
 
@@ -209,9 +207,6 @@ const Topbar = ({ onMenuToggle }) => {
       }
       if (profileRef.current && !profileRef.current.contains(e.target)) {
         setProfileOpen(false);
-      }
-      if (msgRef.current && !msgRef.current.contains(e.target)) {
-        setMsgOpen(false);
       }
       if (meetingsRef.current && !meetingsRef.current.contains(e.target)) {
         setMeetingsOpen(false);
@@ -390,82 +385,7 @@ const Topbar = ({ onMenuToggle }) => {
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
         </button>
 
-        {/* Messages Dropdown */}
-        <div className="topbar-dropdown-wrapper" ref={msgRef}>
-          <button 
-            className={`topbar-icon-btn ${(unreadMsgCount > 0 || chatUnreadCount > 0) ? 'bell-unread' : ''}`}
-            onClick={() => setMsgOpen(!msgOpen)}
-            title={`Messages${chatUnreadCount > 0 ? ` (${chatUnreadCount} unread chat)` : ''}`}
-          >
-            <MessageSquare size={20} />
-            {chatUnreadCount > 0 && (
-              <span className="bell-badge-count" style={{
-                position: 'absolute',
-                top: '-4px',
-                right: '-6px',
-                background: 'var(--color-danger, #ef4444)',
-                color: '#fff',
-                borderRadius: '999px',
-                fontSize: '0.6rem',
-                fontWeight: 700,
-                minWidth: '16px',
-                height: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0 3px',
-                lineHeight: 1,
-                boxShadow: '0 0 0 2px var(--bg-base)'
-              }}>
-                {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-              </span>
-            )}
-            {chatUnreadCount === 0 && unreadMsgCount > 0 && <span className="bell-badge-dot"></span>}
-          </button>
 
-
-          {msgOpen && (
-            <div className="topbar-dropdown-panel notifications-panel animate-slide-up">
-              <div className="panel-header">
-                <span className="panel-title">Messages</span>
-                {unreadMsgCount > 0 && (
-                  <button className="mark-read-all-btn" onClick={markAllMessagesRead}>
-                    <CheckCheck size={14} />
-                    <span>Mark all read</span>
-                  </button>
-                )}
-              </div>
-
-              <div className="panel-body">
-                {messages.length > 0 ? (
-                  messages.map(m => (
-                    <div 
-                      key={m.id} 
-                      className={`notif-item ${m.unread ? 'unread' : ''}`}
-                      onClick={() => markMessageRead(m.id)}
-                    >
-                      <div className="notif-icon-wrapper" style={{ color: 'var(--color-primary-light)' }}>
-                        <MessageSquare size={16} />
-                      </div>
-                      <div className="notif-content">
-                        <span className="notif-sender" style={{ fontWeight: 600, fontSize: '0.82rem', color: 'var(--text-primary)' }}>{m.sender}</span>
-                        <p className="notif-message" style={{ margin: '2px 0 0 0' }}>{m.text}</p>
-                        <span className="notif-time">{m.time}</span>
-                      </div>
-                      {m.unread && <span className="notif-unread-dot"></span>}
-                    </div>
-                  ))
-                ) : (
-                  <div className="notif-empty">
-                    <MessageSquare size={32} className="notif-empty-icon" />
-                    <span>No messages yet</span>
-                    <span className="notif-empty-subtitle">Your inbox is clear!</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Notifications Bell Dropdown */}
         <div className="topbar-dropdown-wrapper" ref={notifRef}>

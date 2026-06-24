@@ -38,6 +38,51 @@ const PollBubble = ({ message, isOwn }) => {
     totalVotes = 0
   } = poll;
 
+  const getRemainingTimeText = (expiry) => {
+    if (!expiry) return null;
+    const now = new Date();
+    const exp = new Date(expiry);
+    const diffMs = exp - now;
+    if (diffMs <= 0) return 'Expired';
+    
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 0) {
+      const hoursPart = diffHours % 24;
+      return `Expires in: ${diffDays}d ${hoursPart}h`;
+    }
+    if (diffHours > 0) {
+      const minsPart = diffMins % 60;
+      return `Expires in: ${diffHours}h ${minsPart}m`;
+    }
+    if (diffMins > 0) {
+      const secsPart = diffSecs % 60;
+      return `Expires in: ${diffMins}m ${secsPart}s`;
+    }
+    return `Expires in: ${diffSecs}s`;
+  };
+
+  const [timeLeft, setTimeLeft] = useState(() => getRemainingTimeText(expiresAt));
+
+  useEffect(() => {
+    if (!expiresAt || isClosed) return;
+    
+    setTimeLeft(getRemainingTimeText(expiresAt));
+
+    const interval = setInterval(() => {
+      const text = getRemainingTimeText(expiresAt);
+      setTimeLeft(text);
+      if (text === 'Expired') {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [expiresAt, isClosed]);
+
   // Check if current user has voted for each option
   const myUserId = currentUser?.id;
   const hasVotedOption = (opt) => opt.votes?.includes(myUserId);
@@ -342,10 +387,12 @@ const PollBubble = ({ message, isOwn }) => {
       </div>
 
       {/* Expiry display */}
-      {expiresAt && !isClosed && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-muted, #64748b)' }}>
+      {expiresAt && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: timeLeft === 'Expired' || isClosed ? '#ef4444' : 'var(--text-muted, #64748b)' }}>
           <Calendar size={12} />
-          <span>Expires: {new Date(expiresAt).toLocaleString()}</span>
+          <span>
+            {isClosed ? 'Closed' : timeLeft} (Expires: {new Date(expiresAt).toLocaleString()})
+          </span>
         </div>
       )}
 

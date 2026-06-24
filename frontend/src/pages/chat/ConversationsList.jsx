@@ -3,9 +3,10 @@
  * @description Left sidebar — all conversations with search + New Chat button.
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useCall } from '../../context/CallContext';
+import { useApp } from '../../context/AppContext';
 import ConversationItem from './ConversationItem';
 import NewChatModal from './NewChatModal';
 import CreateGroupModal from './CreateGroupModal';
@@ -111,8 +112,9 @@ const avatarStyle = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const ConversationsList = ({ currentUser, onSelectConversation }) => {
+const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, onShowHidden }) => {
   const { initiateCall, callState } = useCall();
+  const { addToast, showConfirm } = useApp();
   const {
     conversations, activeConvId, isLoadingConvs,
     unreadCounts, isUserOnline, mutedConversations,
@@ -120,10 +122,29 @@ const ConversationsList = ({ currentUser, onSelectConversation }) => {
     pinConversation, unpinConversation, muteConversation, unmuteConversation,
     apiFetch, startDirectChat,
     setHighlightedMessageId,
+    // Block list states and actions
+    blockedUsers, blockedByUsers, blockUser, unblockUser,
+    archiveConversation, unarchiveConversation, hideConversation, unhideConversation,
+    markConversationAsRead, markConversationAsUnread, deleteConversationForMe, deleteGroup,
+    clearChat,
     // Threading
     threadActivityList, isLoadingThreadActivity, fetchThreadActivity,
     openThread, activeThread, openConversation, threadUnreadCounts
   } = useChat();
+
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+  const menuDropdownRef = useRef(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuDropdownRef.current && !menuDropdownRef.current.contains(e.target)) {
+        setShowMenuDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState(() => {
     const q = window.CHAT_GLOBAL_SEARCH_QUERY || '';
@@ -342,7 +363,7 @@ const ConversationsList = ({ currentUser, onSelectConversation }) => {
               />
             )}
           </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
             <button
               className="conv-new-chat-btn"
               onClick={() => setShowCreateGroup(true)}
@@ -366,6 +387,90 @@ const ConversationsList = ({ currentUser, onSelectConversation }) => {
                 <line x1="8" y1="12" x2="16" y2="12"/>
               </svg>
             </button>
+            <div style={{ position: 'relative' }} ref={menuDropdownRef}>
+              <button
+                className="conv-new-chat-btn"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                title="Menu"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="1"/>
+                  <circle cx="12" cy="5" r="1"/>
+                  <circle cx="12" cy="19" r="1"/>
+                </svg>
+              </button>
+              {showMenuDropdown && (
+                <div 
+                  className="conv-menu-dropdown animate-slide-down"
+                  style={{
+                    position: 'absolute',
+                    right: '0',
+                    top: '36px',
+                    background: 'var(--bg-card, #ffffff)',
+                    border: '1px solid var(--chat-border, #e2e8f0)',
+                    borderRadius: '12px',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
+                    padding: '6px',
+                    zIndex: '1000',
+                    minWidth: '170px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      onShowArchived?.();
+                      setShowMenuDropdown(false);
+                    }}
+                    style={{
+                      padding: '9px 12px',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      color: 'var(--text-primary, #1e293b)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontFamily: 'inherit',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--chat-hover, #f8fafc)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    📥 Archived Chats
+                  </button>
+                  <button
+                    onClick={() => {
+                      onShowHidden?.();
+                      setShowMenuDropdown(false);
+                    }}
+                    style={{
+                      padding: '9px 12px',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      color: 'var(--text-primary, #1e293b)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      fontFamily: 'inherit',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--chat-hover, #f8fafc)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  >
+                    👁️ Hidden Chats
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -525,6 +630,73 @@ const ConversationsList = ({ currentUser, onSelectConversation }) => {
                               onUnpin={unpinConversation}
                               onMute={muteConversation}
                               onUnmute={unmuteConversation}
+                              onArchive={archiveConversation}
+                              onHide={hideConversation}
+                              onMarkUnread={markConversationAsUnread}
+                              onMarkRead={markConversationAsRead}
+                              onBlock={(userId, name) => {
+                                showConfirm(
+                                  'Block User',
+                                  `Are you sure you want to block ${name}? Blocked contacts can no longer message you or view your status.`,
+                                  async () => {
+                                    const success = await blockUser(userId);
+                                    if (success) {
+                                      addToast('success', `${name} blocked successfully`);
+                                    } else {
+                                      addToast('error', `Failed to block ${name}`);
+                                    }
+                                  },
+                                  'danger'
+                                );
+                              }}
+                              onClearChat={(id, name) => {
+                                showConfirm(
+                                  'Clear Chat History',
+                                  `Are you sure you want to clear all chat history for ${name}? This cannot be undone.`,
+                                  async () => {
+                                    const success = await clearChat(id);
+                                    if (success) {
+                                      addToast('success', `Chat history cleared`);
+                                    } else {
+                                      addToast('error', `Failed to clear chat`);
+                                    }
+                                  },
+                                  'danger'
+                                );
+                              }}
+                              onDeleteForMe={(id, name) => {
+                                showConfirm(
+                                  'Delete Chat',
+                                  `Are you sure you want to delete this chat with ${name}? The conversation will be removed from your roster list and history will be cleared.`,
+                                  async () => {
+                                    const success = await deleteConversationForMe(id);
+                                    if (success) {
+                                      addToast('success', 'Chat deleted successfully');
+                                    } else {
+                                      addToast('error', 'Failed to delete chat');
+                                    }
+                                  },
+                                  'danger'
+                                );
+                              }}
+                              onDeleteGroup={(id, name) => {
+                                showConfirm(
+                                  'Delete Group',
+                                  `Are you sure you want to delete the group "${name}"? This will permanently delete the group and all its messages.`,
+                                  async () => {
+                                    const success = await deleteGroup(id);
+                                    if (success) {
+                                      addToast('success', 'Group deleted successfully');
+                                    } else {
+                                      addToast('error', 'Failed to delete group');
+                                    }
+                                  },
+                                  'danger'
+                                );
+                              }}
+                              blockedUsers={blockedUsers}
+                              blockedByUsers={blockedByUsers}
+                              addToast={addToast}
                             />
                           );
                         })}
@@ -717,6 +889,73 @@ const ConversationsList = ({ currentUser, onSelectConversation }) => {
                     onUnpin={unpinConversation}
                     onMute={muteConversation}
                     onUnmute={unmuteConversation}
+                    onArchive={archiveConversation}
+                    onHide={hideConversation}
+                    onMarkUnread={markConversationAsUnread}
+                    onMarkRead={markConversationAsRead}
+                    onBlock={(userId, name) => {
+                      showConfirm(
+                        'Block User',
+                        `Are you sure you want to block ${name}? Blocked contacts can no longer message you or view your status.`,
+                        async () => {
+                          const success = await blockUser(userId);
+                          if (success) {
+                            addToast('success', `${name} blocked successfully`);
+                          } else {
+                            addToast('error', `Failed to block ${name}`);
+                          }
+                        },
+                        'danger'
+                      );
+                    }}
+                    onClearChat={(id, name) => {
+                      showConfirm(
+                        'Clear Chat History',
+                        `Are you sure you want to clear all chat history for ${name}? This cannot be undone.`,
+                        async () => {
+                          const success = await clearChat(id);
+                          if (success) {
+                            addToast('success', `Chat history cleared`);
+                          } else {
+                            addToast('error', `Failed to clear chat`);
+                          }
+                        },
+                        'danger'
+                      );
+                    }}
+                    onDeleteForMe={(id, name) => {
+                      showConfirm(
+                        'Delete Chat',
+                        `Are you sure you want to delete this chat with ${name}? The conversation will be removed from your roster list and history will be cleared.`,
+                        async () => {
+                          const success = await deleteConversationForMe(id);
+                          if (success) {
+                            addToast('success', 'Chat deleted successfully');
+                          } else {
+                            addToast('error', 'Failed to delete chat');
+                          }
+                        },
+                        'danger'
+                      );
+                    }}
+                    onDeleteGroup={(id, name) => {
+                      showConfirm(
+                        'Delete Group',
+                        `Are you sure you want to delete the group "${name}"? This will permanently delete the group and all its messages.`,
+                        async () => {
+                          const success = await deleteGroup(id);
+                          if (success) {
+                            addToast('success', 'Group deleted successfully');
+                          } else {
+                            addToast('error', 'Failed to delete group');
+                          }
+                        },
+                        'danger'
+                      );
+                    }}
+                    blockedUsers={blockedUsers}
+                    blockedByUsers={blockedByUsers}
+                    addToast={addToast}
                   />
                 );
               })
