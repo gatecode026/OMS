@@ -120,7 +120,7 @@ const Overview = () => {
       const calculatedProductivity = branchTasks.length > 0
         ? Math.round(branchTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length / branchTasks.length * 100)
         : (branchEmployees.length > 0
-          ? Math.round(branchEmployees.reduce((sum, emp) => sum + (emp.productivityScore || 90), 0) / branchEmployees.length)
+          ? Math.round(branchEmployees.reduce((sum, emp) => sum + (emp.productivityScore ?? 90), 0) / branchEmployees.length)
           : 0);
 
       // ── Real Attendance: filter attendance records by branch employees today ──
@@ -138,7 +138,7 @@ const Overview = () => {
         const activeBranchEmps = branchEmployees.filter(e => e.status === 'Active');
         if (activeBranchEmps.length > 0) {
           const presentCount = activeBranchEmps.filter(e =>
-            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.attendanceStatus || e.todayPunchStatus)
+            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.todayPunchStatus || e.attendanceStatus)
           ).length;
           calculatedAttendance = Math.round((presentCount / activeBranchEmps.length) * 100);
         }
@@ -191,7 +191,7 @@ const Overview = () => {
       const calculatedProductivity = deptTasks.length > 0
         ? Math.round(deptTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length / deptTasks.length * 100)
         : (deptEmployees.length > 0
-          ? Math.round(deptEmployees.reduce((sum, emp) => sum + (emp.productivityScore || 90), 0) / deptEmployees.length)
+          ? Math.round(deptEmployees.reduce((sum, emp) => sum + (emp.productivityScore ?? 90), 0) / deptEmployees.length)
           : 0);
 
       // ── Real Attendance: filter attendance records by department employees today ──
@@ -209,7 +209,7 @@ const Overview = () => {
         const activeDeptEmps = deptEmployees.filter(e => e.status === 'Active');
         if (activeDeptEmps.length > 0) {
           const presentCount = activeDeptEmps.filter(e =>
-            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.attendanceStatus || e.todayPunchStatus)
+            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.todayPunchStatus || e.attendanceStatus)
           ).length;
           calculatedAttendance = Math.round((presentCount / activeDeptEmps.length) * 100);
         }

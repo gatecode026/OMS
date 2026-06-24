@@ -61,11 +61,16 @@ export const normalizeEmployee = (emp) => {
   normalized.totalHours = hrs;
 
   // 10. Attendance Status / attendanceStatus / todayPunchStatus
-  const att = (normalized.attendanceStatus && normalized.attendanceStatus !== 'Active' && normalized.attendanceStatus !== 'Disabled' && normalized.attendanceStatus !== 'Suspended')
-    ? normalized.attendanceStatus
-    : (normalized.todayPunchStatus || 'Present');
+  const rawPunch = normalized.todayPunchStatus || 'Not Punched';
+  let att = rawPunch;
+  if (rawPunch === 'Not Punched' && normalized.attendanceStatus && !['Active', 'Disabled', 'Suspended'].includes(normalized.attendanceStatus)) {
+    if (normalized.attendanceStatus !== 'Present') {
+      att = normalized.attendanceStatus;
+    }
+  }
   normalized.attendanceStatus = att;
-  normalized.todayPunchStatus = att;
+  normalized.todayPunchStatus = rawPunch;
+
 
   // 11. Employment Status / accountStatus / employmentStatus / status
   const est = (normalized.status === 'Active' || normalized.status === 'Disabled' || normalized.status === 'Suspended')

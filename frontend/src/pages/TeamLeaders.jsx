@@ -67,7 +67,7 @@ const TeamLeaders = () => {
           teamId: ledTeam ? ledTeam.id : null,
           dept: emp.department || 'IT',
           exp: emp.experience || '—',
-          score: emp.productivityScore || 90
+          score: emp.productivityScore ?? 90
         };
       });
   }, [employees, teams]);
@@ -105,7 +105,7 @@ const TeamLeaders = () => {
       department: newLeader.dept,
       team: newLeader.team,
       experience: newLeader.exp,
-      productivityScore: parseInt(newLeader.score) || 90,
+      productivityScore: parseInt(newLeader.score) ?? 90,
       roleId: 'team_leader',
       role: 'Team Leader',
       status: 'Active',

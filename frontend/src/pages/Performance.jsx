@@ -122,18 +122,20 @@ const Performance = () => {
         const tasksAssigned = empTasks.length;
         const tasksCompleted = empTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length;
         
-        let productivity = emp.productivityScore || 85;
+        let productivity = emp.productivityScore ?? 85;
         if (tasksAssigned > 0) {
           productivity = Math.round((tasksCompleted / tasksAssigned) * 100);
         }
         
-        const empAtts = (attendance || []).filter(att => att.employeeId === emp.id);
-        let attendancePct = 95;
-        if (empAtts.length > 0) {
-          const present = empAtts.filter(att => ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(att.status)).length;
-          attendancePct = Math.round((present / empAtts.length) * 100);
-        } else {
-          attendancePct = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(emp.attendanceStatus || emp.todayPunchStatus) ? 100 : 90;
+        let attendancePct = emp.performanceScore?.attendance || 0;
+        if (attendancePct === 0) {
+          const empAtts = (attendance || []).filter(att => att.employeeId === emp.id);
+          if (empAtts.length > 0) {
+            const present = empAtts.filter(att => ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(att.status)).length;
+            attendancePct = Math.round((present / empAtts.length) * 100);
+          } else {
+            attendancePct = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(emp.todayPunchStatus || emp.attendanceStatus) ? 100 : 0;
+          }
         }
         
         const nameHash = (emp.name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -226,13 +228,51 @@ const Performance = () => {
   }, [departments]);
 
   const BRANCH_RANKINGS = useMemo(() => {
-    return (branches || []).map(b => ({
-      name: b.name,
-      score: b.productivity || b.avgPerformance || 90,
-      successRate: b.attendance || b.attendanceRate || 95,
-      color: b.color || 'var(--color-primary)'
-    }));
-  }, [branches]);
+    const today = new Date().toISOString().split('T')[0];
+    return (branches || []).map(b => {
+      const bName = (b.name || '').trim().toLowerCase();
+      const branchEmployees = (contextEmployees || []).filter(emp =>
+        (emp.branch || '').trim().toLowerCase() === bName
+      );
+      
+      const branchEmpIds = new Set(branchEmployees.map(e => e.id));
+      const branchTasks = (tasks || []).filter(t => branchEmpIds.has(t.assigneeId));
+      const calculatedProductivity = branchTasks.length > 0
+        ? Math.round(branchTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length / branchTasks.length * 100)
+        : (branchEmployees.length > 0
+          ? Math.round(branchEmployees.reduce((sum, emp) => sum + (emp.productivityScore ?? 90), 0) / branchEmployees.length)
+          : 90);
+
+      const branchAttToday = (attendance || []).filter(a =>
+        branchEmpIds.has(a.employeeId) && a.date === today
+      );
+      let calculatedAttendance = 0;
+      if (branchAttToday.length > 0) {
+        const present = branchAttToday.filter(a =>
+          a.status === 'Present' || a.status === 'Late' ||
+          a.status === 'Work From Home' || a.status === 'WFH' || a.status === 'Overtime'
+        ).length;
+        calculatedAttendance = Math.round((present / branchAttToday.length) * 100);
+      } else {
+        const activeBranchEmps = branchEmployees.filter(e => e.status === 'Active');
+        if (activeBranchEmps.length > 0) {
+          const presentCount = activeBranchEmps.filter(e =>
+            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.todayPunchStatus || e.attendanceStatus)
+          ).length;
+          calculatedAttendance = Math.round((presentCount / activeBranchEmps.length) * 100);
+        } else {
+          calculatedAttendance = b.attendance || b.attendanceRate || 95;
+        }
+      }
+
+      return {
+        name: b.name,
+        score: calculatedProductivity,
+        successRate: calculatedAttendance,
+        color: b.color || 'var(--color-primary)'
+      };
+    });
+  }, [branches, contextEmployees, tasks, attendance]);
 
   const branchSubtitle = useMemo(() => {
     const names = (branches || []).map(b => b.name).slice(0, 3).join(' vs ');

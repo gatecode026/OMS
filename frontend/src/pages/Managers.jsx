@@ -88,11 +88,11 @@ function reducer(state, action) {
                     return Math.round((completed / teamTasks.length) * 100);
                   }
                   const teamLeaderEmp = action.employees.find(e => e.name === t.leader);
-                  return teamLeaderEmp?.productivityScore || t.productivity || 90;
+                  return teamLeaderEmp?.productivityScore ?? t.productivity ?? 90;
                 });
                 dynamicSuccessRate = Math.round(teamRates.reduce((sum, val) => sum + val, 0) / teamRates.length);
               } else {
-                dynamicSuccessRate = emp.productivityScore || 85;
+                dynamicSuccessRate = emp.productivityScore ?? 85;
               }
             }
           } else {
@@ -106,11 +106,11 @@ function reducer(state, action) {
                   return Math.round((completed / teamTasks.length) * 100);
                 }
                 const teamLeaderEmp = action.employees.find(e => e.name === t.leader);
-                return teamLeaderEmp?.productivityScore || t.productivity || 90;
+                return teamLeaderEmp?.productivityScore ?? t.productivity ?? 90;
               });
               dynamicSuccessRate = Math.round(teamRates.reduce((sum, val) => sum + val, 0) / teamRates.length);
             } else {
-              dynamicSuccessRate = emp.productivityScore || 85;
+              dynamicSuccessRate = emp.productivityScore ?? 85;
             }
           }
 
@@ -156,8 +156,8 @@ function reducer(state, action) {
         .filter(e => (e.roleId === 'team_leader' || e.designation?.toLowerCase().includes('team leader')) && e.status !== 'Inactive')
         .map(emp => {
           const ledTeam = action.teams.find(t => t.leader === emp.name);
-          let leaderProductivity = emp.productivityScore || 90;
-          let leaderAttendance = emp.attendanceRate || 95;
+          let leaderProductivity = emp.productivityScore ?? 90;
+          let leaderAttendance = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(emp.todayPunchStatus || emp.attendanceStatus) ? 100 : 0;
           let leaderActiveProjects = ledTeam ? (ledTeam.activeProjects || 0) : 0;
 
           if (ledTeam) {
@@ -169,7 +169,7 @@ function reducer(state, action) {
               const completed = teamTasks.filter(task => task.completed || task.status === 'Done' || task.status === 'Completed').length;
               leaderProductivity = Math.round((completed / teamTasks.length) * 100);
             } else {
-              leaderProductivity = emp.productivityScore || ledTeam.productivity || 90;
+              leaderProductivity = emp.productivityScore ?? ledTeam.productivity ?? 90;
             }
 
             // Real attendance: team attendance logs
@@ -185,11 +185,11 @@ function reducer(state, action) {
               const teamEmps = (action.employees || []).filter(e => teamMemberIds.has(e.id) && e.status === 'Active');
               if (teamEmps.length > 0) {
                 const presentCount = teamEmps.filter(e =>
-                  ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.attendanceStatus || e.todayPunchStatus)
+                  ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.todayPunchStatus || e.attendanceStatus)
                 ).length;
                 leaderAttendance = Math.round((presentCount / teamEmps.length) * 100);
               } else {
-                leaderAttendance = emp.attendanceRate || ledTeam.attendance || 95;
+                leaderAttendance = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(emp.todayPunchStatus || emp.attendanceStatus) ? 100 : 0;
               }
             }
 
@@ -1876,9 +1876,9 @@ const Managers = () => {
                     <td><div className="pm-name-cell"><Avatar name={member.name} size="sm"/><span style={{fontWeight:600}}>{member.name}</span></div></td>
                     <td>{member.designation}</td>
                     <td><Badge variant={member.status === 'Active' || member.status === 'Confirmed' ? 'success' : 'warning'}>{member.status || 'Active'}</Badge></td>
-                    <td><Badge variant={getPerfBadge(member.productivityScore || 90)}>{member.productivityScore || 90}%</Badge></td>
-                    <td><Badge variant={(member.attendanceStatus === 'Present' || member.attendanceStatus === 'Punched In') ? 'success' : 'warning'}>{member.attendanceStatus || 'Present'}</Badge></td>
-                    <td><span style={{fontSize:'0.82rem',color:'var(--text-muted)'}}>{member.workEmail || member.email}</span></td>
+                    <td><Badge variant={getPerfBadge(member.productivityScore ?? 90)}>{member.productivityScore ?? 90}%</Badge></td>
+                    <td><Badge variant={['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(member.todayPunchStatus || member.attendanceStatus) ? 'success' : 'warning'}>{member.todayPunchStatus || member.attendanceStatus || 'Not Punched'}</Badge></td>
+                    <td><span style={{fontSize:'0.82rem',color:'var(--text-muted)'}}>{member.workEmail ?? member.email}</span></td>
                   </tr>
                 ))}
               </tbody>

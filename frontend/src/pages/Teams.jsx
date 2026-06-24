@@ -40,7 +40,7 @@ const Teams = () => {
     return departments.map(d => {
       const deptEmps = (employees || []).filter(e => e.department === d.name);
       const avg = deptEmps.length > 0
-        ? Math.round(deptEmps.reduce((sum, e) => sum + (e.productivityScore || 90), 0) / deptEmps.length)
+        ? Math.round(deptEmps.reduce((sum, e) => sum + (e.productivityScore ?? 90), 0) / deptEmps.length)
         : 90;
       return {
         name: d.name,
@@ -142,7 +142,7 @@ const Teams = () => {
           empProd = Math.round((empCompleted / empTasks.length) * 100);
         } else {
           const empObj = (employees || []).find(e => e.id === m.id);
-          empProd = empObj?.productivityScore || m.productivity || 90;
+          empProd = empObj?.productivityScore ?? m.productivity ?? 90;
         }
 
         const empAtts = (attendance || []).filter(att => att.employeeId === m.id);
@@ -156,9 +156,9 @@ const Teams = () => {
         } else {
           const empObj = (employees || []).find(e => e.id === m.id);
           if (empObj) {
-            empAtt = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(empObj.attendanceStatus || empObj.todayPunchStatus) ? 100 : 0;
+            empAtt = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(empObj.todayPunchStatus || empObj.attendanceStatus) ? 100 : 0;
           } else {
-            empAtt = m.attendance || 95;
+            empAtt = m.attendance ?? 95;
           }
         }
 
@@ -229,7 +229,7 @@ const Teams = () => {
           teamId: ledTeam ? ledTeam.id : null,
           dept: emp.department || 'IT',
           exp: emp.experience || '—',
-          score: emp.productivityScore || 90
+          score: emp.productivityScore ?? 90
         };
       });
   }, [employees, teams]);
@@ -454,27 +454,50 @@ const Teams = () => {
     }
 
     const selectedEmpObjects = employees.filter(emp => selectedMemberIds.includes(emp.id));
-    const membersList = selectedEmpObjects.map(emp => ({
-      name: emp.name,
-      id: emp.id,
-      designation: emp.designation || emp.role || 'Specialist',
-      date: new Date().toISOString().split('T')[0],
-      attendance: emp.attendanceRate || 95,
-      productivity: emp.productivityScore || 90
-    }));
+    const membersList = selectedEmpObjects.map(emp => {
+      const empAtts = (attendance || []).filter(att => att.employeeId === emp.id);
+      let empAtt = 0;
+      if (empAtts.length > 0) {
+        const empPresent = empAtts.filter(att =>
+          ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(att.status)
+        ).length;
+        empAtt = Math.round((empPresent / empAtts.length) * 100);
+      } else {
+        empAtt = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(emp.todayPunchStatus || emp.attendanceStatus) ? 100 : 0;
+      }
+      return {
+        name: emp.name,
+        id: emp.id,
+        designation: emp.designation || emp.role || 'Specialist',
+        date: new Date().toISOString().split('T')[0],
+        attendance: empAtt,
+        productivity: emp.productivityScore ?? 90
+      };
+    });
 
     // Find the leader and add them to membersList if not already present
     const isLeaderInList = membersList.some(m => m.name === newTeam.leader);
     if (!isLeaderInList && newTeam.leader) {
       const leaderEmp = employees.find(emp => emp.name === newTeam.leader);
       if (leaderEmp) {
+        const leaderAtts = (attendance || []).filter(att => att.employeeId === leaderEmp.id);
+        let leaderAtt = 0;
+        if (leaderAtts.length > 0) {
+          const present = leaderAtts.filter(att =>
+            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(att.status)
+          ).length;
+          leaderAtt = Math.round((present / leaderAtts.length) * 100);
+        } else {
+          leaderAtt = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(leaderEmp.todayPunchStatus || leaderEmp.attendanceStatus) ? 100 : 0;
+        }
+
         membersList.unshift({
           name: leaderEmp.name,
           id: leaderEmp.id,
           designation: leaderEmp.designation || 'Team Leader',
           date: new Date().toISOString().split('T')[0],
-          attendance: leaderEmp.attendanceRate || 95,
-          productivity: leaderEmp.productivityScore || 90
+          attendance: leaderAtt,
+          productivity: leaderEmp.productivityScore ?? 90
         });
       } else {
         membersList.unshift({

@@ -476,7 +476,7 @@ const Reports = () => {
         e.designation || e.role || '',
         e.department || '',
         e.branch || '',
-        e.productivityScore || 75,
+        e.productivityScore ?? 75,
         e.status || 'Active'
       ]);
     } else {
@@ -617,7 +617,7 @@ const Reports = () => {
           e.designation || e.role || '',
           e.department || '',
           e.branch || '',
-          e.productivityScore || 75,
+          e.productivityScore ?? 75,
           e.status || 'Active'
         ]);
       } else if (lowerName.includes('attendance') || lowerName.includes('late') || lowerName.includes('overtime')) {
