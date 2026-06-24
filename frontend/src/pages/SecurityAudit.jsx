@@ -294,6 +294,130 @@ const SecurityAudit = () => {
   const [selectedAuditLog, setSelectedAuditLog] = useState(null);
   const [showLogModal, setShowLogModal] = useState(false);
 
+  // Helper formatter for count numbers
+  const formatNumber = (num) => {
+    if (num === undefined || num === null) return '0';
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toLocaleString();
+  };
+
+  const securityDashboardStats = useMemo(() => {
+    // 1. Total Security Events
+    const totalEvents = auditLogsData.length;
+    const authEvents = auditLogsData.filter(log => 
+      ['Login', 'Logout', 'Authentication', 'Session'].includes(log.action) || 
+      log.eventType === 'Auth' || 
+      log.module?.toLowerCase().includes('auth')
+    ).length;
+    const alertsCount = securityAlerts.length;
+
+    // 2. Failed Login Attempts
+    const employeesFailedAttempts = (employees || []).reduce((sum, e) => sum + (e.securityInfo?.failedAttempts || 0), 0);
+    const failedLogins = Math.max(employeesFailedAttempts, auditLogsData.filter(log => 
+      log.action === 'Failed Login' || 
+      log.status?.toLowerCase() === 'failed' || 
+      log.action?.toLowerCase().includes('failed login')
+    ).length);
+    const blockedIps = (restrictedIps || []).length;
+    const lockoutsCount = securityAlerts.filter(a => 
+      a.type?.toLowerCase().includes('lockout') || 
+      a.message?.toLowerCase().includes('lockout')
+    ).length;
+
+    // 3. Active User Sessions
+    const totalSessions = activeSessions.length;
+    const adminSessionsCount = activeSessions.filter(s => 
+      ['admin', 'super_admin', 'manager'].includes(s.role?.toLowerCase())
+    ).length;
+    const idleSessionsCount = activeSessions.filter(s => 
+      s.status?.toLowerCase() === 'idle'
+    ).length;
+
+    // 4. Security Alerts
+    const criticalAlertsCount = securityAlerts.filter(a => 
+      a.severity?.toLowerCase() === 'critical'
+    ).length;
+    const highAlertsCount = securityAlerts.filter(a => 
+      a.severity?.toLowerCase() === 'high'
+    ).length;
+
+    // 5. Permission Changes
+    const permissionChangesCount = auditLogsData.filter(log => 
+      log.eventType === 'Roles & Permissions' || 
+      log.action === 'Permission Change' || 
+      log.action === 'Role Update' || 
+      log.module === 'RolesPermissions' || 
+      log.action?.toLowerCase().includes('permission')
+    ).length;
+    const roleChangesCount = auditLogsData.filter(log => 
+      log.action === 'Role Update' || 
+      log.action === 'Change Role' || 
+      log.action?.toLowerCase().includes('role')
+    ).length;
+    const policyEditsCount = auditLogsData.filter(log => 
+      log.action === 'Policy Update' || 
+      log.action?.toLowerCase().includes('policy')
+    ).length;
+
+    // 6. Audit Logs Generated (represented by auditLogsData.length)
+    const auditLogsCount = auditLogsData.length;
+
+    // 7. Active MFA Users
+    const mfaUsersCount = (employees || []).filter(e => 
+      e.mfaEnabled || 
+      e.mfaActive || 
+      e.twoFactorEnabled || 
+      e.securityInfo?.mfaStatus?.toLowerCase() === 'enabled' || 
+      e.securityInfo?.mfaStatus?.toLowerCase() === 'active'
+    ).length;
+    const mfaCoverage = (employees || []).length > 0 
+      ? ((mfaUsersCount / employees.length) * 100).toFixed(1) 
+      : '0';
+    
+    const admins = (employees || []).filter(e => 
+      ['admin', 'super_admin', 'manager', 'hr'].includes(e.role?.toLowerCase())
+    );
+    const mfaAdmins = admins.filter(e => 
+      e.mfaEnabled || 
+      e.mfaActive || 
+      e.twoFactorEnabled || 
+      e.securityInfo?.mfaStatus?.toLowerCase() === 'enabled' || 
+      e.securityInfo?.mfaStatus?.toLowerCase() === 'active'
+    );
+    const mfaAdminCoverage = admins.length > 0 
+      ? ((mfaAdmins.length / admins.length) * 100).toFixed(1) 
+      : '0';
+
+    // 8. System Health Score
+    const criticalAlerts = criticalAlertsCount;
+    const highAlerts = highAlertsCount;
+    const mfaRatio = (employees || []).length > 0 ? (mfaUsersCount / employees.length) : 1;
+    const systemHealthScore = Math.max(50, Math.round(100 - (criticalAlerts * 15) - (highAlerts * 5) - ((1 - mfaRatio) * 20) - (blockedIps > 0 ? 5 : 0)));
+
+    return {
+      totalEvents,
+      authEvents,
+      alertsCount,
+      failedLogins,
+      blockedIps,
+      lockoutsCount,
+      totalSessions,
+      adminSessionsCount,
+      idleSessionsCount,
+      criticalAlertsCount,
+      highAlertsCount,
+      permissionChangesCount,
+      roleChangesCount,
+      policyEditsCount,
+      auditLogsCount,
+      mfaUsersCount,
+      mfaCoverage,
+      mfaAdminCoverage,
+      systemHealthScore
+    };
+  }, [auditLogsData, securityAlerts, employees, activeSessions, restrictedIps]);
+
   // 10. Compliance Scorecard dynamically computed
   const complianceData = useMemo(() => {
     const totalEmps = (employees || []).length || 1;
@@ -1060,10 +1184,10 @@ const SecurityAudit = () => {
             <span className="stat-label">Total Security Events</span>
             <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +8.4%</span>
           </div>
-          <h3 className="stat-num">18,450</h3>
+          <h3 className="stat-num">{formatNumber(securityDashboardStats.totalEvents)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
-            <span>Auth: 12,450</span>
-            <span>Alerts: 145</span>
+            <span>Auth: {formatNumber(securityDashboardStats.authEvents)}</span>
+            <span>Alerts: {formatNumber(securityDashboardStats.alertsCount)}</span>
           </div>
         </div>
 
@@ -1072,34 +1196,34 @@ const SecurityAudit = () => {
             <span className="stat-label">Failed Login Attempts</span>
             <span className="stat-trend trend-red"><ArrowUpRight size={14} /> +1.2%</span>
           </div>
-          <h3 className="stat-num text-danger">145</h3>
+          <h3 className="stat-num text-danger">{formatNumber(securityDashboardStats.failedLogins)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
-            <span>Blocked IPs: 7</span>
-            <span>Policy Lockouts: 4</span>
+            <span>Blocked IPs: {formatNumber(securityDashboardStats.blockedIps)}</span>
+            <span>Policy Lockouts: {formatNumber(securityDashboardStats.lockoutsCount)}</span>
           </div>
         </div>
 
         <div className="card security-stat-card border-bottom-info">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Active User Sessions</span>
-            <span className="badge-live font-xsmall"><CheckCircle size={10} /> 248 Active</span>
+            <span className="badge-live font-xsmall"><CheckCircle size={10} /> {formatNumber(securityDashboardStats.totalSessions)} Active</span>
           </div>
-          <h3 className="stat-num text-info">248</h3>
+          <h3 className="stat-num text-info">{formatNumber(securityDashboardStats.totalSessions)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
-            <span>Admin Sessions: 12</span>
-            <span>Idle Sessions: 32</span>
+            <span>Admin Sessions: {formatNumber(securityDashboardStats.adminSessionsCount)}</span>
+            <span>Idle Sessions: {formatNumber(securityDashboardStats.idleSessionsCount)}</span>
           </div>
         </div>
 
         <div className="card security-stat-card border-bottom-warning">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Security Alerts</span>
-            <span className="badge-warning-custom font-xsmall">12 Alerts</span>
+            <span className="badge-warning-custom font-xsmall">{formatNumber(securityDashboardStats.alertsCount)} Alerts</span>
           </div>
-          <h3 className="stat-num text-warning">12</h3>
+          <h3 className="stat-num text-warning">{formatNumber(securityDashboardStats.alertsCount)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
-            <span>Critical: 2</span>
-            <span>High: 5</span>
+            <span>Critical: {formatNumber(securityDashboardStats.criticalAlertsCount)}</span>
+            <span>High: {formatNumber(securityDashboardStats.highAlertsCount)}</span>
           </div>
         </div>
 
@@ -1110,12 +1234,12 @@ const SecurityAudit = () => {
         <div className="card security-stat-card border-bottom-orange">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Permission Changes</span>
-            <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +24 today</span>
+            <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +{formatNumber(securityDashboardStats.permissionChangesCount)} today</span>
           </div>
-          <h3 className="stat-num text-warning">24</h3>
+          <h3 className="stat-num text-warning">{formatNumber(securityDashboardStats.permissionChangesCount)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
-            <span>Role changes: 2</span>
-            <span>Policy edits: 8</span>
+            <span>Role changes: {formatNumber(securityDashboardStats.roleChangesCount)}</span>
+            <span>Policy edits: {formatNumber(securityDashboardStats.policyEditsCount)}</span>
           </div>
         </div>
 
@@ -1124,7 +1248,7 @@ const SecurityAudit = () => {
             <span className="stat-label">Audit Logs Generated</span>
             <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +5.4%</span>
           </div>
-          <h3 className="stat-num">2.8M</h3>
+          <h3 className="stat-num">{formatNumber(securityDashboardStats.auditLogsCount)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
             <span>Retention: 365 days</span>
             <span>WAF logs included</span>
@@ -1136,10 +1260,10 @@ const SecurityAudit = () => {
             <span className="stat-label">Active MFA Users</span>
             <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +12.4%</span>
           </div>
-          <h3 className="stat-num text-success">1,087</h3>
+          <h3 className="stat-num text-success">{formatNumber(securityDashboardStats.mfaUsersCount)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
-            <span>Coverage: 87.2%</span>
-            <span>Admins: 100%</span>
+            <span>Coverage: {securityDashboardStats.mfaCoverage}%</span>
+            <span>Admins: {securityDashboardStats.mfaAdminCoverage}%</span>
           </div>
         </div>
 
@@ -1148,7 +1272,7 @@ const SecurityAudit = () => {
             <span className="stat-label">System Health Score</span>
             <span className="badge-live font-xsmall"><ShieldCheck size={10} /> SOC Enforced</span>
           </div>
-          <h3 className="stat-num text-success">98%</h3>
+          <h3 className="stat-num text-success">{securityDashboardStats.systemHealthScore}%</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
             <span>ISO 27001 Compliant</span>
             <span>Stable status</span>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE } from '../../permissions/permissions';
+import { decodeEmployeeId } from '../../utils/hashId';
 
 /**
  * Route protector checking if the user session token is present.
@@ -27,8 +28,16 @@ export const ProtectedRoute = AuthGuard;
  * Redirects to `/unauthorized` if forbidden.
  */
 export const RoleGuard = ({ allowedRoles = [], children }) => {
-  const { currentUserRole, currentUser, hasPermission } = useApp();
+  const { currentUserRole, currentUser, hasPermission, initialized } = useApp();
   const location = useLocation();
+
+  if (!initialized) {
+    return (
+      <div className="page-loading-wrapper">
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
 
   let isAuthorized = false;
   let moduleKey = null;
@@ -74,7 +83,7 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
     if (!isAuthorized && currentUser) {
       // Check if accessing '/employees/:id' or '/employee-profile/:id'
       if (pathParts.length === 2 && (pathParts[0] === 'employees' || pathParts[0] === 'employee-profile')) {
-        const targetEmployeeId = pathParts[1];
+        const targetEmployeeId = decodeEmployeeId(pathParts[1]);
         
         // 1. Self-service exception: any user can view their own profile
         if (currentUser.id === targetEmployeeId) {

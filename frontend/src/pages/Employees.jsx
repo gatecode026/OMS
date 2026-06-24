@@ -3,6 +3,7 @@ import './Employees.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
 import usePageLoading from '../hooks/usePageLoading';
+import { encodeEmployeeId } from '../utils/hashId';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
@@ -248,7 +249,7 @@ const CopyCell = ({ value, icon: Icon, truncate, underline }) => {
 
 // ─── Column Groups for Toggle Panel ─────────────────────────────────────────
 const COLUMN_GROUPS = [
-  { label: 'Identity', keys: ['checkbox', 'name', 'id'] },
+  { label: 'Identity', keys: ['name', 'id'] },
   { label: 'Role', keys: ['designation', 'department', 'branch', 'teamLeader', 'projectManager'] },
   { label: 'Contact', keys: ['phone', 'workEmail'] },
   { label: 'Timeline', keys: ['joinDate', 'lastSeen'] },
@@ -258,7 +259,7 @@ const COLUMN_GROUPS = [
 ];
 
 const COLUMN_LABELS = {
-  checkbox: 'Select', name: 'Full Name', id: 'Employee ID', designation: 'Designation',
+  name: 'Full Name', id: 'Employee ID', designation: 'Designation',
   department: 'Department', branch: 'Branch/Agency', teamLeader: 'Team Leader', projectManager: 'Project Manager',
   phone: 'Contact Number', workEmail: 'Official Company Email', joinDate: 'Joining Date',
   attendanceStatus: 'Attendance Status', workStatus: 'Work Status', accountStatus: 'Employment Status',
@@ -269,7 +270,7 @@ const COLUMN_LABELS = {
 };
 
 const DEFAULT_VISIBILITY = {
-  checkbox: true, name: true, id: true, designation: true, department: true,
+  name: true, id: true, designation: true, department: true,
   branch: true, teamLeader: false, projectManager: false, phone: false,
   workEmail: true, joinDate: false, attendanceStatus: true, todayPunchIn: true,
   todayPunchOut: true, todayWorkingHours: true, lastSeen: true, workStatus: true,
@@ -301,11 +302,22 @@ const Employees = () => {
     return attendance.find(a => a.employeeId === empId && a.date === todayStr);
   };
 
+  const isEmployeeOnLeaveToday = (empId) => {
+    if (!leaveRequests || leaveRequests.length === 0) return false;
+    const todayStr = getLocalDateString();
+    return leaveRequests.some(r => 
+      r.employeeId === empId && 
+      r.status === 'Approved' && 
+      todayStr >= r.from && 
+      todayStr <= r.to
+    );
+  };
+
   const getTodayStatus = (row) => {
     const att = getTodayAttendance(row.id);
     if (att) return att.status;
-    if (row.status === 'Active') {
-      return row.attendanceStatus || 'Present';
+    if (isEmployeeOnLeaveToday(row.id)) {
+      return 'On Leave';
     }
     return 'Absent';
   };
@@ -1234,9 +1246,12 @@ const Employees = () => {
   const totalEmp = employees.length;
   const presentCount = employees.filter(e => {
     const status = getTodayStatus(e);
-    return ['Present', 'Overtime', 'Half Day', 'Half-Day'].includes(status);
+    return ['Present', 'Overtime', 'Half Day', 'Half-Day', 'Work From Home', 'WFH'].includes(status);
   }).length;
-  const absentCount = employees.filter(e => getTodayStatus(e) === 'Absent').length;
+  const absentCount = employees.filter(e => {
+    const status = getTodayStatus(e);
+    return status === 'Absent' || status === 'Not Punched';
+  }).length;
   const lateCount = employees.filter(e => getTodayStatus(e) === 'Late').length;
   const leaveCount = employees.filter(e => {
     const status = getTodayStatus(e);
@@ -1574,18 +1589,21 @@ const Employees = () => {
                 <span className="att-metric-label">Absent</span>
                 <div className="att-metric-right">
                   <span className="att-metric-count absent-count">{absentCount}</span>
+                  <div className="mini-bar-track"><div className="mini-bar-fill red-fill" style={{ width: `${Math.round(absentCount / Math.max(totalEmp, 1) * 100)}%` }}></div></div>
                 </div>
               </div>
               <div className="att-metric-row att-late-row">
                 <span className="att-metric-label">Late</span>
                 <div className="att-metric-right">
                   <span className="att-metric-count late-count">{lateCount}</span>
+                  <div className="mini-bar-track"><div className="mini-bar-fill orange-fill" style={{ width: `${Math.round(lateCount / Math.max(totalEmp, 1) * 100)}%` }}></div></div>
                 </div>
               </div>
               <div className="att-metric-row att-leave-row">
                 <span className="att-metric-label">On Leave</span>
                 <div className="att-metric-right">
                   <span className="att-metric-count leave-count">{leaveCount}</span>
+                  <div className="mini-bar-track"><div className="mini-bar-fill purple-fill" style={{ width: `${Math.round(leaveCount / Math.max(totalEmp, 1) * 100)}%` }}></div></div>
                 </div>
               </div>
             </div>
@@ -1748,115 +1766,9 @@ const Employees = () => {
           </div>
         </div>
 
-        {/* ── Attendance Snapshot Strip ── */}
-        <div className="card attendance-snapshot-strip glass">
-          <div className="snapshot-left">
-            <span className="snapshot-title">Today's Attendance Snapshot:</span>
-            <div className="snapshot-metrics">
-              <span className="snapshot-metric"><span className="emoji">✅</span> Punched In: <strong>{employees.filter(e => {
-                const status = getTodayStatus(e);
-                return ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime'].includes(status);
-              }).length.toLocaleString()}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">⚠️</span> Not Yet: <strong>{employees.filter(e => {
-                const status = getTodayStatus(e);
-                return status === 'Absent' || !status;
-              }).length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🕐</span> Late: <strong>{employees.filter(e => getTodayStatus(e) === 'Late').length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🏠</span> WFH: <strong>{employees.filter(e => {
-                const status = getTodayStatus(e);
-                return status === 'Work From Home' || status === 'WFH';
-              }).length}</strong></span>
-              <span className="snapshot-metric"><span className="emoji">🌴</span> On Leave: <strong>{employees.filter(e => {
-                const status = getTodayStatus(e);
-                return status === 'On Leave' || status === 'Leave';
-              }).length}</strong></span>
-            </div>
-          </div>
-          <button className="snapshot-link-btn" onClick={() => navigate('/attendance')}>
-            View Full Punch Records →
-          </button>
-        </div>
+        {/* Attendance snapshot strip removed */}
 
-        {/* ── Bulk Actions Bar ── */}
-        <div className={`bulk-actions-bar${selectedIds.size > 0 ? ' bulk-bar-visible' : ''}`}>
-          <div className="bulk-bar-left">
-            <span className="bulk-count-badge">{selectedIds.size}</span>
-            <span className="bulk-bar-label">employee{selectedIds.size !== 1 ? 's' : ''} selected</span>
-            <button className="bulk-deselect-link" onClick={() => setSelectedIds(new Set())}>Deselect All</button>
-          </div>
-          <div className="bulk-bar-right" style={{ flexWrap: 'wrap', gap: '8px' }}>
-            {hasPermission('attendance_management', 'update') && (
-              <button className="bulk-btn bulk-btn-success" onClick={handleBulkMarkPresent} title="Mark Present">
-                <CheckCircle size={14} /> Mark Present
-              </button>
-            )}
-            {hasPermission('attendance_management', 'update') && (
-              <button className="bulk-btn bulk-btn-danger" onClick={handleBulkMarkAbsent} title="Mark Absent">
-                <XCircle size={14} /> Mark Absent
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowShiftModal(true)} title="Assign Shift">
-                <Clock size={14} /> Assign Shift
-              </button>
-            )}
-            {hasPermission('attendance_management', 'export') && (
-              <button className="bulk-btn bulk-btn-success" onClick={handleBulkExportAttendance} title="Export Attendance">
-                <Download size={14} /> Export Attendance
-              </button>
-            )}
-            {hasPermission('employee_management', 'delete') && (
-              <button className="bulk-btn bulk-btn-danger" onClick={handleBulkDelete} title="Delete Selected">
-                <Trash2 size={14} /> Delete
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowTransferModal(true)} title="Transfer Department">
-                <Briefcase size={14} /> Transfer Dept
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowAssignLeaderModal(true)} title="Assign Team Leader">
-                <UserCheck size={14} /> Assign Leader
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowRoleModal(true)} title="Assign Role">
-                <Shield size={14} /> Assign Role
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowStatusModal(true)} title="Update Status">
-                <Activity size={14} /> Status
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowLeaveModal(true)} title="Allocate Leave">
-                <Calendar size={14} /> Allocate Leave
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-secondary" onClick={() => setShowNotifyModal(true)} title="Send Alert">
-                <Mail size={14} /> Send Alert
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-success" onClick={handleBulkActivate} title="Activate Accounts">
-                <CheckCircle size={14} /> Activate
-              </button>
-            )}
-            {hasPermission('employee_management', 'update') && (
-              <button className="bulk-btn bulk-btn-warning" onClick={handleBulkDisable} title="Disable Accounts">
-                <XCircle size={14} /> Disable
-              </button>
-            )}
-            {hasPermission('employee_management', 'export') && (
-              <button className="bulk-btn bulk-btn-ghost" onClick={handleBulkExport} title="Export CSV">
-                <Download size={14} /> Export
-              </button>
-            )}
-          </div>
-        </div>
+        {/* Bulk actions section removed */}
 
         {/* ── Table Card ── */}
         <div className="card table-wrapper-card">
@@ -1897,9 +1809,6 @@ const Employees = () => {
             <table className="emp-table">
               <thead>
                 <tr>
-                  <th className="col-checkbox">
-                    <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
-                  </th>
                   {colVis.name && renderTH("name", FIELD_LABELS.name, true)}
                   {colVis.id && renderTH("id", FIELD_LABELS.id, true)}
                   {colVis.designation && renderTH("designation", FIELD_LABELS.designation, true)}
@@ -1932,14 +1841,14 @@ const Employees = () => {
                 {isLoading ? (
                   Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 15 }).map((_, j) => (
+                      {Array.from({ length: 14 }).map((_, j) => (
                         <td key={j}><Skeleton width="80%" height="14px" /></td>
                       ))}
                     </tr>
                   ))
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={16} className="empty-table-cell">
+                    <td colSpan={26} className="empty-table-cell">
                       <div className="empty-table-msg">
                         <Users size={36} className="empty-icon" />
                         <p>No employees found</p>
@@ -1949,10 +1858,7 @@ const Employees = () => {
                   </tr>
                 ) : paginated.map(row => (
                   <tr key={row.id}
-                    className={`emp-row${selectedIds.has(row.id) ? ' row-selected' : ''}${row.accountStatus === 'Suspended' ? ' row-suspended' : ''}`}>
-                    <td className="col-checkbox">
-                      <input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
-                    </td>
+                    className={`emp-row${row.accountStatus === 'Suspended' ? ' row-suspended' : ''}`}>
                     {colVis.name && (
                       <td>
                         <div className="emp-name-cell">
@@ -1973,7 +1879,7 @@ const Employees = () => {
                         </div>
                       </td>
                     )}
-                    {colVis.id && <td><span className="emp-id-mono emp-id-link" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${row.id}`); }} title="Open Profile">{row.id}</span></td>}
+                    {colVis.id && <td><span className="emp-id-mono emp-id-link" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${encodeEmployeeId(row.id)}`); }} title="Open Profile">{row.id}</span></td>}
                     {colVis.designation && <td><span className="text-secondary-sm">{row.designation || row.role}</span></td>}
                     {colVis.department && <td><span className="dept-text">{row.department || '-'}</span></td>}
                     {colVis.branch && <td><span className="text-secondary-sm">{row.branch || '-'}</span></td>}
@@ -2003,7 +1909,7 @@ const Employees = () => {
                         <span className="punch-time-mono">
                           {(() => {
                             const att = getTodayAttendance(row.id);
-                            const time = (att && att.punchIn && att.punchIn !== '--:--') ? att.punchIn : row.todayPunchIn;
+                            const time = (att && att.punchIn && att.punchIn !== '--:--') ? att.punchIn : null;
                             return time || '-';
                           })()}
                         </span>
@@ -2014,7 +1920,7 @@ const Employees = () => {
                         <span className="punch-time-mono">
                           {(() => {
                             const att = getTodayAttendance(row.id);
-                            const time = (att && att.punchOut && att.punchOut !== '--:--') ? att.punchOut : row.todayPunchOut;
+                            const time = (att && att.punchOut && att.punchOut !== '--:--') ? att.punchOut : null;
                             return time || '-';
                           })()}
                         </span>
@@ -2025,8 +1931,8 @@ const Employees = () => {
                         <span className="bold-text font-mono text-secondary">
                           {(() => {
                             const att = getTodayAttendance(row.id);
-                            const hours = (att && att.totalHours !== undefined && att.totalHours !== null) ? att.totalHours : row.todayWorkingHours;
-                            const hasPunchedIn = (att && att.punchIn && att.punchIn !== '--:--') || row.todayPunchIn;
+                            const hours = (att && att.totalHours !== undefined && att.totalHours !== null) ? att.totalHours : null;
+                            const hasPunchedIn = att && att.punchIn && att.punchIn !== '--:--';
                             if (!hasPunchedIn) return '-';
                             return hours ? fmtHoursTo60(hours) : '-';
                           })()}
@@ -2035,7 +1941,7 @@ const Employees = () => {
                     )}
                     {colVis.attendanceStatus && (
                       <td>
-                        <AttBadge status={row.attendanceStatus || getTodayStatus(row)} />
+                        <AttBadge status={getTodayStatus(row)} />
                       </td>
                     )}
                     {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '-'}</span></td>}
@@ -2043,7 +1949,7 @@ const Employees = () => {
                     {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
                     <td className="col-actions">
                       <div className="table-actions-cell">
-                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${row.id}`); }} title="View Full Profile">
+                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${encodeEmployeeId(row.id)}`); }} title="View Full Profile">
                           <Eye size={16} />
                         </button>
                         {hasPermission('employee_management', 'update') && (
@@ -2200,7 +2106,7 @@ const Employees = () => {
           </div>
           <div className="preview-divider" />
           <div className="preview-actions-grid">
-            <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employee-profile/${previewEmp.id}`); setPreviewEmp(null); }}>View Full Profile</button>
+            <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employee-profile/${encodeEmployeeId(previewEmp.id)}`); setPreviewEmp(null); }}>View Full Profile</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate(`?edit=${previewEmp.id}`); setPreviewEmp(null); }}>Edit Profile</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/my-profile'); setPreviewEmp(null); }}>Profile Settings</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/tasks'); setPreviewEmp(null); }}>Assign Task</button>

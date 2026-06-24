@@ -908,17 +908,10 @@ const Managers = () => {
               </div>
               <Button variant="ghost" size="sm" icon={Download} onClick={()=>setExportOpen(true)}>Export Data</Button>
               <Button variant="ghost" size="sm" icon={FileText} onClick={()=>setReportOpen(true)}>Reports</Button>
-              <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>Assign Manager</Button>
             </div>
           </div>
 
-          {hasPermission('team_management', 'update') && (
-            <div style={{display:'flex',gap:'var(--space-2)',flexWrap:'wrap'}}>
-              <Button variant="secondary" size="sm" icon={Briefcase}  onClick={()=>setAssignProjOpen(true)}>Assign Project</Button>
-              <Button variant="secondary" size="sm" icon={UserPlus}   onClick={()=>setAssignLeaderOpen(true)}>Assign Team Leader</Button>
-              <Button variant="secondary" size="sm" icon={Package}    onClick={()=>setAllocateOpen(true)}>Allocate Resources</Button>
-            </div>
-          )}
+
 
           {/* ── SUMMARY CARDS ── */}
           <div className="pm-summary-grid" style={{flexShrink: 0}}>
