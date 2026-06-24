@@ -68,6 +68,9 @@
 .mini-bar-track { width: 60px; height: 5px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
 .mini-bar-fill  { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
 .green-fill { background: var(--color-success); }
+.red-fill { background: var(--color-danger); }
+.orange-fill { background: var(--color-warning); }
+.purple-fill { background: #a855f7; }
 .widget-total { margin-top: var(--spacing-4); font-size: 0.8rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: var(--spacing-3); }
 
 /* Productivity rows */

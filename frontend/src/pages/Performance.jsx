@@ -122,7 +122,7 @@ const Performance = () => {
         const tasksAssigned = empTasks.length;
         const tasksCompleted = empTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length;
         
-        let productivity = emp.productivityScore ?? 85;
+        let productivity = emp.productivityScore || 0;
         if (tasksAssigned > 0) {
           productivity = Math.round((tasksCompleted / tasksAssigned) * 100);
         }
@@ -134,13 +134,12 @@ const Performance = () => {
             const present = empAtts.filter(att => ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(att.status)).length;
             attendancePct = Math.round((present / empAtts.length) * 100);
           } else {
-            attendancePct = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(emp.todayPunchStatus || emp.attendanceStatus) ? 100 : 0;
+            attendancePct = ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(emp.todayPunchStatus) ? 100 : 0;
           }
         }
         
-        const nameHash = (emp.name || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const efficiency = Math.min(100, Math.max(60, productivity - 5 + (nameHash % 9)));
-        const quality = Math.min(100, Math.max(65, productivity + 3 - (nameHash % 7)));
+        const efficiency = emp.efficiency ?? (productivity > 0 ? productivity : 80);
+        const quality = emp.quality ?? (productivity > 0 ? productivity : 80);
         
         const mappedEmp = {
           ...emp,
@@ -191,12 +190,17 @@ const Performance = () => {
 
   // Derived Performance Charts / Rankings Datasets
   const DEPT_PERF_DATA = useMemo(() => {
-    return (departments || []).map(d => ({
-      name: d.name,
-      score: d.avgPerformance || d.productivity || 90,
-      color: d.color || 'var(--color-primary)'
-    }));
-  }, [departments]);
+    return (departments || []).map(d => {
+      const deptEmployees = employees.filter(e => e.department === d.name);
+      const totalScore = deptEmployees.reduce((sum, e) => sum + (e.productivity || 0), 0);
+      const avg = deptEmployees.length > 0 ? Math.round(totalScore / deptEmployees.length) : 0;
+      return {
+        name: d.name,
+        score: avg,
+        color: d.color || 'var(--color-primary)'
+      };
+    });
+  }, [departments, employees]);
 
   const MONTHLY_TREND_DYNAMIC = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
@@ -240,8 +244,8 @@ const Performance = () => {
       const calculatedProductivity = branchTasks.length > 0
         ? Math.round(branchTasks.filter(t => t.completed || t.status === 'Done' || t.status === 'Completed').length / branchTasks.length * 100)
         : (branchEmployees.length > 0
-          ? Math.round(branchEmployees.reduce((sum, emp) => sum + (emp.productivityScore ?? 90), 0) / branchEmployees.length)
-          : 90);
+          ? Math.round(branchEmployees.reduce((sum, emp) => sum + (emp.productivityScore || 0), 0) / branchEmployees.length)
+          : 0);
 
       const branchAttToday = (attendance || []).filter(a =>
         branchEmpIds.has(a.employeeId) && a.date === today
@@ -257,11 +261,11 @@ const Performance = () => {
         const activeBranchEmps = branchEmployees.filter(e => e.status === 'Active');
         if (activeBranchEmps.length > 0) {
           const presentCount = activeBranchEmps.filter(e =>
-            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.todayPunchStatus || e.attendanceStatus)
+            ['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(e.todayPunchStatus)
           ).length;
           calculatedAttendance = Math.round((presentCount / activeBranchEmps.length) * 100);
         } else {
-          calculatedAttendance = b.attendance || b.attendanceRate || 95;
+          calculatedAttendance = b.attendance || b.attendanceRate || 0;
         }
       }
 
@@ -284,7 +288,7 @@ const Performance = () => {
       name: p.name,
       manager: p.leader || p.manager || 'Unassigned',
       progress: p.progress || 0,
-      score: p.productivity || p.kpiScore || 85
+      score: p.productivity || p.kpiScore || 0
     }));
   }, [projectsList]);
 
@@ -307,6 +311,10 @@ const Performance = () => {
     
     const avgGoalProgress = goals.length > 0
       ? Math.round(goals.reduce((s, g) => s + Math.min(100, Math.round((g.currentProgress / g.targetValue) * 100)), 0) / goals.length)
+      : 0;
+
+    const avgCollab = reviews.length > 0 
+      ? Math.round(reviews.reduce((s, r) => s + (r.rating === 'Outstanding' ? 95 : r.rating === 'Excellent' ? 88 : r.rating === 'Good' ? 80 : 70), 0) / reviews.length) 
       : 80;
       
     return [
@@ -315,9 +323,9 @@ const Performance = () => {
       { subject: 'Efficiency', score: avgEff, fullMark: 100 },
       { subject: 'Quality', score: avgQual, fullMark: 100 },
       { subject: 'Goal Achieved', score: avgGoalProgress, fullMark: 100 },
-      { subject: 'Collaboration', score: 85, fullMark: 100 }
+      { subject: 'Collaboration', score: avgCollab, fullMark: 100 }
     ];
-  }, [employees, goals]);
+  }, [employees, goals, reviews]);
 
   // Fetch goals and pips from API
   const fetchGoalsAndPips = async () => {
@@ -711,7 +719,7 @@ const Performance = () => {
 
     // Calculate project success rate as average project progress
     const totalProjProgress = (projectsList || []).reduce((sum, p) => sum + (p.progress || 0), 0);
-    const projectSuccessRate = (projectsList || []).length > 0 ? (totalProjProgress / projectsList.length).toFixed(1) : '85.0';
+    const projectSuccessRate = (projectsList || []).length > 0 ? (totalProjProgress / projectsList.length).toFixed(1) : '0.0';
 
     // Calculate top performing department based on average employee productivity
     const deptPerformance = (departments || []).map(d => {
@@ -721,8 +729,8 @@ const Performance = () => {
       return { name: d.name, score: avg };
     });
     const sortedDepts = [...deptPerformance].sort((a, b) => b.score - a.score);
-    const topDeptName = sortedDepts.length > 0 ? sortedDepts[0].name : 'Operations';
-    const topDeptScore = sortedDepts.length > 0 ? sortedDepts[0].score : 90;
+    const topDeptName = sortedDepts.length > 0 && sortedDepts[0].score > 0 ? sortedDepts[0].name : 'N/A';
+    const topDeptScore = sortedDepts.length > 0 && sortedDepts[0].score > 0 ? sortedDepts[0].score : 0;
 
     return {
       avgOverallScore,

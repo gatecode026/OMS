@@ -201,11 +201,6 @@ const TeamLeaders = () => {
           </div>
         </div>
         <div>
-          {hasPermission('team_management', 'create') && (
-            <Button variant="primary" onClick={() => setAssignModalOpen(true)} icon={Plus} size="sm">
-              Assign Leader
-            </Button>
-          )}
         </div>
       </div>
 

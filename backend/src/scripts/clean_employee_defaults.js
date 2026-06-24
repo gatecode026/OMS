@@ -16,10 +16,10 @@ async function run() {
   
   const result = await Employee.updateMany({}, {
     $set: {
-      branch: '',
       todayPunchIn: null,
       todayPunchOut: null,
       todayPunchStatus: 'Not Punched',
+      attendanceStatus: 'Not Punched',
       todayWorkingHours: 0,
       lastSeen: '—'
     }

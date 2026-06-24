@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import './MyProfile.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
+import { encodeEmployeeId } from '../utils/hashId';
 import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
@@ -588,7 +589,7 @@ const MyProfile = () => {
 
   const handleShareProfile = () => {
     if (!currentUser) return;
-    const shareUrl = `${window.location.origin}/employees/${currentUser.id}`;
+    const shareUrl = `${window.location.origin}/employees/${encodeEmployeeId(currentUser.id)}`;
     navigator.clipboard.writeText(shareUrl).then(() => {
       addToast('success', 'Profile link copied to clipboard.');
     });

@@ -42,34 +42,24 @@ export const normalizeEmployee = (emp) => {
   normalized.shiftTiming = sh;
   normalized.shift = sh;
 
-  // 7. Punch In Time / todayPunchIn / punchInTime / punchIn
-  const pIn = normalized.punchInTime || normalized.todayPunchIn || normalized.punchIn;
-  normalized.punchInTime = pIn;
-  normalized.todayPunchIn = pIn;
-  normalized.punchIn = pIn;
+  // 7. Punch In Time (cleared from fallback to prevent stale data; resolved dynamically from today's logs)
+  normalized.punchInTime = null;
+  normalized.todayPunchIn = null;
+  normalized.punchIn = null;
 
-  // 8. Punch Out Time / todayPunchOut / punchOutTime / punchOut
-  const pOut = normalized.punchOutTime || normalized.todayPunchOut || normalized.punchOut;
-  normalized.punchOutTime = pOut;
-  normalized.todayPunchOut = pOut;
-  normalized.punchOut = pOut;
+  // 8. Punch Out Time (cleared from fallback to prevent stale data; resolved dynamically from today's logs)
+  normalized.punchOutTime = null;
+  normalized.todayPunchOut = null;
+  normalized.punchOut = null;
 
-  // 9. Working Hours / todayWorkingHours / workingHours / totalHours
-  const hrs = normalized.workingHours || normalized.todayWorkingHours || normalized.totalHours;
-  normalized.workingHours = hrs;
-  normalized.todayWorkingHours = hrs;
-  normalized.totalHours = hrs;
+  // 9. Working Hours (cleared from fallback to prevent stale data; resolved dynamically from today's logs)
+  normalized.workingHours = 0;
+  normalized.todayWorkingHours = 0;
+  normalized.totalHours = 0;
 
-  // 10. Attendance Status / attendanceStatus / todayPunchStatus
-  const rawPunch = normalized.todayPunchStatus || 'Not Punched';
-  let att = rawPunch;
-  if (rawPunch === 'Not Punched' && normalized.attendanceStatus && !['Active', 'Disabled', 'Suspended'].includes(normalized.attendanceStatus)) {
-    if (normalized.attendanceStatus !== 'Present') {
-      att = normalized.attendanceStatus;
-    }
-  }
-  normalized.attendanceStatus = att;
-  normalized.todayPunchStatus = rawPunch;
+  // 10. Attendance Status (defaults to 'Not Punched' to prevent stale 'Present' fallback)
+  normalized.attendanceStatus = 'Not Punched';
+  normalized.todayPunchStatus = 'Not Punched';
 
 
   // 11. Employment Status / accountStatus / employmentStatus / status
@@ -181,6 +171,7 @@ export const AppProvider = ({ children }) => {
   const [departments, setDepartments] = useState([]);
   const [teams, setTeams] = useState([]);
   const [token, setToken] = useState(() => localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token') || '');
+  const [initialized, setInitialized] = useState(() => !localStorage.getItem('saas_token') && !sessionStorage.getItem('saas_token'));
   const [attendance, setAttendance] = useState([]);
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [leavePolicyConfigs, setLeavePolicyConfigs] = useState([]);
@@ -1871,24 +1862,40 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    fetchEmployees();
-    fetchAttendance();
-    fetchLeaves();
-    fetchLeavePolicies();
-    fetchHolidays();
-    fetchDailyReports();
-    fetchAppraisalReviews();
-    fetchPayrollData();
-    fetchAnnouncements();
-    fetchEmergencyAlert();
-    fetchAnnouncementTracking();
-    fetchAnnouncementAudits();
-    fetchNotifications();
-    fetchDocuments();
-    fetchActivityLogs();
-    fetchRoles();
-    fetchPermissionModules();
-    fetchUserOverrides();
+    if (!token) {
+      setInitialized(true);
+      return;
+    }
+    setInitialized(false);
+    const loadInitialData = async () => {
+      try {
+        await Promise.allSettled([
+          fetchEmployees(),
+          fetchAttendance(),
+          fetchLeaves(),
+          fetchLeavePolicies(),
+          fetchHolidays(),
+          fetchDailyReports(),
+          fetchAppraisalReviews(),
+          fetchPayrollData(),
+          fetchAnnouncements(),
+          fetchEmergencyAlert(),
+          fetchAnnouncementTracking(),
+          fetchAnnouncementAudits(),
+          fetchNotifications(),
+          fetchDocuments(),
+          fetchActivityLogs(),
+          fetchRoles(),
+          fetchPermissionModules(),
+          fetchUserOverrides()
+        ]);
+      } catch (err) {
+        console.error('Failed to load initial application state:', err);
+      } finally {
+        setInitialized(true);
+      }
+    };
+    loadInitialData();
   }, [token]);
 
   // Background polling disabled to prevent terminal log flooding (Option B)
@@ -4432,6 +4439,7 @@ export const AppProvider = ({ children }) => {
         sidebarCollapsed,
         currentUser: memoizedCurrentUser,
         setCurrentUserRole,
+        initialized,
 
         setSidebarCollapsed,
         setCommandPaletteOpen,

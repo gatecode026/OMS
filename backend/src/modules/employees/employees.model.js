@@ -151,7 +151,7 @@ const employeeSchema = new mongoose.Schema({
   // Analytics & history fields
   attendanceStatus: {
     type: String,
-    default: 'Present'
+    default: 'Not Punched'
   },
   workStatus: {
     type: String,
@@ -193,6 +193,14 @@ const employeeSchema = new mongoose.Schema({
   productivityScore: {
     type: Number,
     default: 0
+  },
+  efficiency: {
+    type: Number,
+    default: 80
+  },
+  quality: {
+    type: Number,
+    default: 80
   },
   performanceRating: {
     type: String,
