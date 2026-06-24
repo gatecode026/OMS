@@ -1,11 +1,17 @@
 /**
  * @file src/pages/chat/ConversationItem.jsx
- * @description Single conversation row in the sidebar list with right-click actions.
+ * @description Single conversation row in the sidebar list with full context menu
+ *   (desktop right-click / mobile long-press bottom sheet).
+ *   Actions: Pin, Mute, Archive, Hide, Mark Read/Unread, Block, Clear Chat,
+ *   Delete Chat, Delete Group (admin only).
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import StatusDot from './StatusDot';
-import { Pin, Bell, BellOff } from 'lucide-react';
+import {
+  Pin, Bell, BellOff, Archive, EyeOff, MailOpen, Mail,
+  Ban, Trash2, X, Eraser, ShieldAlert, MoreVertical
+} from 'lucide-react';
 
 const stripMarkdown = (text) => {
   if (!text) return '';
@@ -24,6 +30,41 @@ const stripMarkdown = (text) => {
     .trim();
 };
 
+// ── Reusable menu button component ────────────────────────────────────────────
+const MenuButton = ({ icon: Icon, label, danger, onClick, disabled }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    style={{
+      width: '100%',
+      padding: '9px 14px',
+      textAlign: 'left',
+      background: 'none',
+      border: 'none',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      fontSize: '13px',
+      color: danger ? '#ef4444' : 'var(--text-primary, #1e293b)',
+      borderRadius: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      fontFamily: 'inherit',
+      opacity: disabled ? 0.4 : 1,
+      transition: 'background 0.15s'
+    }}
+    onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = danger ? 'rgba(239,68,68,0.08)' : 'var(--chat-hover, #f8fafc)'; }}
+    onMouseLeave={e => e.currentTarget.style.background = 'none'}
+  >
+    <Icon size={15} strokeWidth={2} style={danger ? { color: '#ef4444' } : {}} />
+    <span>{label}</span>
+  </button>
+);
+
+// ── Divider line ──────────────────────────────────────────────────────────────
+const MenuDivider = () => (
+  <div style={{ height: '1px', background: 'var(--chat-border, #e2e8f0)', margin: '4px 8px' }} />
+);
+
 const ConversationItem = ({
   conversation: conv,
   isActive,
@@ -38,14 +79,35 @@ const ConversationItem = ({
   onPin,
   onUnpin,
   onMute,
-  onUnmute
+  onUnmute,
+  // New management actions
+  onArchive,
+  onHide,
+  onMarkUnread,
+  onMarkRead,
+  onBlock,
+  onClearChat,
+  onDeleteForMe,
+  onDeleteGroup,
+  isArchivedView,
+  onUnarchive,
+  isHiddenView,
+  onUnhide,
+  // Block state
+  blockedUsers,
+  blockedByUsers,
+  // Toast + undo
+  addToast
 }) => {
   const other = getOtherParticipant(conv);
   const isDirect = conv.type === 'direct';
 
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
   const menuRef = useRef(null);
+  const touchTimerRef = useRef(null);
+  const touchMoved = useRef(false);
 
   // Close context menu on click outside
   useEffect(() => {
@@ -63,34 +125,127 @@ const ConversationItem = ({
     ? (other?.name || 'Unknown')
     : (conv.name || 'Group');
 
-  // Avatar letter
+  // Avatar
   const avatarLetter = displayName.charAt(0).toUpperCase();
-
-  // Avatar src
   const avatarSrc = isDirect ? other?.avatar : conv.avatar;
-
   const isPinned = conv.pinnedBy?.some(p => p.employeeId === currentUser?.id);
 
-  // Handle right-click
+  const isGroupAdmin = conv.type === 'group' && conv.participants?.some(
+    p => p.employeeId === currentUser?.id && p.isAdmin
+  );
+
+  const otherUserId = other?.employeeId;
+  const isBlocked = isDirect && blockedUsers?.includes(otherUserId);
+  const isBlockedByOther = isDirect && blockedByUsers?.includes(otherUserId);
+
+  // Handle right-click (desktop)
   const handleContextMenu = (e) => {
     e.preventDefault();
-    setMenuPos({ x: e.clientX, y: e.clientY });
+
+    // Adjust position so menu doesn't overflow viewport
+    const x = Math.min(e.clientX, window.innerWidth - 220);
+    const y = Math.min(e.clientY, window.innerHeight - 400);
+
+    setMenuPos({ x, y });
     setShowContextMenu(true);
+    setShowBottomSheet(false);
+  };
+
+  // Touch handlers for mobile long-press
+  const handleTouchStart = useCallback((e) => {
+    touchMoved.current = false;
+    touchTimerRef.current = setTimeout(() => {
+      if (!touchMoved.current) {
+        // Haptic feedback if supported
+        if (navigator.vibrate) navigator.vibrate(30);
+        setShowBottomSheet(true);
+        setShowContextMenu(false);
+      }
+    }, 500);
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    touchMoved.current = true;
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+  }, []);
+
+  const closeAllMenus = () => {
+    setShowContextMenu(false);
+    setShowBottomSheet(false);
+  };
+
+  // ── Action handlers (with undo toasts for non-destructive) ──────────────
+
+  const handlePin = () => {
+    if (isPinned) onUnpin?.(conv.id);
+    else onPin?.(conv.id);
+    closeAllMenus();
+  };
+
+  const handleMute = () => {
+    if (isMuted) onUnmute?.(conv.id);
+    else onMute?.(conv.id);
+    closeAllMenus();
+  };
+
+  const handleArchive = () => {
+    onArchive?.(conv.id);
+    closeAllMenus();
+  };
+
+  const handleHide = () => {
+    onHide?.(conv.id);
+    closeAllMenus();
+  };
+
+  const handleMarkUnread = () => {
+    onMarkUnread?.(conv.id);
+    closeAllMenus();
+  };
+
+  const handleMarkRead = () => {
+    onMarkRead?.(conv.id);
+    closeAllMenus();
+  };
+
+  const handleBlock = () => {
+    onBlock?.(otherUserId, other?.name);
+    closeAllMenus();
+  };
+
+  const handleClearChat = () => {
+    onClearChat?.(conv.id, displayName);
+    closeAllMenus();
+  };
+
+  const handleDeleteForMe = () => {
+    onDeleteForMe?.(conv.id, displayName);
+    closeAllMenus();
+  };
+
+  const handleDeleteGroup = () => {
+    onDeleteGroup?.(conv.id, conv.name);
+    closeAllMenus();
   };
 
   // Last message preview
   const lastMsg = conv.lastMessage;
-  const rawPreview = lastMsg ? (lastMsg.content ? stripMarkdown(lastMsg.content) : null) : null;
-  const preview = lastMsg
+  const hasLastMsg = lastMsg && lastMsg.messageId;
+  const rawPreview = hasLastMsg ? (lastMsg.content ? stripMarkdown(lastMsg.content) : null) : null;
+  const preview = hasLastMsg
     ? rawPreview
       ? rawPreview.length > 48
         ? rawPreview.substring(0, 48) + '...'
         : rawPreview
-      : '📎 Attachment'
+      : (lastMsg.type === 'text' ? '' : '📎 Attachment')
     : 'No messages yet';
 
   // Timestamp
-  const timestamp = formatTime(lastMsg?.sentAt || conv.lastActivityAt);
+  const timestamp = hasLastMsg ? formatTime(lastMsg.sentAt) : '';
 
   // Avatar bg colors by letter
   const avatarColors = [
@@ -99,11 +254,45 @@ const ConversationItem = ({
   ];
   const avatarBg = avatarColors[avatarLetter.charCodeAt(0) % avatarColors.length];
 
+  // ── Build menu options ─────────────────────────────────────────────────
+  const renderMenuOptions = () => (
+    <>
+      <MenuButton icon={Pin} label={isPinned ? 'Unpin Chat' : 'Pin Chat'} onClick={handlePin} />
+      <MenuButton icon={isMuted ? Bell : BellOff} label={isMuted ? 'Unmute Chat' : 'Mute Chat'} onClick={handleMute} />
+      {isArchivedView ? (
+        <MenuButton icon={Archive} label="Unarchive Chat" onClick={() => { onUnarchive?.(conv.id); closeAllMenus(); }} />
+      ) : (
+        <MenuButton icon={Archive} label="Archive Chat" onClick={handleArchive} />
+      )}
+      {isHiddenView ? (
+        <MenuButton icon={EyeOff} label="Unhide Chat" onClick={() => { onUnhide?.(conv.id); closeAllMenus(); }} />
+      ) : (
+        <MenuButton icon={EyeOff} label="Hide Chat" onClick={handleHide} />
+      )}
+      {unreadCount > 0
+        ? <MenuButton icon={MailOpen} label="Mark as Read" onClick={handleMarkRead} />
+        : <MenuButton icon={Mail} label="Mark as Unread" onClick={handleMarkUnread} />
+      }
+      <MenuDivider />
+      {isDirect && !isBlocked && (
+        <MenuButton icon={Ban} label={`Block ${other?.name?.split(' ')[0] || 'User'}`} danger onClick={handleBlock} />
+      )}
+      <MenuButton icon={Eraser} label="Clear Chat" danger onClick={handleClearChat} />
+      <MenuButton icon={Trash2} label="Delete Chat" danger onClick={handleDeleteForMe} />
+      {conv.type === 'group' && isGroupAdmin && (
+        <MenuButton icon={ShieldAlert} label="Delete Group" danger onClick={handleDeleteGroup} />
+      )}
+    </>
+  );
+
   return (
     <div
       className={`conv-item ${isActive ? 'conv-item-active' : ''}`}
       onClick={onClick}
       onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && onClick()}
@@ -131,8 +320,13 @@ const ConversationItem = ({
       {/* Content */}
       <div className="conv-item-content">
         <div className="conv-item-top-row">
-          <span className="conv-item-name" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {displayName}
+          <span className="conv-item-name" style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+            <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+              {displayName}
+            </span>
+            {isBlocked && (
+              <Ban size={12} style={{ color: '#ef4444', flexShrink: 0 }} />
+            )}
             {isPinned && (
               <svg 
                 width="14" 
@@ -163,7 +357,50 @@ const ConversationItem = ({
               </svg>
             )}
           </span>
-          <span className="conv-item-time">{timestamp}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            <span className="conv-item-time" style={{ marginLeft: 0 }}>{timestamp}</span>
+            <button
+              className="conv-item-more-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                const isMobile = window.innerWidth <= 768;
+                if (isMobile) {
+                  setShowBottomSheet(true);
+                  setShowContextMenu(false);
+                } else {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setMenuPos({
+                    x: rect.right - 200,
+                    y: rect.bottom + 5
+                  });
+                  setShowContextMenu(prev => !prev);
+                  setShowBottomSheet(false);
+                }
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-muted, #64748b)',
+                transition: 'background 0.2s, color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--chat-hover, #f1f5f9)';
+                e.currentTarget.style.color = 'var(--text-primary, #0f172a)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'none';
+                e.currentTarget.style.color = 'var(--text-muted, #64748b)';
+              }}
+            >
+              <MoreVertical size={16} />
+            </button>
+          </div>
         </div>
         <div className="conv-item-bottom-row">
           <span className={`conv-item-preview ${unreadCount > 0 ? 'conv-item-preview-unread' : ''}`}>
@@ -180,10 +417,11 @@ const ConversationItem = ({
         </div>
       </div>
 
-      {/* Floating Context Menu */}
+      {/* ── Desktop Floating Context Menu ──────────────────────────────── */}
       {showContextMenu && (
         <div
           ref={menuRef}
+          className="conv-context-menu animate-slide-down"
           style={{
             position: 'fixed',
             left: `${menuPos.x}px`,
@@ -191,75 +429,72 @@ const ConversationItem = ({
             zIndex: 10000,
             background: 'var(--bg-card, #ffffff)',
             border: '1px solid var(--chat-border, #e2e8f0)',
-            borderRadius: '12px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+            borderRadius: '14px',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
             padding: '6px',
-            minWidth: '160px'
+            minWidth: '200px',
+            maxHeight: '400px',
+            overflowY: 'auto'
           }}
-          onClick={(e) => e.stopPropagation()} // Prevent selecting item behind menu
+          onClick={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={() => {
-              if (isPinned) onUnpin(conv.id);
-              else onPin(conv.id);
-              setShowContextMenu(false);
-            }}
+          {renderMenuOptions()}
+        </div>
+      )}
+
+      {/* ── Mobile Bottom Sheet ────────────────────────────────────────── */}
+      {showBottomSheet && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            animation: 'fadeIn 0.2s ease'
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowBottomSheet(false);
+          }}
+        >
+          <div
             style={{
               width: '100%',
-              padding: '8px 12px',
-              textAlign: 'left',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13px',
-              color: 'var(--text-primary, #1e293b)',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontFamily: 'inherit'
+              maxWidth: '500px',
+              background: 'var(--bg-card, #ffffff)',
+              borderRadius: '20px 20px 0 0',
+              padding: '8px 6px 24px',
+              animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+              maxHeight: '70vh',
+              overflowY: 'auto'
             }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--chat-hover, #f8fafc)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            onClick={(e) => e.stopPropagation()}
           >
-            <Pin 
-              size={14} 
-              strokeWidth={2} 
-              style={{ transform: 'rotate(45deg)' }} 
-            />
-            <span>{isPinned ? 'Unpin Chat' : 'Pin Chat'}</span>
-          </button>
-          <button
-            onClick={() => {
-              if (isMuted) onUnmute(conv.id);
-              else onMute(conv.id);
-              setShowContextMenu(false);
-            }}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              textAlign: 'left',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13px',
-              color: 'var(--text-primary, #1e293b)',
-              borderRadius: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontFamily: 'inherit'
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--chat-hover, #f8fafc)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'none'}
-          >
-            {isMuted ? (
-              <Bell size={14} strokeWidth={2} />
-            ) : (
-              <BellOff size={14} strokeWidth={2} />
-            )}
-            <span>{isMuted ? 'Unmute Chat' : 'Mute Chat'}</span>
-          </button>
+            {/* Handle bar */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 10px' }}>
+              <div style={{ width: '36px', height: '4px', borderRadius: '2px', background: 'var(--chat-border, #cbd5e1)' }} />
+            </div>
+
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px 12px' }}>
+              <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary, #1e293b)' }}>
+                {displayName}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowBottomSheet(false); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', borderRadius: '50%', color: 'var(--text-muted)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--chat-border, #e2e8f0)', padding: '6px' }}>
+              {renderMenuOptions()}
+            </div>
+          </div>
         </div>
       )}
     </div>

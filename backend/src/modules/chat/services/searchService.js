@@ -26,7 +26,28 @@ export const performGlobalSearch = async ({ query, category = 'all', userId, pag
     isActive: true
   }).lean();
 
+  if (myConversations.length === 0) {
+    return {
+      conversations: [],
+      messages: [],
+      files: [],
+      contacts: []
+    };
+  }
+
   const myConvIds = myConversations.map(c => c.id);
+
+  const conversationQueries = myConversations.map(conv => {
+    const deleteEntry = conv.deletedBy?.find(d => d.userId === userId);
+    if (deleteEntry) {
+      return {
+        conversationId: conv.id,
+        createdAt: { $gt: deleteEntry.deletedAt }
+      };
+    } else {
+      return { conversationId: conv.id };
+    }
+  });
 
   const results = {
     conversations: [],
@@ -58,14 +79,18 @@ export const performGlobalSearch = async ({ query, category = 'all', userId, pag
   // 2. MESSAGES SEARCH
   if (category === 'all' || category === 'messages') {
     const matchedMessages = await Message.find({
-      conversationId: { $in: myConvIds },
+      $or: conversationQueries,
       isDeleted: false,
       'deletedFor.employeeId': { $ne: userId },
       type: { $in: ['text', 'emoji'] },
-      $or: [
-        { content: { $regex: q, $options: 'i' } },
-        { senderName: { $regex: q, $options: 'i' } },
-        { 'replyTo.content': { $regex: q, $options: 'i' } }
+      $and: [
+        {
+          $or: [
+            { content: { $regex: q, $options: 'i' } },
+            { senderName: { $regex: q, $options: 'i' } },
+            { 'replyTo.content': { $regex: q, $options: 'i' } }
+          ]
+        }
       ]
     })
     .sort({ createdAt: -1 })
@@ -108,15 +133,19 @@ export const performGlobalSearch = async ({ query, category = 'all', userId, pag
   // 3. FILES SEARCH
   if (category === 'all' || category === 'files') {
     const fileMessages = await Message.find({
-      conversationId: { $in: myConvIds },
+      $or: conversationQueries,
       isDeleted: false,
       'deletedFor.employeeId': { $ne: userId },
       type: { $in: ['file', 'image', 'video', 'audio'] },
       'media.url': { $ne: null },
-      $or: [
-        { 'media.fileName': { $regex: q, $options: 'i' } },
-        { 'media.mimeType': { $regex: q, $options: 'i' } },
-        { senderName: { $regex: q, $options: 'i' } }
+      $and: [
+        {
+          $or: [
+            { 'media.fileName': { $regex: q, $options: 'i' } },
+            { 'media.mimeType': { $regex: q, $options: 'i' } },
+            { senderName: { $regex: q, $options: 'i' } }
+          ]
+        }
       ]
     })
     .sort({ createdAt: -1 })

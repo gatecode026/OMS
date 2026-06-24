@@ -72,6 +72,23 @@ const conversationSchema = new mongoose.Schema({
   pinnedBy: [{
     employeeId: { type: String },
     pinnedAt: { type: Date, default: Date.now }
+  }],
+
+  // Soft delete and management statuses
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date, default: null },
+  deletedBy: [{
+    userId: { type: String },
+    deletedAt: { type: Date, default: Date.now },
+    clearHistory: { type: Boolean, default: false }
+  }],
+  hiddenBy: [{
+    userId: { type: String },
+    hiddenAt: { type: Date, default: Date.now }
+  }],
+  archivedBy: [{
+    userId: { type: String },
+    archivedAt: { type: Date, default: Date.now }
   }]
 
 }, {

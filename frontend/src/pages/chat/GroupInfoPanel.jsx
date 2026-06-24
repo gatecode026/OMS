@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '../../context/ChatContext';
+import { useApp } from '../../context/AppContext';
 import StatusDot from './StatusDot';
 import { 
   MoreVertical as LuMoreVertical, 
@@ -27,8 +28,28 @@ const GroupInfoPanel = ({ conversation: conv, currentUser, onClose }) => {
     removeMemberFromGroup, 
     leaveGroup, 
     searchEmployees,
-    presenceMap
+    presenceMap,
+    deleteGroup
   } = useChat();
+
+  const { addToast, showConfirm } = useApp();
+
+  const handleDeleteGroup = () => {
+    showConfirm(
+      'Delete Group',
+      `Are you sure you want to delete the group "${conv.name}"? This action cannot be undone and will delete the group for all participants.`,
+      async () => {
+        try {
+          await deleteGroup(conv.id);
+          addToast('success', 'Group deleted successfully');
+          onClose();
+        } catch (err) {
+          addToast('error', err.response?.data?.message || 'Failed to delete group');
+        }
+      },
+      'danger'
+    );
+  };
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(conv?.name || '');
@@ -555,12 +576,39 @@ const GroupInfoPanel = ({ conversation: conv, currentUser, onClose }) => {
           </div>
         </div>
 
-        {/* Leave Group Action */}
-        <div className="chat-sidebar-actions" style={{ padding: '16px' }}>
+        {/* Leave / Delete Group Actions */}
+        <div className="chat-sidebar-actions" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <button className="chat-sidebar-action chat-sidebar-action-danger" onClick={handleLeaveGroup}>
             <LuLogOut size={16} />
             Leave Group
           </button>
+          {isAdmin && (
+            <button 
+              className="chat-sidebar-action chat-sidebar-action-danger" 
+              onClick={handleDeleteGroup}
+              style={{
+                border: '1.5px solid #ef4444',
+                backgroundColor: 'transparent',
+                color: '#ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '13.5px',
+                transition: 'background 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.05)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <LuShieldAlert size={16} />
+              Delete Group
+            </button>
+          )}
         </div>
 
         {/* Add Members Overlay Drawer */}

@@ -15,6 +15,8 @@ import crypto from 'crypto';
 import Message from './message.model.js';
 import Conversation from './conversation.model.js';
 import ImageKitCleanupLog from './cleanupLog.model.js';
+import ActivityLog from '../activity-logs/activity-log.model.js';
+import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
 
 // ─── HELPER ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +31,28 @@ const getEmployeeInfo = async (employeeId, companyId) => {
     { projection: { id: 1, name: 1, avatar: 1, roleId: 1,
                     status: 1, workStatus: 1, lastSeen: 1 } }
   );
+};
+
+/**
+ * Write to multi-tenant Activity / Audit log
+ */
+const logChatActivity = async (companyId, { actor, actionType, fieldChanged, oldValue, newValue }) => {
+  try {
+    const logId = await generateCompanyUniqueId(companyId, 'activity_logs');
+    await ActivityLog.create({
+      id: logId,
+      companyId,
+      timestamp: new Date().toISOString(),
+      actor: actor || 'System',
+      actionType,
+      fieldChanged: fieldChanged || '—',
+      oldValue: oldValue || '—',
+      newValue: newValue || '—',
+      ip: '127.0.0.1'
+    });
+  } catch (err) {
+    logger.error('[ChatController] Failed to write ActivityLog:', err);
+  }
 };
 
 // ─── CONVERSATIONS ────────────────────────────────────────────────────────────
@@ -69,6 +93,18 @@ export const startDirectChat = asyncHandler(async (req, res) => {
       avatar: targetInfo.avatar, role: targetInfo.roleId },
     companyId
   );
+
+  if (result.isNew && result.conversation) {
+    try {
+      const io = getIO();
+      result.conversation.participants.forEach(p => {
+        io.to(`user:${p.employeeId}`).emit('new_conversation', result.conversation);
+        io.in(`user:${p.employeeId}`).socketsJoin(`conv:${result.conversation.id}`);
+      });
+    } catch (socketErr) {
+      logger.error('[ChatController] startDirectChat socket error:', socketErr);
+    }
+  }
 
   return successResponse(
     res, result,
@@ -156,6 +192,18 @@ export const markRead = asyncHandler(async (req, res) => {
   );
   return successResponse(res, result, 'Messages marked as read');
 });
+
+// PATCH /api/v1/chat/conversations/:id/unread
+export const markUnread = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: employeeId, companyId } = req.user;
+
+  const result = await chatService.markAsUnread(
+    conversationId, employeeId, companyId
+  );
+  return successResponse(res, result, 'Messages marked as unread');
+});
+
 
 // GET /api/v1/chat/conversations/:id/search
 export const searchInConversation = asyncHandler(async (req, res) => {
@@ -429,7 +477,7 @@ export const rejectCall = asyncHandler(async (req, res) => {
       type: 'call'
     }, companyId);
 
-    io.to(`conv:${callRecord.conversationId}`).emit('new_message', {
+    io.to(`conv:${callRecord.conversationId}`).emit('message:new', {
       id: savedMessage.id,
       conversationId: callRecord.conversationId,
       senderId: callRecord.callerId,
@@ -500,29 +548,240 @@ export const deleteMsgPermanent = asyncHandler(async (req, res) => {
 });
 
 // DELETE /api/v1/chat/conversations/:id
-export const deleteConversationPermanent = asyncHandler(async (req, res) => {
+export const deleteGroup = asyncHandler(async (req, res) => {
   const { id: conversationId } = req.params;
-  const { id: employeeId, companyId, role } = req.user;
+  const { id: userId, companyId, name: userName } = req.user;
 
-  // Authorization check: Only participant or admin / super admin can delete conversation
   const conv = await Conversation.findOne({ id: conversationId });
   if (!conv) {
-    return res.status(404).json({
-      status: 'fail',
-      message: 'Conversation not found'
-    });
+    return res.status(404).json({ status: 'fail', message: 'Group not found' });
   }
 
-  const isParticipant = conv.participants.some(p => p.employeeId === employeeId);
-  if (!isParticipant && role !== 'admin' && role !== 'super_admin') {
-    return res.status(403).json({
-      status: 'fail',
-      message: 'Access denied: You are not authorized to delete this conversation'
-    });
+  // Verify requester has isAdmin: true in participants array
+  const participant = conv.participants.find(p => p.employeeId === userId);
+  if (!participant || !participant.isAdmin) {
+    return res.status(403).json({ status: 'fail', message: 'Access denied: Only group admin can delete the group' });
   }
 
-  const result = await chatService.deleteConversationPermanently(conversationId, companyId);
-  return successResponse(res, result, 'Conversation permanently deleted');
+  // Soft delete conversation
+  conv.isDeleted = true;
+  conv.deletedAt = new Date();
+  if (!conv.deletedBy) conv.deletedBy = [];
+  conv.deletedBy.push({ userId, deletedAt: new Date(), clearHistory: false });
+  await conv.save();
+
+  // Mark all messages as conversationDeleted: true
+  await Message.updateMany({ conversationId }, { conversationDeleted: true });
+
+  // Emit group:deleted to entire room
+  try {
+    const io = getIO();
+    io.to(`conv:${conversationId}`).emit('group:deleted', {
+      conversationId,
+      deletedBy: userId,
+      groupName: conv.name
+    });
+
+    // Force all members out
+    io.socketsLeave(`conv:${conversationId}`);
+  } catch (err) {
+    // socket errors are handled/ignored gracefully
+  }
+
+  // Log in audit
+  await logChatActivity(companyId, {
+    actor: userName,
+    actionType: 'group.deleted',
+    fieldChanged: 'isDeleted',
+    oldValue: 'false',
+    newValue: 'true'
+  });
+
+  return successResponse(res, null, 'Group deleted successfully');
+});
+
+// DELETE /api/v1/chat/conversations/:id/me
+export const deleteConversationForMe = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: userId, companyId } = req.user;
+
+  const conv = await Conversation.findOne({ id: conversationId });
+  if (!conv) {
+    return res.status(404).json({ status: 'fail', message: 'Conversation not found' });
+  }
+
+  // Add/Update entry in deletedBy array
+  if (!conv.deletedBy) conv.deletedBy = [];
+  
+  // Remove existing delete/clear entry for this user if any
+  conv.deletedBy = conv.deletedBy.filter(d => d.userId !== userId);
+  conv.deletedBy.push({ userId, deletedAt: new Date(), clearHistory: false });
+  
+  await conv.save();
+
+  // Emit socket event to self only
+  try {
+    const io = getIO();
+    io.to(`user:${userId}`).emit('conversation:deleted_for_me', { conversationId });
+  } catch (err) {
+    // socket errors are handled/ignored gracefully
+  }
+
+  return successResponse(res, null, 'Conversation deleted for you successfully');
+});
+
+// POST /api/v1/chat/conversations/:id/clear
+export const clearChatHistory = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: userId, companyId } = req.user;
+
+  const conv = await Conversation.findOne({ id: conversationId });
+  if (!conv) {
+    return res.status(404).json({ status: 'fail', message: 'Conversation not found' });
+  }
+
+  // Add/Update entry in deletedBy array with clearHistory: true
+  if (!conv.deletedBy) conv.deletedBy = [];
+  
+  conv.deletedBy = conv.deletedBy.filter(d => d.userId !== userId);
+  conv.deletedBy.push({ userId, deletedAt: new Date(), clearHistory: true });
+  
+  await conv.save();
+
+  // Emit socket event to self only
+  try {
+    const io = getIO();
+    io.to(`user:${userId}`).emit('conversation:cleared', { conversationId });
+  } catch (err) {
+    // socket errors are handled/ignored gracefully
+  }
+
+  return successResponse(res, null, 'Chat history cleared successfully');
+});
+
+// POST /api/v1/chat/conversations/:id/hide
+export const hideConversation = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: userId, companyId } = req.user;
+
+  const conv = await Conversation.findOne({ id: conversationId });
+  if (!conv) {
+    return res.status(404).json({ status: 'fail', message: 'Conversation not found' });
+  }
+
+  if (!conv.hiddenBy) conv.hiddenBy = [];
+  if (!conv.hiddenBy.some(h => h.userId === userId)) {
+    conv.hiddenBy.push({ userId, hiddenAt: new Date() });
+    await conv.save();
+  }
+
+  // Emit socket event to self only
+  try {
+    const io = getIO();
+    io.to(`user:${userId}`).emit('conversation:hidden', { conversationId });
+  } catch (err) {
+    // socket errors are handled/ignored gracefully
+  }
+
+  return successResponse(res, null, 'Conversation hidden successfully');
+});
+
+// POST /api/v1/chat/conversations/:id/unhide
+export const unhideConversation = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: userId, companyId } = req.user;
+
+  const conv = await Conversation.findOne({ id: conversationId });
+  if (!conv) {
+    return res.status(404).json({ status: 'fail', message: 'Conversation not found' });
+  }
+
+  if (conv.hiddenBy) {
+    conv.hiddenBy = conv.hiddenBy.filter(h => h.userId !== userId);
+    await conv.save();
+  }
+
+  // Emit socket event to self only
+  try {
+    const io = getIO();
+    io.to(`user:${userId}`).emit('conversation:unhidden', { conversationId });
+  } catch (err) {
+    // socket errors are handled/ignored gracefully
+  }
+
+  return successResponse(res, null, 'Conversation unhidden successfully');
+});
+
+// POST /api/v1/chat/conversations/:id/archive
+export const archiveConversation = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: userId, companyId } = req.user;
+
+  const conv = await Conversation.findOne({ id: conversationId });
+  if (!conv) {
+    return res.status(404).json({ status: 'fail', message: 'Conversation not found' });
+  }
+
+  // Auto un-hide when archiving
+  if (conv.hiddenBy) {
+    conv.hiddenBy = conv.hiddenBy.filter(h => h.userId !== userId);
+  }
+
+  if (!conv.archivedBy) conv.archivedBy = [];
+  if (!conv.archivedBy.some(a => a.userId === userId)) {
+    conv.archivedBy.push({ userId, archivedAt: new Date() });
+    await conv.save();
+  }
+
+  // Emit socket event to self only
+  try {
+    const io = getIO();
+    io.to(`user:${userId}`).emit('conversation:archived', { conversationId });
+  } catch (err) {
+    // socket errors are handled/ignored gracefully
+  }
+
+  return successResponse(res, null, 'Conversation archived successfully');
+});
+
+// POST /api/v1/chat/conversations/:id/unarchive
+export const unarchiveConversation = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: userId, companyId } = req.user;
+
+  const conv = await Conversation.findOne({ id: conversationId });
+  if (!conv) {
+    return res.status(404).json({ status: 'fail', message: 'Conversation not found' });
+  }
+
+  if (conv.archivedBy) {
+    conv.archivedBy = conv.archivedBy.filter(a => a.userId !== userId);
+    await conv.save();
+  }
+
+  // Emit socket event to self only
+  try {
+    const io = getIO();
+    io.to(`user:${userId}`).emit('conversation:unarchived', { conversationId });
+  } catch (err) {
+    // socket errors are handled/ignored gracefully
+  }
+
+  return successResponse(res, null, 'Conversation unarchived successfully');
+});
+
+// GET /api/v1/chat/conversations/archived
+export const getArchivedConversations = asyncHandler(async (req, res) => {
+  const { id: employeeId, companyId } = req.user;
+  const data = await chatService.getArchivedConversations(employeeId, companyId);
+  return successResponse(res, data, 'Archived conversations fetched');
+});
+
+// GET /api/v1/chat/conversations/hidden
+export const getHiddenConversations = asyncHandler(async (req, res) => {
+  const { id: employeeId, companyId } = req.user;
+  const data = await chatService.getHiddenConversations(employeeId, companyId);
+  return successResponse(res, data, 'Hidden conversations fetched');
 });
 
 // GET /api/v1/chat/admin/cleanup/stats
@@ -694,7 +953,7 @@ export const forwardMessage = asyncHandler(async (req, res) => {
         : `📎 ${newMsg.media?.fileName || newMsg.type}`;
 
       // Emit new_message and message:new socket events to conversation room
-      io.to(`conv:${convId}`).emit('new_message', {
+      io.to(`conv:${convId}`).emit('message:new', {
         id: newMsg.id,
         conversationId: convId,
         senderId: userId,

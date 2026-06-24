@@ -5,14 +5,15 @@
 import React from 'react';
 import {
   Bold, Italic, Strikethrough, Code, Terminal,
-  List, ListOrdered, Quote, Eye, EyeOff
+  List, ListOrdered, Quote, Eye, EyeOff, X
 } from 'lucide-react';
 
 const FormattingToolbar = ({
   onFormat,
   onTogglePreview,
   isPreviewMode,
-  visibleMode = false
+  visibleMode = false,
+  onClose
 }) => {
   // Config for markdown actions
   const tools = [
@@ -112,6 +113,21 @@ const FormattingToolbar = ({
         {isPreviewMode ? <EyeOff size={15} /> : <Eye size={15} />}
         <span>{isPreviewMode ? 'Editor' : 'Preview'}</span>
       </button>
+
+      {/* Close button */}
+      {onClose && (
+        <button
+          className="formatting-tool-close-btn"
+          onClick={(e) => {
+            e.preventDefault();
+            onClose();
+          }}
+          title="Close Formatting Toolbar"
+          type="button"
+        >
+          <X size={15} />
+        </button>
+      )}
     </div>
   );
 };

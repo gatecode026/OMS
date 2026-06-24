@@ -34,6 +34,49 @@ export const createPoll = asyncHandler(async (req, res) => {
     });
   }
 
+  // Enforce Authorization: Only Group Admin or Management (Manager/Admin) can create polls
+  const conv = await Conversation.findOne({ id: conversationId });
+  if (!conv) {
+    return res.status(404).json({
+      status: 'fail',
+      message: 'Conversation not found'
+    });
+  }
+
+  if (conv.type !== 'group') {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Access denied: Polls can only be created in group conversations'
+    });
+  }
+
+  const participant = conv.participants?.find(p => p.employeeId === creatorId);
+  if (!participant) {
+    return res.status(403).json({
+      status: 'fail',
+      message: 'Access denied: You are not a member of this conversation'
+    });
+  }
+
+  const isManagerOrAdmin = ['super_admin', 'dept_admin', 'branch_admin', 'manager'].includes((creatorRole || '').toLowerCase());
+  const isGroupAdmin = participant.isAdmin === true;
+
+  if (!isManagerOrAdmin && !isGroupAdmin) {
+    // Check designation field in the DB as fallback
+    const { getTenantConnection } = await import('../../../utils/multidbConnection.js');
+    const conn = await getTenantConnection(companyId);
+    const employee = await conn.collection('employees').findOne({ id: creatorId });
+    const designation = employee?.designation || '';
+    const isManagerDesignation = designation.toLowerCase().includes('manager');
+
+    if (!isManagerDesignation) {
+      return res.status(403).json({
+        status: 'fail',
+        message: 'Access denied: Only group admins or managers can create polls'
+      });
+    }
+  }
+
   const result = await pollService.createPoll({
     question,
     options,

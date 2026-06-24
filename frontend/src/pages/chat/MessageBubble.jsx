@@ -278,6 +278,19 @@ const MessageBubble = ({
 
   const { highlightedMessageId, setHighlightedMessageId, openThread } = useChat();
 
+  const isManagerOrAdmin = (user) => {
+    if (!user) return false;
+    const role = user.roleId || user.role || '';
+    const designation = user.designation || '';
+    const isManagementRole = ['super_admin', 'dept_admin', 'branch_admin', 'manager'].includes(role.toLowerCase());
+    const isManagerDesignation = designation.toLowerCase().includes('manager');
+    return isManagementRole || isManagerDesignation;
+  };
+
+  const isGroupAdmin = conversation?.participants?.find(p => p.employeeId === currentUser?.id)?.isAdmin === true;
+
+  const canCreateTask = isManagerOrAdmin(currentUser) || isGroupAdmin;
+
   // Scroll to and flash message when it's highlighted from search
   useEffect(() => {
     if (highlightedMessageId && msg.id === highlightedMessageId) {
@@ -468,7 +481,7 @@ const MessageBubble = ({
     );
   }
 
-  const isStarred = msg.starredBy?.includes(currentUser?.id);
+  const isStarred = msg.starredBy?.length > 0;
 
   return (
     <div
@@ -571,7 +584,7 @@ const MessageBubble = ({
         )}
 
         {/* Bubble */}
-        <div id={`msg-${msg.id}`} className={`msg-bubble ${isOwn ? 'msg-bubble-own' : 'msg-bubble-other'} ${isStarred ? 'msg-bubble-starred' : ''}`}>
+        <div id={`msg-${msg.id}`} className={`msg-bubble ${isOwn ? 'msg-bubble-own' : 'msg-bubble-other'} ${isStarred ? 'msg-bubble-starred' : ''} ${msg.isPinned ? 'msg-bubble-pinned' : ''}`}>
           {/* Hover Actions */}
           {!msg.isDeleted && msg.type !== 'system' && !isEditing && (
             <div className={`msg-bubble-hover-actions ${isOwn ? 'hover-own' : 'hover-other'}`}>
@@ -609,7 +622,7 @@ const MessageBubble = ({
             </div>
           ) : (
             <>
-              {msg.type === 'poll' ? (
+              {msg.type === 'poll' && conversation?.type === 'group' ? (
                 <PollBubble message={msg} isOwn={isOwn} />
               ) : msg.type === 'audio' ? (
                 <VoiceMessageBubble message={msg} isOwn={isOwn} />
@@ -838,14 +851,14 @@ const MessageBubble = ({
           {/* Footer */}
           <div className="msg-footer" style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
             {isStarred && (
-              <span style={{ color: '#f59e0b', display: 'inline-flex', alignItems: 'center' }} title="Starred message">
+              <span className="msg-star-icon" title="Starred message">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                 </svg>
               </span>
             )}
             {msg.isPinned && (
-              <span style={{ color: 'var(--chat-primary, #6366f1)', display: 'inline-flex', alignItems: 'center' }} title="Pinned message">
+              <span className="msg-pin-icon" title="Pinned message">
                 <svg 
                   width="13" 
                   height="13" 
@@ -1063,16 +1076,18 @@ const MessageBubble = ({
             </button>
 
             {/* Create Task */}
-            <button
-              className="msg-action-btn"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('create-task-from-message', { detail: msg }));
-                setShowOptions(false);
-              }}
-              title="Create Task from Message"
-            >
-              <ClipboardList size={16} strokeWidth={2} />
-            </button>
+            {canCreateTask && (
+              <button
+                className="msg-action-btn"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('create-task-from-message', { detail: msg }));
+                  setShowOptions(false);
+                }}
+                title="Create Task from Message"
+              >
+                <ClipboardList size={16} strokeWidth={2} />
+              </button>
+            )}
 
             {/* Edit (own text only) */}
             {isOwn && msg.type === 'text' && (

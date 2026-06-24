@@ -52,17 +52,21 @@ export const CallProvider = ({ children }) => {
 
   // ── Initiate Call ─────────────────────────────
   const initiateCall = useCallback(async (targetUser, callType, conversationId) => {
+    console.log('[CallContext] initiateCall entered:', { targetUser, callType, conversationId, socketConnected: socket?.connected, callState });
     if (!socket?.connected) {
+      console.log('[CallContext] initiateCall aborted: socket not connected');
       addToast?.('error', 'Not connected to server');
       return;
     }
     if (callState !== 'idle') {
+      console.log('[CallContext] initiateCall aborted: callState is not idle:', callState);
       addToast?.('error', 'Already in a call');
       return;
     }
 
     try {
       setCallError(null);
+      console.log('[CallContext] Calling getMedia...');
       const stream = await getMedia(callType);
       if (callType === 'video' && stream && stream.getVideoTracks().length === 0) {
         addToast?.('warning', 'No camera detected. Starting as voice-only call.');
@@ -78,6 +82,7 @@ export const CallProvider = ({ children }) => {
       });
       setCallState('outgoing');
 
+      console.log('[CallContext] Emitting call:initiate event via socket');
       socket.emit('call:initiate', {
         targetUserId: targetUser.id,
         callType,
@@ -85,6 +90,7 @@ export const CallProvider = ({ children }) => {
       });
 
     } catch (err) {
+      console.log('[CallContext] initiateCall error in getMedia:', err);
       setCallError(err.message);
       setCallState('idle');
       cleanup();

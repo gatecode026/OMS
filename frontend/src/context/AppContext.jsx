@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE } from '../permissions/permissions';
-
+import { connectSocket, disconnectSocket } from '../lib/socketManager';
 
 const AppContext = createContext(undefined);
 
@@ -616,6 +616,14 @@ export const AppProvider = ({ children }) => {
     }
   }, [currentUserId]);
 
+  // Auto-connect socket on mount/refresh if authenticated
+  useEffect(() => {
+    if (token && currentUser) {
+      console.log('[AppContext] Auto-connecting socket on token/user load...');
+      connectSocket(token, currentUser.companyId);
+    }
+  }, [token, currentUser]);
+
   // Auth Actions
   const login = async (email, password) => {
     if (!email || email.trim().length === 0) {
@@ -667,6 +675,9 @@ export const AppProvider = ({ children }) => {
       setCurrentUserId(user.id);
       setCurrentUser(user);
 
+      // Connect socket on login
+      connectSocket(token, user.companyId);
+
       addActivityLog(`User logged in via database: ${user.name}`, 'Authentication', 'success');
       return user;
     } catch (err) {
@@ -688,10 +699,12 @@ export const AppProvider = ({ children }) => {
     setCurrentUser(null);
     setToken('');
 
+    // Disconnect socket on logout
+    disconnectSocket();
+
     // Hard redirect to login — ensures full state reset and no stale role/context
     window.location.href = '/login';
   };
-
   const fetchEmployees = async () => {
     if (!token) {
       setEmployees([]);
@@ -1882,19 +1895,19 @@ export const AppProvider = ({ children }) => {
 
 
   // Toast Handler
-  const addToast = (type, message) => {
+  const addToast = (type, message, action = null) => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts(prev => {
       // Remove any active toast with the same message to prevent duplicate alerts stacking
       const filtered = prev.filter(t => t.message !== message);
       // Keep only the most recent toast to prevent vertical overflow/stacking clutter
       const limited = filtered.slice(-1);
-      return [...limited, { id, type, message }];
+      return [...limited, { id, type, message, action }];
     });
-    // Auto-dismiss after 2.5 seconds (cleaner, faster transition)
+    // Auto-dismiss after 3.5 seconds if there's an action, otherwise 2.5 seconds (gives user time to click)
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
-    }, 2500);
+    }, action ? 3500 : 2500);
   };
 
   // Confirm Dialog Handler

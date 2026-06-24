@@ -7,6 +7,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import VoiceRecorder from './VoiceRecorder';
+import { useChat } from '../../context/ChatContext';
+import { useApp } from '../../context/AppContext';
 import useFileUpload from '../../hooks/useFileUpload';
 import AttachmentCard from '../../components/AttachmentCard';
 import FormattingToolbar from '../../components/FormattingToolbar';
@@ -16,6 +18,24 @@ import { FileText, Image, Headphones, BarChart2, Calendar, CheckSquare } from 'l
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB Large File Support
 
 const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => {
+  const { conversations } = useChat();
+  const { currentUser } = useApp();
+  
+  const conv = conversations?.find(c => c.id === activeConvId);
+  
+  const isManagerOrAdmin = (user) => {
+    if (!user) return false;
+    const role = user.roleId || user.role || '';
+    const designation = user.designation || '';
+    const isManagementRole = ['super_admin', 'dept_admin', 'branch_admin', 'manager'].includes(role.toLowerCase());
+    const isManagerDesignation = designation.toLowerCase().includes('manager');
+    return isManagementRole || isManagerDesignation;
+  };
+
+  const isGroupAdmin = conv?.participants?.find(p => p.employeeId === currentUser?.id)?.isAdmin === true;
+
+  const canCreatePollOrTask = isManagerOrAdmin(currentUser) || isGroupAdmin;
+
   const [message, setMessage] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -296,6 +316,10 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
           onTogglePreview={() => setIsPreviewMode(prev => !prev)}
           isPreviewMode={isPreviewMode}
           visibleMode={showToolbar}
+          onClose={() => {
+            setShowToolbar(false);
+            setIsPreviewMode(false);
+          }}
         />
       )}
 
@@ -398,13 +422,29 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
                     <div className="plus-icon-circle" style={{ backgroundColor: '#f97316' }}><Headphones size={16} /></div>
                     Audio
                   </button>
-                  <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('open-create-poll')); }}>
-                    <div className="plus-icon-circle" style={{ backgroundColor: '#eab308' }}><BarChart2 size={16} /></div>
-                    Poll
-                  </button>
-                  <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('create-task-from-message', { detail: {} })); }}>
+                  {conv?.type === 'group' && (
+                    <button
+                      className="plus-action-item"
+                      type="button"
+                      onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('open-create-poll')); }}
+                      disabled={!canCreatePollOrTask}
+                      title={!canCreatePollOrTask ? "Only group admins or management (managers) can create polls" : ""}
+                      style={!canCreatePollOrTask ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    >
+                      <div className="plus-icon-circle" style={{ backgroundColor: '#eab308' }}><BarChart2 size={16} /></div>
+                      Poll {!canCreatePollOrTask && '🔒'}
+                    </button>
+                  )}
+                  <button
+                    className="plus-action-item"
+                    type="button"
+                    onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('create-task-from-message', { detail: {} })); }}
+                    disabled={!canCreatePollOrTask}
+                    title={!canCreatePollOrTask ? "Only group admins or management (managers) can assign tasks" : ""}
+                    style={!canCreatePollOrTask ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                  >
                     <div className="plus-icon-circle" style={{ backgroundColor: '#10b981' }}><CheckSquare size={16} /></div>
-                    Assign Task
+                    Assign Task {!canCreatePollOrTask && '🔒'}
                   </button>
                   <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); alert('Create Event simulation.'); }}>
                     <div className="plus-icon-circle" style={{ backgroundColor: '#e11d48' }}><Calendar size={16} /></div>
