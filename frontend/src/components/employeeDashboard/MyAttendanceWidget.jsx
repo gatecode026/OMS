@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock } from 'lucide-react';
+import { encodeEmployeeId } from '../../utils/hashId';
 
 const MyAttendanceWidget = ({
   currentUser = {},
@@ -120,7 +121,7 @@ const MyAttendanceWidget = ({
       <div className="widget-header">
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '700' }}>My Attendance</h3>
         <button
-          onClick={() => navigate(`/employee-profile/${currentUser?.id || ''}`)}
+          onClick={() => navigate(`/employee-profile/${encodeEmployeeId(currentUser?.id || '')}`)}
           style={{ 
             fontSize: '0.75rem', 
             color: 'var(--color-primary, #d946ef)', 

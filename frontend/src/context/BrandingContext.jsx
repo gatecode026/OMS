@@ -90,7 +90,7 @@ export const BrandingProvider = ({ children }) => {
 
   return (
     <BrandingContext.Provider value={{ branding, loading }}>
-      {!loading && children}
+      {children}
     </BrandingContext.Provider>
   );
 };

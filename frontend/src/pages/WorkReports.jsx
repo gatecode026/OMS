@@ -81,7 +81,8 @@ const WorkReports = () => {
     addActivityLog,
     markAllNotificationsRead,
     departments: rawDepartments,
-    hasPermission
+    hasPermission,
+    addNotification
   } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
   const loading = usePageLoading(800);
@@ -390,19 +391,33 @@ const WorkReports = () => {
       });
       
       if (missingCount > 0) {
+        // Find the latest reminder notification for this employee
+        const empReminders = (globalNotifications || []).filter(n => 
+          (n.recipientId === emp.id || n.targetUserId === emp.id || n.forUserId === emp.id) &&
+          n.category === 'Reminder'
+        );
+        
+        let lastReminderText = 'Never alerted';
+        if (empReminders.length > 0) {
+          const sorted = empReminders.sort((a, b) => new Date(b.createdAt || b.sentDate) - new Date(a.createdAt || a.sentDate));
+          const latest = sorted[0];
+          const dateObj = new Date(latest.createdAt || latest.sentDate);
+          lastReminderText = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
         list.push({
           empId: emp.id,
           name: emp.name,
           department: emp.department || 'IT',
           team: emp.teamName || 'Operations',
           missingCount,
-          lastReminder: 'Never alerted'
+          lastReminder: lastReminderText
         });
       }
     });
 
     return list.sort((a, b) => b.missingCount - a.missingCount);
-  }, [employees, reports]);
+  }, [employees, reports, globalNotifications]);
 
   const heatmapDates = useMemo(() => {
     const dates = [];
@@ -539,10 +554,28 @@ const WorkReports = () => {
   };
 
   /* Defaulter warning dispatcher */
-  const handleSendReminder = (name, empId) => {
-    pushNotification(`Defaulter reminder alert sent to ${name} (${empId}).`);
-    addAuditLog('Reminder', empId, `Sent report reminder alert to ${name}`);
-    addToast('info', `Work report submission reminder sent to ${name}.`);
+  const handleSendReminder = async (name, empId) => {
+    try {
+      if (addNotification) {
+        await addNotification({
+          title: 'Missing Work Report Alert',
+          message: `Dear ${name}, you have missing work reports. Please submit them as soon as possible.`,
+          type: 'system',
+          category: 'Reminder',
+          priority: 'High',
+          recipientId: empId,
+          targetUserId: empId,
+          forUserId: empId,
+          sentBy: currentUser?.name || 'Manager',
+          sentDate: new Date().toISOString().split('T')[0]
+        });
+      }
+      pushNotification(`Defaulter reminder alert sent to ${name} (${empId}).`);
+      addAuditLog('Reminder', empId, `Sent report reminder alert to ${name}`);
+    } catch (err) {
+      console.error('Failed to send reminder alert:', err);
+      addToast('danger', `Failed to alert ${name}.`);
+    }
   };
 
   /* Export system trigger */

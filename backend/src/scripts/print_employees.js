@@ -14,7 +14,7 @@ async function check() {
   
   const employees = await Employee.find({}).lean();
   employees.forEach(e => {
-    console.log(`Name: ${e.name} | RoleId: ${e.roleId} | Email: ${e.email} | WorkEmail: ${e.workEmail} | Username: ${e.username}`);
+    console.log(e.name, ':', JSON.stringify(e, null, 2));
   });
   await mongoose.disconnect();
 }
