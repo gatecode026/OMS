@@ -1708,15 +1708,99 @@ export const ChatProvider = ({ children }) => {
             };
           }
         } else {
-          // If not active, mapping preview to content is sufficient for offline history / caching
-          fullMessage = {
-            ...message,
-            content: message.preview
-          };
+          // ── NON-ACTIVE CONVERSATION: Don't cache incomplete optimized messages ──
+          // The _isOptimized payload only has preview/type — not full content, media,
+          // reactions, etc. Storing it here would cause stale/broken rendering when
+          // the user opens the conversation later.
+          //
+          // Exception: if this is OUR OWN optimistic message waiting for delivery
+          // confirmation (tempId matches), we still update its delivery status.
+          const isOwnOptimisticMsg = message.tempId && message.senderId === me?.id;
+          if (isOwnOptimisticMsg) {
+            // Just confirm delivery on our own optimistic message
+            setMessages(prev => {
+              const list = prev[convId] || [];
+              const existingIndex = list.findIndex(m => m.tempId === message.tempId || m.id === message.id);
+              if (existingIndex > -1) {
+                const newList = [...list];
+                newList[existingIndex] = {
+                  ...newList[existingIndex],
+                  id: message.id,
+                  _deliveryStatus: 'delivered'
+                };
+                return { ...prev, [convId]: newList };
+              }
+              return prev;
+            });
+          } else {
+            // Mark this conversation's message cache as stale so the next
+            // openConversation() call fetches fresh data from the server.
+            fetchedConvIdsRef.current.delete(convId);
+          }
+
+          // Still update conversation preview and unread count below, then return early
+          setConversations(prev => {
+            const updated = prev.map(conv => {
+              if (conv.id !== convId) return conv;
+              return {
+                ...conv,
+                lastMessage: {
+                  messageId: message.id,
+                  content: message.preview,
+                  type: message.type,
+                  senderId: message.senderId,
+                  senderName: message.senderName || (message.senderId === me?.id ? me?.name : 'Someone'),
+                  sentAt: message.createdAt
+                },
+                lastActivityAt: message.createdAt || new Date().toISOString()
+              };
+            });
+            return updated.sort((a, b) =>
+              new Date(b.lastActivityAt) - new Date(a.lastActivityAt)
+            );
+          });
+
+          if (message.senderId !== me?.id) {
+            const isMuted = mutedConversationsRef.current.has(convId);
+            if (!isMuted) {
+              setUnreadCounts(prev => ({
+                ...prev,
+                [convId]: (prev[convId] || 0) + 1
+              }));
+              // Play a notification chime for incoming group messages
+              playNotificationChimeRef.current?.();
+              // Desktop notification
+              const conv = conversationsRef.current.find(c => c.id === convId);
+              const title = conv?.type === 'group'
+                ? (conv?.name || 'Group Chat')
+                : (message.senderName || 'New Message');
+              const messageBody = message.type === 'text'
+                ? (message.preview || 'Sent a message')
+                : `📎 ${message.type || 'Attachment'}`;
+              const body = conv?.type === 'group'
+                ? `${message.senderName || 'Someone'}: ${messageBody}`
+                : messageBody;
+              sendNotificationRef.current?.(title, {
+                body,
+                icon: message.senderAvatar || conv?.avatar || '/favicon.ico',
+                tag: convId,
+                conversationId: convId,
+                onClickCallback: (targetConvId) => {
+                  setActiveConvId(targetConvId);
+                  window.location.href = `/chat?conversation=${targetConvId}`;
+                  window.focus();
+                }
+              });
+            }
+          }
+          if (me?.id) {
+            localStorage.setItem('chat_last_sync_' + me.id, new Date().toISOString());
+          }
+          return; // ← early return: rest of handler is for active conv only
         }
       }
 
-      // Append to messages state
+      // Append to messages state (only for active conversations or non-optimized messages)
       setMessages(prev => {
         const list = prev[convId] || [];
         const existingIndex = list.findIndex(m => 

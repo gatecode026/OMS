@@ -128,6 +128,13 @@ export const socketAuthMiddleware = async (socket, next) => {
       return next(new Error('Authentication failed: No token provided'));
     }
 
+    // Check if token has been blacklisted/revoked
+    const { isTokenBlacklisted } = await import('../services/security.service.js');
+    if (await isTokenBlacklisted(token)) {
+      logger.warn('[Socket.io] Connection rejected — Revoked token presented');
+      return next(new Error('Authentication failed: Session revoked'));
+    }
+
     const { user, companyId, tokenExp } = await verifySocketToken(token);
 
     socket.user = user;

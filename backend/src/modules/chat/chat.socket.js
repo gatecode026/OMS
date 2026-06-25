@@ -26,6 +26,10 @@ import * as pushNotificationService from '../notifications/pushNotificationServi
 import presenceService from './services/presence.service.js';
 import typingService from './services/typing.service.js';
 import * as readReceiptService from './services/readReceipt.service.js';
+import { registerNotificationSocketHandlers } from './services/notification.socket.js';
+import { checkRateLimit } from '../../services/rateLimiter.service.js';
+import { CacheKeys, TTL, cacheGetOrSet } from '../../services/cache.service.js';
+import { incrementMetric } from '../../services/monitoring.service.js';
 
 // ─── IN-MEMORY ONLINE USERS STORE ────────────────────────────────────────────
 // Structure: Map<companyId, Map<employeeId, { socketId, name, avatar, onlineAt }>>
@@ -256,6 +260,33 @@ const createCallHistoryMessage = async (callRecord, companyId, io) => {
   }
 };
 
+// Rate limits per event per 10 seconds
+const getEventRateLimit = (event) => {
+  switch (event) {
+    case 'send_message':
+      return 15; // Max 15 messages per 10 seconds
+    case 'typing:start':
+    case 'typing:stop':
+      return 25; // Max 25 typing updates per 10 seconds
+    case 'reauthenticate':
+      return 3;  // Max 3 reauth attempts per 10 seconds
+    default:
+      return 50; // General limit
+  }
+};
+
+const verifyParticipantCached = async (companyId, conversationId, userId) => {
+  if (!companyId) return false;
+  const cacheKey = CacheKeys.groupMembers(companyId, conversationId);
+  const members = await cacheGetOrSet(cacheKey, async () => {
+    return runWithTenant(companyId, async () => {
+      const conv = await Conversation.findOne({ id: conversationId }).select('participants.employeeId').lean();
+      return conv ? conv.participants.map(p => p.employeeId) : [];
+    });
+  }, TTL.GROUP_MEMBERS);
+  return members.includes(userId);
+};
+
 // ─── MAIN HANDLER REGISTRATION ───────────────────────────────────────────────
 
 export const registerChatSocketHandlers = (io) => {
@@ -267,6 +298,44 @@ export const registerChatSocketHandlers = (io) => {
     logger.info(
       `[Chat] Connected: ${name} (${userId}) — Company: ${companyId} — Socket: ${socket.id}`
     );
+
+    // Socket.io packet middleware for Event-level Rate Limiting and Conversation Access Control
+    socket.use(async ([event, data], next) => {
+      // 1. Event Rate Limiting
+      const limit = getEventRateLimit(event);
+      const key = `rate:socket:${userId}:${event}`;
+      const check = await checkRateLimit(key, limit, 10);
+      if (!check.allowed) {
+        incrementMetric('socketErrors');
+        return socket.emit('error', { event, message: 'Rate limit exceeded. Please slow down.' });
+      }
+
+      // 2. Conversation Access Verification
+      let conversationId = null;
+      if (event === 'join_conversation' && typeof data === 'string') {
+        conversationId = data;
+      } else if (data && typeof data === 'object') {
+        conversationId = data.conversationId;
+      }
+
+      if (conversationId) {
+        try {
+          const isAllowed = await verifyParticipantCached(companyId, conversationId, userId);
+          if (!isAllowed) {
+            logger.security(`[Security Alert] Unauthorized Socket event "${event}" attempted by user ${userId} for conversation ${conversationId}`);
+            incrementMetric('socketErrors');
+            socket.emit('error', { event, message: 'Access denied.' });
+            socket.disconnect(true);
+            return;
+          }
+        } catch (err) {
+          logger.error(`[Security] Socket conversation validation error: ${err.message}`);
+          return socket.emit('error', { event, message: 'Authorization error' });
+        }
+      }
+
+      next();
+    });
 
     // ── JWT EXPIRY WARNING & REAUTHENTICATION ──────────────────────────
     let expiryTimeout = null;
@@ -300,6 +369,15 @@ export const registerChatSocketHandlers = (io) => {
         if (!token) {
           logger.warn(`[Socket.io] Reauthenticate failed: No token provided on socket ${socket.id}`);
           socket.emit('error', { event: 'reauthenticate', message: 'No token provided' });
+          return;
+        }
+
+        // Check if token has been blacklisted/revoked
+        const { isTokenBlacklisted } = await import('../../services/security.service.js');
+        if (await isTokenBlacklisted(token)) {
+          logger.warn(`[Socket.io] Reauthenticate rejected: Revoked token presented on socket ${socket.id}`);
+          socket.emit('error', { event: 'reauthenticate', message: 'Session revoked' });
+          socket.disconnect(true);
           return;
         }
 
@@ -460,7 +538,7 @@ export const registerChatSocketHandlers = (io) => {
       if (redis.isAvailable) {
         heartbeatInterval = setInterval(async () => {
           try {
-            await presenceService.handleHeartbeat(userId);
+            await presenceService.handleHeartbeat(userId, companyId, name, avatar, chatStatus, statusEmoji);
             await checkStatusExpiry();
           } catch (err) {
             logger.error(`[Presence] Heartbeat error for user ${userId}:`, err);
@@ -532,37 +610,11 @@ export const registerChatSocketHandlers = (io) => {
         });
       }
 
-      // ── ENTERPRISE NOTIFICATION ENGINE SOCKET LISTENERS ──────────────────────
-      socket.on('notification:sync', async () => {
-        try {
-          const notificationsService = await import('../notifications/notifications.service.js');
-          const missed = await notificationsService.syncOfflineNotifications(userId);
-          socket.emit('notification:sync', missed);
-          logger.info(`[Socket.io] Synced offline notifications for user ${name} (${userId})`);
-        } catch (err) {
-          logger.error(`[Socket.io] notification:sync error:`, err);
-        }
-      });
-
-      socket.on('notification:opened', async () => {
-        try {
-          const notificationsService = await import('../notifications/notifications.service.js');
-          await notificationsService.resetUnreadCount(userId);
-          socket.emit('notification:unread_reset');
-          logger.info(`[Socket.io] Reset unread notifications for user ${name} (${userId})`);
-        } catch (err) {
-          logger.error(`[Socket.io] notification:opened error:`, err);
-        }
-      });
-
-      // Send initial unread count on connect
-      try {
-        const notificationsService = await import('../notifications/notifications.service.js');
-        const count = await notificationsService.getUnreadCount(userId, companyId);
-        socket.emit('notification:unread_count', { count });
-      } catch (err) {
-        logger.error(`[Socket.io] Failed to send initial unread count:`, err);
-      }
+      // ── ENTERPRISE NOTIFICATION ENGINE ─────────────────────────────────────
+      // Delegates all notification socket events to the dedicated handler module.
+      // Handles: auto-sync on connect, notification:sync, notification:opened,
+      //          notification:preferences:get, notification:preferences:save
+      await registerNotificationSocketHandlers(socket, userId, companyId, name);
 
     } catch (err) {
       logger.error('[Chat] Error marking user online:', err);

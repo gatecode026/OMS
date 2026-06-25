@@ -14,6 +14,7 @@ import { getIO } from '../../config/socket.js';
 import { uploadToImageKit, deleteFromImageKit, uploadToImageKitDetailed, deleteFileFromImageKitById } from '../../utils/imagekit.js';
 import logger from '../../config/logger.js';
 import * as readReceiptService from './services/readReceipt.service.js';
+import { CacheKeys, TTL, cacheGetOrSet, cacheDel, cacheDelPattern } from '../../services/cache.service.js';
 
 /**
  * Detects if a text content contains Markdown syntax.
@@ -59,7 +60,7 @@ export const detectMarkdown = (content) => {
 export const getOrCreateDirectConversation = async (
   user1, user2, companyId
 ) => {
-  return runWithTenant(companyId, async () => {
+  const result = await runWithTenant(companyId, async () => {
     // Check existing direct conversation
     const existing = await Conversation.findOne({
       type: 'direct',
@@ -98,6 +99,11 @@ export const getOrCreateDirectConversation = async (
 
     return { conversation, isNew: true };
   });
+
+  if (result.isNew) {
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+  }
+  return result;
 };
 
 /**
@@ -179,6 +185,7 @@ export const createGroupConversation = async (
       }
     });
 
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
     return conversation;
   });
 };
@@ -236,25 +243,28 @@ const enrichConversationForUser = async (conv, employeeId) => {
  * Get all conversations for a user (WhatsApp style — sorted by last activity)
  */
 export const getUserConversations = async (employeeId, companyId) => {
-  return runWithTenant(companyId, async () => {
-    const conversations = await Conversation.find({
-      'participants.employeeId': employeeId,
-      isActive: true,
-      isDeleted: { $ne: true },
-      hiddenBy: { $not: { $elemMatch: { userId: employeeId } } },
-      archivedBy: { $not: { $elemMatch: { userId: employeeId } } },
-      deletedBy: { $not: { $elemMatch: { userId: employeeId, clearHistory: false } } }
-    })
-      .sort({ lastActivityAt: -1 })
-      .lean();
+  const cacheKey = CacheKeys.sidebar(companyId, employeeId);
+  return cacheGetOrSet(cacheKey, async () => {
+    return runWithTenant(companyId, async () => {
+      const conversations = await Conversation.find({
+        'participants.employeeId': employeeId,
+        isActive: true,
+        isDeleted: { $ne: true },
+        hiddenBy: { $not: { $elemMatch: { userId: employeeId } } },
+        archivedBy: { $not: { $elemMatch: { userId: employeeId } } },
+        deletedBy: { $not: { $elemMatch: { userId: employeeId, clearHistory: false } } }
+      })
+        .sort({ lastActivityAt: -1 })
+        .lean();
 
-    // Add unread count and compute dynamic lastMessage for each conversation
-    const convsWithUnread = await Promise.all(
-      conversations.map(conv => enrichConversationForUser(conv, employeeId))
-    );
+      // Add unread count and compute dynamic lastMessage for each conversation
+      const convsWithUnread = await Promise.all(
+        conversations.map(conv => enrichConversationForUser(conv, employeeId))
+      );
 
-    return convsWithUnread;
-  });
+      return convsWithUnread;
+    });
+  }, TTL.SIDEBAR);
 };
 
 /**
@@ -264,127 +274,137 @@ export const getMessages = async (
   conversationId, employeeId, companyId,
   cursor = null, limit = 50
 ) => {
-  return runWithTenant(companyId, async () => {
-    // Verify participant
-    const conv = await Conversation.findOne({
-      id: conversationId,
-      'participants.employeeId': employeeId
-    });
-    if (!conv) throw new Error('Conversation not found or access denied');
+  const isCacheable = !cursor;
+  const cacheKey = isCacheable ? CacheKeys.convMsgs(companyId, conversationId) : null;
 
-    const query = {
-      conversationId,
-      $nor: [{ 'deletedFor.employeeId': employeeId }]
-    };
-
-    const deleteEntry = conv.deletedBy?.find(d => d.userId?.toString() === employeeId?.toString());
-    if (deleteEntry) {
-      query.createdAt = { $gt: deleteEntry.deletedAt };
-    }
-
-    if (cursor && mongoose.isValidObjectId(cursor)) {
-      query._id = { $lt: new mongoose.Types.ObjectId(cursor) };
-    }
-
-    const messages = await Message.find(query)
-      .sort({ _id: -1 })
-      .limit(limit)
-      .lean();
-
-    // Fetch and populate poll details for poll messages
-    const pollIds = messages.filter(m => m.type === 'poll' && m.pollId).map(m => m.pollId);
-    if (pollIds.length > 0) {
-      const Poll = mongoose.model('Poll');
-      const polls = await Poll.find({ _id: { $in: pollIds } }).lean();
-
-      // Auto-expire check on fetch
-      const now = new Date();
-      const expiredPollIds = [];
-      const updatedPolls = polls.map(p => {
-        if (!p.isClosed && p.expiresAt && new Date(p.expiresAt) <= now) {
-          p.isClosed = true;
-          expiredPollIds.push(p._id);
-        }
-        return p;
+  const fetchFn = async () => {
+    return runWithTenant(companyId, async () => {
+      // Verify participant
+      const conv = await Conversation.findOne({
+        id: conversationId,
+        'participants.employeeId': employeeId
       });
+      if (!conv) throw new Error('Conversation not found or access denied');
 
-      if (expiredPollIds.length > 0) {
-        await Poll.updateMany(
-          { _id: { $in: expiredPollIds } },
-          { $set: { isClosed: true } }
-        );
+      const query = {
+        conversationId,
+        $nor: [{ 'deletedFor.employeeId': employeeId }]
+      };
+
+      const deleteEntry = conv.deletedBy?.find(d => d.userId?.toString() === employeeId?.toString());
+      if (deleteEntry) {
+        query.createdAt = { $gt: deleteEntry.deletedAt };
       }
 
-      const pollMap = updatedPolls.reduce((acc, p) => {
-        if (p.isAnonymous) {
-          p = {
-            ...p,
-            options: p.options.map(opt => ({
-              optionId: opt.optionId,
-              text: opt.text,
-              votesCount: opt.votes.length,
-              votes: [] // Strip voter identities for privacy
-            }))
+      if (cursor && mongoose.isValidObjectId(cursor)) {
+        query._id = { $lt: new mongoose.Types.ObjectId(cursor) };
+      }
+
+      const messages = await Message.find(query)
+        .sort({ _id: -1 })
+        .limit(limit)
+        .lean();
+
+      // Fetch and populate poll details for poll messages
+      const pollIds = messages.filter(m => m.type === 'poll' && m.pollId).map(m => m.pollId);
+      if (pollIds.length > 0) {
+        const Poll = mongoose.model('Poll');
+        const polls = await Poll.find({ _id: { $in: pollIds } }).lean();
+
+        // Auto-expire check on fetch
+        const now = new Date();
+        const expiredPollIds = [];
+        const updatedPolls = polls.map(p => {
+          if (!p.isClosed && p.expiresAt && new Date(p.expiresAt) <= now) {
+            p.isClosed = true;
+            expiredPollIds.push(p._id);
+          }
+          return p;
+        });
+
+        if (expiredPollIds.length > 0) {
+          await Poll.updateMany(
+            { _id: { $in: expiredPollIds } },
+            { $set: { isClosed: true } }
+          );
+        }
+
+        const pollMap = updatedPolls.reduce((acc, p) => {
+          if (p.isAnonymous) {
+            p = {
+              ...p,
+              options: p.options.map(opt => ({
+                optionId: opt.optionId,
+                text: opt.text,
+                votesCount: opt.votes.length,
+                votes: [] // Strip voter identities for privacy
+              }))
+            };
+          }
+          acc[p._id.toString()] = p;
+          return acc;
+        }, {});
+
+        messages.forEach(m => {
+          if (m.type === 'poll' && m.pollId && pollMap[m.pollId.toString()]) {
+            m.pollId = pollMap[m.pollId.toString()];
+          }
+        });
+      }
+
+      // Populate thread details for messages having a threadId
+      const threadIds = messages.filter(m => m.threadId).map(m => m.threadId);
+      if (threadIds.length > 0) {
+        const Thread = mongoose.model('Thread');
+        const threads = await Thread.find({ _id: { $in: threadIds } }).lean();
+        const threadMap = threads.reduce((acc, t) => {
+          acc[t._id.toString()] = {
+            replyCount: t.replyCount,
+            lastReplyAt: t.lastReplyAt,
+            status: t.status,
+            participants: t.participants
           };
-        }
-        acc[p._id.toString()] = p;
-        return acc;
-      }, {});
+          return acc;
+        }, {});
 
-      messages.forEach(m => {
-        if (m.type === 'poll' && m.pollId && pollMap[m.pollId.toString()]) {
-          m.pollId = pollMap[m.pollId.toString()];
-        }
-      });
-    }
+        messages.forEach(m => {
+          if (m.threadId && threadMap[m.threadId.toString()]) {
+            m.threadDetails = threadMap[m.threadId.toString()];
+          }
+        });
+      }
 
-    // Populate thread details for messages having a threadId
-    const threadIds = messages.filter(m => m.threadId).map(m => m.threadId);
-    if (threadIds.length > 0) {
-      const Thread = mongoose.model('Thread');
-      const threads = await Thread.find({ _id: { $in: threadIds } }).lean();
-      const threadMap = threads.reduce((acc, t) => {
-        acc[t._id.toString()] = {
-          replyCount: t.replyCount,
-          lastReplyAt: t.lastReplyAt,
-          status: t.status,
-          participants: t.participants
-        };
-        return acc;
-      }, {});
+      // Reverse for chronological order (newest last — WhatsApp style)
+      messages.reverse();
 
-      messages.forEach(m => {
-        if (m.threadId && threadMap[m.threadId.toString()]) {
-          m.threadDetails = threadMap[m.threadId.toString()];
-        }
-      });
-    }
+      const nextCursor = messages.length > 0 ? messages[0]._id.toString() : null;
 
-    // Reverse for chronological order (newest last — WhatsApp style)
-    messages.reverse();
+      let hasMore = false;
+      if (nextCursor) {
+        const moreCount = await Message.countDocuments({
+          conversationId,
+          $nor: [{ 'deletedFor.employeeId': employeeId }],
+          _id: { $lt: new mongoose.Types.ObjectId(nextCursor) }
+        });
+        hasMore = moreCount > 0;
+      }
 
-    const nextCursor = messages.length > 0 ? messages[0]._id.toString() : null;
+      return {
+        messages,
+        pagination: {
+          cursor: nextCursor,
+          limit,
+          hasMore
+        },
+        conversation: conv
+      };
+    });
+  };
 
-    let hasMore = false;
-    if (nextCursor) {
-      const moreCount = await Message.countDocuments({
-        conversationId,
-        $nor: [{ 'deletedFor.employeeId': employeeId }],
-        _id: { $lt: new mongoose.Types.ObjectId(nextCursor) }
-      });
-      hasMore = moreCount > 0;
-    }
-
-    return {
-      messages,
-      pagination: {
-        cursor: nextCursor,
-        limit,
-        hasMore
-      },
-      conversation: conv
-    };
-  });
+  if (isCacheable && cacheKey) {
+    return cacheGetOrSet(cacheKey, fetchFn, TTL.RECENT_MESSAGES);
+  }
+  return fetchFn();
 };
 
 /**
@@ -506,6 +526,10 @@ export const saveMessage = async (messageData, companyId) => {
     // Increment unread counts for other participants
     await readReceiptService.incrementUnreadCounts(messageData.conversationId, messageData.senderId, companyId);
 
+    // Invalidate caches
+    cacheDel(CacheKeys.convMsgs(companyId, messageData.conversationId)).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+
     return message;
   });
 };
@@ -608,6 +632,10 @@ export const deleteMessage = async (
       );
     }
 
+    // Invalidate caches
+    cacheDel(CacheKeys.convMsgs(companyId, message.conversationId)).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+
     return { success: true, deleteForEveryone };
   });
 };
@@ -638,6 +666,10 @@ export const clearConversationMessages = async (conversationId, employeeId, comp
         }
       }
     );
+
+    // Invalidate caches
+    cacheDel(CacheKeys.convMsgs(companyId, conversationId)).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
 
     return { success: true };
   });
@@ -706,6 +738,10 @@ export const editMessage = async (
         }
       }
     );
+
+    // Invalidate caches
+    cacheDel(CacheKeys.convMsgs(companyId, message.conversationId)).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
 
     return { success: true };
   });
@@ -817,6 +853,13 @@ export const addGroupMembers = async (
         _isOptimized: true
       });
     } catch (err) {}
+
+    // Invalidate caches
+    cacheDel(
+      CacheKeys.groupMembers(companyId, conversationId),
+      CacheKeys.convMsgs(companyId, conversationId)
+    ).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
 
     return { success: true, addedMembers: addedNames, conversation };
   });
@@ -952,6 +995,13 @@ export const removeGroupMember = async (
       } catch (err) {}
     }
 
+    // Invalidate caches
+    cacheDel(
+      CacheKeys.groupMembers(companyId, conversationId),
+      CacheKeys.convMsgs(companyId, conversationId)
+    ).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+
     return { success: true, conversation: updatedConv };
   });
 };
@@ -1074,6 +1124,10 @@ export const updateGroupDetails = async (conversationId, adminId, groupData, com
       } catch (err) {}
     }
 
+    // Invalidate caches
+    cacheDel(CacheKeys.convMsgs(companyId, conversationId)).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+
     return updatedConv;
   });
 };
@@ -1082,26 +1136,30 @@ export const updateGroupDetails = async (conversationId, adminId, groupData, com
  * Pin a conversation for a specific employee
  */
 export const pinConversation = async (conversationId, employeeId, companyId) => {
-  return runWithTenant(companyId, async () => {
+  const result = await runWithTenant(companyId, async () => {
     return await Conversation.findOneAndUpdate(
       { id: conversationId },
       { $addToSet: { pinnedBy: { employeeId, pinnedAt: new Date() } } },
       { new: true }
     );
   });
+  cacheDel(CacheKeys.sidebar(companyId, employeeId)).catch(() => {});
+  return result;
 };
 
 /**
  * Unpin a conversation for a specific employee
  */
 export const unpinConversation = async (conversationId, employeeId, companyId) => {
-  return runWithTenant(companyId, async () => {
+  const result = await runWithTenant(companyId, async () => {
     return await Conversation.findOneAndUpdate(
       { id: conversationId },
       { $pull: { pinnedBy: { employeeId } } },
       { new: true }
     );
   });
+  cacheDel(CacheKeys.sidebar(companyId, employeeId)).catch(() => {});
+  return result;
 };
 
 /**

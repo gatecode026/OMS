@@ -29,6 +29,15 @@ export const authenticate = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     
+    // Check if token has been blacklisted/revoked
+    const { isTokenBlacklisted } = await import('../services/security.service.js');
+    if (await isTokenBlacklisted(token)) {
+      return res.status(401).json({
+        status: 'fail',
+        message: 'Authentication failed. This session has been revoked.',
+      });
+    }
+
     // Decode token
     const decoded = jwt.verify(token, env.jwtSecret);
     

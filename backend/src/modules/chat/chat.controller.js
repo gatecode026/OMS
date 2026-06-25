@@ -12,6 +12,7 @@ import { getIO } from '../../config/socket.js';
 import Call from './call.model.js';
 import logger from '../../config/logger.js';
 import crypto from 'crypto';
+import { CacheKeys, TTL, cacheGetOrSet } from '../../services/cache.service.js';
 import Message from './message.model.js';
 import Conversation from './conversation.model.js';
 import ImageKitCleanupLog from './cleanupLog.model.js';
@@ -25,12 +26,15 @@ import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
  * Used to hydrate user1/user2 objects for service calls.
  */
 const getEmployeeInfo = async (employeeId, companyId) => {
-  const conn = await getTenantConnection(companyId);
-  return conn.collection('employees').findOne(
-    { id: employeeId },
-    { projection: { id: 1, name: 1, avatar: 1, roleId: 1,
-                    status: 1, workStatus: 1, lastSeen: 1 } }
-  );
+  const cacheKey = CacheKeys.user(companyId, employeeId);
+  return cacheGetOrSet(cacheKey, async () => {
+    const conn = await getTenantConnection(companyId);
+    return conn.collection('employees').findOne(
+      { id: employeeId },
+      { projection: { id: 1, name: 1, avatar: 1, roleId: 1,
+                      status: 1, workStatus: 1, lastSeen: 1 } }
+    );
+  }, TTL.USER_PROFILE);
 };
 
 /**
