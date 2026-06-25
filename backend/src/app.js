@@ -27,6 +27,9 @@ import { authenticate } from './middlewares/auth.middleware.js';
 import { tenantMiddleware } from './middlewares/tenant.middleware.js';
 import { checkRoleAccess } from './middlewares/roleGuard.middleware.js';
 import publicRouter from './modules/companies/public.routes.js';
+import redisClient from './config/redis.js';
+import { getIO } from './config/socket.js';
+import presenceService from './modules/chat/services/presence.service.js';
 
 const app = express();
 
@@ -92,8 +95,66 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/health/redis', async (req, res) => {
+  try {
+    let redisStatus = 'disconnected';
+    let adapterStatus = 'disabled';
+
+    if (redisClient.isAvailable) {
+      try {
+        const pingResponse = await redisClient.ping();
+        if (pingResponse === 'PONG') {
+          redisStatus = 'connected';
+        }
+      } catch (err) {
+        // Failed to ping
+      }
+    }
+
+    try {
+      const io = getIO();
+      if (io && io.redisAdapterEnabled) {
+        adapterStatus = 'enabled';
+      }
+    } catch (err) {
+      // socket.io not initialized yet or error
+    }
+
+    const isHealthy = redisStatus === 'connected' && adapterStatus === 'enabled';
+    return res.status(isHealthy ? 200 : 500).json({
+      redis: redisStatus,
+      adapter: adapterStatus
+    });
+  } catch (err) {
+    return res.status(500).json({
+      redis: 'disconnected',
+      adapter: 'disabled',
+      error: err.message
+    });
+  }
+});
+
 // ─── PUBLIC BRANDING ROUTES ──────────────────────────────────────────────────
 app.use('/api/public', publicRouter);
+
+// ─── PRESENCE REST ENDPOINTS ────────────────────────────────────────────────
+app.get('/api/presence/:userId', authenticate, async (req, res, next) => {
+  try {
+    const presence = await presenceService.getUserPresence(req.params.userId);
+    return res.status(200).json(presence);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/api/presence/company/:companyId', authenticate, async (req, res, next) => {
+  try {
+    const result = await presenceService.getCompanyOnlineUsers(req.params.companyId);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── GLOBAL MODULAR ROUTING BINDING ─────────────────────────────────────────
 app.use('/api/v1', (req, res, next) => {

@@ -1035,7 +1035,14 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setNotifications(result.data || []);
+        const notifData = result.data;
+        if (Array.isArray(notifData)) {
+          setNotifications(notifData);
+        } else if (notifData && Array.isArray(notifData.notifications)) {
+          setNotifications(notifData.notifications);
+        } else {
+          setNotifications([]);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch notifications:', err);

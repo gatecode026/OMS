@@ -20,6 +20,7 @@ import ChatHeader from '../../components/ChatHeader';
 import PinBoardDrawer from '../../components/PinBoardDrawer';
 import ThreadPanel from '../../components/ThreadPanel';
 import CreatePollModal from '../../components/CreatePollModal';
+import TypingIndicator from '../../components/chat/TypingIndicator';
 
 const stripMarkdown = (text) => {
   if (!text) return '';
@@ -79,6 +80,11 @@ const ChatWindow = ({ currentUser, onBack }) => {
   const { initiateCall, callState } = useCall();
 
   const { showConfirm, addToast } = useApp();
+
+  const conv = conversations.find(c => c.id === activeConvId);
+  const convMessages = messages[activeConvId] || [];
+  const typing = typingUsers[activeConvId] || [];
+
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState(new Set());
   const [showPinBoard, setShowPinBoard] = useState(false);
@@ -133,13 +139,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
     );
   };
 
-  useEffect(() => {
-    if (!activeConvId || !socket || !isConnected) return;
-    const timer = setTimeout(() => {
-      socket.emit('mark_read', { conversationId: activeConvId });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [activeConvId, isConnected, socket]);
+
 
   const isMuted = mutedConversations?.has(activeConvId);
 
@@ -175,6 +175,56 @@ const ChatWindow = ({ currentUser, onBack }) => {
   const unreadSeparatorRef = useCallback((node) => {
     setUnreadSeparatorEl(node);
   }, []);
+
+  const lastEmittedReadIdRef = useRef(null);
+
+  // Reset last emitted read receipt ID on conversation switch
+  useEffect(() => {
+    lastEmittedReadIdRef.current = null;
+  }, [activeConvId]);
+
+  const updateReadReceipts = useCallback(() => {
+    if (!activeConvId || !socket || !isConnected || convMessages.length === 0) return;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    let lastVisibleMsg = null;
+
+    // Scan backwards to find the last message sent by others that is visible
+    for (let i = convMessages.length - 1; i >= 0; i--) {
+      const msg = convMessages[i];
+      if (msg.senderId === currentUser?.id) continue;
+
+      const el = document.getElementById(`msg-${msg.id}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        // Check if the element's top boundary is within the container viewport
+        const isVisible = (rect.top >= containerRect.top - 10 && rect.top <= containerRect.bottom + 10);
+        if (isVisible) {
+          lastVisibleMsg = msg;
+          break;
+        }
+      }
+    }
+
+    if (lastVisibleMsg && lastVisibleMsg.id !== lastEmittedReadIdRef.current) {
+      lastEmittedReadIdRef.current = lastVisibleMsg.id;
+      socket.emit('conversation:read', {
+        conversationId: activeConvId,
+        lastReadMessageId: lastVisibleMsg.id
+      });
+    }
+  }, [activeConvId, convMessages, currentUser?.id, isConnected, socket]);
+
+  useEffect(() => {
+    if (!activeConvId || !socket || !isConnected) return;
+    const timer = setTimeout(() => {
+      updateReadReceipts();
+      socket.emit('mark_read', { conversationId: activeConvId });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activeConvId, isConnected, socket, convMessages.length, updateReadReceipts]);
 
   // Initialize unread count for banner AND capture the first-unread message id
   useEffect(() => {
@@ -239,10 +289,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
     };
   }, []);
 
-  // Current conversation
-  const conv = conversations.find(c => c.id === activeConvId);
-  const convMessages = messages[activeConvId] || [];
-  const typing = typingUsers[activeConvId] || [];
+
 
   // No longer compute firstUnreadMsg from msg.readBy (which never updates client-side).
   // We use firstUnreadMsgId which is captured once when the conversation opens.
@@ -388,6 +435,9 @@ const ChatWindow = ({ currentUser, onBack }) => {
       dismissUnreadBanner();
     }
 
+    // Emit read receipt for visible messages
+    updateReadReceipts();
+
     // Load more when scrolled near top
     if (scrollTop < 80 && hasMoreMessages[activeConvId] && !isLoadingMoreRef.current) {
       isLoadingMoreRef.current = true;
@@ -399,7 +449,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
         isLoadingMoreRef.current = false;
       });
     }
-  }, [activeConvId, hasMoreMessages, loadMoreMessages]);
+  }, [activeConvId, hasMoreMessages, loadMoreMessages, updateReadReceipts, dismissUnreadBanner]);
 
   const handleLoadMoreClick = useCallback(async () => {
     const container = messagesContainerRef.current;
@@ -719,18 +769,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
         })}
 
         {/* Typing indicator */}
-        {typing.length > 0 && (
-          <div className="chat-typing-indicator">
-            <div className="chat-typing-avatar">
-              {typing[0]?.name?.charAt(0).toUpperCase()}
-            </div>
-            <div className="chat-typing-bubble">
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-            </div>
-          </div>
-        )}
+        <TypingIndicator typingUsers={typing} />
 
         {/* Scroll anchor */}
         <div ref={messagesEndRef} />
@@ -768,7 +807,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
       <MessageInput
         activeConvId={activeConvId}
         onSend={handleSend}
-        onTypingStart={() => handleTypingStart(activeConvId)}
+        onTypingStart={(isRecording) => handleTypingStart(activeConvId, isRecording)}
         onTypingStop={() => handleTypingStop(activeConvId)}
       />
 

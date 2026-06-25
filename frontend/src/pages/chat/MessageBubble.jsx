@@ -416,7 +416,7 @@ const MessageBubble = ({
   // Deleted message
   if (msg.isDeleted) {
     return (
-      <div className={`msg-row ${isOwn ? 'msg-row-own' : 'msg-row-other'}`}>
+      <div className={`msg-row ${isOwn ? 'msg-row-other' : 'msg-row-own'}`}>
         <div className={`msg-bubble msg-bubble-deleted`}>
           <em className="msg-deleted-text">🚫 This message was deleted</em>
           <span className="msg-time">{timeStr}</span>
@@ -485,7 +485,7 @@ const MessageBubble = ({
 
   return (
     <div
-      className={`msg-row ${isOwn ? 'msg-row-own' : 'msg-row-other'} ${isSelectMode ? 'msg-row-select-mode' : ''} ${isSelected ? 'msg-row-selected' : ''}`}
+      className={`msg-row ${isOwn ? 'msg-row-other' : 'msg-row-own'} ${isSelectMode ? 'msg-row-select-mode' : ''} ${isSelected ? 'msg-row-selected' : ''}`}
       ref={bubbleRef}
       onClick={() => {
         if (isSelectMode) {
@@ -515,18 +515,18 @@ const MessageBubble = ({
         </div>
       )}
       {/* Sender avatar (others only) */}
-      {!isOwn && (
+      {!isOwn && msg.senderName && (
         <div className="msg-sender-avatar">
           {msg.senderAvatar ? (
             <img src={msg.senderAvatar} alt={msg.senderName} />
           ) : (
-            <span>{msg.senderName?.charAt(0).toUpperCase()}</span>
+            <span>{msg.senderName.charAt(0).toUpperCase()}</span>
           )}
         </div>
       )}
 
       <div 
-        className={`msg-bubble-wrapper ${isOwn ? 'msg-bubble-wrapper-own' : ''}`}
+        className={`msg-bubble-wrapper ${!isOwn ? 'msg-bubble-wrapper-own' : ''}`}
         onContextMenu={(e) => {
           if (isSelectMode) return;
           if (msg.isDeleted || msg.type === 'system') return;
@@ -557,8 +557,8 @@ const MessageBubble = ({
           setShowOptions(true);
         }}
       >
-        {/* Sender name (group chats, others only) */}
-        {!isOwn && msg.senderName && (
+        {/* Sender name */}
+        {msg.senderName && (
           <span className="msg-sender-name">{msg.senderName}</span>
         )}
 
@@ -587,7 +587,7 @@ const MessageBubble = ({
         <div id={`msg-${msg.id}`} className={`msg-bubble ${isOwn ? 'msg-bubble-own' : 'msg-bubble-other'} ${isStarred ? 'msg-bubble-starred' : ''} ${msg.isPinned ? 'msg-bubble-pinned' : ''}`}>
           {/* Hover Actions */}
           {!msg.isDeleted && msg.type !== 'system' && !isEditing && (
-            <div className={`msg-bubble-hover-actions ${isOwn ? 'hover-own' : 'hover-other'}`}>
+            <div className={`msg-bubble-hover-actions ${isOwn ? 'hover-other' : 'hover-own'}`}>
               <button 
                 className="msg-bubble-hover-action-btn" 
                 onClick={(e) => { e.stopPropagation(); openThread(msg.id); }}
@@ -663,7 +663,7 @@ const MessageBubble = ({
                       fontSize: '12px',
                       fontWeight: 500,
                       width: 'fit-content',
-                      alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                      alignSelf: isOwn ? 'flex-start' : 'flex-end',
                       transition: 'background 0.2s'
                     }}
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.12)'}
@@ -731,7 +731,7 @@ const MessageBubble = ({
                       fontSize: '12px',
                       fontWeight: 500,
                       width: 'fit-content',
-                      alignSelf: isOwn ? 'flex-end' : 'flex-start',
+                      alignSelf: isOwn ? 'flex-start' : 'flex-end',
                       transition: 'background 0.2s'
                     }}
                     onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.12)'}
@@ -994,7 +994,7 @@ const MessageBubble = ({
                 <Plus size={16} strokeWidth={2.5} />
               </button>
               {showEmojiPicker && (
-                <div className={`msg-emoji-picker-popup ${isOwn ? 'msg-emoji-picker-own' : ''}`}>
+                <div className={`msg-emoji-picker-popup ${!isOwn ? 'msg-emoji-picker-own' : ''}`}>
                   <EmojiPicker
                     onEmojiClick={handleEmojiClick}
                     width={300}

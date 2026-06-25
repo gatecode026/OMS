@@ -2,8 +2,8 @@ import mongoose from 'mongoose';
 import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
 const readReceiptSchema = new mongoose.Schema({
-  userId: { type: String },
-  employeeId: { type: String, required: true },
+  userId: { type: mongoose.Schema.Types.Mixed },
+  employeeId: { type: String },
   name: { type: String },
   readAt: { type: Date, default: Date.now }
 }, { _id: false });
@@ -81,10 +81,8 @@ const messageSchema = new mongoose.Schema({
   deliveredTo: [deliveryReceiptSchema],
   readBy: [readReceiptSchema],
   deliveryStatus: {
-    type: String,
-    enum: ['sent', 'delivered', 'read'],
-    default: 'sent',
-    index: true
+    sentAt: { type: Date, default: Date.now },
+    deliveredAt: { type: Date, default: null }
   },
 
   // Reactions (WhatsApp emoji reactions)

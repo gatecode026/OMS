@@ -3,7 +3,7 @@
  * @description Message compose bar with direct ImageKit uploads, progress view, drag-and-drop, and Send validation.
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import VoiceRecorder from './VoiceRecorder';
@@ -19,7 +19,15 @@ const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB Large File Support
 
 const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => {
   const { conversations } = useChat();
-  const { currentUser } = useApp();
+  const { currentUser: simulatedUser } = useApp();
+  const currentUser = React.useMemo(() => {
+    try {
+      const saved = localStorage.getItem('saas_user');
+      return saved ? JSON.parse(saved) : simulatedUser;
+    } catch (e) {
+      return simulatedUser;
+    }
+  }, [simulatedUser]);
   
   const conv = conversations?.find(c => c.id === activeConvId);
   
@@ -49,9 +57,13 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
   const mediaInputRef = useRef(null);
   const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const plusMenuRef = useRef(null);
+
+  // Typing tracking refs
+  const isTypingRef = useRef(false);
+  const typingIntervalRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   // Hook for client-side uploads directly to ImageKit
   const {
@@ -75,6 +87,29 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
     ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
   }, []);
 
+  const onTypingStartRef = useRef(onTypingStart);
+  const onTypingStopRef = useRef(onTypingStop);
+
+  useEffect(() => {
+    onTypingStartRef.current = onTypingStart;
+    onTypingStopRef.current = onTypingStop;
+  }, [onTypingStart, onTypingStop]);
+
+  const stopTypingState = useCallback(() => {
+    if (isTypingRef.current) {
+      onTypingStopRef.current?.();
+      isTypingRef.current = false;
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (emojiPickerRef.current && 
@@ -92,6 +127,61 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
       'mousedown', handleClickOutside
     );
   }, []);
+
+  // Handle typing cleanup on conversation change
+  useEffect(() => {
+    return () => {
+      stopTypingState();
+    };
+  }, [activeConvId, stopTypingState]);
+
+  // Handle voice recording status propagation
+  useEffect(() => {
+    if (isRecording) {
+      // 1. Clear any existing typing timeouts/intervals
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+      }
+
+      // 2. Set active flag and notify recording start
+      isTypingRef.current = true;
+      onTypingStartRef.current?.(true);
+
+      // 3. Set a 3-second recurring interval to keep recording status alive on backend
+      typingIntervalRef.current = setInterval(() => {
+        if (isTypingRef.current) {
+          onTypingStartRef.current?.(true);
+        }
+      }, 3000);
+    } else {
+      // If we are no longer recording, stop recording/typing state immediately
+      stopTypingState();
+    }
+
+    return () => {
+      // Clear interval on cleanup
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+      }
+    };
+  }, [isRecording, stopTypingState]);
+
+  // Handle typing cleanup on window unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      stopTypingState();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [stopTypingState]);
 
   const handleEmojiSelect = (emoji) => {
     const ta = textareaRef.current;
@@ -113,15 +203,35 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
   };
 
   const handleChange = (e) => {
-    setMessage(e.target.value);
+    const val = e.target.value;
+    setMessage(val);
     resizeTextarea();
 
-    // Typing events
-    onTypingStart?.();
+    if (!val.trim()) {
+      stopTypingState();
+      return;
+    }
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      onTypingStartRef.current?.();
+
+      if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = setInterval(() => {
+        if (isTypingRef.current) {
+          onTypingStartRef.current?.();
+        }
+      }, 3000);
+    }
+
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      onTypingStop?.();
-    }, 2500);
+      stopTypingState();
+    }, 1500);
+  };
+
+  const handleBlur = () => {
+    stopTypingState();
   };
 
   const handleFormat = useCallback((prefix, suffix) => {
@@ -185,9 +295,8 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
     // 3. Clear the upload queue for this conversation
     clearQueue(activeConvId);
 
-    onTypingStop?.();
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-  }, [message, queue, isUploading, onSend, onTypingStop, clearQueue, activeConvId]);
+    stopTypingState();
+  }, [message, queue, isUploading, onSend, stopTypingState, clearQueue, activeConvId]);
 
   const handleKeyDown = (e) => {
     // 1. Check for formatting keyboard shortcuts
@@ -542,6 +651,7 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
                 onKeyDown={handleKeyDown}
                 onFocus={() => setShowToolbar(true)}
                 onClick={() => setShowToolbar(true)}
+                onBlur={handleBlur}
                 rows={1}
               />
             )}

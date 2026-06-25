@@ -29,7 +29,16 @@ const getApiUrl = () => window.API_URL || window.location.origin;
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export const ChatProvider = ({ children }) => {
-  const { token, setToken, currentUser, addToast } = useApp();
+  const { token, setToken, currentUser: simulatedUser, addToast } = useApp();
+
+  const currentUser = React.useMemo(() => {
+    try {
+      const saved = localStorage.getItem('saas_user');
+      return saved ? JSON.parse(saved) : simulatedUser;
+    } catch (e) {
+      return simulatedUser;
+    }
+  }, [simulatedUser]);
 
   // ── Muted Conversations State ──────────────────────────────────────────────
   const [mutedConversations, setMutedConversations] = useState(() => {
@@ -147,6 +156,9 @@ export const ChatProvider = ({ children }) => {
   const currentUserRef = useRef(currentUser);
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
 
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+
   const apiFetchRef = useRef(null);
 
   const addToastRef = useRef(addToast);
@@ -163,8 +175,12 @@ export const ChatProvider = ({ children }) => {
 
   // Typing debounce timers
   const typingTimerRef = useRef({});
+  // Client-side auto-clear safety timeouts for typing indicators
+  const clientTypingTimeoutsRef = useRef({});
   // Timeout references for in-flight messages
   const sendingTimeoutsRef = useRef({});
+  // Track which conversations have had initial history fetched from backend
+  const fetchedConvIdsRef = useRef(new Set());
 
   // Desktop notification hook
   const { permission, requestPermission, sendNotification } = useDesktopNotifications(activeConvId, currentUserStatus?.status);
@@ -333,6 +349,7 @@ export const ChatProvider = ({ children }) => {
     } else {
       setBlockedUsers([]);
       setBlockedByUsers([]);
+      fetchedConvIdsRef.current.clear();
     }
   }, [token, fetchBlockedUsers]);
 
@@ -584,6 +601,9 @@ export const ChatProvider = ({ children }) => {
           ...prev, [convId]: pagination.hasMore
         }));
         setMessageCursors(prev => ({ ...prev, [convId]: pagination.cursor }));
+        if (!cursor) {
+          fetchedConvIdsRef.current.add(convId);
+        }
       }
     } catch (err) {
       console.error('[Chat] fetchMessages error:', err);
@@ -611,14 +631,22 @@ export const ChatProvider = ({ children }) => {
     socketRef.current?.emit('join_conversation', convId);
 
     // Only fetch if not already loaded
-    if (!messages[convId]) {
+    if (!fetchedConvIdsRef.current.has(convId)) {
       await fetchMessages(convId, null);
     }
 
     // Mark as read via REST + socket
     await apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' });
+    
+    // Find last message ID from conversation preview
+    const conv = conversationsRef.current.find(c => c.id === convId);
+    const lastReadMessageId = conv?.lastMessage?.messageId;
+
     socketRef.current?.emit('mark_read', { conversationId: convId });
-  }, [messages, fetchMessages, apiFetch, unreadCounts]);
+    if (lastReadMessageId) {
+      socketRef.current?.emit('conversation:read', { conversationId: convId, lastReadMessageId });
+    }
+  }, [fetchMessages, apiFetch, unreadCounts]);
 
   // ── SEND MESSAGE ──────────────────────────────────────────────────────────
   const sendMessage = useCallback((convId, content,
@@ -723,22 +751,12 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   // ── TYPING INDICATORS ─────────────────────────────────────────────────────
-  const handleTypingStart = useCallback((convId) => {
-    socketRef.current?.emit('typing_start', { conversationId: convId });
-    // Auto-stop after 3 seconds of no keystrokes
-    if (typingTimerRef.current[convId]) {
-      clearTimeout(typingTimerRef.current[convId]);
-    }
-    typingTimerRef.current[convId] = setTimeout(() => {
-      socketRef.current?.emit('typing_stop', { conversationId: convId });
-    }, 3000);
+  const handleTypingStart = useCallback((convId, isRecording = false) => {
+    socketRef.current?.emit('typing:start', { conversationId: convId, isRecording });
   }, []);
 
   const handleTypingStop = useCallback((convId) => {
-    if (typingTimerRef.current[convId]) {
-      clearTimeout(typingTimerRef.current[convId]);
-    }
-    socketRef.current?.emit('typing_stop', { conversationId: convId });
+    socketRef.current?.emit('typing:stop', { conversationId: convId });
   }, []);
 
   // ── START DIRECT CHAT ─────────────────────────────────────────────────────
@@ -847,6 +865,7 @@ export const ChatProvider = ({ children }) => {
         }));
         setHasMoreMessages(prev => ({ ...prev, [convId]: false }));
         setMessageCursors(prev => ({ ...prev, [convId]: null }));
+        fetchedConvIdsRef.current.add(convId);
         setConversations(prev => prev.map(c => {
           if (c.id === convId) {
             return {
@@ -1462,6 +1481,7 @@ export const ChatProvider = ({ children }) => {
                 return {
                   ...conv,
                   lastMessage: {
+                    messageId: msg.id,
                     content: msg.content,
                     type: msg.type,
                     senderId: msg.senderId,
@@ -1477,10 +1497,10 @@ export const ChatProvider = ({ children }) => {
           return updated.sort((a, b) => new Date(b.lastActivityAt) - new Date(a.lastActivityAt));
         });
 
-        // Update unread counts
         missedMessages.forEach(msg => {
           const convId = msg.conversationId;
           if (msg.senderId !== me?.id) {
+            socket.emit('message:delivered', { messageId: msg.id, conversationId: convId });
             const isChatPage = window.location.pathname.startsWith('/chat');
             const isTabVisible = document.visibilityState === 'visible';
             const isMobile = window.innerWidth <= 480;
@@ -1488,6 +1508,7 @@ export const ChatProvider = ({ children }) => {
 
             if (isChatPage && isTabVisible && isLookingAtChat && activeConvIdRef.current === convId) {
               socket.emit('mark_read', { conversationId: convId });
+              socket.emit('conversation:read', { conversationId: convId, lastReadMessageId: msg.id });
               apiFetchRef.current(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
                 console.error('[Chat] Auto-mark read error in missed_events:', err);
               });
@@ -1646,6 +1667,10 @@ export const ChatProvider = ({ children }) => {
       const convId = message.conversationId;
       const me = currentUserRef.current;
 
+      if (message.senderId !== me?.id) {
+        socket.emit('message:delivered', { messageId: message.id, conversationId: convId });
+      }
+
       // Clear timeout and remove from localStorage if this is our own message
       if (message.tempId && message.senderId === me?.id) {
         if (sendingTimeoutsRef.current[message.tempId]) {
@@ -1719,6 +1744,7 @@ export const ChatProvider = ({ children }) => {
           return {
             ...conv,
             lastMessage: {
+              messageId: fullMessage.id,
               content: fullMessage.content,
               type: fullMessage.type,
               senderId: fullMessage.senderId,
@@ -1785,6 +1811,7 @@ export const ChatProvider = ({ children }) => {
           console.log('[Chat] Auto-marking message as read inside new_message');
           // Auto-mark as read if the conversation is currently active and user is looking at it
           socket.emit('mark_read', { conversationId: convId });
+          socket.emit('conversation:read', { conversationId: convId, lastReadMessageId: fullMessage.id });
           apiFetchRef.current(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
             console.error('[Chat] Auto-mark read error:', err);
           });
@@ -1810,6 +1837,7 @@ export const ChatProvider = ({ children }) => {
         return {
           ...conv,
           lastMessage: {
+            messageId: notification.messageId || `notification-${Date.now()}`,
             content: notification.preview,
             senderId: notification.senderId,
             senderName: notification.senderName,
@@ -1834,6 +1862,9 @@ export const ChatProvider = ({ children }) => {
             [notification.conversationId]: 0
           }));
           socket.emit('mark_read', { conversationId: notification.conversationId });
+          if (notification.messageId) {
+            socket.emit('conversation:read', { conversationId: notification.conversationId, lastReadMessageId: notification.messageId });
+          }
           apiFetchRef.current(`/chat/conversations/${notification.conversationId}/read`, { method: 'PATCH' }).catch(err => {
             console.error('[Chat] Auto-mark read error in notification:', err);
           });
@@ -1875,18 +1906,48 @@ export const ChatProvider = ({ children }) => {
 
 
     // ── Typing ────────────────────────────────────────────────────────────
-    socket.on('user_typing', ({ userId, name, conversationId }) => {
+    socket.on('user:typing', ({ userId, name, conversationId, isRecording }) => {
       setTypingUsers(prev => {
         const convTyping = prev[conversationId] || [];
-        if (convTyping.find(u => u.userId === userId)) return prev;
+        const existing = convTyping.find(u => u.userId === userId);
+        if (existing) {
+          if (existing.isRecording === isRecording) return prev;
+          return {
+            ...prev,
+            [conversationId]: convTyping.map(u => u.userId === userId ? { ...u, isRecording } : u)
+          };
+        }
         return {
           ...prev,
-          [conversationId]: [...convTyping, { userId, name }]
+          [conversationId]: [...convTyping, { userId, name, isRecording }]
         };
       });
+
+      // Reset client-side safety timeout to auto-clear in 6 seconds
+      const timeoutKey = `${conversationId}:${userId}`;
+      if (clientTypingTimeoutsRef.current[timeoutKey]) {
+        clearTimeout(clientTypingTimeoutsRef.current[timeoutKey]);
+      }
+      clientTypingTimeoutsRef.current[timeoutKey] = setTimeout(() => {
+        setTypingUsers(prev => {
+          const list = prev[conversationId] || [];
+          if (!list.some(u => u.userId === userId)) return prev;
+          return {
+            ...prev,
+            [conversationId]: list.filter(u => u.userId !== userId)
+          };
+        });
+        delete clientTypingTimeoutsRef.current[timeoutKey];
+      }, 6000);
     });
 
-    socket.on('user_stopped_typing', ({ userId, conversationId }) => {
+    socket.on('user:stopped_typing', ({ userId, conversationId }) => {
+      const timeoutKey = `${conversationId}:${userId}`;
+      if (clientTypingTimeoutsRef.current[timeoutKey]) {
+        clearTimeout(clientTypingTimeoutsRef.current[timeoutKey]);
+        delete clientTypingTimeoutsRef.current[timeoutKey];
+      }
+
       setTypingUsers(prev => ({
         ...prev,
         [conversationId]: (prev[conversationId] || [])
@@ -1956,6 +2017,77 @@ export const ChatProvider = ({ children }) => {
       });
     });
 
+    // ── Real-time Delivery Receipts (Phase 5) ──────────────────────────────
+    socket.on('message:delivery_update', ({ messageId, conversationId, userId, deliveredAt }) => {
+      setMessages(prev => {
+        const convMsgs = prev[conversationId] || [];
+        return {
+          ...prev,
+          [conversationId]: convMsgs.map(msg => {
+            if (msg.id === messageId) {
+              const existingDeliveredTo = msg.deliveredTo || [];
+              const alreadyDelivered = existingDeliveredTo.some(d => d.employeeId === userId);
+              const mergedDeliveredTo = alreadyDelivered 
+                ? existingDeliveredTo 
+                : [...existingDeliveredTo, { employeeId: userId, deliveredAt }];
+              
+              const currentStatus = msg._deliveryStatus;
+              const newStatus = (currentStatus === 'seen') ? 'seen' : 'delivered';
+
+              return {
+                ...msg,
+                _deliveryStatus: newStatus,
+                deliveredTo: mergedDeliveredTo
+              };
+            }
+            return msg;
+          })
+        };
+      });
+    });
+
+    // ── Real-time Read Receipts (Phase 5) ──────────────────────────────────
+    socket.on('conversation:read_update', ({ conversationId, userId, lastReadMessageId, readAt }) => {
+      const me = currentUserRef.current;
+      
+      // Multi-tab synchronization: clear unread count for the reading user
+      if (userId === me?.id) {
+        setUnreadCounts(prev => ({ ...prev, [conversationId]: 0 }));
+      }
+
+      setMessages(prev => {
+        const convMsgs = prev[conversationId] || [];
+        const lastReadIdx = convMsgs.findIndex(m => m.id === lastReadMessageId);
+        
+        return {
+          ...prev,
+          [conversationId]: convMsgs.map((msg, idx) => {
+            const isBeforeOrEqual = lastReadIdx !== -1 
+              ? idx <= lastReadIdx 
+              : (msg.id === lastReadMessageId);
+            
+            if (isBeforeOrEqual && msg.senderId !== userId) {
+              const existingReadBy = msg.readBy || [];
+              const alreadyRead = existingReadBy.some(r => r.employeeId === userId);
+              const mergedReadBy = alreadyRead 
+                ? existingReadBy 
+                : [...existingReadBy, { employeeId: userId, userId, readAt }];
+              
+              const isSentByMe = (msg.senderId === me?.id);
+              const newDeliveryStatus = isSentByMe ? 'seen' : msg._deliveryStatus;
+
+              return {
+                ...msg,
+                _deliveryStatus: newDeliveryStatus,
+                readBy: mergedReadBy
+              };
+            }
+            return msg;
+          })
+        };
+      });
+    });
+
     // ── Message Errors ───────────────────────────────────────────────────
     const handleSendError = ({ tempId, reason }) => {
       console.error('[Chat] Message error received:', reason, tempId);
@@ -2002,6 +2134,7 @@ export const ChatProvider = ({ children }) => {
       }));
       setHasMoreMessages(prev => ({ ...prev, [conversationId]: false }));
       setMessageCursors(prev => ({ ...prev, [conversationId]: null }));
+      fetchedConvIdsRef.current.add(conversationId);
       setConversations(prev => prev.map(c => {
         if (c.id === conversationId) {
           return {
@@ -2451,7 +2584,16 @@ export const ChatProvider = ({ children }) => {
       if (isTabVisible && isChatPage && isLookingAtChat && activeConvIdRef.current) {
         const convId = activeConvIdRef.current;
         console.log('[Chat] Visibility handler marking active conversation as read:', convId);
+        
+        // Find the last message in the active conversation
+        const convMsgs = messagesRef.current[convId] || [];
+        const lastMsg = convMsgs.length > 0 ? convMsgs[convMsgs.length - 1] : null;
+        const lastReadMessageId = lastMsg?.id;
+
         socketRef.current?.emit('mark_read', { conversationId: convId });
+        if (lastReadMessageId) {
+          socketRef.current?.emit('conversation:read', { conversationId: convId, lastReadMessageId });
+        }
         apiFetchRef.current(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
           console.error('[Chat] Visibility mark read error:', err);
         });

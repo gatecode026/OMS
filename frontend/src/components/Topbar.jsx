@@ -5,6 +5,7 @@ import { useChat } from '../context/ChatContext';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import Avatar from './common/Avatar';
 import Badge from './common/Badge';
+import NotificationBell from './notifications/NotificationBell';
 import {
   Menu,
   Bell,
@@ -388,98 +389,7 @@ const Topbar = ({ onMenuToggle }) => {
 
 
         {/* Notifications Bell Dropdown */}
-        <div className="topbar-dropdown-wrapper" ref={notifRef}>
-          <button 
-            className={`topbar-icon-btn ${unreadCount > 0 ? 'bell-unread' : ''}`}
-            onClick={() => setNotifOpen(!notifOpen)}
-          >
-            <Bell size={20} />
-            {unreadCount > 0 && <span className="bell-badge-dot"></span>}
-          </button>
-
-          {notifOpen && (
-            <div className="topbar-dropdown-panel notifications-panel animate-slide-up">
-              <div className="panel-header">
-                <span className="panel-title">Notifications</span>
-                {unreadCount > 0 && (
-                  <button className="mark-read-all-btn" onClick={markAllNotificationsRead}>
-                    <CheckCheck size={14} />
-                    <span>Mark all read</span>
-                  </button>
-                )}
-              </div>
-
-              <div className="panel-body">
-                {recentNotifications.length > 0 ? (
-                  recentNotifications.map(n => {
-                    const action = getNotificationAction(n);
-                    const isActionable = action.path !== '/notifications';
-                    const destLabel = action.path
-                      .replace('/', '')
-                      .replace(/-/g, ' ')
-                      .replace(/\b\w/g, c => c.toUpperCase());
-                    return (
-                      <div
-                        key={n.id}
-                        className={`notif-item ${!n.read ? 'unread' : ''}`}
-                        onClick={() => handleNotificationClick(n)}
-                        style={{ cursor: 'pointer', flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '12px 16px' }}
-                      >
-                        {/* Top row: icon + message + unread dot */}
-                        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                          <div className="notif-icon-wrapper" style={{ marginTop: 2, flexShrink: 0 }}>
-                            {getNotifIcon(n.type)}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p className="notif-message" style={{ margin: 0, lineHeight: 1.4 }}>{n.message}</p>
-                            <span className="notif-time" style={{ marginTop: '6px', display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)' }}>{formatNotificationTime(n)}</span>
-                          </div>
-                          {!n.read && <span className="notif-unread-dot" style={{ flexShrink: 0, marginTop: 6 }}></span>}
-                        </div>
-
-                        {/* Take Action button row */}
-                        {isActionable && (
-                          <div style={{ marginTop: 8, marginLeft: 26 }}>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 5,
-                              fontSize: '0.72rem',
-                              fontWeight: 600,
-                              color: !n.read ? 'var(--color-primary)' : 'var(--text-muted)',
-                              background: !n.read ? 'var(--color-primary-light)' : 'var(--bg-elevated)',
-                              border: `1px solid ${!n.read ? 'var(--color-primary)' : 'var(--border-subtle)'}`,
-                              borderRadius: 20,
-                              padding: '3px 10px 3px 8px',
-                              letterSpacing: '0.01em',
-                              transition: 'all 0.2s',
-                              userSelect: 'none'
-                            }}>
-                              <ArrowRight size={11} />
-                              {destLabel}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="notif-empty">
-                    <Bell size={32} className="notif-empty-icon" />
-                    <span>No notifications</span>
-                    <span className="notif-empty-subtitle">You're all caught up!</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="panel-footer">
-                <Link to="/notifications" className="view-all-link" onClick={() => setNotifOpen(false)}>
-                  View all notifications
-                </Link>
-              </div>
-            </div>
-          )}
-        </div>
+        <NotificationBell />
 
         {/* Meetings & Calendar Dropdown */}
         <div className="topbar-dropdown-wrapper" ref={meetingsRef}>

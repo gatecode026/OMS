@@ -9,18 +9,19 @@ async function run() {
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--ignore-certificate-errors'
+      '--ignore-certificate-errors',
+      '--use-fake-ui-for-media-stream',
+      '--use-fake-device-for-media-stream'
     ],
     ignoreHTTPSErrors: true
   };
 
-  const browser = await puppeteer.launch(launchOptions);
+  const browserA = await puppeteer.launch(launchOptions);
+  const browserB = await puppeteer.launch(launchOptions);
 
   try {
-    const contextA = await browser.createBrowserContext();
-    const contextB = await browser.createBrowserContext();
-    const pageA = await contextA.newPage();
-    const pageB = await contextB.newPage();
+    const pageA = await browserA.newPage();
+    const pageB = await browserB.newPage();
 
     // Catch page errors
     pageA.on('pageerror', err => {
@@ -31,30 +32,6 @@ async function run() {
     pageB.on('pageerror', err => {
       console.error('\n>>> BROWSER B PAGE ERROR <<<');
       console.error(err.stack || err.message || err);
-    });
-
-    pageA.on('response', async response => {
-      if (response.status() === 500) {
-        console.log(`[A Response 500] URL: ${response.url()}`);
-        try {
-          const text = await response.text();
-          console.log(`[A Response 500 Body] ${text}`);
-        } catch (e) {
-          console.log(`[A Response 500 Body Error] ${e.message}`);
-        }
-      }
-    });
-
-    pageB.on('response', async response => {
-      if (response.status() === 500) {
-        console.log(`[B Response 500] URL: ${response.url()}`);
-        try {
-          const text = await response.text();
-          console.log(`[B Response 500 Body] ${text}`);
-        } catch (e) {
-          console.log(`[B Response 500 Body Error] ${e.message}`);
-        }
-      }
     });
 
     // Capture console messages for debug
@@ -131,48 +108,77 @@ async function run() {
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Define unique test message
-    const timestamp = Date.now();
-    const testMessage = `Test Message Standardized Event ${timestamp}`;
-    console.log(`[Geeta] Sending test message: "${testMessage}"`);
+    // Verify mic button on Geeta's page
+    console.log('[Geeta] Waiting for Mic button to appear...');
+    await pageA.waitForSelector('.msg-input-mic-btn', { timeout: 10000 });
 
-    // Type and send message
-    await pageA.waitForSelector('.msg-input-textarea', { timeout: 10000 });
-    await pageA.type('.msg-input-textarea', testMessage);
-    
-    // Find and click send button
-    console.log('[Geeta] Clicking send button...');
-    await pageA.waitForSelector('.msg-input-send-active', { timeout: 10000 });
-    await pageA.click('.msg-input-send-active');
+    // Trigger recording
+    console.log('[Geeta] Clicking Mic button to start recording...');
+    await pageA.click('.msg-input-mic-btn');
+
+    // Wait for VoiceRecorder stage to show up
+    await pageA.waitForSelector('.voice-recorder', { timeout: 5000 });
+    console.log('[Geeta] Voice recorder opened and recording starts.');
+
+    // Wait and verify if "Geeta is recording audio" appears on Rahul's screen
+    console.log('[Rahul] Verifying if voice recording status is shown...');
+    let recordingStatusVisible = false;
+    for (let i = 0; i < 15; i++) {
+      recordingStatusVisible = await pageB.evaluate(() => {
+        const indicatorText = document.querySelector('.typing-indicator-text');
+        if (indicatorText) {
+          console.log(`[Rahul Indicator Text] ${indicatorText.textContent}`);
+          return indicatorText.textContent.toLowerCase().includes('geeta') &&
+                 indicatorText.textContent.toLowerCase().includes('recording audio');
+        }
+        return false;
+      });
+      if (recordingStatusVisible) break;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    if (recordingStatusVisible) {
+      console.log('✅ SUCCESS: Rahul is seeing that Geeta is recording audio!');
+    } else {
+      console.error('❌ FAILURE: Rahul is NOT seeing that Geeta is recording audio within 15 seconds.');
+      throw new Error('Recording status verification failed');
+    }
+
+    // Geeta cancels the voice recording
+    console.log('[Geeta] Canceling the voice recording...');
+    await pageA.click('.vr-btn-cancel');
     await new Promise(resolve => setTimeout(resolve, 2000));
-    // Wait and check if message appears on Rahul's screen (real-time)
-    console.log('[Rahul] Checking if message is received in real-time...');
-    let messageReceived = false;
-    for (let i = 0; i < 10; i++) {
-      messageReceived = await pageB.evaluate((msgText) => {
-        const messages = Array.from(document.querySelectorAll('*'));
-        return messages.some(el => el.textContent && el.textContent.includes(msgText));
-      }, testMessage);
 
-      if (messageReceived) {
+    // Verify the recording status disappears on Rahul's page
+    console.log('[Rahul] Verifying that recording status has cleared...');
+    let recordingStatusCleared = false;
+    for (let i = 0; i < 10; i++) {
+      const isGone = await pageB.evaluate(() => {
+        const indicatorText = document.querySelector('.typing-indicator-text');
+        if (!indicatorText) return true;
+        return !indicatorText.textContent.toLowerCase().includes('recording audio');
+      });
+      if (isGone) {
+        recordingStatusCleared = true;
         break;
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    if (messageReceived) {
-      console.log('SUCCESS: Message received by Rahul in real-time!');
+    if (recordingStatusCleared) {
+      console.log('✅ SUCCESS: Recording status cleared successfully on Rahul\'s page!');
     } else {
-      console.error('FAILURE: Message NOT received by Rahul in real-time within 10 seconds.');
-      throw new Error('Real-time delivery verification failed');
+      console.error('❌ FAILURE: Recording status did NOT clear on Rahul\'s page after cancellation.');
+      throw new Error('Recording status cleanup verification failed');
     }
 
-    console.log('Done testing successfully!');
+    console.log('🎉 All voice recording status tests passed successfully!');
   } catch (err) {
     console.error('Test execution failed:', err);
     process.exit(1);
   } finally {
-    await browser.close();
+    await browserA.close();
+    await browserB.close();
   }
 }
 

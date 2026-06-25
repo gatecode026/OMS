@@ -13,6 +13,7 @@ import { runWithTenant } from '../../utils/tenantContext.js';
 import { getIO } from '../../config/socket.js';
 import { uploadToImageKit, deleteFromImageKit, uploadToImageKitDetailed, deleteFileFromImageKitById } from '../../utils/imagekit.js';
 import logger from '../../config/logger.js';
+import * as readReceiptService from './services/readReceipt.service.js';
 
 /**
  * Detects if a text content contains Markdown syntax.
@@ -195,12 +196,12 @@ const enrichConversationForUser = async (conv, employeeId) => {
   const minCreatedAt = deleteEntry ? deleteEntry.deletedAt : new Date(0);
   const unreadAfter = new Date(Math.max(new Date(lastReadAt).getTime(), new Date(minCreatedAt).getTime()));
 
-  const unreadCount = await Message.countDocuments({
-    conversationId: conv.id,
-    senderId: { $ne: employeeId },
-    isDeleted: false,
-    createdAt: { $gt: unreadAfter }
-  });
+  const unreadCount = await readReceiptService.getUnreadCount(
+    employeeId,
+    conv.id,
+    unreadAfter,
+    conv.companyId
+  );
 
   // Find the actual last message that is NOT deleted or cleared for this user
   const query = {
@@ -501,6 +502,9 @@ export const saveMessage = async (messageData, companyId) => {
         archivedBy: []
       }
     );
+
+    // Increment unread counts for other participants
+    await readReceiptService.incrementUnreadCounts(messageData.conversationId, messageData.senderId, companyId);
 
     return message;
   });

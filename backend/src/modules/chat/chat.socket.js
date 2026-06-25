@@ -23,6 +23,9 @@ import { uploadToImageKit } from '../../utils/imagekit.js';
 import Call from './call.model.js';
 import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
 import * as pushNotificationService from '../notifications/pushNotificationService.js';
+import presenceService from './services/presence.service.js';
+import typingService from './services/typing.service.js';
+import * as readReceiptService from './services/readReceipt.service.js';
 
 // ─── IN-MEMORY ONLINE USERS STORE ────────────────────────────────────────────
 // Structure: Map<companyId, Map<employeeId, { socketId, name, avatar, onlineAt }>>
@@ -171,20 +174,28 @@ const updateUserChatScreenPresence = async (userId, companyId, io) => {
     const userSockets = await io.in(`user:${userId}`).fetchSockets();
     const isOnChatScreen = userSockets.some(s => s.isOnChatScreen === true);
 
-    const companyUsers = getCompanyOnlineUsers(companyId);
-    const userCache = companyUsers.get(userId);
-    if (userCache) {
-      userCache.isOnChatScreen = isOnChatScreen;
-      companyUsers.set(userId, userCache);
-    }
-
     if (redis.isAvailable) {
-      const ttlMs = io.opts?.pingTimeout + 10000 || 50000;
-      const cached = await redis.get(`presence::${userId}`).catch(() => null);
+      const presenceKey = `presence:user:${userId}`;
+      const cached = await redis.get(presenceKey).catch(() => null);
       if (cached) {
-        const data = JSON.parse(cached);
-        data.isOnChatScreen = isOnChatScreen;
-        await redis.set(`presence::${userId}`, JSON.stringify(data), 'PX', ttlMs).catch(() => {});
+        try {
+          const data = JSON.parse(cached);
+          data.isOnChatScreen = isOnChatScreen;
+          if (data.status === 'online') {
+            await redis.set(presenceKey, JSON.stringify(data), { EX: 120 }).catch(() => {});
+          } else {
+            await redis.set(presenceKey, JSON.stringify(data)).catch(() => {});
+          }
+        } catch (e) {
+          logger.warn(`[Redis] Failed to parse presence data in updateUserChatScreenPresence: ${e.message}`);
+        }
+      }
+    } else {
+      const companyUsers = getCompanyOnlineUsers(companyId);
+      const userCache = companyUsers.get(userId);
+      if (userCache) {
+        userCache.isOnChatScreen = isOnChatScreen;
+        companyUsers.set(userId, userCache);
       }
     }
 
@@ -251,6 +262,7 @@ export const registerChatSocketHandlers = (io) => {
 
   io.on('connection', async (socket) => {
     const { id: userId, companyId, name, avatar, role, chatStatus, statusEmoji } = socket.user;
+    socket.typingConvs = new Set();
 
     logger.info(
       `[Chat] Connected: ${name} (${userId}) — Company: ${companyId} — Socket: ${socket.id}`
@@ -337,46 +349,8 @@ export const registerChatSocketHandlers = (io) => {
 
       socket.isOnChatScreen = false;
 
-      const companyUsers = getCompanyOnlineUsers(companyId);
-      companyUsers.set(userId, {
-        socketId: socket.id,
-        name,
-        avatar,
-        onlineAt: new Date(),
-        chatStatus: chatStatus || 'available',
-        statusEmoji: statusEmoji || null,
-        isOnChatScreen: false
-      });
-
-      // Update employee workStatus in DB
-      await runTrackedWrite(() =>
-        runWithTenant(companyId, async () => {
-          const conn = await getTenantConnection(companyId);
-          await conn.collection('employees').updateOne(
-            { id: userId },
-            { $set: { workStatus: 'Online', lastSeen: new Date() } }
-          );
-        })
-      );
-
-      // Store presence in Redis with TTL (pingTimeout + 10s)
-      const ttlMs = socket.server.opts.pingTimeout + 10000;
-      const presenceData = {
-        userId,
-        companyId,
-        name,
-        avatar,
-        onlineAt: new Date(),
-        socketId: socket.id,
-        chatStatus: chatStatus || 'available',
-        statusEmoji: statusEmoji || null,
-        isOnChatScreen: false
-      };
-      if (redis.isAvailable) {
-        await redis.set(`presence::${userId}`, JSON.stringify(presenceData), 'PX', ttlMs).catch(err => {
-          logger.warn('[Redis] Failed to set presence on connect:', err.message);
-        });
-      }
+      let isFirstConnect = true;
+      let onlineList = [];
 
       // Status Expiry Helper
       const checkStatusExpiry = async () => {
@@ -392,20 +366,28 @@ export const registerChatSocketHandlers = (io) => {
                   { $set: { chatStatus: 'available', statusEmoji: null, statusExpiry: null } }
                 );
 
-                const userCache = companyUsers.get(userId);
-                if (userCache) {
-                  userCache.chatStatus = 'available';
-                  userCache.statusEmoji = null;
-                  companyUsers.set(userId, userCache);
-                }
-
                 if (redis.isAvailable) {
-                  const cached = await redis.get(`presence::${userId}`).catch(() => null);
+                  const presenceKey = `presence:user:${userId}`;
+                  const cached = await redis.get(presenceKey).catch(() => null);
                   if (cached) {
-                    const data = JSON.parse(cached);
-                    data.chatStatus = 'available';
-                    data.statusEmoji = null;
-                    await redis.set(`presence::${userId}`, JSON.stringify(data), 'PX', ttlMs).catch(() => {});
+                    try {
+                      const data = JSON.parse(cached);
+                      data.chatStatus = 'available';
+                      data.statusEmoji = null;
+                      if (data.status === 'online') {
+                        await redis.set(presenceKey, JSON.stringify(data), { EX: 120 }).catch(() => {});
+                      } else {
+                        await redis.set(presenceKey, JSON.stringify(data)).catch(() => {});
+                      }
+                    } catch (e) {}
+                  }
+                } else {
+                  const companyUsers = getCompanyOnlineUsers(companyId);
+                  const userCache = companyUsers.get(userId);
+                  if (userCache) {
+                    userCache.chatStatus = 'available';
+                    userCache.statusEmoji = null;
+                    companyUsers.set(userId, userCache);
                   }
                 }
 
@@ -425,57 +407,83 @@ export const registerChatSocketHandlers = (io) => {
         }
       };
 
+      if (redis.isAvailable) {
+        const count = await presenceService.handleConnect(userId, companyId, name, avatar, chatStatus, statusEmoji);
+        isFirstConnect = (count === 1);
+        const presenceResult = await presenceService.getCompanyOnlineUsers(companyId);
+        onlineList = presenceResult.users;
+      } else {
+        const companyUsers = getCompanyOnlineUsers(companyId);
+        companyUsers.set(userId, {
+          socketId: socket.id,
+          name,
+          avatar,
+          onlineAt: new Date(),
+          chatStatus: chatStatus || 'available',
+          statusEmoji: statusEmoji || null,
+          isOnChatScreen: false
+        });
+        onlineList = Array.from(companyUsers.entries()).map(([id, data]) => ({ userId: id, ...data }));
+      }
+
+      // Update employee workStatus in DB if first connection
+      if (isFirstConnect) {
+        await runTrackedWrite(() =>
+          runWithTenant(companyId, async () => {
+            const conn = await getTenantConnection(companyId);
+            await conn.collection('employees').updateOne(
+              { id: userId },
+              { $set: { workStatus: 'Online', lastSeen: new Date() } }
+            );
+          })
+        );
+
+        // Broadcast to the rest of the company — this user is online
+        const onlinePayload = {
+          userId,
+          name,
+          avatar,
+          onlineAt: new Date(),
+          chatStatus: chatStatus || 'available',
+          statusEmoji: statusEmoji || null,
+          isOnChatScreen: false
+        };
+        socket.to(`company:${companyId}`).emit('user_online', onlinePayload);
+        socket.to(`company:${companyId}`).emit('user:online', onlinePayload);
+      }
+
       // Run status expiry check on connect
       await checkStatusExpiry();
 
-      // Reset TTL on Engine.io ping heartbeat
+      // Setup 30s heartbeat interval
+      let heartbeatInterval = null;
+      if (redis.isAvailable) {
+        heartbeatInterval = setInterval(async () => {
+          try {
+            await presenceService.handleHeartbeat(userId);
+            await checkStatusExpiry();
+          } catch (err) {
+            logger.error(`[Presence] Heartbeat error for user ${userId}:`, err);
+          }
+        }, 30000);
+        socket.heartbeatInterval = heartbeatInterval;
+      }
+
+      // Reset TTL on Engine.io ping heartbeat (keeps DB status checks active for non-Redis)
       socket.conn.on('ping', async () => {
         try {
-          if (redis.isAvailable) {
-            await redis.pexpire(`presence::${userId}`, ttlMs).catch(() => {});
+          if (!redis.isAvailable) {
+            await checkStatusExpiry();
           }
-          await checkStatusExpiry();
         } catch (err) {
-          logger.warn(`[Redis] Failed to reset TTL on heartbeat for user ${userId}:`, err.message);
+          logger.warn(`[Presence] Failed to run ping tasks for user ${userId}:`, err.message);
         }
       });
 
-      // Broadcast to the rest of the company — this user is online
-      const onlinePayload = {
-        userId,
-        name,
-        avatar,
-        onlineAt: new Date(),
-        chatStatus: chatStatus || 'available',
-        statusEmoji: statusEmoji || null,
-        isOnChatScreen: false
-      };
-      socket.to(`company:${companyId}`).emit('user_online', onlinePayload);
-      socket.to(`company:${companyId}`).emit('user:online', onlinePayload);
-
-      // Retrieve online users list — prefer Redis (multi-instance safe), fall back to in-memory Map
-      const keys = redis.isAvailable ? await redis.keys('presence::*').catch(() => []) : [];
-      const onlineList = [];
-      if (keys.length > 0) {
-        const values = await redis.mget(keys).catch(() => []);
-        values.forEach(val => {
-          if (val) {
-            try {
-              const data = JSON.parse(val);
-              if (data.companyId === companyId) {
-                onlineList.push(data);
-              }
-            } catch (e) {
-              logger.warn('[Redis] Failed to parse presence data:', e.message);
-            }
-          }
-        });
-      } else {
-        // Fallback to local in-memory cache (single-server mode or Redis unavailable)
-        onlineList.push(...Array.from(companyUsers.entries()).map(([id, data]) => ({ userId: id, ...data })));
-      }
-
       socket.emit('online_users_list', onlineList);
+
+      // Flush pending delivery receipts
+      await readReceiptService.flushPendingDeliveries(userId, socket);
 
       // Reconnection state recovery: Missed messages and receipts sync
       const lastSyncTime = socket.handshake.auth?.lastSyncTime;
@@ -522,6 +530,38 @@ export const registerChatSocketHandlers = (io) => {
 
           logger.info(`[Chat] Emitted missed_events for user ${name} since ${lastSyncTime}: ${missedMessages.length} messages, ${formattedReceipts.length} read receipts.`);
         });
+      }
+
+      // ── ENTERPRISE NOTIFICATION ENGINE SOCKET LISTENERS ──────────────────────
+      socket.on('notification:sync', async () => {
+        try {
+          const notificationsService = await import('../notifications/notifications.service.js');
+          const missed = await notificationsService.syncOfflineNotifications(userId);
+          socket.emit('notification:sync', missed);
+          logger.info(`[Socket.io] Synced offline notifications for user ${name} (${userId})`);
+        } catch (err) {
+          logger.error(`[Socket.io] notification:sync error:`, err);
+        }
+      });
+
+      socket.on('notification:opened', async () => {
+        try {
+          const notificationsService = await import('../notifications/notifications.service.js');
+          await notificationsService.resetUnreadCount(userId);
+          socket.emit('notification:unread_reset');
+          logger.info(`[Socket.io] Reset unread notifications for user ${name} (${userId})`);
+        } catch (err) {
+          logger.error(`[Socket.io] notification:opened error:`, err);
+        }
+      });
+
+      // Send initial unread count on connect
+      try {
+        const notificationsService = await import('../notifications/notifications.service.js');
+        const count = await notificationsService.getUnreadCount(userId, companyId);
+        socket.emit('notification:unread_count', { count });
+      } catch (err) {
+        logger.error(`[Socket.io] Failed to send initial unread count:`, err);
       }
 
     } catch (err) {
@@ -638,13 +678,21 @@ export const registerChatSocketHandlers = (io) => {
 
         // Update Redis presence with new status
         if (redis.isAvailable) {
-          const ttlMs = socket.server.opts.pingTimeout + 10000;
-          const cached = await redis.get(`presence::${userId}`).catch(() => null);
+          const presenceKey = `presence:user:${userId}`;
+          const cached = await redis.get(presenceKey).catch(() => null);
           if (cached) {
-            const data = JSON.parse(cached);
-            data.chatStatus = status;
-            data.statusEmoji = emoji || null;
-            await redis.set(`presence::${userId}`, JSON.stringify(data), 'PX', ttlMs).catch(() => {});
+            try {
+              const data = JSON.parse(cached);
+              data.chatStatus = status;
+              data.statusEmoji = emoji || null;
+              if (data.status === 'online') {
+                await redis.set(presenceKey, JSON.stringify(data), { EX: 120 }).catch(() => {});
+              } else {
+                await redis.set(presenceKey, JSON.stringify(data)).catch(() => {});
+              }
+            } catch (e) {
+              logger.warn(`[Redis] Failed to parse presence data in set_status: ${e.message}`);
+            }
           }
         }
 
@@ -808,21 +856,38 @@ export const registerChatSocketHandlers = (io) => {
             );
 
             for (const participant of otherParticipants) {
-              // Mark as delivered in DB
-              await conn.collection('messages').updateOne(
-                { id: savedMessage.id },
-                {
-                  $push: {
-                    deliveredTo: {
-                      employeeId: participant.employeeId,
-                      deliveredAt: new Date()
-                    }
-                  }
-                }
-              );
-
               // If not in room — send personal notification
               if (!usersInRoom.has(participant.employeeId)) {
+                // ── ENTERPRISE NOTIFICATION ENGINE INTEGRATION ─────────────────
+                try {
+                  const notificationsService = await import('../notifications/notifications.service.js');
+                  // Detect mention: check if message content contains @UserName or @all or @everyone
+                  const isMention = content && typeof content === 'string' && (
+                    content.toLowerCase().includes('@' + participant.name.toLowerCase().replace(/\s+/g, '')) ||
+                    content.toLowerCase().includes('@all') ||
+                    content.toLowerCase().includes('@everyone')
+                  );
+                  
+                  const notifType = isMention ? 'mention' : 'message';
+                  const notifTitle = isMention
+                    ? `Mentioned by ${name} in ${conv.type === 'group' ? conv.name : 'chat'}`
+                    : (conv.type === 'group' ? `New message in ${conv.name}` : `New message from ${name}`);
+
+                  await notificationsService.createNotification(participant.employeeId, companyId, {
+                    type: notifType,
+                    title: notifTitle,
+                    message: type === 'text' ? content.substring(0, 150) : `📎 Shared a ${type}`,
+                    data: {
+                      conversationId,
+                      messageId: savedMessage.id,
+                      senderId: userId,
+                      senderName: name
+                    }
+                  });
+                } catch (err) {
+                  logger.error(`[Chat Socket] Failed to trigger enterprise notification: ${err.message}`);
+                }
+
                 const targetSockets = await io.in(`user:${participant.employeeId}`).fetchSockets();
                 if (targetSockets.length === 0) {
                   const chatStatus = employeeStatusMap.get(participant.employeeId) || 'available';
@@ -871,33 +936,112 @@ export const registerChatSocketHandlers = (io) => {
     });
 
     // ── EVENT: TYPING INDICATORS ────────────────────────────────────────────
-    socket.on('typing_start', ({ conversationId }) => {
+    socket.on('typing:start', async ({ conversationId, isRecording }) => {
       if (!conversationId) return;
 
-      const now = Date.now();
-      if (socket.lastTypingAt && (now - socket.lastTypingAt < 1000)) {
-        return; // Suppress indicator spam
+      // Room authorization check with dynamic fallback joining
+      if (!socket.rooms.has(`conv:${conversationId}`)) {
+        try {
+          await runWithTenant(companyId, async () => {
+            const conn = await getTenantConnection(companyId);
+            const conv = await conn.collection('conversations').findOne({
+              id: conversationId,
+              'participants.employeeId': userId,
+              isActive: true
+            });
+            if (conv) {
+              socket.join(`conv:${conversationId}`);
+              logger.info(`[Typing] Dynamically joined user ${userId} to room conv:${conversationId}`);
+            }
+          });
+        } catch (err) {
+          logger.error(`[Typing] Room authorization check error for ${userId} in ${conversationId}:`, err);
+        }
       }
-      socket.lastTypingAt = now;
 
-      const typingStartPayload = {
-        userId,
-        name,
-        avatar,
-        conversationId
-      };
-      socket.to(`conv:${conversationId}`).emit('user_typing', typingStartPayload);
-      socket.to(`conv:${conversationId}`).emit('typing:start', typingStartPayload);
+      if (!socket.rooms.has(`conv:${conversationId}`)) {
+        logger.warn(`[Typing] Blocked unauthorized typing:start from user ${userId} in room conv:${conversationId}`);
+        return;
+      }
+
+      try {
+        const now = Date.now();
+        if (socket.lastTypingAt && (now - socket.lastTypingAt < 1000)) {
+          return; // Suppress indicator spam
+        }
+        socket.lastTypingAt = now;
+
+        const wasRecording = !!socket.isRecordingMap?.get(conversationId);
+        const nowRecording = !!isRecording;
+
+        if (!socket.isRecordingMap) {
+          socket.isRecordingMap = new Map();
+        }
+        socket.isRecordingMap.set(conversationId, nowRecording);
+
+        if (socket.typingConvs.has(conversationId)) {
+          await typingService.refreshTyping(userId, conversationId);
+
+          if (wasRecording !== nowRecording) {
+            const typingStartPayload = {
+              userId,
+              name,
+              avatar,
+              conversationId,
+              isRecording: nowRecording
+            };
+            socket.to(`conv:${conversationId}`).emit('user:typing', typingStartPayload);
+          }
+        } else {
+          const isFirst = await typingService.handleTypingStart(userId, companyId, conversationId);
+          socket.typingConvs.add(conversationId);
+
+          if (isFirst) {
+            const typingStartPayload = {
+              userId,
+              name,
+              avatar,
+              conversationId,
+              isRecording: nowRecording
+            };
+            socket.to(`conv:${conversationId}`).emit('user:typing', typingStartPayload);
+          }
+        }
+      } catch (err) {
+        logger.error(`[Typing] Error in typing:start for ${userId} in ${conversationId}:`, err);
+      }
     });
 
-    socket.on('typing_stop', ({ conversationId }) => {
+    socket.on('typing:stop', async ({ conversationId }) => {
       if (!conversationId) return;
-      const typingStopPayload = {
-        userId,
-        conversationId
-      };
-      socket.to(`conv:${conversationId}`).emit('user_stopped_typing', typingStopPayload);
-      socket.to(`conv:${conversationId}`).emit('typing:stop', typingStopPayload);
+
+      try {
+        const isLast = await typingService.handleTypingStop(userId, companyId, conversationId);
+        socket.typingConvs.delete(conversationId);
+        socket.isRecordingMap?.delete(conversationId);
+
+        if (isLast) {
+          const typingStopPayload = {
+            userId,
+            conversationId
+          };
+          socket.to(`conv:${conversationId}`).emit('user:stopped_typing', typingStopPayload);
+        }
+      } catch (err) {
+        logger.error(`[Typing] Error in typing:stop for ${userId} in ${conversationId}:`, err);
+      }
+    });
+
+    // ── EVENT: MESSAGE DELIVERED (Phase 5) ──────────────────────────────────
+    socket.on('message:delivered', async ({ messageId, conversationId }) => {
+      if (!messageId || !conversationId) return;
+      await readReceiptService.markMessageDelivered(messageId, userId, companyId);
+    });
+
+    // ── EVENT: CONVERSATION READ (Phase 5) ──────────────────────────────────
+    socket.on('conversation:read', async ({ conversationId, lastReadMessageId }) => {
+      if (!conversationId || !lastReadMessageId) return;
+      await readReceiptService.markConversationRead(conversationId, userId, name, lastReadMessageId, companyId);
     });
 
     // ── EVENT: MARK MESSAGES AS READ (WhatsApp blue tick) ──────────────────
@@ -1155,10 +1299,15 @@ export const registerChatSocketHandlers = (io) => {
     });
 
     // ── EVENT: GET ONLINE USERS (on-demand) ─────────────────────────────────
-    socket.on('get_online_users', () => {
-      const onlineList = Array.from(
-        getCompanyOnlineUsers(companyId).entries()
-      ).map(([id, data]) => ({ userId: id, ...data }));
+    socket.on('get_online_users', async () => {
+      let onlineList = [];
+      if (redis.isAvailable) {
+        const presenceResult = await presenceService.getCompanyOnlineUsers(companyId);
+        onlineList = presenceResult.users;
+      } else {
+        const companyUsers = getCompanyOnlineUsers(companyId);
+        onlineList = Array.from(companyUsers.entries()).map(([id, data]) => ({ userId: id, ...data }));
+      }
       socket.emit('online_users_list', onlineList);
     });
     // ── EVENT: WebRTC CALLING ────────────────────────────────────────────────
@@ -1169,11 +1318,20 @@ export const registerChatSocketHandlers = (io) => {
           return;
         }
 
-        const companyUsers = getCompanyOnlineUsers(companyId);
-        const targetOnlineUser = companyUsers.get(targetUserId);
+        let targetOnlineUser = null;
+        let isTargetOnline = false;
+
+        if (redis.isAvailable) {
+          targetOnlineUser = await presenceService.getUserPresence(targetUserId);
+          isTargetOnline = targetOnlineUser && targetOnlineUser.status === 'online';
+        } else {
+          const companyUsers = getCompanyOnlineUsers(companyId);
+          targetOnlineUser = companyUsers.get(targetUserId);
+          isTargetOnline = !!targetOnlineUser;
+        }
 
         let targetInfo;
-        if (targetOnlineUser) {
+        if (isTargetOnline) {
           targetInfo = {
             name: targetOnlineUser.name,
             avatar: targetOnlineUser.avatar
@@ -1218,7 +1376,7 @@ export const registerChatSocketHandlers = (io) => {
         socketActiveCalls.set(socket.id, { callId, targetUserId, companyId, role: 'caller' });
         socket.emit('call:ringing', { callId, callType });
 
-        if (targetOnlineUser) {
+        if (isTargetOnline) {
           io.to(`user:${targetUserId}`).emit('call:incoming', {
             callId,
             callerId: userId,
@@ -1472,6 +1630,25 @@ export const registerChatSocketHandlers = (io) => {
         logger.error('[Chat] Disconnect chatscreen cleanup error:', err);
       }
 
+      // Clean up active typing sessions on disconnect
+      if (socket.typingConvs && socket.typingConvs.size > 0) {
+        for (const conversationId of socket.typingConvs) {
+          try {
+            const isLast = await typingService.handleTypingStop(userId, companyId, conversationId);
+            if (isLast) {
+              socket.to(`conv:${conversationId}`).emit('user:stopped_typing', {
+                userId,
+                conversationId
+              });
+            }
+          } catch (err) {
+            logger.error(`[Typing] Disconnect typing cleanup error for user ${userId} in ${conversationId}:`, err);
+          }
+        }
+        socket.typingConvs.clear();
+        socket.isRecordingMap?.clear();
+      }
+
       // Clean up call if in progress on disconnect
       const activeCall = socketActiveCalls.get(socket.id);
       if (activeCall) {
@@ -1514,73 +1691,116 @@ export const registerChatSocketHandlers = (io) => {
         }
       }
 
+      if (socket.heartbeatInterval) {
+        clearInterval(socket.heartbeatInterval);
+        socket.heartbeatInterval = null;
+      }
+
       if (expiryTimeout) {
         clearTimeout(expiryTimeout);
         expiryTimeout = null;
       }
 
       try {
-        // Check if user has any other active connections
-        const remainingSockets = await io
-          .in(`user:${userId}`)
-          .fetchSockets();
+        if (redis.isAvailable) {
+          const isOffline = await presenceService.handleDisconnect(userId, companyId);
+          if (isOffline) {
+            // Set 3-second debounce before setting Offline status
+            const timer = setTimeout(async () => {
+              try {
+                offlineDebounceTimers.delete(userId);
 
-        // Only mark offline if truly no remaining connections
-        if (remainingSockets.length === 0) {
-          // Dispatch background job to check and send push notifications for missed/unread events
-          queuePushNotification(userId, null, companyId);
+                // Double check that they didn't reconnect globally in Redis
+                const presence = await presenceService.getUserPresence(userId);
+                if (presence.status === 'offline') {
+                  const lastSeen = new Date();
 
-          const lastSeen = new Date();
+                  // Update DB status to Offline
+                  await runTrackedWrite(() =>
+                    runWithTenant(companyId, async () => {
+                      const conn = await getTenantConnection(companyId);
+                      await conn.collection('employees').updateOne(
+                        { id: userId },
+                        { $set: { workStatus: 'Offline', lastSeen } }
+                      );
+                    })
+                  );
 
-          // Set 3-second debounce before setting Offline status
-          const timer = setTimeout(async () => {
-            try {
-              offlineDebounceTimers.delete(userId);
+                  // Notify rest of the company (using io.to to ensure delivery)
+                  const offlinePayload = {
+                    userId,
+                    name,
+                    lastSeen
+                  };
+                  io.to(`company:${companyId}`).emit('user_offline', offlinePayload);
+                  io.to(`company:${companyId}`).emit('user:offline', offlinePayload);
 
-              // Double check that they didn't reconnect
-              const currentSockets = await io.in(`user:${userId}`).fetchSockets();
-              if (currentSockets.length === 0) {
-                // Remove from local in-memory store
-                const companyUsers = getCompanyOnlineUsers(companyId);
-                companyUsers.delete(userId);
+                  // Dispatch background job to check and send push notifications for missed/unread events
+                  queuePushNotification(userId, null, companyId);
 
-                // Update DB status to Offline
-                await runTrackedWrite(() =>
-                  runWithTenant(companyId, async () => {
-                    const conn = await getTenantConnection(companyId);
-                    await conn.collection('employees').updateOne(
-                      { id: userId },
-                      { $set: { workStatus: 'Offline', lastSeen } }
-                    );
-                  })
-                );
-
-                // Delete presence key from Redis (no-op if Redis is unavailable)
-                if (redis.isAvailable) {
-                  await redis.del(`presence::${userId}`).catch(err => {
-                    logger.warn('[Redis] Failed to delete presence on disconnect:', err.message);
-                  });
+                  logger.info(`[Chat] User ${name} (${userId}) marked offline after 3s debounce (Redis)`);
                 }
-
-                // Notify rest of the company (using io.to to ensure delivery)
-                const offlinePayload = {
-                  userId,
-                  name,
-                  lastSeen
-                };
-                io.to(`company:${companyId}`).emit('user_offline', offlinePayload);
-                io.to(`company:${companyId}`).emit('user:offline', offlinePayload);
-
-                logger.info(`[Chat] User ${name} (${userId}) marked offline after 3s debounce`);
+              } catch (err) {
+                logger.error('[Chat] Redis debounce offline transition error:', err);
               }
-            } catch (err) {
-              logger.error('[Chat] Debounce offline transition error:', err);
-            }
-          }, 3000);
+            }, 3000);
 
-          offlineDebounceTimers.set(userId, timer);
+            offlineDebounceTimers.set(userId, timer);
+          }
+        } else {
+          // Fallback when Redis is unavailable (local in-memory mode)
+          const remainingSockets = await io
+            .in(`user:${userId}`)
+            .fetchSockets();
+
+          if (remainingSockets.length === 0) {
+            // Dispatch background job to check and send push notifications for missed/unread events
+            queuePushNotification(userId, null, companyId);
+
+            const lastSeen = new Date();
+
+            // Set 3-second debounce before setting Offline status
+            const timer = setTimeout(async () => {
+              try {
+                offlineDebounceTimers.delete(userId);
+
+                // Double check that they didn't reconnect
+                const currentSockets = await io.in(`user:${userId}`).fetchSockets();
+                if (currentSockets.length === 0) {
+                  // Remove from local in-memory store
+                  const companyUsers = getCompanyOnlineUsers(companyId);
+                  companyUsers.delete(userId);
+
+                  // Update DB status to Offline
+                  await runTrackedWrite(() =>
+                    runWithTenant(companyId, async () => {
+                      const conn = await getTenantConnection(companyId);
+                      await conn.collection('employees').updateOne(
+                        { id: userId },
+                        { $set: { workStatus: 'Offline', lastSeen } }
+                      );
+                    })
+                  );
+
+                  // Notify rest of the company (using io.to to ensure delivery)
+                  const offlinePayload = {
+                    userId,
+                    name,
+                    lastSeen
+                  };
+                  io.to(`company:${companyId}`).emit('user_offline', offlinePayload);
+                  io.to(`company:${companyId}`).emit('user:offline', offlinePayload);
+
+                  logger.info(`[Chat] User ${name} (${userId}) marked offline after 3s debounce (Local)`);
+                }
+              } catch (err) {
+                logger.error('[Chat] Debounce offline transition error:', err);
+              }
+            }, 3000);
+
+            offlineDebounceTimers.set(userId, timer);
+          }
         }
-
       } catch (err) {
         logger.error('[Chat] Disconnect handler error:', err);
       }
