@@ -30,6 +30,103 @@ if (!process.env.REDIS_URL) {
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
+let server;
+let socketHttpServer;
+let isShuttingDown = false;
+
+/**
+ * Handle graceful shutdown of the application
+ */
+const shutdown = async (signal, error = null) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  logger.warn(`Received ${signal}. Gracefully shutting down servers...`);
+  if (error) {
+    logger.error(`Shutdown triggered due to error: ${error.message || error}`, { stack: error.stack });
+  }
+
+  try {
+    const io = getIO();
+    if (io) {
+      io.isShuttingDown = true;
+      logger.info('Socket.io marked as shutting down. Stop accepting new connections.');
+    }
+  } catch (e) {
+    logger.warn(`Socket.io is not initialized or getIO failed: ${e.message}`);
+  }
+
+  // Close servers immediately to stop listening on ports
+  if (server) {
+    server.close(() => {
+      logger.info('HTTP REST server closed.');
+    });
+  }
+
+  if (socketHttpServer) {
+    socketHttpServer.close(() => {
+      logger.info('Socket.io HTTP server closed.');
+    });
+  }
+
+  // 5-second drain window
+  const drainTimeout = 5000;
+  const startTime = Date.now();
+
+  const checkDrain = async () => {
+    const activeWrites = getActiveWrites();
+    const elapsed = Date.now() - startTime;
+
+    if (activeWrites === 0 || elapsed >= drainTimeout) {
+      if (activeWrites > 0) {
+        logger.warn(`Drain timeout reached. Forcefully shutting down with ${activeWrites} active writes in-flight.`);
+      } else {
+        logger.info('All in-flight message saves completed.');
+      }
+
+      // Force disconnect remaining socket connections
+      try {
+        const io = getIO();
+        if (io) {
+          logger.info('Closing active socket connections...');
+          io.disconnectSockets(true);
+        }
+      } catch (e) {
+        logger.error(`Error disconnecting active sockets: ${e.message}`);
+      }
+
+      try {
+        await closeAllConnections();
+        logger.info('Closed all database tenant connections.');
+      } catch (err) {
+        logger.error(`Error closing tenant connections during shutdown: ${err.message}`);
+      }
+
+      try {
+        if (redisClient.isAvailable) {
+          await redisClient.quit();
+          logger.info('Redis connection closed gracefully.');
+        }
+      } catch (redisErr) {
+        logger.error(`Error closing Redis connection during shutdown: ${redisErr.message}`);
+      }
+
+      try {
+        await database.disconnect();
+        logger.info('Main database connection closed.');
+      } catch (dbErr) {
+        logger.error(`Error closing main database connection during shutdown: ${dbErr.message}`);
+      }
+
+      process.exit(error ? 1 : 0);
+    } else {
+      setTimeout(checkDrain, 100);
+    }
+  };
+
+  await checkDrain();
+};
+
 /**
  * Initialize server database and bootstrap listening interface
  */
@@ -62,97 +159,18 @@ const bootstrap = async () => {
     // startImageKitCleanupJob();
 
     const httpServer = createServer(app);
-    const server = httpServer.listen(PORT, () => {
+    server = httpServer.listen(PORT, () => {
       logger.info(`  REST API Server running in [${NODE_ENV}] mode on port ${PORT}`);
       logger.info(`  Client URL allowed: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     });
 
     const socketPort = process.env.SOCKET_PORT || 5001;
-    const socketHttpServer = createServer();
+    socketHttpServer = createServer();
     await initSocket(socketHttpServer);
-    const socketServer = socketHttpServer.listen(socketPort, () => {
+    socketHttpServer.listen(socketPort, () => {
       logger.info(`  Socket.io Server running on dedicated port ${socketPort}`);
       console.log(`Server running on ${socketPort}`);
     });
-
-    // Handle graceful shutdown
-    const shutdown = async (signal) => {
-      logger.warn(`Received ${signal}. Gracefully shutting down servers...`);
-
-      try {
-        const io = getIO();
-        if (io) {
-          io.isShuttingDown = true;
-          logger.info('Socket.io marked as shutting down. Stop accepting new connections.');
-        }
-      } catch (e) {
-        logger.warn('Socket.io is not initialized or getIO failed:', e.message);
-      }
-
-      // Close servers immediately to stop listening on ports
-      server.close(() => {
-        logger.info('HTTP REST server closed.');
-      });
-
-      socketHttpServer.close(() => {
-        logger.info('Socket.io HTTP server closed.');
-      });
-
-      // 5-second drain window
-      const drainTimeout = 5000;
-      const startTime = Date.now();
-
-      const checkDrain = async () => {
-        const activeWrites = getActiveWrites();
-        const elapsed = Date.now() - startTime;
-
-        if (activeWrites === 0 || elapsed >= drainTimeout) {
-          if (activeWrites > 0) {
-            logger.warn(`Drain timeout reached. Forcefully shutting down with ${activeWrites} active writes in-flight.`);
-          } else {
-            logger.info('All in-flight message saves completed.');
-          }
-
-          // Force disconnect remaining socket connections
-          try {
-            const io = getIO();
-            if (io) {
-              logger.info('Closing active socket connections...');
-              io.disconnectSockets(true);
-            }
-          } catch (e) {
-            logger.error('Error disconnecting active sockets:', e);
-          }
-
-          try {
-            await closeAllConnections();
-          } catch (err) {
-            logger.error('Error closing tenant connections during shutdown:', err);
-          }
-
-          try {
-            if (redisClient.isAvailable) {
-              await redisClient.quit();
-              logger.info('Redis connection closed gracefully.');
-            }
-          } catch (redisErr) {
-            logger.error('Error closing Redis connection during shutdown:', redisErr);
-          }
-
-          database.disconnect().then(() => {
-            logger.info('Database connection closed.');
-            process.exit(0);
-          });
-        } else {
-          setTimeout(checkDrain, 100);
-        }
-      };
-
-      checkDrain();
-    };
-
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
 
   } catch (error) {
     logger.error('Failed to bootstrap application server:', error);
@@ -163,12 +181,15 @@ const bootstrap = async () => {
 // Handle unhandled rejections and exceptions
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  // In production, consider crashing or restarting the application gracefully
+  shutdown('unhandledRejection', reason instanceof Error ? reason : new Error(String(reason)));
 });
 
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception thrown:', error);
-  process.exit(1);
+  shutdown('uncaughtException', error);
 });
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 bootstrap();

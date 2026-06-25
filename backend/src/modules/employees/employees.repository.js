@@ -8,6 +8,8 @@ import Admin from '../admin/admin.model.js';
 import Company from '../companies/company.model.js';
 import logger from '../../config/logger.js';
 import { processEmployeeAssets } from '../../utils/imagekit.js';
+import { getTenantId } from '../../utils/tenantContext.js';
+import { CacheKeys, TTL, cacheGetOrSet, cacheDel } from '../../services/cache.service.js';
 
 /**
  * Sync real-time employee counts back into Branch and Department stored fields.
@@ -58,7 +60,21 @@ const syncBranchDeptCounts = async (companyId, branchNames = [], deptNames = [])
  * @param {Object} query - MongoDB query filters
  */
 export const find = async (query = {}) => {
-  logger.info('EmployeesRepository::find querying employees from database...');
+  const companyId = getTenantId();
+  const queryKeys = Object.keys(query).filter(k => k !== 'companyId');
+  const isListQuery = queryKeys.length === 0;
+
+  if (isListQuery && companyId) {
+    const cacheKey = CacheKeys.empList(companyId);
+    return cacheGetOrSet(cacheKey, async () => {
+      logger.info('EmployeesRepository::find querying employees from database...');
+      return Employee.find(query)
+        .select('-attendanceHistory -overtimeHistory -leaveHistory -taskHistory -activityLog -documents')
+        .lean();
+    }, TTL.EMPLOYEE_LIST);
+  }
+
+  logger.info('EmployeesRepository::find querying filtered employees from database...');
   return Employee.find(query)
     .select('-attendanceHistory -overtimeHistory -leaveHistory -taskHistory -activityLog -documents')
     .lean();
@@ -69,23 +85,36 @@ export const find = async (query = {}) => {
  * @param {String} id - Employee business ID (e.g. EMP-2026-001)
  */
 export const findOne = async (id) => {
-  logger.info(`EmployeesRepository::findOne querying employee with ID: ${id}`);
+  const companyId = getTenantId();
+  if (companyId) {
+    const cacheKey = CacheKeys.user(companyId, id);
+    return cacheGetOrSet(cacheKey, async () => {
+      logger.info(`EmployeesRepository::findOne querying employee with ID: ${id}`);
+      let user = await Employee.findOne({ id });
+      if (!user) {
+        logger.info(`EmployeesRepository::findOne employee not found, querying admin with ID: ${id}`);
+        user = await Admin.findOne({ id });
+      }
+      if (!user && (id.startsWith('COMP-') || id.startsWith('comp-'))) {
+        logger.info(`EmployeesRepository::findOne user not found, querying company with ID: ${id}`);
+        const company = await Company.findOne({ id }).lean();
+        if (company) {
+          user = {
+            ...company,
+            roleId: 'company_admin',
+            role: 'CompanyAdmin',
+            companyId: company.id
+          };
+        }
+      }
+      return user;
+    }, TTL.USER_PROFILE);
+  }
+
+  logger.info(`EmployeesRepository::findOne querying employee without tenant context: ${id}`);
   let user = await Employee.findOne({ id });
   if (!user) {
-    logger.info(`EmployeesRepository::findOne employee not found, querying admin with ID: ${id}`);
     user = await Admin.findOne({ id });
-  }
-  if (!user && (id.startsWith('COMP-') || id.startsWith('comp-'))) {
-    logger.info(`EmployeesRepository::findOne user not found, querying company with ID: ${id}`);
-    const company = await Company.findOne({ id }).lean();
-    if (company) {
-      user = {
-        ...company,
-        roleId: 'company_admin',
-        role: 'CompanyAdmin',
-        companyId: company.id
-      };
-    }
   }
   return user;
 };
@@ -106,6 +135,10 @@ export const save = async (data) => {
   }
   // Passively sync stored branch/department counts
   syncBranchDeptCounts(employee.companyId, [employee.branch], [employee.department]);
+
+  // Invalidate cache
+  cacheDel(CacheKeys.empList(employee.companyId)).catch(() => {});
+
   return employee;
 };
 
@@ -145,7 +178,7 @@ export const update = async (id, data) => {
       logger.error('Error upserting tenant user in registry:', err);
     }
   }
-
+  
   if (!updated) {
     logger.info(`EmployeesRepository::update employee not found, trying admin update for ID: ${id}`);
     updated = await Admin.findOneAndUpdate({ id }, updateData, { new: true, runValidators: true });
@@ -177,6 +210,15 @@ export const update = async (id, data) => {
     const affectedBranches = [updated.branch, oldEmployee?.branch].filter(Boolean);
     const affectedDepts = [updated.department, oldEmployee?.department].filter(Boolean);
     syncBranchDeptCounts(updated.companyId, affectedBranches, affectedDepts);
+
+    // Invalidate cache
+    const companyId = updated.companyId || getTenantId();
+    if (companyId) {
+      cacheDel(
+        CacheKeys.user(companyId, id),
+        CacheKeys.empList(companyId)
+      ).catch(() => {});
+    }
   }
   return updated;
 };
@@ -200,6 +242,15 @@ export const remove = async (id) => {
   // Passively sync stored branch/department counts after deletion
   if (employee) {
     syncBranchDeptCounts(employee.companyId, [employee.branch], [employee.department]);
+
+    // Invalidate cache
+    const companyId = employee.companyId || getTenantId();
+    if (companyId) {
+      cacheDel(
+        CacheKeys.user(companyId, id),
+        CacheKeys.empList(companyId)
+      ).catch(() => {});
+    }
   }
   return deleted;
 };

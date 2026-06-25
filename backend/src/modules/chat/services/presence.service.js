@@ -25,6 +25,8 @@ export const handleConnect = async (userId, companyId, name, avatar, chatStatus,
 
     // 1. Increment connection counter
     const count = await redis.incr(connKey);
+    // Set 120s TTL on connection key to prevent leaks on crashed nodes
+    await redis.expire(connKey, 120);
 
     // 2. Set user presence details (Online with 120s TTL)
     const data = {
@@ -55,17 +57,42 @@ export const handleConnect = async (userId, companyId, name, avatar, chatStatus,
  * Refresh TTL for an online user's presence key (Heartbeat)
  * @param {string} userId - Employee/User ID
  */
-export const handleHeartbeat = async (userId) => {
+export const handleHeartbeat = async (userId, companyId = null, name = null, avatar = null, chatStatus = null, statusEmoji = null) => {
   if (!redis.isAvailable) return;
 
   try {
     const presenceKey = `presence:user:${userId}`;
+    const connKey = `connections:user:${userId}`;
+
+    // Refresh TTL on connections key
+    await redis.expire(connKey, 120);
+
     // Read the current data to preserve attributes
     const cached = await redis.get(presenceKey);
     if (cached) {
       const data = JSON.parse(cached);
       data.lastSeen = Date.now();
+      data.status = "online";
       await redis.set(presenceKey, JSON.stringify(data), { EX: 120 });
+    } else if (companyId) {
+      // Recreate presence key if it expired or was evicted, but socket is still active
+      const data = {
+        userId,
+        companyId,
+        name,
+        avatar,
+        status: "online",
+        chatStatus: chatStatus || "available",
+        statusEmoji: statusEmoji || null,
+        lastSeen: Date.now(),
+        isOnChatScreen: false
+      };
+      await redis.set(presenceKey, JSON.stringify(data), { EX: 120 });
+
+      const companyKey = `presence:company:${companyId}`;
+      await redis.sAdd(companyKey, userId);
+
+      logger.info(`[Presence] Recreated expired presence key during heartbeat for user ${userId}`);
     } else {
       // Fallback: set expiry on the key
       await redis.expire(presenceKey, 120);
@@ -128,6 +155,9 @@ export const handleDisconnect = async (userId, companyId) => {
       logger.debug(`[Presence] User ${userId} is now fully offline.`);
       return true;
     }
+
+    // Refresh remaining connection count TTL to prevent leaks
+    await redis.expire(connKey, 120);
 
     logger.debug(`[Presence] User ${userId} disconnected from one connection. Remaining: ${count}`);
     return false;

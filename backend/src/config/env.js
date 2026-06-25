@@ -6,11 +6,16 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-const requiredEnv = ['JWT_SECRET', 'DB_URI', 'IMAGEKIT_PRIVATE_KEY'];
+const requiredEnv = ['JWT_SECRET', 'DB_URI'];
 const missingEnv = requiredEnv.filter((envVar) => !process.env[envVar] || process.env[envVar].includes('***'));
 
 if (missingEnv.length > 0) {
-  console.warn(`[WARNING] Missing or unconfigured environment variables: ${missingEnv.join(', ')}`);
+  if (process.env.NODE_ENV === 'production') {
+    console.error(`[CRITICAL] Missing required environment variables: ${missingEnv.join(', ')}. Server cannot start in production mode.`);
+    process.exit(1);
+  } else {
+    console.warn(`[WARNING] Missing or unconfigured environment variables: ${missingEnv.join(', ')}`);
+  }
 }
 
 export const env = {

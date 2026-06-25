@@ -1,23 +1,41 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Bell, CheckSquare } from 'lucide-react';
+/**
+ * @file NotificationBell.jsx
+ * @description Enterprise Notification Bell — Top-bar entry point.
+ *
+ *   Features:
+ *   • Live unread badge (Redis-first count)
+ *   • Bell ring animation on new notification
+ *   • Auto-sync on socket connect/reconnect (server-driven)
+ *   • Dropdown quick-view panel
+ *   • Full notification center drawer
+ *   • Keyboard accessible (Enter/Space to toggle)
+ */
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Bell } from 'lucide-react';
 import { getSocket } from '../../lib/socketManager';
 import { useApp } from '../../context/AppContext';
 import NotificationPanel from './NotificationPanel';
 import NotificationDrawer from './NotificationDrawer';
 import './NotificationComponents.css';
 
+const API_BASE = window.API_URL || 'http://localhost:5000';
+
 const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isRinging, setIsRinging] = useState(false);
+
   const { token, currentUser } = useApp();
   const bellRef = useRef(null);
 
-  const playNotificationChime = () => {
+  // ── AUDIO CHIME ───────────────────────────────────────────────────────────
+  const playNotificationChime = useCallback(() => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const playTone = (freq, startTime, duration, vol = 0.1) => {
+      const playTone = (freq, startTime, duration, vol = 0.08) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
@@ -30,99 +48,139 @@ const NotificationBell = () => {
         osc.start(startTime);
         osc.stop(startTime + duration);
       };
-      playTone(1046.50, ctx.currentTime, 0.12); // C6
+      playTone(1046.5, ctx.currentTime, 0.12);       // C6
       playTone(1318.51, ctx.currentTime + 0.08, 0.16); // E6
     } catch (err) {
-      console.warn('[NotificationBell] Failed to play chime:', err);
+      // AudioContext may be blocked before user interaction — safe to ignore
     }
-  };
+  }, []);
 
-  const fetchUnreadCount = async () => {
+  // ── BELL RING ANIMATION ───────────────────────────────────────────────────
+  const triggerBellRing = useCallback(() => {
+    setIsRinging(true);
+    const t = setTimeout(() => setIsRinging(false), 700);
+    return () => clearTimeout(t);
+  }, []);
+
+  // ── API HELPERS ───────────────────────────────────────────────────────────
+  const fetchUnreadCount = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/unread-count`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch(`${API_BASE}/api/v1/notifications/unread-count`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const result = await response.json();
+      const result = await res.json();
       if (result.status === 'success' && result.data) {
-        setUnreadCount(result.data.count);
+        setUnreadCount(result.data.count ?? 0);
       }
     } catch (err) {
-      console.error('[NotificationBell] Failed to fetch unread count:', err);
+      // Non-critical — silently fail
     }
-  };
+  }, [token]);
 
-  const fetchRecentNotifications = async () => {
+  const fetchRecentNotifications = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications?limit=5`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetch(`${API_BASE}/api/v1/notifications?limit=5`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const result = await response.json();
+      const result = await res.json();
       if (result.status === 'success' && result.data) {
         setNotifications(result.data.notifications || []);
       }
     } catch (err) {
-      console.error('[NotificationBell] Failed to fetch recent notifications:', err);
+      // Non-critical
     }
-  };
+  }, [token]);
 
-  // Sync / mark all as read
-  const handleMarkAllRead = async () => {
+  // ── MARK ALL AS READ ──────────────────────────────────────────────────────
+  const handleMarkAllRead = useCallback(async () => {
     if (!token) return;
     try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/read-all`, {
+      const res = await fetch(`${API_BASE}/api/v1/notifications/read-all`, {
         method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const result = await response.json();
+      const result = await res.json();
       if (result.status === 'success') {
         setUnreadCount(0);
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-        
-        // Notify socket
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
         const socket = getSocket();
         socket?.emit('notification:opened');
       }
     } catch (err) {
       console.error('[NotificationBell] Mark all read failed:', err);
     }
-  };
-
-  useEffect(() => {
-    fetchUnreadCount();
-    fetchRecentNotifications();
   }, [token]);
 
-  // Socket connection and listener registry
+  // ── INITIAL LOAD ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (token) {
+      fetchUnreadCount();
+      fetchRecentNotifications();
+    }
+  }, [token, fetchUnreadCount, fetchRecentNotifications]);
+
+  // ── SOCKET LISTENERS ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentUser) return;
     const socket = getSocket();
     if (!socket) return;
 
+    /**
+     * New notification arrived in real-time.
+     * Increment badge, prepend to list, animate bell.
+     */
     const handleNewNotification = (notif) => {
-      setUnreadCount(prev => prev + 1);
-      setNotifications(prev => [notif, ...prev.slice(0, 4)]);
+      setUnreadCount((prev) => prev + 1);
+      setNotifications((prev) => {
+        const merged = [notif, ...prev];
+        // Deduplicate by id
+        const seen = new Set();
+        return merged.filter((n) => {
+          const id = n.id || n._id;
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        }).slice(0, 5);
+      });
+      triggerBellRing();
       playNotificationChime();
     };
 
+    /**
+     * Server pushes authoritative unread count
+     * (on connect, after mark-read via REST on another tab, etc.)
+     */
     const handleUnreadCount = ({ count }) => {
-      setUnreadCount(count);
+      setUnreadCount(typeof count === 'number' ? count : 0);
     };
 
+    /**
+     * Server confirms all-read reset.
+     */
     const handleUnreadReset = () => {
       setUnreadCount(0);
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     };
 
+    /**
+     * Server pushes missed notifications from Redis queue on reconnect.
+     * Client deduplicates by id.
+     */
     const handleSync = (missedNotifs) => {
-      if (missedNotifs && missedNotifs.length > 0) {
-        setNotifications(prev => {
-          const merged = [...missedNotifs, ...prev];
-          const unique = Array.from(new Map(merged.map(item => [item.id || item._id, item])).values());
-          return unique.slice(0, 5);
-        });
-        setUnreadCount(prev => prev + missedNotifs.length);
-      }
+      if (!missedNotifs || missedNotifs.length === 0) return;
+
+      setNotifications((prev) => {
+        const merged = [...missedNotifs, ...prev];
+        const seen = new Set();
+        return merged.filter((n) => {
+          const id = n.id || n._id;
+          if (!id || seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        }).slice(0, 5);
+      });
     };
 
     socket.on('notification:new', handleNewNotification);
@@ -130,18 +188,22 @@ const NotificationBell = () => {
     socket.on('notification:unread_reset', handleUnreadReset);
     socket.on('notification:sync', handleSync);
 
-    // Auto-sync offline notifications on connect/reconnect
-    socket.emit('notification:sync');
+    // On reconnect: re-fetch count as a safety fallback
+    const handleReconnect = () => {
+      fetchUnreadCount();
+    };
+    socket.on('connect', handleReconnect);
 
     return () => {
       socket.off('notification:new', handleNewNotification);
       socket.off('notification:unread_count', handleUnreadCount);
       socket.off('notification:unread_reset', handleUnreadReset);
       socket.off('notification:sync', handleSync);
+      socket.off('connect', handleReconnect);
     };
-  }, [currentUser]);
+  }, [currentUser, triggerBellRing, playNotificationChime, fetchUnreadCount]);
 
-  // Click outside listener
+  // ── CLICK OUTSIDE ─────────────────────────────────────────────────────────
   useEffect(() => {
     const clickOutside = (e) => {
       if (bellRef.current && !bellRef.current.contains(e.target)) {
@@ -152,22 +214,43 @@ const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', clickOutside);
   }, []);
 
+  // ── KEYBOARD ──────────────────────────────────────────────────────────────
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') setPanelOpen(false);
+  };
+
+  // ── TOGGLE PANEL ──────────────────────────────────────────────────────────
   const handleTogglePanel = () => {
-    setPanelOpen(!panelOpen);
-    if (!panelOpen) {
-      // Mark as opened to reset unread count when opening panel
-      const socket = getSocket();
-      socket?.emit('notification:opened');
+    const willOpen = !panelOpen;
+    setPanelOpen(willOpen);
+
+    if (willOpen) {
+      // Reset badge when opening
       setUnreadCount(0);
       fetchRecentNotifications();
+      // Notify server to reset Redis counter
+      const socket = getSocket();
+      socket?.emit('notification:opened');
     }
   };
 
+  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div className="notif-bell-container" ref={bellRef}>
-      <button className="notif-bell-btn" onClick={handleTogglePanel} title="Notifications">
-        <Bell size={20} />
-        {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
+    <div className="notif-bell-container" ref={bellRef} onKeyDown={handleKeyDown}>
+      <button
+        className={`notif-bell-btn${isRinging ? ' notif-bell-ring' : ''}`}
+        onClick={handleTogglePanel}
+        title="Notifications"
+        aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+        aria-expanded={panelOpen}
+        aria-haspopup="dialog"
+      >
+        <Bell size={20} className="notif-bell-icon" />
+        {unreadCount > 0 && (
+          <span className="notif-badge" aria-hidden="true">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
       </button>
 
       {panelOpen && (
@@ -175,7 +258,10 @@ const NotificationBell = () => {
           notifications={notifications}
           onMarkAllRead={handleMarkAllRead}
           onClose={() => setPanelOpen(false)}
-          onOpenDrawer={() => setDrawerOpen(true)}
+          onOpenDrawer={() => {
+            setPanelOpen(false);
+            setDrawerOpen(true);
+          }}
         />
       )}
 
