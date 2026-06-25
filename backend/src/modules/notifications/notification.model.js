@@ -42,7 +42,7 @@ const notificationSchema = new mongoose.Schema({
 }, {
   timestamps: true,
   collection: 'notifications'
-});
+}); 
 
 // Enforce multi-tenancy
 notificationSchema.plugin(tenantPlugin);
