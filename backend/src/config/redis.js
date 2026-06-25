@@ -1,108 +1,127 @@
 /**
  * @file src/config/redis.js
- * @description Redis client with graceful degradation.
- *   - Attempts to connect to Redis on startup.
- *   - If Redis is unavailable (e.g. local dev without Redis installed),
- *     the client stops retrying after MAX_RETRIES and marks itself unavailable.
- *   - All callers should use `redis.isAvailable` to guard optional Redis ops,
- *     or simply rely on the `.catch(() => ...)` fallbacks already in place.
+ * @description Redis client configuration using official Redis v4 client with TLS and ioredis compatibility wrapper.
  */
 
-import Redis from 'ioredis';
-import logger from './logger.js';
+import { createClient } from "redis";
+import dotenv from "dotenv";
+import logger from "./logger.js";
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-const MAX_RETRIES = 3;     // Stop retrying after this many attempts
-const LOG_THROTTLE_MS = 30_000; // Only log repeated errors every 30 s
+dotenv.config();
 
-let retryCount = 0;
-let lastErrorLoggedAt = 0;
+const REDIS_URL = process.env.REDIS_URL;
 
-// ── Initialize client ────────────────────────────────────────────────────────
-const redis = new Redis(REDIS_URL, {
-  lazyConnect: false,
-  maxRetriesPerRequest: 0,   // Don't hang individual commands waiting for reconnect
-  enableOfflineQueue: false, // Fail commands immediately when disconnected
-  retryStrategy(times) {
-    retryCount = times;
-    if (times > MAX_RETRIES) {
-      // Stop retrying — Redis is simply not available in this environment
-      redis.isAvailable = false;
-      return null; // null = stop reconnecting
-    }
-    return Math.min(times * 500, 2000);
+// Convert redis:// to rediss:// to satisfy TLS/SSL requirements of Upstash Redis v4
+const finalUrl = REDIS_URL && REDIS_URL.startsWith("redis://")
+  ? REDIS_URL.replace(/^redis:/, "rediss:")
+  : REDIS_URL;
+
+const client = createClient({
+  url: finalUrl,
+  socket: {
+    tls: true,
+    rejectUnauthorized: false
   }
 });
 
-// Publicly readable flag — other modules check this before using Redis
-redis.isAvailable = false;
+// Flag to track client availability across the application
+client.isAvailable = false;
 
-redis.on('connect', () => {
-  redis.isAvailable = true;
-  retryCount = 0;
-  logger.info(`[Redis] Connected successfully at ${REDIS_URL.replace(/\/\/.*@/, '//')}`);
+// ── Event Handlers ───────────────────────────────────────────────────────────
+client.on("connect", () => {
+  client.isAvailable = true;
+  logger.info(`[Redis] Connected successfully at ${REDIS_URL ? REDIS_URL.replace(/\/\/.*@/, '//') : ''}`);
 });
 
-redis.on('ready', () => {
-  redis.isAvailable = true;
-  logger.info('[Redis] Client is ready to accept commands');
+client.on("ready", () => {
+  client.isAvailable = true;
+  logger.info("[Redis] Client is ready to accept commands");
 });
 
-redis.on('error', (err) => {
-  redis.isAvailable = false;
-  const now = Date.now();
-  // Only log if this is the first error OR 30 s has passed since last log
-  if (now - lastErrorLoggedAt > LOG_THROTTLE_MS || retryCount <= 1) {
-    lastErrorLoggedAt = now;
-    if (err.code === 'ECONNREFUSED') {
-      logger.warn(
-        `[Redis] Connection refused at ${REDIS_URL.replace(/\/\/.*@/, '//')} ` +
-        `(attempt ${retryCount}/${MAX_RETRIES}). ` +
-        `App will run without Redis — presence & pub/sub features degraded.`
-      );
-    } else {
-      logger.error('[Redis] Error:', err.message || err);
-    }
-  }
+client.on("error", (err) => {
+  client.isAvailable = false;
+  logger.error(`[Redis] Error: ${err.message || err}`);
 });
 
-redis.on('close', () => {
-  if (redis.isAvailable) {
-    redis.isAvailable = false;
-    logger.warn('[Redis] Connection closed');
-  }
+client.on("reconnecting", () => {
+  logger.info("[Redis] Reconnecting...");
 });
 
-redis.on('end', () => {
-  redis.isAvailable = false;
-  if (retryCount > MAX_RETRIES) {
-    logger.warn('[Redis] Gave up reconnecting after max retries. Running without Redis.');
-  }
+client.on("end", () => {
+  client.isAvailable = false;
+  logger.warn("[Redis] Connection closed");
 });
 
-// ── Safe wrapper ─────────────────────────────────────────────────────────────
-// Convenience helper — silently no-ops when Redis is down
-redis.safeExec = async (fn) => {
-  if (!redis.isAvailable) return null;
+// ── Safe Exec Helper ──────────────────────────────────────────────────────────
+client.safeExec = async (fn) => {
+  if (!client.isAvailable) return null;
   try {
-    return await fn(redis);
+    return await fn(client);
   } catch (err) {
-    logger.warn('[Redis] Safe exec failed:', err.message);
+    logger.warn(`[Redis] Safe exec failed: ${err.message}`);
     return null;
   }
 };
 
-// ── Duplicate factory (error handler auto-attached) ───────────────────────────
-const originalDuplicate = redis.duplicate.bind(redis);
-redis.duplicate = function (...args) {
+// ── ioredis Signature Compatibility Layer ─────────────────────────────────────
+const originalSet = client.set.bind(client);
+client.set = function (key, value, ...args) {
+  if (args.length === 2 && args[0] === "PX") {
+    return originalSet(key, value, { PX: args[1] });
+  }
+  if (args.length === 2 && args[0] === "EX") {
+    return originalSet(key, value, { EX: args[1] });
+  }
+  return originalSet(key, value, ...args);
+};
+
+client.pexpire = function (key, milliseconds) {
+  return client.pExpire(key, milliseconds);
+};
+
+client.mget = function (keys) {
+  return client.mGet(keys);
+};
+
+// ── Duplicate Factory ─────────────────────────────────────────────────────────
+const originalDuplicate = client.duplicate.bind(client);
+client.duplicate = function (...args) {
   const dup = originalDuplicate(...args);
-  // Inherit availability flag
-  dup.isAvailable = redis.isAvailable;
-  dup.on('connect', () => { dup.isAvailable = true; });
-  dup.on('ready',   () => { dup.isAvailable = true; });
-  dup.on('error',   () => { dup.isAvailable = false; });
-  dup.on('end',     () => { dup.isAvailable = false; });
+  dup.isAvailable = client.isAvailable;
+
+  const dupOriginalSet = dup.set.bind(dup);
+  dup.set = function (key, value, ...args) {
+    if (args.length === 2 && args[0] === "PX") {
+      return dupOriginalSet(key, value, { PX: args[1] });
+    }
+    if (args.length === 2 && args[0] === "EX") {
+      return dupOriginalSet(key, value, { EX: args[1] });
+    }
+    return dupOriginalSet(key, value, ...args);
+  };
+
+  dup.pexpire = function (key, milliseconds) {
+    return dup.pExpire(key, milliseconds);
+  };
+
+  dup.mget = function (keys) {
+    return dup.mGet(keys);
+  };
+
+  dup.on("connect", () => { dup.isAvailable = true; });
+  dup.on("ready", () => { dup.isAvailable = true; });
+  dup.on("error", (err) => {
+    dup.isAvailable = false;
+    logger.error(`[Redis Duplicate] Error: ${err.message || err}`);
+  });
+  dup.on("end", () => { dup.isAvailable = false; });
+
+  // Asynchronously connect the duplicate client to mirror auto-connect behavior of ioredis
+  dup.connect().catch((err) => {
+    logger.error(`[Redis] Failed to connect duplicate client: ${err.message}`);
+  });
+
   return dup;
 };
 
-export default redis;
+export default client;

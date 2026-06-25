@@ -23,6 +23,11 @@ router.get('/push/key', pushNotificationController.getPublicKey);
 router.post('/push/subscribe', pushNotificationController.subscribe);
 router.post('/push/unsubscribe', pushNotificationController.unsubscribe);
 
+// ─── ENTERPRISE NOTIFICATION ENGINE REST ENDPOINTS ──────────────────────────
+router.get('/unread-count', controller.getUnreadCount);
+router.patch('/read-all', controller.markAllRead);
+router.patch('/:id/read', controller.markRead);
+
 router.route('/')
   .get(controller.getAll)
   .post(validateRequest(validation.create), controller.create);

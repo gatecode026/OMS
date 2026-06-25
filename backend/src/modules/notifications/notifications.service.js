@@ -1,8 +1,10 @@
 /**
  * @file src/modules/notifications/notifications.service.js
- * @description Service business logic for Notifications module.
+ * @description Plural service proxy for the Notifications module.
+ *   Provides compatibility wrapper around core notification.service.js functions.
  */
 
+import notificationService from './notification.service.js';
 import repository from './notifications.repository.js';
 import logger from '../../config/logger.js';
 
@@ -18,7 +20,13 @@ export const findById = async (id) => {
 
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing NotificationsService::createRecord by user: ' + currentUser?.id);
-  return repository.save(data);
+  // Route through the new enterprise creation engine
+  return notificationService.createNotification(data.userId || currentUser?.id, currentUser?.companyId, {
+    type: data.type || 'system',
+    title: data.title,
+    message: data.message,
+    data: data.data || {}
+  });
 };
 
 export const updateRecord = async (id, data, currentUser) => {
@@ -31,10 +39,28 @@ export const deleteRecord = async (id, currentUser) => {
   return repository.remove(id);
 };
 
+// Re-export all functions from singular notificationService for complete coverage
+export const createNotification = notificationService.createNotification;
+export const getUnreadCount = notificationService.getUnreadCount;
+export const resetUnreadCount = notificationService.resetUnreadCount;
+export const getNotifications = notificationService.getNotifications;
+export const syncOfflineNotifications = notificationService.syncOfflineNotifications;
+export const markAsRead = notificationService.markAsRead;
+export const markAllAsRead = notificationService.markAllAsRead;
+export const broadcastAnnouncement = notificationService.broadcastAnnouncement;
+
 export default {
   findAll,
   findById,
   createRecord,
   updateRecord,
-  deleteRecord
+  deleteRecord,
+  createNotification,
+  getUnreadCount,
+  resetUnreadCount,
+  getNotifications,
+  syncOfflineNotifications,
+  markAsRead,
+  markAllAsRead,
+  broadcastAnnouncement
 };

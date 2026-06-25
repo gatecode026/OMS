@@ -598,41 +598,70 @@ mark.search-highlight, .search-highlight {
   border-radius: 12px;
 }
 
-/* Typing indicator */
-.chat-typing-indicator {
+/* Premium Theme-Aware Typing indicator */
+.typing-indicator-container {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  padding: 6px 12px;
+  animation: float-up-fade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.typing-indicator-bubble {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
-  padding: 6px 0;
-}
-
-.chat-typing-avatar {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 600; color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.chat-typing-bubble {
-  background: var(--chat-other-bg);
-  border: 1px solid var(--chat-border);
-  border-radius: 18px 18px 18px 4px;
-  padding: 10px 16px;
-  display: flex; gap: 5px; align-items: center;
+  background: var(--chat-other-bg, var(--bg-card, #ffffff));
+  border: 1px solid var(--chat-border, #e2e8f0);
+  border-radius: var(--chat-radius, 16px) var(--chat-radius, 16px) var(--chat-radius, 16px) 4px;
+  padding: 10px 14px;
   box-shadow: var(--chat-shadow);
+  max-width: 85%;
+}
+
+.typing-indicator-text {
+  font-size: 13.5px;
+  color: var(--chat-other-text, var(--text-primary, #1e293b));
+  display: inline-flex;
+  align-items: center;
+}
+
+.typing-username {
+  font-weight: 600;
+  color: var(--chat-other-text, var(--text-primary, #1e293b));
+  margin-right: 4px;
+}
+
+.typing-indicator-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  margin-left: 2px;
+  margin-top: 4px; /* align slightly to match text bottom */
 }
 
 .typing-dot {
-  width: 7px; height: 7px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: var(--text-muted);
+  background: var(--chat-other-text, var(--text-primary, #1e293b));
+  opacity: 0.6;
   animation: typing-bounce 1.2s ease-in-out infinite;
 }
 
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes float-up-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 /* Scroll to bottom button */
 .chat-scroll-bottom-btn {
@@ -3684,5 +3713,55 @@ input:checked + .notif-slider:before {
     display: flex;
   }
 }
+
+/* Custom visual swapping overrides for threads */
+.thread-reply-item.visual-align-right {
+  flex-direction: row-reverse;
+}
+.thread-reply-item.visual-align-left {
+  flex-direction: row;
+}
+.reply-content-box.visual-color-own {
+  background: var(--chat-own-bg, var(--chat-primary, #6366f1)) !important;
+  color: var(--chat-own-text, #ffffff) !important;
+  border: none !important;
+}
+.reply-content-box.visual-color-own .reply-sender-name {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+.reply-content-box.visual-color-own .reply-sent-time {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+.reply-content-box.visual-color-own .reply-file-card {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+.reply-content-box.visual-color-own .reply-file-card .file-link {
+  color: #ffffff !important;
+}
+.reply-content-box.visual-color-own .reply-delivery-status {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.reply-content-box.visual-color-other {
+  background: var(--chat-other-bg, var(--bg-card, #ffffff)) !important;
+  color: var(--chat-other-text, var(--text-primary, #1e293b)) !important;
+  border: 1px solid var(--chat-border, #e2e8f0) !important;
+}
+.reply-content-box.visual-color-other .reply-sender-name {
+  color: var(--chat-other-text, var(--text-primary, #1e293b)) !important;
+}
+.reply-content-box.visual-color-other .reply-sent-time {
+  color: var(--text-muted, #94a3b8) !important;
+}
+.reply-content-box.visual-color-other .reply-file-card {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+.reply-content-box.visual-color-other .reply-file-card .file-link {
+  color: var(--chat-primary, #6366f1) !important;
+}
+.reply-content-box.visual-color-other .reply-delivery-status {
+  color: var(--text-muted, #94a3b8) !important;
+}
+
 
 

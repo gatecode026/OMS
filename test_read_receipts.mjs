@@ -1,8 +1,9 @@
 import puppeteer from 'puppeteer-core';
 
 async function run() {
+  console.log('=== Phase 5 Read Receipts Integration Test ===');
   console.log('Launching Chrome instances...');
-  
+
   const launchOptions = {
     headless: true,
     executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -22,51 +23,18 @@ async function run() {
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
 
-    // Catch page errors
+    // Catch page errors and logs
     pageA.on('pageerror', err => {
-      console.error('\n>>> BROWSER A PAGE ERROR <<<');
-      console.error(err.stack || err.message || err);
+      console.error('[Browser A Error]', err);
     });
-
-    pageB.on('pageerror', err => {
-      console.error('\n>>> BROWSER B PAGE ERROR <<<');
-      console.error(err.stack || err.message || err);
-    });
-
-    pageA.on('response', async response => {
-      if (response.status() === 500) {
-        console.log(`[A Response 500] URL: ${response.url()}`);
-        try {
-          const text = await response.text();
-          console.log(`[A Response 500 Body] ${text}`);
-        } catch (e) {
-          console.log(`[A Response 500 Body Error] ${e.message}`);
-        }
-      }
-    });
-
-    pageB.on('response', async response => {
-      if (response.status() === 500) {
-        console.log(`[B Response 500] URL: ${response.url()}`);
-        try {
-          const text = await response.text();
-          console.log(`[B Response 500 Body] ${text}`);
-        } catch (e) {
-          console.log(`[B Response 500 Body Error] ${e.message}`);
-        }
-      }
-    });
-
-    // Capture console messages for debug
     pageA.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.log(`[A Error] ${msg.text()}`);
-      }
+      console.log('[Browser A Console]', msg.text());
+    });
+    pageB.on('pageerror', err => {
+      console.error('[Browser B Error]', err);
     });
     pageB.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.log(`[B Error] ${msg.text()}`);
-      }
+      console.log('[Browser B Console]', msg.text());
     });
 
     // Login A (Geeta)
@@ -100,7 +68,7 @@ async function run() {
 
     // Open chat on both ends
     console.log('[Geeta] Opening chat with Rahul...');
-    const clickedA = await pageA.evaluate(() => {
+    const geetaClicked = await pageA.evaluate(() => {
       const items = Array.from(document.querySelectorAll('.conv-item'));
       const target = items.find(item => item.textContent.toLowerCase().includes('rahul'));
       if (target) {
@@ -109,13 +77,10 @@ async function run() {
       }
       return false;
     });
-    if (!clickedA) {
-      console.log('[Geeta] Clicked first conversation instead.');
-      await pageA.click('.conv-item');
-    }
+    console.log(`[Geeta] Clicked conversation: ${geetaClicked}`);
 
     console.log('[Rahul] Opening chat with Geeta...');
-    const clickedB = await pageB.evaluate(() => {
+    const rahulClicked = await pageB.evaluate(() => {
       const items = Array.from(document.querySelectorAll('.conv-item'));
       const target = items.find(item => item.textContent.toLowerCase().includes('geeta'));
       if (target) {
@@ -124,50 +89,64 @@ async function run() {
       }
       return false;
     });
-    if (!clickedB) {
-      console.log('[Rahul] Clicked first conversation instead.');
-      await pageB.click('.conv-item');
-    }
+    console.log(`[Rahul] Clicked conversation: ${rahulClicked}`);
 
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    // Define unique test message
+    // Send a message from Geeta
     const timestamp = Date.now();
-    const testMessage = `Test Message Standardized Event ${timestamp}`;
-    console.log(`[Geeta] Sending test message: "${testMessage}"`);
+    const testMessage = `Receipts Test ${timestamp}`;
+    console.log(`[Geeta] Sending message: "${testMessage}"`);
 
-    // Type and send message
     await pageA.waitForSelector('.msg-input-textarea', { timeout: 10000 });
+    await pageA.focus('.msg-input-textarea');
     await pageA.type('.msg-input-textarea', testMessage);
     
-    // Find and click send button
-    console.log('[Geeta] Clicking send button...');
-    await pageA.waitForSelector('.msg-input-send-active', { timeout: 10000 });
-    await pageA.click('.msg-input-send-active');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    // Wait and check if message appears on Rahul's screen (real-time)
-    console.log('[Rahul] Checking if message is received in real-time...');
-    let messageReceived = false;
-    for (let i = 0; i < 10; i++) {
-      messageReceived = await pageB.evaluate((msgText) => {
-        const messages = Array.from(document.querySelectorAll('*'));
-        return messages.some(el => el.textContent && el.textContent.includes(msgText));
+    // Verify textarea content
+    const typedText = await pageA.evaluate(() => {
+      const ta = document.querySelector('.msg-input-textarea');
+      return ta ? ta.value : '';
+    });
+    console.log(`[Geeta Textarea Content] typed text in textarea: "${typedText}"`);
+
+    // Press Enter to send
+    await pageA.keyboard.press('Enter');
+    console.log('[Geeta] Pressed Enter key to send');
+
+    // Wait for message bubble on Geeta's screen and check status
+    console.log('[Geeta] Waiting for message bubble to render...');
+    await pageA.waitForSelector('.msg-row-other .msg-bubble', { timeout: 10000 }); // msg-row-other means own message for flex-direction: row-reverse
+
+    // Let's check status transitions on Geeta's screen
+    console.log('[Geeta] Checking status ticks...');
+    let statusText = '';
+    for (let i = 0; i < 20; i++) {
+      statusText = await pageA.evaluate((msgText) => {
+        const bubbles = Array.from(document.querySelectorAll('.msg-row-other'));
+        console.log(`[Eval] Found ${bubbles.length} own messages (msg-row-other)`);
+        bubbles.forEach((b, idx) => {
+          console.log(`[Eval] msg[${idx}]: "${b.textContent.trim().replace(/\s+/g, ' ')}"`);
+        });
+        const bubble = bubbles.find(b => b.textContent.includes(msgText));
+        if (!bubble) return 'not_found';
+        const statusEl = bubble.querySelector('.msg-status-container');
+        return statusEl ? statusEl.textContent.trim() : 'no_status';
       }, testMessage);
 
-      if (messageReceived) {
+      console.log(`[Geeta Screen Status] Current: "${statusText}"`);
+      if (statusText === 'Seen') {
+        console.log('SUCCESS: Tick status transitioned to Seen (blue double tick) successfully!');
         break;
       }
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    if (messageReceived) {
-      console.log('SUCCESS: Message received by Rahul in real-time!');
-    } else {
-      console.error('FAILURE: Message NOT received by Rahul in real-time within 10 seconds.');
-      throw new Error('Real-time delivery verification failed');
+    if (statusText !== 'Seen') {
+      console.error(`FAILURE: Did not transition to Seen. Last status was: "${statusText}"`);
+      throw new Error('Read receipt verification failed');
     }
 
-    console.log('Done testing successfully!');
+    console.log('=== Test Passed Successfully ===');
   } catch (err) {
     console.error('Test execution failed:', err);
     process.exit(1);

@@ -16,9 +16,16 @@ import { startPollExpiryJob } from './src/jobs/pollExpiry.job.js';
 import { closeAllConnections } from './src/utils/multidbConnection.js';
 import { initSocket, getIO } from './src/config/socket.js';
 import { getActiveWrites } from './src/modules/chat/chat.socket.js';
+import redisClient from './src/config/redis.js';
 
 // Load environment variables
 dotenv.config();
+
+// Verify REDIS_URL exists
+if (!process.env.REDIS_URL) {
+  logger.error('❌ REDIS_URL is missing');
+  process.exit(1);
+}
 
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -30,6 +37,17 @@ const bootstrap = async () => {
   try {
     // Connect to database (simulated/future integration)
     await database.connect();
+
+    // Connect to Redis and verify connectivity
+    try {
+      await redisClient.connect();
+      const pingResponse = await redisClient.ping();
+      logger.info('✅ Redis Connected');
+      logger.info(`Redis Ping: ${pingResponse}`);
+      console.log('✅ Redis Connected');
+    } catch (err) {
+      logger.error(`[Redis] Failed to connect on startup: ${err.message || err}`);
+    }
 
     // Start background meeting reminder checks
     startEventScheduler();
@@ -49,12 +67,12 @@ const bootstrap = async () => {
       logger.info(`  Client URL allowed: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
     });
 
-    // Run Socket.io on dedicated port 5001
     const socketPort = process.env.SOCKET_PORT || 5001;
     const socketHttpServer = createServer();
     await initSocket(socketHttpServer);
     const socketServer = socketHttpServer.listen(socketPort, () => {
       logger.info(`  Socket.io Server running on dedicated port ${socketPort}`);
+      console.log(`Server running on ${socketPort}`);
     });
 
     // Handle graceful shutdown
@@ -110,6 +128,15 @@ const bootstrap = async () => {
             await closeAllConnections();
           } catch (err) {
             logger.error('Error closing tenant connections during shutdown:', err);
+          }
+
+          try {
+            if (redisClient.isAvailable) {
+              await redisClient.quit();
+              logger.info('Redis connection closed gracefully.');
+            }
+          } catch (redisErr) {
+            logger.error('Error closing Redis connection during shutdown:', redisErr);
           }
 
           database.disconnect().then(() => {

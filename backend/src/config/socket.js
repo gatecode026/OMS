@@ -13,6 +13,7 @@ import logger from './logger.js';
 import { socketAuthMiddleware } from '../middlewares/socketAuth.middleware.js';
 import { registerChatSocketHandlers } from '../modules/chat/chat.socket.js';
 import env from './env.js';
+import { createAdapter } from '@socket.io/redis-adapter';
 
 let io = null;
 
@@ -46,10 +47,21 @@ export const initSocket = async (httpServer) => {
 
   if (redisReady && redis.isAvailable) {
     try {
-      const { createAdapter } = await import('@socket.io/redis-adapter');
+      const pubClient = redis;
       const subClient = redis.duplicate();
-      io.adapter(createAdapter(redis, subClient));
+      if (!subClient.isOpen) {
+        try {
+          await subClient.connect();
+        } catch (connectErr) {
+          if (!connectErr.message?.includes('Socket already opened')) {
+            throw connectErr;
+          }
+        }
+      }
+      io.adapter(createAdapter(pubClient, subClient));
+      io.redisAdapterEnabled = true;
       logger.info('[Socket.io] Using Redis pub/sub adapter (multi-instance mode)');
+      console.log('✅ Socket.IO Redis Adapter Enabled');
     } catch (err) {
       logger.warn('[Socket.io] Failed to set up Redis adapter — using in-memory adapter:', err.message);
     }
@@ -76,6 +88,7 @@ export const initSocket = async (httpServer) => {
   registerChatSocketHandlers(io);
 
   logger.info('[Socket.io] Server initialized with JWT auth + Chat handlers');
+  console.log('✅ Presence Service Started');
   return io;
 };
 

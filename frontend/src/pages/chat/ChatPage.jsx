@@ -19,7 +19,15 @@ const ChatPage = () => {
     showMobileList: showList, setShowMobileList: setShowList,
     enterChatScreen, leaveChatScreen
   } = useChat();
-  const { currentUser } = useApp();
+  const { currentUser: simulatedUser } = useApp();
+  const currentUser = React.useMemo(() => {
+    try {
+      const saved = localStorage.getItem('saas_user');
+      return saved ? JSON.parse(saved) : simulatedUser;
+    } catch (e) {
+      return simulatedUser;
+    }
+  }, [simulatedUser]);
   const [leftPanel, setLeftPanel] = useState('list'); // 'list' | 'archived' | 'hidden'
 
   // Notify server of chat screen visibility
