@@ -34,9 +34,60 @@ export const getMasterPayrollData = async () => {
       overtimeHourlyRate: 500,
       taxProfiles: {},
       salaryStructures: {},
-      attendanceDaysMap: {}
+      attendanceDaysMap: {},
+      timelineDeadlines: {
+        reimbursementCutoff: 20,
+        attendanceVerification: 25,
+        payrollProcessing: 28,
+        salaryDisbursement: 30
+      },
+      complianceSchedules: [
+        { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
+        { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
+        { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
+      ],
+      complianceNotices: [
+        'Submission window for Q1 Investment Proofs is currently open.',
+        'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
+      ]
     });
     config = config.toObject();
+  } else {
+    // Ensure existing configs have defaults if fields are missing
+    let updated = false;
+    if (!config.timelineDeadlines) {
+      config.timelineDeadlines = {
+        reimbursementCutoff: 20,
+        attendanceVerification: 25,
+        payrollProcessing: 28,
+        salaryDisbursement: 30
+      };
+      updated = true;
+    }
+    if (!config.complianceSchedules) {
+      config.complianceSchedules = [
+        { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
+        { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
+        { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
+      ];
+      updated = true;
+    }
+    if (!config.complianceNotices) {
+      config.complianceNotices = [
+        'Submission window for Q1 Investment Proofs is currently open.',
+        'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
+      ];
+      updated = true;
+    }
+    if (updated) {
+      await PayrollConfig.updateOne({ id: 'GLOBAL_CONFIG' }, {
+        $set: {
+          timelineDeadlines: config.timelineDeadlines,
+          complianceSchedules: config.complianceSchedules,
+          complianceNotices: config.complianceNotices
+        }
+      });
+    }
   }
 
   return {
@@ -78,6 +129,15 @@ export const saveLoanAdvance = async (loanData) => {
     loanData.id = `${prefix}-${Date.now().toString().slice(-3)}-${count + 1}`;
   }
   return PayrollLoanAdvance.findOneAndUpdate({ id: loanData.id }, loanData, { upsert: true, new: true }).lean();
+};
+
+export const updateLoanAdvanceStatus = async (id, status) => {
+  logger.debug(`Executing PayrollRepository::updateLoanAdvanceStatus: ${id} -> ${status}`);
+  return PayrollLoanAdvance.findOneAndUpdate(
+    { id },
+    { status },
+    { new: true }
+  ).lean();
 };
 
 // CRUD for Bonuses
@@ -157,6 +217,7 @@ export default {
   saveGrade,
   deleteGrade,
   saveLoanAdvance,
+  updateLoanAdvanceStatus,
   saveBonus,
   updateBonusStatus,
   updateReimbursementStatus,

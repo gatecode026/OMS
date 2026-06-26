@@ -31,6 +31,9 @@ const VALID_TYPES = [
   "user_removed",
   "system",
   "chat_invitation",
+  "leave",
+  "attendance",
+  "poll",
 ];
 
 const notificationSchema = new mongoose.Schema(
@@ -181,7 +184,7 @@ export const deriveCategory = (type) => {
   if (t === "file") return "file";
   if (t === "reaction") return "reaction";
   if (t.includes("group") || t.includes("user_added") || t.includes("user_removed")) return "group";
-  if (t === "system") return "system";
+  if (t === "system" || t === "leave" || t === "attendance" || t === "poll") return "system";
   return "other";
 };
 
