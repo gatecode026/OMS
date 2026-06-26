@@ -170,6 +170,8 @@ process.on('unhandledRejection', (reason, promise) => {
   shutdown('unhandledRejection', reason instanceof Error ? reason : new Error(String(reason)));
 });
 
+
+
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception thrown:', error);
   shutdown('uncaughtException', error);
