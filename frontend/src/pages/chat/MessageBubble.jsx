@@ -485,7 +485,7 @@ const MessageBubble = ({
 
   return (
     <div
-      className={`msg-row ${isOwn ? 'msg-row-other' : 'msg-row-own'} ${isSelectMode ? 'msg-row-select-mode' : ''} ${isSelected ? 'msg-row-selected' : ''}`}
+      className={`msg-row ${isOwn ? 'msg-row-own' : 'msg-row-other'} ${isSelectMode ? 'msg-row-select-mode' : ''} ${isSelected ? 'msg-row-selected' : ''}`}
       ref={bubbleRef}
       onClick={() => {
         if (isSelectMode) {
@@ -526,7 +526,7 @@ const MessageBubble = ({
       )}
 
       <div 
-        className={`msg-bubble-wrapper ${!isOwn ? 'msg-bubble-wrapper-own' : ''}`}
+        className={`msg-bubble-wrapper ${isOwn ? 'msg-bubble-wrapper-own' : ''}`}
         onContextMenu={(e) => {
           if (isSelectMode) return;
           if (msg.isDeleted || msg.type === 'system') return;
