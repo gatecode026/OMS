@@ -8,7 +8,7 @@ import Poll from '../models/Poll.js';
 import Message from '../message.model.js';
 import Conversation from '../conversation.model.js';
 import ActivityLog from '../../activity-logs/activity-log.model.js';
-import Notification from '../../notifications/notification.model.js';
+import { createNotification } from '../../notifications/notifications.service.js';
 import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
 import { runWithTenant } from '../../../utils/tenantContext.js';
 import { getIO } from '../../../config/socket.js';
@@ -41,21 +41,12 @@ export const logPollActivity = async (companyId, { actor, actionType, fieldChang
  */
 const createInAppNotification = async (companyId, { title, message, forUserId, sentBy }) => {
   try {
-    const notifId = await generateCompanyUniqueId(companyId, 'notifications');
-    await Notification.create({
-      id: notifId,
-      companyId,
+    await createNotification(forUserId, companyId, {
       type: 'poll',
       title,
       message,
-      time: new Date().toISOString(),
-      read: false,
-      category: 'poll',
-      priority: 'Normal',
-      forUserId,
-      recipientId: forUserId,
-      sentBy,
-      sentDate: new Date().toISOString()
+      data: { sentBy },
+      priority: 'normal'
     });
   } catch (err) {
     logger.error('[PollService] Failed to create Notification record:', err);

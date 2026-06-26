@@ -27,6 +27,13 @@ export const createLoanAdvance = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Loan or Advance record created successfully', 201);
 });
 
+export const updateLoanAdvanceStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const data = await service.updateLoanAdvanceStatus(id, status, req.user);
+  return successResponse(res, data, 'Loan/Advance status updated successfully');
+});
+
 export const recommendBonus = asyncHandler(async (req, res) => {
   const data = await service.createBonus(req.body, req.user);
   return successResponse(res, data, 'Bonus recommendation submitted successfully', 201);
@@ -74,6 +81,7 @@ export default {
   saveSalaryGrade,
   deleteSalaryGrade,
   createLoanAdvance,
+  updateLoanAdvanceStatus,
   recommendBonus,
   updateBonusStatus,
   updateReimbursementStatus,

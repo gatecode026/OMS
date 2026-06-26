@@ -26,6 +26,11 @@ export const createLoanAdvance = async (loanData, currentUser) => {
   return repository.saveLoanAdvance(loanData);
 };
 
+export const updateLoanAdvanceStatus = async (id, status, currentUser) => {
+  logger.info(`Executing PayrollService::updateLoanAdvanceStatus for ${id} -> ${status} by user: ${currentUser?.id}`);
+  return repository.updateLoanAdvanceStatus(id, status);
+};
+
 export const createBonus = async (bonusData, currentUser) => {
   logger.info(`Executing PayrollService::createBonus by user: ${currentUser?.id}`);
   return repository.saveBonus(bonusData);
@@ -66,6 +71,7 @@ export default {
   saveGrade,
   deleteGrade,
   createLoanAdvance,
+  updateLoanAdvanceStatus,
   createBonus,
   updateBonusStatus,
   updateReimbursementStatus,

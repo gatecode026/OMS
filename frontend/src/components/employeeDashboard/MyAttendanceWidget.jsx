@@ -113,7 +113,11 @@ const MyAttendanceWidget = ({
     if (s === 'late') return <span className="status-badge status-late">Late</span>;
     if (s === 'work from home' || s === 'wfh') return <span className="status-badge status-wfh">WFH</span>;
     if (s.includes('leave')) return <span className="status-badge status-leave">On Leave</span>;
-    return <span className="status-badge status-late">Not Punched</span>;
+    if (s === 'half day' || s === 'half-day' || s === 'halfday') return <span className="status-badge status-late">Half Day</span>;
+    if (s === 'overtime') return <span className="status-badge status-present">Overtime</span>;
+    if (!status) return <span className="status-badge status-late">Not Punched</span>;
+    const formatted = status.charAt(0).toUpperCase() + status.slice(1);
+    return <span className="status-badge status-present">{formatted}</span>;
   };
 
   return (
@@ -121,7 +125,7 @@ const MyAttendanceWidget = ({
       <div className="widget-header">
         <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '700' }}>My Attendance</h3>
         <button
-          onClick={() => navigate(`/employee-profile/${encodeEmployeeId(currentUser?.id || '')}`)}
+          onClick={() => navigate('/attendance')}
           style={{ 
             fontSize: '0.75rem', 
             color: 'var(--color-primary, #d946ef)', 
@@ -227,7 +231,7 @@ const MyAttendanceWidget = ({
             <Clock size={14} /> Mark Attendance
           </button>
           <button
-            onClick={() => navigate('/attendance/webportal')}
+            onClick={() => navigate('/attendance')}
             className="flex-1 padding-2 text-xs bold-text rounded flex-center gap-2 transition-all"
             style={{ 
               cursor: 'pointer',

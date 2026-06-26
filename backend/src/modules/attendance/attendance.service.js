@@ -5,7 +5,42 @@
 
 import repository from './attendance.repository.js';
 import logger from '../../config/logger.js';
-import Notification from '../notifications/notification.model.js';
+import { createNotification } from '../notifications/notifications.service.js';
+import { getTenantConnection } from '../../utils/multidbConnection.js';
+
+const notifyAdminsAndManagers = async (companyId, title, message, data = {}) => {
+  try {
+    // 1. Notify company admin (whose user ID is companyId)
+    await createNotification(companyId, companyId, {
+      type: 'attendance',
+      title,
+      message,
+      data,
+      priority: 'normal'
+    });
+
+    // 2. Query and notify other managers/HR/admins in that company
+    const conn = await getTenantConnection(companyId);
+    const managers = await conn.collection('employees').find({
+      roleId: { $in: ['manager', 'hr', 'admin'] },
+      status: 'Active'
+    }).toArray();
+
+    for (const manager of managers) {
+      if (manager.id && manager.id !== companyId) {
+        await createNotification(manager.id, companyId, {
+          type: 'attendance',
+          title,
+          message,
+          data,
+          priority: 'normal'
+        });
+      }
+    }
+  } catch (err) {
+    logger.error('Error notifying admins and managers: ' + err.message);
+  }
+};
 
 export const findAll = async (query) => {
   logger.info('Executing AttendanceService::findAll query');
@@ -21,27 +56,9 @@ export const createRecord = async (data, currentUser) => {
   logger.info('Executing AttendanceService::createRecord by user: ' + currentUser?.id);
   const record = await repository.save(data);
   if (record) {
-    try {
-      const notifId = `NTF-${Math.floor(100000 + Math.random() * 900000)}`;
-      await Notification.create({
-        id: notifId,
-        type: 'attendance',
-        title: 'Employee Punched In',
-        message: `${record.employeeName} (${record.department}) punched in at ${record.punchIn} on ${record.date} (${record.workMode || 'Office'}).${record.notes ? ' Notes: ' + record.notes : ''}`,
-        time: 'Just now',
-        category: 'Attendance',
-        priority: 'Normal',
-        recipientType: 'admin',
-        sentBy: record.employeeName || 'System',
-        sentDate: new Date().toISOString().split('T')[0],
-        deliveryStatus: 'Delivered',
-        readStatus: 'Unread',
-        recipients: 1
-      });
-      logger.info(`Notification generated successfully for attendance punch-in: ${notifId}`);
-    } catch (err) {
-      logger.error('Error generating notification for attendance punch-in: ' + err.message);
-    }
+    const title = 'Employee Punched In';
+    const message = `${record.employeeName} (${record.department}) punched in at ${record.punchIn} on ${record.date} (${record.workMode || 'Office'}).${record.notes ? ' Notes: ' + record.notes : ''}`;
+    await notifyAdminsAndManagers(currentUser.companyId, title, message, { attendanceId: record.id });
   }
   return record;
 };
@@ -50,27 +67,9 @@ export const updateRecord = async (id, data, currentUser) => {
   logger.info('Executing AttendanceService::updateRecord for: ' + id + ' by user: ' + currentUser?.id);
   const record = await repository.update(id, data);
   if (record) {
-    try {
-      const notifId = `NTF-${Math.floor(100000 + Math.random() * 900000)}`;
-      await Notification.create({
-        id: notifId,
-        type: 'attendance',
-        title: 'Employee Punched Out',
-        message: `${record.employeeName} (${record.department}) punched out at ${record.punchOut} on ${record.date}. Total Hours: ${record.totalHours} hrs.${record.notes ? ' Notes: ' + record.notes : ''}`,
-        time: 'Just now',
-        category: 'Attendance',
-        priority: 'Normal',
-        recipientType: 'admin',
-        sentBy: record.employeeName || 'System',
-        sentDate: new Date().toISOString().split('T')[0],
-        deliveryStatus: 'Delivered',
-        readStatus: 'Unread',
-        recipients: 1
-      });
-      logger.info(`Notification generated successfully for attendance punch-out: ${notifId}`);
-    } catch (err) {
-      logger.error('Error generating notification for attendance punch-out: ' + err.message);
-    }
+    const title = 'Employee Punched Out';
+    const message = `${record.employeeName} (${record.department}) punched out at ${record.punchOut} on ${record.date}. Total Hours: ${record.totalHours} hrs.${record.notes ? ' Notes: ' + record.notes : ''}`;
+    await notifyAdminsAndManagers(currentUser.companyId, title, message, { attendanceId: record.id });
   }
   return record;
 };

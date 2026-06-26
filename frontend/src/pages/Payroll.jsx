@@ -80,6 +80,7 @@ const Payroll = () => {
     addOrUpdateSalaryGrade,
     deleteSalaryGrade,
     createLoanOrAdvance,
+    updateLoanAdvanceStatus,
     recommendBonus,
     updateBonusStatus,
     processPayrollCalculations,
@@ -194,6 +195,30 @@ const Payroll = () => {
   const taxProfiles = useMemo(() => payrollConfigs?.taxProfiles || {}, [payrollConfigs]);
   const attendanceDaysMap = useMemo(() => payrollConfigs?.attendanceDaysMap || {}, [payrollConfigs]);
   const salaryStructures = useMemo(() => payrollConfigs?.salaryStructures || {}, [payrollConfigs]);
+
+  const timelineDeadlines = useMemo(() => {
+    return payrollConfigs?.timelineDeadlines || {
+      reimbursementCutoff: 20,
+      attendanceVerification: 25,
+      payrollProcessing: 28,
+      salaryDisbursement: 30
+    };
+  }, [payrollConfigs]);
+
+  const complianceSchedules = useMemo(() => {
+    return payrollConfigs?.complianceSchedules || [
+      { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
+      { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
+      { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
+    ];
+  }, [payrollConfigs]);
+
+  const complianceNotices = useMemo(() => {
+    return payrollConfigs?.complianceNotices || [
+      'Submission window for Q1 Investment Proofs is currently open.',
+      'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
+    ];
+  }, [payrollConfigs]);
 
   const auditLogs = useMemo(() => {
     return (activityLogs || [])
@@ -402,6 +427,92 @@ const Payroll = () => {
     December: '12'
   }), []);
 
+  // --- Dynamic Calendar & Timeline Helpers ---
+  const getTimelineDate = (day) => {
+    const monthNum = parseInt(monthMap[month] || '06') - 1;
+    const yrNum = parseInt(year || '2026');
+    const maxDays = new Date(yrNum, monthNum + 1, 0).getDate();
+    const actualDay = Math.min(day, maxDays);
+    return new Date(yrNum, monthNum, actualDay);
+  };
+
+  const formatTimelineDate = (day) => {
+    const d = getTimelineDate(day);
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
+  const getStageStatus = (stageIndex, deadlines) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const stages = [
+      { key: 'reimbursementCutoff', day: deadlines.reimbursementCutoff ?? 20 },
+      { key: 'attendanceVerification', day: deadlines.attendanceVerification ?? 25 },
+      { key: 'payrollProcessing', day: deadlines.payrollProcessing ?? 28 },
+      { key: 'salaryDisbursement', day: deadlines.salaryDisbursement ?? 30 }
+    ];
+
+    const currentStageDate = getTimelineDate(stages[stageIndex].day);
+    currentStageDate.setHours(0, 0, 0, 0);
+
+    if (today.getTime() > currentStageDate.getTime()) {
+      return { text: 'Passed', variant: 'success', className: 'step-passed' };
+    }
+
+    let isActive = false;
+    if (stageIndex === 0) {
+      isActive = today.getTime() <= currentStageDate.getTime();
+    } else {
+      const prevStageDate = getTimelineDate(stages[stageIndex - 1].day);
+      prevStageDate.setHours(0, 0, 0, 0);
+      isActive = today.getTime() > prevStageDate.getTime() && today.getTime() <= currentStageDate.getTime();
+    }
+
+    if (isActive) {
+      return { text: 'In Progress', variant: 'warning', className: 'step-active' };
+    }
+
+    const labels = ['Scheduled', 'Scheduled', 'Scheduled', 'Disbursement'];
+    return { text: labels[stageIndex], variant: 'secondary', className: '' };
+  };
+
+  const getComplianceDate = (item) => {
+    const monthNum = parseInt(monthMap[month] || '06') - 1;
+    const yrNum = parseInt(year || '2026');
+    const targetMonth = monthNum + (item.monthOffset || 0);
+    return new Date(yrNum, targetMonth, item.day);
+  };
+
+  const formatComplianceMonth = (item) => {
+    const d = getComplianceDate(item);
+    return d.toLocaleDateString('en-US', { month: 'short' });
+  };
+
+  const formatComplianceDay = (item) => {
+    const d = getComplianceDate(item);
+    return String(d.getDate()).padStart(2, '0');
+  };
+
+  const getDaysRemaining = (item) => {
+    const targetDate = getComplianceDate(item);
+    const today = new Date();
+    targetDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diffTime = targetDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const formatDaysRemaining = (item) => {
+    const days = getDaysRemaining(item);
+    if (days > 0) {
+      return `Due in ${days} Days`;
+    } else if (days === 0) {
+      return `Due Today`;
+    } else {
+      return `Overdue by ${Math.abs(days)} Days`;
+    }
+  };
+
   // --- Dynamic Calculator Engine logic ---
   const calculatedPayrollData = useMemo(() => {
     return scopedPayrollState.map(p => {
@@ -475,13 +586,13 @@ const Payroll = () => {
         .filter(r => r.employeeId === empId && (r.status === 'Approved' || r.status === 'Released'))
         .reduce((sum, curr) => sum + curr.amount, 0);
 
-      // Deductions from loans / advances
+      // Deductions from loans / advances (only Approved ones)
       const loanEMI = loans
-        .filter(l => l.employeeId === empId)
+        .filter(l => l.employeeId === empId && l.status === 'Approved')
         .reduce((sum, curr) => sum + curr.emi, 0);
 
       const advanceDeduct = advances
-        .filter(a => a.employeeId === empId)
+        .filter(a => a.employeeId === empId && a.status === 'Approved')
         .reduce((sum, curr) => sum + curr.amount, 0);
 
       // Total Statutory Deductions
@@ -611,6 +722,20 @@ const Payroll = () => {
     if (success) {
       addPageToast('success', `Bonus ${id} status updated: ${newStatus}`);
     }
+  };
+
+  // Approve or Reject Loan/Advance Request
+  const handleUpdateLoanStatus = async (id, newStatus) => {
+    showConfirm(
+      `${newStatus === 'Approved' ? 'Approve' : 'Reject'} Request`,
+      `Are you sure you want to ${newStatus.toLowerCase()} request ${id}?`,
+      async () => {
+        const success = await updateLoanAdvanceStatus(id, newStatus);
+        if (success) {
+          addPageToast('success', `Request ${id} has been ${newStatus.toLowerCase()} successfully.`);
+        }
+      }
+    );
   };
 
   // Apply new loan or advance
@@ -1775,7 +1900,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Outstanding Loan Balance</span>
-                    <h3 className="stat-num text-danger">{formatCurrency(scopedLoans.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <h3 className="stat-num text-danger">{formatCurrency(scopedLoans.filter(l => l.status === 'Approved').reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
                     <span className="font-xsmall text-muted">Remaining principal balance</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-danger">
@@ -1786,7 +1911,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Salary Advance Balance</span>
-                    <h3 className="stat-num text-warning">{formatCurrency(scopedAdvances.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <h3 className="stat-num text-warning">{formatCurrency(scopedAdvances.filter(a => a.status === 'Approved').reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
                     <span className="font-xsmall text-muted">Awaiting payroll settlement</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-warning">
@@ -1799,8 +1924,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <span className="stat-label">Next Month's Recovery EMI</span>
                     <h3 className="stat-num text-success">
                       {formatCurrency(
-                        scopedLoans.reduce((sum, curr) => sum + curr.emi, 0) +
-                        scopedAdvances.reduce((sum, curr) => sum + curr.remainingBalance, 0)
+                        scopedLoans.filter(l => l.status === 'Approved').reduce((sum, curr) => sum + curr.emi, 0) +
+                        scopedAdvances.filter(a => a.status === 'Approved').reduce((sum, curr) => sum + curr.remainingBalance, 0)
                       )}
                     </h3>
                     <span className="font-xsmall text-muted">Estimated paycheck deduction</span>
@@ -1840,6 +1965,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                             <div className="flex-center justify-between font-xsmall text-muted">
                               <span>EMI Recovery: {formatCurrency(l.emi)}/mo</span>
                               <span>Terms: {l.recoverySchedule}</span>
+                              <span>Status: <Badge variant={l.status === 'Approved' ? 'success' : l.status === 'Rejected' ? 'danger' : 'warning'}>{l.status || 'Approved'}</Badge></span>
                             </div>
                             <div className="loan-progress-track">
                               <div className="loan-progress-text">
@@ -1864,7 +1990,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                             </div>
                             <div className="flex-center justify-between font-xsmall text-muted">
                               <span>Terms: {a.recoverySchedule}</span>
-                              <span>Status: <Badge variant="success">{a.status}</Badge></span>
+                              <span>Status: <Badge variant={a.status === 'Approved' ? 'success' : a.status === 'Rejected' ? 'danger' : 'warning'}>{a.status || 'Approved'}</Badge></span>
                             </div>
                             <div className="loan-progress-track">
                               <div className="loan-progress-text">
@@ -1968,7 +2094,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Total Distributed Loans</span>
-                    <h3 className="stat-num text-primary">{formatCurrency(loans.reduce((sum, curr) => sum + curr.amount, 0))}</h3>
+                    <h3 className="stat-num text-primary">{formatCurrency(loans.filter(l => l.status === 'Approved').reduce((sum, curr) => sum + curr.amount, 0))}</h3>
                     <span className="font-xsmall text-muted">Total corporate loan capital</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-primary">
@@ -1979,7 +2105,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Salary Advances Outstanding</span>
-                    <h3 className="stat-num text-warning">{formatCurrency(advances.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <h3 className="stat-num text-warning">{formatCurrency(advances.filter(a => a.status === 'Approved').reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
                     <span className="font-xsmall text-muted">Pending salary settlements</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-warning">
@@ -1990,7 +2116,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Monthly EMI Recovery Pool</span>
-                    <h3 className="stat-num text-success">{formatCurrency(loans.reduce((sum, curr) => sum + curr.emi, 0))}</h3>
+                    <h3 className="stat-num text-success">{formatCurrency(loans.filter(l => l.status === 'Approved').reduce((sum, curr) => sum + curr.emi, 0))}</h3>
                     <span className="font-xsmall text-muted">Recoverable next payroll run</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-success">
@@ -2001,7 +2127,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Active Debtors Count</span>
-                    <h3 className="stat-num text-info">{new Set([...loans, ...advances].map(item => item.employeeId)).size} Staff</h3>
+                    <h3 className="stat-num text-info">{new Set([...loans, ...advances].filter(item => item.status === 'Approved').map(item => item.employeeId)).size} Staff</h3>
                     <span className="font-xsmall text-muted">Active balances total</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-info">
@@ -2010,6 +2136,90 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 </div>
               </div>
 
+              {/* Pending Requests */}
+              {(() => {
+                const pendingLoans = scopedLoans.filter(l => l.status === 'Pending');
+                const pendingAdvances = scopedAdvances.filter(a => a.status === 'Pending');
+                const hasPending = pendingLoans.length > 0 || pendingAdvances.length > 0;
+                
+                if (!hasPending) return null;
+
+                return (
+                  <div className="card p-5 flex-column gap-3 mb-6" style={{ borderLeft: '4px solid var(--color-warning)' }}>
+                    <h4 className="text-warning font-bold flex-center gap-2 justify-start" style={{ margin: 0 }}>
+                      <Clock size={18} /> Pending Loan & Salary Advance Requests
+                    </h4>
+                    <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>
+                      The following employee applications are awaiting administrative review. Approved requests will be disbursed and enrolled in the next active payroll cycle.
+                    </p>
+                    <div className="overflow-x-auto mt-2">
+                      <table className="payroll-data-table">
+                        <thead>
+                          <tr>
+                            <th>Type</th>
+                            <th>Employee Name</th>
+                            <th>Category / Term</th>
+                            <th>Request ID</th>
+                            <th>Principal Amount</th>
+                            <th>Recovery EMI</th>
+                            {hasPermission('payroll_management', 'update') && <th>Actions</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...pendingLoans, ...pendingAdvances].map(req => (
+                            <tr key={req.id}>
+                              <td>
+                                <Badge variant={req.type === 'Loan' ? 'primary' : 'success'}>
+                                  {req.type}
+                                </Badge>
+                              </td>
+                              <td>
+                                <div className="flex-center gap-2 justify-start">
+                                  <Avatar name={req.employeeName} size="xs" />
+                                  <span className="emp-name-bold">{req.employeeName}</span>
+                                </div>
+                              </td>
+                              <td>{req.loanType || (req.type === 'Loan' ? 'Personal Loan' : 'Advance Salary')}</td>
+                              <td className="font-xsmall text-muted">{req.id}</td>
+                              <td className="font-bold text-primary">{formatCurrency(req.amount)}</td>
+                              <td>
+                                {req.type === 'Loan' ? (
+                                  <span>{formatCurrency(req.emi)}/mo ({req.recoverySchedule})</span>
+                                ) : (
+                                  <span>{req.recoverySchedule}</span>
+                                )}
+                              </td>
+                              {hasPermission('payroll_management', 'update') && (
+                                <td>
+                                  <div className="flex-center gap-2 justify-start">
+                                    <Button
+                                      variant="success"
+                                      size="sm"
+                                      icon={Check}
+                                      onClick={() => handleUpdateLoanStatus(req.id, 'Approved')}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      icon={X}
+                                      onClick={() => handleUpdateLoanStatus(req.id, 'Rejected')}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Ledger Cards */}
               <div className="grid-2-col gap-6">
                 {/* Active Loans */}
@@ -2017,8 +2227,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   <h4 className="text-primary font-bold">Active Employee Loans</h4>
                   
                   <div className="flex-column gap-4">
-                    {scopedLoans.length > 0 ? (
-                      scopedLoans.map(l => (
+                    {scopedLoans.filter(l => l.status === 'Approved').length > 0 ? (
+                      scopedLoans.filter(l => l.status === 'Approved').map(l => (
                         <div key={l.id} className="loan-card-item flex-column gap-2">
                           <div className="loan-card-header-row">
                             <div className="loan-avatar-info">
@@ -2062,8 +2272,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   <h4 className="text-success font-bold">Salary Advances Outstanding</h4>
                   
                   <div className="flex-column gap-4">
-                    {scopedAdvances.length > 0 ? (
-                      scopedAdvances.map(a => (
+                    {scopedAdvances.filter(a => a.status === 'Approved').length > 0 ? (
+                      scopedAdvances.filter(a => a.status === 'Approved').map(a => (
                         <div key={a.id} className="loan-card-item flex-column gap-2" style={{ borderColor: 'var(--color-success-light)' }}>
                           <div className="loan-card-header-row">
                             <div className="loan-avatar-info">
@@ -2185,54 +2395,47 @@ BANK PAYMENT & COMPLIANCE DETAIL:
             {/* Left Column: Payroll Processing Timeline */}
             <div className="card p-5 flex-column gap-4">
               <h4 className="font-semibold text-primary flex-center gap-2 justify-start" style={{ margin: 0 }}>
-                <Clock size={18} /> Payroll Run Cycle Timeline (June 2026)
+                <Clock size={18} /> Payroll Run Cycle Timeline ({month} {year})
               </h4>
               <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Key stages for monthly attendance auditing, verification, and disbursement.</p>
               
               <div className="calendar-timeline-v">
-                {/* Step 1: Completed */}
-                <div className="timeline-step-item step-passed">
-                  <div className="timeline-step-node"></div>
-                  <div className="timeline-step-header">
-                    <span className="font-bold font-small">1. Reimbursements Cutoff</span>
-                    <Badge variant="success">Passed</Badge>
-                  </div>
-                  <span className="font-xsmall text-muted font-semibold">Deadline: June 20, 2026</span>
-                  <p className="font-xsmall text-muted mt-1">Submit travel, medical, and client expense claims for inclusion in this cycle.</p>
-                </div>
-
-                {/* Step 2: Active */}
-                <div className="timeline-step-item step-active">
-                  <div className="timeline-step-node"></div>
-                  <div className="timeline-step-header">
-                    <span className="font-bold font-small text-primary">2. Attendance & Log Verification</span>
-                    <Badge variant="warning">In Progress</Badge>
-                  </div>
-                  <span className="font-xsmall text-muted font-semibold">Deadline: June 25, 2026</span>
-                  <p className="font-xsmall text-muted mt-1">Verify employee check-ins, half days, overtime, and punch records for payroll sync.</p>
-                </div>
-
-                {/* Step 3: Upcoming */}
-                <div className="timeline-step-item">
-                  <div className="timeline-step-node"></div>
-                  <div className="timeline-step-header">
-                    <span className="font-bold font-small text-secondary">3. Payroll Run Processing Due</span>
-                    <Badge variant="secondary">Scheduled</Badge>
-                  </div>
-                  <span className="font-xsmall text-muted font-semibold">Deadline: June 28, 2026</span>
-                  <p className="font-xsmall text-muted mt-1">Recalculate structures, basic revision edits, TDS deductions, and professional tax.</p>
-                </div>
-
-                {/* Step 4: Upcoming */}
-                <div className="timeline-step-item">
-                  <div className="timeline-step-node"></div>
-                  <div className="timeline-step-header">
-                    <span className="font-bold font-small text-secondary">4. Salary Disbursement Release</span>
-                    <Badge variant="secondary">Disbursement</Badge>
-                  </div>
-                  <span className="font-xsmall text-muted font-semibold">Deadline: June 30, 2026</span>
-                  <p className="font-xsmall text-muted mt-1">Disburse payments to bank accounts and send system notification slips.</p>
-                </div>
+                {[
+                  {
+                    title: '1. Reimbursements Cutoff',
+                    day: timelineDeadlines.reimbursementCutoff ?? 20,
+                    description: 'Submit travel, medical, and client expense claims for inclusion in this cycle.'
+                  },
+                  {
+                    title: '2. Attendance & Log Verification',
+                    day: timelineDeadlines.attendanceVerification ?? 25,
+                    description: 'Verify employee check-ins, half days, overtime, and punch records for payroll sync.'
+                  },
+                  {
+                    title: '3. Payroll Run Processing Due',
+                    day: timelineDeadlines.payrollProcessing ?? 28,
+                    description: 'Recalculate structures, basic revision edits, TDS deductions, and professional tax.'
+                  },
+                  {
+                    title: '4. Salary Disbursement Release',
+                    day: timelineDeadlines.salaryDisbursement ?? 30,
+                    description: 'Disburse payments to bank accounts and send system notification slips.'
+                  }
+                ].map((stage, index) => {
+                  const status = getStageStatus(index, timelineDeadlines);
+                  const headerTextColorClass = status.text === 'Passed' ? '' : (status.text === 'In Progress' ? 'text-primary' : 'text-secondary');
+                  return (
+                    <div key={index} className={`timeline-step-item ${status.className}`}>
+                      <div className="timeline-step-node"></div>
+                      <div className="timeline-step-header">
+                        <span className={`font-bold font-small ${headerTextColorClass}`}>{stage.title}</span>
+                        <Badge variant={status.variant}>{status.text}</Badge>
+                      </div>
+                      <span className="font-xsmall text-muted font-semibold">Deadline: {formatTimelineDate(stage.day)}</span>
+                      <p className="font-xsmall text-muted mt-1">{stage.description}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -2244,57 +2447,54 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Important quarterly and monthly filing deadlines for government audits.</p>
               
               <div className="compliance-grid-v">
-                {/* Due 1 */}
-                <div className="compliance-card-premium">
-                  <div className="calendar-sheet">
-                    <div className="calendar-sheet-header bg-primary">Jul</div>
-                    <div className="calendar-sheet-day">07</div>
-                  </div>
-                  <div className="compliance-card-info">
-                    <span className="compliance-card-title">Monthly TDS Deposit Due</span>
-                    <span className="compliance-card-due font-xsmall text-muted">Filing period: June 2026 • Challan ITNS 281</span>
-                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 25 Days</span>
-                  </div>
-                </div>
-
-                {/* Due 2 */}
-                <div className="compliance-card-premium" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
-                  <div className="calendar-sheet">
-                    <div className="calendar-sheet-header bg-success">Jul</div>
-                    <div className="calendar-sheet-day">15</div>
-                  </div>
-                  <div className="compliance-card-info">
-                    <span className="compliance-card-title">PF & ESI Filing Deadline</span>
-                    <span className="compliance-card-due font-xsmall text-muted">Filing period: June 2026 • Form 5 & Form 10</span>
-                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 33 Days</span>
-                  </div>
-                </div>
-
-                {/* Due 3 */}
-                <div className="compliance-card-premium" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-                  <div className="calendar-sheet">
-                    <div className="calendar-sheet-header">Jul</div>
-                    <div className="calendar-sheet-day">31</div>
-                  </div>
-                  <div className="compliance-card-info">
-                    <span className="compliance-card-title">TDS Return Filing (Q1)</span>
-                    <span className="compliance-card-due font-xsmall text-muted">Form 24Q Submission • FY 2026-27</span>
-                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 49 Days</span>
-                  </div>
-                </div>
+                {complianceSchedules.map((item, index) => {
+                  const isTdsDeposit = item.id === 'tds_deposit';
+                  const isPfEsi = item.id === 'pf_esi_filing';
+                  
+                  let headerBg = '';
+                  let cardStyle = {};
+                  
+                  if (isTdsDeposit) {
+                    headerBg = 'bg-primary';
+                  } else if (isPfEsi) {
+                    headerBg = 'bg-success';
+                    cardStyle = { borderColor: 'rgba(16, 185, 129, 0.2)' };
+                  } else {
+                    cardStyle = { borderColor: 'rgba(239, 68, 68, 0.2)' };
+                  }
+                  
+                  return (
+                    <div key={item.id || index} className="compliance-card-premium" style={cardStyle}>
+                      <div className="calendar-sheet">
+                        <div className={`calendar-sheet-header ${headerBg}`}>{formatComplianceMonth(item)}</div>
+                        <div className="calendar-sheet-day">{formatComplianceDay(item)}</div>
+                      </div>
+                      <div className="compliance-card-info">
+                        <span className="compliance-card-title">{item.title}</span>
+                        <span className="compliance-card-due font-xsmall text-muted">Filing period: {month} {year} • {item.info}</span>
+                        <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>
+                          {formatDaysRemaining(item)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Reminders box */}
               <div className="p-4 bg-secondary rounded flex-column gap-2 mt-2">
-                <span className="font-semibold text-warning font-small flex-center gap-1"><AlertTriangle size={14} /> Compliance Notices</span>
+                <span className="font-semibold text-warning font-small flex-center gap-1">
+                  <AlertTriangle size={14} /> Compliance Notices
+                </span>
                 <div className="flex-column gap-1 font-xsmall text-muted">
-                  <div>🔔 Submission window for Q1 Investment Proofs is currently open.</div>
-                  <div>🔔 Penalty for late TDS return filing is ₹200 per day under Section 234E.</div>
-                </div>
+                  {complianceNotices.map((notice, index) => (
+                    <div key={index}>🔔 {notice}</div>
+                  ))}
               </div>
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* ==================== TAB CONTENT: AUDIT TRAILS ==================== */}

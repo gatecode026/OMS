@@ -47,7 +47,7 @@ const payrollLoanAdvanceSchema = new mongoose.Schema({
   recoverySchedule: { type: String, required: true },
   remainingBalance: { type: Number, required: true },
   progress: { type: Number, default: 0 },
-  status: { type: String, default: 'Approved' }
+  status: { type: String, default: 'Pending' }
 }, { timestamps: true });
 
 payrollLoanAdvanceSchema.pre('validate', function (next) {
@@ -115,7 +115,32 @@ const payrollConfigSchema = new mongoose.Schema({
   // Map fields use Mixed to allow easy serialization of dynamic configurations keyed by employeeId
   taxProfiles: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
   salaryStructures: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
-  attendanceDaysMap: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} }
+  attendanceDaysMap: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
+  timelineDeadlines: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: {
+      reimbursementCutoff: 20,
+      attendanceVerification: 25,
+      payrollProcessing: 28,
+      salaryDisbursement: 30
+    }
+  },
+  complianceSchedules: {
+    type: [mongoose.Schema.Types.Mixed],
+    default: [
+      { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
+      { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
+      { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
+    ]
+  },
+  complianceNotices: {
+    type: [String],
+    default: [
+      'Submission window for Q1 Investment Proofs is currently open.',
+      'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
+    ]
+  }
 }, { timestamps: true, collection: 'payroll_configs' });
 
 payrollGradeSchema.index({ companyId: 1, id: 1 }, { unique: true });
