@@ -33,6 +33,8 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 let server;
 let isShuttingDown = false;
 
+
+
 /**
  * Handle graceful shutdown of the application
  */
@@ -169,6 +171,8 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
   shutdown('unhandledRejection', reason instanceof Error ? reason : new Error(String(reason)));
 });
+
+
 
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception thrown:', error);

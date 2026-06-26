@@ -9,6 +9,7 @@ import crypto from 'crypto';
 
 dotenv.config();
 
+
 const PORT = process.env.PORT || 5000;
 const PUBLIC_KEY = process.env.IMAGEKIT_PUBLIC_KEY;
 const PRIVATE_KEY = process.env.IMAGEKIT_PRIVATE_KEY;
@@ -97,7 +98,7 @@ async function runDiagnostics() {
   console.log('\n[4/5] Testing ImageKit Server-side Upload (Basic Auth)...');
   const dummyBase64 = Buffer.from('ImageKit Diagnostic File').toString('base64');
   const basicAuthHeader = 'Basic ' + Buffer.from(PRIVATE_KEY + ':').toString('base64');
-  
+
   const basicFormData = new FormData();
   basicFormData.append('file', dummyBase64);
   basicFormData.append('fileName', `diagnostic_basic_${Date.now()}.txt`);
@@ -118,8 +119,8 @@ async function runDiagnostics() {
       basicAuthOk = true;
     } else {
       const errorText = await res.text();
-      fail(`Basic Auth upload failed with status ${res.status}: ${errorText}`, 
-           'Your IMAGEKIT_PRIVATE_KEY is invalid or the account is disabled.');
+      fail(`Basic Auth upload failed with status ${res.status}: ${errorText}`,
+        'Your IMAGEKIT_PRIVATE_KEY is invalid or the account is disabled.');
     }
   } catch (err) {
     fail(`Basic Auth request crashed: ${err.message}`);
@@ -156,9 +157,9 @@ async function runDiagnostics() {
     } else {
       const errorData = await res.json().catch(() => ({ message: 'Could not parse error response' }));
       const errorMsg = errorData.message || 'Unknown error';
-      
-      fail(`Signature upload failed with status ${res.status}: ${errorMsg}`, 
-           res.status === 403 ? 'This indicates a mismatch between public and private keys.' : null);
+
+      fail(`Signature upload failed with status ${res.status}: ${errorMsg}`,
+        res.status === 403 ? 'This indicates a mismatch between public and private keys.' : null);
     }
   } catch (err) {
     fail(`Signature request crashed: ${err.message}`);
