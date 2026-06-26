@@ -70,14 +70,19 @@ export const login = async (email, password, options = {}) => {
     });
   }
 
+  const isFullEmail = resolvedEmail.includes('@');
+
   // Fetch account from the dedicated Super Admin collection
-  let user = await Admin.findOne({
-    $or: [
-      { email: resolvedEmail },
-      { email: new RegExp('^' + escapedPrefix + '(@|.*)', 'i') },
-      { name: new RegExp('^' + escapedPrefix + '($|\\s)', 'i') }
-    ]
-  }).select('+password');
+  let user = await Admin.findOne(
+    isFullEmail
+      ? { email: resolvedEmail }
+      : {
+          $or: [
+            { email: new RegExp('^' + escapedPrefix + '(@|.*)', 'i') },
+            { name: new RegExp('^' + escapedPrefix + '($|\\s)', 'i') }
+          ]
+        }
+  ).select('+password');
 
   let isEmployee = false;
   let isCompanyAdmin = false;
@@ -87,8 +92,9 @@ export const login = async (email, password, options = {}) => {
       // Query dedicated database connection using runWithTenant
       const { runWithTenant } = await import('../../utils/tenantContext.js');
       await runWithTenant(resolvedCompany.id, async () => {
-        user = await Employee.findOne({ email: resolvedEmail }).select('+password');
-        if (!user) {
+        if (isFullEmail) {
+          user = await Employee.findOne({ email: resolvedEmail }).select('+password');
+        } else {
           user = await Employee.findOne({
             $or: [
               { username: prefix },
@@ -107,8 +113,9 @@ export const login = async (email, password, options = {}) => {
       }
     } else {
       // Shared database flow
-      user = await Employee.findOne({ email: resolvedEmail, companyId: resolvedCompany.id }).select('+password');
-      if (!user) {
+      if (isFullEmail) {
+        user = await Employee.findOne({ email: resolvedEmail, companyId: resolvedCompany.id }).select('+password');
+      } else {
         user = await Employee.findOne({
           $or: [
             { username: prefix },

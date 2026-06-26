@@ -43,9 +43,8 @@ export const database = {
 
         await Admin.create({
           id: 'EMP-2026-001',
-          name: 'Balram Suman',
+          name: 'Super Admin',
           email: 'superadmin@saas.com',
-          phone: '+91 98765 43210',
           role: 'Super Admin',
           roleId: 'super_admin',
           status: 'Active',
