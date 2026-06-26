@@ -14,12 +14,13 @@ async function run() {
     ignoreHTTPSErrors: true
   };
 
-  const browserA = await puppeteer.launch(launchOptions);
-  const browserB = await puppeteer.launch(launchOptions);
+  const browser = await puppeteer.launch(launchOptions);
 
   try {
-    const pageA = await browserA.newPage();
-    const pageB = await browserB.newPage();
+    const contextA = await browser.createBrowserContext();
+    const contextB = await browser.createBrowserContext();
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
 
     // Catch page errors
     pageA.on('pageerror', err => {
@@ -141,8 +142,8 @@ async function run() {
     
     // Find and click send button
     console.log('[Geeta] Clicking send button...');
-    await pageA.waitForSelector('.msg-input-send-btn', { timeout: 10000 });
-    await pageA.click('.msg-input-send-btn');
+    await pageA.waitForSelector('.msg-input-send-active', { timeout: 10000 });
+    await pageA.click('.msg-input-send-active');
     await new Promise(resolve => setTimeout(resolve, 2000));
     // Wait and check if message appears on Rahul's screen (real-time)
     console.log('[Rahul] Checking if message is received in real-time...');
@@ -171,8 +172,7 @@ async function run() {
     console.error('Test execution failed:', err);
     process.exit(1);
   } finally {
-    await browserA.close();
-    await browserB.close();
+    await browser.close();
   }
 }
 

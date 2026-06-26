@@ -28,7 +28,15 @@ const CallScreen = () => {
     adjustQualityProfile
   } = useCall();
 
-  const { currentUser } = useApp();
+  const { currentUser: simulatedUser } = useApp();
+  const currentUser = React.useMemo(() => {
+    try {
+      const saved = localStorage.getItem('saas_user');
+      return saved ? JSON.parse(saved) : simulatedUser;
+    } catch (e) {
+      return simulatedUser;
+    }
+  }, [simulatedUser]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isControlsVisible, setIsControlsVisible] = useState(true);

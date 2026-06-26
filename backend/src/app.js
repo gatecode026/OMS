@@ -27,6 +27,12 @@ import { authenticate } from './middlewares/auth.middleware.js';
 import { tenantMiddleware } from './middlewares/tenant.middleware.js';
 import { checkRoleAccess } from './middlewares/roleGuard.middleware.js';
 import publicRouter from './modules/companies/public.routes.js';
+import redisClient from './config/redis.js';
+import { getIO } from './config/socket.js';
+import presenceService from './modules/chat/services/presence.service.js';
+import systemRouter from './routes/system.routes.js';
+import healthRouter from './routes/health.routes.js';
+import { correlationMiddleware, sanitizeInputMiddleware } from './middlewares/security.middleware.js';
 
 const app = express();
 
@@ -34,6 +40,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ─── SECURITY MIDDLEWARES ────────────────────────────────────────────────────
+app.use(correlationMiddleware);
 app.use(helmet());
 app.use(cors(corsOptions));
 
@@ -70,6 +77,7 @@ app.use('/api/v1/auth', authLimiter);
 // ─── REQUEST PARSING ─────────────────────────────────────────────────────────
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ extended: true, limit: '500mb' }));
+app.use(sanitizeInputMiddleware);
 
 // ─── REQUEST LOGGING ─────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'development') {
@@ -82,18 +90,33 @@ app.use(loggerMiddleware);
 // ─── STATIC FILE VAULT ───────────────────────────────────────────────────────
 app.use('/uploads', express.static('uploads'));
 
-// ─── HEALTH CHECK ROUTE ──────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Gatecode OMS Workforce Backend API is fully operational',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
+// ─── HEALTH & METRICS ROUTES ──────────────────────────────────────────────────
+app.use('/health', healthRouter);
 
 // ─── PUBLIC BRANDING ROUTES ──────────────────────────────────────────────────
 app.use('/api/public', publicRouter);
+
+// ─── SYSTEM MONITORING ROUTES ────────────────────────────────────────────────
+app.use('/api/system', systemRouter);
+
+// ─── PRESENCE REST ENDPOINTS ────────────────────────────────────────────────
+app.get('/api/presence/:userId', authenticate, async (req, res, next) => {
+  try {
+    const presence = await presenceService.getUserPresence(req.params.userId);
+    return res.status(200).json(presence);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/api/presence/company/:companyId', authenticate, async (req, res, next) => {
+  try {
+    const result = await presenceService.getCompanyOnlineUsers(req.params.companyId);
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── GLOBAL MODULAR ROUTING BINDING ─────────────────────────────────────────
 app.use('/api/v1', (req, res, next) => {

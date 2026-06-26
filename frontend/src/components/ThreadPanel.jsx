@@ -247,14 +247,14 @@ const ThreadPanel = ({ onClose }) => {
             filteredReplies.map((reply) => {
               const isOwn = reply.senderId === currentUser?.id;
               return (
-                <div key={reply.id} className={`thread-reply-item ${isOwn ? 'own-reply' : ''}`}>
+                <div key={reply.id} className={`thread-reply-item ${!isOwn ? 'visual-align-right' : 'visual-align-left'}`}>
                   <Avatar 
                     name={reply.senderName} 
                     src={reply.senderAvatar} 
                     size="sm" 
                     className="reply-avatar"
                   />
-                  <div className="reply-content-box">
+                  <div className={`reply-content-box ${isOwn ? 'visual-color-own' : 'visual-color-other'}`}>
                     <div className="reply-meta-row">
                       <span className="reply-sender-name">{reply.senderName}</span>
                       <span className="reply-sent-time">{formatTime(reply.createdAt)}</span>

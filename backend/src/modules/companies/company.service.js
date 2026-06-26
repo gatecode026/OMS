@@ -2,6 +2,7 @@ import Company from './company.model.js';
 import Employee from '../employees/employees.model.js';
 import SystemSettings from '../settings/settings.model.js';
 import logger from '../../config/logger.js';
+import { CacheKeys, TTL, cacheGetOrSet, cacheDel } from '../../services/cache.service.js';
 
 export const createCompany = async (data) => {
   logger.info(`CompanyService::createCompany creating company: ${data.name}`);
@@ -223,14 +224,17 @@ export const findAll = async (query = {}) => {
 };
 
 export const findById = async (id) => {
-  logger.info(`CompanyService::findById querying company ID: ${id}`);
-  const company = await Company.findOne({ id });
-  if (!company) {
-    const err = new Error('Company not found');
-    err.statusCode = 404;
-    throw err;
-  }
-  return company;
+  const cacheKey = CacheKeys.company(id);
+  return cacheGetOrSet(cacheKey, async () => {
+    logger.info(`CompanyService::findById querying company ID: ${id}`);
+    const company = await Company.findOne({ id }).lean();
+    if (!company) {
+      const err = new Error('Company not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    return company;
+  }, TTL.COMPANY_SETTINGS);
 };
 
 export const updateCompany = async (id, data) => {
@@ -266,6 +270,10 @@ export const updateCompany = async (id, data) => {
     err.statusCode = 404;
     throw err;
   }
+
+  // Invalidate cache
+  cacheDel(CacheKeys.company(id)).catch(() => {});
+
   return company;
 };
 
@@ -288,6 +296,9 @@ export const setStatus = async (id, status) => {
     err.statusCode = 404;
     throw err;
   }
+
+  // Invalidate cache
+  cacheDel(CacheKeys.company(id)).catch(() => {});
 
   // If company is suspended, suspend all company employees too
   if (status === 'Suspended') {

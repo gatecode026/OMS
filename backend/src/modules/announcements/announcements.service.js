@@ -59,6 +59,20 @@ export const createRecord = async (data, currentUser) => {
     logger.error('Failed to initialize tracking logs for new announcement:', err);
   }
 
+  // Trigger Broadcast Notification via Enterprise Notification Engine
+  try {
+    const notificationsService = await import('../notifications/notifications.service.js');
+    await notificationsService.broadcastAnnouncement(
+      currentUser?.companyId || 'COMP-001',
+      currentUser?.id || 'System',
+      `Company Announcement: ${record.title}`,
+      record.content || record.description || record.title || '',
+      { announcementId: record.id }
+    );
+  } catch (err) {
+    logger.error('Failed to trigger broadcast announcement notification:', err);
+  }
+
   return record;
 };
 

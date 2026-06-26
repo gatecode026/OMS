@@ -1,12 +1,15 @@
 /**
  * @file src/config/logger.js
- * @description Standard Logger wrapper. Simulates enterprise logger output levels.
+ * @description Standard Logger wrapper. Simulates enterprise logger output levels and correlation tracing.
  */
+
+import { getCorrelationId } from '../utils/correlationContext.js';
 
 const formatMessage = (level, message, ...args) => {
   const timestamp = new Date().toISOString();
+  const cid = getCorrelationId() || global._activeCorrelationId || 'n/a';
   let extraArgs = args.length > 0 ? ` | ${JSON.stringify(args)}` : '';
-  return `[${timestamp}] [${level.toUpperCase()}] ${message}${extraArgs}`;
+  return `[${timestamp}] [${level.toUpperCase()}] [CID: ${cid}] ${message}${extraArgs}`;
 };
 
 export const logger = {
@@ -23,6 +26,12 @@ export const logger = {
     if (process.env.NODE_ENV === 'development') {
       console.log(`\x1b[36m${formatMessage('debug', message, ...args)}\x1b[0m`);
     }
+  },
+  security: (message, ...args) => {
+    console.log(`\x1b[35m${formatMessage('security', message, ...args)}\x1b[0m`);
+  },
+  audit: (message, ...args) => {
+    console.log(`\x1b[34m${formatMessage('audit', message, ...args)}\x1b[0m`);
   }
 };
 

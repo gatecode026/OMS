@@ -5,7 +5,15 @@ import { useApp } from '../../context/AppContext';
 
 const ChatPrivacySettings = () => {
   const navigate = useNavigate();
-  const { currentUser } = useApp();
+  const { currentUser: simulatedUser } = useApp();
+  const currentUser = React.useMemo(() => {
+    try {
+      const saved = localStorage.getItem('saas_user');
+      return saved ? JSON.parse(saved) : simulatedUser;
+    } catch (e) {
+      return simulatedUser;
+    }
+  }, [simulatedUser]);
   const {
     blockedUsers,
     unblockUser,
