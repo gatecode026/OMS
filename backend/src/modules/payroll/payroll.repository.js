@@ -12,6 +12,7 @@ import {
   PayrollConfig
 } from './payroll.model.js';
 import logger from '../../config/logger.js';
+import { getTenantId } from '../../utils/tenantContext.js';
 
 // Get unified master dataset
 export const getMasterPayrollData = async () => {
@@ -118,6 +119,14 @@ export const saveMonthlyPayment = async (paymentData) => {
   if (!paymentData.id) {
     paymentData.id = `${paymentData.employeeId}-${paymentData.month}-${paymentData.year}`;
   }
+  
+  const existing = await PayrollPayment.findOne({ id: paymentData.id });
+  if (!existing && !paymentData.payrollCode) {
+    const companyId = getTenantId() || paymentData.companyId || 'COMP-001';
+    const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+    paymentData.payrollCode = await generateCompanyUniqueId(companyId, 'payroll');
+  }
+
   return PayrollPayment.findOneAndUpdate({ id: paymentData.id }, paymentData, { upsert: true, new: true }).lean();
 };
 

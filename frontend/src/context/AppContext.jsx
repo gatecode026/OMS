@@ -187,9 +187,9 @@ export const AppProvider = ({ children }) => {
   const [payrollPayments, setPayrollPayments] = useState([]);
   const [payrollConfigs, setPayrollConfigs] = useState({
     id: 'GLOBAL_CONFIG',
-    leaveDeductionRate: 2000,
-    lateArrivalPenalty: 300,
-    overtimeHourlyRate: 500,
+    leaveDeductionRate: 0,
+    lateArrivalPenalty: 0,
+    overtimeHourlyRate: 0,
     taxProfiles: {},
     salaryStructures: {},
     attendanceDaysMap: {}
@@ -553,7 +553,7 @@ export const AppProvider = ({ children }) => {
 
           // Default fallback
           if (!resolvedAssigneeId) {
-            resolvedAssigneeId = 'EMP-2026-003';
+            resolvedAssigneeId = '';
           }
 
           const resolvedAssigneeName = t.assigneeName || (t.assignedTo && t.assignedTo.length > 0 ? t.assignedTo.join(', ') : proj.leader || 'Unassigned');
@@ -567,7 +567,7 @@ export const AppProvider = ({ children }) => {
             assigneeId: resolvedAssigneeId,
             assigneeName: resolvedAssigneeName,
             description: t.description || '',
-            estimatedHours: t.estimatedHours || 20,
+            estimatedHours: t.estimatedHours || 0,
             status: t.completed
               ? 'Done'
               : (t.status === 'Done' || t.status === 'done' || t.status === 'Completed' || t.status === 'completed'
@@ -580,14 +580,8 @@ export const AppProvider = ({ children }) => {
             progress: t.completed ? 100 : (t.progress !== undefined ? t.progress : 0),
             comments: t.comments || [],
             attachments: t.attachments || [],
-            approvals: (t.approvals && t.approvals.length > 0 ? t.approvals : [
-              { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
-            ]).filter(app => app.level !== 4 && app.role !== 'Super Admin Approval'),
-            activityLog: t.activityLog || [
-              { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
-            ]
+            approvals: t.approvals || [],
+            activityLog: t.activityLog || []
           });
         });
       }
@@ -734,9 +728,9 @@ export const AppProvider = ({ children }) => {
       setPayrollPayments([]);
       setPayrollConfigs({
         id: 'GLOBAL_CONFIG',
-        leaveDeductionRate: 2000,
-        lateArrivalPenalty: 300,
-        overtimeHourlyRate: 500,
+        leaveDeductionRate: 0,
+        lateArrivalPenalty: 0,
+        overtimeHourlyRate: 0,
         taxProfiles: {},
         salaryStructures: {},
         attendanceDaysMap: {}

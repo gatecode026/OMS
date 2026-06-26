@@ -141,7 +141,7 @@ const Documents = () => {
       type: uploadForm.type,
       category: uploadForm.category,
       size: uploadForm.size,
-      uploadedBy: currentUser?.name || 'Balram Suman',
+      uploadedBy: currentUser?.name || 'Unknown',
       uploadDate: new Date().toISOString().split('T')[0],
       downloads: 0,
       fileUrl: fileBase64

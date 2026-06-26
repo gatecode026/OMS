@@ -507,12 +507,12 @@ const WebPortalAttendance = () => {
       employeeId: empId,
       employeeName: empData.name,
       department: empData.department || '',
-      branch: empData.branch || 'Jaipur',
+      branch: empData.branch || '',
       workMode: row.workMode || empData.workMode || 'WFO',
       date: dateFilter,
       punchIn: punchIn,
       punchOut: punchOut,
-      breakTime: row.breakTime || '45 mins',
+      breakTime: row.breakTime || '0 mins',
       totalHours: totalHours,
       status: row.status,
       source: 'Web Portal',
@@ -650,7 +650,7 @@ const WebPortalAttendance = () => {
         return {
           ...item,
           department: item.department || empDetails?.department || '',
-          branch: item.branch || empDetails?.branch || 'Jaipur',
+          branch: item.branch || empDetails?.branch || '',
           employeeName: item.employeeName || empDetails?.name || 'Unknown'
         };
       })
@@ -1001,7 +1001,7 @@ const WebPortalAttendance = () => {
                       {colVis.shift && (
                         <td>
                           <span className="wp-shift-text" style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                            {emp.shift || '09:00 AM - 06:00 PM'}
+                            {emp.shift || 'Flexible Shift'}
                           </span>
                         </td>
                       )}
@@ -1052,7 +1052,7 @@ const WebPortalAttendance = () => {
                       {colVis.breakTime && (
                         <td>
                           <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            {rowState.breakTime || '45 mins'}
+                            {rowState.breakTime || '--'}
                           </span>
                         </td>
                       )}

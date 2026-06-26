@@ -87,7 +87,9 @@ const Payroll = () => {
     updateSinglePayrollStatus,
     toggleEmployeeTaxRegime,
     savePayrollSalaryRevision,
-    hasPermission
+    hasPermission,
+    attendance,
+    fetchAttendance
   } = useApp();
 
   // Selected Month/Year
@@ -99,6 +101,10 @@ const Payroll = () => {
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState(currentUserRole === 'employee' ? 'processing' : 'dashboard');
+
+  React.useEffect(() => {
+    fetchAttendance();
+  }, []);
 
   React.useEffect(() => {
     setPerspective(currentUserRole || 'super_admin');
@@ -172,9 +178,9 @@ const Payroll = () => {
 
   // Derived Configurations
   const attendanceConfigs = useMemo(() => ({
-    leaveDeductionRate: payrollConfigs?.leaveDeductionRate ?? 2000,
-    lateArrivalPenalty: payrollConfigs?.lateArrivalPenalty ?? 300,
-    overtimeHourlyRate: payrollConfigs?.overtimeHourlyRate ?? 500
+    leaveDeductionRate: payrollConfigs?.leaveDeductionRate ?? 0,
+    lateArrivalPenalty: payrollConfigs?.lateArrivalPenalty ?? 0,
+    overtimeHourlyRate: payrollConfigs?.overtimeHourlyRate ?? 0
   }), [payrollConfigs]);
 
   const taxProfiles = useMemo(() => payrollConfigs?.taxProfiles || {}, [payrollConfigs]);
@@ -188,8 +194,8 @@ const Payroll = () => {
         id: log.id,
         user: log.employeeName || 'System',
         action: log.action,
-        prevVal: log.details || '—',
-        newVal: log.target || '—',
+        prevVal: log.details || '-',
+        newVal: log.target || '-',
         timestamp: log.timestamp
       }));
   }, [activityLogs]);
@@ -212,27 +218,27 @@ const Payroll = () => {
         const empBasicSalary = Number(emp.salaryAmount) || 0;
         const struct = salaryStructures[emp.id] || {
           basic: empBasicSalary,
-          hra: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.4) : 0,
-          travel: empBasicSalary > 0 ? 3000 : 0,
-          medical: empBasicSalary > 0 ? 2000 : 0,
-          special: empBasicSalary > 0 ? 1000 : 0,
-          pf: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.12) : 0,
+          hra: 0,
+          travel: 0,
+          medical: 0,
+          special: 0,
+          pf: 0,
           esi: 0,
-          pt: empBasicSalary > 0 ? 200 : 0,
-          tds: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.1) : 0
+          pt: 0,
+          tds: 0
         };
         const basicSalary = struct.basic || empBasicSalary;
         const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
         const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
         const grossSalary = basicSalary + totalAllowances;
-        const netSalary = grossSalary - statutoryDeductions;
+        const netSalary = Math.max(0, grossSalary - statutoryDeductions);
         return {
           id: `${emp.id}-${month}-${year}`,
           employeeId: emp.id,
           employeeName: emp.name,
-          department: emp.department || '—',
-          designation: emp.designation || '—',
-          branch: emp.branch || '—',
+          department: emp.department || '-',
+          designation: emp.designation || '-',
+          branch: emp.branch || '-',
           month,
           year,
           status: 'Hold',
@@ -247,7 +253,15 @@ const Payroll = () => {
           advanceDeduct: 0,
           leaveDeductions: 0,
           lateDeductions: 0,
-          statutoryDeductions
+          statutoryDeductions,
+          hra: struct.hra || 0,
+          travel: struct.travel || 0,
+          medical: struct.medical || 0,
+          special: struct.special || 0,
+          pf: struct.pf || 0,
+          esi: struct.esi || 0,
+          pt: struct.pt || 0,
+          tds: struct.tds || 0
         };
       });
 
@@ -360,36 +374,83 @@ const Payroll = () => {
     });
   }, [auditLogs, currentUser, currentUserRole, perspective]);
 
+  const monthMap = useMemo(() => ({
+    January: '01',
+    February: '02',
+    March: '03',
+    April: '04',
+    May: '05',
+    June: '06',
+    July: '07',
+    August: '08',
+    September: '09',
+    October: '10',
+    November: '11',
+    December: '12'
+  }), []);
+
   // --- Dynamic Calculator Engine logic ---
   const calculatedPayrollData = useMemo(() => {
     return scopedPayrollState.map(p => {
       const empId = p.employeeId;
       const emp = employees.find(e => e.id === empId);
+
       const empBasicSalary = Number(emp?.salaryAmount) || 0;
       const struct = salaryStructures[empId] || {
         basic: empBasicSalary,
-        hra: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.4) : 0,
-        travel: empBasicSalary > 0 ? 3000 : 0,
-        medical: empBasicSalary > 0 ? 2000 : 0,
-        special: empBasicSalary > 0 ? 1000 : 0,
-        pf: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.12) : 0,
+        hra: 0,
+        travel: 0,
+        medical: 0,
+        special: 0,
+        pf: 0,
         esi: 0,
-        pt: empBasicSalary > 0 ? 200 : 0,
-        tds: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.1) : 0
+        pt: 0,
+        tds: 0
       };
-      const att = attendanceDaysMap[empId] || { present: 0, absent: 0, halfDays: 0, paidLeaves: 0, unpaidLeaves: 0, overtimeHours: 0, lateArrivals: 0 };
+
+      const monthStr = monthMap[month] || '06';
+      const prefix = `${year}-${monthStr}`;
+      const empRecords = (attendance || []).filter(
+        a => a.employeeId === empId && a.date && a.date.startsWith(prefix)
+      );
+
+      let presentCount = 0;
+      let absentCount = 0;
+      let halfDaysCount = 0;
+      let paidLeavesCount = 0;
+      let lateArrivalsCount = 0;
+      let overtimeHoursCount = 0;
+
+      if (empRecords.length > 0) {
+        presentCount = empRecords.filter(a => ['Present', 'Work From Home', 'WFH', 'Overtime'].includes(a.status)).length;
+        absentCount = empRecords.filter(a => a.status === 'Absent').length;
+        halfDaysCount = empRecords.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
+        paidLeavesCount = empRecords.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length;
+        lateArrivalsCount = empRecords.filter(a => a.status === 'Late').length;
+        overtimeHoursCount = empRecords.reduce((sum, a) => {
+          const hrs = parseFloat(a.overtime) || 0;
+          return sum + hrs;
+        }, 0);
+      } else {
+        presentCount = 0;
+        absentCount = 0;
+        halfDaysCount = 0;
+        paidLeavesCount = 0;
+        lateArrivalsCount = 0;
+        overtimeHoursCount = 0;
+      }
 
       // Allowances Sum
       const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
 
       // Unpaid Leave Deduction
-      const leaveDeduction = att.unpaidLeaves * Math.round((struct.basic || empBasicSalary) / 24);
+      const leaveDeduction = absentCount * Math.round((struct.basic || empBasicSalary) / 24);
 
       // Late penalty
-      const lateDeduction = att.lateArrivals * attendanceConfigs.lateArrivalPenalty;
+      const lateDeduction = lateArrivalsCount * attendanceConfigs.lateArrivalPenalty;
 
       // Overtime Pay
-      const overtimePay = att.overtimeHours * attendanceConfigs.overtimeHourlyRate;
+      const overtimePay = overtimeHoursCount * attendanceConfigs.overtimeHourlyRate;
 
       // Bonuses
       const approvedBonuses = bonuses
@@ -420,13 +481,16 @@ const Payroll = () => {
       const grossSalary = (struct.basic || empBasicSalary) + totalAllowances + overtimePay + approvedBonuses;
 
       // Net Salary
-      const netSalary = grossSalary - totalDeductions;
+      const netSalary = Math.max(0, grossSalary - totalDeductions);
 
       return {
         ...p,
+        branch: emp?.branch || p.branch || '-',
+        department: emp?.department || p.department || '-',
+        designation: emp?.designation || p.designation || '-',
         basicSalary: struct.basic || empBasicSalary,
         grossSalary,
-        attendanceDays: att.present + att.paidLeaves + (att.halfDays * 0.5),
+        attendanceDays: presentCount + paidLeavesCount + (halfDaysCount * 0.5),
         leaveDeductions: leaveDeduction,
         lateDeductions: lateDeduction,
         statutoryDeductions,
@@ -437,14 +501,22 @@ const Payroll = () => {
         reimbursementAmount: approvedReimbursements,
         totalDeductions,
         netSalary,
-        bankName: emp?.bank?.bankName || struct.bankName || '—',
-        bankAccount: emp?.bank?.accountNumber || struct.bankAccountNumber || '—',
-        bankIfsc: emp?.bank?.ifsc || struct.bankIfscCode || '—',
-        pan: emp?.panNumber || taxProfiles[empId]?.pan || '—',
-        regime: taxProfiles[empId]?.regime || '—'
+        bankName: emp?.bank?.bankName || struct.bankName || '-',
+        bankAccount: emp?.bank?.accountNumber || struct.bankAccountNumber || '-',
+        bankIfsc: emp?.bank?.ifsc || struct.bankIfscCode || '-',
+        pan: emp?.panNumber || taxProfiles[empId]?.pan || '-',
+        regime: taxProfiles[empId]?.regime || '-',
+        hra: struct.hra || 0,
+        travel: struct.travel || 0,
+        medical: struct.medical || 0,
+        special: struct.special || 0,
+        pf: struct.pf || 0,
+        esi: struct.esi || 0,
+        pt: struct.pt || 0,
+        tds: struct.tds || 0
       };
     });
-  }, [payrollState, salaryStructures, attendanceDaysMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees]);
+  }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees]);
 
   // --- Executive Dashboard KPI aggregations ---
   const totalEmployees = calculatedPayrollData.length;
@@ -682,7 +754,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
   Tax Regime                      : ${empObj.regime} Regime
   Credit Bank                     : ${empObj.bankName}
   Account Number                  : ${empObj.bankAccount}
-  Transaction Status              : ${empObj.status === 'Released' ? 'PROCESSED & DISBURSED' : 'AWAITING DISBURSAL'}
+  Transaction Status              : ${empObj.status === 'Released' ? 'PROCESSED & DISTRIBUTED' : 'AWAITING DISTRIBUTION'}
 ========================================================================
   Auto-generated on behalf of SaaS Corporate Finance Division.
 ========================================================================
@@ -838,13 +910,13 @@ BANK PAYMENT & COMPLIANCE DETAIL:
 
             <div className="card payroll-stat-card border-bottom-success">
               <div className="stat-card-header flex-center justify-between width-full">
-                <span className="stat-label">Payroll Disbursed</span>
+                <span className="stat-label">Payroll Distributed</span>
                 <span className="badge-paid flex-center gap-1 font-xsmall"><CheckCircle size={12} /> Live</span>
               </div>
               <h3 className="stat-num text-success">{formatCurrency(calculatedPayrollData.filter(p => p.status === 'Released').reduce((sum, c) => sum + c.netSalary, 0))}</h3>
               <div className="flex-center justify-between font-small text-muted width-full">
                 <span>Processed: {processedCount} Staff</span>
-                <span>Pending Disbursal: {pendingCount}</span>
+                <span>Pending Distribution: {pendingCount}</span>
               </div>
             </div>
 
@@ -970,7 +1042,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     >
                       <div className="flex-column gap-1">
                         <span className="period-month">{m} {year}</span>
-                        <span className="period-net">{periodObj ? formatCurrency(periodObj.netSalary) : '—'}</span>
+                        <span className="period-net">{periodObj ? formatCurrency(periodObj.netSalary) : '-'}</span>
                       </div>
                       <Badge variant={isPaid ? 'success' : 'warning'}>
                         {isPaid ? 'Paid' : 'Pending'}
@@ -1027,12 +1099,14 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <span className="font-bold text-success border-bottom pb-1 flex-row gap-1 align-center">
                         <TrendingUp size={14} /> Earnings
                       </span>
-                      <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(selectedEmployeeObj.basicSalary) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.4)) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Conveyance & Medical Allowances:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(8000) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{selectedEmployeeObj.overtimeAmount > 0 ? formatCurrency(selectedEmployeeObj.overtimeAmount) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{selectedEmployeeObj.bonusAmount > 0 ? formatCurrency(selectedEmployeeObj.bonusAmount) : '—'}</strong></div>
-                      <div className="flex-center justify-between border-top pt-2 font-semibold text-success"><span>Gross Earnings:</span> <strong>{selectedEmployeeObj.grossSalary > 0 ? formatCurrency(selectedEmployeeObj.grossSalary) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(selectedEmployeeObj.basicSalary) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{selectedEmployeeObj.hra > 0 ? formatCurrency(selectedEmployeeObj.hra) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Conveyance Allowance:</span> <strong>{selectedEmployeeObj.travel > 0 ? formatCurrency(selectedEmployeeObj.travel) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Medical Allowance:</span> <strong>{selectedEmployeeObj.medical > 0 ? formatCurrency(selectedEmployeeObj.medical) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Special Allowance:</span> <strong>{selectedEmployeeObj.special > 0 ? formatCurrency(selectedEmployeeObj.special) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{selectedEmployeeObj.overtimeAmount > 0 ? formatCurrency(selectedEmployeeObj.overtimeAmount) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{selectedEmployeeObj.bonusAmount > 0 ? formatCurrency(selectedEmployeeObj.bonusAmount) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between border-top pt-2 font-semibold text-success"><span>Gross Earnings:</span> <strong>{selectedEmployeeObj.grossSalary > 0 ? formatCurrency(selectedEmployeeObj.grossSalary) : '₹0'}</strong></div>
                     </div>
  
                     {/* Deductions */}
@@ -1040,13 +1114,13 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <span className="font-bold text-danger border-bottom pb-1 flex-row gap-1 align-center">
                         <MinusCircle size={14} /> Deductions
                       </span>
-                      <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.12)) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.1)) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(200) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{selectedEmployeeObj.leaveDeductions > 0 ? formatCurrency(selectedEmployeeObj.leaveDeductions) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{selectedEmployeeObj.lateDeductions > 0 ? formatCurrency(selectedEmployeeObj.lateDeductions) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct > 0 ? formatCurrency(selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct) : '—'}</strong></div>
-                      <div className="flex-center justify-between border-top pt-2 font-semibold text-danger"><span>Total Deductions:</span> <strong>{selectedEmployeeObj.totalDeductions > 0 ? formatCurrency(selectedEmployeeObj.totalDeductions) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{selectedEmployeeObj.pf > 0 ? formatCurrency(selectedEmployeeObj.pf) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{selectedEmployeeObj.tds > 0 ? formatCurrency(selectedEmployeeObj.tds) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{selectedEmployeeObj.pt > 0 ? formatCurrency(selectedEmployeeObj.pt) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{selectedEmployeeObj.leaveDeductions > 0 ? formatCurrency(selectedEmployeeObj.leaveDeductions) : '-'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{selectedEmployeeObj.lateDeductions > 0 ? formatCurrency(selectedEmployeeObj.lateDeductions) : '-'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct > 0 ? formatCurrency(selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct) : '-'}</strong></div>
+                      <div className="flex-center justify-between border-top pt-2 font-semibold text-danger"><span>Total Deductions:</span> <strong>{selectedEmployeeObj.totalDeductions > 0 ? formatCurrency(selectedEmployeeObj.totalDeductions) : '-'}</strong></div>
                     </div>
                   </div>
  
@@ -1056,7 +1130,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <span className="font-semibold text-primary">Net Take-Home Salary</span>
                       <span className="font-xsmall text-muted">Transferred to your bank account on disbursal</span>
                     </div>
-                    <span className="font-bold text-success font-large">{selectedEmployeeObj.netSalary > 0 ? formatCurrency(selectedEmployeeObj.netSalary) : '—'}</span>
+                    <span className="font-bold text-success font-large">{selectedEmployeeObj.netSalary > 0 ? formatCurrency(selectedEmployeeObj.netSalary) : '-'}</span>
                   </div>
                 </>
               ) : (
@@ -1100,7 +1174,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <option value="Calculated">Calculated</option>
                     <option value="HR Verified">HR Verified</option>
                     <option value="Finance Approved">Finance Approved</option>
-                    <option value="Released">Released (Paid)</option>
+                    <option value="Released">Distributed</option>
                     <option value="Hold">On Hold</option>
                   </select>
                 </div>
@@ -1124,7 +1198,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                           Approve (Fin)
                         </Button>
                         <Button variant="primary" onClick={() => handleBulkAction('release')} icon={Landmark}>
-                          Release Salary
+                          Distribute Salary
                         </Button>
                       </div>
                     )}
@@ -1170,13 +1244,13 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                               <span>{row.designation}</span>
                             </div>
                           </td>
-                          <td><span className="badge badge-secondary">{row.branch}</span></td>
-                          <td className="font-semibold">{row.basicSalary > 0 ? formatCurrency(row.basicSalary) : '—'}</td>
-                          <td className="text-center font-semibold">{row.attendanceDays > 0 ? row.attendanceDays : '—'}</td>
-                          <td className="text-success font-semibold">{row.overtimeAmount > 0 ? `+${formatCurrency(row.overtimeAmount)}` : '—'}</td>
-                          <td className="text-success font-semibold">{row.bonusAmount > 0 ? `+${formatCurrency(row.bonusAmount)}` : '—'}</td>
-                          <td className="text-danger font-semibold">{row.totalDeductions > 0 ? `-${formatCurrency(row.totalDeductions)}` : '—'}</td>
-                          <td className="text-info font-bold">{row.netSalary > 0 ? formatCurrency(row.netSalary) : '—'}</td>
+                          <td><span className="badge badge-secondary">{row.branch === '—' ? '-' : row.branch}</span></td>
+                          <td className="font-semibold">{row.basicSalary > 0 ? formatCurrency(row.basicSalary) : '₹0'}</td>
+                          <td className="text-center font-semibold">{row.attendanceDays >= 0 ? row.attendanceDays : 0}</td>
+                          <td className="text-success font-semibold">{row.overtimeAmount > 0 ? `+${formatCurrency(row.overtimeAmount)}` : '₹0'}</td>
+                          <td className="text-success font-semibold">{row.bonusAmount > 0 ? `+${formatCurrency(row.bonusAmount)}` : '₹0'}</td>
+                          <td className="text-danger font-semibold">{row.totalDeductions > 0 ? `-${formatCurrency(row.totalDeductions)}` : '₹0'}</td>
+                          <td className="text-info font-bold">{row.netSalary > 0 ? formatCurrency(row.netSalary) : '₹0'}</td>
                           <td>
                             <Badge variant={
                               row.status === 'Released' ? 'success' :
@@ -1184,7 +1258,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                               row.status === 'HR Verified' ? 'primary' :
                               row.status === 'Hold' ? 'danger' : 'warning'
                             }>
-                              {row.status === 'Released' ? 'Disbursed' : row.status}
+                              {row.status === 'Released' ? 'Distributed' : row.status}
                             </Badge>
                           </td>
                           <td>
@@ -1215,11 +1289,11 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                                 />
                               )}
 
-                              {perspective === 'super_admin' && row.status !== 'Released' && (
+                              {perspective !== 'employee' && row.status !== 'Released' && (
                                 <button
                                   className="action-circle-btn success-btn"
                                   onClick={() => handleStatusChange(row.employeeId, 'Released')}
-                                  title="Release Salary"
+                                  title="Distribute Salary"
                                 >
                                   <Check size={14} />
                                 </button>
@@ -1444,7 +1518,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <h3 className="stat-num text-success">
                       {formatCurrency(scopedBonuses.filter(b => b.status === 'Super Admin Approved').reduce((sum, curr) => sum + curr.amount, 0))}
                     </h3>
-                    <span className="font-xsmall text-muted">Disbursed in current cycle</span>
+                    <span className="font-xsmall text-muted">Distributed in current cycle</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-success">
                     <Award size={20} />
@@ -1536,7 +1610,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <h3 className="stat-num text-success">
                       {formatCurrency(scopedBonuses.filter(b => b.status === 'Super Admin Approved').reduce((sum, curr) => sum + curr.amount, 0))}
                     </h3>
-                    <span className="font-xsmall text-muted">Disbursed performance awards</span>
+                    <span className="font-xsmall text-muted">Distributed performance awards</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-success">
                     <Award size={20} />
@@ -1880,7 +1954,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <div className="loans-kpi-grid">
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
-                    <span className="stat-label">Total Disbursed Loans</span>
+                    <span className="stat-label">Total Distributed Loans</span>
                     <h3 className="stat-num text-primary">{formatCurrency(loans.reduce((sum, curr) => sum + curr.amount, 0))}</h3>
                     <span className="font-xsmall text-muted">Total corporate loan capital</span>
                   </div>
@@ -2321,20 +2395,22 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 {/* Earnings */}
                 <div className="flex-column gap-2 border-right pr-4">
                   <span className="font-bold text-success border-bottom pb-1">Earnings</span>
-                  <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{formatCurrency(payslipEmployeeObj.basicSalary)}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{formatCurrency(Math.round(payslipEmployeeObj.basicSalary * 0.4))}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>Conveyance & Medical Allowances:</span> <strong>{formatCurrency(8000)}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{formatCurrency(payslipEmployeeObj.overtimeAmount)}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{formatCurrency(payslipEmployeeObj.bonusAmount)}</strong></div>
-                  <div className="flex-center justify-between border-top pt-2 font-semibold"><span>Gross Earnings:</span> <strong>{formatCurrency(payslipEmployeeObj.grossSalary)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{formatCurrency(payslipEmployeeObj.basicSalary || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{formatCurrency(payslipEmployeeObj.hra || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Conveyance Allowance:</span> <strong>{formatCurrency(payslipEmployeeObj.travel || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Medical Allowance:</span> <strong>{formatCurrency(payslipEmployeeObj.medical || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Special Allowance:</span> <strong>{formatCurrency(payslipEmployeeObj.special || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{formatCurrency(payslipEmployeeObj.overtimeAmount || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{formatCurrency(payslipEmployeeObj.bonusAmount || 0)}</strong></div>
+                  <div className="flex-center justify-between border-top pt-2 font-semibold"><span>Gross Earnings:</span> <strong>{formatCurrency(payslipEmployeeObj.grossSalary || 0)}</strong></div>
                 </div>
 
                 {/* Deductions */}
                 <div className="flex-column gap-2">
                   <span className="font-bold text-danger border-bottom pb-1">Deductions</span>
-                  <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{formatCurrency(Math.round(payslipEmployeeObj.basicSalary * 0.12))}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{formatCurrency(Math.round(payslipEmployeeObj.basicSalary * 0.1))}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{formatCurrency(200)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{formatCurrency(payslipEmployeeObj.pf || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{formatCurrency(payslipEmployeeObj.tds || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{formatCurrency(payslipEmployeeObj.pt || 0)}</strong></div>
                   <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{formatCurrency(payslipEmployeeObj.leaveDeductions)}</strong></div>
                   <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{formatCurrency(payslipEmployeeObj.lateDeductions)}</strong></div>
                   <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{formatCurrency(payslipEmployeeObj.loanEMI + payslipEmployeeObj.advanceDeduct)}</strong></div>
@@ -2345,7 +2421,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               {/* Net Take home pay highlight */}
               <div className="flex-center justify-between p-4 bg-secondary-dark rounded border border-primary mt-3">
                 <div className="flex-column">
-                  <span className="font-semibold text-primary">Net Salary Disbursed</span>
+                  <span className="font-semibold text-primary">Net Salary Distributed</span>
                   <span className="font-xsmall text-muted">For period: {month} {year}</span>
                 </div>
                 <span className="font-bold text-success font-large">{formatCurrency(payslipEmployeeObj.netSalary)}</span>
