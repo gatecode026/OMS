@@ -866,7 +866,7 @@ const EmployeeProfile = () => {
                   </div>
                 </div>
                 <div className="id-card-back-signature-area">
-                  <div className="id-signature-font">{emp.reportingManager || emp.teamLeader || 'Vikram Singh'}</div>
+                  <div className="id-signature-font">{emp.reportingManager || emp.teamLeader || 'Authorized Signatory'}</div>
                   <div className="id-signature-line"></div>
                   <div className="id-signature-label">Authorized Signatory</div>
                 </div>

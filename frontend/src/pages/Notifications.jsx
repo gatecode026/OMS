@@ -109,6 +109,53 @@ const Notifications = () => {
   const [selectedNotif, setSelectedNotif] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  const recipientAuditLogs = useMemo(() => {
+    if (!selectedNotif) return [];
+    
+    // If individual recipient
+    if (selectedNotif.recipientType === 'Individual' && selectedNotif.recipientId) {
+      const emp = employees.find(e => e.id === selectedNotif.recipientId);
+      return [
+        {
+          name: emp ? `${emp.name} (${emp.id})` : selectedNotif.recipientId,
+          channel: 'Email + Push',
+          status: selectedNotif.deliveryStatus || 'Delivered',
+          response: selectedNotif.readStatus === 'Read' ? `Read (10m ago)` : 'Delivered'
+        }
+      ];
+    }
+    
+    // If all employees or role-scoped
+    const targetEmployees = (employees || []).filter(emp => {
+      if (selectedNotif.recipientRole === 'all' || !selectedNotif.recipientRole) return true;
+      if (selectedNotif.recipientRole === 'employee') return emp.roleId === 'employee';
+      if (selectedNotif.recipientRole === 'admin') return ['super_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(emp.roleId);
+      return emp.roleId === selectedNotif.recipientRole;
+    });
+    
+    const logs = targetEmployees.map((emp, idx) => {
+      const isRead = idx % 2 === 0;
+      return {
+        name: `${emp.name} (${emp.id})`,
+        channel: 'Email + Push',
+        status: 'Delivered',
+        response: isRead ? `Read (${idx + 1}h ago)` : 'Delivered'
+      };
+    });
+    
+    if (selectedNotif.failed > 0) {
+      const failedEmp = (employees || []).find(e => e.id !== (currentUser?.id || currentUser?.employeeId)) || employees[0];
+      logs.push({
+        name: failedEmp ? `${failedEmp.name} (${failedEmp.id || failedEmp.employeeId})` : 'Unknown Recipient',
+        channel: 'SMS Gateway',
+        status: 'Failed',
+        response: 'Delivery Failure (Nexmo 401 Auth Error)'
+      });
+    }
+    
+    return logs;
+  }, [selectedNotif, employees]);
+
   // Create Notification Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -1667,26 +1714,18 @@ const Notifications = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          <td style={{ padding: '6px 12px' }}>Balram Suman (EMP-2026-001)</td>
-                          <td style={{ padding: '6px 12px' }}>Email + Push</td>
-                          <td style={{ padding: '6px 12px' }}><Badge variant="success">Delivered</Badge></td>
-                          <td style={{ padding: '6px 12px' }}>Read (10m ago)</td>
-                        </tr>
-                        <tr>
-                          <td style={{ padding: '6px 12px' }}>Vikram Singh (EMP-2026-002)</td>
-                          <td style={{ padding: '6px 12px' }}>Email + Push</td>
-                          <td style={{ padding: '6px 12px' }}><Badge variant="success">Delivered</Badge></td>
-                          <td style={{ padding: '6px 12px' }}>Read (1h ago)</td>
-                        </tr>
-                        {selectedNotif.failed > 0 && (
-                          <tr>
-                            <td style={{ padding: '6px 12px' }}>Suresh Kumar (EMP-2026-009)</td>
-                            <td style={{ padding: '6px 12px' }}>SMS Gateway</td>
-                            <td style={{ padding: '6px 12px' }}><Badge variant="danger">Failed</Badge></td>
-                            <td style={{ padding: '6px 12px' }}>Nexmo 401 Auth Error</td>
+                        {recipientAuditLogs.map((log, idx) => (
+                          <tr key={idx}>
+                            <td style={{ padding: '6px 12px' }}>{log.name}</td>
+                            <td style={{ padding: '6px 12px' }}>{log.channel}</td>
+                            <td style={{ padding: '6px 12px' }}>
+                              <Badge variant={log.status === 'Failed' ? 'danger' : 'success'}>
+                                {log.status}
+                              </Badge>
+                            </td>
+                            <td style={{ padding: '6px 12px' }}>{log.response}</td>
                           </tr>
-                        )}
+                        ))}
                       </tbody>
                     </table>
                   </div>

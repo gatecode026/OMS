@@ -245,6 +245,7 @@ const SystemSettings = () => {
     setSecuritySettings,
     saveSystemSettings,
     token,
+    activityLogs,
     // Real database branches & departments
     branches: dbBranches,
     departments: dbDepartments,
@@ -2273,21 +2274,23 @@ const SystemSettings = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { time: 'Today, 10:30 AM', user: 'Balram Suman', action: 'Modified Overtime Multiplier to 1.5x', scope: 'Payroll Settings', status: 'Success' },
-                      { time: 'Today, 09:15 AM', user: 'Balram Suman', action: 'Authorized Twilio SMS Gateway URL', scope: 'SMS Config', status: 'Success' },
-                      { time: 'Yesterday, 04:22 PM', user: 'Neha Verma', action: 'Updated Leaves Quota Balances', scope: 'Leave Policies', status: 'Success' },
-                      { time: 'Yesterday, 02:00 AM', user: 'SYSTEM Scheduler', action: 'Database Auto-Backup completed', scope: 'System Backup', status: 'Success' },
-                      { time: '03-Jun-2026, 11:00 AM', user: 'Balram Suman', action: 'Added New Branch (Jaipur Operations)', scope: 'Branch Config', status: 'Success' }
-                    ].map((row, idx) => (
-                      <tr key={idx}>
-                        <td><span className="text-muted font-mono">{row.time}</span></td>
-                        <td><strong>{row.user}</strong></td>
-                        <td>{row.action}</td>
-                        <td><span className="badge badge-info">{row.scope}</span></td>
-                        <td><span className="badge badge-success">{row.status}</span></td>
+                    {(activityLogs || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                          No activity logs found.
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      [...(activityLogs || [])].slice(0, 5).map((log, idx) => (
+                        <tr key={idx}>
+                          <td><span className="text-muted font-mono">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '—'}</span></td>
+                          <td><strong>{log.actorName || log.user || '—'}</strong></td>
+                          <td>{log.action || log.description || log.message || '—'}</td>
+                          <td><span className="badge badge-info">{log.module || log.scope || '—'}</span></td>
+                          <td><span className="badge badge-success">{log.status || 'Success'}</span></td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

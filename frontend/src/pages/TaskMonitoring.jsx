@@ -524,7 +524,7 @@ const TaskMonitoring = () => {
 
   const handleAddCommentSubmit = async () => {
     if (!newCommentText.trim()) return;
-    const updatedTask = await addTaskComment(selectedTask.id, newCommentText, currentUser?.name || 'Balram Suman', currentUser?.role || 'Super Admin');
+    const updatedTask = await addTaskComment(selectedTask.id, newCommentText, currentUser?.name || 'Unknown', currentUser?.role || 'Super Admin');
     setNewCommentText('');
     if (updatedTask) {
       setSelectedTask(updatedTask);

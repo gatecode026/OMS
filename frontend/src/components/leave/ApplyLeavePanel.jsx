@@ -32,12 +32,25 @@ const diffWorkingDays = (from, to, holidays = []) => {
 };
 
 const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = [], editingLeave = null }) => {
-  const { leaveRequests = [], currentUser } = useApp();
+  const { leaveRequests = [], currentUser, leavePolicyConfigs = [] } = useApp();
   const [form, setForm] = useState({ type: '', from: '', to: '', reason: '' });
   const [days, setDays] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  const activePolicies = React.useMemo(() => {
+    return leavePolicyConfigs && leavePolicyConfigs.length > 0
+      ? leavePolicyConfigs.filter(p => p.isActive)
+      : [
+          { leaveCode: 'CL', leaveName: 'Casual Leave' },
+          { leaveCode: 'SL', leaveName: 'Sick Leave' },
+          { leaveCode: 'PL', leaveName: 'Paid Leave' },
+          { leaveCode: 'ML', leaveName: 'Maternity Leave' },
+          { leaveCode: 'UL', leaveName: 'Unpaid Leave' },
+          { leaveCode: 'Other', leaveName: 'Other' }
+        ];
+  }, [leavePolicyConfigs]);
 
   useEffect(() => {
     const calculatedDays = diffWorkingDays(form.from, form.to, holidays);
@@ -92,13 +105,23 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.type || !form.type.trim()) { setError('Please specify Leave Type.'); return; }
+    if (!form.type || !form.type.trim()) { setError('Please select Leave Type.'); return; }
     if (!form.from || !form.to) { setError('Please select From and To dates.'); return; }
     if (days <= 0) { setError('Date range has 0 working days. Please adjust.'); return; }
 
     const today = new Date().toISOString().split('T')[0];
     if (form.from < today) {
       setError('Start date cannot be before today.');
+      return;
+    }
+
+    if (days > 365) {
+      setError('Leave request range cannot exceed 365 days.');
+      return;
+    }
+
+    if (form.type !== 'UL' && form.type !== 'Other' && remaining !== null && remaining < days) {
+      setError('Insufficient leave balance for the selected leave type.');
       return;
     }
 
@@ -195,14 +218,19 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
             {/* Leave Type */}
             <div>
               <label style={labelStyle}>Leave Type</label>
-              <input
-                type="text"
+              <select
                 value={form.type}
                 onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
-                placeholder="e.g. Casual Leave, Sick Leave..."
                 style={inputStyle}
                 required
-              />
+              >
+                <option value="">-- Select --</option>
+                {activePolicies.map(p => (
+                  <option key={p.leaveCode} value={p.leaveCode}>
+                    {p.leaveName} ({p.leaveCode})
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* From Date */}

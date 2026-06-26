@@ -825,12 +825,12 @@ const Overview = () => {
       addToast('warning', 'Please fill in all announcement fields.');
       return;
     }
-    const finalBranch = branchFilter === 'All' ? (branches[0]?.name || 'Jaipur HQ') : branchFilter;
+    const finalBranch = branchFilter === 'All' ? (branches[0]?.name || 'All') : branchFilter;
     const newAnn = {
       category: announcementForm.category,
       title: announcementForm.title,
       desc: announcementForm.desc,
-      department: deptFilter === 'All' ? 'Operations' : deptFilter,
+      department: deptFilter === 'All' ? 'All' : deptFilter,
       branch: finalBranch,
       date: new Date().toISOString().split('T')[0]
     };
