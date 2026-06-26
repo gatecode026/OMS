@@ -25,11 +25,11 @@ const getFileIcon = (mimeType, fileName) => {
   const mime = (mimeType || '').toLowerCase();
   if (mime.includes('pdf') || name.endsWith('.pdf'))
     return { icon: '📄', color: '#ef4444', label: 'PDF' };
-  if (mime.includes('word') || name.endsWith('.doc') || 
-      name.endsWith('.docx'))
+  if (mime.includes('word') || name.endsWith('.doc') ||
+    name.endsWith('.docx'))
     return { icon: '📝', color: '#2563eb', label: 'DOC' };
-  if (mime.includes('excel') || name.endsWith('.xls') || 
-      name.endsWith('.xlsx'))
+  if (mime.includes('excel') || name.endsWith('.xls') ||
+    name.endsWith('.xlsx'))
     return { icon: '📊', color: '#16a34a', label: 'XLS' };
   if (mime.includes('zip') || name.endsWith('.zip'))
     return { icon: '🗜️', color: '#7c3aed', label: 'ZIP' };
@@ -40,6 +40,7 @@ const getVideoPoster = (url) => {
   if (url && url.includes('imagekit.io')) {
     const queryIdx = url.indexOf('?');
     if (queryIdx !== -1) {
+
       const basePath = url.substring(0, queryIdx);
       const queryParams = url.substring(queryIdx);
       return `${basePath}/ik-thumbnail.jpg${queryParams}`;
@@ -140,9 +141,9 @@ const MessageStatus = ({ message: msg, conversation, onRetry }) => {
 
   if (msg._deliveryStatus === 'failed') {
     return (
-      <div 
-        className="msg-status-container status-failed" 
-        onClick={() => onRetry && onRetry(msg.id)} 
+      <div
+        className="msg-status-container status-failed"
+        onClick={() => onRetry && onRetry(msg.id)}
         style={{ cursor: 'pointer', color: 'var(--text-danger, #ef4444)', display: 'flex', alignItems: 'center', gap: '4px' }}
       >
         <span style={{ fontSize: '0.78rem', fontWeight: '500' }}>Failed — tap to retry</span>
@@ -344,13 +345,13 @@ const MessageBubble = ({
   // File type and preview variables
   const fileInfo = (msg.type === 'file' || msg.type === 'video') && msg.media ? getFileIcon(msg.media.mimeType || msg.media.fileType, msg.media.fileName) : null;
   const isPDF = msg.type === 'file' && msg.media && (((msg.media.mimeType || msg.media.fileType || '').includes('pdf')) || (msg.media.fileName || '').endsWith('.pdf'));
-  const fileSizeKB = (msg.type === 'file' || msg.type === 'video') && msg.media && msg.media.fileSize 
-    ? (msg.media.fileSize / 1024).toFixed(1) + ' KB' 
+  const fileSizeKB = (msg.type === 'file' || msg.type === 'video') && msg.media && msg.media.fileSize
+    ? (msg.media.fileSize / 1024).toFixed(1) + ' KB'
     : '';
   const mime = (msg.media?.mimeType || msg.media?.fileType || '').toLowerCase();
-  const isVideo = (msg.type === 'file' || msg.type === 'video') && 
-                  msg.media && 
-                  (mime.startsWith('video/') || ['video/mp4', 'video/webm', 'video/ogg'].includes(mime));
+  const isVideo = (msg.type === 'file' || msg.type === 'video') &&
+    msg.media &&
+    (mime.startsWith('video/') || ['video/mp4', 'video/webm', 'video/ogg'].includes(mime));
 
   // Close menus on click outside of action popups
   useEffect(() => {
@@ -359,9 +360,9 @@ const MessageBubble = ({
         setShowEmojiPicker(false);
       }
 
-      const clickedOption = e.target.closest('.msg-action-bar') || 
-                            e.target.closest('.msg-emoji-picker-popup') || 
-                            e.target.closest('.msg-delete-menu');
+      const clickedOption = e.target.closest('.msg-action-bar') ||
+        e.target.closest('.msg-emoji-picker-popup') ||
+        e.target.closest('.msg-delete-menu');
       if (!clickedOption) {
         setShowOptions(false);
         setShowDeleteMenu(false);
@@ -439,7 +440,7 @@ const MessageBubble = ({
     const isVideo = msg.content?.toLowerCase().includes('video');
     const isMissed = msg.content?.toLowerCase().includes('missed');
     const isDeclined = msg.content?.toLowerCase().includes('declined') || msg.content?.toLowerCase().includes('decline');
-    
+
     return (
       <div className="msg-system" style={{ margin: '12px 0' }}>
         <div style={{
@@ -458,17 +459,17 @@ const MessageBubble = ({
           <span style={{ fontSize: '15px', display: 'flex', alignItems: 'center' }}>
             {isMissed ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5">
-                <line x1="1" y1="1" x2="23" y2="23"/>
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                <line x1="1" y1="1" x2="23" y2="23" />
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             ) : isVideo ? (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polygon points="23 7 16 12 23 17 23 7"/>
-                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
               </svg>
             ) : (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
             )}
           </span>
@@ -525,7 +526,7 @@ const MessageBubble = ({
         </div>
       )}
 
-      <div 
+      <div
         className={`msg-bubble-wrapper ${isOwn ? 'msg-bubble-wrapper-own' : ''}`}
         onContextMenu={(e) => {
           if (isSelectMode) return;
@@ -564,8 +565,8 @@ const MessageBubble = ({
 
         {/* Reply quote */}
         {msg.replyTo && (
-          <div 
-            className="msg-reply-quote" 
+          <div
+            className="msg-reply-quote"
             style={{ cursor: 'pointer' }}
             onClick={() => {
               const targetEl = document.getElementById(`msg-${msg.replyTo.messageId}`);
@@ -588,8 +589,8 @@ const MessageBubble = ({
           {/* Hover Actions */}
           {!msg.isDeleted && msg.type !== 'system' && !isEditing && (
             <div className={`msg-bubble-hover-actions ${isOwn ? 'hover-other' : 'hover-own'}`}>
-              <button 
-                className="msg-bubble-hover-action-btn" 
+              <button
+                className="msg-bubble-hover-action-btn"
                 onClick={(e) => { e.stopPropagation(); openThread(msg.id); }}
                 title="Reply in Thread"
               >
@@ -631,7 +632,7 @@ const MessageBubble = ({
                   <img
                     src={msg.media?.url || msg.content}
                     alt={msg.media?.fileName || 'Image'}
-                    style={{ 
+                    style={{
                       maxWidth: '240px', maxHeight: '200px',
                       objectFit: 'cover', borderRadius: '8px',
                       cursor: 'pointer',
@@ -670,11 +671,11 @@ const MessageBubble = ({
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.06)'}
                     title="Download Image"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" 
+                    <svg width="14" height="14" viewBox="0 0 24 24"
                       fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="7 10 12 15 17 10"/>
-                      <line x1="12" y1="15" x2="12" y2="3"/>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
                     Download
                   </button>
@@ -689,7 +690,7 @@ const MessageBubble = ({
                       muted
                       playsInline
                       onError={() => setVideoError(true)}
-                      style={{ 
+                      style={{
                         maxWidth: '240px', maxHeight: '200px',
                         borderRadius: '8px', display: 'block'
                       }}
@@ -738,11 +739,11 @@ const MessageBubble = ({
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.06)'}
                     title="Download Video"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" 
+                    <svg width="14" height="14" viewBox="0 0 24 24"
                       fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                      <polyline points="7 10 12 15 17 10"/>
-                      <line x1="12" y1="15" x2="12" y2="3"/>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
                     </svg>
                     Download
                   </button>
@@ -759,27 +760,27 @@ const MessageBubble = ({
                     width: '40px', height: '40px', borderRadius: '8px',
                     background: fileInfo.color + '20',
                     border: '1px solid ' + fileInfo.color + '40',
-                    display: 'flex', alignItems: 'center', 
+                    display: 'flex', alignItems: 'center',
                     justifyContent: 'center', flexShrink: 0,
                     fontSize: '20px'
                   }}>
                     {fileInfo.icon}
                   </div>
-                  
+
                   {/* File name + size */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{
                       fontSize: '13px', fontWeight: 600,
                       color: 'var(--text-primary)',
-                      whiteSpace: 'nowrap', overflow: 'hidden', 
+                      whiteSpace: 'nowrap', overflow: 'hidden',
                       textOverflow: 'ellipsis'
                     }}>
                       {msg.media?.fileName || 'File'}
                     </div>
-                    <div style={{ 
-                      fontSize: '11px', 
-                      color: 'var(--text-muted)', 
-                      marginTop: '2px' 
+                    <div style={{
+                      fontSize: '11px',
+                      color: 'var(--text-muted)',
+                      marginTop: '2px'
                     }}>
                       {fileInfo.label}
                       {fileSizeKB && ` · ${fileSizeKB}`}
@@ -804,10 +805,10 @@ const MessageBubble = ({
                         }}
                         title="Preview PDF"
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" 
+                        <svg width="14" height="14" viewBox="0 0 24 24"
                           fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                          <circle cx="12" cy="12" r="3"/>
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
                         </svg>
                       </button>
                     )}
@@ -826,11 +827,11 @@ const MessageBubble = ({
                       }}
                       title="Download"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" 
+                      <svg width="14" height="14" viewBox="0 0 24 24"
                         fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
                       </svg>
                     </button>
                   </div>
@@ -853,25 +854,25 @@ const MessageBubble = ({
             {isStarred && (
               <span className="msg-star-icon" title="Starred message">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
               </span>
             )}
             {msg.isPinned && (
               <span className="msg-pin-icon" title="Pinned message">
-                <svg 
-                  width="13" 
-                  height="13" 
-                  viewBox="0 0 24 24" 
-                  fill="currentColor" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   style={{ transform: 'rotate(45deg)' }}
                 >
-                  <line x1="12" y1="17" x2="12" y2="22"/>
-                  <path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.47A2 2 0 0 1 15 9.3V5a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4.3a2 2 0 0 1-.78 1.23l-2.78 3.5a2 2 0 0 0-.44 1.24z"/>
+                  <line x1="12" y1="17" x2="12" y2="22" />
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.47A2 2 0 0 1 15 9.3V5a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4.3a2 2 0 0 1-.78 1.23l-2.78 3.5a2 2 0 0 0-.44 1.24z" />
                 </svg>
               </span>
             )}
@@ -902,7 +903,7 @@ const MessageBubble = ({
 
         {/* Thread Summary Footer */}
         {msg.threadId && (
-          <div 
+          <div
             className={`msg-thread-footer ${isOwn ? 'thread-own' : 'thread-other'}`}
             onClick={(e) => { e.stopPropagation(); openThread(msg.id); }}
             style={{ cursor: 'pointer' }}
@@ -956,7 +957,7 @@ const MessageBubble = ({
 
       {/* ── Context Action Bar (Right-Click Action Bar) ────────────────────────── */}
       {showOptions && !isEditing && createPortal(
-        <div 
+        <div
           ref={actionBarRef}
           className={`msg-action-bar ${isOwn ? 'msg-action-bar-own' : 'msg-action-bar-other'}`}
           style={{

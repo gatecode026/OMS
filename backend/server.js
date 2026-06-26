@@ -33,6 +33,8 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 let server;
 let isShuttingDown = false;
 
+
+
 /**
  * Handle graceful shutdown of the application
  */
