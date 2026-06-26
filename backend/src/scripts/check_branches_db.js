@@ -10,11 +10,11 @@ async function check() {
   await mongoose.connect(dbUri);
   console.log('Connected to Main DB');
   
-  const Employee = mongoose.connection.db.collection('employees');
-  const emps = await Employee.find({ id: { $in: ['GATECO-EMP-005', 'GATECO-EMP-006'] } }).toArray();
-  console.log('Geeta & Udit details:');
-  emps.forEach(e => {
-    console.log(JSON.stringify(e));
+  const Branch = mongoose.connection.db.collection('branches');
+  const branches = await Branch.find({}).toArray();
+  console.log('Branches in DB:');
+  branches.forEach(b => {
+    console.log(JSON.stringify(b));
   });
   
   await mongoose.disconnect();

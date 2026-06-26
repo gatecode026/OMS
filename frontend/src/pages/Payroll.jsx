@@ -92,6 +92,14 @@ const Payroll = () => {
     fetchAttendance
   } = useApp();
 
+  const resolveEmployee = React.useCallback((empId, empName) => {
+    if (!employees || employees.length === 0) return null;
+    return employees.find(e => 
+      (empId && (e.id === empId || e.employeeId === empId || e.employeeCode === empId)) ||
+      (empName && e.name && e.name.toLowerCase().replace(/\s+/g, ' ') === empName.toLowerCase().replace(/\s+/g, ' '))
+    );
+  }, [employees]);
+
   // Selected Month/Year
   const [month, setMonth] = useState('June');
   const [year, setYear] = useState('2026');
@@ -210,7 +218,12 @@ const Payroll = () => {
     const activeState = employees
       .filter(emp => emp.status !== 'Inactive')
       .map(emp => {
-        const savedPayment = monthlyPayments.find(p => p.employeeId === emp.id);
+        const savedPayment = monthlyPayments.find(p => 
+          p.employeeId === emp.id || 
+          p.employeeId === emp.employeeId || 
+          p.employeeId === emp.employeeCode || 
+          (p.employeeName && emp.name && p.employeeName.toLowerCase().replace(/\s+/g, ' ') === emp.name.toLowerCase().replace(/\s+/g, ' '))
+        );
         if (savedPayment) {
           return savedPayment;
         }
@@ -267,7 +280,7 @@ const Payroll = () => {
 
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return activeState;
     return activeState.filter(p => {
-      const emp = employees.find(e => e.id === p.employeeId);
+      const emp = resolveEmployee(p.employeeId, p.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return p.employeeId === currentUser?.id;
       }
@@ -282,12 +295,12 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [payrollState, employees, currentUser, currentUserRole, perspective, month, year, salaryStructures]);
+  }, [payrollState, employees, currentUser, currentUserRole, perspective, month, year, salaryStructures, resolveEmployee]);
 
   const scopedReimbursements = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return reimbursements;
     return reimbursements.filter(r => {
-      const emp = employees.find(e => e.id === r.employeeId);
+      const emp = resolveEmployee(r.employeeId, r.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return r.employeeId === currentUser?.id;
       }
@@ -302,12 +315,12 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [reimbursements, employees, currentUser, currentUserRole, perspective]);
-
+  }, [reimbursements, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
+ 
   const scopedLoans = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return loans;
     return loans.filter(l => {
-      const emp = employees.find(e => e.id === l.employeeId);
+      const emp = resolveEmployee(l.employeeId, l.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return l.employeeId === currentUser?.id;
       }
@@ -322,12 +335,12 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [loans, employees, currentUser, currentUserRole, perspective]);
-
+  }, [loans, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
+ 
   const scopedAdvances = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return advances;
     return advances.filter(a => {
-      const emp = employees.find(e => e.id === a.employeeId);
+      const emp = resolveEmployee(a.employeeId, a.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return a.employeeId === currentUser?.id;
       }
@@ -342,12 +355,12 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [advances, employees, currentUser, currentUserRole, perspective]);
-
+  }, [advances, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
+ 
   const scopedBonuses = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return bonuses;
     return bonuses.filter(b => {
-      const emp = employees.find(e => e.id === b.employeeId);
+      const emp = resolveEmployee(b.employeeId, b.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return b.employeeId === currentUser?.id;
       }
@@ -362,7 +375,7 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [bonuses, employees, currentUser, currentUserRole, perspective]);
+  }, [bonuses, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
 
   const scopedAuditLogs = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return auditLogs;
@@ -393,7 +406,7 @@ const Payroll = () => {
   const calculatedPayrollData = useMemo(() => {
     return scopedPayrollState.map(p => {
       const empId = p.employeeId;
-      const emp = employees.find(e => e.id === empId);
+      const emp = resolveEmployee(p.employeeId, p.employeeName);
 
       const empBasicSalary = Number(emp?.salaryAmount) || 0;
       const struct = salaryStructures[empId] || {
@@ -485,9 +498,9 @@ const Payroll = () => {
 
       return {
         ...p,
-        branch: emp?.branch || p.branch || '-',
-        department: emp?.department || p.department || '-',
-        designation: emp?.designation || p.designation || '-',
+        branch: (emp?.branch || p.branch || '-').trim(),
+        department: (emp?.department || p.department || '-').trim(),
+        designation: (emp?.designation || p.designation || '-').trim(),
         basicSalary: struct.basic || empBasicSalary,
         grossSalary,
         attendanceDays: presentCount + paidLeavesCount + (halfDaysCount * 0.5),
@@ -516,7 +529,7 @@ const Payroll = () => {
         tds: struct.tds || 0
       };
     });
-  }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees]);
+  }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees, resolveEmployee]);
 
   // --- Executive Dashboard KPI aggregations ---
   const totalEmployees = calculatedPayrollData.length;
@@ -604,7 +617,7 @@ const Payroll = () => {
   const handleCreateLoanAdvance = async (e) => {
     e.preventDefault();
     const empId = perspective === 'employee' ? (currentUser?.id || 'EMP-2026-001') : (applyForm.employeeId || employees[0]?.id);
-    const targetEmp = employees.find(emp => emp.id === empId) || { name: 'Employee' };
+    const targetEmp = resolveEmployee(empId) || { name: 'Employee' };
     const payload = {
       employeeId: empId,
       amount: parseInt(applyForm.amount),
@@ -629,7 +642,7 @@ const Payroll = () => {
   // Submit Bonus Request
   const handleCreateBonus = async (e) => {
     e.preventDefault();
-    const targetEmp = employees.find(emp => emp.id === bonusForm.employeeId) || { name: 'Employee' };
+    const targetEmp = resolveEmployee(bonusForm.employeeId) || { name: 'Employee' };
     const payload = {
       employeeId: bonusForm.employeeId,
       type: bonusForm.type,

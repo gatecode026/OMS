@@ -10,11 +10,11 @@ async function check() {
   await mongoose.connect(dbUri);
   console.log('Connected to Main DB');
   
-  const Employee = mongoose.connection.db.collection('employees');
-  const emps = await Employee.find({ id: { $in: ['GATECO-EMP-005', 'GATECO-EMP-006'] } }).toArray();
-  console.log('Geeta & Udit details:');
-  emps.forEach(e => {
-    console.log(JSON.stringify(e));
+  const Payments = mongoose.connection.db.collection('payrollpayments');
+  const docs = await Payments.find({}).toArray();
+  console.log('Payroll Payments in DB:');
+  docs.forEach(d => {
+    console.log(`id: ${d.id}, empId: ${d.employeeId}, empName: ${d.employeeName}, branch: ${d.branch}, dept: ${d.department}`);
   });
   
   await mongoose.disconnect();
