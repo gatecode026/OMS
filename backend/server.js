@@ -31,7 +31,6 @@ const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 let server;
-let socketHttpServer;
 let isShuttingDown = false;
 
 /**
@@ -59,13 +58,7 @@ const shutdown = async (signal, error = null) => {
   // Close servers immediately to stop listening on ports
   if (server) {
     server.close(() => {
-      logger.info('HTTP REST server closed.');
-    });
-  }
-
-  if (socketHttpServer) {
-    socketHttpServer.close(() => {
-      logger.info('Socket.io HTTP server closed.');
+      logger.info('HTTP REST and Socket.io server closed.');
     });
   }
 
@@ -159,17 +152,10 @@ const bootstrap = async () => {
     // startImageKitCleanupJob();
 
     const httpServer = createServer(app);
+    await initSocket(httpServer);
     server = httpServer.listen(PORT, () => {
-      logger.info(`  REST API Server running in [${NODE_ENV}] mode on port ${PORT}`);
+      logger.info(`  REST API Server and Socket.io running in [${NODE_ENV}] mode on port ${PORT}`);
       logger.info(`  Client URL allowed: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
-    });
-
-    const socketPort = process.env.SOCKET_PORT || 5001;
-    socketHttpServer = createServer();
-    await initSocket(socketHttpServer);
-    socketHttpServer.listen(socketPort, () => {
-      logger.info(`  Socket.io Server running on dedicated port ${socketPort}`);
-      console.log(`Server running on ${socketPort}`);
     });
 
   } catch (error) {
