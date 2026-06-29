@@ -74,6 +74,9 @@ export const syncDeptProjectStats = async (companyId, departmentNames) => {
 export const find = async (query = {}) => {
   logger.debug('Executing ProjectsRepository::find', query);
   const filter = {};
+  if (query.branch) {
+    filter.branch = query.branch;
+  }
   if (query.department) {
     filter.department = query.department;
   }
@@ -97,6 +100,15 @@ export const save = async (data) => {
     const count = await Project.countDocuments();
     data.id = `PRJ-${String(count + 1).padStart(3, '0')}`;
   }
+
+  // Auto-resolve branch from department
+  if (data.department && (!data.branch || data.branch.trim() === '')) {
+    const dept = await Department.findOne({ name: { $regex: new RegExp(`^${data.department.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') } });
+    if (dept) {
+      data.branch = dept.branch;
+    }
+  }
+
   const newProj = await Project.create(data);
   if (newProj && newProj.companyId && newProj.department) {
     syncDeptProjectStats(newProj.companyId, [newProj.department]).catch(err => 
@@ -130,6 +142,15 @@ export const update = async (id, data) => {
   }
 
   Object.assign(project, data);
+
+  // Auto-resolve branch from department on update
+  if (project.department) {
+    const dept = await Department.findOne({ name: { $regex: new RegExp(`^${project.department.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') } });
+    if (dept) {
+      project.branch = dept.branch;
+    }
+  }
+
   const updatedProj = await project.save();
   
   const affectedDepts = [];

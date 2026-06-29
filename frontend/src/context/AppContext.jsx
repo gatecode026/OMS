@@ -461,7 +461,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     if (currentUserId) {
       const match = employees.find(e => e.id === currentUserId);
-      if (match && match.roleId === currentUserRole) {
+      if (match && (match.roleId === rawUserRole || match.roleId === currentUserRole || getBaseRole(match.roleId) === currentUserRole)) {
         setCurrentUser(match);
         return;
       }
@@ -471,7 +471,7 @@ export const AppProvider = ({ children }) => {
       if (savedUserStr) {
         try {
           const savedUser = JSON.parse(savedUserStr);
-          if (savedUser && savedUser.id === currentUserId && savedUser.roleId === currentUserRole) {
+          if (savedUser && savedUser.id === currentUserId && (savedUser.roleId === rawUserRole || savedUser.roleId === currentUserRole || getBaseRole(savedUser.roleId) === currentUserRole)) {
             setCurrentUser(savedUser);
             return;
           }
@@ -494,18 +494,18 @@ export const AppProvider = ({ children }) => {
 
     const userMap = {
       super_admin: savedSuperAdmin || employees.find(e => e.roleId === 'super_admin') || employees[0],
-      dept_admin: employees.find(e => e.roleId === 'dept_admin'),
-      branch_admin: employees.find(e => e.roleId === 'branch_admin'),
-      manager: employees.find(e => e.roleId === 'manager'),
-      team_leader: employees.find(e => e.roleId === 'team_leader'),
-      employee: employees.find(e => e.roleId === 'employee')
+      dept_admin: employees.find(e => e.roleId === 'dept_admin') || employees.find(e => getBaseRole(e.roleId) === 'dept_admin'),
+      branch_admin: employees.find(e => e.roleId === 'branch_admin') || employees.find(e => getBaseRole(e.roleId) === 'branch_admin'),
+      manager: employees.find(e => e.roleId === 'manager') || employees.find(e => getBaseRole(e.roleId) === 'manager'),
+      team_leader: employees.find(e => e.roleId === 'team_leader') || employees.find(e => getBaseRole(e.roleId) === 'team_leader'),
+      employee: employees.find(e => e.roleId === 'employee') || employees.find(e => getBaseRole(e.roleId) === 'employee')
     };
     const defaultUser = userMap[currentUserRole] || employees[0];
     setCurrentUser(defaultUser);
     if (defaultUser && defaultUser.id !== currentUserId) {
       setCurrentUserId(defaultUser.id);
     }
-  }, [currentUserRole, currentUserId, employees]);
+  }, [currentUserRole, rawUserRole, currentUserId, employees]);
 
   const tasks = React.useMemo(() => {
     if (!projectsList) return [];
@@ -2016,7 +2016,7 @@ export const AppProvider = ({ children }) => {
       currentAddress: newEmp.currentAddress || '',
       permanentAddress: newEmp.permanentAddress || '',
       employmentType: newEmp.employmentType || 'Full-Time',
-      workLocation: newEmp.workLocation || newEmp.branch || '',
+      workLocation: newEmp.workLocation || '',
       attendanceHistory: [],
       overtimeHistory: [],
       leaveHistory: [],
@@ -4311,7 +4311,9 @@ export const AppProvider = ({ children }) => {
     const isDbBacked = Object.values(MODULE_MAPPING).includes(dbKey) || Object.keys(MODULE_MAPPING).includes(module);
 
     if (isDbBacked) {
-      const roleObj = roles.find(r => r.id === rawUserRole || r.id === currentUserRole || getBaseRole(r.id) === currentUserRole);
+      const roleObj = roles.find(r => r.id === rawUserRole) || 
+                      roles.find(r => r.id === currentUserRole) || 
+                      roles.find(r => getBaseRole(r.id) === currentUserRole);
       const permissions = roleObj?.permissions;
       const dbPermission = permissions
         ? (permissions[module] !== undefined ? permissions[module] : permissions[dbKey])
@@ -4355,7 +4357,7 @@ export const AppProvider = ({ children }) => {
   const memoizedEmployees = useMemo(() => {
     return (employees || []).map(emp => {
       const normalized = normalizeEmployee(emp);
-      if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager')) {
+      if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager' || (normalized.roleId && normalized.roleId.includes('manager')) || (normalized.role && normalized.role.toLowerCase().includes('manager')))) {
         const hasNoBranch = !normalized.branch || normalized.branch === '—' || normalized.branch === '-';
         if (hasNoBranch) {
           const foundBranch = (branches || []).find(
@@ -4374,7 +4376,7 @@ export const AppProvider = ({ children }) => {
   const memoizedCurrentUser = useMemo(() => {
     if (!currentUser) return null;
     const normalized = normalizeEmployee(currentUser);
-    if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager')) {
+    if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager' || (normalized.roleId && normalized.roleId.includes('manager')) || (normalized.role && normalized.role.toLowerCase().includes('manager')))) {
       const hasNoBranch = !normalized.branch || normalized.branch === '—' || normalized.branch === '-';
       if (hasNoBranch) {
         const foundBranch = (branches || []).find(

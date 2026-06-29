@@ -568,9 +568,19 @@ export const registerChatSocketHandlers = (io) => {
       if (lastSyncTime) {
         await runWithTenant(companyId, async () => {
           const conn = await getTenantConnection(companyId);
+          const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(socket.user.role?.toLowerCase());
+          const query = { 'participants.employeeId': userId, isActive: true };
+
+          if (!isExcluded && socket.user.branch) {
+            query.$or = [
+              { type: 'direct' },
+              { type: 'group', $or: [{ branch: socket.user.branch }, { branch: { $exists: false } }, { branch: null }] }
+            ];
+          }
+
           const conversations = await conn
             .collection('conversations')
-            .find({ 'participants.employeeId': userId, isActive: true }, { projection: { id: 1 } })
+            .find(query, { projection: { id: 1 } })
             .toArray();
           const convIds = conversations.map(c => c.id);
 
@@ -624,12 +634,19 @@ export const registerChatSocketHandlers = (io) => {
     try {
       await runWithTenant(companyId, async () => {
         const conn = await getTenantConnection(companyId);
+        const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(socket.user.role?.toLowerCase());
+        const query = { 'participants.employeeId': userId, isActive: true };
+
+        if (!isExcluded && socket.user.branch) {
+          query.$or = [
+            { type: 'direct' },
+            { type: 'group', $or: [{ branch: socket.user.branch }, { branch: { $exists: false } }, { branch: null }] }
+          ];
+        }
+
         const conversations = await conn
           .collection('conversations')
-          .find(
-            { 'participants.employeeId': userId, isActive: true },
-            { projection: { id: 1 } }
-          )
+          .find(query, { projection: { id: 1 } })
           .toArray();
 
         conversations.forEach(conv => {

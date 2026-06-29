@@ -322,7 +322,7 @@ const LeaveManagement = () => {
         if (currentUserRole === 'branch_admin') {
           return emp?.branch === currentUser?.branch;
         }
-        if (currentUserRole === 'dept_admin') {
+        if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
           return req.department === currentUser?.department;
         }
         if (currentUserRole === 'employee') {
@@ -346,7 +346,7 @@ const LeaveManagement = () => {
       if (currentUserRole === 'branch_admin') {
         return emp?.branch === currentUser?.branch;
       }
-      if (currentUserRole === 'dept_admin') {
+      if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
         return emp?.department === currentUser?.department;
       }
       if (currentUserRole === 'employee') {

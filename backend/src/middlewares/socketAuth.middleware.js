@@ -74,7 +74,8 @@ export const verifySocketToken = async (token) => {
             lastSeen: 1,
             chatStatus: 1,
             statusEmoji: 1,
-            statusExpiry: 1
+            statusExpiry: 1,
+            branch: 1
           }
         }
       );
@@ -98,7 +99,8 @@ export const verifySocketToken = async (token) => {
       avatar: user.avatar || null,
       chatStatus: user.chatStatus || 'available',
       statusEmoji: user.statusEmoji || null,
-      statusExpiry: user.statusExpiry || null
+      statusExpiry: user.statusExpiry || null,
+      branch: user.branch || null
     },
     companyId,
     tokenExp: decoded.exp

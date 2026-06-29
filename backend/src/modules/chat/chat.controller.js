@@ -63,8 +63,8 @@ const logChatActivity = async (companyId, { actor, actionType, fieldChanged, old
 
 // GET /api/v1/chat/conversations
 export const getConversations = asyncHandler(async (req, res) => {
-  const { id: employeeId, companyId } = req.user;
-  const data = await chatService.getUserConversations(employeeId, companyId);
+  const { id: employeeId, companyId, role, branch } = req.user;
+  const data = await chatService.getUserConversations(employeeId, companyId, role, branch);
   return successResponse(res, data, 'Conversations fetched');
 });
 
@@ -120,7 +120,7 @@ export const startDirectChat = asyncHandler(async (req, res) => {
 // POST /api/v1/chat/conversations/group
 export const createGroup = asyncHandler(async (req, res) => {
   const { name, description, participantIds, avatar } = req.body;
-  const { id: myId, companyId } = req.user;
+  const { id: myId, companyId, branch } = req.user;
 
   if (!name || !participantIds?.length)
     return res.status(400).json({
@@ -139,7 +139,7 @@ export const createGroup = asyncHandler(async (req, res) => {
   const conversation = await chatService.createGroupConversation(
     { id: myId, name: myInfo?.name || req.user.name,
       avatar: myInfo?.avatar, role: myInfo?.roleId || req.user.role },
-    { name, description, avatar },
+    { name, description, avatar, branch },
     participants.map(p => ({
       id: p.id, name: p.name, avatar: p.avatar, role: p.roleId
     })),
@@ -359,11 +359,16 @@ export const removeMember = asyncHandler(async (req, res) => {
 
 // GET /api/v1/chat/employees?q=<search>
 export const searchEmployees = asyncHandler(async (req, res) => {
-  const { id: myId, companyId } = req.user;
+  const { id: myId, companyId, role, branch } = req.user;
   const { q } = req.query;
 
   const conn = await getTenantConnection(companyId);
   const query = { id: { $ne: myId }, status: 'Active' };
+
+  const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
+  if (!isExcluded && branch) {
+    query.branch = branch;
+  }
 
   if (q?.trim()) {
     query.$or = [
@@ -776,15 +781,15 @@ export const unarchiveConversation = asyncHandler(async (req, res) => {
 
 // GET /api/v1/chat/conversations/archived
 export const getArchivedConversations = asyncHandler(async (req, res) => {
-  const { id: employeeId, companyId } = req.user;
-  const data = await chatService.getArchivedConversations(employeeId, companyId);
+  const { id: employeeId, companyId, role, branch } = req.user;
+  const data = await chatService.getArchivedConversations(employeeId, companyId, role, branch);
   return successResponse(res, data, 'Archived conversations fetched');
 });
 
 // GET /api/v1/chat/conversations/hidden
 export const getHiddenConversations = asyncHandler(async (req, res) => {
-  const { id: employeeId, companyId } = req.user;
-  const data = await chatService.getHiddenConversations(employeeId, companyId);
+  const { id: employeeId, companyId, role, branch } = req.user;
+  const data = await chatService.getHiddenConversations(employeeId, companyId, role, branch);
   return successResponse(res, data, 'Hidden conversations fetched');
 });
 

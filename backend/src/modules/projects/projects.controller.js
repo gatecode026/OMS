@@ -8,12 +8,12 @@ import { successResponse } from '../../utils/response.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const getAll = asyncHandler(async (req, res) => {
-  const data = await service.findAll(req.query);
+  const data = await service.findAll(req.query, req.user);
   return successResponse(res, data, 'Records fetched successfully');
 });
 
 export const getById = asyncHandler(async (req, res) => {
-  const data = await service.findById(req.params.id);
+  const data = await service.findById(req.params.id, req.user);
   return successResponse(res, data, 'Record fetched successfully');
 });
 

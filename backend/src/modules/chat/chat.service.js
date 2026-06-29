@@ -160,6 +160,7 @@ export const createGroupConversation = async (
       avatar: avatarUrl,
       avatarImageKitFileId: avatarFileId,
       createdBy: creatorUser.id,
+      branch: groupData.branch || null,
       participants,
       lastActivityAt: new Date(),
       settings: {
@@ -242,18 +243,28 @@ const enrichConversationForUser = async (conv, employeeId) => {
 /**
  * Get all conversations for a user (WhatsApp style — sorted by last activity)
  */
-export const getUserConversations = async (employeeId, companyId) => {
+export const getUserConversations = async (employeeId, companyId, role, branch) => {
   const cacheKey = CacheKeys.sidebar(companyId, employeeId);
   return cacheGetOrSet(cacheKey, async () => {
     return runWithTenant(companyId, async () => {
-      const conversations = await Conversation.find({
+      const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
+      const query = {
         'participants.employeeId': employeeId,
         isActive: true,
         isDeleted: { $ne: true },
         hiddenBy: { $not: { $elemMatch: { userId: employeeId } } },
         archivedBy: { $not: { $elemMatch: { userId: employeeId } } },
         deletedBy: { $not: { $elemMatch: { userId: employeeId, clearHistory: false } } }
-      })
+      };
+
+      if (!isExcluded && branch) {
+        query.$or = [
+          { type: 'direct' },
+          { type: 'group', $or: [{ branch: branch }, { branch: { $exists: false } }, { branch: null }] }
+        ];
+      }
+
+      const conversations = await Conversation.find(query)
         .sort({ lastActivityAt: -1 })
         .lean();
 
@@ -1500,14 +1511,24 @@ export const forwardMessage = async (messageId, targetConversationIds, forwardin
 /**
  * Get all archived conversations for a user
  */
-export const getArchivedConversations = async (employeeId, companyId) => {
+export const getArchivedConversations = async (employeeId, companyId, role, branch) => {
   return runWithTenant(companyId, async () => {
-    const conversations = await Conversation.find({
+    const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
+    const query = {
       'participants.employeeId': employeeId,
       isActive: true,
       isDeleted: { $ne: true },
       archivedBy: { $elemMatch: { userId: employeeId } }
-    })
+    };
+
+    if (!isExcluded && branch) {
+      query.$or = [
+        { type: 'direct' },
+        { type: 'group', $or: [{ branch: branch }, { branch: { $exists: false } }, { branch: null }] }
+      ];
+    }
+
+    const conversations = await Conversation.find(query)
       .sort({ lastActivityAt: -1 })
       .lean();
 
@@ -1523,14 +1544,24 @@ export const getArchivedConversations = async (employeeId, companyId) => {
 /**
  * Get all hidden conversations for a user
  */
-export const getHiddenConversations = async (employeeId, companyId) => {
+export const getHiddenConversations = async (employeeId, companyId, role, branch) => {
   return runWithTenant(companyId, async () => {
-    const conversations = await Conversation.find({
+    const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
+    const query = {
       'participants.employeeId': employeeId,
       isActive: true,
       isDeleted: { $ne: true },
       hiddenBy: { $elemMatch: { userId: employeeId } }
-    })
+    };
+
+    if (!isExcluded && branch) {
+      query.$or = [
+        { type: 'direct' },
+        { type: 'group', $or: [{ branch: branch }, { branch: { $exists: false } }, { branch: null }] }
+      ];
+    }
+
+    const conversations = await Conversation.find(query)
       .sort({ lastActivityAt: -1 })
       .lean();
 
@@ -1542,5 +1573,7 @@ export const getHiddenConversations = async (employeeId, companyId) => {
     return convsWithUnread;
   });
 };
+
+
 
 

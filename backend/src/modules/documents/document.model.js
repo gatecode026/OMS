@@ -45,6 +45,10 @@ const documentSchema = new mongoose.Schema({
   fileUrl: {
     type: String,
     default: ''
+  },
+  branch: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true,
