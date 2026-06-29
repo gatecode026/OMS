@@ -108,9 +108,29 @@ export const save = async (data) => {
 
 export const update = async (id, data) => {
   logger.debug('Executing ProjectsRepository::update for: ' + id, data);
-  // Find the old project first to know its department/companyId in case they changed
   const oldProj = await Project.findOne({ id }).lean();
-  const updatedProj = await Project.findOneAndUpdate({ id }, data, { new: true });
+  
+  const project = await Project.findOne({ id });
+  if (!project) return null;
+
+  // If the manager is being changed, update all pending Project Manager Approvals in tasks
+  if (data.manager && data.manager !== project.manager) {
+    if (project.tasks && Array.isArray(project.tasks)) {
+      project.tasks.forEach(task => {
+        if (task.approvals && Array.isArray(task.approvals)) {
+          task.approvals.forEach(approval => {
+            if (approval.role === 'Project Manager Approval' && approval.status === 'Pending') {
+              approval.approver = data.manager;
+            }
+          });
+        }
+      });
+      project.markModified('tasks');
+    }
+  }
+
+  Object.assign(project, data);
+  const updatedProj = await project.save();
   
   const affectedDepts = [];
   let companyId = null;

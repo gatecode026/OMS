@@ -26,6 +26,7 @@ import adminRouter from './modules/admin/admin.routes.js';
 import { authenticate } from './middlewares/auth.middleware.js';
 import { tenantMiddleware } from './middlewares/tenant.middleware.js';
 import { checkRoleAccess } from './middlewares/roleGuard.middleware.js';
+import { branchScopeMiddleware } from './middlewares/branchScope.middleware.js';
 import publicRouter from './modules/companies/public.routes.js';
 import redisClient from './config/redis.js';
 import { getIO } from './config/socket.js';
@@ -125,7 +126,9 @@ app.use('/api/v1', (req, res, next) => {
   }
   return authenticate(req, res, () => {
     checkRoleAccess(req, res, () => {
-      tenantMiddleware(req, res, next);
+      tenantMiddleware(req, res, () => {
+        branchScopeMiddleware(req, res, next);
+      });
     });
   });
 });

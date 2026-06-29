@@ -68,7 +68,7 @@ export const authenticate = async (req, res, next) => {
       // For employees, resolve the correct database connection before querying the model
       const companyId = decoded.companyId || 'COMP-DEFAULT';
       user = await runWithTenant(companyId, async () => {
-        return await Employee.findOne({ id: decoded.id }).select('id name email roleId status companyId').lean();
+        return await Employee.findOne({ id: decoded.id }).select('id name email roleId status companyId branch').lean();
       });
     }
 
@@ -92,7 +92,8 @@ export const authenticate = async (req, res, next) => {
       name: user.name,
       email: user.email,
       role: user.roleId,
-      companyId: user.companyId || 'COMP-DEFAULT'
+      companyId: user.companyId || 'COMP-DEFAULT',
+      branch: user.branch
     };
 
     const isSuperAdmin = user.roleId === 'super_admin';

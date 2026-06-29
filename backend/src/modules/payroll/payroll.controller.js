@@ -8,7 +8,7 @@ import { successResponse } from '../../utils/response.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const getMasterData = asyncHandler(async (req, res) => {
-  const data = await service.getMasterPayrollData();
+  const data = await service.getMasterPayrollData(req.user);
   return successResponse(res, data, 'Master payroll data fetched successfully');
 });
 
