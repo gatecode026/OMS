@@ -24,33 +24,21 @@ const sidebarGroups = [
   {
     title: 'Workforce & Policies',
     items: [
-      { id: 'employee', label: 'Employee Settings', icon: Users },
-      { id: 'attendance', label: 'Attendance Rules', icon: Clock },
-      { id: 'leave', label: 'Leave Policies', icon: CalendarDays },
-      { id: 'payroll', label: 'Payroll & Salaries', icon: DollarSignIcon }
+      { id: 'attendance', label: 'Attendance Rules', icon: Clock }
     ]
   },
   {
     title: 'Operations',
     items: [
       { id: 'project', label: 'Project Config', icon: Briefcase },
-      { id: 'task', label: 'Task Rules', icon: KanbanSquare },
-      { id: 'workflow', label: 'Approval Matrices', icon: Share2 }
+      { id: 'task', label: 'Task Rules', icon: KanbanSquare }
     ]
   },
-  {
-    title: 'Access & Security',
-    items: [
-      { id: 'roles', label: 'Roles & Access', icon: Lock },
-      { id: 'security', label: 'Security & IPs', icon: Shield },
-      { id: 'compliance', label: 'Audit & GDPR', icon: ShieldAlert }
-    ]
-  },
+
   {
     title: 'Branding & Theme',
     items: [
-      { id: 'appearance', label: 'Theme Customization', icon: Palette },
-      { id: 'branding', label: 'Branding Settings', icon: Globe }
+      { id: 'appearance', label: 'Theme Customization', icon: Palette }
     ]
   },
   {
@@ -64,9 +52,6 @@ const sidebarGroups = [
   {
     title: 'Gateway & Integrations',
     items: [
-      { id: 'email', label: 'Email SMTP', icon: Mail },
-      { id: 'sms', label: 'SMS Gateway', icon: Smartphone },
-      { id: 'integrations', label: 'Integrations', icon: Zap },
       { id: 'backup', label: 'Backup & Restore', icon: Database }
     ]
   },

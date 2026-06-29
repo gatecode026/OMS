@@ -72,10 +72,23 @@ export const deleteRecord = async (id, currentUser) => {
   return repository.remove(id);
 };
 
+export const incrementDownloads = async (id) => {
+  logger.info('Executing DocumentsService::incrementDownloads for: ' + id);
+  const doc = await repository.findOne(id);
+  if (!doc) {
+    const error = new Error('Document not found');
+    error.statusCode = 404;
+    throw error;
+  }
+  doc.downloads = (doc.downloads || 0) + 1;
+  return doc.save();
+};
+
 export default {
   findAll,
   findById,
   createRecord,
   updateRecord,
-  deleteRecord
+  deleteRecord,
+  incrementDownloads
 };
