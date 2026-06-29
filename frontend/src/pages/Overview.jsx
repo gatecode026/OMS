@@ -310,7 +310,19 @@ const Overview = () => {
 
   // ── Search & Filter State ──
   const [searchQuery, setSearchQuery] = useState('');
-  const [branchFilter, setBranchFilter] = useState('All');
+  const isGlobalAdmin = currentUserRole === 'super_admin' || currentUserRole === 'company_admin';
+  const [branchFilter, setBranchFilter] = useState(() => {
+    if (currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
+      return currentUser?.branch || 'All';
+    }
+    return 'All';
+  });
+
+  useEffect(() => {
+    if (currentUser && currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
+      setBranchFilter(currentUser.branch || 'All');
+    }
+  }, [currentUser, currentUserRole]);
   const [deptFilter, setDeptFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All');
   const [performanceFilter, setPerformanceFilter] = useState('All');
@@ -379,8 +391,19 @@ const Overview = () => {
 
     // 2. Branch Filter Match
     if (branchFilter !== 'All') {
-      if (item.branch && item.branch !== branchFilter) return false;
-      if (item.name && item.type === 'branch' && item.name !== branchFilter) return false;
+      const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      if (item.branch) {
+        const normItemBranch = item.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        if (normItemBranch !== normFilterBranch && !normItemBranch.includes(normFilterBranch) && !normFilterBranch.includes(normItemBranch)) {
+          return false;
+        }
+      }
+      if (item.name && item.type === 'branch') {
+        const normItemBranchName = item.name.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        if (normItemBranchName !== normFilterBranch && !normItemBranchName.includes(normFilterBranch) && !normFilterBranch.includes(normItemBranchName)) {
+          return false;
+        }
+      }
     }
 
     // 3. Department Filter Match

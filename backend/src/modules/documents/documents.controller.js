@@ -36,11 +36,17 @@ export const getPublicData = asyncHandler(async (req, res) => {
   return successResponse(res, { status: 'mock_public_data' }, 'Public record fetched');
 });
 
+export const incrementDownloads = asyncHandler(async (req, res) => {
+  const data = await service.incrementDownloads(req.params.id);
+  return successResponse(res, data, 'Downloads count incremented successfully');
+});
+
 export default {
   getAll,
   getById,
   create,
   update,
   remove,
-  getPublicData
+  getPublicData,
+  incrementDownloads
 };

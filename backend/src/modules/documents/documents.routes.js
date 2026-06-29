@@ -26,4 +26,6 @@ router.route('/:id')
   .put(validateRequest(validation.update), controller.update)
   .delete(controller.remove);
 
+router.patch('/:id/download', controller.incrementDownloads);
+
 export default router;

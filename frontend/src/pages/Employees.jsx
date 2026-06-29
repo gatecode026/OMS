@@ -285,7 +285,7 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees: rawEmployees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves, generalSettings, currentUserRole, currentUser } = useApp();
+  const { employees: rawEmployees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves, fetchDepartments, generalSettings, currentUserRole, currentUser } = useApp();
   
   const employees = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin') return rawEmployees;
@@ -361,10 +361,23 @@ const Employees = () => {
     }
   };
 
+  const isGlobalAdmin = currentUserRole === 'super_admin' || currentUserRole === 'company_admin';
+
   // ── Filters ──
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
-  const [branchFilter, setBranchFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState(() => {
+    if (currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
+      return currentUser?.branch || '';
+    }
+    return '';
+  });
+
+  useEffect(() => {
+    if (currentUser && currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
+      setBranchFilter(currentUser.branch || '');
+    }
+  }, [currentUser, currentUserRole]);
   const [statusFilter, setStatusFilter] = useState('');
   const [attFilter, setAttFilter] = useState('');
   const [shiftFilter, setShiftFilter] = useState('');
@@ -833,6 +846,9 @@ const Employees = () => {
     fetchEmployees();
     fetchAttendance();
     fetchLeaves();
+    if (typeof fetchDepartments === 'function') {
+      fetchDepartments();
+    }
 
     const interval = setInterval(() => {
       fetchEmployees();
@@ -851,7 +867,13 @@ const Employees = () => {
   const filteredEmployees = employees.filter(e => {
     const ms = e.name.toLowerCase().includes(searchTerm.toLowerCase()) || e.id.toLowerCase().includes(searchTerm.toLowerCase());
     const md = deptFilter ? e.department === deptFilter : true;
-    const mb = branchFilter ? e.branch === branchFilter : true;
+    const mb = (() => {
+      if (!branchFilter) return true;
+      if (!e.branch) return false;
+      const normEmpBranch = e.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      return normEmpBranch.includes(normFilterBranch) || normFilterBranch.includes(normEmpBranch);
+    })();
     const mst = statusFilter ? e.status === statusFilter : true;
     
     const resolvedAttStatus = getTodayStatus(e);
@@ -1462,7 +1484,26 @@ const Employees = () => {
     setPage(1);
   }
 
-  const depts = [...new Set(employees.map(e => e.department))].sort();
+  const depts = useMemo(() => {
+    console.log('--- depts calculation debug ---', {
+      rawDbDepartmentsLength: rawDbDepartments?.length,
+      rawDbDepartments,
+      employeesLength: employees?.length,
+      branchFilter
+    });
+    const branchDepts = (rawDbDepartments || []).filter(d => {
+      if (!branchFilter || branchFilter === 'All') return true;
+      if (!d.branch) return false;
+      const normDeptBranch = d.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      return normDeptBranch.includes(normFilterBranch) || normFilterBranch.includes(normDeptBranch);
+    }).map(d => d.name);
+
+    const empDepts = employees.map(e => e.department).filter(Boolean);
+    const result = [...new Set([...branchDepts, ...empDepts])].sort();
+    console.log('--- depts result ---', result);
+    return result;
+  }, [rawDbDepartments, employees, branchFilter]);
   const branches = [...new Set(employees.map(e => e.branch))].sort();
   const leaders = employees.filter(e => e.roleId === 'team_leader' || e.roleId === 'manager' || e.roleId === 'branch_admin' || e.roleId === 'super_admin');
   const managers = employees.filter(e => e.roleId === 'manager');
@@ -1611,10 +1652,12 @@ const Employees = () => {
               <option value="">All Departments</option>
               {depts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
-            <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
-              <option value="">All Branches</option>
-              {branches.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
+            {isGlobalAdmin && (
+              <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
+                <option value="">All Branches</option>
+                {branches.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            )}
             <select value={attFilter} onChange={e => setAttFilter(e.target.value)}>
               <option value="">Attendance</option>
               <option value="Present">Present</option>

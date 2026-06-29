@@ -262,7 +262,19 @@ const Attendance = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState(getLocalDateString());
   const [deptFilter, setDeptFilter] = useState('');
-  const [branchFilter, setBranchFilter] = useState('');
+  const isGlobalAdmin = currentUserRole === 'super_admin' || currentUserRole === 'company_admin';
+  const [branchFilter, setBranchFilter] = useState(() => {
+    if (currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
+      return currentUser?.branch || '';
+    }
+    return '';
+  });
+
+  useEffect(() => {
+    if (currentUser && currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
+      setBranchFilter(currentUser.branch || '');
+    }
+  }, [currentUser, currentUserRole]);
   const [shiftFilter, setShiftFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
@@ -849,7 +861,13 @@ const Attendance = () => {
         : true;
       const matchesDate = (currentUserRole === 'employee' || !dateFilter) ? true : a.date === dateFilter;
       const matchesDept = deptFilter ? a.department === deptFilter : true;
-      const matchesBranch = branchFilter ? a.branch === branchFilter : true;
+      const matchesBranch = (() => {
+        if (!branchFilter) return true;
+        if (!a.branch) return false;
+        const normObjBranch = a.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        return normObjBranch.includes(normFilterBranch) || normFilterBranch.includes(normObjBranch);
+      })();
       const matchesShift = shiftFilter ? a.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
       const matchesSource = sourceFilter ? a.source?.toLowerCase() === sourceFilter.toLowerCase() : true;
 
@@ -866,7 +884,13 @@ const Attendance = () => {
           e.id?.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
       const matchesDept = deptFilter ? e.department === deptFilter : true;
-      const matchesBranch = branchFilter ? e.branch === branchFilter : true;
+      const matchesBranch = (() => {
+        if (!branchFilter) return true;
+        if (!e.branch) return false;
+        const normObjBranch = e.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        return normObjBranch.includes(normFilterBranch) || normFilterBranch.includes(normObjBranch);
+      })();
       const matchesShift = shiftFilter ? e.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
       return matchesSearch && matchesDept && matchesBranch && matchesShift;
     });
@@ -950,7 +974,13 @@ const Attendance = () => {
         : true;
       const matchesDate = (currentUserRole === 'employee' || !dateFilter) ? true : a.date === dateFilter;
       const matchesDept = deptFilter ? a.department === deptFilter : true;
-      const matchesBranch = branchFilter ? a.branch === branchFilter : true;
+      const matchesBranch = (() => {
+        if (!branchFilter) return true;
+        if (!a.branch) return false;
+        const normObjBranch = a.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        return normObjBranch.includes(normFilterBranch) || normFilterBranch.includes(normObjBranch);
+      })();
       const matchesShift = shiftFilter ? a.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
       const matchesStatus = statusFilter 
         ? (statusFilter.toLowerCase() === 'on leave'
@@ -976,7 +1006,13 @@ const Attendance = () => {
           e.id?.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
       const matchesDept = deptFilter ? e.department === deptFilter : true;
-      const matchesBranch = branchFilter ? e.branch === branchFilter : true;
+      const matchesBranch = (() => {
+        if (!branchFilter) return true;
+        if (!e.branch) return false;
+        const normObjBranch = e.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+        return normObjBranch.includes(normFilterBranch) || normFilterBranch.includes(normObjBranch);
+      })();
       const matchesShift = shiftFilter ? e.shift?.toLowerCase().includes(shiftFilter.toLowerCase()) : true;
       return matchesSearch && matchesDept && matchesBranch && matchesShift;
     }).length;
@@ -1901,12 +1937,14 @@ const Attendance = () => {
                     <option key={dept.id || dept.name} value={dept.name}>{dept.name}</option>
                   ))}
                 </select>
-                <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
-                  <option value="">All Branches</option>
-                  {(branches && branches.length > 0 ? branches.map(b => b.name) : Array.from(new Set(employees.map(e => e.branch).filter(Boolean)))).map(branchName => (
-                    <option key={branchName} value={branchName}>{branchName}</option>
-                  ))}
-                </select>
+                {isGlobalAdmin && (
+                  <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
+                    <option value="">All Branches</option>
+                    {(branches && branches.length > 0 ? branches.map(b => b.name) : Array.from(new Set(employees.map(e => e.branch).filter(Boolean)))).map(branchName => (
+                      <option key={branchName} value={branchName}>{branchName}</option>
+                    ))}
+                  </select>
+                )}
                 <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)}>
                   <option value="">All Shifts</option>
                   <option value="Morning">Morning Shift</option>

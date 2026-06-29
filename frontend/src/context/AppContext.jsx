@@ -1118,6 +1118,26 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const downloadDocument = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/${id}/download`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setDocumentsList(prev => prev.map(d => d.id === id ? { ...d, downloads: (d.downloads || 0) + 1 } : d));
+        return true;
+      }
+    } catch (err) {
+      console.error('Failed to increment download count:', err);
+    }
+    return false;
+  };
+
   const addNotification = async (notifData) => {
     if (!token) return;
     try {
@@ -4450,6 +4470,7 @@ export const AppProvider = ({ children }) => {
         fetchDocuments,
         addDocument,
         deleteDocument,
+        downloadDocument,
         activityLogs,
         addActivityLog,
         fetchActivityLogs,
