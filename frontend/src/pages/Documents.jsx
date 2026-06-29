@@ -144,7 +144,8 @@ const Documents = () => {
       uploadedBy: currentUser?.name || 'Unknown',
       uploadDate: new Date().toISOString().split('T')[0],
       downloads: 0,
-      fileUrl: fileBase64
+      fileUrl: fileBase64,
+      branch: currentUser?.branch || ''
     };
     await addDocument(docData);
     handleCloseModal();

@@ -32,6 +32,10 @@ const projectSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  branch: {
+    type: String,
+    default: ''
+  },
   client: {
     type: String,
     default: 'Internal'

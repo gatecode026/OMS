@@ -35,6 +35,7 @@ const conversationSchema = new mongoose.Schema({
   avatar: { type: String, default: null },
   avatarImageKitFileId: { type: String, default: null },
   createdBy: { type: String, default: null },
+  branch: { type: String, default: null },
 
   participants: [participantSchema],
 

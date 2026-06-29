@@ -769,19 +769,8 @@ const SystemSettings = () => {
           officialPhone: '+91 11 4050 6070', address: 'Plot No. 12, Sector 18, Udyog Vihar',
           city: 'Gurugram', state: 'Haryana', country: 'India', postalCode: '122008'
         },
-        branches: [
-          { code: 'BR-DEL', name: 'Delhi Head Office', manager: '', status: 'Active' },
-          { code: 'BR-MUM', name: 'Mumbai Branch', manager: '', status: 'Active' },
-          { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: '', status: 'Active' },
-          { code: 'BR-JPR', name: 'Jaipur Operations', manager: '', status: 'Active' }
-        ],
-        departments: [
-          { id: '1', name: 'Engineering', head: '', capacity: 150 },
-          { id: '2', name: 'Human Resources', head: '', capacity: 30 },
-          { id: '3', name: 'Sales & Marketing', head: '', capacity: 80 },
-          { id: '4', name: 'Operations', head: '', capacity: 120 },
-          { id: '5', name: 'Finance', head: '', capacity: 25 }
-        ],
+        branches: [],
+        departments: [],
         generalSettings: defaultGeneral,
         notificationSettings: defaultNotif,
         securitySettings: defaultSecurity

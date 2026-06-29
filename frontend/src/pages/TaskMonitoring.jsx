@@ -52,7 +52,7 @@ const TaskMonitoring = () => {
     if (currentUserRole === 'branch_admin') {
       return employees.filter(e => e.branch === currentUser?.branch);
     }
-    if (currentUserRole === 'dept_admin') {
+    if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
       return employees.filter(e => e.department === currentUser?.department);
     }
     if (currentUserRole === 'employee') {
@@ -68,7 +68,7 @@ const TaskMonitoring = () => {
       if (currentUserRole === 'branch_admin') {
         return t.branch === currentUser?.branch || assignee?.branch === currentUser?.branch;
       }
-      if (currentUserRole === 'dept_admin') {
+      if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
         return t.department === currentUser?.department || assignee?.department === currentUser?.department;
       }
       if (currentUserRole === 'employee') {

@@ -118,8 +118,8 @@ const Branches = () => {
         productivity: branchProductivity,
         departments: getBranchDepartments(branch),
         employeeCount: branchActiveEmps.length,
-        teamLeaders: branchActiveEmps.filter(emp => emp.role === 'Team Leader' || emp.roleId === 'team_leader').length,
-        projectManagers: branchActiveEmps.filter(emp => emp.role === 'Manager' || emp.roleId === 'manager').length,
+        teamLeaders: branchActiveEmps.filter(emp => emp.roleId === 'team_leader' || (emp.roleId && emp.roleId.includes('leader')) || (emp.role && emp.role.toLowerCase().includes('leader'))).length,
+        projectManagers: branchActiveEmps.filter(emp => emp.roleId === 'manager' || (emp.roleId && emp.roleId.includes('manager')) || (emp.role && emp.role.toLowerCase().includes('manager'))).length,
         projects: {
           completed,
           active,

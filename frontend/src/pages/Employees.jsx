@@ -285,7 +285,21 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves, generalSettings } = useApp();
+  const { employees: rawEmployees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves, generalSettings, currentUserRole, currentUser } = useApp();
+  
+  const employees = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin') return rawEmployees;
+    if (currentUserRole === 'branch_admin') {
+      return rawEmployees.filter(e => e.branch === currentUser?.branch);
+    }
+    if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
+      return rawEmployees.filter(e => e.department === currentUser?.department);
+    }
+    if (currentUserRole === 'employee') {
+      return rawEmployees.filter(e => e.department === currentUser?.department);
+    }
+    return rawEmployees;
+  }, [rawEmployees, currentUser, currentUserRole]);
   const location = useLocation();
 
   const getLocalDateString = () => {
@@ -655,6 +669,69 @@ const Employees = () => {
     setUploadedDocs(docs);
 
     setWizardStep(1); setFormMode('edit'); setSelectedEmployeeId(emp.id); setShowFormPanel(true);
+  };
+
+  const handleOpenView = (emp) => {
+    const generatedUsername = emp.username || (emp.name ? `${emp.name.split(' ')[0].toLowerCase()}.${emp.name.split(' ')[1]?.toLowerCase() || 'emp'}` : 'emp');
+    const generatedOfficialEmail = emp.officialEmail || emp.workEmail || emp.email || `${emp.name?.split(' ')[0]?.toLowerCase() || 'employee'}@saas.io`;
+
+    const cleanDept = emp.department || '';
+    const cleanBranch = emp.branch || emp.branchAgency || emp.workLocation || '';
+
+    setFormData({
+      ...emp,
+      currentAddress: addressToString(emp.currentAddress),
+      permanentAddress: addressToString(emp.permanentAddress),
+      username: generatedUsername,
+      officialEmail: generatedOfficialEmail,
+      password: '••••••••',
+      confirmPassword: '••••••••',
+      experience: emp.experience || '',
+      employeeType: emp.employeeType || 'Full Time',
+      probationEndDate: emp.probationEndDate || '',
+      contractEndDate: emp.contractEndDate || '',
+      department: cleanDept,
+      branch: cleanBranch
+    });
+
+    const docs = {
+      aadhaar: null, pan: null, resume: null,
+      certificates: null, offerLetter: null, profilePhoto: null,
+      experienceLetter: null, addressProof: null, passportPhoto: null, signedAgreements: null
+    };
+
+    if (emp.documents && Array.isArray(emp.documents)) {
+      emp.documents.forEach(doc => {
+        if (doc.category) {
+          const key = doc.category.toLowerCase().replace(' card', '').replace(' / cv', '').replace(' photo', 'Photo').replace(' letter', 'Letter').replace(' proof', 'Proof').replace(' agreements', 'Agreements');
+          if (key in docs) {
+            const sizeBytes = doc.downloadUrl ? Math.round(doc.downloadUrl.length * 0.75) : 10000;
+            docs[key] = {
+              name: doc.fileName || `${doc.category}.bin`,
+              size: sizeBytes,
+              type: doc.fileType || 'application/octet-stream',
+              downloadUrl: doc.downloadUrl,
+              uploadDate: doc.uploadDate,
+              isExisting: true
+            };
+          }
+        }
+      });
+    }
+
+    if (emp.avatar) {
+      const sizeBytes = emp.avatar.startsWith('data:') ? Math.round(emp.avatar.length * 0.75) : 15000;
+      docs.profilePhoto = {
+        name: emp.avatar.startsWith('data:') ? 'Profile_Photo.jpg' : (emp.avatar.split('/').pop() || 'Profile_Photo.jpg'),
+        size: sizeBytes,
+        type: 'image/jpeg',
+        downloadUrl: emp.avatar,
+        isExisting: true
+      };
+    }
+
+    setUploadedDocs(docs);
+    setSlideOverOpen(true);
   };
 
   // Sync department options when branch changes in "add" mode
@@ -1949,7 +2026,7 @@ const Employees = () => {
                     {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
                     <td className="col-actions">
                       <div className="table-actions-cell">
-                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${encodeEmployeeId(row.id)}`); }} title="View Full Profile">
+                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); handleOpenView(row); }} title="View Profile Detail">
                           <Eye size={16} />
                         </button>
                         {hasPermission('employee_management', 'update') && (
@@ -2106,7 +2183,7 @@ const Employees = () => {
           </div>
           <div className="preview-divider" />
           <div className="preview-actions-grid">
-            <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employee-profile/${encodeEmployeeId(previewEmp.id)}`); setPreviewEmp(null); }}>View Full Profile</button>
+            <button className="preview-btn preview-btn-primary" onClick={() => { handleOpenView(previewEmp); setPreviewEmp(null); }}>View Profile Detail</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate(`?edit=${previewEmp.id}`); setPreviewEmp(null); }}>Edit Profile</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/my-profile'); setPreviewEmp(null); }}>Profile Settings</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/tasks'); setPreviewEmp(null); }}>Assign Task</button>

@@ -75,7 +75,7 @@ const MarkAttendanceModal = ({
         employeeId: currentUser.id,
         employeeName: currentUser.name,
         department: currentUser.department,
-        branch: currentUser.branch || 'Delhi Office',
+        branch: currentUser.branch || '',
         date: todayStr,
         punchIn: formattedTimeStr,
         punchOut: null,

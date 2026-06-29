@@ -119,7 +119,7 @@ const WorkReports = () => {
         if (activeRole === 'branch_admin') {
           return emp?.branch === currentUser?.branch;
         }
-        if (activeRole === 'dept_admin') {
+        if (activeRole === 'dept_admin' || activeRole === 'team_leader') {
           return r.department === currentUser?.department || emp?.department === currentUser?.department;
         }
         if (activeRole === 'employee') {
@@ -1572,12 +1572,12 @@ const WorkReports = () => {
       )}
 
       {/* ── Slide-over Detail Audit Drawer ── */}
-      {selectedReport && (
-        <SlideOver
-          isOpen={!!selectedReport}
-          onClose={() => setSelectedReport(null)}
-          title={isEmployee ? `Daily Report Details — ${selectedReport.id}` : `Audit Daily Report — ${selectedReport.id}`}
-        >
+      <SlideOver
+        isOpen={!!selectedReport}
+        onClose={() => setSelectedReport(null)}
+        title={selectedReport ? (isEmployee ? `Daily Report Details — ${selectedReport.id}` : `Audit Daily Report — ${selectedReport.id}`) : ''}
+      >
+        {selectedReport && (
           <div className="report-detail-wrapper animate-slide-up">
             
             {/* Employee info header card */}
@@ -1744,8 +1744,8 @@ const WorkReports = () => {
             )}
 
           </div>
-        </SlideOver>
-      )}
+        )}
+      </SlideOver>
 
     </div>
   );

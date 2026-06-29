@@ -122,6 +122,14 @@ const Payroll = () => {
     }
   }, [currentUserRole]);
 
+  React.useEffect(() => {
+    if (currentUser?.branch && currentUserRole !== 'super_admin' && perspective !== 'super_admin') {
+      setFilterBranch(currentUser.branch);
+    } else {
+      setFilterBranch('');
+    }
+  }, [currentUser, currentUserRole, perspective]);
+
   // --- Search & Filters ---
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDept, setFilterDept] = useState('');
@@ -313,6 +321,9 @@ const Payroll = () => {
         return emp?.branch === currentUser?.branch;
       }
       if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        if (currentUser?.branch) {
+          return emp?.branch === currentUser?.branch;
+        }
         return emp?.department === currentUser?.department;
       }
       if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
@@ -333,6 +344,9 @@ const Payroll = () => {
         return emp?.branch === currentUser?.branch;
       }
       if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        if (currentUser?.branch) {
+          return emp?.branch === currentUser?.branch;
+        }
         return emp?.department === currentUser?.department;
       }
       if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
@@ -353,6 +367,9 @@ const Payroll = () => {
         return emp?.branch === currentUser?.branch;
       }
       if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        if (currentUser?.branch) {
+          return emp?.branch === currentUser?.branch;
+        }
         return emp?.department === currentUser?.department;
       }
       if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
@@ -373,6 +390,9 @@ const Payroll = () => {
         return emp?.branch === currentUser?.branch;
       }
       if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        if (currentUser?.branch) {
+          return emp?.branch === currentUser?.branch;
+        }
         return emp?.department === currentUser?.department;
       }
       if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
@@ -393,6 +413,9 @@ const Payroll = () => {
         return emp?.branch === currentUser?.branch;
       }
       if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+        if (currentUser?.branch) {
+          return emp?.branch === currentUser?.branch;
+        }
         return emp?.department === currentUser?.department;
       }
       if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
@@ -1300,12 +1323,14 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     ))}
                   </select>
 
-                  <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="table-filter-select">
-                    <option value="">All Branches</option>
-                    {(branches || []).map(b => (
-                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
+                  {(!currentUser?.branch || currentUserRole === 'super_admin' || perspective === 'super_admin') && (
+                    <select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="table-filter-select">
+                      <option value="">All Branches</option>
+                      {(branches || []).map(b => (
+                        <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
+                  )}
 
                   <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="table-filter-select">
                     <option value="">All Statuses</option>
