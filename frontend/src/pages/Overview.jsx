@@ -91,10 +91,14 @@ const Overview = () => {
     createAnnouncement,
     deleteNotification,
     employees,
-    attendance
+    attendance,
+    currentUserRole,
+    currentUser
   } = useApp();
   const navigate = useNavigate();
   const loading = usePageLoading(600);
+  
+  const isBranchScoped = currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin' && currentUserRole !== 'SuperAdmin' && currentUser?.branch;
 
   const branches = contextBranches || [];
   const departments = (contextDepartments || []).filter(d => d.status === 'Active');
@@ -1092,8 +1096,12 @@ const Overview = () => {
       {/* ── Page Header ── */}
       <div className="overview-header">
         <div className="overview-title-section">
-          <h1>Company Overview</h1>
-          <p className="subtitle">Monitor and manage complete organizational performance, company operations, and global operational metrics.</p>
+          <h1>{isBranchScoped ? 'Branch Overview' : 'Company Overview'}</h1>
+          <p className="subtitle">
+            {isBranchScoped 
+              ? 'Monitor and manage branch performance, department operations, and local operational metrics.' 
+              : 'Monitor and manage complete organizational performance, company operations, and global operational metrics.'}
+          </p>
         </div>
         <div className="overview-header-actions">
           <Button variant="primary" onClick={() => setShowReportsModal(true)} icon={FileText}>
@@ -1116,12 +1124,14 @@ const Overview = () => {
             />
           </div>
           
-          <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
-            <option value="All">All Branches</option>
-            {branchesMapped.map(b => (
-              <option key={b.id || b.name} value={b.name}>{b.name}</option>
-            ))}
-          </select>
+          {!isBranchScoped && (
+            <select value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
+              <option value="All">All Branches</option>
+              {branchesMapped.map(b => (
+                <option key={b.id || b.name} value={b.name}>{b.name}</option>
+              ))}
+            </select>
+          )}
           
           <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
             <option value="All">All Departments</option>
@@ -1165,34 +1175,34 @@ const Overview = () => {
           {/* ── KPI Stats Grid ── */}
           <div className="overview-stats-grid">
             <StatCard
-              title="Total Branches"
+              title={isBranchScoped ? 'Branch Status' : 'Total Branches'}
               value={filteredBranches.length}
               icon={Building2}
-              description="Global operational hubs"
+              description={isBranchScoped ? 'Your active branch' : 'Global operational hubs'}
               trend={branchFilter !== 'All' ? 'Filtered' : '+1 in last 6 months'}
               trendType="info"
             />
             <StatCard
-              title="Global Headcount"
+              title={isBranchScoped ? 'Branch Headcount' : 'Global Headcount'}
               value={totalEmployees}
               icon={Users}
-              description="Active workforce members"
+              description={isBranchScoped ? 'Branch workforce members' : 'Active workforce members'}
               trend={performanceFilter !== 'All' ? 'Filtered' : '+8% this quarter'}
               trendType="success"
             />
             <StatCard
-              title="Global Productivity"
+              title={isBranchScoped ? 'Branch Productivity' : 'Global Productivity'}
               value={`${averageProductivity}%`}
               icon={TrendingUp}
-              description="Average productivity rating"
+              description={isBranchScoped ? 'Branch productivity rating' : 'Average productivity rating'}
               trend="Target: 90%+"
               trendType={averageProductivity >= 90 ? 'success' : 'warning'}
             />
             <StatCard
-              title="Global Attendance"
+              title={isBranchScoped ? 'Branch Attendance' : 'Global Attendance'}
               value={`${averageAttendance}%`}
               icon={Clock}
-              description="Average daily attendance rate"
+              description={isBranchScoped ? 'Branch daily attendance rate' : 'Average daily attendance rate'}
               trend="Optimal compliance"
               trendType="success"
             />

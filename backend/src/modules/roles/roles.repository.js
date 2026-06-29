@@ -24,7 +24,23 @@ export const save = async (data) => {
 
 export const update = async (id, data) => {
   logger.info(`RolesRepository::update updating role with ID: ${id}`);
-  return Role.findOneAndUpdate({ id }, data, { new: true });
+  const role = await Role.findOne({ id });
+  if (!role) return null;
+
+  if (data.permissions) {
+    for (const [key, val] of Object.entries(data.permissions)) {
+      role.permissions.set(key, val);
+    }
+    role.markModified('permissions');
+  }
+
+  if (data.name) role.name = data.name;
+  if (data.description) role.description = data.description;
+  if (data.accentColor) role.accentColor = data.accentColor;
+  if (data.accessLevel) role.accessLevel = data.accessLevel;
+  if (data.status) role.status = data.status;
+
+  return role.save();
 };
 
 export const remove = async (id) => {

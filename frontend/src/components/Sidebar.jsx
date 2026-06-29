@@ -4,7 +4,7 @@ import './Sidebar.css';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
 import Avatar from './common/Avatar';
-import { filterMenuByRole } from '../permissions/permissions';
+import { filterMenuByRole, isMenuItemAccessible } from '../permissions/permissions';
 import {
   ChevronDown,
   LayoutDashboard,
@@ -402,27 +402,37 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                   { name: 'Payroll', icon: DollarSign, path: '/payroll' },
                   { name: 'Documents', icon: FolderClosed, path: '/documents' },
                   { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }
-                ].map(item => renderItem(item))}
+                ]
+                .filter(item => isMenuItemAccessible(item, currentUserRole, hasPermission))
+                .map(item => renderItem(item))}
               </div>
             </div>
           ) : (
-            filterMenuByRole(
-              menuStructure.map(sec => ({
-                ...sec,
-                items: sec.items.filter(item => 
-                  item.name !== 'Employee Dashboard'
-                )
-              })), 
-              currentUserRole, 
-              hasPermission
-            ).map((section) => (
-              <div key={section.title} className="sidebar-section">
-                {!effectiveCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
-                <div className="sidebar-section-items">
-                  {section.items.map((item) => renderItem(item))}
+            (() => {
+              const isBranchScoped = currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin' && currentUserRole !== 'SuperAdmin' && currentUser?.branch;
+              return filterMenuByRole(
+                menuStructure.map(sec => ({
+                  ...sec,
+                  items: sec.items
+                    .filter(item => item.name !== 'Employee Dashboard')
+                    .map(item => {
+                      if (item.name === 'Company Overview' && isBranchScoped) {
+                        return { ...item, name: 'Branch Overview' };
+                      }
+                      return item;
+                    })
+                })), 
+                currentUserRole, 
+                hasPermission
+              ).map((section) => (
+                <div key={section.title} className="sidebar-section">
+                  {!effectiveCollapsed && <h5 className="sidebar-section-title">{section.title}</h5>}
+                  <div className="sidebar-section-items">
+                    {section.items.map((item) => renderItem(item))}
+                  </div>
                 </div>
-              </div>
-            ))
+              ));
+            })()
           )}
 
           {/* Quick Actions (Employee only) */}
@@ -430,30 +440,42 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
             <div className="sidebar-quick-actions">
               <span className="quick-actions-title">Quick Actions</span>
               <div className="quick-actions-grid-layout">
-                <Link to="/employee-dashboard" onClick={() => setMobileOpen(false)} className="quick-action-tile">
-                  <Clock size={14} className="tile-icon text-primary-c" />
-                  <span className="tile-label">Punch In/Out</span>
-                </Link>
-                <Link to="/attendance" onClick={() => setMobileOpen(false)} className="quick-action-tile">
-                  <Clock size={14} className="tile-icon text-info" />
-                  <span className="tile-label">History</span>
-                </Link>
-                <Link to="/tasks" onClick={() => setMobileOpen(false)} className="quick-action-tile">
-                  <KanbanSquare size={14} className="tile-icon text-warning" />
-                  <span className="tile-label">Tasks</span>
-                </Link>
-                <Link to="/work-reports" onClick={() => setMobileOpen(false)} className="quick-action-tile">
-                  <FileText size={14} className="tile-icon text-success" />
-                  <span className="tile-label">Submit DWR</span>
-                </Link>
-                <Link to="/leaves" onClick={() => setMobileOpen(false)} className="quick-action-tile">
-                  <CalendarDays size={14} className="tile-icon text-danger" />
-                  <span className="tile-label">Apply Leave</span>
-                </Link>
-                <Link to="/documents" onClick={() => setMobileOpen(false)} className="quick-action-tile">
-                  <FolderClosed size={14} className="tile-icon text-primary-c" />
-                  <span className="tile-label">Documents</span>
-                </Link>
+                {isMenuItemAccessible({ path: '/employee-dashboard' }, currentUserRole, hasPermission) && (
+                  <Link to="/employee-dashboard" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                    <Clock size={14} className="tile-icon text-primary-c" />
+                    <span className="tile-label">Punch In/Out</span>
+                  </Link>
+                )}
+                {isMenuItemAccessible({ path: '/attendance' }, currentUserRole, hasPermission) && (
+                  <Link to="/attendance" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                    <Clock size={14} className="tile-icon text-info" />
+                    <span className="tile-label">History</span>
+                  </Link>
+                )}
+                {isMenuItemAccessible({ path: '/tasks' }, currentUserRole, hasPermission) && (
+                  <Link to="/tasks" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                    <KanbanSquare size={14} className="tile-icon text-warning" />
+                    <span className="tile-label">Tasks</span>
+                  </Link>
+                )}
+                {isMenuItemAccessible({ path: '/work-reports' }, currentUserRole, hasPermission) && (
+                  <Link to="/work-reports" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                    <FileText size={14} className="tile-icon text-success" />
+                    <span className="tile-label">Submit DWR</span>
+                  </Link>
+                )}
+                {isMenuItemAccessible({ path: '/leaves' }, currentUserRole, hasPermission) && (
+                  <Link to="/leaves" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                    <CalendarDays size={14} className="tile-icon text-danger" />
+                    <span className="tile-label">Apply Leave</span>
+                  </Link>
+                )}
+                {isMenuItemAccessible({ path: '/documents' }, currentUserRole, hasPermission) && (
+                  <Link to="/documents" onClick={() => setMobileOpen(false)} className="quick-action-tile">
+                    <FolderClosed size={14} className="tile-icon text-primary-c" />
+                    <span className="tile-label">Documents</span>
+                  </Link>
+                )}
               </div>
             </div>
           )}
