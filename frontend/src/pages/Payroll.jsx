@@ -80,6 +80,7 @@ const Payroll = () => {
     addOrUpdateSalaryGrade,
     deleteSalaryGrade,
     createLoanOrAdvance,
+    updateLoanAdvanceStatus,
     recommendBonus,
     updateBonusStatus,
     processPayrollCalculations,
@@ -87,8 +88,18 @@ const Payroll = () => {
     updateSinglePayrollStatus,
     toggleEmployeeTaxRegime,
     savePayrollSalaryRevision,
-    hasPermission
+    hasPermission,
+    attendance,
+    fetchAttendance
   } = useApp();
+
+  const resolveEmployee = React.useCallback((empId, empName) => {
+    if (!employees || employees.length === 0) return null;
+    return employees.find(e => 
+      (empId && (e.id === empId || e.employeeId === empId || e.employeeCode === empId)) ||
+      (empName && e.name && e.name.toLowerCase().replace(/\s+/g, ' ') === empName.toLowerCase().replace(/\s+/g, ' '))
+    );
+  }, [employees]);
 
   // Selected Month/Year
   const [month, setMonth] = useState('June');
@@ -99,6 +110,10 @@ const Payroll = () => {
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState(currentUserRole === 'employee' ? 'processing' : 'dashboard');
+
+  React.useEffect(() => {
+    fetchAttendance();
+  }, []);
 
   React.useEffect(() => {
     setPerspective(currentUserRole || 'super_admin');
@@ -172,14 +187,38 @@ const Payroll = () => {
 
   // Derived Configurations
   const attendanceConfigs = useMemo(() => ({
-    leaveDeductionRate: payrollConfigs?.leaveDeductionRate ?? 2000,
-    lateArrivalPenalty: payrollConfigs?.lateArrivalPenalty ?? 300,
-    overtimeHourlyRate: payrollConfigs?.overtimeHourlyRate ?? 500
+    leaveDeductionRate: payrollConfigs?.leaveDeductionRate ?? 0,
+    lateArrivalPenalty: payrollConfigs?.lateArrivalPenalty ?? 0,
+    overtimeHourlyRate: payrollConfigs?.overtimeHourlyRate ?? 0
   }), [payrollConfigs]);
 
   const taxProfiles = useMemo(() => payrollConfigs?.taxProfiles || {}, [payrollConfigs]);
   const attendanceDaysMap = useMemo(() => payrollConfigs?.attendanceDaysMap || {}, [payrollConfigs]);
   const salaryStructures = useMemo(() => payrollConfigs?.salaryStructures || {}, [payrollConfigs]);
+
+  const timelineDeadlines = useMemo(() => {
+    return payrollConfigs?.timelineDeadlines || {
+      reimbursementCutoff: 20,
+      attendanceVerification: 25,
+      payrollProcessing: 28,
+      salaryDisbursement: 30
+    };
+  }, [payrollConfigs]);
+
+  const complianceSchedules = useMemo(() => {
+    return payrollConfigs?.complianceSchedules || [
+      { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
+      { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
+      { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
+    ];
+  }, [payrollConfigs]);
+
+  const complianceNotices = useMemo(() => {
+    return payrollConfigs?.complianceNotices || [
+      'Submission window for Q1 Investment Proofs is currently open.',
+      'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
+    ];
+  }, [payrollConfigs]);
 
   const auditLogs = useMemo(() => {
     return (activityLogs || [])
@@ -188,8 +227,8 @@ const Payroll = () => {
         id: log.id,
         user: log.employeeName || 'System',
         action: log.action,
-        prevVal: log.details || '—',
-        newVal: log.target || '—',
+        prevVal: log.details || '-',
+        newVal: log.target || '-',
         timestamp: log.timestamp
       }));
   }, [activityLogs]);
@@ -204,7 +243,12 @@ const Payroll = () => {
     const activeState = employees
       .filter(emp => emp.status !== 'Inactive')
       .map(emp => {
-        const savedPayment = monthlyPayments.find(p => p.employeeId === emp.id);
+        const savedPayment = monthlyPayments.find(p => 
+          p.employeeId === emp.id || 
+          p.employeeId === emp.employeeId || 
+          p.employeeId === emp.employeeCode || 
+          (p.employeeName && emp.name && p.employeeName.toLowerCase().replace(/\s+/g, ' ') === emp.name.toLowerCase().replace(/\s+/g, ' '))
+        );
         if (savedPayment) {
           return savedPayment;
         }
@@ -212,27 +256,27 @@ const Payroll = () => {
         const empBasicSalary = Number(emp.salaryAmount) || 0;
         const struct = salaryStructures[emp.id] || {
           basic: empBasicSalary,
-          hra: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.4) : 0,
-          travel: empBasicSalary > 0 ? 3000 : 0,
-          medical: empBasicSalary > 0 ? 2000 : 0,
-          special: empBasicSalary > 0 ? 1000 : 0,
-          pf: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.12) : 0,
+          hra: 0,
+          travel: 0,
+          medical: 0,
+          special: 0,
+          pf: 0,
           esi: 0,
-          pt: empBasicSalary > 0 ? 200 : 0,
-          tds: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.1) : 0
+          pt: 0,
+          tds: 0
         };
         const basicSalary = struct.basic || empBasicSalary;
         const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
         const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
         const grossSalary = basicSalary + totalAllowances;
-        const netSalary = grossSalary - statutoryDeductions;
+        const netSalary = Math.max(0, grossSalary - statutoryDeductions);
         return {
           id: `${emp.id}-${month}-${year}`,
           employeeId: emp.id,
           employeeName: emp.name,
-          department: emp.department || '—',
-          designation: emp.designation || '—',
-          branch: emp.branch || '—',
+          department: emp.department || '-',
+          designation: emp.designation || '-',
+          branch: emp.branch || '-',
           month,
           year,
           status: 'Hold',
@@ -247,13 +291,21 @@ const Payroll = () => {
           advanceDeduct: 0,
           leaveDeductions: 0,
           lateDeductions: 0,
-          statutoryDeductions
+          statutoryDeductions,
+          hra: struct.hra || 0,
+          travel: struct.travel || 0,
+          medical: struct.medical || 0,
+          special: struct.special || 0,
+          pf: struct.pf || 0,
+          esi: struct.esi || 0,
+          pt: struct.pt || 0,
+          tds: struct.tds || 0
         };
       });
 
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return activeState;
     return activeState.filter(p => {
-      const emp = employees.find(e => e.id === p.employeeId);
+      const emp = resolveEmployee(p.employeeId, p.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return p.employeeId === currentUser?.id;
       }
@@ -268,12 +320,12 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [payrollState, employees, currentUser, currentUserRole, perspective, month, year, salaryStructures]);
+  }, [payrollState, employees, currentUser, currentUserRole, perspective, month, year, salaryStructures, resolveEmployee]);
 
   const scopedReimbursements = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return reimbursements;
     return reimbursements.filter(r => {
-      const emp = employees.find(e => e.id === r.employeeId);
+      const emp = resolveEmployee(r.employeeId, r.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return r.employeeId === currentUser?.id;
       }
@@ -288,12 +340,12 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [reimbursements, employees, currentUser, currentUserRole, perspective]);
-
+  }, [reimbursements, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
+ 
   const scopedLoans = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return loans;
     return loans.filter(l => {
-      const emp = employees.find(e => e.id === l.employeeId);
+      const emp = resolveEmployee(l.employeeId, l.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return l.employeeId === currentUser?.id;
       }
@@ -308,12 +360,12 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [loans, employees, currentUser, currentUserRole, perspective]);
-
+  }, [loans, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
+ 
   const scopedAdvances = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return advances;
     return advances.filter(a => {
-      const emp = employees.find(e => e.id === a.employeeId);
+      const emp = resolveEmployee(a.employeeId, a.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return a.employeeId === currentUser?.id;
       }
@@ -328,12 +380,12 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [advances, employees, currentUser, currentUserRole, perspective]);
-
+  }, [advances, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
+ 
   const scopedBonuses = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return bonuses;
     return bonuses.filter(b => {
-      const emp = employees.find(e => e.id === b.employeeId);
+      const emp = resolveEmployee(b.employeeId, b.employeeName);
       if (perspective === 'employee' || currentUserRole === 'employee') {
         return b.employeeId === currentUser?.id;
       }
@@ -348,7 +400,7 @@ const Payroll = () => {
       }
       return true;
     });
-  }, [bonuses, employees, currentUser, currentUserRole, perspective]);
+  }, [bonuses, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
 
   const scopedAuditLogs = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return auditLogs;
@@ -360,36 +412,169 @@ const Payroll = () => {
     });
   }, [auditLogs, currentUser, currentUserRole, perspective]);
 
+  const monthMap = useMemo(() => ({
+    January: '01',
+    February: '02',
+    March: '03',
+    April: '04',
+    May: '05',
+    June: '06',
+    July: '07',
+    August: '08',
+    September: '09',
+    October: '10',
+    November: '11',
+    December: '12'
+  }), []);
+
+  // --- Dynamic Calendar & Timeline Helpers ---
+  const getTimelineDate = (day) => {
+    const monthNum = parseInt(monthMap[month] || '06') - 1;
+    const yrNum = parseInt(year || '2026');
+    const maxDays = new Date(yrNum, monthNum + 1, 0).getDate();
+    const actualDay = Math.min(day, maxDays);
+    return new Date(yrNum, monthNum, actualDay);
+  };
+
+  const formatTimelineDate = (day) => {
+    const d = getTimelineDate(day);
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
+  const getStageStatus = (stageIndex, deadlines) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const stages = [
+      { key: 'reimbursementCutoff', day: deadlines.reimbursementCutoff ?? 20 },
+      { key: 'attendanceVerification', day: deadlines.attendanceVerification ?? 25 },
+      { key: 'payrollProcessing', day: deadlines.payrollProcessing ?? 28 },
+      { key: 'salaryDisbursement', day: deadlines.salaryDisbursement ?? 30 }
+    ];
+
+    const currentStageDate = getTimelineDate(stages[stageIndex].day);
+    currentStageDate.setHours(0, 0, 0, 0);
+
+    if (today.getTime() > currentStageDate.getTime()) {
+      return { text: 'Passed', variant: 'success', className: 'step-passed' };
+    }
+
+    let isActive = false;
+    if (stageIndex === 0) {
+      isActive = today.getTime() <= currentStageDate.getTime();
+    } else {
+      const prevStageDate = getTimelineDate(stages[stageIndex - 1].day);
+      prevStageDate.setHours(0, 0, 0, 0);
+      isActive = today.getTime() > prevStageDate.getTime() && today.getTime() <= currentStageDate.getTime();
+    }
+
+    if (isActive) {
+      return { text: 'In Progress', variant: 'warning', className: 'step-active' };
+    }
+
+    const labels = ['Scheduled', 'Scheduled', 'Scheduled', 'Disbursement'];
+    return { text: labels[stageIndex], variant: 'secondary', className: '' };
+  };
+
+  const getComplianceDate = (item) => {
+    const monthNum = parseInt(monthMap[month] || '06') - 1;
+    const yrNum = parseInt(year || '2026');
+    const targetMonth = monthNum + (item.monthOffset || 0);
+    return new Date(yrNum, targetMonth, item.day);
+  };
+
+  const formatComplianceMonth = (item) => {
+    const d = getComplianceDate(item);
+    return d.toLocaleDateString('en-US', { month: 'short' });
+  };
+
+  const formatComplianceDay = (item) => {
+    const d = getComplianceDate(item);
+    return String(d.getDate()).padStart(2, '0');
+  };
+
+  const getDaysRemaining = (item) => {
+    const targetDate = getComplianceDate(item);
+    const today = new Date();
+    targetDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diffTime = targetDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const formatDaysRemaining = (item) => {
+    const days = getDaysRemaining(item);
+    if (days > 0) {
+      return `Due in ${days} Days`;
+    } else if (days === 0) {
+      return `Due Today`;
+    } else {
+      return `Overdue by ${Math.abs(days)} Days`;
+    }
+  };
+
   // --- Dynamic Calculator Engine logic ---
   const calculatedPayrollData = useMemo(() => {
     return scopedPayrollState.map(p => {
       const empId = p.employeeId;
-      const emp = employees.find(e => e.id === empId);
+      const emp = resolveEmployee(p.employeeId, p.employeeName);
+
       const empBasicSalary = Number(emp?.salaryAmount) || 0;
       const struct = salaryStructures[empId] || {
         basic: empBasicSalary,
-        hra: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.4) : 0,
-        travel: empBasicSalary > 0 ? 3000 : 0,
-        medical: empBasicSalary > 0 ? 2000 : 0,
-        special: empBasicSalary > 0 ? 1000 : 0,
-        pf: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.12) : 0,
+        hra: 0,
+        travel: 0,
+        medical: 0,
+        special: 0,
+        pf: 0,
         esi: 0,
-        pt: empBasicSalary > 0 ? 200 : 0,
-        tds: empBasicSalary > 0 ? Math.round(empBasicSalary * 0.1) : 0
+        pt: 0,
+        tds: 0
       };
-      const att = attendanceDaysMap[empId] || { present: 0, absent: 0, halfDays: 0, paidLeaves: 0, unpaidLeaves: 0, overtimeHours: 0, lateArrivals: 0 };
+
+      const monthStr = monthMap[month] || '06';
+      const prefix = `${year}-${monthStr}`;
+      const empRecords = (attendance || []).filter(
+        a => a.employeeId === empId && a.date && a.date.startsWith(prefix)
+      );
+
+      let presentCount = 0;
+      let absentCount = 0;
+      let halfDaysCount = 0;
+      let paidLeavesCount = 0;
+      let lateArrivalsCount = 0;
+      let overtimeHoursCount = 0;
+
+      if (empRecords.length > 0) {
+        presentCount = empRecords.filter(a => ['Present', 'Work From Home', 'WFH', 'Overtime'].includes(a.status)).length;
+        absentCount = empRecords.filter(a => a.status === 'Absent').length;
+        halfDaysCount = empRecords.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
+        paidLeavesCount = empRecords.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length;
+        lateArrivalsCount = empRecords.filter(a => a.status === 'Late').length;
+        overtimeHoursCount = empRecords.reduce((sum, a) => {
+          const hrs = parseFloat(a.overtime) || 0;
+          return sum + hrs;
+        }, 0);
+      } else {
+        presentCount = 0;
+        absentCount = 0;
+        halfDaysCount = 0;
+        paidLeavesCount = 0;
+        lateArrivalsCount = 0;
+        overtimeHoursCount = 0;
+      }
 
       // Allowances Sum
       const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
 
       // Unpaid Leave Deduction
-      const leaveDeduction = att.unpaidLeaves * Math.round((struct.basic || empBasicSalary) / 24);
+      const leaveDeduction = absentCount * Math.round((struct.basic || empBasicSalary) / 24);
 
       // Late penalty
-      const lateDeduction = att.lateArrivals * attendanceConfigs.lateArrivalPenalty;
+      const lateDeduction = lateArrivalsCount * attendanceConfigs.lateArrivalPenalty;
 
       // Overtime Pay
-      const overtimePay = att.overtimeHours * attendanceConfigs.overtimeHourlyRate;
+      const overtimePay = overtimeHoursCount * attendanceConfigs.overtimeHourlyRate;
 
       // Bonuses
       const approvedBonuses = bonuses
@@ -401,13 +586,13 @@ const Payroll = () => {
         .filter(r => r.employeeId === empId && (r.status === 'Approved' || r.status === 'Released'))
         .reduce((sum, curr) => sum + curr.amount, 0);
 
-      // Deductions from loans / advances
+      // Deductions from loans / advances (only Approved ones)
       const loanEMI = loans
-        .filter(l => l.employeeId === empId)
+        .filter(l => l.employeeId === empId && l.status === 'Approved')
         .reduce((sum, curr) => sum + curr.emi, 0);
 
       const advanceDeduct = advances
-        .filter(a => a.employeeId === empId)
+        .filter(a => a.employeeId === empId && a.status === 'Approved')
         .reduce((sum, curr) => sum + curr.amount, 0);
 
       // Total Statutory Deductions
@@ -420,13 +605,16 @@ const Payroll = () => {
       const grossSalary = (struct.basic || empBasicSalary) + totalAllowances + overtimePay + approvedBonuses;
 
       // Net Salary
-      const netSalary = grossSalary - totalDeductions;
+      const netSalary = Math.max(0, grossSalary - totalDeductions);
 
       return {
         ...p,
+        branch: (emp?.branch || p.branch || '-').trim(),
+        department: (emp?.department || p.department || '-').trim(),
+        designation: (emp?.designation || p.designation || '-').trim(),
         basicSalary: struct.basic || empBasicSalary,
         grossSalary,
-        attendanceDays: att.present + att.paidLeaves + (att.halfDays * 0.5),
+        attendanceDays: presentCount + paidLeavesCount + (halfDaysCount * 0.5),
         leaveDeductions: leaveDeduction,
         lateDeductions: lateDeduction,
         statutoryDeductions,
@@ -437,14 +625,22 @@ const Payroll = () => {
         reimbursementAmount: approvedReimbursements,
         totalDeductions,
         netSalary,
-        bankName: emp?.bank?.bankName || struct.bankName || '—',
-        bankAccount: emp?.bank?.accountNumber || struct.bankAccountNumber || '—',
-        bankIfsc: emp?.bank?.ifsc || struct.bankIfscCode || '—',
-        pan: emp?.panNumber || taxProfiles[empId]?.pan || '—',
-        regime: taxProfiles[empId]?.regime || '—'
+        bankName: emp?.bank?.bankName || struct.bankName || '-',
+        bankAccount: emp?.bank?.accountNumber || struct.bankAccountNumber || '-',
+        bankIfsc: emp?.bank?.ifsc || struct.bankIfscCode || '-',
+        pan: emp?.panNumber || taxProfiles[empId]?.pan || '-',
+        regime: taxProfiles[empId]?.regime || '-',
+        hra: struct.hra || 0,
+        travel: struct.travel || 0,
+        medical: struct.medical || 0,
+        special: struct.special || 0,
+        pf: struct.pf || 0,
+        esi: struct.esi || 0,
+        pt: struct.pt || 0,
+        tds: struct.tds || 0
       };
     });
-  }, [payrollState, salaryStructures, attendanceDaysMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees]);
+  }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees, resolveEmployee]);
 
   // --- Executive Dashboard KPI aggregations ---
   const totalEmployees = calculatedPayrollData.length;
@@ -528,11 +724,25 @@ const Payroll = () => {
     }
   };
 
+  // Approve or Reject Loan/Advance Request
+  const handleUpdateLoanStatus = async (id, newStatus) => {
+    showConfirm(
+      `${newStatus === 'Approved' ? 'Approve' : 'Reject'} Request`,
+      `Are you sure you want to ${newStatus.toLowerCase()} request ${id}?`,
+      async () => {
+        const success = await updateLoanAdvanceStatus(id, newStatus);
+        if (success) {
+          addPageToast('success', `Request ${id} has been ${newStatus.toLowerCase()} successfully.`);
+        }
+      }
+    );
+  };
+
   // Apply new loan or advance
   const handleCreateLoanAdvance = async (e) => {
     e.preventDefault();
     const empId = perspective === 'employee' ? (currentUser?.id || 'EMP-2026-001') : (applyForm.employeeId || employees[0]?.id);
-    const targetEmp = employees.find(emp => emp.id === empId) || { name: 'Employee' };
+    const targetEmp = resolveEmployee(empId) || { name: 'Employee' };
     const payload = {
       employeeId: empId,
       amount: parseInt(applyForm.amount),
@@ -557,7 +767,7 @@ const Payroll = () => {
   // Submit Bonus Request
   const handleCreateBonus = async (e) => {
     e.preventDefault();
-    const targetEmp = employees.find(emp => emp.id === bonusForm.employeeId) || { name: 'Employee' };
+    const targetEmp = resolveEmployee(bonusForm.employeeId) || { name: 'Employee' };
     const payload = {
       employeeId: bonusForm.employeeId,
       type: bonusForm.type,
@@ -682,7 +892,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
   Tax Regime                      : ${empObj.regime} Regime
   Credit Bank                     : ${empObj.bankName}
   Account Number                  : ${empObj.bankAccount}
-  Transaction Status              : ${empObj.status === 'Released' ? 'PROCESSED & DISBURSED' : 'AWAITING DISBURSAL'}
+  Transaction Status              : ${empObj.status === 'Released' ? 'PROCESSED & DISTRIBUTED' : 'AWAITING DISTRIBUTION'}
 ========================================================================
   Auto-generated on behalf of SaaS Corporate Finance Division.
 ========================================================================
@@ -838,13 +1048,13 @@ BANK PAYMENT & COMPLIANCE DETAIL:
 
             <div className="card payroll-stat-card border-bottom-success">
               <div className="stat-card-header flex-center justify-between width-full">
-                <span className="stat-label">Payroll Disbursed</span>
+                <span className="stat-label">Payroll Distributed</span>
                 <span className="badge-paid flex-center gap-1 font-xsmall"><CheckCircle size={12} /> Live</span>
               </div>
               <h3 className="stat-num text-success">{formatCurrency(calculatedPayrollData.filter(p => p.status === 'Released').reduce((sum, c) => sum + c.netSalary, 0))}</h3>
               <div className="flex-center justify-between font-small text-muted width-full">
                 <span>Processed: {processedCount} Staff</span>
-                <span>Pending Disbursal: {pendingCount}</span>
+                <span>Pending Distribution: {pendingCount}</span>
               </div>
             </div>
 
@@ -970,7 +1180,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     >
                       <div className="flex-column gap-1">
                         <span className="period-month">{m} {year}</span>
-                        <span className="period-net">{periodObj ? formatCurrency(periodObj.netSalary) : '—'}</span>
+                        <span className="period-net">{periodObj ? formatCurrency(periodObj.netSalary) : '-'}</span>
                       </div>
                       <Badge variant={isPaid ? 'success' : 'warning'}>
                         {isPaid ? 'Paid' : 'Pending'}
@@ -1027,12 +1237,14 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <span className="font-bold text-success border-bottom pb-1 flex-row gap-1 align-center">
                         <TrendingUp size={14} /> Earnings
                       </span>
-                      <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(selectedEmployeeObj.basicSalary) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.4)) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Conveyance & Medical Allowances:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(8000) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{selectedEmployeeObj.overtimeAmount > 0 ? formatCurrency(selectedEmployeeObj.overtimeAmount) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{selectedEmployeeObj.bonusAmount > 0 ? formatCurrency(selectedEmployeeObj.bonusAmount) : '—'}</strong></div>
-                      <div className="flex-center justify-between border-top pt-2 font-semibold text-success"><span>Gross Earnings:</span> <strong>{selectedEmployeeObj.grossSalary > 0 ? formatCurrency(selectedEmployeeObj.grossSalary) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(selectedEmployeeObj.basicSalary) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{selectedEmployeeObj.hra > 0 ? formatCurrency(selectedEmployeeObj.hra) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Conveyance Allowance:</span> <strong>{selectedEmployeeObj.travel > 0 ? formatCurrency(selectedEmployeeObj.travel) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Medical Allowance:</span> <strong>{selectedEmployeeObj.medical > 0 ? formatCurrency(selectedEmployeeObj.medical) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Special Allowance:</span> <strong>{selectedEmployeeObj.special > 0 ? formatCurrency(selectedEmployeeObj.special) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{selectedEmployeeObj.overtimeAmount > 0 ? formatCurrency(selectedEmployeeObj.overtimeAmount) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{selectedEmployeeObj.bonusAmount > 0 ? formatCurrency(selectedEmployeeObj.bonusAmount) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between border-top pt-2 font-semibold text-success"><span>Gross Earnings:</span> <strong>{selectedEmployeeObj.grossSalary > 0 ? formatCurrency(selectedEmployeeObj.grossSalary) : '₹0'}</strong></div>
                     </div>
  
                     {/* Deductions */}
@@ -1040,13 +1252,13 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <span className="font-bold text-danger border-bottom pb-1 flex-row gap-1 align-center">
                         <MinusCircle size={14} /> Deductions
                       </span>
-                      <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.12)) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(Math.round(selectedEmployeeObj.basicSalary * 0.1)) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{selectedEmployeeObj.basicSalary > 0 ? formatCurrency(200) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{selectedEmployeeObj.leaveDeductions > 0 ? formatCurrency(selectedEmployeeObj.leaveDeductions) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{selectedEmployeeObj.lateDeductions > 0 ? formatCurrency(selectedEmployeeObj.lateDeductions) : '—'}</strong></div>
-                      <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct > 0 ? formatCurrency(selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct) : '—'}</strong></div>
-                      <div className="flex-center justify-between border-top pt-2 font-semibold text-danger"><span>Total Deductions:</span> <strong>{selectedEmployeeObj.totalDeductions > 0 ? formatCurrency(selectedEmployeeObj.totalDeductions) : '—'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{selectedEmployeeObj.pf > 0 ? formatCurrency(selectedEmployeeObj.pf) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{selectedEmployeeObj.tds > 0 ? formatCurrency(selectedEmployeeObj.tds) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{selectedEmployeeObj.pt > 0 ? formatCurrency(selectedEmployeeObj.pt) : '₹0'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{selectedEmployeeObj.leaveDeductions > 0 ? formatCurrency(selectedEmployeeObj.leaveDeductions) : '-'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{selectedEmployeeObj.lateDeductions > 0 ? formatCurrency(selectedEmployeeObj.lateDeductions) : '-'}</strong></div>
+                      <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct > 0 ? formatCurrency(selectedEmployeeObj.loanEMI + selectedEmployeeObj.advanceDeduct) : '-'}</strong></div>
+                      <div className="flex-center justify-between border-top pt-2 font-semibold text-danger"><span>Total Deductions:</span> <strong>{selectedEmployeeObj.totalDeductions > 0 ? formatCurrency(selectedEmployeeObj.totalDeductions) : '-'}</strong></div>
                     </div>
                   </div>
  
@@ -1056,7 +1268,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <span className="font-semibold text-primary">Net Take-Home Salary</span>
                       <span className="font-xsmall text-muted">Transferred to your bank account on disbursal</span>
                     </div>
-                    <span className="font-bold text-success font-large">{selectedEmployeeObj.netSalary > 0 ? formatCurrency(selectedEmployeeObj.netSalary) : '—'}</span>
+                    <span className="font-bold text-success font-large">{selectedEmployeeObj.netSalary > 0 ? formatCurrency(selectedEmployeeObj.netSalary) : '-'}</span>
                   </div>
                 </>
               ) : (
@@ -1100,7 +1312,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <option value="Calculated">Calculated</option>
                     <option value="HR Verified">HR Verified</option>
                     <option value="Finance Approved">Finance Approved</option>
-                    <option value="Released">Released (Paid)</option>
+                    <option value="Released">Distributed</option>
                     <option value="Hold">On Hold</option>
                   </select>
                 </div>
@@ -1124,7 +1336,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                           Approve (Fin)
                         </Button>
                         <Button variant="primary" onClick={() => handleBulkAction('release')} icon={Landmark}>
-                          Release Salary
+                          Distribute Salary
                         </Button>
                       </div>
                     )}
@@ -1170,13 +1382,13 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                               <span>{row.designation}</span>
                             </div>
                           </td>
-                          <td><span className="badge badge-secondary">{row.branch}</span></td>
-                          <td className="font-semibold">{row.basicSalary > 0 ? formatCurrency(row.basicSalary) : '—'}</td>
-                          <td className="text-center font-semibold">{row.attendanceDays > 0 ? row.attendanceDays : '—'}</td>
-                          <td className="text-success font-semibold">{row.overtimeAmount > 0 ? `+${formatCurrency(row.overtimeAmount)}` : '—'}</td>
-                          <td className="text-success font-semibold">{row.bonusAmount > 0 ? `+${formatCurrency(row.bonusAmount)}` : '—'}</td>
-                          <td className="text-danger font-semibold">{row.totalDeductions > 0 ? `-${formatCurrency(row.totalDeductions)}` : '—'}</td>
-                          <td className="text-info font-bold">{row.netSalary > 0 ? formatCurrency(row.netSalary) : '—'}</td>
+                          <td><span className="badge badge-secondary">{row.branch === '—' ? '-' : row.branch}</span></td>
+                          <td className="font-semibold">{row.basicSalary > 0 ? formatCurrency(row.basicSalary) : '₹0'}</td>
+                          <td className="text-center font-semibold">{row.attendanceDays >= 0 ? row.attendanceDays : 0}</td>
+                          <td className="text-success font-semibold">{row.overtimeAmount > 0 ? `+${formatCurrency(row.overtimeAmount)}` : '₹0'}</td>
+                          <td className="text-success font-semibold">{row.bonusAmount > 0 ? `+${formatCurrency(row.bonusAmount)}` : '₹0'}</td>
+                          <td className="text-danger font-semibold">{row.totalDeductions > 0 ? `-${formatCurrency(row.totalDeductions)}` : '₹0'}</td>
+                          <td className="text-info font-bold">{row.netSalary > 0 ? formatCurrency(row.netSalary) : '₹0'}</td>
                           <td>
                             <Badge variant={
                               row.status === 'Released' ? 'success' :
@@ -1184,7 +1396,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                               row.status === 'HR Verified' ? 'primary' :
                               row.status === 'Hold' ? 'danger' : 'warning'
                             }>
-                              {row.status === 'Released' ? 'Disbursed' : row.status}
+                              {row.status === 'Released' ? 'Distributed' : row.status}
                             </Badge>
                           </td>
                           <td>
@@ -1215,11 +1427,11 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                                 />
                               )}
 
-                              {perspective === 'super_admin' && row.status !== 'Released' && (
+                              {perspective !== 'employee' && row.status !== 'Released' && (
                                 <button
                                   className="action-circle-btn success-btn"
                                   onClick={() => handleStatusChange(row.employeeId, 'Released')}
-                                  title="Release Salary"
+                                  title="Distribute Salary"
                                 >
                                   <Check size={14} />
                                 </button>
@@ -1444,7 +1656,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <h3 className="stat-num text-success">
                       {formatCurrency(scopedBonuses.filter(b => b.status === 'Super Admin Approved').reduce((sum, curr) => sum + curr.amount, 0))}
                     </h3>
-                    <span className="font-xsmall text-muted">Disbursed in current cycle</span>
+                    <span className="font-xsmall text-muted">Distributed in current cycle</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-success">
                     <Award size={20} />
@@ -1536,7 +1748,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <h3 className="stat-num text-success">
                       {formatCurrency(scopedBonuses.filter(b => b.status === 'Super Admin Approved').reduce((sum, curr) => sum + curr.amount, 0))}
                     </h3>
-                    <span className="font-xsmall text-muted">Disbursed performance awards</span>
+                    <span className="font-xsmall text-muted">Distributed performance awards</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-success">
                     <Award size={20} />
@@ -1688,7 +1900,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Outstanding Loan Balance</span>
-                    <h3 className="stat-num text-danger">{formatCurrency(scopedLoans.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <h3 className="stat-num text-danger">{formatCurrency(scopedLoans.filter(l => l.status === 'Approved').reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
                     <span className="font-xsmall text-muted">Remaining principal balance</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-danger">
@@ -1699,7 +1911,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Salary Advance Balance</span>
-                    <h3 className="stat-num text-warning">{formatCurrency(scopedAdvances.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <h3 className="stat-num text-warning">{formatCurrency(scopedAdvances.filter(a => a.status === 'Approved').reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
                     <span className="font-xsmall text-muted">Awaiting payroll settlement</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-warning">
@@ -1712,8 +1924,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <span className="stat-label">Next Month's Recovery EMI</span>
                     <h3 className="stat-num text-success">
                       {formatCurrency(
-                        scopedLoans.reduce((sum, curr) => sum + curr.emi, 0) +
-                        scopedAdvances.reduce((sum, curr) => sum + curr.remainingBalance, 0)
+                        scopedLoans.filter(l => l.status === 'Approved').reduce((sum, curr) => sum + curr.emi, 0) +
+                        scopedAdvances.filter(a => a.status === 'Approved').reduce((sum, curr) => sum + curr.remainingBalance, 0)
                       )}
                     </h3>
                     <span className="font-xsmall text-muted">Estimated paycheck deduction</span>
@@ -1753,6 +1965,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                             <div className="flex-center justify-between font-xsmall text-muted">
                               <span>EMI Recovery: {formatCurrency(l.emi)}/mo</span>
                               <span>Terms: {l.recoverySchedule}</span>
+                              <span>Status: <Badge variant={l.status === 'Approved' ? 'success' : l.status === 'Rejected' ? 'danger' : 'warning'}>{l.status || 'Approved'}</Badge></span>
                             </div>
                             <div className="loan-progress-track">
                               <div className="loan-progress-text">
@@ -1777,7 +1990,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                             </div>
                             <div className="flex-center justify-between font-xsmall text-muted">
                               <span>Terms: {a.recoverySchedule}</span>
-                              <span>Status: <Badge variant="success">{a.status}</Badge></span>
+                              <span>Status: <Badge variant={a.status === 'Approved' ? 'success' : a.status === 'Rejected' ? 'danger' : 'warning'}>{a.status || 'Approved'}</Badge></span>
                             </div>
                             <div className="loan-progress-track">
                               <div className="loan-progress-text">
@@ -1880,8 +2093,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <div className="loans-kpi-grid">
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
-                    <span className="stat-label">Total Disbursed Loans</span>
-                    <h3 className="stat-num text-primary">{formatCurrency(loans.reduce((sum, curr) => sum + curr.amount, 0))}</h3>
+                    <span className="stat-label">Total Distributed Loans</span>
+                    <h3 className="stat-num text-primary">{formatCurrency(loans.filter(l => l.status === 'Approved').reduce((sum, curr) => sum + curr.amount, 0))}</h3>
                     <span className="font-xsmall text-muted">Total corporate loan capital</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-primary">
@@ -1892,7 +2105,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Salary Advances Outstanding</span>
-                    <h3 className="stat-num text-warning">{formatCurrency(advances.reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
+                    <h3 className="stat-num text-warning">{formatCurrency(advances.filter(a => a.status === 'Approved').reduce((sum, curr) => sum + curr.remainingBalance, 0))}</h3>
                     <span className="font-xsmall text-muted">Pending salary settlements</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-warning">
@@ -1903,7 +2116,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Monthly EMI Recovery Pool</span>
-                    <h3 className="stat-num text-success">{formatCurrency(loans.reduce((sum, curr) => sum + curr.emi, 0))}</h3>
+                    <h3 className="stat-num text-success">{formatCurrency(loans.filter(l => l.status === 'Approved').reduce((sum, curr) => sum + curr.emi, 0))}</h3>
                     <span className="font-xsmall text-muted">Recoverable next payroll run</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-success">
@@ -1914,7 +2127,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div className="premium-kpi-card">
                   <div className="premium-kpi-info">
                     <span className="stat-label">Active Debtors Count</span>
-                    <h3 className="stat-num text-info">{new Set([...loans, ...advances].map(item => item.employeeId)).size} Staff</h3>
+                    <h3 className="stat-num text-info">{new Set([...loans, ...advances].filter(item => item.status === 'Approved').map(item => item.employeeId)).size} Staff</h3>
                     <span className="font-xsmall text-muted">Active balances total</span>
                   </div>
                   <div className="premium-kpi-icon-badge badge-glow-info">
@@ -1923,6 +2136,90 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 </div>
               </div>
 
+              {/* Pending Requests */}
+              {(() => {
+                const pendingLoans = scopedLoans.filter(l => l.status === 'Pending');
+                const pendingAdvances = scopedAdvances.filter(a => a.status === 'Pending');
+                const hasPending = pendingLoans.length > 0 || pendingAdvances.length > 0;
+                
+                if (!hasPending) return null;
+
+                return (
+                  <div className="card p-5 flex-column gap-3 mb-6" style={{ borderLeft: '4px solid var(--color-warning)' }}>
+                    <h4 className="text-warning font-bold flex-center gap-2 justify-start" style={{ margin: 0 }}>
+                      <Clock size={18} /> Pending Loan & Salary Advance Requests
+                    </h4>
+                    <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>
+                      The following employee applications are awaiting administrative review. Approved requests will be disbursed and enrolled in the next active payroll cycle.
+                    </p>
+                    <div className="overflow-x-auto mt-2">
+                      <table className="payroll-data-table">
+                        <thead>
+                          <tr>
+                            <th>Type</th>
+                            <th>Employee Name</th>
+                            <th>Category / Term</th>
+                            <th>Request ID</th>
+                            <th>Principal Amount</th>
+                            <th>Recovery EMI</th>
+                            {hasPermission('payroll_management', 'update') && <th>Actions</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...pendingLoans, ...pendingAdvances].map(req => (
+                            <tr key={req.id}>
+                              <td>
+                                <Badge variant={req.type === 'Loan' ? 'primary' : 'success'}>
+                                  {req.type}
+                                </Badge>
+                              </td>
+                              <td>
+                                <div className="flex-center gap-2 justify-start">
+                                  <Avatar name={req.employeeName} size="xs" />
+                                  <span className="emp-name-bold">{req.employeeName}</span>
+                                </div>
+                              </td>
+                              <td>{req.loanType || (req.type === 'Loan' ? 'Personal Loan' : 'Advance Salary')}</td>
+                              <td className="font-xsmall text-muted">{req.id}</td>
+                              <td className="font-bold text-primary">{formatCurrency(req.amount)}</td>
+                              <td>
+                                {req.type === 'Loan' ? (
+                                  <span>{formatCurrency(req.emi)}/mo ({req.recoverySchedule})</span>
+                                ) : (
+                                  <span>{req.recoverySchedule}</span>
+                                )}
+                              </td>
+                              {hasPermission('payroll_management', 'update') && (
+                                <td>
+                                  <div className="flex-center gap-2 justify-start">
+                                    <Button
+                                      variant="success"
+                                      size="sm"
+                                      icon={Check}
+                                      onClick={() => handleUpdateLoanStatus(req.id, 'Approved')}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      variant="danger"
+                                      size="sm"
+                                      icon={X}
+                                      onClick={() => handleUpdateLoanStatus(req.id, 'Rejected')}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </div>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Ledger Cards */}
               <div className="grid-2-col gap-6">
                 {/* Active Loans */}
@@ -1930,8 +2227,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   <h4 className="text-primary font-bold">Active Employee Loans</h4>
                   
                   <div className="flex-column gap-4">
-                    {scopedLoans.length > 0 ? (
-                      scopedLoans.map(l => (
+                    {scopedLoans.filter(l => l.status === 'Approved').length > 0 ? (
+                      scopedLoans.filter(l => l.status === 'Approved').map(l => (
                         <div key={l.id} className="loan-card-item flex-column gap-2">
                           <div className="loan-card-header-row">
                             <div className="loan-avatar-info">
@@ -1975,8 +2272,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   <h4 className="text-success font-bold">Salary Advances Outstanding</h4>
                   
                   <div className="flex-column gap-4">
-                    {scopedAdvances.length > 0 ? (
-                      scopedAdvances.map(a => (
+                    {scopedAdvances.filter(a => a.status === 'Approved').length > 0 ? (
+                      scopedAdvances.filter(a => a.status === 'Approved').map(a => (
                         <div key={a.id} className="loan-card-item flex-column gap-2" style={{ borderColor: 'var(--color-success-light)' }}>
                           <div className="loan-card-header-row">
                             <div className="loan-avatar-info">
@@ -2098,54 +2395,47 @@ BANK PAYMENT & COMPLIANCE DETAIL:
             {/* Left Column: Payroll Processing Timeline */}
             <div className="card p-5 flex-column gap-4">
               <h4 className="font-semibold text-primary flex-center gap-2 justify-start" style={{ margin: 0 }}>
-                <Clock size={18} /> Payroll Run Cycle Timeline (June 2026)
+                <Clock size={18} /> Payroll Run Cycle Timeline ({month} {year})
               </h4>
               <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Key stages for monthly attendance auditing, verification, and disbursement.</p>
               
               <div className="calendar-timeline-v">
-                {/* Step 1: Completed */}
-                <div className="timeline-step-item step-passed">
-                  <div className="timeline-step-node"></div>
-                  <div className="timeline-step-header">
-                    <span className="font-bold font-small">1. Reimbursements Cutoff</span>
-                    <Badge variant="success">Passed</Badge>
-                  </div>
-                  <span className="font-xsmall text-muted font-semibold">Deadline: June 20, 2026</span>
-                  <p className="font-xsmall text-muted mt-1">Submit travel, medical, and client expense claims for inclusion in this cycle.</p>
-                </div>
-
-                {/* Step 2: Active */}
-                <div className="timeline-step-item step-active">
-                  <div className="timeline-step-node"></div>
-                  <div className="timeline-step-header">
-                    <span className="font-bold font-small text-primary">2. Attendance & Log Verification</span>
-                    <Badge variant="warning">In Progress</Badge>
-                  </div>
-                  <span className="font-xsmall text-muted font-semibold">Deadline: June 25, 2026</span>
-                  <p className="font-xsmall text-muted mt-1">Verify employee check-ins, half days, overtime, and punch records for payroll sync.</p>
-                </div>
-
-                {/* Step 3: Upcoming */}
-                <div className="timeline-step-item">
-                  <div className="timeline-step-node"></div>
-                  <div className="timeline-step-header">
-                    <span className="font-bold font-small text-secondary">3. Payroll Run Processing Due</span>
-                    <Badge variant="secondary">Scheduled</Badge>
-                  </div>
-                  <span className="font-xsmall text-muted font-semibold">Deadline: June 28, 2026</span>
-                  <p className="font-xsmall text-muted mt-1">Recalculate structures, basic revision edits, TDS deductions, and professional tax.</p>
-                </div>
-
-                {/* Step 4: Upcoming */}
-                <div className="timeline-step-item">
-                  <div className="timeline-step-node"></div>
-                  <div className="timeline-step-header">
-                    <span className="font-bold font-small text-secondary">4. Salary Disbursement Release</span>
-                    <Badge variant="secondary">Disbursement</Badge>
-                  </div>
-                  <span className="font-xsmall text-muted font-semibold">Deadline: June 30, 2026</span>
-                  <p className="font-xsmall text-muted mt-1">Disburse payments to bank accounts and send system notification slips.</p>
-                </div>
+                {[
+                  {
+                    title: '1. Reimbursements Cutoff',
+                    day: timelineDeadlines.reimbursementCutoff ?? 20,
+                    description: 'Submit travel, medical, and client expense claims for inclusion in this cycle.'
+                  },
+                  {
+                    title: '2. Attendance & Log Verification',
+                    day: timelineDeadlines.attendanceVerification ?? 25,
+                    description: 'Verify employee check-ins, half days, overtime, and punch records for payroll sync.'
+                  },
+                  {
+                    title: '3. Payroll Run Processing Due',
+                    day: timelineDeadlines.payrollProcessing ?? 28,
+                    description: 'Recalculate structures, basic revision edits, TDS deductions, and professional tax.'
+                  },
+                  {
+                    title: '4. Salary Disbursement Release',
+                    day: timelineDeadlines.salaryDisbursement ?? 30,
+                    description: 'Disburse payments to bank accounts and send system notification slips.'
+                  }
+                ].map((stage, index) => {
+                  const status = getStageStatus(index, timelineDeadlines);
+                  const headerTextColorClass = status.text === 'Passed' ? '' : (status.text === 'In Progress' ? 'text-primary' : 'text-secondary');
+                  return (
+                    <div key={index} className={`timeline-step-item ${status.className}`}>
+                      <div className="timeline-step-node"></div>
+                      <div className="timeline-step-header">
+                        <span className={`font-bold font-small ${headerTextColorClass}`}>{stage.title}</span>
+                        <Badge variant={status.variant}>{status.text}</Badge>
+                      </div>
+                      <span className="font-xsmall text-muted font-semibold">Deadline: {formatTimelineDate(stage.day)}</span>
+                      <p className="font-xsmall text-muted mt-1">{stage.description}</p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -2157,57 +2447,54 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Important quarterly and monthly filing deadlines for government audits.</p>
               
               <div className="compliance-grid-v">
-                {/* Due 1 */}
-                <div className="compliance-card-premium">
-                  <div className="calendar-sheet">
-                    <div className="calendar-sheet-header bg-primary">Jul</div>
-                    <div className="calendar-sheet-day">07</div>
-                  </div>
-                  <div className="compliance-card-info">
-                    <span className="compliance-card-title">Monthly TDS Deposit Due</span>
-                    <span className="compliance-card-due font-xsmall text-muted">Filing period: June 2026 • Challan ITNS 281</span>
-                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 25 Days</span>
-                  </div>
-                </div>
-
-                {/* Due 2 */}
-                <div className="compliance-card-premium" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
-                  <div className="calendar-sheet">
-                    <div className="calendar-sheet-header bg-success">Jul</div>
-                    <div className="calendar-sheet-day">15</div>
-                  </div>
-                  <div className="compliance-card-info">
-                    <span className="compliance-card-title">PF & ESI Filing Deadline</span>
-                    <span className="compliance-card-due font-xsmall text-muted">Filing period: June 2026 • Form 5 & Form 10</span>
-                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 33 Days</span>
-                  </div>
-                </div>
-
-                {/* Due 3 */}
-                <div className="compliance-card-premium" style={{ borderColor: 'rgba(239, 68, 68, 0.2)' }}>
-                  <div className="calendar-sheet">
-                    <div className="calendar-sheet-header">Jul</div>
-                    <div className="calendar-sheet-day">31</div>
-                  </div>
-                  <div className="compliance-card-info">
-                    <span className="compliance-card-title">TDS Return Filing (Q1)</span>
-                    <span className="compliance-card-due font-xsmall text-muted">Form 24Q Submission • FY 2026-27</span>
-                    <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>Due in 49 Days</span>
-                  </div>
-                </div>
+                {complianceSchedules.map((item, index) => {
+                  const isTdsDeposit = item.id === 'tds_deposit';
+                  const isPfEsi = item.id === 'pf_esi_filing';
+                  
+                  let headerBg = '';
+                  let cardStyle = {};
+                  
+                  if (isTdsDeposit) {
+                    headerBg = 'bg-primary';
+                  } else if (isPfEsi) {
+                    headerBg = 'bg-success';
+                    cardStyle = { borderColor: 'rgba(16, 185, 129, 0.2)' };
+                  } else {
+                    cardStyle = { borderColor: 'rgba(239, 68, 68, 0.2)' };
+                  }
+                  
+                  return (
+                    <div key={item.id || index} className="compliance-card-premium" style={cardStyle}>
+                      <div className="calendar-sheet">
+                        <div className={`calendar-sheet-header ${headerBg}`}>{formatComplianceMonth(item)}</div>
+                        <div className="calendar-sheet-day">{formatComplianceDay(item)}</div>
+                      </div>
+                      <div className="compliance-card-info">
+                        <span className="compliance-card-title">{item.title}</span>
+                        <span className="compliance-card-due font-xsmall text-muted">Filing period: {month} {year} • {item.info}</span>
+                        <span className="badge badge-secondary p-1 font-xsmall" style={{ width: 'fit-content', marginTop: 4 }}>
+                          {formatDaysRemaining(item)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Reminders box */}
               <div className="p-4 bg-secondary rounded flex-column gap-2 mt-2">
-                <span className="font-semibold text-warning font-small flex-center gap-1"><AlertTriangle size={14} /> Compliance Notices</span>
+                <span className="font-semibold text-warning font-small flex-center gap-1">
+                  <AlertTriangle size={14} /> Compliance Notices
+                </span>
                 <div className="flex-column gap-1 font-xsmall text-muted">
-                  <div>🔔 Submission window for Q1 Investment Proofs is currently open.</div>
-                  <div>🔔 Penalty for late TDS return filing is ₹200 per day under Section 234E.</div>
-                </div>
+                  {complianceNotices.map((notice, index) => (
+                    <div key={index}>🔔 {notice}</div>
+                  ))}
               </div>
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* ==================== TAB CONTENT: AUDIT TRAILS ==================== */}
@@ -2321,20 +2608,22 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 {/* Earnings */}
                 <div className="flex-column gap-2 border-right pr-4">
                   <span className="font-bold text-success border-bottom pb-1">Earnings</span>
-                  <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{formatCurrency(payslipEmployeeObj.basicSalary)}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{formatCurrency(Math.round(payslipEmployeeObj.basicSalary * 0.4))}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>Conveyance & Medical Allowances:</span> <strong>{formatCurrency(8000)}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{formatCurrency(payslipEmployeeObj.overtimeAmount)}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{formatCurrency(payslipEmployeeObj.bonusAmount)}</strong></div>
-                  <div className="flex-center justify-between border-top pt-2 font-semibold"><span>Gross Earnings:</span> <strong>{formatCurrency(payslipEmployeeObj.grossSalary)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Basic Salary:</span> <strong>{formatCurrency(payslipEmployeeObj.basicSalary || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>House Rent Allowance (HRA):</span> <strong>{formatCurrency(payslipEmployeeObj.hra || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Conveyance Allowance:</span> <strong>{formatCurrency(payslipEmployeeObj.travel || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Medical Allowance:</span> <strong>{formatCurrency(payslipEmployeeObj.medical || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Special Allowance:</span> <strong>{formatCurrency(payslipEmployeeObj.special || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Overtime Remunerations:</span> <strong>{formatCurrency(payslipEmployeeObj.overtimeAmount || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Performance Bonus:</span> <strong>{formatCurrency(payslipEmployeeObj.bonusAmount || 0)}</strong></div>
+                  <div className="flex-center justify-between border-top pt-2 font-semibold"><span>Gross Earnings:</span> <strong>{formatCurrency(payslipEmployeeObj.grossSalary || 0)}</strong></div>
                 </div>
 
                 {/* Deductions */}
                 <div className="flex-column gap-2">
                   <span className="font-bold text-danger border-bottom pb-1">Deductions</span>
-                  <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{formatCurrency(Math.round(payslipEmployeeObj.basicSalary * 0.12))}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{formatCurrency(Math.round(payslipEmployeeObj.basicSalary * 0.1))}</strong></div>
-                  <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{formatCurrency(200)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Provident Fund (PF):</span> <strong>{formatCurrency(payslipEmployeeObj.pf || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>TDS / Income Tax:</span> <strong>{formatCurrency(payslipEmployeeObj.tds || 0)}</strong></div>
+                  <div className="flex-center justify-between py-1"><span>Professional Tax (PT):</span> <strong>{formatCurrency(payslipEmployeeObj.pt || 0)}</strong></div>
                   <div className="flex-center justify-between py-1"><span>Leave Deductions:</span> <strong>{formatCurrency(payslipEmployeeObj.leaveDeductions)}</strong></div>
                   <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{formatCurrency(payslipEmployeeObj.lateDeductions)}</strong></div>
                   <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{formatCurrency(payslipEmployeeObj.loanEMI + payslipEmployeeObj.advanceDeduct)}</strong></div>
@@ -2345,7 +2634,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               {/* Net Take home pay highlight */}
               <div className="flex-center justify-between p-4 bg-secondary-dark rounded border border-primary mt-3">
                 <div className="flex-column">
-                  <span className="font-semibold text-primary">Net Salary Disbursed</span>
+                  <span className="font-semibold text-primary">Net Salary Distributed</span>
                   <span className="font-xsmall text-muted">For period: {month} {year}</span>
                 </div>
                 <span className="font-bold text-success font-large">{formatCurrency(payslipEmployeeObj.netSalary)}</span>

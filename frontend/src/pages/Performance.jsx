@@ -835,6 +835,16 @@ const Performance = () => {
     );
   }
 
+  const simulatedEmp = useMemo(() => {
+    return employees[0] || {
+      name: 'Sample Employee',
+      productivity: 95,
+      attendance: 95,
+      efficiency: 90,
+      quality: 95
+    };
+  }, [employees]);
+
   return (
     <div className="performance-page animate-fade-in">
       
@@ -1422,27 +1432,27 @@ const Performance = () => {
               </div>
 
               <div className="formula-simulation-preview" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, marginTop: 5 }}>
-                <span className="reports-form-lbl" style={{ fontWeight: 600 }}>Simulated recalculation for Balram Suman:</span>
+                <span className="reports-form-lbl" style={{ fontWeight: 600 }}>Simulated recalculation for {simulatedEmp.name}:</span>
                 <div className="flex-row justify-between text-secondary-sm" style={{ marginTop: 6 }}>
-                  <span>Productivity: 98 * {editWeights.productivity}%</span>
-                  <span>= {parseFloat((98 * editWeights.productivity / 100).toFixed(1))}</span>
+                  <span>Productivity: {simulatedEmp.productivity} * {editWeights.productivity}%</span>
+                  <span>= {parseFloat((simulatedEmp.productivity * editWeights.productivity / 100).toFixed(1))}</span>
                 </div>
                 <div className="flex-row justify-between text-secondary-sm">
-                  <span>Attendance: 98 * {editWeights.attendance}%</span>
-                  <span>= {parseFloat((98 * editWeights.attendance / 100).toFixed(1))}</span>
+                  <span>Attendance: {simulatedEmp.attendance} * {editWeights.attendance}%</span>
+                  <span>= {parseFloat((simulatedEmp.attendance * editWeights.attendance / 100).toFixed(1))}</span>
                 </div>
                 <div className="flex-row justify-between text-secondary-sm">
-                  <span>Efficiency: 95 * {editWeights.efficiency}%</span>
-                  <span>= {parseFloat((95 * editWeights.efficiency / 100).toFixed(1))}</span>
+                  <span>Efficiency: {simulatedEmp.efficiency} * {editWeights.efficiency}%</span>
+                  <span>= {parseFloat((simulatedEmp.efficiency * editWeights.efficiency / 100).toFixed(1))}</span>
                 </div>
                 <div className="flex-row justify-between text-secondary-sm">
-                  <span>Quality: 98 * {editWeights.quality}%</span>
-                  <span>= {parseFloat((98 * editWeights.quality / 100).toFixed(1))}</span>
+                  <span>Quality: {simulatedEmp.quality} * {editWeights.quality}%</span>
+                  <span>= {parseFloat((simulatedEmp.quality * editWeights.quality / 100).toFixed(1))}</span>
                 </div>
                 <div className="flex-row justify-between" style={{ borderTop: '1px dashed var(--border-color)', marginTop: 6, paddingTop: 4, fontWeight: 700, color: 'var(--color-success)' }}>
                   <span>Simulated Overall score:</span>
                   <span>
-                    {Math.round((98 * editWeights.productivity + 98 * editWeights.attendance + 95 * editWeights.efficiency + 98 * editWeights.quality) / 100)}%
+                    {Math.round((simulatedEmp.productivity * editWeights.productivity + simulatedEmp.attendance * editWeights.attendance + simulatedEmp.efficiency * editWeights.efficiency + simulatedEmp.quality * editWeights.quality) / 100)}%
                   </span>
                 </div>
               </div>

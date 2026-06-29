@@ -1634,7 +1634,7 @@ const RolesPermissions = () => {
                               })()
                             )}
                             <Sliders size={14} className="text-muted" />
-                            <span>{mod.label}</span>
+                            <span>{(mod.key === 'company_overview' && selectedRoleId !== 'super_admin' && selectedRoleId !== 'company_admin' && selectedRoleId !== 'SuperAdmin') ? 'Branch Overview' : mod.label}</span>
                             {!['dashboard', 'company_overview', 'employee_management', 'agency_branch_management', 'department_management', 'team_management', 'attendance_management', 'leave_management', 'project_management', 'task_monitoring', 'work_reports', 'performance_analytics', 'payroll_management', 'announcements', 'notifications', 'document_management', 'role_permission', 'system_settings', 'security_audit_logs', 'profile_settings'].includes(mod.key) && (
                               <button
                                 type="button"

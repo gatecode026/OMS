@@ -11,7 +11,7 @@ async function test() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: 'superadmin@saas.com',
-      password: 'password123'
+      password: 'password'
     })
   });
   

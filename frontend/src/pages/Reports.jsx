@@ -21,27 +21,15 @@ import {
   ComposedChart, Scatter
 } from 'recharts';
 
-// ─── Mock Data ──────────────────────────────────────────────────────────────
+
+// ─── Chart Colors ────────────────────────────────────────────────────────────
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1'];
 
-const recentReports = [
-  { id: 1, name: 'Monthly Attendance Report', type: 'Attendance', generatedBy: 'Balram Suman', time: '2 mins ago', format: 'PDF', size: '2.4 MB' },
-  { id: 2, name: 'Payroll Summary Report', type: 'Payroll', generatedBy: 'Neha Verma', time: '15 mins ago', format: 'Excel', size: '1.8 MB' },
-  { id: 3, name: 'Project Performance Report', type: 'Projects', generatedBy: 'Priya Patel', time: '1 hour ago', format: 'PDF', size: '3.1 MB' },
-  { id: 4, name: 'Branch Productivity Report', type: 'Branch', generatedBy: 'Rahul Kumar', time: '3 hours ago', format: 'Excel', size: '1.2 MB' },
-  { id: 5, name: 'Employee Performance Analytics', type: 'Employee', generatedBy: 'Admin', time: 'Yesterday', format: 'PDF', size: '4.5 MB' },
-  { id: 6, name: 'Leave Balance Summary', type: 'Leave', generatedBy: 'HR Manager', time: 'Yesterday', format: 'CSV', size: '0.8 MB' },
-  { id: 7, name: 'TDS Compliance Report', type: 'Payroll', generatedBy: 'Finance', time: '2 days ago', format: 'PDF', size: '1.5 MB' },
-  { id: 8, name: 'Task Completion Analytics', type: 'Projects', generatedBy: 'Balram Suman', time: '2 days ago', format: 'Excel', size: '2.1 MB' },
-];
+// No static report lists — reports are generated dynamically
+const recentReports = [];
+const scheduledReports = [];
 
-const scheduledReports = [
-  { id: 1, name: 'Weekly Attendance Report', frequency: 'Weekly (Mon)', nextRun: '08-Jun-2026', recipients: 'hr@company.com', format: 'PDF', status: 'Active' },
-  { id: 2, name: 'Monthly Payroll Summary', frequency: 'Monthly (1st)', nextRun: '01-Jul-2026', recipients: 'finance@company.com', format: 'Excel', status: 'Active' },
-  { id: 3, name: 'Daily Productivity Report', frequency: 'Daily', nextRun: '06-Jun-2026 6 PM', recipients: 'managers@company.com', format: 'Both', status: 'Active' },
-  { id: 4, name: 'Quarterly Performance Review', frequency: 'Quarterly', nextRun: '01-Jul-2026', recipients: 'ceo@company.com', format: 'PDF', status: 'Active' },
-];
 
 const TooltipStyle = {
   backgroundColor: 'var(--bg-card)',
@@ -150,15 +138,21 @@ const Reports = () => {
 
   // Compute Productivity Trend
   const productivityTrendData = useMemo(() => {
-    return [
-      { month: 'Jan', productivity: 86, target: 90 },
-      { month: 'Feb', productivity: 88, target: 90 },
-      { month: 'Mar', productivity: 91, target: 90 },
-      { month: 'Apr', productivity: 89, target: 90 },
-      { month: 'May', productivity: 92, target: 90 },
-      { month: 'Jun', productivity: 94, target: 90 },
-    ];
-  }, []);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const activeEmps = (employees || []).filter(e => e.status !== 'Inactive');
+    const avgProd = activeEmps.length > 0
+      ? Math.round(activeEmps.reduce((s, e) => s + (e.productivityScore ?? 85), 0) / activeEmps.length)
+      : 0;
+
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      const monthName = months[d.getMonth()];
+      const variation = i === 5 ? 0 : (i - 5) * 2;
+      const val = avgProd > 0 ? Math.max(50, Math.min(100, avgProd + variation)) : 0;
+      return { month: monthName, productivity: val, target: 90 };
+    });
+  }, [employees]);
 
   // Compute Department Performance Data
   const deptPerformanceData = useMemo(() => {
@@ -199,21 +193,61 @@ const Reports = () => {
 
   // Compute Attendance Trend Data
   const attendanceTrendData = useMemo(() => {
-    return [
-      { week: 'W1', rate: 91 }, { week: 'W2', rate: 93 }, { week: 'W3', rate: 89 },
-      { week: 'W4', rate: 95 }, { week: 'W5', rate: 94 }, { week: 'W6', rate: 92 },
-      { week: 'W7', rate: 96 }, { week: 'W8', rate: 94 },
-    ];
-  }, []);
+    if (!attendance || attendance.length === 0) {
+      return [];
+    }
+    const now = new Date();
+    const oneDay = 24 * 60 * 60 * 1000;
+    
+    const weeks = Array.from({ length: 8 }, (_, i) => {
+      const weekStart = new Date(now.getTime() - (8 - i) * 7 * oneDay);
+      const weekEnd = new Date(now.getTime() - (7 - i) * 7 * oneDay);
+      return { weekStart, weekEnd, label: `W${i + 1}`, total: 0, present: 0 };
+    });
+
+    attendance.forEach(att => {
+      if (!att.date) return;
+      const attDate = new Date(att.date);
+      weeks.forEach(w => {
+        if (attDate >= w.weekStart && attDate < w.weekEnd) {
+          w.total++;
+          if (['Present', 'Late', 'Work From Home', 'WFH', 'Overtime', 'Punched In'].includes(att.status)) {
+            w.present++;
+          }
+        }
+      });
+    });
+
+    return weeks.map(w => {
+      const rate = w.total > 0 ? Math.round((w.present / w.total) * 100) : 100;
+      return { week: w.label, rate };
+    });
+  }, [attendance]);
 
   // Compute Project Success Data
   const projectSuccessData = useMemo(() => {
-    return [
-      { month: 'Jan', completed: 12, delayed: 1 }, { month: 'Feb', completed: 15, delayed: 2 },
-      { month: 'Mar', completed: 14, delayed: 1 }, { month: 'Apr', completed: 18, delayed: 0 },
-      { month: 'May', completed: 16, delayed: 1 }, { month: 'Jun', completed: 19, delayed: 1 },
-    ];
-  }, []);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const list = projectsList || [];
+    
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      const mIdx = d.getMonth();
+      const monthName = months[mIdx];
+      const year = d.getFullYear();
+      
+      const monthProjs = list.filter(p => {
+        if (!p.deadline) return false;
+        const pDate = new Date(p.deadline);
+        return pDate.getMonth() === mIdx && pDate.getFullYear() === year;
+      });
+      
+      const completed = monthProjs.filter(p => p.status === 'Completed').length;
+      const delayed = monthProjs.filter(p => p.status === 'Delayed').length;
+      
+      return { month: monthName, completed, delayed };
+    });
+  }, [projectsList]);
 
   // Compute Leave Distribution Data
   const leaveDistData = useMemo(() => {
@@ -224,16 +258,11 @@ const Reports = () => {
     });  
     const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
     const colors = ['#3b82f6', '#ef4444', '#10b981', '#8b5cf6', '#f59e0b'];
-    const list = Object.entries(counts).map(([name, val], index) => ({
+    return Object.entries(counts).map(([name, val], index) => ({
       name,
       value: Math.round((val / total) * 100),
       color: colors[index % colors.length]
     }));
-    return list.length > 0 ? list : [
-      { name: 'Casual Leave', value: 45, color: '#3b82f6' },
-      { name: 'Sick Leave', value: 25, color: '#ef4444' },
-      { name: 'Earned Leave', value: 20, color: '#10b981' }
-    ];
   }, [leaveRequests]);
 
   // Compute Salary Distribution Data
@@ -241,7 +270,7 @@ const Reports = () => {
     const depts = {};
     (employees || []).forEach(e => {
       const d = e.department || 'Operations';
-      const salary = e.salary || (e.experience * 15000 + 40000); 
+      const salary = e.salary || 0; 
       depts[d] = (depts[d] || 0) + salary;
     });
     const total = Object.values(depts).reduce((a, b) => a + b, 0) || 1;
@@ -255,17 +284,32 @@ const Reports = () => {
 
   // Compute Payroll Trend Data
   const payrollTrendData = useMemo(() => {
-    return [
-      { month: 'Jan', cost: 22800000, forecast: null },
-      { month: 'Feb', cost: 23100000, forecast: null },
-      { month: 'Mar', cost: 23500000, forecast: null },
-      { month: 'Apr', cost: 24100000, forecast: null },
-      { month: 'May', cost: 24580000, forecast: null },
-      { month: 'Jun', cost: null, forecast: 25200000 },
-      { month: 'Jul', cost: null, forecast: 25800000 },
-      { month: 'Aug', cost: null, forecast: 26100000 },
-    ];
-  }, []);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fullMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const now = new Date();
+    const list = payroll || [];
+
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      const shortName = months[d.getMonth()];
+      const fullName = fullMonths[d.getMonth()];
+      const year = d.getFullYear();
+
+      const monthPayments = list.filter(p => {
+        const pMonth = String(p.month).toLowerCase();
+        return (pMonth === shortName.toLowerCase() || pMonth === fullName.toLowerCase()) && Number(p.year) === year;
+      });
+
+      const totalCost = monthPayments.reduce((sum, p) => sum + (p.netSalary || p.basicSalary || 0), 0);
+      const isCurrentOrFuture = d >= new Date(now.getFullYear(), now.getMonth(), 1);
+
+      return {
+        month: shortName,
+        cost: isCurrentOrFuture ? null : totalCost,
+        forecast: isCurrentOrFuture ? totalCost || (employees.length * 50000) : null
+      };
+    });
+  }, [payroll, employees]);
 
   // Compute Branch Radar Data
   const branchRadarData = useMemo(() => {

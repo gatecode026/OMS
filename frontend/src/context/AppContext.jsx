@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE } from '../permissions/permissions';
+import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE, getBaseRole } from '../permissions/permissions';
 import { connectSocket, disconnectSocket } from '../lib/socketManager';
 
 const AppContext = createContext(undefined);
@@ -187,9 +187,9 @@ export const AppProvider = ({ children }) => {
   const [payrollPayments, setPayrollPayments] = useState([]);
   const [payrollConfigs, setPayrollConfigs] = useState({
     id: 'GLOBAL_CONFIG',
-    leaveDeductionRate: 2000,
-    lateArrivalPenalty: 300,
-    overtimeHourlyRate: 500,
+    leaveDeductionRate: 0,
+    lateArrivalPenalty: 0,
+    overtimeHourlyRate: 0,
     taxProfiles: {},
     salaryStructures: {},
     attendanceDaysMap: {}
@@ -218,9 +218,12 @@ export const AppProvider = ({ children }) => {
     onCancel: () => { }
   });
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [currentUserRole, setCurrentUserRole] = useState(() => {
+  const [rawUserRole, setCurrentUserRole] = useState(() => {
     return localStorage.getItem('saas_role') || 'super_admin';
   });
+  const currentUserRole = useMemo(() => {
+    return getBaseRole(rawUserRole);
+  }, [rawUserRole]);
   const [currentUserId, setCurrentUserId] = useState(() => {
     return localStorage.getItem('saas_user_id') || '';
   });
@@ -553,7 +556,7 @@ export const AppProvider = ({ children }) => {
 
           // Default fallback
           if (!resolvedAssigneeId) {
-            resolvedAssigneeId = 'EMP-2026-003';
+            resolvedAssigneeId = '';
           }
 
           const resolvedAssigneeName = t.assigneeName || (t.assignedTo && t.assignedTo.length > 0 ? t.assignedTo.join(', ') : proj.leader || 'Unassigned');
@@ -567,7 +570,7 @@ export const AppProvider = ({ children }) => {
             assigneeId: resolvedAssigneeId,
             assigneeName: resolvedAssigneeName,
             description: t.description || '',
-            estimatedHours: t.estimatedHours || 20,
+            estimatedHours: t.estimatedHours || 0,
             status: t.completed
               ? 'Done'
               : (t.status === 'Done' || t.status === 'done' || t.status === 'Completed' || t.status === 'completed'
@@ -580,14 +583,8 @@ export const AppProvider = ({ children }) => {
             progress: t.completed ? 100 : (t.progress !== undefined ? t.progress : 0),
             comments: t.comments || [],
             attachments: t.attachments || [],
-            approvals: (t.approvals && t.approvals.length > 0 ? t.approvals : [
-              { level: 1, role: 'Employee', approver: t.assigneeName || proj.leader || 'Employee', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 2, role: 'Team Leader Approval', approver: proj.leader || 'Team Leader', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' },
-              { level: 3, role: 'Project Manager Approval', approver: proj.manager || 'Project Manager', status: t.completed ? 'Approved' : 'Pending', timestamp: '', remarks: '' }
-            ]).filter(app => app.level !== 4 && app.role !== 'Super Admin Approval'),
-            activityLog: t.activityLog || [
-              { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: 'System' }
-            ]
+            approvals: t.approvals || [],
+            activityLog: t.activityLog || []
           });
         });
       }
@@ -596,8 +593,8 @@ export const AppProvider = ({ children }) => {
   }, [projectsList, currentUser, employees]);
 
   useEffect(() => {
-    localStorage.setItem('saas_role', currentUserRole);
-  }, [currentUserRole]);
+    localStorage.setItem('saas_role', rawUserRole || '');
+  }, [rawUserRole]);
 
   useEffect(() => {
     if (currentUserId) {
@@ -734,9 +731,9 @@ export const AppProvider = ({ children }) => {
       setPayrollPayments([]);
       setPayrollConfigs({
         id: 'GLOBAL_CONFIG',
-        leaveDeductionRate: 2000,
-        lateArrivalPenalty: 300,
-        overtimeHourlyRate: 500,
+        leaveDeductionRate: 0,
+        lateArrivalPenalty: 0,
+        overtimeHourlyRate: 0,
         taxProfiles: {},
         salaryStructures: {},
         attendanceDaysMap: {}
@@ -3713,7 +3710,7 @@ export const AppProvider = ({ children }) => {
         employeeName: emp ? emp.name : 'Unknown Employee',
         remainingBalance: applyForm.amount,
         progress: 0,
-        status: 'Approved'
+        status: 'Pending'
       };
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/loans-advances', {
         method: 'POST',
@@ -3736,6 +3733,34 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error(err);
       addToast('danger', 'Error creating loan or advance.');
+      return false;
+    }
+  };
+
+  const updateLoanAdvanceStatus = async (id, newStatus) => {
+    if (!token) return false;
+    try {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/payroll/loans-advances/status/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchPayrollData();
+        addActivityLog(`Updated loan/advance ${id} status to ${newStatus}`, 'Payroll', 'success');
+        addToast('success', `Request status updated: ${newStatus}`);
+        return true;
+      } else {
+        addToast('danger', result.message || 'Failed to update request status.');
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('danger', 'Error updating request status.');
       return false;
     }
   };
@@ -4286,7 +4311,7 @@ export const AppProvider = ({ children }) => {
     const isDbBacked = Object.values(MODULE_MAPPING).includes(dbKey) || Object.keys(MODULE_MAPPING).includes(module);
 
     if (isDbBacked) {
-      const roleObj = roles.find(r => r.id === currentUserRole);
+      const roleObj = roles.find(r => r.id === rawUserRole || r.id === currentUserRole || getBaseRole(r.id) === currentUserRole);
       const permissions = roleObj?.permissions;
       const dbPermission = permissions
         ? (permissions[module] !== undefined ? permissions[module] : permissions[dbKey])
@@ -4400,6 +4425,7 @@ export const AppProvider = ({ children }) => {
         addOrUpdateSalaryGrade,
         deleteSalaryGrade,
         createLoanOrAdvance,
+        updateLoanAdvanceStatus,
         recommendBonus,
         updateReimbursementStatus,
         updateBonusStatus,

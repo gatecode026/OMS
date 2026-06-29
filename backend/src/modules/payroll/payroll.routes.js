@@ -21,6 +21,7 @@ router.delete('/grades/:id', controller.deleteSalaryGrade);
 
 // 3. Loans & Advances
 router.post('/loans-advances', controller.createLoanAdvance);
+router.post('/loans-advances/status/:id', controller.updateLoanAdvanceStatus);
 
 // 4. Bonuses & Incentives
 router.post('/bonuses', controller.recommendBonus);

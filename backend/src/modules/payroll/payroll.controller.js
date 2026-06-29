@@ -8,7 +8,7 @@ import { successResponse } from '../../utils/response.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const getMasterData = asyncHandler(async (req, res) => {
-  const data = await service.getMasterPayrollData();
+  const data = await service.getMasterPayrollData(req.user);
   return successResponse(res, data, 'Master payroll data fetched successfully');
 });
 
@@ -25,6 +25,13 @@ export const deleteSalaryGrade = asyncHandler(async (req, res) => {
 export const createLoanAdvance = asyncHandler(async (req, res) => {
   const data = await service.createLoanAdvance(req.body, req.user);
   return successResponse(res, data, 'Loan or Advance record created successfully', 201);
+});
+
+export const updateLoanAdvanceStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const data = await service.updateLoanAdvanceStatus(id, status, req.user);
+  return successResponse(res, data, 'Loan/Advance status updated successfully');
 });
 
 export const recommendBonus = asyncHandler(async (req, res) => {
@@ -74,6 +81,7 @@ export default {
   saveSalaryGrade,
   deleteSalaryGrade,
   createLoanAdvance,
+  updateLoanAdvanceStatus,
   recommendBonus,
   updateBonusStatus,
   updateReimbursementStatus,

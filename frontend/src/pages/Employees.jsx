@@ -596,9 +596,9 @@ const Employees = () => {
     const generatedUsername = emp.username || (emp.name ? `${emp.name.split(' ')[0].toLowerCase()}.${emp.name.split(' ')[1]?.toLowerCase() || 'emp'}` : 'emp');
     const generatedOfficialEmail = emp.officialEmail || emp.workEmail || emp.email || `${emp.name?.split(' ')[0]?.toLowerCase() || 'employee'}@saas.io`;
 
-    // When editing a manager, clear branch and department
-    const cleanDept = emp.roleId === 'manager' ? '' : (emp.department === 'Management' ? '' : (emp.department || ''));
-    const cleanBranch = emp.roleId === 'manager' ? '' : (emp.branch || emp.branchAgency || emp.workLocation || '');
+    // Use actual branch and department for all roles
+    const cleanDept = emp.department || '';
+    const cleanBranch = emp.branch || emp.branchAgency || emp.workLocation || '';
 
     setFormData({
       ...emp,
@@ -1166,8 +1166,8 @@ const Employees = () => {
       designation: isManager ? 'Manager' : formData.designation,
       roleId: matchingRole.id,
       role: matchingRole.name,
-      branch: isManager ? '' : formData.branch,
-      department: isManager ? '' : formData.department,
+      branch: formData.branch,
+      department: formData.department,
       avatar: avatarBase64,
       documents: docsToSave,
       currentAddress: addressToString(formData.currentAddress),
@@ -2333,8 +2333,6 @@ const Employees = () => {
                             roleId: nextRole
                           };
                           if (nextRole === 'manager') {
-                            updated.branch = '';
-                            updated.department = '';
                             updated.designation = 'Manager';
                           }
                           return updated;
@@ -2423,56 +2421,53 @@ const Employees = () => {
                         )}
                       </div>
                     )}
-                    {formData.roleId !== 'manager' && (
-                      <div className="form-field">
-                        <label>{FIELD_LABELS.branch} *</label>
-                        <select
-                          value={formData.branch}
-                          onChange={e => {
-                            const selectedBranch = e.target.value;
-                            const filtered = (dbDepartments || []).filter(
-                              d => d.branch?.trim().toLowerCase() === selectedBranch.trim().toLowerCase()
-                            );
-                            const firstDept = filtered.length > 0 ? filtered[0].name : '';
-                            setFormData(p => ({
-                              ...p,
-                              branch: selectedBranch,
-                              department: formData.roleId === 'manager' ? p.department : firstDept
-                            }));
-                          }}
-                          required
-                        >
-                          {(() => {
-                            const hasDbBranches = dbBranches && dbBranches.length > 0;
-                            if (!hasDbBranches) {
-                              return <option value="">Select Branch/Agency</option>;
-                            }
-                            return [
-                              <option key="__empty" value="">Select Branch/Agency</option>,
-                              ...dbBranches.map(b => (
-                                <option key={b.id || b._id} value={b.name}>
-                                  {b.name}
-                                </option>
-                              ))
-                            ];
-                          })()}
-                        </select>
-                      </div>
-                    )}
-                    {formData.roleId !== 'manager' && (
-                      <div className="form-field">
-                        <label>{FIELD_LABELS.department}</label>
-                        <select
-                          value={formData.department}
-                          onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}
-                        >
-                          {(() => {
-                            const filteredDbDepts = dbDepartments && dbDepartments.length > 0
-                              ? (formData.branch
-                                  ? dbDepartments.filter(d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase())
-                                  : dbDepartments)
-                              : [];
-                            const hasDbDepts = filteredDbDepts.length > 0;
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.branch} *</label>
+                      <select
+                        value={formData.branch}
+                        onChange={e => {
+                          const selectedBranch = e.target.value;
+                          const filtered = (dbDepartments || []).filter(
+                            d => d.branch?.trim().toLowerCase() === selectedBranch.trim().toLowerCase()
+                          );
+                          const firstDept = filtered.length > 0 ? filtered[0].name : '';
+                          setFormData(p => ({
+                            ...p,
+                            branch: selectedBranch,
+                            department: firstDept
+                          }));
+                        }}
+                        required
+                      >
+                        {(() => {
+                          const hasDbBranches = dbBranches && dbBranches.length > 0;
+                          if (!hasDbBranches) {
+                            return <option value="">Select Branch/Agency</option>;
+                          }
+                          return [
+                            <option key="__empty" value="">Select Branch/Agency</option>,
+                            ...dbBranches.map(b => (
+                              <option key={b.id || b._id} value={b.name}>
+                                {b.name}
+                              </option>
+                            ))
+                          ];
+                        })()}
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>{FIELD_LABELS.department}</label>
+                      <select
+                        value={formData.department}
+                        onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}
+                      >
+                        {(() => {
+                          const filteredDbDepts = dbDepartments && dbDepartments.length > 0
+                            ? (formData.branch
+                                ? dbDepartments.filter(d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase())
+                                : dbDepartments)
+                            : [];
+                          const hasDbDepts = filteredDbDepts.length > 0;
                             if (!hasDbDepts) {
                               return <option value="">Select Department</option>;
                             }
@@ -2487,7 +2482,6 @@ const Employees = () => {
                           })()}
                         </select>
                       </div>
-                    )}
                     {formData.roleId !== 'manager' && (
                       <>
                         {formData.roleId !== 'team_leader' && (
@@ -2951,7 +2945,7 @@ const Employees = () => {
               <div className="id-card-back">
                 <div className="id-card-back-bullets"><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {idCardEmployee.companyName || generalSettings?.companyName || 'OMS Enterprise'} and must be returned on demand.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {idCardEmployee.branchAddress || getBranchAddress(idCardEmployee.branch, dbBranches)}</p></div></div>
                 <div className="id-card-back-middle"><div className="id-card-back-dates"><div className="id-date-row"><span className="id-date-label">Join Date:</span><span className="id-date-val">{fmtJoinDate(idCardEmployee.joinDate)}</span></div><div className="id-date-row"><span className="id-date-label">Expire Date:</span><span className="id-date-val">{idCardEmployee.contractEndDate ? fmtJoinDate(idCardEmployee.contractEndDate) : calculateExpiry(idCardEmployee.joinDate)}</span></div><div className="id-card-barcode-area"><svg viewBox="0 0 100 20" className="id-card-barcode-svg"><rect x="0" y="0" width="3" height="20" fill="#0f172a" /><rect x="5" y="0" width="1" height="20" fill="#0f172a" /><rect x="8" y="0" width="2" height="20" fill="#0f172a" /><rect x="12" y="0" width="4" height="20" fill="#0f172a" /><rect x="18" y="0" width="1" height="20" fill="#0f172a" /><rect x="21" y="0" width="2" height="20" fill="#0f172a" /><rect x="25" y="0" width="3" height="20" fill="#0f172a" /><rect x="30" y="0" width="1" height="20" fill="#0f172a" /><rect x="33" y="0" width="2" height="20" fill="#0f172a" /><rect x="37" y="0" width="5" height="20" fill="#0f172a" /><rect x="44" y="0" width="1" height="20" fill="#0f172a" /><rect x="47" y="0" width="3" height="20" fill="#0f172a" /><rect x="52" y="0" width="2" height="20" fill="#0f172a" /><rect x="56" y="0" width="4" height="20" fill="#0f172a" /><rect x="62" y="0" width="1" height="20" fill="#0f172a" /><rect x="65" y="0" width="2" height="20" fill="#0f172a" /><rect x="69" y="0" width="3" height="20" fill="#0f172a" /><rect x="74" y="0" width="1" height="20" fill="#0f172a" /><rect x="77" y="0" width="2" height="20" fill="#0f172a" /><rect x="81" y="0" width="5" height="20" fill="#0f172a" /><rect x="88" y="0" width="1" height="20" fill="#0f172a" /><rect x="91" y="0" width="3" height="20" fill="#0f172a" /><rect x="96" y="0" width="2" height="20" fill="#0f172a" /></svg><div className="id-card-barcode-text">*{idCardEmployee.id}*</div></div></div><div className="id-card-back-qr"><svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg"><rect x="0" y="0" width="28" height="28" fill="#0f172a" /><rect x="4" y="4" width="20" height="20" fill="#ffffff" /><rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="72" y="0" width="28" height="28" fill="#0f172a" /><rect x="76" y="4" width="20" height="20" fill="#ffffff" /><rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="0" y="72" width="28" height="28" fill="#0f172a" /><rect x="4" y="76" width="20" height="20" fill="#ffffff" /><rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" /><rect x="36" y="4" width="8" height="8" fill="#0f172a" /><rect x="52" y="4" width="8" height="8" fill="#0f172a" /><rect x="44" y="12" width="16" height="8" fill="#0f172a" /><rect x="36" y="24" width="8" height="8" fill="#0f172a" /><rect x="4" y="36" width="8" height="8" fill="#0f172a" /><rect x="16" y="44" width="8" height="8" fill="#0f172a" /><rect x="24" y="36" width="8" height="8" fill="#0f172a" /><rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" /><rect x="40" y="40" width="8" height="8" fill="#ffffff" /><rect x="60" y="36" width="8" height="8" fill="#0f172a" /><rect x="56" y="48" width="8" height="8" fill="#0f172a" /><rect x="36" y="56" width="8" height="8" fill="#0f172a" /><rect x="48" y="60" width="8" height="8" fill="#0f172a" /><rect x="76" y="36" width="8" height="8" fill="#0f172a" /><rect x="84" y="44" width="12" height="8" fill="#0f172a" /><rect x="72" y="56" width="8" height="16" fill="#0f172a" /><rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" /><rect x="36" y="76" width="12" height="8" fill="#0f172a" /><rect x="52" y="72" width="8" height="16" fill="#0f172a" /><rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" /><rect x="76" y="76" width="12" height="8" fill="#0f172a" /><rect x="84" y="84" width="12" height="8" fill="#0f172a" /></svg><span className="id-qr-label">SCAN ME</span></div></div>
-                <div className="id-card-back-signature-area"><div className="id-signature-font">{idCardEmployee.teamLeader || 'Vikram Singh'}</div><div className="id-signature-line"></div><div className="id-signature-label">Authorized Signatory</div></div>
+                <div className="id-card-back-signature-area"><div className="id-signature-font">{idCardEmployee.teamLeader || idCardEmployee.reportingManager || 'Authorized Signatory'}</div><div className="id-signature-line"></div><div className="id-signature-label">Authorized Signatory</div></div>
                 <div className="id-card-back-bottom-bg"><div className="id-card-watermark"></div></div><div className="id-card-back-pink-bg"></div>
               </div>
             </div>

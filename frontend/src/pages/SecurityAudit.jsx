@@ -265,17 +265,17 @@ const SecurityAudit = () => {
         timestamp: log.timestamp,
         user: log.actor,
         empId: log.actorId || '—',
-        role: 'Staff',
+        role: log.actorRole || 'Staff',
         eventType: log.fieldChanged || 'System',
         module: log.fieldChanged || 'System',
         action: log.actionType,
         oldVal: log.oldValue || '—',
         newVal: log.newValue || '—',
         ipAddress: log.ip || '127.0.0.1',
-        device: 'Chrome / Windows',
-        location: 'Jaipur, India',
-        status: 'Success',
-        severity: 'Info'
+        device: log.userAgent || log.device || '—',
+        location: log.location || '—',
+        status: log.status || 'Success',
+        severity: log.severity || 'Info'
       }));
       setAuditLogsData(mapped);
     }

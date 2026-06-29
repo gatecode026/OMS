@@ -38,7 +38,7 @@ const getLocalDateString = () => {
 };
 
 const formatTime12 = (time24) => {
-  if (!time24) return '09:15 AM';
+  if (!time24) return '--:--';
   const parts = time24.split(':');
   if (parts.length < 2) return time24;
   let hours = parseInt(parts[0], 10);
@@ -388,10 +388,7 @@ const Attendance = () => {
     if (recordWithBreaks) {
       return recordWithBreaks.breaks;
     }
-    return [
-      { breakType: 'Lunch Break', duration: 40 },
-      { breakType: 'Snacks Break', duration: 15 }
-    ];
+    return [];
   }, [attendance, dateFilter]);
 
   const totalBreakMinutes = useMemo(() => {
@@ -727,13 +724,13 @@ const Attendance = () => {
             records.push({
               ...item,
               status,
-              employeeId: item.employeeId || empDetails?.id || 'EMP-2026-101',
-              employeeName: item.employeeName || empDetails?.name || 'uttam Rajpurohit',
-              department: item.department || empDetails?.department || 'IT Department',
-              branch: item.branch || empDetails?.branch || 'Jaipur Branch',
-              shift: item.shift || empDetails?.shift || 'Flexible (09:00 AM - 06:00 PM)',
+              employeeId: item.employeeId || empDetails?.id || '',
+              employeeName: item.employeeName || empDetails?.name || 'Unknown',
+              department: item.department || empDetails?.department || '',
+              branch: item.branch || empDetails?.branch || '',
+              shift: item.shift || empDetails?.shift || 'Flexible Shift',
               source: item.source || 'Biometric',
-              breakTime: item.breakTime || '45 mins',
+              breakTime: item.breakTime || '0 mins',
               workMode: item.workMode || empDetails?.workMode || 'WFO',
               totalHours,
               overtime: totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs'
@@ -744,19 +741,19 @@ const Attendance = () => {
           const emp = currentUser;
           records.push({
             id: `ABS-${emp?.id || 'emp'}-${date}`,
-            employeeId: emp?.id || 'EMP-2026-101',
-            employeeName: emp?.name || 'uttam Rajpurohit',
-            department: emp?.department || 'IT Department',
-            branch: emp?.branch || 'Jaipur Branch',
+            employeeId: emp?.id || '',
+            employeeName: emp?.name || 'Unknown',
+            department: emp?.department || '',
+            branch: emp?.branch || '',
             date: date,
             status: 'Absent',
             punchIn: '--:--',
             punchOut: '--:--',
             totalHours: 0,
-            shift: emp?.shift || 'Flexible (09:00 AM - 06:00 PM)',
+            shift: emp?.shift || 'Flexible Shift',
             source: 'System',
             workMode: emp?.workMode || 'WFO',
-            breakTime: '45 mins',
+            breakTime: '0 mins',
             overtime: '0 hrs',
             isVirtual: true
           });
@@ -804,10 +801,10 @@ const Attendance = () => {
       return {
         ...item,
         status,
-        employeeId: item.employeeId || empDetails?.id || 'EMP-2026-999',
-        shift: item.shift || empDetails?.shift || 'Flexible (09:00 AM - 06:00 PM)',
+        employeeId: item.employeeId || empDetails?.id || '',
+        shift: item.shift || empDetails?.shift || 'Flexible Shift',
         source: item.source || 'Biometric',
-        breakTime: item.breakTime || '45 mins',
+        breakTime: item.breakTime || '0 mins',
         workMode: item.workMode || empDetails?.workMode || 'WFO',
         totalHours,
         overtime: totalHours > 8 ? `${(totalHours - 8).toFixed(1)} hrs` : '0 hrs'
@@ -834,7 +831,7 @@ const Attendance = () => {
         source: 'System',
         breakTime: '45 mins',
         workMode: emp.workMode || 'WFO',
-        shift: emp.shift || 'Flexible (09:00 AM - 06:00 PM)',
+        shift: emp.shift || 'Flexible Shift',
         overtime: '0 hrs',
         isVirtual: true
       });
@@ -932,9 +929,7 @@ const Attendance = () => {
       );
 
       if (scopedLogs.length === 0) {
-        // Fallback to a varied stable baseline: Mon=88, Tue=92, Wed=87, Thu=94, Fri=90, Sat=45, Sun=30
-        const fallbacks = [88, 92, 87, 94, 90, 45, 30];
-        return fallbacks[idx];
+        return 0;
       }
 
       const presentCount = scopedLogs.filter(a => 
@@ -996,7 +991,7 @@ const Attendance = () => {
   const totalHalfDay = useMemo(() => kpiFilteredAttendance.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length, [kpiFilteredAttendance]);
   
   const attendanceRate = useMemo(() => {
-    const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 94;
+    const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
     return Math.min(rawRate, 100);
   }, [totalEmployees, totalPresent, totalHalfDay, totalWFH]);
 
@@ -1038,22 +1033,25 @@ const Attendance = () => {
       
       const rows = [headers];
       filteredAttendance.forEach(r => {
-        rows.push([
-          `"${r.employeeId || ''}"`,
-          `"${r.employeeName || ''}"`,
-          `"${r.department || ''}"`,
-          `"${r.branch || ''}"`,
-          `"${r.date || ''}"`,
-          `"${r.shift || ''}"`,
-          `"${r.punchIn || '--:--'}"`,
-          `"${r.punchOut || '--:--'}"`,
-          `"${totalBreakMinutes} mins"`,
-          `"${r.totalHours > 0 ? decimalToTimeStr(r.totalHours) : '00:00'}"`,
-          `"${r.overtime || '0 hrs'}"`,
-          `"${r.status || ''}"`,
-          `"${r.source || ''}"`,
-          `"${r.workMode || ''}"`
-        ]);
+          const breakMins = r.breaks && r.breaks.length > 0
+            ? r.breaks.reduce((sum, b) => sum + (b.duration || 0), 0)
+            : 0;
+          rows.push([
+            `"${r.employeeId || ''}"`,
+            `"${r.employeeName || ''}"`,
+            `"${r.department || ''}"`,
+            `"${r.branch || ''}"`,
+            `"${r.date || ''}"`,
+            `"${r.shift || ''}"`,
+            `"${r.punchIn || '--:--'}"`,
+            `"${r.punchOut || '--:--'}"`,
+            `"${breakMins > 0 ? `${breakMins} mins` : '0 mins'}"`,
+            `"${r.totalHours > 0 ? decimalToTimeStr(r.totalHours) : '00:00'}"`,
+            `"${r.overtime || '0 hrs'}"`,
+            `"${r.status || ''}"`,
+            `"${r.source || ''}"`,
+            `"${r.workMode || ''}"`
+          ]);
       });
       
       const csvContent = rows.map(e => e.join(",")).join("\n");
@@ -1156,7 +1154,12 @@ const Attendance = () => {
         key: 'breakTime',
         header: 'Break',
         sortable: true,
-        render: (row) => <span>{totalBreakMinutes} mins</span>
+        render: (row) => {
+          const breakMins = row.breaks && row.breaks.length > 0
+            ? row.breaks.reduce((sum, b) => sum + (b.duration || 0), 0)
+            : 0;
+          return <span>{breakMins > 0 ? `${breakMins} mins` : '--'}</span>;
+        }
       },
       {
         key: 'totalHours',
@@ -1213,7 +1216,7 @@ const Attendance = () => {
       ? branches.map(b => b?.name).filter(Boolean) 
       : Array.from(new Set((scopedEmployees || []).map(e => e?.branch).filter(Boolean)));
     
-    const finalBranches = dbBranches.length > 0 ? dbBranches : ['Jaipur Branch'];
+    const finalBranches = dbBranches;
 
     return finalBranches.map(branchName => {
       const branchEmployees = (scopedEmployees || []).filter(e => e?.branch === branchName);
@@ -1250,7 +1253,7 @@ const Attendance = () => {
 
       return {
         name: branchName,
-        address: address || (branchName.toLowerCase().includes('jaipur') ? 'Malviya Nagar, Jaipur' : 'MG Road'),
+        address: address || '',
         total: branchEmployees.length,
         active: activeToday,
         office: officeCount,

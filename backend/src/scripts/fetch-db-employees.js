@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import dns from 'dns';
+dns.setServers(['1.1.1.1']);
 import path from 'path';
 import { fileURLToPath } from 'url';
 

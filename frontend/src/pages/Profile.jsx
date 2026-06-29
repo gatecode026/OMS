@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import './Profile.css';
 import { useApp } from '../context/AppContext';
 import Button from '../components/common/Button';
@@ -6,27 +6,45 @@ import Avatar from '../components/common/Avatar';
 import Badge from '../components/common/Badge';
 import {
   User, Edit2, Save, Camera, Mail, Phone, MapPin, Calendar,
-  Briefcase, Shield, Key, Clock, CheckCircle, Globe, Lock
+  Briefcase, Shield, Key, Clock, CheckCircle, Globe, Lock, Activity
 } from 'lucide-react';
 
 const Profile = () => {
-  const { currentUser, updateEmployee, addToast } = useApp();
+  const { currentUser, updateEmployee, addToast, activityLogs, tasks, leaveRequests, attendance } = useApp();
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('profile');
 
   const [form, setForm] = useState({
-    name: currentUser?.name || 'Balram Suman',
-    email: currentUser?.email || 'balram.suman@saas.com',
-    phone: currentUser?.phone || '+91 98765 43210',
-    department: currentUser?.department || 'Operations',
-    branch: currentUser?.branch || 'Jaipur',
-    role: currentUser?.role || 'Super Admin',
-    dob: currentUser?.dob || '1985-11-10',
-    joinDate: currentUser?.joinDate || '2022-03-15',
-    bio: 'Senior administrator overseeing enterprise operations, workforce management, and cross-branch strategic alignment. Certified PMP with 12+ years of leadership experience.',
-    linkedin: 'linkedin.com/in/balramsuman',
-    location: 'Jaipur, India'
+    name: '',
+    email: '',
+    phone: '',
+    department: '',
+    branch: '',
+    role: '',
+    dob: '',
+    joinDate: '',
+    bio: '',
+    linkedin: '',
+    location: ''
   });
+
+  useEffect(() => {
+    if (currentUser) {
+      setForm({
+        name: currentUser.name || '',
+        email: currentUser.email || '',
+        phone: currentUser.phone || '',
+        department: currentUser.department || '',
+        branch: currentUser.branch || '',
+        role: currentUser.designation || currentUser.roleId || 'Employee',
+        dob: currentUser.dob || '',
+        joinDate: currentUser.joinDate || '',
+        bio: currentUser.bio || '',
+        linkedin: currentUser.linkedin || '',
+        location: currentUser.location || (currentUser.currentAddress?.city ? `${currentUser.currentAddress.city}, ${currentUser.currentAddress.state || ''}` : '')
+      });
+    }
+  }, [currentUser]);
 
   const [passwords, setPasswords] = useState({
     current: '',
@@ -50,13 +68,50 @@ const Profile = () => {
     addToast('success', 'Password changed successfully!');
   };
 
-  const activityHistory = [
-    { action: 'Approved leave request for Neha Verma', time: '5 min ago', icon: CheckCircle, color: '#10b981' },
-    { action: 'Ran payroll for Engineering department', time: '2 hours ago', icon: Briefcase, color: '#3b82f6' },
-    { action: 'Updated permissions for Branch Admin role', time: '1 day ago', icon: Shield, color: '#8b5cf6' },
-    { action: 'Added new employee: Deepak Joshi', time: '3 days ago', icon: User, color: '#10b981' },
-    { action: 'Modified system timezone settings', time: '1 week ago', icon: Globe, color: '#f59e0b' }
-  ];
+  // Build activity history dynamically from activityLogs filtered to current user
+  const activityHistory = useMemo(() => {
+    const userLogs = (activityLogs || []).filter(
+      log => log.actorId === currentUser?.id || log.actorName === currentUser?.name
+    );
+    if (userLogs.length === 0) return [];
+    return userLogs.slice(0, 5).map(log => ({
+      action: log.action || log.description || log.message || 'Performed an action',
+      time: log.createdAt ? new Date(log.createdAt).toLocaleString() : '',
+      icon: Activity,
+      color: '#3b82f6'
+    }));
+  }, [activityLogs, currentUser]);
+
+  // Compute profile stats dynamically
+  const profileStats = useMemo(() => {
+    const userTasks = (tasks || []).filter(
+      t => t.assigneeId === currentUser?.id || t.assignee === currentUser?.name
+    );
+    const completedTasks = userTasks.filter(t => t.status === 'Done' || t.status === 'Completed').length;
+
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const monthlyAttendance = (attendance || []).filter(rec => {
+      if (rec.employeeId !== currentUser?.id && rec.employeeId !== currentUser?.employeeId) return false;
+      const d = new Date(rec.date || rec.createdAt);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+    const presentCount = monthlyAttendance.filter(r => r.status === 'Present' || r.status === 'Late').length;
+    const attendanceRate = monthlyAttendance.length > 0
+      ? Math.round((presentCount / monthlyAttendance.length) * 100)
+      : 0;
+
+    const leaveBalance = currentUser?.leaveBalance ?? currentUser?.remainingLeaves ?? 0;
+    const performanceScore = currentUser?.performanceScore?.overall ?? currentUser?.performanceScore ?? 0;
+
+    return [
+      { label: 'Tasks Completed', value: completedTasks, color: '#10b981' },
+      { label: 'Attendance Rate', value: `${attendanceRate}%`, color: '#3b82f6' },
+      { label: 'Leave Balance', value: `${leaveBalance} days`, color: '#f59e0b' },
+      { label: 'Performance', value: performanceScore ? `${performanceScore}/100` : '—', color: '#8b5cf6' }
+    ];
+  }, [tasks, attendance, leaveRequests, currentUser]);
 
   return (
     <div className="profile-page">
@@ -210,12 +265,7 @@ const Profile = () => {
             <div className="card profile-stats-card">
               <h3 className="card-title">Quick Stats</h3>
               <div className="profile-stats-grid">
-                {[
-                  { label: 'Tasks Completed', value: 24, color: '#10b981' },
-                  { label: 'Attendance Rate', value: '98%', color: '#3b82f6' },
-                  { label: 'Leave Balance', value: '12 days', color: '#f59e0b' },
-                  { label: 'Performance', value: '98/100', color: '#8b5cf6' }
-                ].map((s, i) => (
+                {profileStats.map((s, i) => (
                   <div key={i} className="profile-stat-tile">
                     <span className="profile-stat-num" style={{ color: s.color }}>{s.value}</span>
                     <span className="profile-stat-label">{s.label}</span>
@@ -276,20 +326,24 @@ const Profile = () => {
           <p className="chart-subtitle">Your last 5 actions on the platform</p>
 
           <div className="activity-timeline">
-            {activityHistory.map((item, i) => {
-              const Icon = item.icon;
-              return (
-                <div key={i} className="timeline-item">
-                  <div className="timeline-icon" style={{ background: `${item.color}20`, color: item.color }}>
-                    <Icon size={14} />
+            {activityHistory.length === 0 ? (
+              <p className="chart-subtitle" style={{ textAlign: 'center', padding: '24px 0' }}>No activity recorded yet.</p>
+            ) : (
+              activityHistory.map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <div key={i} className="timeline-item">
+                    <div className="timeline-icon" style={{ background: `${item.color}20`, color: item.color }}>
+                      <Icon size={14} />
+                    </div>
+                    <div className="timeline-content">
+                      <p className="timeline-action">{item.action}</p>
+                      <span className="timeline-time"><Clock size={11} /> {item.time}</span>
+                    </div>
                   </div>
-                  <div className="timeline-content">
-                    <p className="timeline-action">{item.action}</p>
-                    <span className="timeline-time"><Clock size={11} /> {item.time}</span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}
