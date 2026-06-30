@@ -1,11 +1,22 @@
 /**
  * @file src/modules/projects/projects.repository.js
- * @description Data Access layer for Projects module.
+ * @description Data Access layer for Projects module, secured by the Enterprise Authorization Framework.
  */
 
 import Project from './projects.model.js';
 import Department from '../departments/departments.model.js';
 import logger from '../../config/logger.js';
+
+// Security and Query Builder Imports
+import { resolveSecurityContext } from '../../security/scopeEngine.js';
+import { 
+  validateRepositoryAccess, 
+  sanitizeQueryOperators, 
+  getQueryLogging
+} from '../../security/repositoryContract.js';
+import { logSecurityEvent } from '../../security/auditLogger.js';
+import { ProjectsQueryBuilder } from './projects.queryBuilder.js';
+import { getStore } from '../../utils/tenantContext.js';
 
 /**
  * Recalculate project and task stats for a department and update it in the Department collection.
@@ -72,29 +83,68 @@ export const syncDeptProjectStats = async (companyId, departmentNames) => {
 };
 
 export const find = async (query = {}) => {
-  logger.debug('Executing ProjectsRepository::find', query);
-  const filter = {};
-  if (query.branch) {
-    filter.branch = query.branch;
+  const context = resolveSecurityContext();
+  const builder = new ProjectsQueryBuilder(context);
+
+  sanitizeQueryOperators(query);
+
+  const filters = {};
+  if (query.branch) filters.branch = query.branch;
+  if (query.department) filters.department = query.department;
+  if (query.status) filters.status = query.status;
+  if (query.priority) filters.priority = query.priority;
+
+  const scopedFilters = builder.buildReadQuery(filters);
+
+  if (getQueryLogging()) {
+    logger.info(`[DEBUGLOG] ProjectsRepository::find:
+    - Query: ${JSON.stringify(query)}
+    - Scope: ${JSON.stringify(scopedFilters)}`);
   }
-  if (query.department) {
-    filter.department = query.department;
-  }
-  if (query.status) {
-    filter.status = query.status;
-  }
-  if (query.priority) {
-    filter.priority = query.priority;
-  }
-  return Project.find(filter).sort({ id: 1 });
+
+  return Project.find(scopedFilters).sort({ id: 1 });
 };
 
 export const findOne = async (id) => {
-  logger.debug('Executing ProjectsRepository::findOne for: ' + id);
-  return Project.findOne({ id });
+  const context = resolveSecurityContext();
+  sanitizeQueryOperators({ id });
+
+  const project = await Project.findOne({ id });
+
+  if (project && context) {
+    // If employee, verify membership
+    if (context.isEmployee) {
+      const store = getStore();
+      const userName = store?.user?.name || '';
+      const isMember = project.members && project.members.map(m => m.toLowerCase()).includes(userName.toLowerCase());
+      if (!isMember) {
+        logSecurityEvent(context, 'Projects', 'read', 'OWNERSHIP_DENIED', 'DENIED', 'Access Denied: User is not a member of the project', id);
+        const err = new Error('Access denied: You are not a member of this project.');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    await validateRepositoryAccess('read', project, {
+      ownerIdFields: [],
+      moduleName: 'Projects'
+    });
+  }
+
+  return project;
 };
 
 export const save = async (data) => {
+  const context = resolveSecurityContext();
+  sanitizeQueryOperators(data);
+
+  if (context) {
+    await validateRepositoryAccess('create', data, {
+      ownerIdFields: [],
+      moduleName: 'Projects'
+    });
+  }
+
   logger.debug('Executing ProjectsRepository::save', data);
   if (!data.id) {
     const count = await Project.countDocuments();
@@ -119,11 +169,35 @@ export const save = async (data) => {
 };
 
 export const update = async (id, data) => {
-  logger.debug('Executing ProjectsRepository::update for: ' + id, data);
-  const oldProj = await Project.findOne({ id }).lean();
-  
+  const context = resolveSecurityContext();
+  sanitizeQueryOperators(data);
+
   const project = await Project.findOne({ id });
   if (!project) return null;
+
+  if (context) {
+    // If employee, verify membership
+    if (context.isEmployee) {
+      const store = getStore();
+      const userName = store?.user?.name || '';
+      const isMember = project.members && project.members.map(m => m.toLowerCase()).includes(userName.toLowerCase());
+      if (!isMember) {
+        logSecurityEvent(context, 'Projects', 'update', 'OWNERSHIP_DENIED', 'DENIED', 'Access Denied: User is not a member of the project', id);
+        const err = new Error('Access denied: You are not a member of this project.');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    await validateRepositoryAccess('update', project, {
+      ownerIdFields: [],
+      updatePayload: data,
+      moduleName: 'Projects'
+    });
+  }
+
+  logger.debug('Executing ProjectsRepository::update for: ' + id, data);
+  const oldProj = project.toObject();
 
   // If the manager is being changed, update all pending Project Manager Approvals in tasks
   if (data.manager && data.manager !== project.manager) {
@@ -173,8 +247,34 @@ export const update = async (id, data) => {
 };
 
 export const remove = async (id) => {
+  const context = resolveSecurityContext();
+  sanitizeQueryOperators({ id });
+
+  const project = await Project.findOne({ id });
+  if (!project) return null;
+
+  if (context) {
+    // If employee, verify membership
+    if (context.isEmployee) {
+      const store = getStore();
+      const userName = store?.user?.name || '';
+      const isMember = project.members && project.members.map(m => m.toLowerCase()).includes(userName.toLowerCase());
+      if (!isMember) {
+        logSecurityEvent(context, 'Projects', 'delete', 'OWNERSHIP_DENIED', 'DENIED', 'Access Denied: User is not a member of the project', id);
+        const err = new Error('Access denied: You are not a member of this project.');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    await validateRepositoryAccess('delete', project, {
+      ownerIdFields: [],
+      moduleName: 'Projects'
+    });
+  }
+
   logger.debug('Executing ProjectsRepository::remove for: ' + id);
-  const oldProj = await Project.findOne({ id }).lean();
+  const oldProj = project.toObject();
   const deletedProj = await Project.findOneAndDelete({ id });
   
   if (oldProj && oldProj.companyId && oldProj.department) {

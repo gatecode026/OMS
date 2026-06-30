@@ -433,7 +433,7 @@
   flex-direction: column;
   align-items: center;
   z-index: 5;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .id-card-logo-svg {
@@ -445,12 +445,12 @@
   font-weight: 800;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .id-card-company-subtitle {
   font-size: 0.55rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: #64748b;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
@@ -602,6 +602,8 @@
 }
 
 .id-card-back-middle {
+  position: relative;
+  z-index: 5;
   margin-top: 20px;
   padding: 0 20px;
   display: flex;

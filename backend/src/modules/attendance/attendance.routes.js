@@ -17,6 +17,8 @@ router.get('/public', controller.getPublicData);
 // Secured routes boundary
 router.use(authenticate);
 
+router.post('/qr-punch', controller.qrPunch);
+
 router.route('/')
   .get(controller.getAll)
   .post(validateRequest(validation.create), controller.create);

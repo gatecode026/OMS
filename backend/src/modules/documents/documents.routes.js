@@ -14,6 +14,10 @@ const router = express.Router();
 // Public routes placeholder
 router.get('/public', controller.getPublicData);
 
+// File proxy route (before authenticate — browser img/iframe tags cannot send Auth headers)
+// Token is verified manually inside the controller via ?token= query param
+router.get('/:id/file', controller.serveFile);
+
 // Secured routes boundary
 router.use(authenticate);
 

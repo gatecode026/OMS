@@ -36,6 +36,20 @@ const Documents = () => {
   const [uploadForm, setUploadForm] = useState({ name: '', type: 'PDF', category: isEmployee ? 'Project' : 'HR Policies', size: '1.2 MB' });
   const fileInputRef = useRef(null);
 
+  // Build a backend-proxied URL for a document (avoids CORS when fileUrl is external e.g. ImageKit)
+  const getProxyUrl = (doc, download = false) => {
+    if (!doc?.fileUrl) return null;
+    // If the fileUrl is a base64 data URL, use it directly (no proxy needed)
+    if (doc.fileUrl.startsWith('data:')) return doc.fileUrl;
+    // Get the JWT token for query-param auth (img/iframe can't send headers)
+    const token = localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token') || '';
+    // Route through the backend proxy — same origin (Vite proxies /api → localhost:5000)
+    const base = (window.API_URL || 'http://localhost:5000') + '/api/v1';
+    const params = new URLSearchParams({ token });
+    if (download) params.set('download', 'true');
+    return `${base}/documents/${doc.id}/file?${params.toString()}`;
+  };
+
   const visibleDocs = React.useMemo(() => {
     if (isEmployee) {
       return documentsList.filter(d => d.category === 'Project' || d.category === 'Reports' || d.category === 'HR Policies');
@@ -152,36 +166,46 @@ const Documents = () => {
     handleCloseModal();
   };
 
-  const handleDownloadFile = async (doc) => {
+  const handleDownloadFile = (doc) => {
     if (!doc.fileUrl) {
       addToast('warning', 'No download file available.');
       return;
     }
-    addToast('info', `Downloading "${doc.name}"...`);
-    
-    // Track real download count in DB
-    await downloadDocument(doc.id);
 
-    try {
-      const response = await fetch(doc.fileUrl);
-      if (!response.ok) throw new Error('Failed to fetch file');
-      const blob = await response.blob();
+    const proxyUrl = getProxyUrl(doc, true);
+
+    if (doc.fileUrl.startsWith('data:')) {
+      // base64 data URL — create a blob and trigger download directly
+      const [meta, b64] = proxyUrl.split(',');
+      const mime = meta.match(/:(.*?);/)?.[1] || 'application/octet-stream';
+      const binary = atob(b64);
+      const arr = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+      const blob = new Blob([arr], { type: mime });
       const blobUrl = URL.createObjectURL(blob);
-      
       const link = document.createElement('a');
       link.href = blobUrl;
       const fileExt = doc.type ? doc.type.toLowerCase() : 'bin';
       link.download = doc.name.endsWith(`.${fileExt}`) ? doc.name : `${doc.name}.${fileExt}`;
-      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
+      downloadDocument(doc.id);
       addToast('success', `Downloaded "${doc.name}" successfully.`);
-    } catch (err) {
-      console.error('Download failed, falling back to open:', err);
-      window.open(doc.fileUrl, '_blank');
+      return;
     }
+
+    // For external URLs proxied through the backend — use a direct anchor download
+    // This is synchronous (no await / popup blocker issues)
+    const link = document.createElement('a');
+    link.href = proxyUrl;
+    const fileExt = doc.type ? doc.type.toLowerCase() : 'bin';
+    link.download = doc.name.endsWith(`.${fileExt}`) ? doc.name : `${doc.name}.${fileExt}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast('success', `Downloading "${doc.name}"...`);
   };
 
   if (isLoading) {
@@ -442,13 +466,13 @@ const Documents = () => {
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', width: '100%', overflow: 'hidden', background: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
             {previewDoc?.type === 'PNG' || previewDoc?.type === 'JPG' || (previewDoc?.fileUrl && /\.(png|jpg|jpeg|gif|webp)$/i.test(previewDoc.fileUrl)) ? (
               <img 
-                src={previewDoc.fileUrl} 
+                src={getProxyUrl(previewDoc)} 
                 alt={previewDoc.name} 
                 style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: '4px' }} 
               />
             ) : previewDoc?.type === 'PDF' || (previewDoc?.fileUrl && /\.pdf$/i.test(previewDoc.fileUrl)) ? (
               <iframe 
-                src={previewDoc.fileUrl} 
+                src={getProxyUrl(previewDoc)} 
                 title={previewDoc.name} 
                 style={{ width: '100%', height: '60vh', border: 'none', borderRadius: '4px' }} 
               />

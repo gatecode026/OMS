@@ -28,7 +28,7 @@ export const tenantMiddleware = (req, res, next) => {
   }
 
   // 4. Run the rest of request lifecycle inside the resolved tenant context
-  runWithTenant(tenantId, next, isSuperAdmin).catch(next);
+  runWithTenant(tenantId, next, isSuperAdmin, req.user).catch(next);
 };
 
 export default tenantMiddleware;

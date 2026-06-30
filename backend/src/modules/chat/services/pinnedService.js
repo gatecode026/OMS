@@ -4,8 +4,8 @@
  *   Validates conversation membership and enforces logical tenant scoping.
  */
 
-import Conversation from '../conversation.model.js';
-import Message from '../message.model.js';
+import Conversation from '../conversation.repository.js';
+import Message from '../message.repository.js';
 import { runWithTenant } from '../../../utils/tenantContext.js';
 
 /**

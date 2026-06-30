@@ -4,9 +4,40 @@ import { connectSocket, disconnectSocket } from '../lib/socketManager';
 
 const AppContext = createContext(undefined);
 
+const unescapeHtml = (str) => {
+  if (!str || typeof str !== 'string') return str;
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/');
+};
+
+export const normalizeDepartment = (dept) => {
+  if (!dept) return dept;
+  return {
+    ...dept,
+    name: unescapeHtml(dept.name),
+    branch: unescapeHtml(dept.branch),
+    head: unescapeHtml(dept.head)
+  };
+};
+
 export const normalizeEmployee = (emp) => {
   if (!emp) return emp;
   const normalized = { ...emp };
+
+  // Unescape XSS entity encoding on string attributes
+  normalized.name = unescapeHtml(normalized.name);
+  normalized.fullName = unescapeHtml(normalized.fullName);
+  normalized.designation = unescapeHtml(normalized.designation);
+  normalized.department = unescapeHtml(normalized.department);
+  normalized.branch = unescapeHtml(normalized.branch);
+  normalized.branchAgency = unescapeHtml(normalized.branchAgency);
+  normalized.teamLeader = unescapeHtml(normalized.teamLeader);
+  normalized.projectManager = unescapeHtml(normalized.projectManager);
 
   // 1. Employee ID / id / employeeId
   const idVal = normalized.id || normalized.employeeId;
@@ -873,7 +904,7 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setDepartments(result.data || []);
+        setDepartments((result.data || []).map(normalizeDepartment));
       }
     } catch (err) {
       console.error('Failed to fetch departments from backend:', err);
@@ -2860,10 +2891,10 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setDepartments(prev => [...prev, result.data]);
+        setDepartments(prev => [...prev, normalizeDepartment(result.data)]);
         addToast('success', `Department "${result.data.name}" added successfully!`);
         addActivityLog(`Added new department: ${result.data.name}`, 'Departments', 'success');
-        return result.data;
+        return normalizeDepartment(result.data);
       } else {
         addToast('error', result.message || 'Failed to add department');
       }
@@ -2885,9 +2916,9 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setDepartments(prev => prev.map(d => d.id === id ? result.data : d));
+        setDepartments(prev => prev.map(d => d.id === id ? normalizeDepartment(result.data) : d));
         addActivityLog(`Updated department ID: ${id}`, 'Departments', 'success');
-        return result.data;
+        return normalizeDepartment(result.data);
       } else {
         addToast('error', result.message || 'Failed to update department');
       }

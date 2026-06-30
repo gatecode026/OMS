@@ -33,16 +33,31 @@ export const getActiveConnection = () => {
  * Runs a callback inside the resolved tenant context.
  * Resolves the database connection pool asynchronously first.
  */
-export const runWithTenant = async (tenantId, callback, isSuperAdmin = false) => {
+export const runWithTenant = async (tenantId, callback, isSuperAdmin = false, user = null) => {
   const connection = await getTenantConnection(tenantId);
-  return tenantStorage.run({ tenantId, connection, isSuperAdmin }, callback);
+  return tenantStorage.run({ tenantId, connection, isSuperAdmin, user }, callback);
 };
 
 /**
  * Runs a callback synchronously if the connection is already resolved.
  */
-export const runWithTenantConnection = (tenantId, connection, callback, isSuperAdmin = false) => {
-  return tenantStorage.run({ tenantId, connection, isSuperAdmin }, callback);
+export const runWithTenantConnection = (tenantId, connection, callback, isSuperAdmin = false, user = null) => {
+  return tenantStorage.run({ tenantId, connection, isSuperAdmin, user }, callback);
+};
+
+/**
+ * Gets the current request's authenticated user context.
+ */
+export const getCurrentUser = () => {
+  const store = tenantStorage.getStore();
+  return store ? store.user : null;
+};
+
+/**
+ * Gets the raw AsyncLocalStorage store object.
+ */
+export const getStore = () => {
+  return tenantStorage.getStore();
 };
 
 export default {
@@ -50,5 +65,7 @@ export default {
   isSuperAdminRequest,
   getActiveConnection,
   runWithTenant,
-  runWithTenantConnection
+  runWithTenantConnection,
+  getCurrentUser,
+  getStore
 };

@@ -49,6 +49,22 @@ export const getSummary = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Summary fetched successfully');
 });
 
+export const qrPunch = asyncHandler(async (req, res) => {
+  const { employeeId, companyId } = req.body;
+
+  if (!employeeId || !companyId) {
+    return res.status(400).json({ success: false, message: 'employeeId and companyId are required' });
+  }
+
+  // Tenant boundary verification
+  if (req.user && req.user.role !== 'super_admin' && req.user.companyId !== companyId) {
+    return res.status(403).json({ success: false, message: 'Access denied: Tenant mismatch' });
+  }
+
+  const result = await service.qrPunch(employeeId, companyId);
+  return successResponse(res, result, result.message);
+});
+
 export default {
   getAll,
   getById,
@@ -57,5 +73,6 @@ export default {
   remove,
   getPublicData,
   getToday,
-  getSummary
+  getSummary,
+  qrPunch
 };
