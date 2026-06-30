@@ -6,7 +6,7 @@
 import webpush from 'web-push';
 import env from '../../config/env.js';
 import PushSubscription from './pushSubscriptionModel.js';
-import Conversation from '../chat/conversation.model.js';
+import Conversation from '../chat/conversation.repository.js';
 import logger from '../../config/logger.js';
 
 // Initialize web-push with VAPID details

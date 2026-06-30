@@ -6,8 +6,8 @@
  */
 
 import mongoose from 'mongoose';
-import Conversation from './conversation.model.js';
-import Message from './message.model.js';
+import Conversation from './conversation.repository.js';
+import Message from './message.repository.js';
 import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
 import { runWithTenant } from '../../utils/tenantContext.js';
 import { getIO } from '../../config/socket.js';

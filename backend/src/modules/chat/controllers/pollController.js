@@ -5,7 +5,7 @@
 
 import * as pollService from '../services/pollService.js';
 import Poll from '../models/Poll.js';
-import Conversation from '../conversation.model.js';
+import Conversation from '../conversation.repository.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { successResponse } from '../../../utils/response.js';
 

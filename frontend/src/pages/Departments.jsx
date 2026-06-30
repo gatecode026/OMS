@@ -34,6 +34,7 @@ const Departments = () => {
     addDepartment, 
     updateDepartment,
     updateEmployee,
+    addEmployee,
     addToast, 
     showConfirm,
     teams: contextTeams = [],
@@ -200,6 +201,11 @@ const Departments = () => {
     name: '', code: '', head: '', branch: defaultBranch, description: ''
   });
 
+  const [newHeadName, setNewHeadName] = useState('');
+  const [newHeadEmail, setNewHeadEmail] = useState('');
+  const [newHeadPhone, setNewHeadPhone] = useState('');
+  const [newHeadPassword, setNewHeadPassword] = useState('');
+
   useEffect(() => {
     setNewDeptForm(prev => ({
       ...prev,
@@ -247,9 +253,7 @@ const Departments = () => {
     if (!employees || employees.length === 0) return [];
     return employees.filter(emp =>
       emp.roleId === 'team_leader' ||
-      emp.role === 'Team Leader' ||
-      emp.roleId === 'manager' ||
-      emp.role === 'Manager'
+      emp.role === 'Team Leader'
     );
   }, [employees]);
 
@@ -346,8 +350,74 @@ const Departments = () => {
       return;
     }
     
-    const tl = availableTeamLeaders.find(x => x.name === newDeptForm.head);
-    const headId = tl ? tl.id : 'EMP-2026-999';
+    let head = newDeptForm.head;
+    let headId = 'EMP-2026-999';
+
+    if (head === 'create_new_head') {
+      if (!newHeadName.trim() || !newHeadEmail.trim() || !newHeadPhone.trim() || !newHeadPassword) {
+        if (addToast) addToast('error', 'Please fill in the new department head name, email, phone number, and password.');
+        return;
+      }
+
+      // Email address validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newHeadEmail.trim())) {
+        if (addToast) addToast('error', 'Please enter a valid email address.');
+        return;
+      }
+
+      // Phone number validation
+      let cleanedPhone = newHeadPhone.trim().replace(/[-. ]/g, '');
+      if (cleanedPhone.startsWith('+91') && cleanedPhone.length === 13) {
+        cleanedPhone = cleanedPhone.slice(3);
+      } else if (cleanedPhone.startsWith('91') && cleanedPhone.length === 12) {
+        cleanedPhone = cleanedPhone.slice(2);
+      } else if (cleanedPhone.startsWith('0') && cleanedPhone.length === 11) {
+        cleanedPhone = cleanedPhone.slice(1);
+      }
+
+      const phoneRegex = /^[6789]\d{9}$/;
+      if (!phoneRegex.test(cleanedPhone)) {
+        if (addToast) addToast('error', 'Phone number must be exactly 10 digits and start with 6, 7, 8, or 9.');
+        return;
+      }
+
+      // Password length check
+      if (newHeadPassword.length < 6) {
+        if (addToast) addToast('error', 'Password must be at least 6 characters long.');
+        return;
+      }
+      
+      const newEmpObj = {
+        name: newHeadName.trim(),
+        email: newHeadEmail.trim(),
+        officialEmail: newHeadEmail.trim(),
+        phone: cleanedPhone,
+        password: newHeadPassword,
+        roleId: 'team_leader',
+        role: 'Team Leader',
+        branch: finalBranch,
+        department: newDeptForm.name,
+        designation: 'Team Leader',
+        status: 'Active'
+      };
+
+      try {
+        const savedEmp = await addEmployee(newEmpObj);
+        if (!savedEmp) {
+          return;
+        }
+        head = savedEmp.name;
+        headId = savedEmp.id || savedEmp.employeeId;
+      } catch (err) {
+        console.error('Failed to create new department head:', err);
+        if (addToast) addToast('error', 'Failed to create new department head employee.');
+        return;
+      }
+    } else {
+      const tl = availableTeamLeaders.find(x => x.name === head);
+      headId = tl ? tl.id : 'EMP-2026-999';
+    }
 
     if (newDeptForm.branch === 'add_custom' && !branchOptions.includes(finalBranch)) {
       setBranchOptions([...branchOptions, finalBranch]);
@@ -357,7 +427,7 @@ const Departments = () => {
       const updated = await updateDepartment(editingDeptId, {
         name: newDeptForm.name,
         departmentCode: newDeptForm.code,
-        head: newDeptForm.head,
+        head: head,
         headId: headId,
         branch: finalBranch,
         description: newDeptForm.description
@@ -368,13 +438,17 @@ const Departments = () => {
         setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, description: '' });
         setShowCustomBranchInput(false);
         setCustomBranch('');
+        setNewHeadName('');
+        setNewHeadEmail('');
+        setNewHeadPhone('');
+        setNewHeadPassword('Password@123');
       }
     } else if (addDepartment) {
       const newDeptObj = {
         id: `DEPT-${Date.now().toString().slice(-4)}`,
         name: newDeptForm.name,
         departmentCode: newDeptForm.code,
-        head: newDeptForm.head,
+        head: head,
         headId: headId,
         employeeCount: 0,
         activeTeams: 0,
@@ -402,6 +476,10 @@ const Departments = () => {
         setNewDeptForm({ name: '', code: '', head: '', branch: defaultBranch, description: '' });
         setShowCustomBranchInput(false);
         setCustomBranch('');
+        setNewHeadName('');
+        setNewHeadEmail('');
+        setNewHeadPhone('');
+        setNewHeadPassword('Password@123');
       }
     }
   };
@@ -995,8 +1073,19 @@ const Departments = () => {
       </div>
 
       {/* MODAL 1: ADD/EDIT DEPARTMENT */}
-      <Modal isOpen={addDeptOpen} onClose={() => setAddDeptOpen(false)} title={isEditMode ? "Edit Department" : "Add Department"} size="md">
-        <form onSubmit={handleAddDeptSubmit} className="policy-form flex-column gap-4 py-2">
+      <Modal 
+        isOpen={addDeptOpen} 
+        onClose={() => setAddDeptOpen(false)} 
+        title={isEditMode ? "Edit Department" : "Add Department"} 
+        size="md"
+        footer={(
+          <div className="flex-center justify-end gap-2" style={{ width: '100%' }}>
+            <Button variant="secondary" type="button" onClick={() => setAddDeptOpen(false)}>Cancel</Button>
+            <Button variant="primary" type="submit" form="addDeptForm">{isEditMode ? "Save Changes" : "Create Department"}</Button>
+          </div>
+        )}
+      >
+        <form id="addDeptForm" onSubmit={handleAddDeptSubmit} className="policy-form flex-column gap-4 py-2">
           <div className="form-group flex-column gap-1">
             <label htmlFor="deptBranch">Branch Location</label>
             <select
@@ -1067,6 +1156,7 @@ const Departments = () => {
               onChange={e => setNewDeptForm({ ...newDeptForm, head: e.target.value })}
             >
               <option value="">Select Department Head / Manager</option>
+              <option value="create_new_head">+ Create New Department Head</option>
               {availableTeamLeaders.map(tl => (
                 <option key={tl.id} value={tl.name}>
                   {tl.name} ({tl.role || 'Team Leader'})
@@ -1074,6 +1164,71 @@ const Departments = () => {
               ))}
             </select>
           </div>
+
+          {newDeptForm.head === 'create_new_head' && (
+            <div style={{
+              background: 'rgba(217, 70, 239, 0.05)',
+              border: '1px solid rgba(217, 70, 239, 0.2)',
+              borderRadius: '8px',
+              padding: '16px',
+              marginTop: '8px',
+              marginBottom: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}>
+              <h5 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)' }}>New Department Head Details (Team Leader)</h5>
+              
+              <div className="form-group flex-column gap-1">
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Full Name *</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  required
+                  placeholder="e.g. John Doe"
+                  value={newHeadName}
+                  onChange={e => setNewHeadName(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group flex-column gap-1">
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Email Address *</label>
+                <input 
+                  type="email" 
+                  className="form-control" 
+                  required
+                  placeholder="e.g. john.doe@company.com"
+                  value={newHeadEmail}
+                  onChange={e => setNewHeadEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group flex-column gap-1">
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Phone Number *</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  required
+                  maxLength={10}
+                  placeholder="e.g. 9876543210 (10 digits) *"
+                  value={newHeadPhone}
+                  onChange={e => setNewHeadPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                />
+              </div>
+
+              <div className="form-group flex-column gap-1">
+                <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>Password *</label>
+                <input 
+                  type="password" 
+                  className="form-control" 
+                  required
+                  placeholder="Enter password *"
+                  value={newHeadPassword}
+                  onChange={e => setNewHeadPassword(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="form-group flex-column gap-1">
             <label htmlFor="deptDesc">Description</label>
@@ -1085,11 +1240,6 @@ const Departments = () => {
               value={newDeptForm.description}
               onChange={e => setNewDeptForm({ ...newDeptForm, description: e.target.value })}
             />
-          </div>
-
-          <div className="flex-center justify-end gap-2 mt-2">
-            <Button variant="secondary" type="button" onClick={() => setAddDeptOpen(false)}>Cancel</Button>
-            <Button variant="primary" type="submit">{isEditMode ? "Save Changes" : "Create Department"}</Button>
           </div>
         </form>
       </Modal>

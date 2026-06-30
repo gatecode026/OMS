@@ -5,8 +5,8 @@
 
 import redis from "../../../config/redis.js";
 import logger from "../../../config/logger.js";
-import Message from "../message.model.js";
-import Conversation from "../conversation.model.js";
+import Message from "../message.repository.js";
+import Conversation from "../conversation.repository.js";
 import { runWithTenant } from "../../../utils/tenantContext.js";
 import { getIO } from "../../../config/socket.js";
 

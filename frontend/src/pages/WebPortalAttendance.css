@@ -1372,3 +1372,25 @@
   .wp-bulk-btn { padding: 3px 8px; font-size: 0.7rem; }
   .wp-col-panel { width: 220px; right: auto; left: 0; }
 }
+
+/* ─── QR Scanner Kiosk Styling ─── */
+@keyframes qrScannerLaserAnim {
+  0% { top: 10px; }
+  50% { top: 165px; }
+  100% { top: 10px; }
+}
+
+.qr-result-box {
+  animation: slideInDown 0.25s ease-out;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

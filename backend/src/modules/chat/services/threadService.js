@@ -6,8 +6,8 @@
 
 import mongoose from 'mongoose';
 import Thread from '../models/Thread.js';
-import Message from '../message.model.js';
-import Conversation from '../conversation.model.js';
+import Message from '../message.repository.js';
+import Conversation from '../conversation.repository.js';
 import Employee from '../../employees/employees.model.js';
 import { runWithTenant } from '../../../utils/tenantContext.js';
 import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
