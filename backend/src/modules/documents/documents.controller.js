@@ -54,6 +54,18 @@ export const serveFile = asyncHandler(async (req, res) => {
     }
   }
 
+  // Reverse XSS entity encoding applied by the global sanitizeInputMiddleware,
+  // which escapes forward slashes in JWT tokens (/ → &#x2F;) and other chars.
+  if (token && typeof token === 'string') {
+    token = token
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&#x2F;/g, '/');
+  }
+
   if (!token) {
     return res.status(401).json({ status: 'fail', message: 'Authentication required.' });
   }
@@ -89,6 +101,11 @@ export const serveFile = asyncHandler(async (req, res) => {
 
   const contentType = response.headers.get('content-type') || 'application/octet-stream';
   res.setHeader('Content-Type', contentType);
+
+  // Relax security headers to allow cross-origin image rendering and iframe embedding
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'self' *");
 
   if (isDownload) {
     const fileExt = document.type ? document.type.toLowerCase() : 'bin';

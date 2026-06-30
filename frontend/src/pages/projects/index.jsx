@@ -18,7 +18,7 @@ import ActivityFeed from '../../components/projects/ActivityFeed';
 
 
 const Projects = () => {
-  const { addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole, hasPermission, currentUser } = useApp();
+  const { token, addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole, hasPermission, currentUser } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
   // State Management
@@ -264,6 +264,20 @@ const Projects = () => {
 
     const success = await updateProject(projectId, updatedFields);
     if (success) {
+      const toggledTask = updatedTasks.find(t => t.id === taskId);
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: toggledTask.status })
+        });
+      } catch (err) {
+        console.error('Failed to sync task status update to tasks collection:', err);
+      }
+
       if (selectedProject && selectedProject.id === projectId) {
         setSelectedProject({ ...targetProj, ...updatedFields });
       }
@@ -396,6 +410,28 @@ const Projects = () => {
       progress
     });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            id: nextTaskId,
+            title: title.trim(),
+            description: addTaskForm.description || '',
+            status: 'To Do',
+            priority,
+            dueDate,
+            assigneeId,
+            assigneeName: selectedTaskEmployees.length > 0 ? selectedTaskEmployees.join(', ') : 'Unassigned'
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync task creation to tasks collection:', err);
+      }
+
       if (selectedProject && selectedProject.id === projectId) {
         setSelectedProject({ ...selectedProject, tasks: newTasks, tasksTotal, progress });
       }

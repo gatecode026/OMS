@@ -1574,6 +1574,31 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const addDailyReport = async (reportData) => {
+    if (!token) return null;
+    try {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/work-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(reportData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDailyReports();
+        return result.data;
+      } else {
+        throw new Error(result.message || 'Failed to submit work report');
+      }
+    } catch (err) {
+      console.error('Error submitting daily report:', err);
+      addToast('danger', err.message || 'Network error while submitting report.');
+      return null;
+    }
+  };
+
   const fetchAppraisalReviews = async () => {
     if (!token) {
       setAppraisalReviews([]);
@@ -2676,6 +2701,19 @@ export const AppProvider = ({ children }) => {
     });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: status })
+        });
+      } catch (err) {
+        console.error('Failed to sync task progress update to tasks collection:', err);
+      }
+
       addActivityLog(`Updated task status to ${status} (${progress}%)`, 'Tasks', 'success');
       addToast('success', `Task updated successfully.`);
       return updatedTasks.find(t => t.id === id);
@@ -3214,6 +3252,19 @@ export const AppProvider = ({ children }) => {
     });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+      } catch (err) {
+        console.error('Failed to sync task status update to tasks collection:', err);
+      }
+
       addActivityLog(`Moved task to ${newStatus}`, 'Tasks', 'success');
       addToast('success', `Task moved to ${newStatus}.`);
       return updatedTasks.find(t => t.id === id);
@@ -3280,6 +3331,28 @@ export const AppProvider = ({ children }) => {
     });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            id: nextTaskId,
+            title: newTask.title,
+            description: newTask.description,
+            status: newTask.status,
+            priority: newTask.priority,
+            dueDate: newTask.dueDate,
+            assigneeId: newTask.assigneeId,
+            assigneeName: newTask.assigneeName
+          })
+        });
+      } catch (err) {
+        console.error('Failed to save task in tasks collection:', err);
+      }
+
       addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
       addToast('success', 'Task created successfully.');
 
@@ -3314,6 +3387,17 @@ export const AppProvider = ({ children }) => {
     });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      } catch (err) {
+        console.error('Failed to delete task from tasks collection:', err);
+      }
+
       addActivityLog(`Deleted task "${id}"`, 'Tasks', 'danger');
       addToast('warning', `Task deleted.`);
     }
@@ -3347,6 +3431,22 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            assigneeId: assigneeId,
+            assigneeName: assigneeName
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync task reassignment to tasks collection:', err);
+      }
+
       addActivityLog(`Reassigned task ${taskId} to ${assigneeName}`, 'Tasks', 'info');
       addToast('info', `Task reassigned to ${assigneeName}`);
       return updatedTasks.find(t => t.id === taskId);
@@ -3379,6 +3479,21 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            dueDate: newDate
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync task deadline extension to tasks collection:', err);
+      }
+
       addActivityLog(`Extended deadline for task ${taskId} to ${newDate}`, 'Tasks', 'warning');
       addToast('success', `Extended deadline to ${newDate}`);
       return updatedTasks.find(t => t.id === taskId);
@@ -3411,6 +3526,21 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            priority: 'Critical'
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync task escalation to tasks collection:', err);
+      }
+
       addActivityLog(`Escalated task ${taskId} to Critical priority`, 'Tasks', 'danger');
       addToast('error', `Task ${taskId} escalated to Critical!`);
       return updatedTasks.find(t => t.id === taskId);
@@ -4516,6 +4646,7 @@ export const AppProvider = ({ children }) => {
         deleteUserOverride,
         dailyReports,
         setDailyReports,
+        addDailyReport,
         updateDailyReportStatus,
         appraisalReviews,
         addAppraisalReview,

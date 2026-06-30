@@ -28,22 +28,40 @@ const StatusBadge = ({ status }) => {
 };
 
 const ProfileHeroCard = ({ user }) => {
-  const handleDownloadQR = async (employeeId, companyId) => {
+  const handleDownloadQR = (employeeId, companyId) => {
     try {
       const data = JSON.stringify({ employeeId, companyId });
       const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data)}`;
-      const response = await fetch(qrUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `employee_qr_${employeeId}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // request CORS access
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const dataURL = canvas.toDataURL('image/png');
+          
+          const link = document.createElement('a');
+          link.href = dataURL;
+          link.download = `employee_qr_${employeeId}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } catch (canvasErr) {
+          console.error('Canvas export failed, falling back to direct tab:', canvasErr);
+          window.open(qrUrl, '_blank');
+        }
+      };
+      img.onerror = (err) => {
+        console.error('Failed to load QR image for canvas download, opening in new tab:', err);
+        window.open(qrUrl, '_blank');
+      };
+      img.src = qrUrl;
     } catch (err) {
-      console.error('Failed to download QR code image:', err);
+      console.error('Failed to download QR code:', err);
     }
   };
 

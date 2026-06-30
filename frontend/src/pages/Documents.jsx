@@ -44,7 +44,7 @@ const Documents = () => {
     // Get the JWT token for query-param auth (img/iframe can't send headers)
     const token = localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token') || '';
     // Route through the backend proxy — same origin (Vite proxies /api → localhost:5000)
-    const base = (window.API_URL || 'http://localhost:5000') + '/api/v1';
+    const base = (window.API_URL || '') + '/api/v1';
     const params = new URLSearchParams({ token });
     if (download) params.set('download', 'true');
     return `${base}/documents/${doc.id}/file?${params.toString()}`;

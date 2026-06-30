@@ -10,6 +10,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
+import mongoose from 'mongoose';
 
 // Configuration Imports
 import corsOptions from './config/cors.js';
@@ -121,7 +122,13 @@ app.get('/api/presence/company/:companyId', authenticate, async (req, res, next)
 
 // ─── GLOBAL MODULAR ROUTING BINDING ─────────────────────────────────────────
 app.use('/api/v1', (req, res, next) => {
+  // Skip global auth for routes that handle their own token verification
   if (req.path.startsWith('/auth')) {
+    return next();
+  }
+  // Document file proxy — token is verified via ?token= query param inside the controller
+  // (img/iframe elements cannot send Authorization headers)
+  if (/^\/documents\/[^/]+\/file/.test(req.path)) {
     return next();
   }
   return authenticate(req, res, () => {

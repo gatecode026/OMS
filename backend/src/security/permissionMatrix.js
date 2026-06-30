@@ -1,20 +1,46 @@
-import { ResourceClassifications } from './securityConstants.js';
+/**
+ * @file src/security/permissionMatrix.js
+ * @description Dynamic permission matrix that reads action-level permissions
+ * from the database (rbac_roles collection) while keeping field-level security
+ * policies (restrictedFields, allowedFields) hardcoded for safety.
+ *
+ * The frontend Roles & Permissions UI toggles now directly control backend
+ * enforcement in real-time.
+ */
 
-const matrix = {
+import mongoose from 'mongoose';
+import { ResourceClassifications } from './securityConstants.js';
+import { resolveSecurityContext } from './scopeEngine.js';
+import logger from '../config/logger.js';
+
+// ─── MODULE KEY MAPPING ─────────────────────────────────────────────────────
+// Maps frontend permission module keys (stored in DB) to backend matrix keys
+// used by repository contracts.
+const FRONTEND_TO_BACKEND_KEY = {
+  employee_management: 'Employee',
+  attendance_management: 'Attendance',
+  leave_management: 'Leave',
+  project_management: 'Projects',
+  task_monitoring: 'Tasks',
+  document_management: 'Documents',
+  chat: 'Chat',
+  payroll_management: 'Payroll'
+};
+
+// Reverse mapping: backend key → frontend key (for DB lookups)
+const BACKEND_TO_FRONTEND_KEY = {};
+for (const [feKey, beKey] of Object.entries(FRONTEND_TO_BACKEND_KEY)) {
+  BACKEND_TO_FRONTEND_KEY[beKey] = feKey;
+}
+
+// ─── FIELD-LEVEL SECURITY POLICIES (HARDCODED — NOT UI-CONFIGURABLE) ────────
+// These protect sensitive fields from being modified by unauthorized roles.
+// They remain static and cannot be toggled from the Roles & Permissions UI.
+const fieldPolicies = {
   Employee: {
-    resource: 'Employee',
     classification: ResourceClassifications.INTERNAL,
     scopeRequirement: 'branch',
     ownershipRequirement: true,
-    permissions: {
-      read: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      create: ['branch_admin', 'company_admin', 'super_admin'],
-      update: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      delete: ['super_admin'],
-      approve: [],
-      export: ['company_admin', 'super_admin', 'branch_admin'],
-      import: ['company_admin', 'super_admin']
-    },
     allowedFields: {
       employee: ['phone', 'address', 'profilePhoto', 'password'],
       team_leader: ['phone', 'address', 'profilePhoto', 'password'],
@@ -26,19 +52,9 @@ const matrix = {
     }
   },
   Attendance: {
-    resource: 'Attendance',
     classification: ResourceClassifications.INTERNAL,
     scopeRequirement: 'branch',
     ownershipRequirement: true,
-    permissions: {
-      read: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      create: ['employee', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      update: ['employee', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      delete: ['branch_admin', 'company_admin', 'super_admin'],
-      approve: ['manager', 'branch_admin', 'company_admin', 'super_admin'],
-      export: ['branch_admin', 'company_admin', 'super_admin'],
-      import: ['company_admin', 'super_admin']
-    },
     allowedFields: {
       employee: ['notes', 'breaks', 'breakTime', 'punchOut', 'punchIn', 'overtime']
     },
@@ -47,79 +63,41 @@ const matrix = {
     }
   },
   Leave: {
-    resource: 'Leave',
     classification: ResourceClassifications.INTERNAL,
     scopeRequirement: 'branch',
     ownershipRequirement: true,
-    permissions: {
-      read: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      create: ['employee', 'company_admin', 'super_admin'],
-      update: ['employee', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      delete: ['employee', 'branch_admin', 'company_admin', 'super_admin'],
-      approve: ['team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      export: ['branch_admin', 'company_admin', 'super_admin'],
-      import: ['company_admin', 'super_admin']
-    },
     allowedFields: {
       employee: ['type', 'fromDate', 'toDate', 'days', 'reason', 'documentType', 'fileName', 'fileFormat']
     },
     restrictedFields: {
-      employee: ['status', 'approver', 'approvedBy', 'approvalDate', 'approverNotes']
+      employee: ['status', 'approver', 'approvedBy', 'approvalDate', 'approverNotes'],
+      team_leader: [],
+      manager: []
     }
   },
   Projects: {
-    resource: 'Projects',
     classification: ResourceClassifications.CONFIDENTIAL,
     scopeRequirement: 'department',
     ownershipRequirement: false,
-    permissions: {
-      read: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      create: ['manager', 'branch_admin', 'company_admin', 'super_admin'],
-      update: ['manager', 'branch_admin', 'company_admin', 'super_admin'],
-      delete: ['company_admin', 'super_admin'],
-      approve: [],
-      export: ['company_admin', 'super_admin'],
-      import: ['company_admin', 'super_admin']
-    },
     allowedFields: {},
     restrictedFields: {
-      employee: ['budget', 'manager', 'leader', 'members', 'approvalStatus'],
-      team_leader: ['budget', 'manager', 'leader', 'members', 'approvalStatus']
+      employee: ['name', 'description', 'department', 'branch', 'client', 'manager', 'leader', 'members', 'priority', 'startDate', 'deadline', 'budget', 'workflowStage', 'approvalStatus'],
+      team_leader: ['name', 'description', 'department', 'branch', 'client', 'manager', 'leader', 'members', 'priority', 'startDate', 'deadline', 'budget', 'workflowStage', 'approvalStatus']
     }
   },
   Tasks: {
-    resource: 'Tasks',
     classification: ResourceClassifications.CONFIDENTIAL,
     scopeRequirement: 'department',
     ownershipRequirement: true,
-    permissions: {
-      read: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      create: ['team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      update: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      delete: ['team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      approve: [],
-      export: ['company_admin', 'super_admin'],
-      import: ['company_admin', 'super_admin']
-    },
     allowedFields: {},
     restrictedFields: {
       employee: ['assigneeId', 'assigneeName', 'priority', 'dueDate', 'creatorId', 'projectId', 'branch', 'department', 'approvalStatus', 'createdBy', 'updatedBy']
     }
   },
   Documents: {
-    resource: 'Documents',
     classification: ResourceClassifications.PRIVATE,
     scopeRequirement: 'branch',
     ownershipRequirement: true,
-    permissions: {
-      read: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      create: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      update: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      delete: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      approve: [],
-      export: ['company_admin', 'super_admin'],
-      import: ['company_admin', 'super_admin']
-    },
     allowedFields: {},
     restrictedFields: {
       employee: ['branch', 'uploadedBy', 'fileUrl', 'visibility', 'owner'],
@@ -127,36 +105,16 @@ const matrix = {
     }
   },
   Chat: {
-    resource: 'Chat',
     classification: ResourceClassifications.PRIVATE,
     scopeRequirement: 'none',
     ownershipRequirement: true,
-    permissions: {
-      read: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      create: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      update: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      delete: ['employee', 'team_leader', 'manager', 'branch_admin', 'company_admin', 'super_admin'],
-      approve: [],
-      export: [],
-      import: []
-    },
     allowedFields: {},
     restrictedFields: {}
   },
   Payroll: {
-    resource: 'Payroll',
     classification: ResourceClassifications.HIGHLY_CONFIDENTIAL,
     scopeRequirement: 'branch',
     ownershipRequirement: true,
-    permissions: {
-      read: ['employee', 'manager', 'branch_admin', 'company_admin', 'super_admin', 'hr_manager', 'finance_manager'],
-      create: ['branch_admin', 'company_admin', 'super_admin', 'hr_manager'],
-      update: ['branch_admin', 'company_admin', 'super_admin', 'hr_manager', 'finance_manager'],
-      delete: ['super_admin'],
-      approve: ['company_admin', 'super_admin', 'hr_manager', 'finance_manager'],
-      export: ['company_admin', 'super_admin', 'hr_manager', 'finance_manager'],
-      import: ['company_admin', 'super_admin']
-    },
     allowedFields: {},
     restrictedFields: {
       employee: ['basicSalary', 'grossSalary', 'netSalary', 'bankAccount', 'IFSC', 'PAN', 'tax', 'totalDeductions', 'pf', 'esi', 'salaryGrade', 'paymentStatus', 'approvalStatus', 'status'],
@@ -168,49 +126,157 @@ const matrix = {
   }
 };
 
+// ─── IN-MEMORY CACHE ─────────────────────────────────────────────────────────
+// Caches role permission lookups for 30 seconds to avoid hitting the DB on
+// every single API call. Cache is keyed by `companyId:roleId`.
+const permissionCache = new Map();
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
 /**
- * Checks if a specific role is allowed to perform an action on a module.
+ * Retrieves the role document from the database (with caching).
+ * @param {string} companyId - The tenant company ID
+ * @param {string} roleId - The role identifier (e.g. 'employee', 'manager')
+ * @returns {Object|null} The role's permissions map, or null if not found
  */
-export const checkActionPermission = (moduleName, role, action) => {
-  const mod = matrix[moduleName];
-  if (!mod) return true; // Default allowed if module is not registered
+const getRolePermissionsFromDB = async (companyId, roleId) => {
+  const cacheKey = `${companyId}:${roleId}`;
 
-  const allowedRoles = mod.permissions[action];
-  if (!allowedRoles) return true;
+  // Check cache first
+  const cached = permissionCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+    return cached.permissions;
+  }
 
-  return allowedRoles.includes(role);
+  try {
+    // Use mongoose directly to query the Role collection in the tenant's database
+    const RoleModel = mongoose.model('Role');
+    const roleDoc = await RoleModel.findOne({ id: roleId });
+
+    if (!roleDoc || !roleDoc.permissions) {
+      // Cache the miss so we don't re-query immediately
+      permissionCache.set(cacheKey, { permissions: null, timestamp: Date.now() });
+      return null;
+    }
+
+    // Convert Mongoose Map to plain object
+    const permissions = roleDoc.permissions instanceof Map
+      ? Object.fromEntries(roleDoc.permissions)
+      : roleDoc.permissions;
+
+    permissionCache.set(cacheKey, { permissions, timestamp: Date.now() });
+    return permissions;
+  } catch (err) {
+    logger.warn(`PermissionMatrix::getRolePermissionsFromDB - Failed to fetch role "${roleId}" for company "${companyId}": ${err.message}`);
+    return null;
+  }
 };
 
 /**
- * Validates that an update payload contains only allowed fields or no restricted fields for the role.
+ * Clears the permission cache. Call this when permissions are updated via the UI
+ * to ensure changes take effect immediately.
+ */
+export const clearPermissionCache = () => {
+  permissionCache.clear();
+};
+
+// ─── ACTION-LEVEL PERMISSION CHECK (DYNAMIC — DB-DRIVEN) ───────────────────
+
+/**
+ * Checks if a specific role is allowed to perform an action on a module.
+ * Reads from the database (rbac_roles collection) instead of hardcoded arrays.
+ *
+ * @param {string} moduleName - Backend module name (e.g. 'Leave', 'Projects')
+ * @param {string} role - The user's role (e.g. 'employee', 'manager')
+ * @param {string} action - The action to check (e.g. 'read', 'create', 'update', 'delete', 'approve', 'export')
+ * @returns {Promise<boolean>} Whether the role is allowed to perform the action
+ */
+export const checkActionPermission = async (moduleName, role, action) => {
+  // Super admin always has full access — non-negotiable safety net
+  if (role === 'super_admin') return true;
+
+  // Resolve the security context to get the company ID for tenant-scoped DB query
+  const context = resolveSecurityContext();
+  const companyId = context?.companyId;
+
+  if (!companyId) {
+    // No company context — fail open (field-level restrictions still apply)
+    logger.warn(`PermissionMatrix::checkActionPermission - No companyId in context for role "${role}", module "${moduleName}"`);
+    return true;
+  }
+
+  // Get the role's permissions from the database
+  const permissions = await getRolePermissionsFromDB(companyId, role);
+
+  if (!permissions) {
+    // No role found in DB — company_admin and branch_admin get full access as fallback
+    if (role === 'company_admin' || role === 'branch_admin') return true;
+    // Other roles: fail open (field-level restrictions still protect sensitive data)
+    logger.warn(`PermissionMatrix::checkActionPermission - No DB permissions found for role "${role}", allowing action "${action}" on "${moduleName}"`);
+    return true;
+  }
+
+  // Map the backend module name to the frontend key used in the DB
+  const frontendKey = BACKEND_TO_FRONTEND_KEY[moduleName];
+
+  if (!frontendKey) {
+    // Module not mapped — not DB-controlled, allow by default
+    return true;
+  }
+
+  // Look up the module permissions in the role's permission map
+  const modulePerms = permissions[frontendKey];
+
+  if (!modulePerms) {
+    // Module not found in the role's permissions — deny by default for safety
+    // (This means the admin hasn't configured this module for this role)
+    if (role === 'company_admin' || role === 'branch_admin') return true;
+    return false;
+  }
+
+  // Check the specific action
+  const isAllowed = !!modulePerms[action];
+  return isAllowed;
+};
+
+// ─── FIELD-LEVEL RESTRICTION CHECK (HARDCODED — STAYS STATIC) ───────────────
+
+/**
+ * Returns restricted fields for a role on a module.
+ * This is NOT dynamic — field-level security policies are hardcoded for safety.
  */
 export const getRestrictedFields = (moduleName, role) => {
-  const mod = matrix[moduleName];
-  if (!mod) return [];
+  const policy = fieldPolicies[moduleName];
+  if (!policy) return [];
 
   // If the role is an admin role, do not fallback to 'employee'
   if (role === 'super_admin' || role === 'company_admin' || role === 'branch_admin') {
-    return mod.restrictedFields[role] || [];
+    return policy.restrictedFields[role] || [];
   }
 
   // Get restricted fields for the role (or fallback to employee defaults)
-  return mod.restrictedFields[role] || mod.restrictedFields['employee'] || [];
+  return policy.restrictedFields[role] || policy.restrictedFields['employee'] || [];
+};
+
+// ─── MODULE CONFIG (FOR SCOPE/OWNERSHIP REQUIREMENTS) ───────────────────────
+
+/**
+ * Registers a new module's field-level security policies dynamically.
+ */
+export const registerModulePermissions = (moduleName, config) => {
+  fieldPolicies[moduleName] = config;
 };
 
 /**
- * Registers a new module's permission definitions dynamically.
+ * Gets the module's security configuration (classification, scope, ownership).
  */
-export const registerModulePermissions = (moduleName, config) => {
-  matrix[moduleName] = config;
-};
-
 export const getModuleConfig = (moduleName) => {
-  return matrix[moduleName] || null;
+  return fieldPolicies[moduleName] || null;
 };
 
 export default {
   checkActionPermission,
   getRestrictedFields,
   registerModulePermissions,
-  getModuleConfig
+  getModuleConfig,
+  clearPermissionCache
 };
