@@ -24,33 +24,21 @@ const sidebarGroups = [
   {
     title: 'Workforce & Policies',
     items: [
-      { id: 'employee', label: 'Employee Settings', icon: Users },
-      { id: 'attendance', label: 'Attendance Rules', icon: Clock },
-      { id: 'leave', label: 'Leave Policies', icon: CalendarDays },
-      { id: 'payroll', label: 'Payroll & Salaries', icon: DollarSignIcon }
+      { id: 'attendance', label: 'Attendance Rules', icon: Clock }
     ]
   },
   {
     title: 'Operations',
     items: [
       { id: 'project', label: 'Project Config', icon: Briefcase },
-      { id: 'task', label: 'Task Rules', icon: KanbanSquare },
-      { id: 'workflow', label: 'Approval Matrices', icon: Share2 }
+      { id: 'task', label: 'Task Rules', icon: KanbanSquare }
     ]
   },
-  {
-    title: 'Access & Security',
-    items: [
-      { id: 'roles', label: 'Roles & Access', icon: Lock },
-      { id: 'security', label: 'Security & IPs', icon: Shield },
-      { id: 'compliance', label: 'Audit & GDPR', icon: ShieldAlert }
-    ]
-  },
+
   {
     title: 'Branding & Theme',
     items: [
-      { id: 'appearance', label: 'Theme Customization', icon: Palette },
-      { id: 'branding', label: 'Branding Settings', icon: Globe }
+      { id: 'appearance', label: 'Theme Customization', icon: Palette }
     ]
   },
   {
@@ -64,9 +52,6 @@ const sidebarGroups = [
   {
     title: 'Gateway & Integrations',
     items: [
-      { id: 'email', label: 'Email SMTP', icon: Mail },
-      { id: 'sms', label: 'SMS Gateway', icon: Smartphone },
-      { id: 'integrations', label: 'Integrations', icon: Zap },
       { id: 'backup', label: 'Backup & Restore', icon: Database }
     ]
   },
@@ -769,19 +754,8 @@ const SystemSettings = () => {
           officialPhone: '+91 11 4050 6070', address: 'Plot No. 12, Sector 18, Udyog Vihar',
           city: 'Gurugram', state: 'Haryana', country: 'India', postalCode: '122008'
         },
-        branches: [
-          { code: 'BR-DEL', name: 'Delhi Head Office', manager: '', status: 'Active' },
-          { code: 'BR-MUM', name: 'Mumbai Branch', manager: '', status: 'Active' },
-          { code: 'BR-BLR', name: 'Bangalore Tech Center', manager: '', status: 'Active' },
-          { code: 'BR-JPR', name: 'Jaipur Operations', manager: '', status: 'Active' }
-        ],
-        departments: [
-          { id: '1', name: 'Engineering', head: '', capacity: 150 },
-          { id: '2', name: 'Human Resources', head: '', capacity: 30 },
-          { id: '3', name: 'Sales & Marketing', head: '', capacity: 80 },
-          { id: '4', name: 'Operations', head: '', capacity: 120 },
-          { id: '5', name: 'Finance', head: '', capacity: 25 }
-        ],
+        branches: [],
+        departments: [],
         generalSettings: defaultGeneral,
         notificationSettings: defaultNotif,
         securitySettings: defaultSecurity

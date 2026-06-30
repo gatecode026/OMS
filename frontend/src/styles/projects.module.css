@@ -418,11 +418,19 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0px);
   z-index: 1000;
   display: flex;
   justify-content: flex-end;
+  pointer-events: none;
+  transition: background-color 0.25s ease, backdrop-filter 0.25s ease;
+}
+
+.backdrop.isOpen {
+  background-color: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
 }
 
 .slideOver {
@@ -435,12 +443,12 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideIn {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+.slideOver.isOpen {
+  transform: translateX(0);
 }
 
 .slideHeader {

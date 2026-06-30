@@ -141,6 +141,11 @@ const RolesPermissions = () => {
       setLocalRoles(prev => {
         return contextRoles.map(r => {
           const existing = prev.find(p => p.id === r.id);
+          const userCount = (employees || []).filter(emp => {
+            const rId = emp.roleId || (emp.role ? emp.role.toLowerCase().replace(/\s+/g, '_') : 'employee');
+            return rId === r.id;
+          }).length;
+
           return {
             ...r,
             icon: r.icon || defaultIcons[r.id] || '⚙️',
@@ -149,12 +154,13 @@ const RolesPermissions = () => {
             lastModified: existing?.lastModified || '05-Jun-2026',
             status: existing?.status || 'Active',
             color: r.accentColor || defaultColors[r.id] || '#6366f1',
-            description: r.description || 'Granular permissions managed at module level.'
+            description: r.description || 'Granular permissions managed at module level.',
+            userCount
           };
         });
       });
     }
-  }, [contextRoles]);
+  }, [contextRoles, employees]);
 
   // Selected role for the manual operations matrix
   const [selectedRoleId, setSelectedRoleId] = useState('branch_admin');

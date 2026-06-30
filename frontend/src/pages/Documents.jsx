@@ -25,7 +25,8 @@ const getIconForType = (type) => {
 
 const Documents = () => {
   const isLoading = usePageLoading(500);
-  const { addToast, showConfirm, documentsList, addDocument, deleteDocument, currentUser, currentUserRole } = useApp();
+  const { addToast, showConfirm, documentsList, addDocument, deleteDocument, downloadDocument, currentUser, currentUserRole } = useApp();
+  const [previewDoc, setPreviewDoc] = useState(null);
   const isEmployee = currentUserRole === 'employee';
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
@@ -144,7 +145,8 @@ const Documents = () => {
       uploadedBy: currentUser?.name || 'Unknown',
       uploadDate: new Date().toISOString().split('T')[0],
       downloads: 0,
-      fileUrl: fileBase64
+      fileUrl: fileBase64,
+      branch: currentUser?.branch || ''
     };
     await addDocument(docData);
     handleCloseModal();
@@ -156,6 +158,10 @@ const Documents = () => {
       return;
     }
     addToast('info', `Downloading "${doc.name}"...`);
+    
+    // Track real download count in DB
+    await downloadDocument(doc.id);
+
     try {
       const response = await fetch(doc.fileUrl);
       if (!response.ok) throw new Error('Failed to fetch file');
@@ -269,21 +275,9 @@ const Documents = () => {
                 <button
                   className="doc-action-btn"
                   title="Preview"
-                  onClick={async () => {
+                  onClick={() => {
                     if (doc.fileUrl) {
-                      if (doc.fileUrl.startsWith('data:')) {
-                        try {
-                          const response = await fetch(doc.fileUrl);
-                          const blob = await response.blob();
-                          const blobUrl = URL.createObjectURL(blob);
-                          window.open(blobUrl, '_blank');
-                        } catch (err) {
-                          console.error('Failed to generate preview blob:', err);
-                          addToast('danger', 'Failed to load preview.');
-                        }
-                      } else {
-                        window.open(doc.fileUrl, '_blank');
-                      }
+                      setPreviewDoc(doc);
                     } else {
                       addToast('warning', 'No preview file available.');
                     }
@@ -435,6 +429,47 @@ const Documents = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Preview Document Modal */}
+      <Modal
+        isOpen={!!previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        title={previewDoc?.name || 'Document Preview'}
+        size="md"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', width: '100%', overflow: 'hidden', background: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
+            {previewDoc?.type === 'PNG' || previewDoc?.type === 'JPG' || (previewDoc?.fileUrl && /\.(png|jpg|jpeg|gif|webp)$/i.test(previewDoc.fileUrl)) ? (
+              <img 
+                src={previewDoc.fileUrl} 
+                alt={previewDoc.name} 
+                style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: '4px' }} 
+              />
+            ) : previewDoc?.type === 'PDF' || (previewDoc?.fileUrl && /\.pdf$/i.test(previewDoc.fileUrl)) ? (
+              <iframe 
+                src={previewDoc.fileUrl} 
+                title={previewDoc.name} 
+                style={{ width: '100%', height: '60vh', border: 'none', borderRadius: '4px' }} 
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '24px' }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                  Preview is not supported for this file type ({previewDoc?.type}).
+                </p>
+                <Button onClick={() => { handleDownloadFile(previewDoc); setPreviewDoc(null); }}>
+                  Download File
+                </Button>
+              </div>
+            )}
+          </div>
+          {previewDoc?.fileUrl && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <Button variant="secondary" size="sm" onClick={() => setPreviewDoc(null)}>Close</Button>
+              <Button variant="primary" size="sm" onClick={() => { handleDownloadFile(previewDoc); setPreviewDoc(null); }}>Download</Button>
+            </div>
+          )}
+        </div>
       </Modal>
 
     </div>

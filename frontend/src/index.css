@@ -142,7 +142,7 @@
   /* Layout measures */
   --sidebar-width:           260px;
   --sidebar-width-collapsed:  72px;
-  --topbar-height:            64px;
+  --topbar-height:            48px;
 }
 
 /* ==========================================================================
@@ -798,4 +798,107 @@ select option {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ── Notification Permission Banner ──────────────────────────── */
+.notif-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-card, #151f32);
+  border-bottom: 1px solid var(--border-color, #233554);
+  padding: 12px 24px;
+  gap: 16px;
+  z-index: 2000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  animation: slideDownNotif 0.3s ease forwards;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.notif-banner.dismissing {
+  animation: slideUpNotif 0.3s ease forwards;
+  opacity: 0;
+}
+
+.notif-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notif-banner-icon {
+  color: var(--color-warning, #eab308);
+  display: flex;
+  align-items: center;
+}
+
+.notif-banner-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-banner-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #f8fafc);
+  margin: 0;
+}
+
+.notif-banner-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #94a3b8);
+  margin: 2px 0 0 0;
+}
+
+.notif-banner-right {
+  display: flex;
+  gap: 8px;
+}
+
+.notif-banner-btn-enable {
+  background-color: var(--color-primary, #d946ef);
+  color: var(--text-white, #ffffff);
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.notif-banner-btn-enable:hover {
+  filter: brightness(1.1);
+}
+
+.notif-banner-btn-dismiss {
+  background: none;
+  border: 1px solid var(--border-color, #233554);
+  color: var(--text-secondary, #94a3b8);
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.notif-banner-btn-dismiss:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary, #f8fafc);
+}
+
+@keyframes slideDownNotif {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideUpNotif {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-100%); opacity: 0; }
 }

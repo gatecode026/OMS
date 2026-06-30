@@ -47,6 +47,7 @@ const Performance = () => {
     addAppraisalReview,
     notifications,
     activityLogs,
+    addActivityLog,
     projectsList,
     addNotification,
     markAllNotificationsRead,
@@ -824,6 +825,16 @@ const Performance = () => {
     }
   };
 
+  const simulatedEmp = useMemo(() => {
+    return employees[0] || {
+      name: 'Sample Employee',
+      productivity: 95,
+      attendance: 95,
+      efficiency: 90,
+      quality: 95
+    };
+  }, [employees]);
+
   /* Loading State */
   if (isLoading) {
     return (
@@ -834,16 +845,6 @@ const Performance = () => {
       </div>
     );
   }
-
-  const simulatedEmp = useMemo(() => {
-    return employees[0] || {
-      name: 'Sample Employee',
-      productivity: 95,
-      attendance: 95,
-      efficiency: 90,
-      quality: 95
-    };
-  }, [employees]);
 
   return (
     <div className="performance-page animate-fade-in">
@@ -2028,12 +2029,12 @@ const Performance = () => {
       )}
 
       {/* ── Drilldown Slideover Detail Panel Drawer ── */}
-      {selectedEmp && (
-        <SlideOver
-          isOpen={!!selectedEmp}
-          onClose={() => setSelectedEmp(null)}
-          title={`Performance Profile — ${selectedEmp.id}`}
-        >
+      <SlideOver
+        isOpen={!!selectedEmp}
+        onClose={() => setSelectedEmp(null)}
+        title={`Performance Profile — ${selectedEmp?.id || ''}`}
+      >
+        {selectedEmp && (
           <div className="report-detail-wrapper animate-slide-up">
             
             {/* Employee Hero */}
@@ -2167,8 +2168,8 @@ const Performance = () => {
             )}
 
           </div>
-        </SlideOver>
-      )}
+        )}
+      </SlideOver>
 
     </div>
   );

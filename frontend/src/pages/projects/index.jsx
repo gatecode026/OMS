@@ -38,11 +38,18 @@ const Projects = () => {
           return isManager || isLeader || isMember || hasTask;
         });
         setProjects(filtered);
+      } else if (currentUserRole === 'branch_admin' && currentUser) {
+        const branchDepts = departments.filter(d => d.branch === currentUser.branch).map(d => d.name.toLowerCase());
+        const filtered = projectsList.filter(p => p.department && branchDepts.includes(p.department.toLowerCase()));
+        setProjects(filtered);
+      } else if ((currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') && currentUser) {
+        const filtered = projectsList.filter(p => p.department?.toLowerCase() === currentUser.department?.toLowerCase());
+        setProjects(filtered);
       } else {
         setProjects(projectsList);
       }
     }
-  }, [projectsList, currentUserRole, currentUser]);
+  }, [projectsList, currentUserRole, currentUser, departments]);
   const [filters, setFilters] = useState({
     search: '',
     status: 'All',

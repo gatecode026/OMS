@@ -12,6 +12,20 @@ export const find = async (query = {}) => {
   return Document.find(query).sort({ createdAt: -1 });
 };
 
+export const findForBranch = async (branch, query = {}) => {
+  logger.info(`DocumentsRepository::findForBranch querying docs for branch: ${branch}`);
+  // Return docs that belong to this branch OR docs with no branch (company-wide)
+  return Document.find({
+    ...query,
+    $or: [
+      { branch: branch },
+      { branch: { $exists: false } },
+      { branch: '' },
+      { branch: null }
+    ]
+  }).sort({ createdAt: -1 });
+};
+
 export const findOne = async (id) => {
   logger.info(`DocumentsRepository::findOne querying document with ID: ${id}`);
   return Document.findOne({ id });
@@ -53,6 +67,7 @@ export const remove = async (id) => {
 
 export default {
   find,
+  findForBranch,
   findOne,
   save,
   update,

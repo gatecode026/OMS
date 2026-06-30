@@ -25,6 +25,8 @@ import {
 const Departments = () => {
   const isLoading = usePageLoading(600);
   const { 
+    currentUser,
+    currentUserRole,
     employees = [], 
     branches = [], 
     departments: contextDepartments = [], 
@@ -43,11 +45,21 @@ const Departments = () => {
     tasks = []
   } = useApp() || {};
 
+  const isGlobalAdmin = currentUserRole === 'super_admin' || currentUserRole === 'company_admin';
+
   // Tab State
   const [activeTab, setActiveTab] = useState('directory');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [branchFilter, setBranchFilter] = useState('All');
+
+  useEffect(() => {
+    if (!isGlobalAdmin && currentUser?.branch) {
+      setBranchFilter(currentUser.branch);
+    } else {
+      setBranchFilter('All');
+    }
+  }, [currentUser, currentUserRole, isGlobalAdmin]);
   const [perfFilter, setPerfFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All');
   const [branchOptions, setBranchOptions] = useState([]);
@@ -303,7 +315,13 @@ const Departments = () => {
       d.departmentCode?.toLowerCase().includes(search.toLowerCase());
 
     const matchesStatus = statusFilter === 'All' || d.status === statusFilter;
-    const matchesBranch = branchFilter === 'All' || (d.branch && d.branch.includes(branchFilter));
+    const matchesBranch = (() => {
+      if (branchFilter === 'All') return true;
+      if (!d.branch) return false;
+      const normDeptBranch = d.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      return normDeptBranch.includes(normFilterBranch) || normFilterBranch.includes(normDeptBranch);
+    })();
     
     let matchesPerf = true;
     const perf = d.avgPerformance || 0;
@@ -681,15 +699,17 @@ const Departments = () => {
                 </select>
               </div>
 
-              <div className="filter-select-wrap">
-                <ChevronDown size={14} className="filter-chevron" />
-                <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
-                  <option value="All">All Locations</option>
-                  {branchOptions.map(branch => (
-                    <option key={branch} value={branch}>{branch}</option>
-                  ))}
-                </select>
-              </div>
+              {isGlobalAdmin && (
+                <div className="filter-select-wrap">
+                  <ChevronDown size={14} className="filter-chevron" />
+                  <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
+                    <option value="All">All Locations</option>
+                    {branchOptions.map(branch => (
+                      <option key={branch} value={branch}>{branch}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="filter-select-wrap">
                 <ChevronDown size={14} className="filter-chevron" />

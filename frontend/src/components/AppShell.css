@@ -22,7 +22,7 @@
 
 .app-shell-content {
   flex: 1;
-  padding: var(--spacing-6);
+  padding: 8px var(--spacing-6) var(--spacing-6) var(--spacing-6);
   margin-top: var(--topbar-height);
   overflow-y: auto;
   overflow-x: hidden;
@@ -48,7 +48,7 @@
   }
 
   .app-shell-content {
-    padding: var(--spacing-4);
+    padding: 8px var(--spacing-4) var(--spacing-4) var(--spacing-4);
   }
 }
 
