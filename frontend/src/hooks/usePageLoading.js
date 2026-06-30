@@ -5,9 +5,11 @@ export const usePageLoading = (delay = 600) => {
 
   useEffect(() => {
     setLoading(true);
+    // Cap artificial delay at 50ms for snappy transitions and instant page rendering
+    const SnappyDelay = 50;
     const timer = setTimeout(() => {
       setLoading(false);
-    }, delay);
+    }, SnappyDelay);
     return () => clearTimeout(timer);
   }, []);
 

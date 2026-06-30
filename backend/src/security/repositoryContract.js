@@ -148,7 +148,7 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
   } = options;
 
   // 1. Verify Action Level Permission Matrix
-  const isAllowed = checkActionPermission(moduleName, context.role, operation);
+  const isAllowed = await checkActionPermission(moduleName, context.role, operation);
   if (!isAllowed) {
     logSecurityEvent(context, moduleName, operation, SecurityEventTypes.AUTHORIZATION_DENIED, 'DENIED', `Action "${operation}" not allowed for role ${context.role}`, resource.id);
     const err = new Error(`Access denied: Role ${context.role} is not authorized to perform ${operation} on ${moduleName}.`);

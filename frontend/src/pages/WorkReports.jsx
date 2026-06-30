@@ -74,6 +74,8 @@ const WorkReports = () => {
     employees,
     dailyReports: rawReports,
     setDailyReports: setReports,
+    addDailyReport,
+    projectsList,
     updateDailyReportStatus,
     activityLogs,
     notifications: globalNotifications,
@@ -89,8 +91,9 @@ const WorkReports = () => {
 
   const initialUserRole = useMemo(() => {
     if (currentUserRole === 'super_admin') return 'Super Admin';
-    if (currentUserRole === 'branch_admin' || currentUserRole === 'dept_admin') return 'HR/Admin';
-    if (currentUserRole === 'project_manager') return 'Project Manager';
+    if (currentUserRole === 'company_admin') return 'Company Admin';
+    if (currentUserRole === 'branch_admin' || currentUserRole === 'dept_admin' || currentUserRole === 'hr') return 'HR/Admin';
+    if (currentUserRole === 'project_manager' || currentUserRole === 'manager') return 'Project Manager';
     if (currentUserRole === 'team_leader') return 'Team Leader';
     return 'Employee';
   }, [currentUserRole]);
@@ -103,6 +106,98 @@ const WorkReports = () => {
   }, [initialUserRole]);
 
   const isEmployee = currentUserRole === 'employee' || userRole === 'Employee';
+
+  const getAssignedTasksCountForProject = (projectName) => {
+    if (!projectName) return 0;
+    const normalizeName = (name) => {
+      if (!name) return '';
+      return name.trim().replace(/\s+/g, ' ').toLowerCase();
+    };
+    const normCurrentUserName = normalizeName(currentUser?.name);
+    
+    const proj = (projectsList || []).find(p => p.name === projectName);
+    if (!proj || !proj.tasks) return 0;
+    
+    let count = 0;
+    proj.tasks.forEach(t => {
+      const isCurrentUserAssigned = (t.assignedTo && t.assignedTo.map(normalizeName).includes(normCurrentUserName)) ||
+                                     (t.assigneeName && normalizeName(t.assigneeName).includes(normCurrentUserName)) ||
+                                     (t.assigneeId && currentUser && t.assigneeId === currentUser.id);
+      if (isCurrentUserAssigned) {
+        count++;
+      }
+    });
+    return count;
+  };
+
+  const [formData, setFormData] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    project: '',
+    tasksAssigned: 0,
+    tasksCompleted: 0,
+    summary: '',
+    majorAccomplishments: ''
+  });
+
+  const handleProjectChange = (projectName) => {
+    const assignedTasks = getAssignedTasksCountForProject(projectName);
+    setFormData(prev => ({
+      ...prev,
+      project: projectName,
+      tasksAssigned: assignedTasks,
+      tasksCompleted: 0
+    }));
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.project.trim()) {
+      addToast('warning', 'Please specify the project name.');
+      return;
+    }
+    if (!formData.summary.trim()) {
+      addToast('warning', 'Please provide a daily work summary.');
+      return;
+    }
+    if (!formData.majorAccomplishments.trim()) {
+      addToast('warning', 'Please list your major accomplishments.');
+      return;
+    }
+
+    const payload = {
+      ...formData,
+      employeeId: currentUser?.employeeId || currentUser?.id || 'GATECO-EMP-001',
+      employeeName: currentUser?.name || 'Employee',
+      department: currentUser?.department || 'IT',
+      team: currentUser?.teamName || 'Operations',
+      submittedTime: new Date().toISOString(),
+      status: 'Submitted',
+      productivityScore: Math.min(100, Math.round((formData.tasksCompleted / Math.max(1, formData.tasksAssigned)) * 100)),
+      approvalHistory: [
+        {
+          role: 'Employee',
+          user: currentUser?.name || 'Employee',
+          action: 'Submitted',
+          timestamp: new Date().toISOString(),
+          comments: 'Daily report submitted.'
+        }
+      ]
+    };
+
+    try {
+      const result = await addDailyReport(payload);
+      if (result) {
+        addToast('success', 'Daily work report submitted successfully!');
+        setFormData(prev => ({
+          ...prev,
+          summary: '',
+          majorAccomplishments: ''
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   /* Page Tabs Controller */
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, directory, submit, calendar, analytics, leaderboards, logs
@@ -478,8 +573,8 @@ const WorkReports = () => {
 
 
   /* Calendar Monthly navigation */
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState(5); // June (0-indexed base)
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth()); // 0-indexed base
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   /* Export system mock animation states */
@@ -818,9 +913,217 @@ const WorkReports = () => {
 
   return (
     <div className="work-reports-page animate-fade-in">
-      
-      {/* ── HEADER ── */}
-      <div className="reports-header flex-row justify-between flex-wrap gap-4">
+      {isEmployee ? (
+        <>
+          {/* ── EMPLOYEE HEADER ── */}
+          <div className="reports-header flex-row justify-between flex-wrap gap-4">
+            <div className="reports-title-section">
+              <h1>My Daily Work Reports</h1>
+              <p className="subtitle">Submit your daily work reports and track your submission history.</p>
+            </div>
+            <div className="flex-center gap-3">
+              <Button variant="ghost" size="sm" icon={Download} onClick={() => handleExportSystem('CSV')}>
+                {exporting ? 'Exporting...' : 'Export My Reports'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="employee-layout-grid">
+            {/* LEFT COLUMN: Submit Form */}
+            <div className="card padding-5 employee-submit-card animate-slide-up">
+              <div className="flex-row align-center gap-2" style={{ marginBottom: 16 }}>
+                <Plus size={18} style={{ color: 'var(--color-primary)' }} />
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Submit Daily Report</h2>
+              </div>
+
+              <form onSubmit={handleFormSubmit} className="flex-column gap-4">
+                {/* Row 1: Date & Project */}
+                <div className="form-row-2">
+                  <div className="form-group-item">
+                    <label className="reports-form-lbl">Report Date *</label>
+                    <input
+                      type="date"
+                      className="reports-form-input"
+                      value={formData.date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="form-group-item">
+                    <label className="reports-form-lbl">Project Name / Client *</label>
+                    <select
+                      className="reports-form-input"
+                      value={formData.project}
+                      onChange={(e) => handleProjectChange(e.target.value)}
+                      required
+                    >
+                      <option value="">— Select Project —</option>
+                      {(projectsList || []).map(p => (
+                        <option key={p.id || p.name} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 2: Timings & Hours */}
+
+                {/* Row 3: Tasks Counts */}
+                <div className="form-row-2">
+                  <div className="form-group-item">
+                    <label className="reports-form-lbl">Tasks Assigned *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="reports-form-input"
+                      value={formData.tasksAssigned}
+                      readOnly
+                      required
+                    />
+                  </div>
+                  <div className="form-group-item">
+                    <label className="reports-form-lbl">Tasks Completed *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="reports-form-input"
+                      value={formData.tasksCompleted}
+                      onChange={(e) => setFormData(prev => ({ ...prev, tasksCompleted: parseInt(e.target.value, 10) || 0 }))}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Row 4: Summary & Accomplishments */}
+                <div className="form-group-item">
+                  <label className="reports-form-lbl">Daily Work Summary *</label>
+                  <textarea
+                    className="reports-form-textarea"
+                    rows={3}
+                    placeholder="Describe the specific tasks you worked on today..."
+                    value={formData.summary}
+                    onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="form-group-item">
+                  <label className="reports-form-lbl">Major Accomplishments *</label>
+                  <textarea
+                    className="reports-form-textarea"
+                    rows={2}
+                    placeholder="Key accomplishments or milestones reached..."
+                    value={formData.majorAccomplishments}
+                    onChange={(e) => setFormData(prev => ({ ...prev, majorAccomplishments: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <Button type="submit" variant="primary" icon={Send} fullWidth>
+                    Submit Daily Work Report
+                  </Button>
+                </div>
+              </form>
+            </div>
+
+            {/* RIGHT COLUMN: Submitted Reports List */}
+            <div className="card padding-5 employee-history-card flex-column animate-slide-up">
+              <div className="flex-row align-center gap-2" style={{ marginBottom: 16 }}>
+                <FileText size={18} style={{ color: 'var(--color-primary)' }} />
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>My Submitted Reports</h2>
+              </div>
+
+              {/* Quick Filters */}
+              <div className="reports-filters-group flex-row gap-2" style={{ marginBottom: 16 }}>
+                <div className="reports-search-box flex-1">
+                  <Search size={14} />
+                  <input
+                    type="text"
+                    placeholder="Search project or summary..."
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                    style={{ height: '32px', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  className="reports-select-filter"
+                  style={{ height: '32px', fontSize: '0.8rem', padding: '0 8px' }}
+                >
+                  <option value="All">All Statuses</option>
+                  <option>Submitted</option>
+                  <option>Approved</option>
+                  <option>Changes Requested</option>
+                  <option>Escalated</option>
+                  <option>Rejected</option>
+                </select>
+              </div>
+
+              <div className="reports-table-wrap flex-1" style={{ overflowY: 'auto' }}>
+                <table className="reports-data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Project</th>
+                      <th>Tasks</th>
+                      <th>Hours</th>
+                      <th>Status</th>
+                      <th className="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedList.length > 0 ? pagedList.map(report => (
+                      <tr key={report.id}>
+                        <td>{report.date}</td>
+                        <td><Badge variant="neutral">{report.project}</Badge></td>
+                        <td>{report.tasksCompleted}/{report.tasksAssigned}</td>
+                        <td>{report.workingHours} hrs</td>
+                        <td><Badge variant={getStatusBadgeVariant(report.status)}>{report.status}</Badge></td>
+                        <td className="text-right">
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            icon={Eye}
+                            onClick={() => {
+                              setSelectedReport(report);
+                              setEvaluationFeedback(report.feedback || '');
+                            }}
+                          >
+                            View
+                          </Button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={6} className="reports-table-empty">
+                          <FileText size={24} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 8 }} />
+                          <p style={{ fontSize: '0.8rem' }}>No reports found.</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="reports-pagination flex-row justify-between" style={{ marginTop: 16 }}>
+                <span className="pagination-info-text" style={{ fontSize: '0.75rem' }}>
+                  Showing {sorted.length === 0 ? 0 : (page - 1) * itemsPerPage + 1}–{Math.min(page * itemsPerPage, sorted.length)} of {sorted.length} logs
+                </span>
+                <div className="flex-center gap-1">
+                  <button className="pagination-btn-arrow" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Page {page} of {totalPages}</span>
+                  <button className="pagination-btn-arrow" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* ── HEADER ── */}
+          <div className="reports-header flex-row justify-between flex-wrap gap-4">
         <div className="reports-title-section">
           <h1>Work Reports</h1>
           <p className="subtitle">Submit updates, audit timesheets, track deliverables, and manage employee productivity.</p>
@@ -884,25 +1187,25 @@ const WorkReports = () => {
             <div className="card stat-metric-card border-left-blue">
               <span className="card-lbl-gray">Total Submissions</span>
               <div className="card-value-display text-white">{stats.total}</div>
-              <span className="card-sub-desc">↑ 12% vs previous period</span>
+              <span className="card-sub-desc">Logged submission entries</span>
             </div>
             
             <div className="card stat-metric-card border-left-warning">
               <span className="card-lbl-gray">Pending Review</span>
               <div className="card-value-display text-warning">{stats.pending}</div>
-              <span className="card-sub-desc">Awaiting manager validation</span>
+              <span className="card-sub-desc">{stats.total > 0 ? Math.round((stats.pending / stats.total) * 100) : 0}% of submissions</span>
             </div>
 
             <div className="card stat-metric-card border-left-success">
               <span className="card-lbl-gray">Approved Logs</span>
               <div className="card-value-display text-success">{stats.approved}</div>
-              <span className="card-sub-desc">Verified timesheets & goals</span>
+              <span className="card-sub-desc">{stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}% approval rate</span>
             </div>
 
             <div className="card stat-metric-card border-left-danger">
               <span className="card-lbl-gray">Flags & Rejections</span>
               <div className="card-value-display text-danger">{stats.rejected}</div>
-              <span className="card-sub-desc">Clarifications requested</span>
+              <span className="card-sub-desc">{stats.total > 0 ? Math.round((stats.rejected / stats.total) * 100) : 0}% revision rate</span>
             </div>
           </div>
 
@@ -911,25 +1214,25 @@ const WorkReports = () => {
               <div className="card stat-metric-card border-left-teal">
                 <span className="card-lbl-gray">Active Workforce Logged</span>
                 <div className="card-value-display text-teal">{stats.activeReporting} Staff</div>
-                <span className="card-sub-desc">Reporting to date</span>
+                <span className="card-sub-desc">{employees.length > 0 ? Math.round((stats.activeReporting / employees.length) * 100) : 0}% of workforce</span>
               </div>
 
               <div className="card stat-metric-card border-left-purple">
                 <span className="card-lbl-gray">Avg Productivity Score</span>
                 <div className="card-value-display text-purple">{stats.avgProductivity}%</div>
-                <span className="card-sub-desc">Calculated completion matrix</span>
+                <span className="card-sub-desc">Calculated performance average</span>
               </div>
 
               <div className="card stat-metric-card border-left-orange">
                 <span className="card-lbl-gray">Missing Reports</span>
                 <div className="card-value-display text-orange">{missingReportsCount} Alerts</div>
-                <span className="card-sub-desc">From active roster teams</span>
+                <span className="card-sub-desc">{reports.length + missingReportsCount > 0 ? Math.round((reports.length / (reports.length + missingReportsCount)) * 100) : 100}% compliance rate</span>
               </div>
 
               <div className="card stat-metric-card border-left-neutral">
                 <span className="card-lbl-gray">Late Submissions</span>
                 <div className="card-value-display text-white">{lateSubmissionsCount} Records</div>
-                <span className="card-sub-desc">Past 18:00 cutoff deadline</span>
+                <span className="card-sub-desc">{stats.total > 0 ? Math.round((lateSubmissionsCount / stats.total) * 100) : 0}% after-hours entries</span>
               </div>
             </div>
           ) : (
@@ -1259,7 +1562,7 @@ const WorkReports = () => {
             </div>
             <div className="calendar-days-grid">
               {calendarDays.map((cell, idx) => {
-                const isToday = cell.dateStr === '2026-06-03';
+                const isToday = cell.dateStr === new Date().toISOString().slice(0, 10);
                 const hasSub = cell.reports.length > 0;
                 
                 // Determine day status color
@@ -1569,6 +1872,8 @@ const WorkReports = () => {
           </div>
 
         </div>
+      )}
+      </>
       )}
 
       {/* ── Slide-over Detail Audit Drawer ── */}
