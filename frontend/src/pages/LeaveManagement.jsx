@@ -61,9 +61,23 @@ const LeaveManagement = () => {
     deleteHoliday,
     updateEmployee,
     departments: rawDepartments,
-    fetchLeaves
+    fetchLeaves,
+    hasPermission
   } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
+
+  const canManageLeaves = useMemo(() => {
+    if (typeof hasPermission !== 'function') return true;
+    return hasPermission('leave_management', 'create') || 
+           hasPermission('leave_management', 'update') || 
+           hasPermission('leave_management', 'approve') ||
+           hasPermission('leave_management', 'delete');
+  }, [hasPermission]);
+
+  const canApplyLeaveRole = useMemo(() => {
+    if (typeof hasPermission !== 'function') return true;
+    return hasPermission('leave_management', 'create');
+  }, [hasPermission]);
 
   // Primary Tab state: 'requests' | 'analytics' | 'balances' | 'holidays' | 'policies'
   const [activeTab, setActiveTab] = useState('requests');
@@ -1016,15 +1030,17 @@ const LeaveManagement = () => {
           >
             <Eye size={14} />
           </button>
-          <button
-            className="action-btn-mini edit-btn"
-            onClick={() => handleEditLeaveClick(row)}
-            title={row.status === 'Pending' ? "Edit Leave Request" : "Cannot edit approved/rejected requests"}
-            disabled={row.status !== 'Pending'}
-          >
-            <Edit size={14} />
-          </button>
-          {row.status === 'Pending' && currentUserRole !== 'employee' && (
+          {canManageLeaves && (
+            <button
+              className="action-btn-mini edit-btn"
+              onClick={() => handleEditLeaveClick(row)}
+              title={row.status === 'Pending' ? "Edit Leave Request" : "Cannot edit approved/rejected requests"}
+              disabled={row.status !== 'Pending'}
+            >
+              <Edit size={14} />
+            </button>
+          )}
+          {canManageLeaves && row.status === 'Pending' && currentUserRole !== 'employee' && (
             <>
               <button
                 className="action-btn-mini success-btn"
@@ -1460,27 +1476,27 @@ const LeaveManagement = () => {
           <p className="page-desc-text">Oversee balances, request approvals, policy overrides, and company calendars</p>
         </div>
         <div className="flex align-center gap-3">
-          {currentUserRole !== 'employee' && (
+          {canApplyLeaveRole && !['manager', 'company_admin', 'super_admin', 'companyadmin', 'superadmin'].includes(currentUserRole) && (
+            <Button
+              variant="primary"
+              icon={Plus}
+              onClick={() => {
+                setEditingLeave(null);
+                setApplyForm({
+                  employeeId: currentUser?.id || '',
+                  customLeaveType: 'CL',
+                  startDate: new Date().toISOString().split('T')[0],
+                  days: 1,
+                  reason: ''
+                });
+                setApplyModalOpen(true);
+              }}
+            >
+              Apply Leave
+            </Button>
+          )}
+          {currentUserRole !== 'employee' && canManageLeaves && (
             <>
-              {currentUserRole === 'manager' && (
-                <Button
-                  variant="primary"
-                  icon={Plus}
-                  onClick={() => {
-                    setEditingLeave(null);
-                    setApplyForm({
-                      employeeId: currentUser?.id || '',
-                      customLeaveType: 'CL',
-                      startDate: new Date().toISOString().split('T')[0],
-                      days: 1,
-                      reason: ''
-                    });
-                    setApplyModalOpen(true);
-                  }}
-                >
-                  Apply Leave
-                </Button>
-              )}
               <Button variant="secondary" icon={Settings2} onClick={() => { setActiveTab('policies'); addToast('info', 'Viewing Policy & Leave Settings'); }}>
                 Policy Controls
               </Button>
@@ -1944,7 +1960,7 @@ const LeaveManagement = () => {
                           </div>
                         </th>
                       ))}
-                      <th>Actions</th>
+                      {canManageLeaves && <th>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1990,17 +2006,19 @@ const LeaveManagement = () => {
                             </td>
                           );
                         })}
-                        <td>
-                          {currentUserRole !== 'employee' && (
-                            <button
-                              className="action-btn-mini edit-btn"
-                              onClick={() => handleEditBalanceClick(emp)}
-                              title="Edit Quotas"
-                            >
-                              <Edit size={14} />
-                            </button>
-                          )}
-                        </td>
+                        {canManageLeaves && (
+                          <td>
+                            {currentUserRole !== 'employee' && (
+                              <button
+                                className="action-btn-mini edit-btn"
+                                onClick={() => handleEditBalanceClick(emp)}
+                                title="Edit Quotas"
+                              >
+                                <Edit size={14} />
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -2199,7 +2217,7 @@ const LeaveManagement = () => {
                   <h4>Company Holiday Calendar</h4>
                   <p className="text-muted text-xs">Approved scheduled holidays for the current fiscal calendar year</p>
                 </div>
-                {currentUserRole !== 'employee' && (
+                {currentUserRole !== 'employee' && canManageLeaves && (
                   <div className="flex-center gap-2">
                     <Button variant="secondary" icon={Plus} onClick={() => setShowAddHolidayModal(true)}>
                       Add Holiday
@@ -2216,7 +2234,7 @@ const LeaveManagement = () => {
                       <th>Holiday Description</th>
                       <th>Category</th>
                       <th>Detailed Summary</th>
-                      {currentUserRole !== 'employee' && <th>Actions</th>}
+                      {currentUserRole !== 'employee' && canManageLeaves && <th>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -2234,13 +2252,13 @@ const LeaveManagement = () => {
                           </Badge>
                         </td>
                         <td className="text-secondary text-xs">{hol.description}</td>
-                        {currentUserRole !== 'employee' && (
+                        {currentUserRole !== 'employee' && canManageLeaves && (
                           <td>
                             <div className="table-actions-cell" onClick={(e) => e.stopPropagation()}>
                               <button
                                 className="action-btn-mini danger-btn"
                                 onClick={() => handleDeleteHolidayClick(hol)}
-                                title="Delete Holiday"
+                                  title="Delete Holiday"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -2343,17 +2361,19 @@ const LeaveManagement = () => {
                 <Database size={18} className="text-primary" />
                 <h4>Global Leave Policy Configuration Table</h4>
               </div>
-              <div className="flex-center gap-2">
-                <Button variant="primary" icon={Plus} onClick={() => setShowAssignLeaveModal(true)} disabled={true}>
-                  Leave assign
-                </Button>
-                <Button variant="danger" icon={RefreshCw} onClick={handleResetAllPolicies}>
-                  Reset to Default
-                </Button>
-                <Button variant="primary" icon={Plus} onClick={() => setShowAddPolicyModal(true)}>
-                  Add New Policy
-                </Button>
-              </div>
+              {canManageLeaves && (
+                <div className="flex-center gap-2">
+                  <Button variant="primary" icon={Plus} onClick={() => setShowAssignLeaveModal(true)} disabled={true}>
+                    Leave assign
+                  </Button>
+                  <Button variant="danger" icon={RefreshCw} onClick={handleResetAllPolicies}>
+                    Reset to Default
+                  </Button>
+                  <Button variant="primary" icon={Plus} onClick={() => setShowAddPolicyModal(true)}>
+                    Add New Policy
+                  </Button>
+                </div>
+              )}
             </div>
             <p className="text-xs text-muted mt-2">
               Configure default leave quotas for all employees. Changes here will apply as default entitlements during leave balance initialization.
@@ -2417,7 +2437,7 @@ const LeaveManagement = () => {
                       <th>Gender Restriction</th>
                       <th>Status</th>
                       <th>Description</th>
-                      <th>Actions</th>
+                      {canManageLeaves && <th>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -2450,6 +2470,7 @@ const LeaveManagement = () => {
                           <button
                             className={`status-toggle-btn ${policy.isActive ? 'active' : 'inactive'}`}
                             onClick={() => handleTogglePolicyStatus(policy.id, policy.isActive)}
+                            disabled={!canManageLeaves}
                           >
                             {policy.isActive ? 'Active' : 'Inactive'}
                           </button>
@@ -2459,24 +2480,26 @@ const LeaveManagement = () => {
                             {policy.description.length > 35 ? policy.description.substring(0, 35) + '...' : policy.description}
                           </span>
                         </td>
-                        <td>
-                          <div className="policy-actions">
-                            <button
-                              className="action-btn-mini edit-btn"
-                              onClick={() => handleEditPolicyClick(policy)}
-                              title="Edit Policy"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              className="action-btn-mini danger-btn"
-                              onClick={() => setShowDeletePolicyConfirm(policy)}
-                              title="Delete Policy"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </td>
+                        {canManageLeaves && (
+                          <td>
+                            <div className="policy-actions">
+                              <button
+                                className="action-btn-mini edit-btn"
+                                onClick={() => handleEditPolicyClick(policy)}
+                                title="Edit Policy"
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button
+                                className="action-btn-mini danger-btn"
+                                onClick={() => setShowDeletePolicyConfirm(policy)}
+                                title="Delete Policy"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -2771,7 +2794,7 @@ const LeaveManagement = () => {
         title="Leave Request Details"
         size="md"
         footer={
-          (selectedLeave?.status === 'Pending' && currentUserRole !== 'employee') ? (
+          (selectedLeave?.status === 'Pending' && currentUserRole !== 'employee' && canManageLeaves) ? (
             <div className="modal-actions-wrapper">
               <Button
                 variant="secondary"

@@ -51,7 +51,7 @@ const AVATAR_COLORS = ['#ec4899','#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d
 
 export default function Calendar() {
   const isLoading = usePageLoading(600);
-  const { token, addToast, showConfirm, employees = [], currentUser = null, currentUserRole = '', attendanceRules = {} } = useApp();
+  const { token, addToast, showConfirm, employees = [], departments = [], currentUser = null, currentUserRole = '', attendanceRules = {}, hasPermission } = useApp();
 
   const todayNavLabel = useMemo(() => {
     return new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
@@ -67,6 +67,8 @@ export default function Calendar() {
   const [isDetailsOpen,  setIsDetailsOpen]  = useState(false);
   const [selectedEvent,  setSelectedEvent]  = useState(null);
   const [formState,      setFormState]      = useState(BLANK_FORM);
+  const [submitting,     setSubmitting]     = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState('');
 
   // ── Attendees Dropdown State & Ref ──
   const dropdownRef = useRef(null);
@@ -89,6 +91,7 @@ export default function Calendar() {
     if (!isFormOpen) {
       setIsDropdownOpen(false);
       setAttendeeSearchQuery('');
+      setSelectedDepartment('');
     }
   }, [isFormOpen]);
 
@@ -98,7 +101,7 @@ export default function Calendar() {
 
     const isAdmin = currentUserRole === 'super_admin' || currentUserRole === 'admin' || currentUserRole === 'branch_admin';
 
-    return employees.filter(emp => {
+    let filtered = employees.filter(emp => {
       // Exclude self (the logged-in user)
       const isSelf = emp.id === currentUser.id || 
                      emp.employeeId === currentUser.id || 
@@ -128,7 +131,13 @@ export default function Calendar() {
 
       return sameTeam || sameDept || isTL;
     });
-  }, [employees, currentUser, currentUserRole]);
+
+    if (selectedDepartment) {
+      filtered = filtered.filter(emp => emp.department && emp.department.toLowerCase().trim() === selectedDepartment.toLowerCase().trim());
+    }
+
+    return filtered;
+  }, [employees, currentUser, currentUserRole, selectedDepartment]);
 
   // Search filtered employees list
   const searchedDropdownEmployees = useMemo(() => {
@@ -268,10 +277,13 @@ export default function Calendar() {
   // ── Role-based action access ──
   const canModify = useCallback((evt) => {
     if (!evt || !currentUser) return false;
+    const hasWritePermission = typeof hasPermission === 'function' && (hasPermission('announcements', 'update') || hasPermission('announcements', 'delete'));
+    if (!hasWritePermission) return false;
+
     const isAdmin = currentUserRole === 'super_admin' || currentUserRole === 'admin' || currentUserRole === 'branch_admin' || currentUserRole === 'hr' || currentUserRole === 'hr_manager';
     const isCreator = evt.createdBy && (evt.createdBy.id === currentUser.id || evt.createdBy._id === currentUser._id);
     return isAdmin || isCreator;
-  }, [currentUser, currentUserRole]);
+  }, [currentUser, currentUserRole, hasPermission]);
 
   const isUserSenior = useMemo(() => {
     if (!currentUser) return false;
@@ -406,9 +418,12 @@ export default function Calendar() {
 
   // ── Event handlers ──
   const openAddEvent = useCallback((date = new Date()) => {
+    if (typeof hasPermission === 'function' && !hasPermission('announcements', 'create')) {
+      return;
+    }
     setFormState({ ...BLANK_FORM, date: formatDate(date) });
     setIsFormOpen(true);
-  }, []);
+  }, [hasPermission]);
 
   const openEditEvent = useCallback((evt) => {
     setFormState({
@@ -429,9 +444,21 @@ export default function Calendar() {
 
   const handleSaveEvent = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     if (!formState.title.trim()) { addToast('error', 'Event title is required.'); return; }
     if (formState.date < todayStr) {
       addToast('error', 'Cannot schedule events before today.');
+      return;
+    }
+
+    // Past time validation
+    const now = new Date();
+    const currentHours = String(now.getHours()).padStart(2, '0');
+    const currentMinutes = String(now.getMinutes()).padStart(2, '0');
+    const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+    if (formState.date === todayStr && formState.time < currentTimeStr) {
+      addToast('error', 'Cannot schedule events in the past time.');
       return;
     }
     
@@ -475,6 +502,7 @@ export default function Calendar() {
     };
 
     try {
+      setSubmitting(true);
       let response;
       if (formState.id) {
         // Update
@@ -519,6 +547,8 @@ export default function Calendar() {
     } catch (err) {
       console.error('Error saving event:', err);
       addToast('error', 'An error occurred while saving the event.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -546,7 +576,12 @@ export default function Calendar() {
     }, 'danger');
   }, [showConfirm, addToast, token, fetchEvents]);
 
-  const handleCellClick     = (date) => { setSelectedDate(date); openAddEvent(date); };
+  const handleCellClick     = (date) => {
+    setSelectedDate(date);
+    if (typeof hasPermission === 'function' && hasPermission('announcements', 'create')) {
+      openAddEvent(date);
+    }
+  };
   const handleEventClick    = (e, evt) => { e.stopPropagation(); setSelectedEvent(evt); setIsDetailsOpen(true); };
 
   // ── Attendee avatars ──
@@ -673,10 +708,12 @@ export default function Calendar() {
           </div>
 
           {/* New event button */}
-          <button id="cal-new-event-btn" className="cal-new-btn" onClick={() => openAddEvent(selectedDate)}>
-            <Plus size={16} />
-            New Event
-          </button>
+          {typeof hasPermission === 'function' && hasPermission('announcements', 'create') && (
+            <button id="cal-new-event-btn" className="cal-new-btn" onClick={() => openAddEvent(selectedDate)}>
+              <Plus size={16} />
+              New Event
+            </button>
+          )}
         </div>
       </div>
 
@@ -878,7 +915,7 @@ export default function Calendar() {
                       <span className={`cal-date-num ${isToday ? 'cal-date-num--today' : ''}`}>
                         {cell.date.getDate()}
                       </span>
-                      {ds >= todayStr && (
+                      {ds >= todayStr && typeof hasPermission === 'function' && hasPermission('announcements', 'create') && (
                         <button
                           className="cal-cell-add-btn"
                           title="Add event on this day"
@@ -982,7 +1019,7 @@ export default function Calendar() {
                         </div>
                       ))}
 
-                      {ds >= todayStr && (
+                      {ds >= todayStr && typeof hasPermission === 'function' && hasPermission('announcements', 'create') && (
                         <div className="cal-week-add-slot" onClick={() => handleCellClick(date)}>
                           <Plus size={12} /> Add
                         </div>
@@ -1296,6 +1333,20 @@ export default function Calendar() {
                   />
                 </div>
                 <div className="cal-form__group">
+                  <label className="cal-form__label" htmlFor="evt-department">Department Filter</label>
+                  <select
+                    id="evt-department"
+                    className="cal-form__input"
+                    value={selectedDepartment}
+                    onChange={(e) => setSelectedDepartment(e.target.value)}
+                  >
+                    <option value="">All Departments</option>
+                    {departments.filter(d => d.status === 'Active').map(d => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="cal-form__group">
                   <label className="cal-form__label">Attendees</label>
                   <div className="cal-attendees-select" ref={dropdownRef}>
                     <div
@@ -1393,12 +1444,12 @@ export default function Calendar() {
 
               {/* Footer */}
               <div className="cal-form__footer">
-                <button type="button" className="cal-btn cal-btn--ghost" onClick={() => setIsFormOpen(false)}>
+                <button type="button" className="cal-btn cal-btn--ghost" onClick={() => setIsFormOpen(false)} disabled={submitting}>
                   Cancel
                 </button>
-                <button type="submit" className="cal-btn cal-btn--primary">
+                <button type="submit" className="cal-btn cal-btn--primary" disabled={submitting}>
                   <Check size={14} />
-                  {formState.id ? 'Save Changes' : 'Schedule Event'}
+                  {submitting ? 'Saving...' : (formState.id ? 'Save Changes' : 'Schedule Event')}
                 </button>
               </div>
             </form>

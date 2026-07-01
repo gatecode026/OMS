@@ -38,10 +38,19 @@ export class AttendanceQueryBuilder {
       }
     }
 
-    // Team Leader sees only members of their assigned team
+    // Team Leader sees only members of their assigned team (plus their own)
     if (this.context.isTeamLeader) {
       const teamEmployeeIds = this.context.teamEmployeeIds || [];
-      filters.employeeId = { $in: teamEmployeeIds };
+      const allowedIds = [...teamEmployeeIds, this.context.userId];
+      if (incomingQuery.employeeId) {
+        if (allowedIds.includes(incomingQuery.employeeId)) {
+          filters.employeeId = incomingQuery.employeeId;
+        } else {
+          filters.employeeId = 'UNAUTHORIZED';
+        }
+      } else {
+        filters.employeeId = { $in: allowedIds };
+      }
     }
 
     // Standard employee can only see their own attendance logs
@@ -78,7 +87,8 @@ export class AttendanceQueryBuilder {
 
     if (this.context.isTeamLeader) {
       const teamEmployeeIds = this.context.teamEmployeeIds || [];
-      filters.employeeId = { $in: teamEmployeeIds };
+      const allowedIds = [...teamEmployeeIds, this.context.userId];
+      filters.employeeId = { $in: allowedIds };
     }
 
     if (this.context.isEmployee) {

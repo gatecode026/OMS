@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import './Attendance.css';
+import './EmployeeDashboard.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +13,7 @@ import MonthlyDonutChart from '../components/MonthlyDonutChart';
 import LiveActivityFeed from '../components/LiveActivityFeed';
 import useMyAttendance from '../hooks/useMyAttendance';
 import usePageLoading from '../hooks/usePageLoading';
+import MarkAttendanceModal from '../components/employeeDashboard/modals/MarkAttendanceModal';
 import DataTable from '../components/common/DataTable';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
@@ -201,9 +203,10 @@ const Attendance = () => {
     addToast,
     currentUser,
     currentUserRole,
-    fetchAttendance,
     fetchEmployees,
-    attendanceRules
+    fetchAttendance,
+    attendanceRules,
+    hasPermission
   } = useApp();
 
   const [personalTab, setPersonalTab] = useState('today'); // today, 7days, month, custom
@@ -240,6 +243,16 @@ const Attendance = () => {
     records: personalRecords,
     refetch: personalRefetch
   } = useMyAttendance(personalFilters);
+
+  console.log('DEBUG Attendance.jsx: personalTodayRecord =', personalTodayRecord, 'loading =', personalLoading);
+
+  const canManageAttendance = useMemo(() => {
+    if (typeof hasPermission !== 'function') return true;
+    return hasPermission('attendance_management', 'create') || 
+           hasPermission('attendance_management', 'update') || 
+           hasPermission('attendance_management', 'approve') ||
+           hasPermission('attendance_management', 'delete');
+  }, [hasPermission]);
 
   const scopedEmployees = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin') return employees;
@@ -298,6 +311,7 @@ const Attendance = () => {
 
   // Mark Attendance state
   const [markModalOpen, setMarkModalOpen] = useState(false);
+  const [selfAttModalOpen, setSelfAttModalOpen] = useState(false);
   const [markFormData, setMarkFormData] = useState({
     employeeId: '',
     employeeName: '',
@@ -1019,6 +1033,12 @@ const Attendance = () => {
   }, [scopedEmployees, searchQuery, deptFilter, branchFilter, shiftFilter]);
 
   const totalEmployees = filteredEmployeesCount;
+
+  const joinedThisMonth = useMemo(() => {
+    const currentYearMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+    return scopedEmployees.filter(e => e.joinDate && e.joinDate.startsWith(currentYearMonth)).length;
+  }, [scopedEmployees]);
+
   const totalPresent = useMemo(() => kpiFilteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length, [kpiFilteredAttendance]);
   const totalLate = useMemo(() => kpiFilteredAttendance.filter(a => a.status === 'Late').length, [kpiFilteredAttendance]);
   const totalAbsent = useMemo(() => kpiFilteredAttendance.filter(a => a.status === 'Absent').length, [kpiFilteredAttendance]);
@@ -1030,6 +1050,30 @@ const Attendance = () => {
     const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
     return Math.min(rawRate, 100);
   }, [totalEmployees, totalPresent, totalHalfDay, totalWFH]);
+
+  const rateComparison = useMemo(() => {
+    const today = new Date(dateFilter || getLocalDateString());
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const yesterdayRecords = (attendance || []).filter(a => a.date === yesterdayStr);
+    const scopedYesterdayRecords = yesterdayRecords.filter(a => {
+      const emp = scopedEmployees.find(e => e.id === a.employeeId);
+      return !!emp;
+    });
+
+    const yesterdayPresent = scopedYesterdayRecords.filter(a => ['Present', 'Overtime'].includes(a.status)).length;
+    const yesterdayHalfDay = scopedYesterdayRecords.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
+    const yesterdayWFH = scopedYesterdayRecords.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length;
+
+    const yesterdayRate = totalEmployees > 0 ? Math.round(((yesterdayPresent + yesterdayHalfDay + yesterdayWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
+    const rateDiff = attendanceRate - Math.min(yesterdayRate, 100);
+    return {
+      diff: rateDiff,
+      label: `${rateDiff >= 0 ? '+' : ''}${rateDiff}% vs yesterday`
+    };
+  }, [attendance, dateFilter, scopedEmployees, totalEmployees, attendanceRate]);
 
   // Get counts by status for clickable cards
   const statusCounts = useMemo(() => {
@@ -1240,7 +1284,7 @@ const Attendance = () => {
         )
       }
     ];
-    if (currentUserRole === 'employee') {
+    if (currentUserRole === 'employee' || !canManageAttendance) {
       return cols.filter(c => c.key !== 'actions');
     }
     return cols;
@@ -1589,7 +1633,7 @@ const Attendance = () => {
           }} icon={RefreshCw} size="sm">
             Refresh
           </Button>
-          {currentUserRole !== 'employee' && (
+          {currentUserRole !== 'employee' && canManageAttendance && (
             <>
               <Button variant="secondary" onClick={() => setShiftModalOpen(true)} icon={Clock} size="sm">
                 Assign Shift
@@ -1602,7 +1646,12 @@ const Attendance = () => {
               </Button>
             </>
           )}
-          {currentUserRole !== 'employee' && (
+          {currentUserRole !== 'employee' && currentUserRole !== 'company_admin' && currentUserRole !== 'super_admin' && currentUserRole !== 'SuperAdmin' && (
+            <Button variant="primary" onClick={() => setSelfAttModalOpen(true)} icon={Plus}>
+              Self Attendance
+            </Button>
+          )}
+          {currentUserRole !== 'employee' && canManageAttendance && (
             <Button variant="primary" onClick={() => setMarkModalOpen(true)} icon={Plus}>
               Mark Attendance
             </Button>
@@ -1662,8 +1711,8 @@ const Attendance = () => {
             </div>
             <div className="att-kpi-value">{totalEmployees.toLocaleString()}</div>
             <div className="att-kpi-sub">
-              <TrendingUp size={11} />
-              <span>+12 this month</span>
+              {joinedThisMonth >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              <span>{joinedThisMonth >= 0 ? `+${joinedThisMonth}` : joinedThisMonth} this month</span>
             </div>
           </div>
 
@@ -1742,8 +1791,8 @@ const Attendance = () => {
             </div>
             <div className="att-kpi-value">{attendanceRate}%</div>
             <div className="att-kpi-sub">
-              <TrendingUp size={11} />
-              <span>+2.1% vs last week</span>
+              {rateComparison.diff >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              <span>{rateComparison.label}</span>
             </div>
           </div>
         </div>
@@ -2557,6 +2606,17 @@ const Attendance = () => {
           </div>
         </div>
       </Modal>
+
+      <MarkAttendanceModal
+        isOpen={selfAttModalOpen}
+        onClose={() => {
+          setSelfAttModalOpen(false);
+          personalRefetch();
+          fetchAttendance();
+        }}
+        todayRecord={personalTodayRecord || {}}
+        currentUser={currentUser || {}}
+      />
 
       {/* Assign Shift Modal */}
       <Modal isOpen={shiftModalOpen} onClose={() => setShiftModalOpen(false)} title="Assign Shift Schedule" size="sm"

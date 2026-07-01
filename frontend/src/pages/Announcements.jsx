@@ -106,7 +106,7 @@ const Announcements = () => {
   // Creation/Edit modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
-    title: '', category: 'Company', priority: 'Medium', description: '', publishDate: '', expiryDate: '',
+    title: '', category: 'Company', priority: 'Medium', description: '', publishDate: new Date().toISOString().split('T')[0], expiryDate: '',
     audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
   });
 
@@ -120,6 +120,7 @@ const Announcements = () => {
 
   // Page toast alerts
   const [pageToasts, setPageToasts] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const addPageToast = (type, message) => {
     const id = Date.now();
     setPageToasts(prev => [...prev, { id, type, message }]);
@@ -209,12 +210,22 @@ const Announcements = () => {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    await createAnnouncement(createForm);
-    setShowCreateModal(false);
-    setCreateForm({
-      title: '', category: 'Company', priority: 'Medium', description: '', publishDate: '', expiryDate: '',
-      audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
-    });
+    setSubmitting(true);
+    try {
+      const created = await createAnnouncement(createForm);
+      if (created) {
+        setSelectedAnn(created);
+      }
+    } catch (err) {
+      console.error('Failed to create announcement:', err);
+    } finally {
+      setSubmitting(false);
+      setShowCreateModal(false);
+      setCreateForm({
+        title: '', category: 'Company', priority: 'Medium', description: '', publishDate: new Date().toISOString().split('T')[0], expiryDate: '',
+        audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
+      });
+    }
   };
 
   const handleEmergencyTrigger = async (type) => {
@@ -383,16 +394,7 @@ const Announcements = () => {
         </div>
       </div>
 
-      {/* Primary Navigation Tabs */}
-      <div className="card tab-bar-card overflow-x-auto">
-        <div className="payroll-tabs-list">
-          <button onClick={() => setActiveTab('board')} className={`tab-btn ${activeTab === 'board' ? 'active' : ''}`}><Megaphone size={16} />Digital Notice Board</button>
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('management')} className={`tab-btn ${activeTab === 'management' ? 'active' : ''}`}><Sliders size={16} />Management Center</button>}
-          <button onClick={() => setActiveTab('analytics')} className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}><AreaChart size={16} />Reach & Engagement</button>
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('emergency')} className={`tab-btn ${activeTab === 'emergency' ? 'active' : ''}`}><ShieldAlert size={16} />Emergency Hub</button>}
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('tracking')} className={`tab-btn ${activeTab === 'tracking' ? 'active' : ''}`}><Users size={16} />Compliance Audits</button>}
-        </div>
-      </div>
+
 
       {/* ==================== TAB CONTENT: Notice Board ==================== */}
       {activeTab === 'board' && (
@@ -1002,9 +1004,10 @@ const Announcements = () => {
 
               <div className="grid-2-col gap-3">
                 <div>
-                  <label className="input-label">Publish Date (Leave blank for instant)</label>
+                  <label className="input-label">Publish Date</label>
                   <input
                     type="date"
+                    required
                     value={createForm.publishDate}
                     onChange={(e) => setCreateForm(prev => ({ ...prev, publishDate: e.target.value }))}
                     className="table-search-input width-full p-2"
@@ -1036,7 +1039,9 @@ const Announcements = () => {
 
             <div className="flex justify-end gap-3 border-top pt-4 mt-4">
               <Button variant="secondary" type="button" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-              <Button variant="primary" type="submit">Submit & Publish</Button>
+              <Button variant="primary" type="submit" disabled={submitting}>
+                {submitting ? 'Publishing...' : 'Submit & Publish'}
+              </Button>
             </div>
           </form>
         </div>

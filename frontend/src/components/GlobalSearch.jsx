@@ -40,7 +40,18 @@ const CATEGORY_META = {
 
 const GlobalSearch = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { employees, departments, branches, teams, tasks, leaveRequests, roles } = useApp();
+  const { 
+    employees, 
+    departments, 
+    branches, 
+    teams, 
+    tasks, 
+    leaveRequests, 
+    roles, 
+    currentUser, 
+    currentUserRole, 
+    projectsList 
+  } = useApp();
 
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -67,12 +78,59 @@ const GlobalSearch = ({ isOpen, onClose }) => {
     return () => document.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
 
+  const allowedPages = useMemo(() => {
+    if (currentUserRole === 'employee') {
+      return [
+        { name: 'Dashboard', path: '/', icon: 'hash', desc: 'Personal Workspace' },
+        { name: 'Attendance', path: '/attendance', icon: 'calendar', desc: 'My Attendance Logs' },
+        { name: 'Leave Management', path: '/leaves', icon: 'calendar', desc: 'My Leave Applications' },
+        { name: 'Tasks & Projects', path: '/tasks', icon: 'check', desc: 'My Work Items' },
+      ];
+    }
+    return PAGES;
+  }, [currentUserRole]);
+
+  const allowedCategoryMeta = useMemo(() => {
+    if (currentUserRole === 'employee') {
+      return {
+        projects: { label: 'Projects', icon: Briefcase, color: '#3b82f6' },
+        tasks: { label: 'Tasks', icon: CheckCircle, color: '#ec4899' },
+        leaves: { label: 'Leave Requests', icon: Calendar, color: '#f97316' },
+        pages: { label: 'Pages', icon: Hash, color: '#64748b' },
+      };
+    }
+    return CATEGORY_META;
+  }, [currentUserRole]);
+
   const q = query.toLowerCase().trim();
 
   const results = useMemo(() => {
     if (!q) return {};
 
     const match = (str) => (str || '').toLowerCase().includes(q);
+
+    if (currentUserRole === 'employee') {
+      const myTasks = tasks.filter(t => t.assigneeId === currentUser?.id || t.assignedTo?.includes(currentUser?.name));
+      const myLeaves = leaveRequests.filter(l => l.employeeId === currentUser?.id);
+      
+      const matchedProjects = (projectsList || []).filter(p => {
+        const isManager = p.manager?.toLowerCase() === currentUser?.name?.toLowerCase();
+        const isLeader = p.leader?.toLowerCase() === currentUser?.name?.toLowerCase();
+        const isMember = p.members?.some(m => m?.toLowerCase() === currentUser?.name?.toLowerCase());
+        const hasTask = p.tasks?.some(t => 
+          (t.assigneeId && t.assigneeId === currentUser?.id) || 
+          (t.assigneeName && t.assigneeName.toLowerCase() === currentUser?.name?.toLowerCase())
+        );
+        return isManager || isLeader || isMember || hasTask;
+      }).filter(p => match(p.name));
+
+      return {
+        projects: matchedProjects.slice(0, 4),
+        tasks: myTasks.filter(t => match(t.title) || match(t.project) || match(t.status)).slice(0, 4),
+        leaves: myLeaves.filter(l => match(l.type) || match(l.status)).slice(0, 4),
+        pages: allowedPages.filter(p => match(p.name) || match(p.desc)).slice(0, 4),
+      };
+    }
 
     return {
       employees: employees.filter(e =>
@@ -109,7 +167,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
         match(p.name) || match(p.desc)
       ).slice(0, 4),
     };
-  }, [q, employees, tasks, leaveRequests, roles]);
+  }, [q, employees, tasks, leaveRequests, roles, projectsList, currentUser, currentUserRole, allowedPages]);
 
   // Flatten all results for keyboard nav
   const flatResults = useMemo(() => {
@@ -163,6 +221,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
       case 'departments': navigate('/departments'); break;
       case 'branches': navigate('/branches'); break;
       case 'teams': navigate('/teams'); break;
+      case 'projects': navigate('/projects'); break;
       case 'tasks': navigate('/tasks'); break;
       case 'leaves': navigate('/leaves'); break;
       case 'roles': navigate('/permissions'); break;
@@ -234,6 +293,20 @@ const GlobalSearch = ({ isOpen, onClose }) => {
           </div>
         );
 
+      case 'projects':
+        return (
+          <div key={item.id} className={base} data-idx={globalIdx} onClick={() => handleSelect(cat, item)}>
+            <div className="gs-icon-dot" style={{ background: '#3b82f620', color: '#3b82f6' }}>
+              <Briefcase size={14} />
+            </div>
+            <div className="gs-item-info">
+              <span className="gs-item-primary">{item.name}</span>
+              <span className="gs-item-secondary">Status: {item.status} · Dept: {item.department}</span>
+            </div>
+            <ChevronRight size={14} className="gs-arrow" />
+          </div>
+        );
+
       case 'tasks':
         return (
           <div key={item.id} className={base} data-idx={globalIdx} onClick={() => handleSelect(cat, item)}>
@@ -299,7 +372,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const filters = ['all', ...Object.keys(CATEGORY_META)];
+  const filters = ['all', ...Object.keys(allowedCategoryMeta)];
   let globalIdx = 0;
 
   const visibleCategories = Object.entries(results).filter(([cat, items]) => {
@@ -318,7 +391,11 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             ref={inputRef}
             type="text"
             className="gs-input"
-            placeholder="Search employees, branches, departments, teams, tasks…"
+            placeholder={
+              currentUserRole === 'employee'
+                ? "Search tasks, projects, leaves..."
+                : "Search employees, branches, departments, teams, tasks…"
+            }
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
@@ -335,7 +412,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
         {/* Category Filters */}
         <div className="gs-filters">
           {filters.map(f => {
-            const meta = CATEGORY_META[f];
+            const meta = allowedCategoryMeta[f];
             const count = f === 'all' ? totalResults : (results[f]?.length || 0);
             return (
               <button
@@ -356,9 +433,13 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             <div className="gs-empty-state">
               <Search size={40} className="gs-empty-icon" />
               <p className="gs-empty-title">Global Search</p>
-              <p className="gs-empty-desc">Search across employees, branches, departments, teams, tasks, leaves, roles and pages</p>
+              <p className="gs-empty-desc">
+                {currentUserRole === 'employee'
+                  ? "Search across your tasks, projects, leaves and pages"
+                  : "Search across employees, branches, departments, teams, tasks, leaves, roles and pages"}
+              </p>
               <div className="gs-quick-nav">
-                {PAGES.slice(0, 6).map(p => (
+                {allowedPages.slice(0, 6).map(p => (
                   <button key={p.path} className="gs-quick-btn" onClick={() => { navigate(p.path); onClose(); }}>
                     <Hash size={12} />
                     {p.name}
@@ -370,11 +451,15 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             <div className="gs-empty-state">
               <Search size={36} className="gs-empty-icon" />
               <p className="gs-empty-title">No results for "{query}"</p>
-              <p className="gs-empty-desc">Try a different keyword — employee name, ID, department, or branch</p>
+              <p className="gs-empty-desc">
+                {currentUserRole === 'employee'
+                  ? "Try a different keyword — task title, project name, or status"
+                  : "Try a different keyword — employee name, ID, department, or branch"}
+              </p>
             </div>
           ) : (
             visibleCategories.map(([cat, items]) => {
-              const meta = CATEGORY_META[cat];
+              const meta = allowedCategoryMeta[cat];
               const Icon = meta.icon;
               return (
                 <div key={cat} className="gs-category-section">

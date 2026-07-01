@@ -768,8 +768,15 @@ const Notifications = () => {
   }, [notifications]);
 
   const dynamicStats = useMemo(() => {
+    const getRecipientsCount = (n) => {
+      if (!n) return 0;
+      // If system/broadcast/general announcement with no target user, assume sent to all employees
+      const isBroadcast = n.type === 'broadcast' || n.type === 'announcement' || (!n.userId && !n.recipientId && !n.targetUserId);
+      return isBroadcast ? (employees?.length || 1) : 1;
+    };
+
     // 1. Total Dispatch Logs
-    const totalDispatchesCount = notifications.reduce((sum, n) => sum + (n.recipients || 0), 0);
+    const totalDispatchesCount = notifications.reduce((sum, n) => sum + getRecipientsCount(n), 0);
 
     // 2. Trigger rules configured and active
     const totalTriggerRules = automationRules.reduce((sum, cat) => sum + cat.rules.length, 0);
@@ -777,31 +784,26 @@ const Notifications = () => {
 
     // 3. Dispatched Today
     const todayStr = new Date().toISOString().split('T')[0];
-    const todayNotifs = notifications.filter(n => (n.sentDate || '').startsWith(todayStr));
-    const dispatchedTodayCount = todayNotifs.reduce((sum, n) => sum + (n.recipients || 0), 0);
+    const todayNotifs = notifications.filter(n => (n.createdAt || n.sentDate || '').startsWith(todayStr));
+    const dispatchedTodayCount = todayNotifs.reduce((sum, n) => sum + getRecipientsCount(n), 0);
 
     // 4. Pending / Queued
-    const pendingNotifs = notifications.filter(n => ['Scheduled', 'Pending'].includes(n.deliveryStatus));
-    const pendingCount = pendingNotifs.reduce((sum, n) => sum + (n.recipients || 0), 0);
+    const pendingNotifs = notifications.filter(n => ['Scheduled', 'Pending'].includes(n.deliveryStatus || n.status));
+    const pendingCount = pendingNotifs.reduce((sum, n) => sum + getRecipientsCount(n), 0);
 
     // 5. Delivered Dispatches
-    const deliveredCount = notifications.reduce((sum, n) => sum + (n.delivered || 0), 0);
+    // All notifications stored in database are successfully delivered
+    const deliveredCount = notifications.reduce((sum, n) => sum + (n.failed ? 0 : getRecipientsCount(n)), 0);
 
     // 6. Read / Acknowledged
-    const readCount = notifications.reduce((sum, n) => sum + (typeof n.read === 'number' ? n.read : (n.read === true ? (n.recipients || 1) : 0)), 0);
+    const readCount = notifications.reduce((sum, n) => sum + ((n.isRead || n.read) ? getRecipientsCount(n) : 0), 0);
 
     // 7. Unread Notifications
     const unreadCount = Math.max(0, totalDispatchesCount - readCount);
 
     // 8. Delivery Success Rate
-    let totalDelivered = 0;
-    let totalFailed = 0;
-    notifications.forEach(n => {
-      totalDelivered += n.delivered || 0;
-      totalFailed += n.failed || 0;
-    });
-    const totalSent = totalDelivered + totalFailed;
-    const successRate = totalSent > 0 ? parseFloat(((totalDelivered / totalSent) * 100).toFixed(1)) : 100.0;
+    const totalSent = notifications.reduce((sum, n) => sum + getRecipientsCount(n), 0);
+    const successRate = totalSent > 0 ? parseFloat(((deliveredCount / totalSent) * 100).toFixed(1)) : 0.0;
 
     return {
       totalDispatchesCount,
@@ -815,7 +817,7 @@ const Notifications = () => {
       unreadCount,
       successRate
     };
-  }, [notifications, automationRules]);
+  }, [notifications, automationRules, employees]);
 
   const getPriorityStyle = (priority) => {
     switch (priority) {

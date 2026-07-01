@@ -131,13 +131,6 @@ const ActiveProjectsWidget = ({
           >
             <FolderOpen size={14} /> View Project Details
           </button>
-          <button
-            onClick={onOpenUploadModal}
-            className="flex-1 padding-2 text-xs bold-text bg-surface border-border text-primary-500 hover:text-primary-400 rounded flex-center gap-1 transition-all"
-            style={{ cursor: 'pointer' }}
-          >
-            <Upload size={14} /> Upload Project Files
-          </button>
         </div>
       </div>
     </div>

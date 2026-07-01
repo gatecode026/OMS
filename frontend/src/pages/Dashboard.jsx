@@ -169,7 +169,9 @@ const Dashboard = () => {
     notifications,
     announcementsList,
     createAnnouncement,
-    projectsList
+    projectsList,
+    token,
+    leaveRequests
   } = useApp();
 
   const navigate = useNavigate();
@@ -250,33 +252,107 @@ const Dashboard = () => {
   const totalEmployeesCount = employees.length;
   const activeProjectsCount = projectsList ? projectsList.filter(p => p.status === 'In Progress' || p.status === 'Active').length : 0;
 
+  // Use LOCAL date string (not UTC) to avoid IST timezone offset issues.
+  // e.g. at 11:50 PM IST = 6:20 PM UTC, toISOString would give yesterday's date!
   const todayStr = React.useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    if (attendance && attendance.length > 0) {
-      const dates = attendance.map(a => a.date).filter(Boolean);
-      if (dates.includes(today)) return today;
-      return dates.sort().pop() || today;
-    }
-    return today;
-  }, [attendance]);
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
 
-  const presentToday = React.useMemo(() => {
-    return attendance.filter(a => a.date === todayStr && (a.status === 'Present' || a.status === 'Late' || a.status === 'Work From Home')).length;
-  }, [attendance, todayStr]);
+  // Dedicated real-time fetch for today's attendance — used ONLY for the dashboard card.
+  // This is separate from the global `attendance` array (which covers 60 days for other pages).
+  const [todayAttendance, setTodayAttendance] = React.useState([]);
 
-  const absentToday = React.useMemo(() => {
-    return attendance.filter(a => a.date === todayStr && a.status === 'Absent').length;
-  }, [attendance, todayStr]);
+  React.useEffect(() => {
+    if (!token) return;
+    const fetchTodayAttendance = async () => {
+      try {
+        const url = `${window.API_URL || 'http://localhost:5000'}/api/v1/attendance?from=${todayStr}&to=${todayStr}`;
+        const response = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          setTodayAttendance(result.data || []);
+        }
+      } catch (err) {
+        console.error('[Dashboard] Failed to fetch today attendance:', err);
+        // Fallback: filter from global attendance array
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const localToday = `${yyyy}-${mm}-${dd}`;
+        setTodayAttendance(attendance.filter(a => a.date === localToday));
+      }
+    };
+    fetchTodayAttendance();
+  }, [token, todayStr]);
 
-  const lateToday = React.useMemo(() => {
-    return attendance.filter(a => a.date === todayStr && a.status === 'Late').length;
-  }, [attendance, todayStr]);
 
-  const leaveToday = React.useMemo(() => {
-    return attendance.filter(a => a.date === todayStr && (a.status === 'On Leave' || a.status === 'Leave' || a.status === 'Half Day')).length;
-  }, [attendance, todayStr]);
 
-  const attendanceRate = totalEmployeesCount > 0 ? Math.round((presentToday / totalEmployeesCount) * 100) : 0;
+  const activeEmployees = React.useMemo(() => {
+    return employees.filter(e => e.status !== 'Inactive');
+  }, [employees]);
+
+  const attendanceMetrics = React.useMemo(() => {
+    let present = 0;
+    let late = 0;
+    let leave = 0;
+    let absent = 0;
+
+    activeEmployees.forEach(emp => {
+      // Find today's attendance record for this active employee (by ID or name)
+      const att = todayAttendance.find(a => 
+        (a.employeeId === emp.id || (a.employeeName && a.employeeName.toLowerCase() === emp.name.toLowerCase()))
+      );
+
+      if (att) {
+        const status = att.status;
+        if (['Present', 'Overtime', 'Work From Home', 'WFH'].includes(status)) {
+          present++;
+        } else if (status === 'Late') {
+          late++;
+        } else if (['On Leave', 'Leave', 'Half Day', 'Half-Day'].includes(status)) {
+          leave++;
+        } else if (status === 'Absent') {
+          absent++;
+        } else {
+          present++; // Fallback
+        }
+      } else {
+        // No record today. Check if the employee has approved leave today in leaveRequests.
+        const onLeave = leaveRequests && leaveRequests.some(r => 
+          r.employeeId === emp.id && 
+          r.status === 'Approved' && 
+          todayStr >= r.fromDate && 
+          todayStr <= r.toDate
+        );
+
+        if (onLeave) {
+          leave++;
+        } else {
+          absent++; // Virtual absent
+        }
+      }
+    });
+
+    const accountedFor = present + late + leave;
+    const rate = activeEmployees.length > 0 ? Math.round((accountedFor / activeEmployees.length) * 100) : 0;
+
+    return { present, late, leave, absent, rate };
+  }, [activeEmployees, todayAttendance, leaveRequests, todayStr]);
+
+  const presentToday = attendanceMetrics.present;
+  const lateToday = attendanceMetrics.late;
+  const leaveToday = attendanceMetrics.leave;
+  const absentToday = attendanceMetrics.absent;
+  const attendanceRate = attendanceMetrics.rate;
+
+
 
   const todoTasks = tasks.filter(t => t.status === 'To Do' || t.status === 'To Do').length;
   const progressTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'in progress').length;
@@ -368,12 +444,8 @@ const Dashboard = () => {
   }, [employees, employeeScores]);
 
   const newEmployeesCount = React.useMemo(() => {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return (employees || []).filter(e => {
-      const joinDate = e.joinDate ? new Date(e.joinDate) : null;
-      return joinDate && joinDate >= thirtyDaysAgo;
-    }).length;
+    const currentYearMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    return (employees || []).filter(e => e.joinDate && e.joinDate.startsWith(currentYearMonth)).length;
   }, [employees]);
 
   const projectMetrics = React.useMemo(() => {
@@ -432,7 +504,7 @@ const Dashboard = () => {
     const scoredBranches = list.map(b => branchScores[b.name]).filter(Boolean);
     const avgPerf = scoredBranches.length > 0 
       ? Math.round(scoredBranches.reduce((sum, s) => sum + s, 0) / scoredBranches.length) 
-      : 90;
+      : 0;
     
     const hqBranch = list.find(b => b.name && (b.name.toLowerCase().includes('head') || b.name.toLowerCase().includes('hq'))) || list[0];
     const hqHeadcount = (hqBranch && hqBranch.name) ? employees.filter(e => e.branch === hqBranch.name).length : 0;
@@ -617,8 +689,8 @@ const Dashboard = () => {
           sparklineData={employeesSparkline}
           onClick={() => navigate('/employees')}
           subMetrics={[
-            { label: 'Active', value: `+ ${employees.filter(e => e.status !== 'Inactive').length}`, icon: UserCheck },
-            { label: 'New', value: `+ ${newEmployeesCount}`, icon: UserPlus }
+            { label: 'Active', value: employees.filter(e => e.status !== 'Inactive').length, icon: UserCheck },
+            { label: 'New', value: newEmployeesCount, icon: UserPlus }
           ]}
           variant="employees"
         />
@@ -633,7 +705,7 @@ const Dashboard = () => {
           sparklineData={attendanceSparkline}
           onClick={() => navigate('/attendance')}
           subMetrics={[
-            { label: 'Present', value: presentToday - lateToday, icon: Check },
+            { label: 'Present', value: presentToday, icon: Check },
             { label: 'Absent', value: absentToday, icon: X },
             { label: 'Late', value: lateToday, icon: Clock },
             { label: 'Leave', value: leaveToday, icon: Briefcase }
@@ -705,7 +777,7 @@ const Dashboard = () => {
           gaugeValue={branchMetrics.avgPerf}
           onClick={() => navigate('/branches')}
           subMetrics={[
-            { label: 'Active', value: `+ ${branchMetrics.active}`, icon: Globe },
+            { label: 'Active', value: branchMetrics.active, icon: Globe },
             { label: 'Avg Perf', value: `${branchMetrics.avgPerf}%`, icon: TrendingUp },
             { label: 'HQ Headcount', value: branchMetrics.hqHeadcount, icon: Building2 }
           ]}

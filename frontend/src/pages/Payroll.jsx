@@ -257,7 +257,7 @@ const Payroll = () => {
           p.employeeId === emp.employeeCode || 
           (p.employeeName && emp.name && p.employeeName.toLowerCase().replace(/\s+/g, ' ') === emp.name.toLowerCase().replace(/\s+/g, ' '))
         );
-        if (savedPayment) {
+        if (savedPayment && savedPayment.netSalary > 0) {
           return savedPayment;
         }
 
@@ -665,6 +665,88 @@ const Payroll = () => {
     });
   }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees, resolveEmployee]);
 
+  const employeeMonthlyPayslips = useMemo(() => {
+    if (!currentUser?.id) return {};
+
+    const months = ['June', 'May', 'April', 'March', 'February', 'January'];
+    const result = {};
+
+    months.forEach(m => {
+      // 1. Find if there is a saved/released payment for this month in payrollState
+      const saved = payrollState.find(p => p.month === m && p.year === year && (
+        p.employeeId === currentUser.id ||
+        (p.employeeName && currentUser.name && p.employeeName.toLowerCase() === currentUser.name.toLowerCase())
+      ));
+
+      if (saved && saved.netSalary > 0) {
+        result[m] = {
+          netSalary: saved.netSalary,
+          status: saved.status,
+          exists: true
+        };
+        return;
+      }
+
+      // 2. Otherwise calculate on the fly for this month
+      // Resolve employee
+      const emp = employees?.find(e => e.id === currentUser.id) || currentUser;
+      const empBasicSalary = Number(emp?.salaryAmount) || 0;
+      const struct = salaryStructures[emp.id || currentUser.id] || {
+        basic: empBasicSalary, hra: 0, travel: 0, medical: 0, special: 0, pf: 0, esi: 0, pt: 0, tds: 0
+      };
+
+      const monthStr = monthMap[m] || '06';
+      const prefix = `${year}-${monthStr}`;
+      const empRecords = (attendance || []).filter(
+        a => a.employeeId === (emp.id || currentUser.id) && a.date && a.date.startsWith(prefix)
+      );
+
+      let absentCount = 0;
+      let lateArrivalsCount = 0;
+      let overtimeHoursCount = 0;
+
+      if (empRecords.length > 0) {
+        absentCount = empRecords.filter(a => a.status === 'Absent').length;
+        lateArrivalsCount = empRecords.filter(a => a.status === 'Late').length;
+        overtimeHoursCount = empRecords.reduce((sum, a) => sum + (parseFloat(a.overtime) || 0), 0);
+      }
+
+      const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
+      const leaveDeduction = absentCount * Math.round((struct.basic || empBasicSalary) / 24);
+      const lateDeduction = lateArrivalsCount * attendanceConfigs.lateArrivalPenalty;
+      const overtimePay = overtimeHoursCount * attendanceConfigs.overtimeHourlyRate;
+
+      const approvedBonuses = bonuses
+        .filter(b => b.employeeId === (emp.id || currentUser.id) && (b.status === 'Super Admin Approved' || b.status === 'Released'))
+        .reduce((sum, curr) => sum + curr.amount, 0);
+
+      const approvedReimbursements = reimbursements
+        .filter(r => r.employeeId === (emp.id || currentUser.id) && (r.status === 'Approved' || r.status === 'Released'))
+        .reduce((sum, curr) => sum + curr.amount, 0);
+
+      const loanEMI = loans
+        .filter(l => l.employeeId === (emp.id || currentUser.id) && l.status === 'Approved')
+        .reduce((sum, curr) => sum + curr.emi, 0);
+
+      const advanceDeduct = advances
+        .filter(a => a.employeeId === (emp.id || currentUser.id) && a.status === 'Approved')
+        .reduce((sum, curr) => sum + curr.amount, 0);
+
+      const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
+      const totalDeductions = statutoryDeductions + leaveDeduction + lateDeduction + loanEMI + advanceDeduct;
+      const grossSalary = (struct.basic || empBasicSalary) + totalAllowances + overtimePay + approvedBonuses;
+      const netSalary = Math.max(0, grossSalary - totalDeductions);
+
+      result[m] = {
+        netSalary,
+        status: 'Pending',
+        exists: false
+      };
+    });
+
+    return result;
+  }, [payrollState, employees, currentUser, salaryStructures, attendance, year, monthMap, attendanceConfigs, bonuses, reimbursements, loans, advances]);
+
   // --- Executive Dashboard KPI aggregations ---
   const totalEmployees = calculatedPayrollData.length;
   const currentMonthCost = calculatedPayrollData.reduce((sum, curr) => sum + curr.netSalary, 0);
@@ -1064,7 +1146,6 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               </div>
               <h3 className="stat-num">{formatCurrency(currentMonthCost)}</h3>
               <div className="flex-center justify-between font-small text-muted width-full">
-                <span>Prev Month: {formatCurrency(540000)}</span>
                 <span>Active Staff: {totalEmployees}</span>
               </div>
             </div>
@@ -1191,8 +1272,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <div className="payslip-periods-list">
                 {['June', 'May', 'April', 'March', 'February', 'January'].map(m => {
                   const isCurrent = month === m;
-                  // Find the payslip object for this month
-                  const periodObj = calculatedPayrollData.find(p => p.month === m && p.year === year);
+                  const periodObj = employeeMonthlyPayslips[m];
                   const isPaid = periodObj?.status === 'Released';
                   
                   return (

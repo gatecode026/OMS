@@ -9,28 +9,37 @@
  */
 
 import mongoose from 'mongoose';
+import '../modules/roles/roles.model.js';
 import { ResourceClassifications } from './securityConstants.js';
 import { resolveSecurityContext } from './scopeEngine.js';
 import logger from '../config/logger.js';
 
-// ─── MODULE KEY MAPPING ─────────────────────────────────────────────────────
-// Maps frontend permission module keys (stored in DB) to backend matrix keys
-// used by repository contracts.
-const FRONTEND_TO_BACKEND_KEY = {
-  employee_management: 'Employee',
-  attendance_management: 'Attendance',
-  leave_management: 'Leave',
-  project_management: 'Projects',
-  task_monitoring: 'Tasks',
-  document_management: 'Documents',
-  chat: 'Chat',
-  payroll_management: 'Payroll'
+const FRONTEND_TO_BACKEND_KEYS = {
+  employee_management: ['Employee', 'Employees'],
+  attendance_management: ['Attendance'],
+  leave_management: ['Leave', 'Leaves'],
+  project_management: ['Project', 'Projects'],
+  task_monitoring: ['Task', 'Tasks'],
+  document_management: ['Document', 'Documents'],
+  chat: ['Chat', 'Conversation', 'Message', 'Call'],
+  payroll_management: ['Payroll', 'PayrollGrade', 'PayrollReimbursement', 'PayrollLoanAdvance', 'PayrollBonus', 'PayrollPayment', 'PayrollConfig'],
+  department_management: ['Department', 'Departments'],
+  agency_branch_management: ['Branch', 'Branches'],
+  team_management: ['Team', 'Teams'],
+  notifications: ['Notification', 'Notifications'],
+  announcements: ['Announcement', 'Announcements', 'AnnouncementTrackingLog', 'AnnouncementAuditLog'],
+  system_settings: ['SystemSettings', 'Settings'],
+  role_permission: ['Role', 'PermissionModule', 'UserOverride', 'Workflow', 'Workflows'],
+  security_audit_logs: ['SecurityAlert', 'Security', 'ActivityLog']
 };
 
 // Reverse mapping: backend key → frontend key (for DB lookups)
 const BACKEND_TO_FRONTEND_KEY = {};
-for (const [feKey, beKey] of Object.entries(FRONTEND_TO_BACKEND_KEY)) {
-  BACKEND_TO_FRONTEND_KEY[beKey] = feKey;
+for (const [feKey, beKeys] of Object.entries(FRONTEND_TO_BACKEND_KEYS)) {
+  for (const beKey of beKeys) {
+    BACKEND_TO_FRONTEND_KEY[beKey] = feKey;
+    BACKEND_TO_FRONTEND_KEY[beKey.toLowerCase()] = feKey;
+  }
 }
 
 // ─── FIELD-LEVEL SECURITY POLICIES (HARDCODED — NOT UI-CONFIGURABLE) ────────
@@ -199,28 +208,27 @@ export const checkActionPermission = async (moduleName, role, action) => {
   const companyId = context?.companyId;
 
   if (!companyId) {
-    // No company context — fail open (field-level restrictions still apply)
+    // No company context — fail closed for safety, but allow company_admin as fallback
     logger.warn(`PermissionMatrix::checkActionPermission - No companyId in context for role "${role}", module "${moduleName}"`);
-    return true;
+    return role === 'company_admin';
   }
 
   // Get the role's permissions from the database
   const permissions = await getRolePermissionsFromDB(companyId, role);
 
   if (!permissions) {
-    // No role found in DB — company_admin and branch_admin get full access as fallback
-    if (role === 'company_admin' || role === 'branch_admin') return true;
-    // Other roles: fail open (field-level restrictions still protect sensitive data)
-    logger.warn(`PermissionMatrix::checkActionPermission - No DB permissions found for role "${role}", allowing action "${action}" on "${moduleName}"`);
-    return true;
+    // No DB permissions found for role
+    logger.warn(`PermissionMatrix::checkActionPermission - No DB permissions found for role "${role}", denying action "${action}" on "${moduleName}"`);
+    return role === 'company_admin';
   }
 
   // Map the backend module name to the frontend key used in the DB
-  const frontendKey = BACKEND_TO_FRONTEND_KEY[moduleName];
+  const frontendKey = BACKEND_TO_FRONTEND_KEY[moduleName] || BACKEND_TO_FRONTEND_KEY[moduleName?.toLowerCase()];
 
   if (!frontendKey) {
-    // Module not mapped — not DB-controlled, allow by default
-    return true;
+    // Module not mapped — deny by default for safety
+    logger.warn(`PermissionMatrix::checkActionPermission - Module "${moduleName}" is not mapped to any permission key, denying action "${action}"`);
+    return role === 'company_admin';
   }
 
   // Look up the module permissions in the role's permission map
@@ -228,9 +236,7 @@ export const checkActionPermission = async (moduleName, role, action) => {
 
   if (!modulePerms) {
     // Module not found in the role's permissions — deny by default for safety
-    // (This means the admin hasn't configured this module for this role)
-    if (role === 'company_admin' || role === 'branch_admin') return true;
-    return false;
+    return role === 'company_admin';
   }
 
   // Check the specific action
@@ -241,11 +247,32 @@ export const checkActionPermission = async (moduleName, role, action) => {
 // ─── FIELD-LEVEL RESTRICTION CHECK (HARDCODED — STAYS STATIC) ───────────────
 
 /**
+ * Helper to resolve the canonical field security policy dynamically.
+ */
+const getCanonicalPolicy = (moduleName) => {
+  if (!moduleName) return null;
+  let policy = fieldPolicies[moduleName];
+  if (!policy) {
+    const feKey = BACKEND_TO_FRONTEND_KEY[moduleName] || BACKEND_TO_FRONTEND_KEY[moduleName.toLowerCase()];
+    if (feKey) {
+      const canonicalKey = Object.keys(fieldPolicies).find(key => {
+        const mappedFe = BACKEND_TO_FRONTEND_KEY[key] || BACKEND_TO_FRONTEND_KEY[key.toLowerCase()];
+        return mappedFe === feKey;
+      });
+      if (canonicalKey) {
+        policy = fieldPolicies[canonicalKey];
+      }
+    }
+  }
+  return policy;
+};
+
+/**
  * Returns restricted fields for a role on a module.
  * This is NOT dynamic — field-level security policies are hardcoded for safety.
  */
 export const getRestrictedFields = (moduleName, role) => {
-  const policy = fieldPolicies[moduleName];
+  const policy = getCanonicalPolicy(moduleName);
   if (!policy) return [];
 
   // If the role is an admin role, do not fallback to 'employee'
@@ -270,7 +297,7 @@ export const registerModulePermissions = (moduleName, config) => {
  * Gets the module's security configuration (classification, scope, ownership).
  */
 export const getModuleConfig = (moduleName) => {
-  return fieldPolicies[moduleName] || null;
+  return getCanonicalPolicy(moduleName) || null;
 };
 
 export default {

@@ -44,6 +44,7 @@ const MarkAttendanceModal = ({
 
   // Pre-select logically based on today's state
   useEffect(() => {
+    console.log('DEBUG: MarkAttendanceModal todayRecord =', todayRecord);
     if (todayRecord.punchIn && !todayRecord.punchOut) {
       setAction('out');
     } else {
@@ -148,53 +149,47 @@ const MarkAttendanceModal = ({
         {/* Radio Actions */}
         <div className="flex-column gap-2">
           <label className="attendance-field-label">Select Action</label>
-          <div className="flex-row gap-3 flex-wrap">
-            <label className={`attendance-action-card ${action === 'in' ? 'active' : ''} ${!!todayRecord.punchIn ? 'disabled' : ''}`}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <label className={`attendance-action-card ${action === 'in' ? 'active' : ''}`}>
               <input
                 type="radio"
                 name="punchAction"
                 value="in"
                 checked={action === 'in'}
                 onChange={() => setAction('in')}
-                disabled={!!todayRecord.punchIn}
                 className="attendance-radio-input"
               />
               <span className="attendance-action-label">Punch In</span>
             </label>
-            <label className={`attendance-action-card ${action === 'out' ? 'active' : ''} ${(!todayRecord.punchIn || !!todayRecord.punchOut) ? 'disabled' : ''}`}>
+            <label className={`attendance-action-card ${action === 'out' ? 'active' : ''}`}>
               <input
                 type="radio"
                 name="punchAction"
                 value="out"
                 checked={action === 'out'}
                 onChange={() => setAction('out')}
-                disabled={!todayRecord.punchIn || !!todayRecord.punchOut}
                 className="attendance-radio-input"
               />
               <span className="attendance-action-label">Punch Out</span>
             </label>
-          </div>
-          <div className="flex-row gap-3 flex-wrap mt-1">
-            <label className={`attendance-action-card ${action === 'break_start' ? 'active' : ''} ${(!todayRecord.punchIn || !!todayRecord.punchOut) ? 'disabled' : ''}`}>
+            <label className={`attendance-action-card ${action === 'break_start' ? 'active' : ''}`}>
               <input
                 type="radio"
                 name="punchAction"
                 value="break_start"
                 checked={action === 'break_start'}
                 onChange={() => setAction('break_start')}
-                disabled={!todayRecord.punchIn || !!todayRecord.punchOut}
                 className="attendance-radio-input"
               />
               <span className="attendance-action-label">Break Start</span>
             </label>
-            <label className={`attendance-action-card ${action === 'break_end' ? 'active' : ''} ${(!todayRecord.punchIn || !!todayRecord.punchOut) ? 'disabled' : ''}`}>
+            <label className={`attendance-action-card ${action === 'break_end' ? 'active' : ''}`}>
               <input
                 type="radio"
                 name="punchAction"
                 value="break_end"
                 checked={action === 'break_end'}
                 onChange={() => setAction('break_end')}
-                disabled={!todayRecord.punchIn || !!todayRecord.punchOut}
                 className="attendance-radio-input"
               />
               <span className="attendance-action-label">Break End</span>

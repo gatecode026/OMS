@@ -553,21 +553,17 @@ const TaskMonitoring = () => {
       if (!task) return;
       const currentStatus = getDisplayStatus(task.status);
       
-      // Enforce sequential transitions
-      if (currentStatus === 'To Do' && targetCol !== 'In Progress') {
-        if (addToast) addToast('warning', 'Tasks in "To Do" must first move to "In Progress".');
+      // Enforce sequential transitions: To Do → In Review → Done
+      if (currentStatus === 'To Do' && targetCol !== 'In Review') {
+        if (addToast) addToast('warning', 'Tasks in "To Do" must be submitted to "In Review" for Team Leader approval.');
         return;
       }
-      if (currentStatus === 'In Progress' && targetCol !== 'In Review') {
-        if (addToast) addToast('warning', 'Tasks in "In Progress" must be submitted to "In Review".');
-        return;
-      }
-      if (targetCol === 'Done' && currentUserRole === 'employee') {
-        if (addToast) addToast('warning', 'Only management can approve and set task to "Done".');
+      if (currentStatus === 'In Review' && targetCol === 'Done' && currentUserRole === 'employee') {
+        if (addToast) addToast('warning', 'Only the Project Manager can approve and move a task to "Done".');
         return;
       }
       if (currentStatus === 'In Review' && targetCol !== 'Done') {
-        if (addToast) addToast('warning', 'Tasks in "In Review" must be approved/completed to move to "Done".');
+        if (addToast) addToast('warning', 'Tasks in "In Review" can only move to "Done" after Project Manager approval.');
         return;
       }
       if (currentStatus === 'Done') {
@@ -578,12 +574,9 @@ const TaskMonitoring = () => {
       // Map display columns back to DB status keys
       let statusVal = 'todo';
       let progressVal = 0;
-      if (targetCol === 'In Progress') {
-        statusVal = 'in_progress';
-        progressVal = 10;
-      } else if (targetCol === 'In Review') {
+      if (targetCol === 'In Review') {
         statusVal = 'review';
-        progressVal = 90;
+        progressVal = 50;
       } else if (targetCol === 'Done') {
         statusVal = 'done';
         progressVal = 100;
@@ -597,7 +590,7 @@ const TaskMonitoring = () => {
       <div className="task-monitoring-page grid-gap">
         <div className="card" style={{ height: '80px' }}><Skeleton variant="rect" height="100%" /></div>
         <div className="kanban-grid">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="card column-card" style={{ height: '400px' }}><Skeleton variant="rect" height="100%" /></div>
           ))}
         </div>
@@ -616,7 +609,7 @@ const TaskMonitoring = () => {
         </div>
         <div className="flex-center gap-2 flex-wrap">
           <Button variant="ghost" onClick={() => setIsExportOpen(true)} icon={Download}>Export Report</Button>
-          {hasPermission('task_monitoring', 'create') && (
+          {currentUserRole !== 'employee' && hasPermission('task_monitoring', 'create') && (
             <Button variant="primary" onClick={() => setIsCreateOpen(true)} icon={Plus}>Create Task</Button>
           )}
         </div>
@@ -709,35 +702,37 @@ const TaskMonitoring = () => {
       </div>
 
       {/* ── Section 4: View Toggle Toolbar ── */}
-      <div className="view-toggle-toolbar card glass flex-row justify-between flex-wrap gap-3">
-        <div className="tab-buttons-group">
-          <button className={`view-tab-btn ${activeView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveView('kanban')}>
-            <KanbanSquare size={16} />
-            <span>Board</span>
-          </button>
-          <button className={`view-tab-btn ${activeView === 'list' ? 'active' : ''}`} onClick={() => setActiveView('list')}>
-            <SlidersHorizontal size={16} />
-            <span>Data Lists View</span>
-          </button>
-          <button className={`view-tab-btn ${activeView === 'analytics' ? 'active' : ''}`} onClick={() => setActiveView('analytics')}>
-            <Clock size={16} />
-            <span>Analytics & Feeds</span>
-          </button>
-        </div>
-        <div className="flex-center gap-2">
-          {activeView === 'list' && (
-            <button className="toggle-cols-btn" onClick={() => setGanttViewEnabled(prev => !prev)}>
-              <span>{ganttViewEnabled ? '📊 Show Metrics Table' : '🗓️ Show Timeline (Gantt)'}</span>
+      {currentUserRole !== 'employee' && (
+        <div className="view-toggle-toolbar card glass flex-row justify-between flex-wrap gap-3">
+          <div className="tab-buttons-group">
+            <button className={`view-tab-btn ${activeView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveView('kanban')}>
+              <KanbanSquare size={16} />
+              <span>Board</span>
             </button>
-          )}
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Filtered: <strong>{filteredTasks.length}</strong> tasks</span>
+            <button className={`view-tab-btn ${activeView === 'list' ? 'active' : ''}`} onClick={() => setActiveView('list')}>
+              <SlidersHorizontal size={16} />
+              <span>Data Lists View</span>
+            </button>
+            <button className={`view-tab-btn ${activeView === 'analytics' ? 'active' : ''}`} onClick={() => setActiveView('analytics')}>
+              <Clock size={16} />
+              <span>Analytics & Feeds</span>
+            </button>
+          </div>
+          <div className="flex-center gap-2">
+            {activeView === 'list' && (
+              <button className="toggle-cols-btn" onClick={() => setGanttViewEnabled(prev => !prev)}>
+                <span>{ganttViewEnabled ? '📊 Show Metrics Table' : '🗓️ Show Timeline (Gantt)'}</span>
+              </button>
+            )}
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Filtered: <strong>{filteredTasks.length}</strong> tasks</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Section 5: KANBAN VIEW ── */}
       {activeView === 'kanban' && (
         <div className="kanban-grid">
-          {['To Do', 'In Progress', 'In Review', 'Done'].map(col => {
+          {['To Do', 'In Review', 'Done'].map(col => {
             const colTasks = filteredTasks.filter(t => getDisplayStatus(t.status) === col);
             return (
               <div
@@ -1451,10 +1446,7 @@ const TaskMonitoring = () => {
                         <Badge variant={app.status === 'Approved' ? 'success' : app.status === 'Rejected' ? 'danger' : 'warning'}>
                           {app.status}
                         </Badge>
-                        {app.status === 'Pending' && (
-                          (app.level === 1 && (currentUser?.id === selectedTask.assigneeId || currentUser?.name?.toLowerCase() === app.approver?.toLowerCase())) ||
-                          (app.level > 1 && currentUser?.name?.toLowerCase() === app.approver?.toLowerCase())
-                        ) && (
+                        {app.status === 'Pending' && currentUser?.name?.toLowerCase() === app.approver?.toLowerCase() && (
                           <div className="flex-center gap-1">
                             <button className="action-circle-btn approve-btn" onClick={() => handleApproveLevel(app.level)} title="Approve">✓</button>
                             <button className="action-circle-btn reject-btn" onClick={() => handleRejectLevel(app.level)} title="Reject">✗</button>

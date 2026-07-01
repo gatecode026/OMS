@@ -5,6 +5,8 @@
 
 import Goal from './goal.model.js';
 import logger from '../../config/logger.js';
+import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
+import { getTenantId } from '../../utils/tenantContext.js';
 
 export const find = async (query = {}) => {
   logger.info('GoalsRepository::find querying goals from database...');
@@ -18,6 +20,10 @@ export const findOne = async (id) => {
 
 export const save = async (data) => {
   logger.info(`GoalsRepository::save creating goal: ${data.title}`);
+  if (!data.id) {
+    const tenantId = getTenantId() || 'COMP-DEFAULT';
+    data.id = await generateCompanyUniqueId(tenantId, 'goals');
+  }
   return Goal.create(data);
 };
 

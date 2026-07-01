@@ -1086,38 +1086,43 @@ const Departments = () => {
         )}
       >
         <form id="addDeptForm" onSubmit={handleAddDeptSubmit} className="policy-form flex-column gap-4 py-2">
-          <div className="form-group flex-column gap-1">
-            <label htmlFor="deptBranch">Branch Location</label>
-            <select
-              id="deptBranch"
-              className="form-control"
-              value={newDeptForm.branch}
-              onChange={e => {
-                const val = e.target.value;
-                setNewDeptForm({ ...newDeptForm, branch: val });
-                setShowCustomBranchInput(val === 'add_custom');
-              }}
-            >
-              {branchOptions.map(branch => (
-                <option key={branch} value={branch}>{branch}</option>
-              ))}
-              <option value="add_custom">+ Add Custom Location...</option>
-            </select>
-          </div>
+          {/* Branch Location — only company admin can add/change branches */}
+          {['company_admin', 'super_admin', 'companyadmin', 'superadmin'].includes(currentUserRole) && (
+            <>
+              <div className="form-group flex-column gap-1">
+                <label htmlFor="deptBranch">Branch Location</label>
+                <select
+                  id="deptBranch"
+                  className="form-control"
+                  value={newDeptForm.branch}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNewDeptForm({ ...newDeptForm, branch: val });
+                    setShowCustomBranchInput(val === 'add_custom');
+                  }}
+                >
+                  {branchOptions.map(branch => (
+                    <option key={branch} value={branch}>{branch}</option>
+                  ))}
+                  <option value="add_custom">+ Add Custom Location...</option>
+                </select>
+              </div>
 
-          {showCustomBranchInput && (
-            <div className="form-group flex-column gap-1 animate-fade-in">
-              <label htmlFor="customBranch">Custom Branch Name *</label>
-              <input
-                id="customBranch"
-                type="text"
-                required
-                className="form-control"
-                placeholder="e.g. Bangalore Office"
-                value={customBranch}
-                onChange={e => setCustomBranch(e.target.value)}
-              />
-            </div>
+              {showCustomBranchInput && (
+                <div className="form-group flex-column gap-1 animate-fade-in">
+                  <label htmlFor="customBranch">Custom Branch Name *</label>
+                  <input
+                    id="customBranch"
+                    type="text"
+                    required
+                    className="form-control"
+                    placeholder="e.g. Bangalore Office"
+                    value={customBranch}
+                    onChange={e => setCustomBranch(e.target.value)}
+                  />
+                </div>
+              )}
+            </>
           )}
 
           <div className="form-group flex-column gap-1">

@@ -107,6 +107,25 @@ const WorkReports = () => {
 
   const isEmployee = currentUserRole === 'employee' || userRole === 'Employee';
 
+  const scopedEmployees = useMemo(() => {
+    const activeRole = isEmployee ? 'employee' : currentUserRole;
+    if (!activeRole || activeRole === 'super_admin' || activeRole === 'company_admin') {
+      return employees;
+    }
+    return employees.filter(emp => {
+      if (activeRole === 'branch_admin') {
+        return emp?.branch === currentUser?.branch;
+      }
+      if (activeRole === 'dept_admin' || activeRole === 'team_leader') {
+        return emp?.department === currentUser?.department;
+      }
+      if (activeRole === 'employee') {
+        return emp?.id === currentUser?.id;
+      }
+      return true;
+    });
+  }, [employees, currentUser, currentUserRole, isEmployee]);
+
   const getAssignedTasksCountForProject = (projectName) => {
     if (!projectName) return 0;
     const normalizeName = (name) => {
@@ -464,9 +483,86 @@ const WorkReports = () => {
     }));
   }, [reports]);
 
+  /* Filter, Search, Pagination state */
+  const [search, setSearch] = useState('');
+  const [deptFilter, setDeptFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [projectFilter, setProjectFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('');
+  const [sortCol, setSortCol] = useState('submittedTime');
+  const [sortDir, setSortDir] = useState('desc');
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 8;
+
+  /* Checkbox Bulk Selection State */
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  /* Filter and search execution */
+  const filtered = useMemo(() => {
+    return reports.filter(r => {
+      // Search text match
+      const query = search.toLowerCase();
+      if (search) {
+        const matchesName = r.employeeName.toLowerCase().includes(query);
+        const matchesProj = r.project.toLowerCase().includes(query);
+        const matchesDept = r.department.toLowerCase().includes(query);
+        const matchesId = r.id.toLowerCase().includes(query);
+        const matchesSummary = r.summary.toLowerCase().includes(query);
+        if (!matchesName && !matchesProj && !matchesDept && !matchesId && !matchesSummary) return false;
+      }
+
+      // Status filters
+      if (statusFilter !== 'All') {
+        if (statusFilter === 'Flagged') {
+          if (r.status !== 'Changes Requested' && r.status !== 'Escalated') return false;
+        } else if (r.status !== statusFilter) {
+          return false;
+        }
+      }
+
+      // Project filter
+      if (projectFilter !== 'All' && r.project !== projectFilter) return false;
+
+      // Department filter
+      if (deptFilter && r.department !== deptFilter) return false;
+
+      // Calendar click or date filter
+      if (dateFilter && r.date !== dateFilter) return false;
+
+      return true;
+    });
+  }, [reports, search, statusFilter, projectFilter, deptFilter, dateFilter]);
+
+  /* Auto Calculations derived states */
+  const stats = useMemo(() => {
+    const total = filtered.length;
+    const pending = filtered.filter(r => r.status === 'Submitted' || r.status === 'Escalated').length;
+    const approved = filtered.filter(r => r.status === 'Approved').length;
+    const rejected = filtered.filter(r => r.status === 'Rejected' || r.status === 'Changes Requested').length;
+    
+    const activeReporting = new Set(filtered.map(r => r.employeeId)).size;
+    const avgProductivity = total > 0 ? Math.round(filtered.reduce((s, r) => s + (r.productivityScore ?? 80), 0) / total) : 0;
+    
+    return { total, pending, approved, rejected, activeReporting, avgProductivity };
+  }, [filtered]);
+
+  const lateSubmissionsCount = useMemo(() => {
+    return filtered.filter(r => {
+      if (!r.submittedTime) return false;
+      const timePart = r.submittedTime.split('T')[1];
+      if (!timePart) return false;
+      const [h, m] = timePart.split(':').map(Number);
+      return h >= 18 && (h > 18 || m > 0);
+    }).length;
+  }, [filtered]);
+
   const defaultersList = useMemo(() => {
     const weekdays = [];
-    let curr = new Date();
+    let curr = dateFilter ? new Date(dateFilter) : new Date();
+    
+    // Safety check for invalid date
+    if (isNaN(curr.getTime())) curr = new Date();
+
     while (weekdays.length < 5) {
       const day = curr.getDay();
       if (day !== 0 && day !== 6) {
@@ -476,7 +572,7 @@ const WorkReports = () => {
     }
 
     const list = [];
-    employees.forEach(emp => {
+    scopedEmployees.forEach(emp => {
       let missingCount = 0;
       weekdays.forEach(dateStr => {
         const hasReport = reports.some(r => r.date === dateStr && (r.employeeId === emp.id || r.employeeName === emp.name));
@@ -512,20 +608,40 @@ const WorkReports = () => {
     });
 
     return list.sort((a, b) => b.missingCount - a.missingCount);
-  }, [employees, reports, globalNotifications]);
+  }, [scopedEmployees, reports, globalNotifications, dateFilter]);
+
+  const missingReportsCount = useMemo(() => {
+    const checkDate = dateFilter || new Date().toISOString().slice(0, 10);
+    const day = new Date(checkDate).getDay();
+    if (day === 0 || day === 6) return 0; // No compliance alerts on weekends
+
+    let count = 0;
+    scopedEmployees.forEach(emp => {
+      const hasReport = reports.some(r => r.date === checkDate && (r.employeeId === emp.id || r.employeeName === emp.name));
+      if (!hasReport) {
+        count++;
+      }
+    });
+    return count;
+  }, [scopedEmployees, reports, dateFilter]);
 
   const heatmapDates = useMemo(() => {
     const dates = [];
+    const baseDate = dateFilter ? new Date(dateFilter) : new Date();
+    
+    // Safety check for invalid date
+    const finalBaseDate = isNaN(baseDate.getTime()) ? new Date() : baseDate;
+
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+      const d = new Date(finalBaseDate);
+      d.setDate(finalBaseDate.getDate() - i);
       dates.push(d.toISOString().slice(0, 10));
     }
     return dates;
-  }, []);
+  }, [dateFilter]);
 
   const heatmapData = useMemo(() => {
-    return employees.map(emp => {
+    return scopedEmployees.map(emp => {
       const hours = heatmapDates.map(dateStr => {
         const rep = reports.find(r => r.date === dateStr && (r.employeeId === emp.id || r.employeeName === emp.name));
         return rep ? parseFloat(rep.workingHours || 0) : 0.0;
@@ -535,35 +651,9 @@ const WorkReports = () => {
         hours
       };
     });
-  }, [employees, heatmapDates, reports]);
+  }, [scopedEmployees, heatmapDates, reports]);
 
-  const missingReportsCount = useMemo(() => {
-    return defaultersList.reduce((sum, d) => sum + d.missingCount, 0);
-  }, [defaultersList]);
 
-  const lateSubmissionsCount = useMemo(() => {
-    return reports.filter(r => {
-      if (!r.submittedTime) return false;
-      const timePart = r.submittedTime.split('T')[1];
-      if (!timePart) return false;
-      const [h, m] = timePart.split(':').map(Number);
-      return h >= 18 && (h > 18 || m > 0);
-    }).length;
-  }, [reports]);
-
-  /* Filter, Search, Pagination state */
-  const [search, setSearch] = useState('');
-  const [deptFilter, setDeptFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [projectFilter, setProjectFilter] = useState('All');
-  const [dateFilter, setDateFilter] = useState('');
-  const [sortCol, setSortCol] = useState('submittedTime');
-  const [sortDir, setSortDir] = useState('desc');
-  const [page, setPage] = useState(1);
-  const itemsPerPage = 8;
-
-  /* Checkbox Bulk Selection State */
-  const [selectedIds, setSelectedIds] = useState([]);
 
   /* Selected Audit Detail Drawers & Modals */
   const [selectedReport, setSelectedReport] = useState(null);
@@ -748,54 +838,7 @@ const WorkReports = () => {
     }, 1000);
   };
 
-  /* Auto Calculations derived states */
-  const stats = useMemo(() => {
-    const total = reports.length;
-    const pending = reports.filter(r => r.status === 'Submitted' || r.status === 'Escalated').length;
-    const approved = reports.filter(r => r.status === 'Approved').length;
-    const rejected = reports.filter(r => r.status === 'Rejected' || r.status === 'Changes Requested').length;
-    
-    const activeReporting = new Set(reports.map(r => r.employeeId)).size;
-    const avgProductivity = total > 0 ? Math.round(reports.reduce((s, r) => s + (r.productivityScore ?? 80), 0) / total) : 0;
-    
-    return { total, pending, approved, rejected, activeReporting, avgProductivity };
-  }, [reports]);
 
-  /* Filter and search execution */
-  const filtered = useMemo(() => {
-    return reports.filter(r => {
-      // Search text match
-      const query = search.toLowerCase();
-      if (search) {
-        const matchesName = r.employeeName.toLowerCase().includes(query);
-        const matchesProj = r.project.toLowerCase().includes(query);
-        const matchesDept = r.department.toLowerCase().includes(query);
-        const matchesId = r.id.toLowerCase().includes(query);
-        const matchesSummary = r.summary.toLowerCase().includes(query);
-        if (!matchesName && !matchesProj && !matchesDept && !matchesId && !matchesSummary) return false;
-      }
-
-      // Status filters
-      if (statusFilter !== 'All') {
-        if (statusFilter === 'Flagged') {
-          if (r.status !== 'Changes Requested' && r.status !== 'Escalated') return false;
-        } else if (r.status !== statusFilter) {
-          return false;
-        }
-      }
-
-      // Project filter
-      if (projectFilter !== 'All' && r.project !== projectFilter) return false;
-
-      // Department filter
-      if (deptFilter && r.department !== deptFilter) return false;
-
-      // Calendar click or date filter
-      if (dateFilter && r.date !== dateFilter) return false;
-
-      return true;
-    });
-  }, [reports, search, statusFilter, projectFilter, deptFilter, dateFilter]);
 
   /* Sorted data */
   const sorted = useMemo(() => {
@@ -1214,7 +1257,7 @@ const WorkReports = () => {
               <div className="card stat-metric-card border-left-teal">
                 <span className="card-lbl-gray">Active Workforce Logged</span>
                 <div className="card-value-display text-teal">{stats.activeReporting} Staff</div>
-                <span className="card-sub-desc">{employees.length > 0 ? Math.round((stats.activeReporting / employees.length) * 100) : 0}% of workforce</span>
+                <span className="card-sub-desc">{scopedEmployees.length > 0 ? Math.round((stats.activeReporting / scopedEmployees.length) * 100) : 0}% of workforce</span>
               </div>
 
               <div className="card stat-metric-card border-left-purple">
@@ -1226,7 +1269,7 @@ const WorkReports = () => {
               <div className="card stat-metric-card border-left-orange">
                 <span className="card-lbl-gray">Missing Reports</span>
                 <div className="card-value-display text-orange">{missingReportsCount} Alerts</div>
-                <span className="card-sub-desc">{reports.length + missingReportsCount > 0 ? Math.round((reports.length / (reports.length + missingReportsCount)) * 100) : 100}% compliance rate</span>
+                <span className="card-sub-desc">{stats.total + missingReportsCount > 0 ? Math.round((stats.total / (stats.total + missingReportsCount)) * 100) : 100}% compliance rate</span>
               </div>
 
               <div className="card stat-metric-card border-left-neutral">

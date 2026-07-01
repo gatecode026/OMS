@@ -110,11 +110,11 @@ const branchSchema = new mongoose.Schema({
   },
   attendance: {
     type: Number,
-    default: 95
+    default: 0
   },
   productivity: {
     type: Number,
-    default: 90
+    default: 0
   },
   projects: {
     active: { type: Number, default: 0 },

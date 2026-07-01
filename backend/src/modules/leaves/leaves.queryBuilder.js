@@ -50,10 +50,19 @@ export class LeaveQueryBuilder {
       }
     }
 
-    // Team Leader: Scoped by their assigned team members (cached on authentication)
+    // Team Leader: Scoped by their assigned team members (cached on authentication) plus their own
     if (this.context.isTeamLeader) {
       const teamEmployeeIds = this.context.teamEmployeeIds || [];
-      filters.employeeId = { $in: teamEmployeeIds };
+      const allowedIds = [...teamEmployeeIds, this.context.userId];
+      if (incomingQuery.employeeId) {
+        if (allowedIds.includes(incomingQuery.employeeId)) {
+          filters.employeeId = incomingQuery.employeeId;
+        } else {
+          filters.employeeId = 'UNAUTHORIZED';
+        }
+      } else {
+        filters.employeeId = { $in: allowedIds };
+      }
     }
 
     // Standard employee: Scoped by own ID
@@ -93,7 +102,8 @@ export class LeaveQueryBuilder {
 
     if (this.context.isTeamLeader) {
       const teamEmployeeIds = this.context.teamEmployeeIds || [];
-      filters.employeeId = { $in: teamEmployeeIds };
+      const allowedIds = [...teamEmployeeIds, this.context.userId];
+      filters.employeeId = { $in: allowedIds };
     }
 
     if (this.context.isEmployee) {
