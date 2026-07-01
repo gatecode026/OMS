@@ -138,7 +138,7 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
     throw err;
   }
 
-  const moduleName = options.moduleName || (resource && resource.constructor && resource.constructor.modelName) || 'unknown';
+  let moduleName = options.moduleName || (resource && resource.constructor && resource.constructor.modelName) || 'unknown';
 
   const {
     branchField = 'branch',
@@ -146,6 +146,19 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
     ownerIdFields = ['id', 'userId', 'employeeId'],
     updatePayload = null
   } = options;
+
+  // Delegate project task updates to 'Tasks' module check if appropriate
+  if (moduleName === 'Projects' && operation === 'update' && updatePayload) {
+    const isTaskOnlyUpdate = Object.keys(updatePayload).every(key =>
+      ['tasks', 'tasksDone', 'progress', 'status'].includes(key)
+    );
+    if (isTaskOnlyUpdate) {
+      const hasTaskUpdatePerm = await checkActionPermission('Tasks', context.role, 'update');
+      if (hasTaskUpdatePerm) {
+        moduleName = 'Tasks';
+      }
+    }
+  }
 
   // 1. Verify Action Level Permission Matrix
   const isAllowed = await checkActionPermission(moduleName, context.role, operation);
@@ -160,7 +173,7 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
   if (operation === 'update' && updatePayload) {
     const restrictedFields = getRestrictedFields(moduleName, context.role);
     for (const field of restrictedFields) {
-      if (updatePayload[field] !== undefined) {
+      if (updatePayload[field] !== undefined && String(updatePayload[field] ?? '') !== String(resource[field] ?? '')) {
         logSecurityEvent(context, moduleName, operation, SecurityEventTypes.FIELD_ACCESS_DENIED, 'DENIED', `Modification of protected field "${field}" blocked`, resource.id);
         const err = new Error(`Access denied: You are not authorized to modify the "${field}" field.`);
         err.statusCode = 403;

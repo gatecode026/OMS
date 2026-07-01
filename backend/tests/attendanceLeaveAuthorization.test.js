@@ -3,6 +3,7 @@ import database from '../src/config/database.js';
 import Employee from '../src/modules/employees/employees.model.js';
 import Attendance from '../src/modules/attendance/attendance.model.js';
 import Leave from '../src/modules/leaves/leaves.model.js';
+import Role from '../src/modules/roles/roles.model.js';
 import { runWithTenant } from '../src/utils/tenantContext.js';
 import attendanceRepository from '../src/modules/attendance/attendance.repository.js';
 import leavesRepository from '../src/modules/leaves/leaves.repository.js';
@@ -23,6 +24,27 @@ const testAttendanceLeaveAuthorization = async () => {
       await Employee.deleteMany({});
       await Attendance.deleteMany({});
       await Leave.deleteMany({});
+      await Role.deleteMany({});
+
+      const getPerms = (create, read, update, del, approve, exp) => ({
+        create, read, update, delete: del, approve, export: exp
+      });
+
+      const modules = ['employees', 'attendance', 'leaves', 'payroll', 'departments', 'branches', 'projects', 'tasks', 'teams', 'settings', 'notifications', 'documents', 'employee_management', 'attendance_management', 'leave_management', 'project_management', 'task_monitoring', 'payroll_management', 'department_management', 'agency_branch_management', 'team_management', 'notifications', 'announcements', 'system_settings', 'role_permission', 'security_audit_logs', 'document_management'];
+
+      const allPerms = {};
+      modules.forEach(m => {
+        allPerms[m] = getPerms(true, true, true, true, true, true);
+      });
+
+      const rolesToSeed = ['employee', 'team_leader', 'dept_admin', 'manager'].map(roleId => ({
+        id: roleId,
+        name: roleId,
+        companyId: 'COMP-A',
+        permissions: allPerms
+      }));
+
+      await Role.insertMany(rolesToSeed);
       
       // Seed employees
       // Jaipur branch Engineering team leader and developer

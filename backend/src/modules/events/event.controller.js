@@ -6,6 +6,7 @@
 import Event from './event.model.js';
 import Employee from '../employees/employees.model.js';
 import Admin from '../admin/admin.model.js';
+import Company from '../companies/company.model.js';
 import notificationRepository from '../notifications/notifications.repository.js';
 import SystemSettings from '../settings/settings.model.js';
 import logger from '../../config/logger.js';
@@ -68,13 +69,24 @@ const getCurrentTimeFormatted = () => {
 
 /**
  * Resolves a custom string user ID to a database document with its _id.
- * Queries Employee, falling back to Admin if not found.
+ * Queries Employee, falling back to Admin, and Company if not found.
  */
 const resolveUserByStringId = async (stringId) => {
   if (!stringId) return null;
   let user = await Employee.findOne({ id: stringId }).select('_id id name avatar photoUrl roleId').lean();
   if (!user) {
     user = await Admin.findOne({ id: stringId }).select('_id id name avatar photoUrl roleId').lean();
+  }
+  if (!user) {
+    const comp = await Company.findOne({ id: stringId }).select('_id id name').lean();
+    if (comp) {
+      user = {
+        _id: comp._id,
+        id: comp.id,
+        name: comp.name,
+        roleId: 'company_admin'
+      };
+    }
   }
   return user;
 };
@@ -86,7 +98,14 @@ const resolveUsersByStringIds = async (stringIds) => {
   if (!stringIds || stringIds.length === 0) return [];
   const employees = await Employee.find({ id: { $in: stringIds } }).select('_id id name avatar photoUrl roleId').lean();
   const admins = await Admin.find({ id: { $in: stringIds } }).select('_id id name avatar photoUrl roleId').lean();
-  return [...employees, ...admins];
+  const companies = await Company.find({ id: { $in: stringIds } }).select('_id id name').lean();
+  const mappedCompanies = companies.map(c => ({
+    _id: c._id,
+    id: c.id,
+    name: c.name,
+    roleId: 'company_admin'
+  }));
+  return [...employees, ...admins, ...mappedCompanies];
 };
 
 /**

@@ -219,7 +219,7 @@ const ProjectsTable = ({ projects, onView, onEdit, onAssignTeam }) => {
                         >
                           <Eye size={13} />
                         </button>
-                        {hasPermission('project_management', 'update') && (
+                        {currentUserRole !== 'employee' && hasPermission('project_management', 'update') && (
                           <>
                             <button
                               className={`${styles.actionBtn} ${styles.actionBtnEdit}`}

@@ -43,7 +43,7 @@ export const resolveSecurityContext = () => {
   const securityContext = {
     userId: user.id,
     employeeId: user.id,
-    companyId: user.companyId,
+    companyId: user.companyId || store.tenantId || null,
     role: role,
     branch: user.branch || null,
     department: user.department || null,

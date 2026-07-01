@@ -12,6 +12,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid
 } from 'recharts';
 
+import { useApp } from '../../context/AppContext';
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatCurrency = (val) => {
   if (!val && val !== 0) return '$0';
@@ -94,6 +96,7 @@ const StatMini = ({ label, value, color }) => (
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const ProjectDetailPage = ({ project: initialProject, onBack, onEdit, allProjects, setProjects }) => {
+  const { currentUserRole } = useApp();
   const [project, setProjectLocal] = useState(initialProject);
   const [commTab, setCommTab] = useState('discussions');
   const [discussions, setDiscussions] = useState([
@@ -445,7 +448,7 @@ const ProjectDetailPage = ({ project: initialProject, onBack, onEdit, allProject
 
       {/* SECTION E: Tasks */}
       <Section title="Task Management" icon={CheckSquare}
-        action={<button onClick={() => setShowAddTask(!showAddTask)} style={btn('primary')}><Plus size={13} /> Add Task</button>}
+        action={currentUserRole !== 'employee' && <button onClick={() => setShowAddTask(!showAddTask)} style={btn('primary')}><Plus size={13} /> Add Task</button>}
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
           <StatMini label="Total Tasks" value={taskStats.total} />

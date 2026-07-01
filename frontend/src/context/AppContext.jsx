@@ -661,10 +661,15 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       });
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error('Server returned an invalid response. The backend may still be starting up — please wait a moment and try again.');
+      }
 
-      if (result.status !== 'success') {
-        throw new Error(result.message || 'Authentication failed');
+      if (!result || result.status !== 'success') {
+        throw new Error(result?.message || 'Authentication failed');
       }
 
       const { user, token } = result.data;
@@ -862,9 +867,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchSystemSettings();
-  }, [token]);
+  // fetchSystemSettings is now called inside the main 2-phase loadInitialData effect below
 
   const fetchBranches = async () => {
     if (!token) {
@@ -887,9 +890,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchBranches();
-  }, [token]);
+  // fetchBranches is now called inside the main 2-phase loadInitialData effect below
 
   const fetchDepartments = async () => {
     if (!token) {
@@ -912,9 +913,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchDepartments();
-  }, [token]);
+  // fetchDepartments is now called inside the main 2-phase loadInitialData effect below
 
   const fetchTeams = async () => {
     if (!token) {
@@ -937,9 +936,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchTeams();
-  }, [token]);
+  // fetchTeams is now called inside the main 2-phase loadInitialData effect below
 
   const fetchProjects = async () => {
     if (!token) {
@@ -962,9 +959,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchProjects();
-  }, [token]);
+  // fetchProjects is now called inside the main 2-phase loadInitialData effect below
 
   const fetchAttendance = async () => {
     if (!token) {
@@ -1947,34 +1942,49 @@ export const AppProvider = ({ children }) => {
       return;
     }
     setInitialized(false);
+
     const loadInitialData = async () => {
+      // ─── Phase 1: Critical data — unblocks UI as soon as these complete ───
+      // These are the minimum needed to render the dashboard shell and sidebar.
       try {
         await Promise.allSettled([
           fetchEmployees(),
-          fetchAttendance(),
-          fetchLeaves(),
-          fetchLeavePolicies(),
-          fetchHolidays(),
-          fetchDailyReports(),
-          fetchAppraisalReviews(),
-          fetchPayrollData(),
-          fetchAnnouncements(),
-          fetchEmergencyAlert(),
-          fetchAnnouncementTracking(),
-          fetchAnnouncementAudits(),
-          fetchNotifications(),
-          fetchDocuments(),
-          fetchActivityLogs(),
           fetchRoles(),
-          fetchPermissionModules(),
-          fetchUserOverrides()
+          fetchBranches(),
+          fetchDepartments(),
+          fetchTeams(),
+          fetchSystemSettings(),
+          fetchNotifications()
         ]);
       } catch (err) {
-        console.error('Failed to load initial application state:', err);
+        console.error('[AppContext] Phase 1 load error:', err);
       } finally {
+        // Unlock the UI — dashboard is now visible
         setInitialized(true);
       }
+
+      // ─── Phase 2: Deferred data — loads silently in background ───
+      // These are heavy or less critical; they populate as the user navigates.
+      Promise.allSettled([
+        fetchAttendance(),
+        fetchLeaves(),
+        fetchLeavePolicies(),
+        fetchHolidays(),
+        fetchDailyReports(),
+        fetchAppraisalReviews(),
+        fetchPayrollData(),
+        fetchAnnouncements(),
+        fetchEmergencyAlert(),
+        fetchAnnouncementTracking(),
+        fetchAnnouncementAudits(),
+        fetchDocuments(),
+        fetchActivityLogs(),
+        fetchPermissionModules(),
+        fetchUserOverrides(),
+        fetchProjects()
+      ]).catch(err => console.error('[AppContext] Phase 2 load error:', err));
     };
+
     loadInitialData();
   }, [token]);
 
@@ -2032,7 +2042,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Logging Helper
-  const addActivityLog = async (action, module, status = 'success', details = '', target = '') => {
+  const addActivityLog = (action, module, status = 'success', details = '', target = '') => {
     const logId = `LOG-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
     const logData = {
       id: logId,
@@ -2045,23 +2055,20 @@ export const AppProvider = ({ children }) => {
       ip: '127.0.0.1'
     };
 
+    // Optimistic update — immediately add to local state so UI feels instant
+    setActivityLogs(prev => [logData, ...prev]);
+
     if (token) {
-      try {
-        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/activity-logs', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(logData)
-        });
-        fetchActivityLogs();
-      } catch (err) {
-        console.error('Failed to post activity log:', err);
-        setActivityLogs(prev => [logData, ...prev]);
-      }
-    } else {
-      setActivityLogs(prev => [logData, ...prev]);
+      // Fire-and-forget: do NOT await, do NOT re-fetch the whole list.
+      // This removes 2 blocking requests (POST + GET) from the login critical path.
+      fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/activity-logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(logData)
+      }).catch(err => console.error('Failed to post activity log:', err));
     }
   };
 
@@ -2204,12 +2211,15 @@ export const AppProvider = ({ children }) => {
         addActivityLog(`Updated details for employee ID: ${id}`, 'Employees', 'success');
         addToast('success', 'Employee details updated successfully!');
         fetchBranches();
+        return true;
       } else {
         addToast('error', result.message || 'Failed to update employee in database');
+        return false;
       }
     } catch (err) {
       console.error('Error updating employee:', err);
       addToast('error', 'Network error while updating employee');
+      return false;
     }
   };
 
@@ -3311,9 +3321,8 @@ export const AppProvider = ({ children }) => {
       comments: [],
       attachments: [],
       approvals: [
-        { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' }
+        { level: 1, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 2, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
@@ -3638,8 +3647,10 @@ export const AppProvider = ({ children }) => {
       let finalStatus = t.status || 'To Do';
       const allCompleted = updatedApprovals.every(app => app.status === 'Approved');
       if (allCompleted) {
+        // L2 (Project Manager) approved — task is fully done
         finalStatus = 'Done';
-      } else if (level === 2) {
+      } else if (level === 1) {
+        // L1 (Team Leader) approved — keep in In Review awaiting Project Manager
         finalStatus = 'In Review';
       }
 
@@ -4485,7 +4496,8 @@ export const AppProvider = ({ children }) => {
       'team_management': 'teams',
       'system_settings': 'settings',
       'document_management': 'documents',
-      'notifications': 'notifications'
+      'notifications': 'notifications',
+      'announcements': 'announcements'
     };
 
     const dbKey = MODULE_MAPPING[module] || module;

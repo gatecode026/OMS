@@ -5,6 +5,8 @@
 
 import Pip from './pip.model.js';
 import logger from '../../config/logger.js';
+import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
+import { getTenantId } from '../../utils/tenantContext.js';
 
 export const find = async (query = {}) => {
   logger.info('PipsRepository::find querying PIPs from database...');
@@ -18,6 +20,10 @@ export const findOne = async (id) => {
 
 export const save = async (data) => {
   logger.info(`PipsRepository::save creating PIP for: ${data.employeeName}`);
+  if (!data.id) {
+    const tenantId = getTenantId() || 'COMP-DEFAULT';
+    data.id = await generateCompanyUniqueId(tenantId, 'pip');
+  }
   return Pip.create(data);
 };
 

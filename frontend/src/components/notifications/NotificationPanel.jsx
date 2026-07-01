@@ -15,7 +15,7 @@ import { useApp } from '../../context/AppContext';
 import {
   MessageSquare, AtSign, Megaphone, CheckSquare, Calendar,
   Paperclip, Users, Info, Bell, CheckCheck, ArrowRight,
-  Smile, Radio, UserPlus, UserMinus, Zap
+  Smile, Radio, UserPlus, UserMinus, Zap, ClipboardList, CreditCard, Clock
 } from 'lucide-react';
 import './NotificationComponents.css';
 
@@ -38,6 +38,9 @@ const TYPE_CONFIG = {
   user_added:    { icon: UserPlus,       bg: '#10b981', label: 'Added to Group' },
   user_removed:  { icon: UserMinus,      bg: '#ef4444', label: 'Removed from Group' },
   system:        { icon: Zap,            bg: '#64748b', label: 'System' },
+  leave:         { icon: ClipboardList,  bg: '#f97316', label: 'Leave' },
+  attendance:    { icon: Clock,          bg: '#0ea5e9', label: 'Attendance' },
+  payroll:       { icon: CreditCard,     bg: '#a855f7', label: 'Payroll' },
 };
 
 const getNotifConfig = (type) => TYPE_CONFIG[type] || { icon: Info, bg: '#64748b', label: 'Notification' };

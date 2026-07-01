@@ -200,16 +200,12 @@ const AttBadge = ({ status }) => {
   );
 };
 
-// ─── Work Status Dot ─────────────────────────────────────────────────────────
 const WorkStatusDot = ({ status }) => {
   const map = {
-    'Active': { cls: 'dot-green', label: 'Active', pulse: false },
-    'Idle': { cls: 'dot-grey', label: 'Idle', pulse: false },
-    'In Meeting': { cls: 'dot-blue', label: 'In Meeting', pulse: false },
+    'Online': { cls: 'dot-green', label: 'Online', pulse: true },
     'Offline': { cls: 'dot-red', label: 'Offline', pulse: false },
-    'Working': { cls: 'dot-green', label: 'Working', pulse: true },
   };
-  const cfg = map[status] || { cls: 'dot-grey', label: status || '—', pulse: false };
+  const cfg = map[status] || { cls: 'dot-red', label: 'Offline', pulse: false };
   return (
     <span className={`work-status-cell ${cfg.cls}`}>
       <span className={`work-dot${cfg.pulse ? ' pulse-dot' : ''}`}></span>
@@ -252,7 +248,7 @@ const COLUMN_GROUPS = [
   { label: 'Identity', keys: ['name', 'id'] },
   { label: 'Role', keys: ['designation', 'department', 'branch', 'teamLeader', 'projectManager'] },
   { label: 'Contact', keys: ['phone', 'workEmail'] },
-  { label: 'Timeline', keys: ['joinDate', 'lastSeen'] },
+  { label: 'Timeline', keys: ['joinDate'] },
   { label: 'Status', keys: ['attendanceStatus', 'workStatus', 'accountStatus'] },
   { label: 'Punch Info', keys: ['todayPunchIn', 'todayPunchOut', 'todayWorkingHours'] },
   { label: 'Advanced', keys: ['employeeType', 'shift', 'experience', 'lastLogin', 'currentProjects', 'leaveBalance', 'productivityScore', 'performanceRating'] },
@@ -264,7 +260,7 @@ const COLUMN_LABELS = {
   phone: 'Contact Number', workEmail: 'Official Company Email', joinDate: 'Joining Date',
   attendanceStatus: 'Attendance Status', workStatus: 'Work Status', accountStatus: 'Employment Status',
   todayPunchIn: "Punch In Time", todayPunchOut: "Punch Out Time", todayWorkingHours: "Working Hours",
-  lastSeen: 'Last Seen', employeeType: 'Employee Type', shift: 'Shift Timing', experience: 'Experience', lastLogin: 'Last Login',
+  employeeType: 'Employee Type', shift: 'Shift Timing', experience: 'Experience', lastLogin: 'Last Login',
   currentProjects: 'Projects Count', leaveBalance: 'Leave Balance', productivityScore: 'Productivity',
   performanceRating: 'Performance Rating', actions: 'Actions'
 };
@@ -273,7 +269,7 @@ const DEFAULT_VISIBILITY = {
   name: true, id: true, designation: true, department: true,
   branch: true, teamLeader: false, projectManager: false, phone: false,
   workEmail: true, joinDate: false, attendanceStatus: true, todayPunchIn: true,
-  todayPunchOut: true, todayWorkingHours: true, lastSeen: true, workStatus: true,
+  todayPunchOut: true, todayWorkingHours: true, workStatus: true,
   accountStatus: true, employeeType: false, shift: false, experience: false,
   lastLogin: false, currentProjects: false, leaveBalance: false, productivityScore: false,
   performanceRating: false, actions: true
@@ -1300,7 +1296,11 @@ const Employees = () => {
           setCreatedEmpInfo(prev => ({ ...prev, id: savedEmp.id }));
         }
       } else {
-        await updateEmployee(selectedEmployeeId, finalData);
+        const success = await updateEmployee(selectedEmployeeId, finalData);
+        if (!success) {
+          setIsSubmitting(false);
+          return;
+        }
         addToast('success', `Employee ${formData.name} updated successfully!`);
       }
       setShowFormPanel(false);
@@ -1964,7 +1964,6 @@ const Employees = () => {
                   {colVis.todayPunchOut && renderTH("todayPunchOut", FIELD_LABELS.punchOutTime, true)}
                   {colVis.todayWorkingHours && renderTH("todayWorkingHours", FIELD_LABELS.workingHours, true)}
                   {colVis.attendanceStatus && renderTH("attendanceStatus", FIELD_LABELS.attendanceStatus, true)}
-                  {colVis.lastSeen && renderTH("lastSeen", "Last Seen", true)}
                   {colVis.workStatus && renderTH("workStatus", "Work Status", true)}
                   {colVis.accountStatus && renderTH("accountStatus", FIELD_LABELS.employmentStatus, true)}
                   <th className="col-actions">Actions</th>
@@ -2077,8 +2076,17 @@ const Employees = () => {
                         <AttBadge status={getTodayStatus(row)} />
                       </td>
                     )}
-                    {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '-'}</span></td>}
-                    {colVis.workStatus && <td><WorkStatusDot status={row.workStatus} /></td>}
+                    {colVis.workStatus && (
+                      <td>
+                        <WorkStatusDot
+                          status={(() => {
+                            const att = getTodayAttendance(row.id);
+                            const hasPunchedIn = att && att.punchIn && att.punchIn !== '--:--';
+                            return hasPunchedIn ? 'Online' : 'Offline';
+                          })()}
+                        />
+                      </td>
+                    )}
                     {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
                     <td className="col-actions">
                       <div className="table-actions-cell">

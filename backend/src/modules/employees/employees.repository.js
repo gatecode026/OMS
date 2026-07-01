@@ -222,7 +222,8 @@ export const update = async (id, data) => {
     if (data.branch !== undefined || data.department !== undefined) {
       const mergedPayload = { ...oldEmployee, ...data };
       await validateRepositoryAccess('update', mergedPayload, {
-        ownerIdFields: ['id']
+        ownerIdFields: ['id'],
+        moduleName: 'Employee'
       });
     }
   }

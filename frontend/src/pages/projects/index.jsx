@@ -69,7 +69,7 @@ const Projects = () => {
   
   // Form States for Modals
   const [newProjectForm, setNewProjectForm] = useState({
-    name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
+    name: '', client: '', department: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
   });
   const [assignTeamForm, setAssignTeamForm] = useState({ projectId: '', memberName: '' });
   const [selectedMembers, setSelectedMembers] = useState([]);
@@ -218,7 +218,6 @@ const Projects = () => {
       name: proj.name,
       client: proj.client || 'Google',
       department: proj.department,
-      manager: proj.manager,
       leader: proj.leader,
       startDate: proj.startDate,
       deadline: proj.deadline,
@@ -304,15 +303,15 @@ const Projects = () => {
         description: newProjectForm.description,
         department: newProjectForm.department,
         client: newProjectForm.client || 'Internal',
-        manager: newProjectForm.manager,
+        manager: '',
         leader: newProjectForm.leader,
-        members: [newProjectForm.manager, newProjectForm.leader].filter(Boolean),
+        members: [newProjectForm.leader].filter(Boolean),
         priority: newProjectForm.priority,
         startDate: newProjectForm.startDate || new Date().toISOString().split('T')[0],
         deadline: newProjectForm.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         progress: 0,
         status: 'Pending',
-        tasksTotal: 1,
+        tasksTotal: 0,
         tasksDone: 0,
         workflowStage: 'Planning',
         pendingApprovals: 1,
@@ -321,15 +320,13 @@ const Projects = () => {
         milestonesCompleted: 0,
         milestonesTotal: 5,
         documents: [],
-        tasks: [
-          { id: `t-${nextId}-1`, title: 'Kickoff meeting and alignment', completed: false, dueDate: newProjectForm.startDate || new Date().toISOString().split('T')[0], priority: 'Medium' }
-        ]
+        tasks: []
       };
       await addProject(newProjObj);
     }
     setActiveModal(null);
     setNewProjectForm({
-      name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
+      name: '', client: '', department: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
     });
   };
 
@@ -667,7 +664,11 @@ const Projects = () => {
       <div className={styles.tableHeaderRow}>
         <div>
           <h1 style={{ margin: 0 }}>Active Projects Dashboard</h1>
-          <p style={{ margin: 0, fontSize: '0.85rem' }}>Track and manage all company projects, timelines, tasks, and budgets.</p>
+          <p style={{ margin: 0, fontSize: '0.85rem' }}>
+            {currentUserRole === 'employee'
+              ? 'View your assigned projects, timelines, and tasks.'
+              : 'Track and manage all company projects, timelines, tasks, and budgets.'}
+          </p>
         </div>
 
         {/* Header Alerts Dropdown Button */}
@@ -680,60 +681,64 @@ const Projects = () => {
       </div>
 
       {/* Top Banner Alert Bar */}
-      <div className={styles.alertsBanner}>
-        <div className={styles.alertsHeader}>
-          <span className={styles.alertsTitle}>
-            <Bell size={16} /> Important Dashboard System Alerts
-          </span>
+      {currentUserRole !== 'employee' && (
+        <div className={styles.alertsBanner}>
+          <div className={styles.alertsHeader}>
+            <span className={styles.alertsTitle}>
+              <Bell size={16} /> Important Dashboard System Alerts
+            </span>
+          </div>
+          <div className={styles.alertList}>
+            <div className={styles.alertItem}>
+              <span className={styles.alertDot} />
+              <span>Upcoming Deadlines: <strong>{stats.upcoming}</strong> projects need delivery this month.</span>
+            </div>
+            <div className={styles.alertItem}>
+              <span className={styles.alertDot} />
+              <span>Delayed Projects: <strong>{stats.delayed}</strong> databases and systems core lagging.</span>
+            </div>
+            <div className={styles.alertItem}>
+              <span className={styles.alertDot} />
+              <span>Approvals: <strong>8</strong> approvals pending from managers.</span>
+            </div>
+          </div>
         </div>
-        <div className={styles.alertList}>
-          <div className={styles.alertItem}>
-            <span className={styles.alertDot} />
-            <span>Upcoming Deadlines: <strong>{stats.upcoming}</strong> projects need delivery this month.</span>
-          </div>
-          <div className={styles.alertItem}>
-            <span className={styles.alertDot} />
-            <span>Delayed Projects: <strong>{stats.delayed}</strong> databases and systems core lagging.</span>
-          </div>
-          <div className={styles.alertItem}>
-            <span className={styles.alertDot} />
-            <span>Approvals: <strong>8</strong> approvals pending from managers.</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Section G - Quick Action Buttons Bar */}
-      <div className={styles.quickActionsRow}>
-        {hasPermission('project_management', 'create') && (
-          <>
-            <button className={`${styles.pageBtn} ${styles.primaryAction}`} onClick={() => { setSelectedProject(null); setActiveModal('create'); }}>
-              <Plus size={14} /> Create New Project
-            </button>
-            <button className={styles.pageBtn} onClick={() => setActiveModal('assign')}>
-              <Users size={14} /> Assign Team
-            </button>
-            <button className={styles.pageBtn} onClick={() => {
-              setAddTaskForm({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
-              setSelectedTaskEmployees([]);
-              setActiveModal('task');
-            }}>
-              <CheckSquare size={14} /> Add Tasks
-            </button>
-            <button className={styles.pageBtn} onClick={() => setActiveModal('document')}>
-              <FileText size={14} /> Upload Documents
-            </button>
-            <button className={styles.pageBtn} onClick={() => setActiveModal('report')}>
-              <BarChart2 size={14} /> Generate Reports
-            </button>
-          </>
-        )}
-        <button className={styles.pageBtn} onClick={handleExportCSV}>
-          <Download size={14} /> Export Data (CSV)
-        </button>
-        <button className={styles.pageBtn} onClick={handleViewAnalytics}>
-          <TrendingUp size={14} /> View Analytics
-        </button>
-      </div>
+      {currentUserRole !== 'employee' && (
+        <div className={styles.quickActionsRow}>
+          {hasPermission('project_management', 'create') && (
+            <>
+              <button className={`${styles.pageBtn} ${styles.primaryAction}`} onClick={() => { setSelectedProject(null); setActiveModal('create'); }}>
+                <Plus size={14} /> Create New Project
+              </button>
+              <button className={styles.pageBtn} onClick={() => setActiveModal('assign')}>
+                <Users size={14} /> Assign Team
+              </button>
+              <button className={styles.pageBtn} onClick={() => {
+                setAddTaskForm({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
+                setSelectedTaskEmployees([]);
+                setActiveModal('task');
+              }}>
+                <CheckSquare size={14} /> Add Tasks
+              </button>
+              <button className={styles.pageBtn} onClick={() => setActiveModal('document')}>
+                <FileText size={14} /> Upload Documents
+              </button>
+              <button className={styles.pageBtn} onClick={() => setActiveModal('report')}>
+                <BarChart2 size={14} /> Generate Reports
+              </button>
+            </>
+          )}
+          <button className={styles.pageBtn} onClick={handleExportCSV}>
+            <Download size={14} /> Export Data (CSV)
+          </button>
+          <button className={styles.pageBtn} onClick={handleViewAnalytics}>
+            <TrendingUp size={14} /> View Analytics
+          </button>
+        </div>
+      )}
 
       {/* Section A — Top Summary Cards */}
       <div className={styles.summaryGrid}>
@@ -987,25 +992,6 @@ const Projects = () => {
                   </div>
                 </div>
                 <div className={styles.basicGrid}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Project Manager</label>
-                    <select
-                      className={styles.filterSelect}
-                      style={{ width: '100%' }}
-                      value={newProjectForm.manager}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, manager: e.target.value })}
-                      required
-                    >
-                      <option value="">Select a manager...</option>
-                      {(employees || [])
-                        .filter(emp => emp.roleId === 'manager' || emp.role?.toLowerCase() === 'manager' || emp.designation?.toLowerCase().includes('manager'))
-                        .map(emp => (
-                          <option key={emp.id} value={emp.name}>
-                            {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
-                          </option>
-                        ))}
-                    </select>
-                  </div>
                   <div className={styles.formGroup}>
                     <label className={styles.formLabel}>Team Leader</label>
                     <select

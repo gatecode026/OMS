@@ -107,7 +107,13 @@ const ApplyLeaveModal = ({
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setStartDate(val);
+                if (endDate && endDate < val) {
+                  setEndDate('');
+                }
+              }}
               required
               min={new Date().toISOString().split('T')[0]}
               className="padding-2 border-border"
@@ -121,8 +127,13 @@ const ApplyLeaveModal = ({
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               required
-              min={startDate || new Date().toISOString().split('T')[0]}
+              disabled={!startDate}
+              min={startDate}
               className="padding-2 border-border"
+              style={{
+                opacity: startDate ? 1 : 0.6,
+                cursor: startDate ? 'text' : 'not-allowed'
+              }}
             />
           </div>
         </div>

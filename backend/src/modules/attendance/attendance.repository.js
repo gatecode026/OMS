@@ -31,9 +31,18 @@ export const find = async (query = {}) => {
   if (query.employeeId) filters.employeeId = query.employeeId;
   if (query.from && query.to) {
     filters.date = { $gte: query.from, $lte: query.to };
-  } else if (query.date) {  
+  } else if (query.date) {
     filters.date = query.date;
-  }  
+  } else {
+    // Default: limit to last 60 days when no date range is requested.
+    // Prevents returning the entire attendance history on initial page load.
+    const today = new Date();
+    const sixtyDaysAgo = new Date(today);
+    sixtyDaysAgo.setDate(today.getDate() - 60);
+    const toStr = today.toISOString().split('T')[0];
+    const fromStr = sixtyDaysAgo.toISOString().split('T')[0];
+    filters.date = { $gte: fromStr, $lte: toStr };
+  }
   if (query.branch) filters.branch = query.branch;
   if (query.department) filters.department = query.department;
   if (query.status) filters.status = query.status;
@@ -49,6 +58,7 @@ export const find = async (query = {}) => {
 
   // 3. Apply role-based query filters
   const scopedFilters = builder.buildReadQuery(filters);
+
 
   if (getQueryLogging()) {
     logger.info(`[DEBUGLOG] AttendanceRepository::find:

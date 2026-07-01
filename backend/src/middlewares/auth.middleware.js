@@ -76,7 +76,8 @@ export const authenticate = async (req, res, next) => {
           const teamEmps = await Employee.find({
             $or: [
               { team: emp.team },
-              { teamLeader: emp.id }
+              { teamLeader: emp.id },
+              { teamLeader: emp.name }
             ]
           }).select('id').lean();
           const teamEmployeeIds = teamEmps.map(e => e.id);

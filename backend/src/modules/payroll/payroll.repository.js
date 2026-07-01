@@ -13,6 +13,7 @@ import {
 } from './payroll.model.js';
 import logger from '../../config/logger.js';
 import { getTenantId } from '../../utils/tenantContext.js';
+import { CacheKeys, TTL, cacheGetOrSet, cacheDel } from '../../services/cache.service.js';
 
 // Security and Query Builder Imports
 import { resolveSecurityContext } from '../../security/scopeEngine.js';
@@ -36,10 +37,11 @@ const overrideDepartmentForAdminRoles = (record, context) => {
   return record;
 };
 
-// Get unified master dataset
+// Get unified master dataset — cached for 5 minutes to avoid 6 sequential DB queries on every login
 export const getMasterPayrollData = async () => {
   logger.debug('Executing PayrollRepository::getMasterPayrollData');
   const context = resolveSecurityContext();
+  const companyId = getTenantId();
   const builder = new PayrollResourceQueryBuilder(context);
 
   const queryFilters = await builder.buildQuery({}, 'payroll');
@@ -48,90 +50,101 @@ export const getMasterPayrollData = async () => {
   const showGrades = context ? (context.isSuperAdmin || context.isCompanyAdmin || context.role === 'hr_manager' || context.role === 'finance_manager') : true;
   const showConfig = context ? (context.isSuperAdmin || context.isCompanyAdmin || context.role === 'hr_manager' || context.role === 'finance_manager') : true;
 
-  const grades = showGrades ? await PayrollGrade.find().lean() : [];
-  const reimbursements = await PayrollReimbursement.find(queryFilters).lean();
-  const loans = await PayrollLoanAdvance.find(queryFilters).lean();
-  const bonuses = await PayrollBonus.find(queryFilters).lean();
-  const payments = await PayrollPayment.find(queryFilters).lean();
-  
-  // Find or create global config
-  let config = null;
-  if (showConfig) {
-    config = await PayrollConfig.findOne({ id: 'GLOBAL_CONFIG' }).lean();
-    if (!config) {
-      config = await PayrollConfig.create({
-        id: 'GLOBAL_CONFIG',
-        leaveDeductionRate: 2000,
-        lateArrivalPenalty: 300,
-        overtimeHourlyRate: 500,
-        taxProfiles: {},
-        salaryStructures: {},
-        attendanceDaysMap: {},
-        timelineDeadlines: {
-          reimbursementCutoff: 20,
-          attendanceVerification: 25,
-          payrollProcessing: 28,
-          salaryDisbursement: 30
-        },
-        complianceSchedules: [
-          { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
-          { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
-          { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
-        ],
-        complianceNotices: [
-          'Submission window for Q1 Investment Proofs is currently open.',
-          'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
-        ]
-      });
-      config = config.toObject();
-    } else {
-      // Ensure existing configs have defaults if fields are missing
-      let updated = false;
-      if (!config.timelineDeadlines) {
-        config.timelineDeadlines = {
-          reimbursementCutoff: 20,
-          attendanceVerification: 25,
-          payrollProcessing: 28,
-          salaryDisbursement: 30
-        };
-        updated = true;
-      }
-      if (!config.complianceSchedules) {
-        config.complianceSchedules = [
-          { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
-          { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
-          { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
-        ];
-        updated = true;
-      }
-      if (!config.complianceNotices) {
-        config.complianceNotices = [
-          'Submission window for Q1 Investment Proofs is currently open.',
-          'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
-        ];
-        updated = true;
-      }
-      if (updated) {
-        await PayrollConfig.updateOne({ id: 'GLOBAL_CONFIG' }, {
-          $set: {
-            timelineDeadlines: config.timelineDeadlines,
-            complianceSchedules: config.complianceSchedules,
-            complianceNotices: config.complianceNotices
-          }
+  // Use a role-scoped cache key so employee vs admin see correct filtered data
+  const roleScope = context?.role || 'unknown';
+  const cacheKey = companyId ? `payroll_master:${companyId}:${roleScope}` : null;
+
+  const fetchFreshData = async () => {
+    const grades = showGrades ? await PayrollGrade.find().lean() : [];
+    const reimbursements = await PayrollReimbursement.find(queryFilters).lean();
+    const loans = await PayrollLoanAdvance.find(queryFilters).lean();
+    const bonuses = await PayrollBonus.find(queryFilters).lean();
+    const payments = await PayrollPayment.find(queryFilters).lean();
+
+    // Find or create global config
+    let config = null;
+    if (showConfig) {
+      config = await PayrollConfig.findOne({ id: 'GLOBAL_CONFIG' }).lean();
+      if (!config) {
+        config = await PayrollConfig.create({
+          id: 'GLOBAL_CONFIG',
+          leaveDeductionRate: 2000,
+          lateArrivalPenalty: 300,
+          overtimeHourlyRate: 500,
+          taxProfiles: {},
+          salaryStructures: {},
+          attendanceDaysMap: {},
+          timelineDeadlines: {
+            reimbursementCutoff: 20,
+            attendanceVerification: 25,
+            payrollProcessing: 28,
+            salaryDisbursement: 30
+          },
+          complianceSchedules: [
+            { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
+            { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
+            { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
+          ],
+          complianceNotices: [
+            'Submission window for Q1 Investment Proofs is currently open.',
+            'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
+          ]
         });
+        config = config.toObject();
+      } else {
+        // Ensure existing configs have defaults if fields are missing
+        let updated = false;
+        if (!config.timelineDeadlines) {
+          config.timelineDeadlines = {
+            reimbursementCutoff: 20,
+            attendanceVerification: 25,
+            payrollProcessing: 28,
+            salaryDisbursement: 30
+          };
+          updated = true;
+        }
+        if (!config.complianceSchedules) {
+          config.complianceSchedules = [
+            { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
+            { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
+            { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
+          ];
+          updated = true;
+        }
+        if (!config.complianceNotices) {
+          config.complianceNotices = [
+            'Submission window for Q1 Investment Proofs is currently open.',
+            'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
+          ];
+          updated = true;
+        }
+        if (updated) {
+          await PayrollConfig.updateOne({ id: 'GLOBAL_CONFIG' }, {
+            $set: {
+              timelineDeadlines: config.timelineDeadlines,
+              complianceSchedules: config.complianceSchedules,
+              complianceNotices: config.complianceNotices
+            }
+          });
+        }
       }
     }
-  }
 
-  return {
-    grades,
-    reimbursements,
-    loans: loans.filter(l => l.type === 'Loan'),
-    advances: loans.filter(l => l.type === 'Advance'),
-    bonuses,
-    payments,
-    config
+    return {
+      grades,
+      reimbursements,
+      loans: loans.filter(l => l.type === 'Loan'),
+      advances: loans.filter(l => l.type === 'Advance'),
+      bonuses,
+      payments,
+      config
+    };
   };
+
+  if (cacheKey) {
+    return cacheGetOrSet(cacheKey, fetchFreshData, TTL.EMPLOYEE_LIST);
+  }
+  return fetchFreshData();
 };
 
 // CRUD for Salary Grade structures

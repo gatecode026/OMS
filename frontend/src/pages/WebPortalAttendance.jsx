@@ -509,7 +509,6 @@ const WebPortalAttendance = () => {
     });
   }, [employees, wpSearch, wpBranch, wpDept, wpStatus, wpWorkMode, wpState]);
 
-  // ── Statistics ──
   const stats = useMemo(() => {
     const todayRecords = attendance.filter(a => a.date === dateFilter);
     const webPortalToday = todayRecords.filter(a => a.source === 'Web Portal').length;
@@ -526,16 +525,45 @@ const WebPortalAttendance = () => {
       return mins !== null && mins <= lateThresholdMins;
     }).length;
 
+    // ── Yesterday comparison for trend arrows ──
+    const yesterday = new Date(dateFilter);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayRecords = attendance.filter(a => a.date === yesterdayStr);
+    const yesterdayPresent = yesterdayRecords.filter(a => a.status === 'Present' || a.status === 'Overtime').length;
+    const yesterdayMarked = yesterdayRecords.filter(a => a.source === 'Web Portal').length;
+    const yesterdayOnTime = yesterdayRecords.filter(a => {
+      if (!a.punchIn) return false;
+      const mins = timeToMinutes(a.punchIn);
+      return mins !== null && mins <= lateThresholdMins;
+    }).length;
+    const yesterdayAvgHours = yesterdayPresent > 0
+      ? Math.round(yesterdayRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0) / yesterdayPresent * 10) / 10
+      : 0;
+
+    const presentDelta = presentToday - yesterdayPresent;
+    const markedDelta = webPortalToday - yesterdayMarked;
+    const onTimeDelta = presentToday > 0 && yesterdayPresent > 0
+      ? Math.round((onTimeCount / presentToday) * 100) - Math.round((yesterdayOnTime / yesterdayPresent) * 100)
+      : 0;
+    const avgHoursNow = presentToday > 0 ? Math.round(todayRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0) / presentToday * 10) / 10 : 0;
+    const avgHoursDelta = Math.round((avgHoursNow - yesterdayAvgHours) * 10) / 10;
+
     return {
       webPortalToday,
       presentToday,
-      totalEmployees: wpFilteredEmployees.length, // filtered count shown in table header
+      totalEmployees: wpFilteredEmployees.length,
       completionRate,
-      pendingCount: Math.max(0, totalEmployees - webPortalToday), // never negative
+      pendingCount: Math.max(0, totalEmployees - webPortalToday),
       onTimeRate: presentToday > 0 ? Math.round((onTimeCount / presentToday) * 100) : 0,
-      avgHours: presentToday > 0 ? Math.round(todayRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0) / presentToday * 10) / 10 : 0
+      avgHours: avgHoursNow,
+      // Trend deltas vs yesterday
+      presentDelta,
+      markedDelta,
+      onTimeDelta,
+      avgHoursDelta,
     };
-  }, [attendance, dateFilter, wpFilteredEmployees, employees]);
+  }, [attendance, dateFilter, wpFilteredEmployees, employees, attendanceRules]);
 
   // ── Change handlers ──
   const handleWpChange = (empId, field, value) => {
@@ -805,7 +833,10 @@ const WebPortalAttendance = () => {
             <span className="wp-stat-label">Total Employees</span>
             <div className="wp-stat-progress"><div className="wp-stat-prog-fill" style={{ width: '100%', background: '#60a5fa' }} /></div>
           </div>
-          <div className="wp-stat-trend wp-trend-up"><TrendingUp size={13} /> <span>+12</span></div>
+          <div className={`wp-stat-trend ${stats.presentDelta >= 0 ? 'wp-trend-up' : 'wp-trend-down'}`}>
+            {stats.presentDelta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+            <span>{stats.presentDelta >= 0 ? '+' : ''}{stats.presentDelta} vs yesterday</span>
+          </div>
         </div>
 
         <div className="wp-stat-card wp-stat-marked">
@@ -835,7 +866,10 @@ const WebPortalAttendance = () => {
             <span className="wp-stat-label">Present Today</span>
             <div className="wp-stat-progress"><div className="wp-stat-prog-fill" style={{ width: stats.totalEmployees > 0 ? `${Math.round((stats.presentToday / stats.totalEmployees) * 100)}%` : '0%', background: '#a78bfa' }} /></div>
           </div>
-          <div className="wp-stat-trend wp-trend-up"><TrendingUp size={13} /> <span>+5</span></div>
+          <div className={`wp-stat-trend ${stats.presentDelta >= 0 ? 'wp-trend-up' : 'wp-trend-down'}`}>
+            {stats.presentDelta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+            <span>{stats.presentDelta >= 0 ? '+' : ''}{stats.presentDelta} vs yesterday</span>
+          </div>
         </div>
 
         <div className="wp-stat-card wp-stat-ontime">

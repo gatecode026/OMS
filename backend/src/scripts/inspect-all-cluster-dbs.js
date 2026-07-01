@@ -8,6 +8,9 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+import { setServers } from 'dns';
+setServers(['1.1.1.1']);
+
 const CLUSTER_URI = process.env.CLUSTER_1_URI || 'mongodb+srv://gatecode026:tBNyNzO68BNn3Zkn@cluster0.1meot8l.mongodb.net';
 
 async function run() {
