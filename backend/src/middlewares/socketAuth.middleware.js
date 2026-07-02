@@ -68,6 +68,7 @@ export const verifySocketToken = async (token) => {
             email: 1,
             roleId: 1,
             status: 1,
+            accountStatus: 1,
             avatar: 1,
             companyId: 1,
             workStatus: 1,
@@ -85,7 +86,8 @@ export const verifySocketToken = async (token) => {
     throw new Error('Authentication failed: User not found');
   }
 
-  if (user.status !== 'Active' && user.status !== 'On Leave') {
+  const accountStatus = (decoded.role === 'super_admin' || decoded.role === 'company_admin') ? user.status : user.accountStatus;
+  if (accountStatus !== 'Active') {
     throw new Error('Authentication failed: Account inactive');
   }
 

@@ -71,7 +71,7 @@ export const authenticate = async (req, res, next) => {
       // For employees, resolve the correct database connection before querying the model
       const companyId = decoded.companyId || 'COMP-DEFAULT';
       user = await runWithTenant(companyId, async () => {
-        const emp = await Employee.findOne({ id: decoded.id }).select('id name email roleId status companyId branch department team').lean();
+        const emp = await Employee.findOne({ id: decoded.id }).select('id name email roleId status accountStatus companyId branch department team').lean();
         if (emp && emp.roleId === 'team_leader') {
           const teamEmps = await Employee.find({
             $or: [
@@ -97,7 +97,8 @@ export const authenticate = async (req, res, next) => {
       });
     }
 
-    if (user.status !== 'Active' && user.status !== 'On Leave') {
+    const accountStatus = (decoded.role === 'super_admin' || decoded.role === 'company_admin') ? user.status : user.accountStatus;
+    if (accountStatus !== 'Active') {
       return res.status(403).json({
         status: 'fail',
         message: 'Authentication failed. This account is inactive.',

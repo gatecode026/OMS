@@ -80,7 +80,8 @@ export const findOne = async (id) => {
 
   if (record && context) {
     await validateRepositoryAccess('read', record, {
-      ownerIdFields: ['employeeId']
+      ownerIdFields: ['employeeId'],
+      moduleName: 'Leave'
     });
   }
 
@@ -103,7 +104,8 @@ export const save = async (data) => {
 
   if (context) {
     await validateRepositoryAccess('create', data, {
-      ownerIdFields: ['employeeId']
+      ownerIdFields: ['employeeId'],
+      moduleName: 'Leave'
     });
   }
 
@@ -178,7 +180,8 @@ export const remove = async (id) => {
 
   if (context) {
     await validateRepositoryAccess('delete', record, {
-      ownerIdFields: ['employeeId']
+      ownerIdFields: ['employeeId'],
+      moduleName: 'Leave'
     });
 
     // Standard Employee cannot delete if already processed
