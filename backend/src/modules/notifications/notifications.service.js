@@ -23,11 +23,13 @@ export const findById = async (id) => {
 
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing NotificationsService::createRecord by user: ' + currentUser?.id);
+  let effectiveType = data.type || 'system';
+  if (effectiveType === 'info') effectiveType = 'system';
   return notificationService.createNotification(
     data.userId || currentUser?.id,
     currentUser?.companyId,
     {
-      type: data.type || 'system',
+      type: effectiveType,
       title: data.title,
       message: data.message,
       data: data.data || {},

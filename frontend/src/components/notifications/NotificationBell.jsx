@@ -32,7 +32,7 @@ const deriveAppNotifications = ({ currentUser, currentUserRole, leaveRequests, p
         message: `${leave.employeeName || leave.name || 'An employee'} requested ${leave.leaveType || 'leave'} (${leave.startDate || ''} – ${leave.endDate || ''})`,
         isRead: false,
         priority: 'high',
-        createdAt: leave.appliedDate || leave.createdAt || new Date().toISOString(),
+        createdAt: leave.createdAt || leave.appliedDate || new Date().toISOString(),
         category: 'system',
       });
     });
@@ -52,7 +52,7 @@ const deriveAppNotifications = ({ currentUser, currentUserRole, leaveRequests, p
         message: `Your ${leave.leaveType || 'leave'} request is pending approval`,
         isRead: false,
         priority: 'normal',
-        createdAt: leave.appliedDate || leave.createdAt || new Date().toISOString(),
+        createdAt: leave.createdAt || leave.appliedDate || new Date().toISOString(),
         category: 'system',
       });
     });
