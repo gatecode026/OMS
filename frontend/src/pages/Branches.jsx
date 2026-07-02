@@ -21,7 +21,7 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole } = useApp();
 
   // Real employee counts by branch (from actual employees data)
   const branchEmployeeCountMap = useMemo(() => {
@@ -841,11 +841,17 @@ const Branches = () => {
 
     if (result) {
       const targetBranch = branches.find(b => b.id === managerUpdate.branchId);
+      if (empMatch && targetBranch) {
+        await updateEmployee(empMatch.id, {
+          branch: targetBranch.name,
+          branchAgency: targetBranch.name
+        });
+      }
       setActivities(prev => [
-        { id: Date.now(), text: `Manager updated for ${targetBranch.name}: ${managerName}`, time: 'Just now', type: 'success' },
+        { id: Date.now(), text: `Manager updated for ${targetBranch ? targetBranch.name : 'branch'}: ${managerName}`, time: 'Just now', type: 'success' },
         ...prev
       ]);
-      addToast('success', `Manager updated for ${targetBranch.name}!`);
+      addToast('success', `Manager updated for ${targetBranch ? targetBranch.name : 'branch'}!`);
       setShowManagerModal(false);
     }
   };
@@ -1942,7 +1948,7 @@ const Branches = () => {
                   <p className="meta-row"><Mail size={12} /> {selectedBranch.managerEmail || 'No contact email record'}</p>
                 </div>
               </div>
-              {hasPermission('agency_branch_management', 'update') && (
+              {(currentUserRole === 'company_admin' || currentUserRole === 'super_admin') && (
                 <div className="manager-actions" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
                   <Button size="sm" variant="secondary" icon={Edit2} onClick={() => {
                     setManagerUpdate({
@@ -1953,49 +1959,6 @@ const Branches = () => {
                     });
                     setShowManagerModal(true);
                   }}>Change Branch Manager</Button>
-                </div>
-              )}
-            </div>
-
-            {/* Compliance Document Vault */}
-            <div className="card detail-vault-card">
-              <h2 className="section-title"><Calendar size={16} /> Branch Compliance Document Vault</h2>
-              <p className="desc text-muted">Upload and manage agreements, structural audits, state license certificates, and other records.</p>
-              
-              <div className="vault-file-list" style={{ marginTop: '12px' }}>
-                {(selectedBranch.documents || []).length === 0 ? (
-                  <p className="empty-text">No compliance documents uploaded yet.</p>
-                ) : (
-                  (selectedBranch.documents || []).map(doc => (
-                    <div key={doc} className="vault-file-row">
-                      <span className="file-icon">📄</span>
-                      <span className="file-name">{doc}</span>
-                      <div className="file-actions">
-                        <button className="btn-file-icon btn-download" onClick={() => handleDownloadDocument(doc)} title="Download Document" type="button">
-                          <Download size={14} />
-                        </button>
-                        {hasPermission('agency_branch_management', 'delete') && (
-                          <button className="btn-file-icon btn-delete" onClick={() => handleDeleteDocument(doc)} title="Delete Document" type="button">
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {hasPermission('agency_branch_management', 'create') && (
-                <div className="vault-upload-form" style={{ marginTop: '16px' }}>
-                  <Button 
-                    size="sm" 
-                    variant="primary" 
-                    icon={Plus} 
-                    onClick={() => fileInputRef.current?.click()}
-                    type="button"
-                  >
-                    Upload to Vault
-                  </Button>
                 </div>
               )}
             </div>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE, getBaseRole } from '../permissions/permissions';
-import { connectSocket, disconnectSocket } from '../lib/socketManager';
+import { connectSocket, disconnectSocket, getSocket } from '../lib/socketManager';
 
 const AppContext = createContext(undefined);
 
@@ -643,6 +643,32 @@ export const AppProvider = ({ children }) => {
     }
   }, [token, currentUser]);
 
+  // Live socket notification listener to update global notifications in real time
+  useEffect(() => {
+    if (!currentUser || !token) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNewNotification = (notif) => {
+      console.log('[AppContext] Live socket notification received, refreshing notifications...');
+      fetchNotifications();
+    };
+
+    const handleSync = (missedNotifs) => {
+      console.log('[AppContext] Live socket sync received, refreshing notifications...');
+      fetchNotifications();
+    };
+
+    socket.on('notification:new', handleNewNotification);
+    socket.on('notification:sync', handleSync);
+
+    return () => {
+      socket.off('notification:new', handleNewNotification);
+      socket.off('notification:sync', handleSync);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, token]);
+
   // Auth Actions
   const login = async (email, password) => {
     if (!email || email.trim().length === 0) {
@@ -1211,7 +1237,7 @@ export const AppProvider = ({ children }) => {
 
       const newNotif = {
         id: `NTF-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-        type: 'info',
+        type: 'system',
         title,
         message,
         time: new Date().toISOString(),
@@ -4546,11 +4572,36 @@ export const AppProvider = ({ children }) => {
 
   // Memoize the normalized employees array to prevent creating a new reference
   // on every render, which would cause all context consumers to re-render infinitely.
-  // Also dynamically resolve branch and department for manager roles.
+  // Also dynamically resolve branch and department for manager roles, and today's attendance details.
   const memoizedEmployees = useMemo(() => {
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+
     return (employees || []).map(emp => {
       const normalized = normalizeEmployee(emp);
-      if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager' || (normalized.roleId && normalized.roleId.includes('manager')) || (normalized.role && normalized.role.toLowerCase().includes('manager')))) {
+      if (!normalized) return normalized;
+
+      // Resolve today's attendance status dynamically
+      const todayRecord = (attendance || []).find(
+        record => record.employeeId === normalized.id && record.date === todayStr
+      );
+      if (todayRecord) {
+        normalized.attendanceStatus = todayRecord.status || 'Present';
+        normalized.todayPunchStatus = todayRecord.status === 'Absent' ? 'Not Punched' : 'Punched In';
+        normalized.todayPunchIn = todayRecord.punchIn || null;
+        normalized.todayPunchOut = todayRecord.punchOut || null;
+        normalized.todayWorkingHours = todayRecord.totalHours || 0;
+        normalized.punchIn = todayRecord.punchIn || null;
+        normalized.punchOut = todayRecord.punchOut || null;
+        normalized.totalHours = todayRecord.totalHours || 0;
+      }
+
+      if (normalized.roleId === 'manager' || normalized.role === 'Manager' || (normalized.roleId && normalized.roleId.includes('manager')) || (normalized.role && normalized.role.toLowerCase().includes('manager'))) {
         const hasNoBranch = !normalized.branch || normalized.branch === '—' || normalized.branch === '-';
         if (hasNoBranch) {
           const foundBranch = (branches || []).find(
@@ -4564,11 +4615,33 @@ export const AppProvider = ({ children }) => {
       }
       return normalized;
     });
-  }, [employees, branches, departments]);
+  }, [employees, branches, departments, attendance]);
 
   const memoizedCurrentUser = useMemo(() => {
     if (!currentUser) return null;
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+
     const normalized = normalizeEmployee(currentUser);
+    const todayRecord = (attendance || []).find(
+      record => record.employeeId === normalized.id && record.date === todayStr
+    );
+    if (todayRecord) {
+      normalized.attendanceStatus = todayRecord.status || 'Present';
+      normalized.todayPunchStatus = todayRecord.status === 'Absent' ? 'Not Punched' : 'Punched In';
+      normalized.todayPunchIn = todayRecord.punchIn || null;
+      normalized.todayPunchOut = todayRecord.punchOut || null;
+      normalized.todayWorkingHours = todayRecord.totalHours || 0;
+      normalized.punchIn = todayRecord.punchIn || null;
+      normalized.punchOut = todayRecord.punchOut || null;
+      normalized.totalHours = todayRecord.totalHours || 0;
+    }
+
     if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager' || (normalized.roleId && normalized.roleId.includes('manager')) || (normalized.role && normalized.role.toLowerCase().includes('manager')))) {
       const hasNoBranch = !normalized.branch || normalized.branch === '—' || normalized.branch === '-';
       if (hasNoBranch) {
@@ -4582,7 +4655,7 @@ export const AppProvider = ({ children }) => {
       }
     }
     return normalized;
-  }, [currentUser, branches, departments]);
+  }, [currentUser, branches, departments, attendance]);
 
 
   return (

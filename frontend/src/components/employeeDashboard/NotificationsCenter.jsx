@@ -70,7 +70,7 @@ const NotificationsCenter = ({
   const getFilteredNotifications = () => {
     const isAdminRole = ['super_admin', 'company_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
     return notifications.filter(n => {
-      const recipientId   = n.recipientId || n.targetUserId || n.forUserId;
+      const recipientId   = n.recipientId || n.targetUserId || n.forUserId || n.userId;
       const recipientRole = (n.recipientRole || n.targetRole || n.recipientType || '').toLowerCase();
       const msg = (n.message || n.title || '').toLowerCase();
 
@@ -145,7 +145,40 @@ const NotificationsCenter = ({
           {filteredNotifs.slice(0, 5).map((notif) => (
             <div
               key={notif.id}
-              onClick={() => markNotificationRead(notif.id)}
+              onClick={() => {
+                const notifId = notif.id || notif._id;
+                if (notifId) {
+                  markNotificationRead(notifId);
+                  
+                  const type = (notif.type || '').toLowerCase();
+                  const category = (notif.category || '').toLowerCase();
+                  const msg = (notif.message || '').toLowerCase();
+                  const title = (notif.title || '').toLowerCase();
+                  const data = notif.data || {};
+
+                  if (type === 'leave' || category === 'leave' || msg.includes('leave') || title.includes('leave')) {
+                    navigate('/leaves');
+                  } else if (type === 'attendance' || category === 'attendance' || msg.includes('attendance') || msg.includes('punch') || msg.includes('late') || title.includes('attendance') || title.includes('punch') || title.includes('late')) {
+                    navigate('/attendance');
+                  } else if (type.includes('task') || category === 'task' || msg.includes('task') || title.includes('task')) {
+                    navigate('/tasks');
+                  } else if (type === 'meeting' || category === 'meeting' || msg.includes('meeting') || title.includes('meeting')) {
+                    navigate('/calendar');
+                  } else if (type === 'payroll' || category === 'payroll' || msg.includes('payroll') || msg.includes('salary') || msg.includes('payslip') || title.includes('payroll') || title.includes('salary') || title.includes('payslip')) {
+                    navigate('/payroll');
+                  } else if (
+                    type.includes('message') || type.includes('mention') || type === 'chat_invitation' || type === 'reaction' ||
+                    type.includes('group') || type.includes('user_') || category === 'message' || category === 'mention' || category === 'group'
+                  ) {
+                    navigate('/chat', { state: { conversationId: data.conversationId } });
+                  } else if (type === 'announcement' || type === 'broadcast' || category === 'announcement' || category === 'broadcast') {
+                    navigate('/announcements');
+                  } else {
+                    // Fallback: redirect to the main notification page
+                    navigate('/notifications', { state: { selectedNotifId: notifId } });
+                  }
+                }
+              }}
               className="flex-row align-start gap-3 py-3 border-b border-border cursor-pointer hover:bg-surface rounded px-2"
               style={{ borderBottom: '1px solid var(--border-color)', padding: '12px 8px' }}
             >
