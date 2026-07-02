@@ -108,8 +108,8 @@ export const validateDepartmentScope = (context, resource, deptField = 'departme
 export const validateOwnership = (context, resource, ownerIdFields = ['id', 'userId', 'employeeId'], moduleName = 'unknown', operation = 'read') => {
   if (context.isSuperAdmin || context.isCompanyAdmin) return true;
 
-  // For employee role, enforce strict ownership matching
-  if (context.isEmployee) {
+  // For employee and team_leader roles, enforce strict ownership matching
+  if (context.isEmployee || context.isTeamLeader) {
     let hasMatch = false;
     for (const field of ownerIdFields) {
       if (resource[field] === context.userId) {

@@ -139,7 +139,8 @@ export const findOne = async (id) => {
   if (user && user.roleId !== 'company_admin' && user.roleId !== 'super_admin' && user.branch !== undefined) {
     if (context) {
       await validateRepositoryAccess('read', user, {
-        ownerIdFields: ['id']
+        ownerIdFields: ['id'],
+        moduleName: 'Employee'
       });
     }
   }
@@ -166,7 +167,8 @@ export const save = async (data) => {
   // Validate that user is allowed to create this employee under the specified branch/department scope
   if (context) {
     await validateRepositoryAccess('create', data, {
-      ownerIdFields: []
+      ownerIdFields: [],
+      moduleName: 'Employee'
     });
   }
 
@@ -321,7 +323,8 @@ export const remove = async (id) => {
   if (employee) {
     if (context) {
       await validateRepositoryAccess('delete', employee, {
-        ownerIdFields: ['id']
+        ownerIdFields: ['id'],
+        moduleName: 'Employee'
       });
     }
   }
