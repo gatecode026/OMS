@@ -285,7 +285,21 @@ const LS_KEY = 'saas_emp_col_visibility';
 const Employees = () => {
   const isLoading = usePageLoading(600);
   const navigate = useNavigate();
-  const { employees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves, generalSettings } = useApp();
+  const { employees: rawEmployees, addEmployee, updateEmployee, deactivateEmployee, activateEmployee, showConfirm, roles, addToast, leaveRequests, branches: dbBranches, departments: rawDbDepartments, teams, appraisalReviews, hasPermission, token, attendance, tasks, fetchEmployees, fetchAttendance, fetchLeaves, fetchDepartments, generalSettings, currentUserRole, currentUser } = useApp();
+  
+  const employees = useMemo(() => {
+    if (!currentUserRole || currentUserRole === 'super_admin') return rawEmployees;
+    if (currentUserRole === 'branch_admin') {
+      return rawEmployees.filter(e => e.branch === currentUser?.branch);
+    }
+    if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
+      return rawEmployees.filter(e => e.department === currentUser?.department);
+    }
+    if (currentUserRole === 'employee') {
+      return rawEmployees.filter(e => e.department === currentUser?.department);
+    }
+    return rawEmployees;
+  }, [rawEmployees, currentUser, currentUserRole]);
   const location = useLocation();
 
   const getLocalDateString = () => {
@@ -347,10 +361,23 @@ const Employees = () => {
     }
   };
 
+  const isGlobalAdmin = currentUserRole === 'super_admin' || currentUserRole === 'company_admin';
+
   // ── Filters ──
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
-  const [branchFilter, setBranchFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState(() => {
+    if (currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
+      return currentUser?.branch || '';
+    }
+    return '';
+  });
+
+  useEffect(() => {
+    if (currentUser && currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
+      setBranchFilter(currentUser.branch || '');
+    }
+  }, [currentUser, currentUserRole]);
   const [statusFilter, setStatusFilter] = useState('');
   const [attFilter, setAttFilter] = useState('');
   const [shiftFilter, setShiftFilter] = useState('');
@@ -657,6 +684,69 @@ const Employees = () => {
     setWizardStep(1); setFormMode('edit'); setSelectedEmployeeId(emp.id); setShowFormPanel(true);
   };
 
+  const handleOpenView = (emp) => {
+    const generatedUsername = emp.username || (emp.name ? `${emp.name.split(' ')[0].toLowerCase()}.${emp.name.split(' ')[1]?.toLowerCase() || 'emp'}` : 'emp');
+    const generatedOfficialEmail = emp.officialEmail || emp.workEmail || emp.email || `${emp.name?.split(' ')[0]?.toLowerCase() || 'employee'}@saas.io`;
+
+    const cleanDept = emp.department || '';
+    const cleanBranch = emp.branch || emp.branchAgency || emp.workLocation || '';
+
+    setFormData({
+      ...emp,
+      currentAddress: addressToString(emp.currentAddress),
+      permanentAddress: addressToString(emp.permanentAddress),
+      username: generatedUsername,
+      officialEmail: generatedOfficialEmail,
+      password: '••••••••',
+      confirmPassword: '••••••••',
+      experience: emp.experience || '',
+      employeeType: emp.employeeType || 'Full Time',
+      probationEndDate: emp.probationEndDate || '',
+      contractEndDate: emp.contractEndDate || '',
+      department: cleanDept,
+      branch: cleanBranch
+    });
+
+    const docs = {
+      aadhaar: null, pan: null, resume: null,
+      certificates: null, offerLetter: null, profilePhoto: null,
+      experienceLetter: null, addressProof: null, passportPhoto: null, signedAgreements: null
+    };
+
+    if (emp.documents && Array.isArray(emp.documents)) {
+      emp.documents.forEach(doc => {
+        if (doc.category) {
+          const key = doc.category.toLowerCase().replace(' card', '').replace(' / cv', '').replace(' photo', 'Photo').replace(' letter', 'Letter').replace(' proof', 'Proof').replace(' agreements', 'Agreements');
+          if (key in docs) {
+            const sizeBytes = doc.downloadUrl ? Math.round(doc.downloadUrl.length * 0.75) : 10000;
+            docs[key] = {
+              name: doc.fileName || `${doc.category}.bin`,
+              size: sizeBytes,
+              type: doc.fileType || 'application/octet-stream',
+              downloadUrl: doc.downloadUrl,
+              uploadDate: doc.uploadDate,
+              isExisting: true
+            };
+          }
+        }
+      });
+    }
+
+    if (emp.avatar) {
+      const sizeBytes = emp.avatar.startsWith('data:') ? Math.round(emp.avatar.length * 0.75) : 15000;
+      docs.profilePhoto = {
+        name: emp.avatar.startsWith('data:') ? 'Profile_Photo.jpg' : (emp.avatar.split('/').pop() || 'Profile_Photo.jpg'),
+        size: sizeBytes,
+        type: 'image/jpeg',
+        downloadUrl: emp.avatar,
+        isExisting: true
+      };
+    }
+
+    setUploadedDocs(docs);
+    setSlideOverOpen(true);
+  };
+
   // Sync department options when branch changes in "add" mode
   useEffect(() => {
     if (showFormPanel && formMode === 'add' && formData.branch) {
@@ -756,6 +846,9 @@ const Employees = () => {
     fetchEmployees();
     fetchAttendance();
     fetchLeaves();
+    if (typeof fetchDepartments === 'function') {
+      fetchDepartments();
+    }
 
     const interval = setInterval(() => {
       fetchEmployees();
@@ -774,7 +867,13 @@ const Employees = () => {
   const filteredEmployees = employees.filter(e => {
     const ms = e.name.toLowerCase().includes(searchTerm.toLowerCase()) || e.id.toLowerCase().includes(searchTerm.toLowerCase());
     const md = deptFilter ? e.department === deptFilter : true;
-    const mb = branchFilter ? e.branch === branchFilter : true;
+    const mb = (() => {
+      if (!branchFilter) return true;
+      if (!e.branch) return false;
+      const normEmpBranch = e.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      return normEmpBranch.includes(normFilterBranch) || normFilterBranch.includes(normEmpBranch);
+    })();
     const mst = statusFilter ? e.status === statusFilter : true;
     
     const resolvedAttStatus = getTodayStatus(e);
@@ -1385,7 +1484,26 @@ const Employees = () => {
     setPage(1);
   }
 
-  const depts = [...new Set(employees.map(e => e.department))].sort();
+  const depts = useMemo(() => {
+    console.log('--- depts calculation debug ---', {
+      rawDbDepartmentsLength: rawDbDepartments?.length,
+      rawDbDepartments,
+      employeesLength: employees?.length,
+      branchFilter
+    });
+    const branchDepts = (rawDbDepartments || []).filter(d => {
+      if (!branchFilter || branchFilter === 'All') return true;
+      if (!d.branch) return false;
+      const normDeptBranch = d.branch.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      const normFilterBranch = branchFilter.toLowerCase().replace(/branch|office|agency/gi, '').trim();
+      return normDeptBranch.includes(normFilterBranch) || normFilterBranch.includes(normDeptBranch);
+    }).map(d => d.name);
+
+    const empDepts = employees.map(e => e.department).filter(Boolean);
+    const result = [...new Set([...branchDepts, ...empDepts])].sort();
+    console.log('--- depts result ---', result);
+    return result;
+  }, [rawDbDepartments, employees, branchFilter]);
   const branches = [...new Set(employees.map(e => e.branch))].sort();
   const leaders = employees.filter(e => e.roleId === 'team_leader' || e.roleId === 'manager' || e.roleId === 'branch_admin' || e.roleId === 'super_admin');
   const managers = employees.filter(e => e.roleId === 'manager');
@@ -1534,10 +1652,12 @@ const Employees = () => {
               <option value="">All Departments</option>
               {depts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
-            <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
-              <option value="">All Branches</option>
-              {branches.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
+            {isGlobalAdmin && (
+              <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}>
+                <option value="">All Branches</option>
+                {branches.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            )}
             <select value={attFilter} onChange={e => setAttFilter(e.target.value)}>
               <option value="">Attendance</option>
               <option value="Present">Present</option>
@@ -1949,7 +2069,7 @@ const Employees = () => {
                     {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
                     <td className="col-actions">
                       <div className="table-actions-cell">
-                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employee-profile/${encodeEmployeeId(row.id)}`); }} title="View Full Profile">
+                        <button className="table-action-icon-btn" onClick={(e) => { e.stopPropagation(); handleOpenView(row); }} title="View Profile Detail">
                           <Eye size={16} />
                         </button>
                         {hasPermission('employee_management', 'update') && (
@@ -2106,7 +2226,7 @@ const Employees = () => {
           </div>
           <div className="preview-divider" />
           <div className="preview-actions-grid">
-            <button className="preview-btn preview-btn-primary" onClick={() => { navigate(`/employee-profile/${encodeEmployeeId(previewEmp.id)}`); setPreviewEmp(null); }}>View Full Profile</button>
+            <button className="preview-btn preview-btn-primary" onClick={() => { handleOpenView(previewEmp); setPreviewEmp(null); }}>View Profile Detail</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate(`?edit=${previewEmp.id}`); setPreviewEmp(null); }}>Edit Profile</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/my-profile'); setPreviewEmp(null); }}>Profile Settings</button>
             <button className="preview-btn preview-btn-secondary" onClick={() => { navigate('/tasks'); setPreviewEmp(null); }}>Assign Task</button>

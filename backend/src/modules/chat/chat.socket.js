@@ -536,18 +536,16 @@ export const registerChatSocketHandlers = (io) => {
             if (employee && employee.statusExpiry) {
               const expiryDate = new Date(employee.statusExpiry);
               if (expiryDate <= new Date()) {
-                await conn
-                  .collection("employees")
-                  .updateOne(
-                    { id: userId },
-                    {
-                      $set: {
-                        chatStatus: "available",
-                        statusEmoji: null,
-                        statusExpiry: null,
-                      },
+                await conn.collection("employees").updateOne(
+                  { id: userId },
+                  {
+                    $set: {
+                      chatStatus: "available",
+                      statusEmoji: null,
+                      statusExpiry: null,
                     },
-                  );
+                  },
+                );
 
                 if (redis.isAvailable) {
                   const presenceKey = `presence:user:${userId}`;
@@ -705,6 +703,28 @@ export const registerChatSocketHandlers = (io) => {
       if (lastSyncTime) {
         await runWithTenant(companyId, async () => {
           const conn = await getTenantConnection(companyId);
+          const isExcluded = [
+            "super_admin",
+            "company_admin",
+            "superadmin",
+            "companyadmin",
+          ].includes(socket.user.role?.toLowerCase());
+          const query = { "participants.employeeId": userId, isActive: true };
+
+          if (!isExcluded && socket.user.branch) {
+            query.$or = [
+              { type: "direct" },
+              {
+                type: "group",
+                $or: [
+                  { branch: socket.user.branch },
+                  { branch: { $exists: false } },
+                  { branch: null },
+                ],
+              },
+            ];
+          }
+
           const conversations = await conn
             .collection("conversations")
             .find(
@@ -765,6 +785,28 @@ export const registerChatSocketHandlers = (io) => {
     try {
       await runWithTenant(companyId, async () => {
         const conn = await getTenantConnection(companyId);
+        const isExcluded = [
+          "super_admin",
+          "company_admin",
+          "superadmin",
+          "companyadmin",
+        ].includes(socket.user.role?.toLowerCase());
+        const query = { "participants.employeeId": userId, isActive: true };
+
+        if (!isExcluded && socket.user.branch) {
+          query.$or = [
+            { type: "direct" },
+            {
+              type: "group",
+              $or: [
+                { branch: socket.user.branch },
+                { branch: { $exists: false } },
+                { branch: null },
+              ],
+            },
+          ];
+        }
+
         const conversations = await conn
           .collection("conversations")
           .find(
@@ -858,18 +900,16 @@ export const registerChatSocketHandlers = (io) => {
         await runTrackedWrite(() =>
           runWithTenant(companyId, async () => {
             const conn = await getTenantConnection(companyId);
-            await conn
-              .collection("employees")
-              .updateOne(
-                { id: userId },
-                {
-                  $set: {
-                    chatStatus: status,
-                    statusEmoji: emoji || null,
-                    statusExpiry: expiresAt,
-                  },
+            await conn.collection("employees").updateOne(
+              { id: userId },
+              {
+                $set: {
+                  chatStatus: status,
+                  statusEmoji: emoji || null,
+                  statusExpiry: expiresAt,
                 },
-              );
+              },
+            );
           }),
         );
 

@@ -9,23 +9,40 @@ import Avatar from '../common/Avatar';
 const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const panelRef = useRef(null);
+  const [animateState, setAnimateState] = useState('closed');
 
   // Esc key and click outside to close
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && isOpen) onClose();
     };
     if (isOpen) {
       document.addEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'hidden';
     }
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen || !project) return null;
+  useEffect(() => {
+    if (isOpen && project) {
+      setAnimateState('opening');
+      const timer = setTimeout(() => setAnimateState('open'), 50);
+      document.body.style.overflow = 'hidden';
+      return () => clearTimeout(timer);
+    } else {
+      if (animateState === 'open' || animateState === 'opening') {
+        setAnimateState('closing');
+        const timer = setTimeout(() => {
+          setAnimateState('closed');
+          document.body.style.overflow = '';
+        }, 250);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isOpen, project]);
+
+  if (animateState === 'closed' || !project) return null;
 
   const handleBackdropClick = (e) => {
     if (e.target.classList.contains(styles.backdrop)) {
@@ -33,17 +50,17 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
     }
   };
 
-
-
   // Format currency
   const formatCurrency = (val) => {
     if (!val) return '$0';
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
   };
 
+  const isTransitioningIn = animateState === 'opening' || animateState === 'open';
+
   return (
-    <div className={styles.backdrop} onClick={handleBackdropClick}>
-      <div className={styles.slideOver} ref={panelRef}>
+    <div className={`${styles.backdrop} ${isTransitioningIn ? styles.isOpen : ''}`} onClick={handleBackdropClick}>
+      <div className={`${styles.slideOver} ${isTransitioningIn ? styles.isOpen : ''}`} ref={panelRef}>
         {/* Header */}
         <div className={styles.slideHeader}>
           <div className={styles.slideTitleWrapper}>

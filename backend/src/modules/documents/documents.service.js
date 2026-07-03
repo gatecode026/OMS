@@ -1,14 +1,32 @@
 /**
  * @file src/modules/documents/documents.service.js
  * @description Service business logic for Documents module.
+ *
+ * Branch isolation rules:
+ *  - super_admin / company_admin  → see ALL documents
+ *  - branch_admin / manager / team_leader / employee → see only documents
+ *    whose `branch` matches their own branch (OR documents with no branch set,
+ *    which are treated as company-wide shared documents)
  */
 
 import repository from './documents.repository.js';
 import logger from '../../config/logger.js';
 
-export const findAll = async (query) => {
+// Roles that can see all documents across branches
+const GLOBAL_ROLES = ['super_admin', 'company_admin'];
+
+export const findAll = async (query, currentUser) => {
   logger.info('Executing DocumentsService::findAll query');
-  return repository.find(query);
+  const userRole = currentUser?.role;
+  const userBranch = currentUser?.branch;
+
+  // Super admin / company admin → unrestricted access
+  if (!userRole || GLOBAL_ROLES.includes(userRole)) {
+    return repository.find(query);
+  }
+
+  // All other roles → only documents for their branch OR company-wide (no branch)
+  return repository.findForBranch(userBranch, query);
 };
 
 export const findById = async (id) => {
@@ -18,6 +36,10 @@ export const findById = async (id) => {
 
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing DocumentsService::createRecord by user: ' + currentUser?.id);
+  // Stamp the uploader's branch so the document is scoped correctly
+  if (currentUser?.branch && !GLOBAL_ROLES.includes(currentUser?.role)) {
+    data.branch = currentUser.branch;
+  }
   return repository.save(data);
 };
 
@@ -34,8 +56,15 @@ export const deleteRecord = async (id, currentUser) => {
     error.statusCode = 404;
     throw error;
   }
-  // Check permission: super_admin can delete anything, others can only delete their own uploaded documents
-  if (currentUser?.role !== 'super_admin' && doc.uploadedBy !== currentUser?.name) {
+  // super_admin / company_admin can delete anything
+  // branch-scoped admins/managers can delete docs in their branch
+  // employees can only delete their own uploads
+  const isGlobal = GLOBAL_ROLES.includes(currentUser?.role);
+  const isSameBranch = doc.branch === currentUser?.branch;
+  const isOwner = doc.uploadedBy === currentUser?.name;
+  const isBranchAdmin = ['branch_admin', 'manager'].includes(currentUser?.role);
+
+  if (!isGlobal && !isOwner && !(isBranchAdmin && isSameBranch)) {
     const error = new Error('You do not have permission to delete this document');
     error.statusCode = 403;
     throw error;
@@ -43,10 +72,23 @@ export const deleteRecord = async (id, currentUser) => {
   return repository.remove(id);
 };
 
+export const incrementDownloads = async (id) => {
+  logger.info('Executing DocumentsService::incrementDownloads for: ' + id);
+  const doc = await repository.findOne(id);
+  if (!doc) {
+    const error = new Error('Document not found');
+    error.statusCode = 404;
+    throw error;
+  }
+  doc.downloads = (doc.downloads || 0) + 1;
+  return doc.save();
+};
+
 export default {
   findAll,
   findById,
   createRecord,
   updateRecord,
-  deleteRecord
+  deleteRecord,
+  incrementDownloads
 };
