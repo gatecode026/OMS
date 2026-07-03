@@ -158,13 +158,13 @@ const MessageStatus = ({ message: msg, conversation, onRetry }) => {
 
   let status = 'sent';
   if (isGroup) {
-    if (seenCount > 0) {
+    if (seenCount > 0 || msg._deliveryStatus === 'seen' || msg._deliveryStatus === 'read') {
       status = 'seen';
     } else if (deliveries.length > 0 || msg._deliveryStatus === 'delivered') {
       status = 'delivered';
     }
   } else {
-    const isSeen = seenCount > 0 || msg._deliveryStatus === 'read';
+    const isSeen = seenCount > 0 || msg._deliveryStatus === 'read' || msg._deliveryStatus === 'seen';
     const isDelivered = !isSeen && (deliveries.length > 0 || msg._deliveryStatus === 'delivered');
     if (isSeen) {
       status = 'seen';

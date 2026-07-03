@@ -132,7 +132,7 @@ export const createGroup = asyncHandler(async (req, res) => {
 
   // Fetch all valid active participants
   const participants = await conn.collection('employees').find(
-    { id: { $in: participantIds }, status: 'Active' },
+    { id: { $in: participantIds }, status: { $ne: 'Inactive' } },
     { projection: { id: 1, name: 1, avatar: 1, roleId: 1 } }
   ).toArray();
 
@@ -363,7 +363,7 @@ export const searchEmployees = asyncHandler(async (req, res) => {
   const { q } = req.query;
 
   const conn = await getTenantConnection(companyId);
-  const query = { id: { $ne: myId }, status: 'Active' };
+  const query = { id: { $ne: myId }, status: { $ne: 'Inactive' } };
 
   const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
   if (!isExcluded && branch) {

@@ -196,11 +196,11 @@ export const CallProvider = ({ children }) => {
       callSounds.startOutgoingRing();
     } else if (callState === 'incoming') {
       callSounds.startIncomingRing();
-    } else if (callState === 'idle') {
-      if (prevCallStateRef.current === 'active') {
+    } else {
+      callSounds.stopAll();
+      if (callState === 'idle' && prevCallStateRef.current === 'active') {
         callSounds.playDisconnectSound();
       }
-      callSounds.stopAll();
     }
     prevCallStateRef.current = callState;
   }, [callState]);

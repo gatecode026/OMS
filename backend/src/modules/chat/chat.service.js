@@ -20,36 +20,39 @@ import { CacheKeys, TTL, cacheGetOrSet, cacheDel, cacheDelPattern } from '../../
  * Detects if a text content contains Markdown syntax.
  */
 export const detectMarkdown = (content) => {
-  if (!content || typeof content !== 'string') return 'plain';
+  if (!content || typeof content !== "string") return "plain";
 
   // 1. Code blocks (``` or ~~~)
-  if (content.includes('```') || content.includes('~~~')) return 'markdown';
+  if (content.includes("```") || content.includes("~~~")) return "markdown";
 
   // 2. Inline code (`inline`)
-  if (/`[^`\n]+`/.test(content)) return 'markdown';
+  if (/`[^`\n]+`/.test(content)) return "markdown";
 
   // 3. Bold (**text** or *text*)
-  if (/\*\*[^*]+\*\*/.test(content) || /(?<!\*)\*(?!\*)[^*]+\*/.test(content)) return 'markdown';
+  if (/\*\*[^*]+\*\*/.test(content) || /(?<!\*)\*(?!\*)[^*]+\*/.test(content))
+    return "markdown";
 
   // 4. Underscores (__bold__ or _italic_)
-  if (/__[^_]+__/.test(content) || /(?<!_)_(?!_)[^_]+_/.test(content)) return 'markdown';
+  if (/__[^_]+__/.test(content) || /(?<!_)_(?!_)[^_]+_/.test(content))
+    return "markdown";
 
   // 5. Strikethrough (~text~)
-  if (/(?<!~)~(?!~)[^~]+~/.test(content) || /~~[^~]+~~/.test(content)) return 'markdown';
+  if (/(?<!~)~(?!~)[^~]+~/.test(content) || /~~[^~]+~~/.test(content))
+    return "markdown";
 
   // 6. Blockquote (> text at the start of string or newlines)
-  if (/(^|\n)\s*>\s+\S/.test(content)) return 'markdown';
+  if (/(^|\n)\s*>\s+\S/.test(content)) return "markdown";
 
   // 7. Bullet lists (*, -, + followed by whitespace at beginning of string or after a newline)
-  if (/(^|\n)\s*[\*\-+]\s+\S/.test(content)) return 'markdown';
+  if (/(^|\n)\s*[\*\-+]\s+\S/.test(content)) return "markdown";
 
   // 8. Numbered lists (digits followed by dot and whitespace)
-  if (/(^|\n)\s*\d+\.\s+\S/.test(content)) return 'markdown';
+  if (/(^|\n)\s*\d+\.\s+\S/.test(content)) return "markdown";
 
   // 9. Horizontal rule (--- or *** or ___ alone on a line)
-  if (/(^|\n)\s*(-{3,}|\*{3,}|_{3,})\s*($|\n)/.test(content)) return 'markdown';
+  if (/(^|\n)\s*(-{3,}|\*{3,}|_{3,})\s*($|\n)/.test(content)) return "markdown";
 
-  return 'plain';
+  return "plain";
 };
 
 // ─── CONVERSATIONS ────────────────────────────────────────────────────────────
@@ -58,50 +61,52 @@ export const detectMarkdown = (content) => {
  * Get or create direct conversation between 2 users
  */
 export const getOrCreateDirectConversation = async (
-  user1, user2, companyId
+  user1,
+  user2,
+  companyId,
 ) => {
   const result = await runWithTenant(companyId, async () => {
     // Check existing direct conversation
     const existing = await Conversation.findOne({
-      type: 'direct',
-      'participants.employeeId': { $all: [user1.id, user2.id] }
+      type: "direct",
+      "participants.employeeId": { $all: [user1.id, user2.id] },
     });
 
     if (existing) return { conversation: existing, isNew: false };
 
     // Create new direct conversation
-    const convId = await generateCompanyUniqueId(companyId, 'conversations');
+    const convId = await generateCompanyUniqueId(companyId, "conversations");
 
     const conversation = await Conversation.create({
       id: convId,
       companyId,
-      type: 'direct',
+      type: "direct",
       participants: [
         {
           employeeId: user1.id,
           name: user1.name,
           avatar: user1.avatar || null,
-          role: user1.role || 'employee',
+          role: user1.role || "employee",
           joinedAt: new Date(),
-          isAdmin: false
+          isAdmin: false,
         },
         {
           employeeId: user2.id,
           name: user2.name,
           avatar: user2.avatar || null,
-          role: user2.role || 'employee',
+          role: user2.role || "employee",
           joinedAt: new Date(),
-          isAdmin: false
-        }
+          isAdmin: false,
+        },
       ],
-      lastActivityAt: new Date()
+      lastActivityAt: new Date(),
     });
 
     return { conversation, isNew: true };
   });
 
   if (result.isNew) {
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
   }
   return result;
 };
@@ -110,20 +115,30 @@ export const getOrCreateDirectConversation = async (
  * Create group conversation
  */
 export const createGroupConversation = async (
-  creatorUser, groupData, participantUsers, companyId
+  creatorUser,
+  groupData,
+  participantUsers,
+  companyId,
 ) => {
   return runWithTenant(companyId, async () => {
-    const convId = await generateCompanyUniqueId(companyId, 'conversations');
+    const convId = await generateCompanyUniqueId(companyId, "conversations");
 
     let avatarUrl = groupData.avatar || null;
     let avatarFileId = null;
-    if (avatarUrl && avatarUrl.startsWith('data:') && avatarUrl.includes(';base64,')) {
+    if (
+      avatarUrl &&
+      avatarUrl.startsWith("data:") &&
+      avatarUrl.includes(";base64,")
+    ) {
       try {
-        const uploadResult = await uploadToImageKitDetailed(avatarUrl, `group_avatar_${convId}_${Date.now()}.jpg`);
+        const uploadResult = await uploadToImageKitDetailed(
+          avatarUrl,
+          `group_avatar_${convId}_${Date.now()}.jpg`,
+        );
         avatarUrl = uploadResult.url;
         avatarFileId = uploadResult.fileId;
       } catch (err) {
-        logger.error('[Chat] Group avatar upload failed:', err);
+        logger.error("[Chat] Group avatar upload failed:", err);
       }
     }
 
@@ -133,28 +148,28 @@ export const createGroupConversation = async (
         employeeId: creatorUser.id,
         name: creatorUser.name,
         avatar: creatorUser.avatar || null,
-        role: creatorUser.role || 'employee',
+        role: creatorUser.role || "employee",
         joinedAt: new Date(),
         isAdmin: true,
         canAddMembers: true,
-        canRemoveMembers: true
+        canRemoveMembers: true,
       },
-      ...participantUsers.map(p => ({
+      ...participantUsers.map((p) => ({
         employeeId: p.id,
         name: p.name,
         avatar: p.avatar || null,
-        role: p.role || 'employee',
+        role: p.role || "employee",
         joinedAt: new Date(),
         isAdmin: false,
         canAddMembers: false,
-        canRemoveMembers: false
-      }))
+        canRemoveMembers: false,
+      })),
     ];
 
     const conversation = await Conversation.create({
       id: convId,
       companyId,
-      type: 'group',
+      type: "group",
       name: groupData.name.trim(),
       description: groupData.description || null,
       avatar: avatarUrl,
@@ -165,28 +180,28 @@ export const createGroupConversation = async (
       lastActivityAt: new Date(),
       settings: {
         onlyAdminsCanMessage: false,
-        onlyAdminsCanEditInfo: true
-      }
+        onlyAdminsCanEditInfo: true,
+      },
     });
 
     // System message: "John created group XYZ"
-    const msgId = await generateCompanyUniqueId(companyId, 'messages');
+    const msgId = await generateCompanyUniqueId(companyId, "messages");
     await Message.create({
       id: msgId,
       companyId,
       conversationId: convId,
-      senderId: 'system',
-      senderName: 'System',
+      senderId: "system",
+      senderName: "System",
       content: `${creatorUser.name} created group "${groupData.name}"`,
-      type: 'system',
+      type: "system",
       systemMeta: {
-        action: 'group_created',
+        action: "group_created",
         targetId: creatorUser.id,
-        targetName: creatorUser.name
-      }
+        targetName: creatorUser.name,
+      },
     });
 
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
     return conversation;
   });
 };
@@ -196,33 +211,35 @@ export const createGroupConversation = async (
  */
 const enrichConversationForUser = async (conv, employeeId) => {
   const participant = conv.participants.find(
-    p => p.employeeId === employeeId
+    (p) => p.employeeId === employeeId,
   );
   const lastReadAt = participant?.lastReadAt || new Date(0);
 
-  const deleteEntry = conv.deletedBy?.find(d => d.userId?.toString() === employeeId?.toString());
+  const deleteEntry = conv.deletedBy?.find(
+    (d) => d.userId?.toString() === employeeId?.toString(),
+  );
   const minCreatedAt = deleteEntry ? deleteEntry.deletedAt : new Date(0);
-  const unreadAfter = new Date(Math.max(new Date(lastReadAt).getTime(), new Date(minCreatedAt).getTime()));
+  const unreadAfter = new Date(
+    Math.max(new Date(lastReadAt).getTime(), new Date(minCreatedAt).getTime()),
+  );
 
   const unreadCount = await readReceiptService.getUnreadCount(
     employeeId,
     conv.id,
     unreadAfter,
-    conv.companyId
+    conv.companyId,
   );
 
   // Find the actual last message that is NOT deleted or cleared for this user
   const query = {
     conversationId: conv.id,
-    $nor: [{ 'deletedFor.employeeId': employeeId }]
+    $nor: [{ "deletedFor.employeeId": employeeId }],
   };
   if (deleteEntry) {
     query.createdAt = { $gt: deleteEntry.deletedAt };
   }
 
-  const latestMsg = await Message.findOne(query)
-    .sort({ createdAt: -1 })
-    .lean();
+  const latestMsg = await Message.findOne(query).sort({ createdAt: -1 }).lean();
 
   let lastMessage = null;
   if (latestMsg) {
@@ -233,7 +250,7 @@ const enrichConversationForUser = async (conv, employeeId) => {
       senderId: latestMsg.senderId,
       senderName: latestMsg.senderName,
       sentAt: latestMsg.createdAt,
-      isDeleted: latestMsg.isDeleted
+      isDeleted: latestMsg.isDeleted,
     };
   }
 
@@ -243,66 +260,115 @@ const enrichConversationForUser = async (conv, employeeId) => {
 /**
  * Get all conversations for a user (WhatsApp style — sorted by last activity)
  */
-export const getUserConversations = async (employeeId, companyId, role, branch) => {
+export const getUserConversations = async (
+  employeeId,
+  companyId,
+  role,
+  branch,
+) => {
   const cacheKey = CacheKeys.sidebar(companyId, employeeId);
-  return cacheGetOrSet(cacheKey, async () => {
-    return runWithTenant(companyId, async () => {
-      const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
-      const query = {
-        'participants.employeeId': employeeId,
-        isActive: true,
-        isDeleted: { $ne: true },
-        hiddenBy: { $not: { $elemMatch: { userId: employeeId } } },
-        archivedBy: { $not: { $elemMatch: { userId: employeeId } } },
-        deletedBy: { $not: { $elemMatch: { userId: employeeId, clearHistory: false } } }
-      };
+  return cacheGetOrSet(
+    cacheKey,
+    async () => {
+      return runWithTenant(companyId, async () => {
+        const isExcluded = [
+          "super_admin",
+          "company_admin",
+          "superadmin",
+          "companyadmin",
+        ].includes(role?.toLowerCase());
+        const query = {
+          "participants.employeeId": employeeId,
+          isActive: true,
+          isDeleted: { $ne: true },
+          hiddenBy: { $not: { $elemMatch: { userId: employeeId } } },
+          archivedBy: { $not: { $elemMatch: { userId: employeeId } } },
+          deletedBy: {
+            $not: { $elemMatch: { userId: employeeId, clearHistory: false } },
+          },
+        };
 
-      if (!isExcluded && branch) {
-        query.$or = [
-          { type: 'direct' },
-          { type: 'group', $or: [{ branch: branch }, { branch: { $exists: false } }, { branch: null }] }
-        ];
-      }
+        if (!isExcluded && branch) {
+          query.$or = [
+            { type: "direct" },
+            {
+              type: "group",
+              $or: [
+                { branch: branch },
+                { branch: { $exists: false } },
+                { branch: null },
+              ],
+            },
+          ];
+        }
 
-      const conversations = await Conversation.find(query)
-        .sort({ lastActivityAt: -1 })
-        .lean();
+        const conversations = await Conversation.find(query)
+          .sort({ lastActivityAt: -1 })
+          .lean();
 
-      // Add unread count and compute dynamic lastMessage for each conversation
-      const convsWithUnread = await Promise.all(
-        conversations.map(conv => enrichConversationForUser(conv, employeeId))
-      );
+        // Filter: exclude if the user deleted the conversation and there has been no new activity since then
+        const activeConversations = conversations.filter((conv) => {
+          const deleteEntry = conv.deletedBy?.find(
+            (d) => d.userId?.toString() === employeeId?.toString(),
+          );
+          if (deleteEntry && !deleteEntry.clearHistory) {
+            const lastActivityTime = new Date(
+              conv.lastActivityAt || 0,
+            ).getTime();
+            const deleteTime = new Date(deleteEntry.deletedAt).getTime();
+            if (lastActivityTime <= deleteTime) {
+              return false;
+            }
+          }
+          return true;
+        });
 
-      return convsWithUnread;
-    });
-  }, TTL.SIDEBAR);
+        // Add unread count and compute dynamic lastMessage for each conversation
+        const convsWithUnread = await Promise.all(
+          activeConversations.map((conv) =>
+            enrichConversationForUser(conv, employeeId),
+          ),
+        );
+
+        return convsWithUnread;
+      });
+    },
+    TTL.SIDEBAR,
+  );
 };
 
 /**
  * Get paginated messages for a conversation
  */
 export const getMessages = async (
-  conversationId, employeeId, companyId,
-  cursor = null, limit = 50
+  conversationId,
+  employeeId,
+  companyId,
+  cursor = null,
+  limit = 50,
 ) => {
   const isCacheable = !cursor;
-  const cacheKey = isCacheable ? CacheKeys.convMsgs(companyId, conversationId) : null;
+  const cacheKey = isCacheable
+    ? CacheKeys.convMsgs(companyId, conversationId)
+    : null;
 
   const fetchFn = async () => {
     return runWithTenant(companyId, async () => {
       // Verify participant
       const conv = await Conversation.findOne({
         id: conversationId,
-        'participants.employeeId': employeeId
+        "participants.employeeId": employeeId,
       });
-      if (!conv) throw new Error('Conversation not found or access denied');
+      if (!conv) throw new Error("Conversation not found or access denied");
 
       const query = {
         conversationId,
-        $nor: [{ 'deletedFor.employeeId': employeeId }]
+        $nor: [{ "deletedFor.employeeId": employeeId }],
       };
 
-      const deleteEntry = conv.deletedBy?.find(d => d.userId?.toString() === employeeId?.toString());
+      const deleteEntry = conv.deletedBy?.find(
+        (d) => d.userId?.toString() === employeeId?.toString(),
+      );
       if (deleteEntry) {
         query.createdAt = { $gt: deleteEntry.deletedAt };
       }
@@ -317,15 +383,17 @@ export const getMessages = async (
         .lean();
 
       // Fetch and populate poll details for poll messages
-      const pollIds = messages.filter(m => m.type === 'poll' && m.pollId).map(m => m.pollId);
+      const pollIds = messages
+        .filter((m) => m.type === "poll" && m.pollId)
+        .map((m) => m.pollId);
       if (pollIds.length > 0) {
-        const Poll = mongoose.model('Poll');
+        const Poll = mongoose.model("Poll");
         const polls = await Poll.find({ _id: { $in: pollIds } }).lean();
 
         // Auto-expire check on fetch
         const now = new Date();
         const expiredPollIds = [];
-        const updatedPolls = polls.map(p => {
+        const updatedPolls = polls.map((p) => {
           if (!p.isClosed && p.expiresAt && new Date(p.expiresAt) <= now) {
             p.isClosed = true;
             expiredPollIds.push(p._id);
@@ -336,7 +404,7 @@ export const getMessages = async (
         if (expiredPollIds.length > 0) {
           await Poll.updateMany(
             { _id: { $in: expiredPollIds } },
-            { $set: { isClosed: true } }
+            { $set: { isClosed: true } },
           );
         }
 
@@ -344,41 +412,43 @@ export const getMessages = async (
           if (p.isAnonymous) {
             p = {
               ...p,
-              options: p.options.map(opt => ({
+              options: p.options.map((opt) => ({
                 optionId: opt.optionId,
                 text: opt.text,
                 votesCount: opt.votes.length,
-                votes: [] // Strip voter identities for privacy
-              }))
+                votes: [], // Strip voter identities for privacy
+              })),
             };
           }
           acc[p._id.toString()] = p;
           return acc;
         }, {});
 
-        messages.forEach(m => {
-          if (m.type === 'poll' && m.pollId && pollMap[m.pollId.toString()]) {
+        messages.forEach((m) => {
+          if (m.type === "poll" && m.pollId && pollMap[m.pollId.toString()]) {
             m.pollId = pollMap[m.pollId.toString()];
           }
         });
       }
 
       // Populate thread details for messages having a threadId
-      const threadIds = messages.filter(m => m.threadId).map(m => m.threadId);
+      const threadIds = messages
+        .filter((m) => m.threadId)
+        .map((m) => m.threadId);
       if (threadIds.length > 0) {
-        const Thread = mongoose.model('Thread');
+        const Thread = mongoose.model("Thread");
         const threads = await Thread.find({ _id: { $in: threadIds } }).lean();
         const threadMap = threads.reduce((acc, t) => {
           acc[t._id.toString()] = {
             replyCount: t.replyCount,
             lastReplyAt: t.lastReplyAt,
             status: t.status,
-            participants: t.participants
+            participants: t.participants,
           };
           return acc;
         }, {});
 
-        messages.forEach(m => {
+        messages.forEach((m) => {
           if (m.threadId && threadMap[m.threadId.toString()]) {
             m.threadDetails = threadMap[m.threadId.toString()];
           }
@@ -388,14 +458,15 @@ export const getMessages = async (
       // Reverse for chronological order (newest last — WhatsApp style)
       messages.reverse();
 
-      const nextCursor = messages.length > 0 ? messages[0]._id.toString() : null;
+      const nextCursor =
+        messages.length > 0 ? messages[0]._id.toString() : null;
 
       let hasMore = false;
       if (nextCursor) {
         const moreCount = await Message.countDocuments({
           conversationId,
-          $nor: [{ 'deletedFor.employeeId': employeeId }],
-          _id: { $lt: new mongoose.Types.ObjectId(nextCursor) }
+          $nor: [{ "deletedFor.employeeId": employeeId }],
+          _id: { $lt: new mongoose.Types.ObjectId(nextCursor) },
         });
         hasMore = moreCount > 0;
       }
@@ -405,9 +476,9 @@ export const getMessages = async (
         pagination: {
           cursor: nextCursor,
           limit,
-          hasMore
+          hasMore,
         },
-        conversation: conv
+        conversation: conv,
       };
     });
   };
@@ -425,36 +496,40 @@ export const getMessageDetail = async (messageId, employeeId, companyId) => {
   return runWithTenant(companyId, async () => {
     const message = await Message.findOne({
       id: messageId,
-      $nor: [{ 'deletedFor.employeeId': employeeId }]
+      $nor: [{ "deletedFor.employeeId": employeeId }],
     }).lean();
 
-    if (!message) throw new Error('Message not found');
+    if (!message) throw new Error("Message not found");
 
     // Verify participant
     const conv = await Conversation.findOne({
       id: message.conversationId,
-      'participants.employeeId': employeeId
+      "participants.employeeId": employeeId,
     });
-    if (!conv) throw new Error('Access denied');
+    if (!conv) throw new Error("Access denied");
 
-    if (message.type === 'poll' && message.pollId) {
-      const Poll = mongoose.model('Poll');
+    if (message.type === "poll" && message.pollId) {
+      const Poll = mongoose.model("Poll");
       let poll = await Poll.findById(message.pollId).lean();
       if (poll) {
         const now = new Date();
-        if (!poll.isClosed && poll.expiresAt && new Date(poll.expiresAt) <= now) {
+        if (
+          !poll.isClosed &&
+          poll.expiresAt &&
+          new Date(poll.expiresAt) <= now
+        ) {
           poll.isClosed = true;
           await Poll.findByIdAndUpdate(poll._id, { $set: { isClosed: true } });
         }
         if (poll.isAnonymous) {
           poll = {
             ...poll,
-            options: poll.options.map(opt => ({
+            options: poll.options.map((opt) => ({
               optionId: opt.optionId,
               text: opt.text,
               votesCount: opt.votes.length,
-              votes: []
-            }))
+              votes: [],
+            })),
           };
         }
         message.pollId = poll;
@@ -472,48 +547,53 @@ export const saveMessage = async (messageData, companyId) => {
   return runWithTenant(companyId, async () => {
     // Enforce onlyAdminsCanMessage settings
     const conv = await Conversation.findOne({ id: messageData.conversationId });
-    if (!conv) throw new Error('Conversation not found');
+    if (!conv) throw new Error("Conversation not found");
 
-    if (conv.type === 'group' && conv.settings?.onlyAdminsCanMessage) {
-      const participant = conv.participants.find(p => p.employeeId === messageData.senderId);
+    if (conv.type === "group" && conv.settings?.onlyAdminsCanMessage) {
+      const participant = conv.participants.find(
+        (p) => p.employeeId === messageData.senderId,
+      );
       if (!participant?.isAdmin) {
-        throw new Error('Only admins can send messages in this group');
+        throw new Error("Only admins can send messages in this group");
       }
     }
 
-    const msgId = await generateCompanyUniqueId(companyId, 'messages');
+    const msgId = await generateCompanyUniqueId(companyId, "messages");
 
     let replyToObject = null;
-    if (messageData.replyTo && typeof messageData.replyTo === 'string') {
+    if (messageData.replyTo && typeof messageData.replyTo === "string") {
       const originalMsg = await Message.findOne({ id: messageData.replyTo });
       if (originalMsg) {
         replyToObject = {
           messageId: originalMsg.id,
-          content: originalMsg.content || '',
+          content: originalMsg.content || "",
           senderId: originalMsg.senderId,
           senderName: originalMsg.senderName,
-          type: originalMsg.type || 'text',
-          mediaUrl: originalMsg.media?.url || null
+          type: originalMsg.type || "text",
+          mediaUrl: originalMsg.media?.url || null,
         };
       }
-    } else if (messageData.replyTo && typeof messageData.replyTo === 'object') {
+    } else if (messageData.replyTo && typeof messageData.replyTo === "object") {
       replyToObject = messageData.replyTo;
     }
 
-    const contentType = messageData.type === 'text' ? detectMarkdown(messageData.content) : 'plain';
+    const contentType =
+      messageData.type === "text"
+        ? detectMarkdown(messageData.content)
+        : "plain";
 
     const message = await Message.create({
       id: msgId,
       companyId,
       ...messageData,
       contentType: messageData.contentType || contentType,
-      replyTo: replyToObject
+      replyTo: replyToObject,
     });
 
     // Update conversation lastMessage + lastActivityAt
     const previewContent = messageData.isDeleted
       ? null
-      : messageData.type === 'text'
+      : messageData.type === "text"
         ? messageData.content
         : `📎 ${messageData.media?.fileName || messageData.type}`;
 
@@ -526,20 +606,26 @@ export const saveMessage = async (messageData, companyId) => {
           type: messageData.type,
           senderId: messageData.senderId,
           senderName: messageData.senderName,
-          sentAt: new Date()
+          sentAt: new Date(),
         },
         lastActivityAt: new Date(),
         hiddenBy: [],
-        archivedBy: []
-      }
+        archivedBy: [],
+      },
     );
 
     // Increment unread counts for other participants
-    await readReceiptService.incrementUnreadCounts(messageData.conversationId, messageData.senderId, companyId);
+    await readReceiptService.incrementUnreadCounts(
+      messageData.conversationId,
+      messageData.senderId,
+      companyId,
+    );
 
     // Invalidate caches
-    cacheDel(CacheKeys.convMsgs(companyId, messageData.conversationId)).catch(() => {});
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDel(CacheKeys.convMsgs(companyId, messageData.conversationId)).catch(
+      () => {},
+    );
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
 
     return message;
   });
@@ -549,7 +635,10 @@ export const saveMessage = async (messageData, companyId) => {
  * Mark messages as read — WhatsApp blue tick
  */
 export const markAsRead = async (
-  conversationId, employeeId, employeeName, companyId
+  conversationId,
+  employeeId,
+  employeeName,
+  companyId,
 ) => {
   return runWithTenant(companyId, async () => {
     const now = new Date();
@@ -560,26 +649,26 @@ export const markAsRead = async (
         conversationId,
         senderId: { $ne: employeeId },
         isDeleted: false,
-        'readBy.employeeId': { $ne: employeeId }
+        "readBy.employeeId": { $ne: employeeId },
       },
       {
         $push: {
-          readBy: { employeeId, name: employeeName, readAt: now }
-        }
-      }
+          readBy: { employeeId, name: employeeName, readAt: now },
+        },
+      },
     );
 
     // Update participant's lastReadAt
     await Conversation.findOneAndUpdate(
       {
         id: conversationId,
-        'participants.employeeId': employeeId
+        "participants.employeeId": employeeId,
       },
       {
         $set: {
-          'participants.$.lastReadAt': now
-        }
-      }
+          "participants.$.lastReadAt": now,
+        },
+      },
     );
 
     return { success: true, readAt: now };
@@ -590,34 +679,52 @@ export const markAsRead = async (
  * Delete message — for me only OR for everyone
  */
 export const deleteMessage = async (
-  messageId, employeeId, deleteForEveryone, companyId
+  messageId,
+  employeeId,
+  deleteForEveryone,
+  companyId,
 ) => {
   return runWithTenant(companyId, async () => {
     const message = await Message.findOne({ id: messageId });
-    if (!message) throw new Error('Message not found');
+    if (!message) throw new Error("Message not found");
 
     if (deleteForEveryone) {
       // Only sender can delete for everyone
       if (message.senderId !== employeeId) {
-        throw new Error('Only sender can delete message for everyone');
+        throw new Error("Only sender can delete message for everyone");
       }
       // Check time limit (WhatsApp: 60 hours)
       const hoursDiff = (Date.now() - message.createdAt) / (1000 * 60 * 60);
       if (hoursDiff > 60) {
-        throw new Error('Cannot delete message after 60 hours');
+        throw new Error("Cannot delete message after 60 hours");
       }
 
       // Delete from ImageKit immediately if media exists
       if (message.media) {
         if (message.media.imageKitFileId) {
-          logger.info(`[ImageKit] Immediate deletion on Delete for Everyone. FileID: ${message.media.imageKitFileId}`);
-          deleteFileFromImageKitById(message.media.imageKitFileId).catch(err => {
-            logger.error(`[ImageKit] Failed to delete fileId ${message.media.imageKitFileId} immediately:`, err);
-          });
-        } else if (message.media.url && message.media.url.includes('imagekit.io')) {
-          logger.info(`[ImageKit] Immediate deletion on Delete for Everyone. URL: ${message.media.url}`);
-          deleteFromImageKit(message.media.url).catch(err => {
-            logger.error(`[ImageKit] Failed to delete URL ${message.media.url} immediately:`, err);
+          logger.info(
+            `[ImageKit] Immediate deletion on Delete for Everyone. FileID: ${message.media.imageKitFileId}`,
+          );
+          deleteFileFromImageKitById(message.media.imageKitFileId).catch(
+            (err) => {
+              logger.error(
+                `[ImageKit] Failed to delete fileId ${message.media.imageKitFileId} immediately:`,
+                err,
+              );
+            },
+          );
+        } else if (
+          message.media.url &&
+          message.media.url.includes("imagekit.io")
+        ) {
+          logger.info(
+            `[ImageKit] Immediate deletion on Delete for Everyone. URL: ${message.media.url}`,
+          );
+          deleteFromImageKit(message.media.url).catch((err) => {
+            logger.error(
+              `[ImageKit] Failed to delete URL ${message.media.url} immediately:`,
+              err,
+            );
           });
         }
       }
@@ -627,9 +734,9 @@ export const deleteMessage = async (
         {
           isDeleted: true,
           deletedAt: new Date(),
-          content: '',
-          media: null
-        }
+          content: "",
+          media: null,
+        },
       );
     } else {
       // Delete for me only
@@ -637,15 +744,17 @@ export const deleteMessage = async (
         { id: messageId },
         {
           $push: {
-            deletedFor: { employeeId, deletedAt: new Date() }
-          }
-        }
+            deletedFor: { employeeId, deletedAt: new Date() },
+          },
+        },
       );
     }
 
     // Invalidate caches
-    cacheDel(CacheKeys.convMsgs(companyId, message.conversationId)).catch(() => {});
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDel(CacheKeys.convMsgs(companyId, message.conversationId)).catch(
+      () => {},
+    );
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
 
     return { success: true, deleteForEveryone };
   });
@@ -654,14 +763,18 @@ export const deleteMessage = async (
 /**
  * Clear all messages in a conversation for a specific employee (soft delete for this user)
  */
-export const clearConversationMessages = async (conversationId, employeeId, companyId) => {
+export const clearConversationMessages = async (
+  conversationId,
+  employeeId,
+  companyId,
+) => {
   return runWithTenant(companyId, async () => {
     // Verify participant
     const conv = await Conversation.findOne({
       id: conversationId,
-      'participants.employeeId': employeeId
+      "participants.employeeId": employeeId,
     });
-    if (!conv) throw new Error('Conversation not found or access denied');
+    if (!conv) throw new Error("Conversation not found or access denied");
 
     const now = new Date();
 
@@ -669,35 +782,38 @@ export const clearConversationMessages = async (conversationId, employeeId, comp
     await Message.updateMany(
       {
         conversationId,
-        'deletedFor.employeeId': { $ne: employeeId }
+        "deletedFor.employeeId": { $ne: employeeId },
       },
       {
         $push: {
-          deletedFor: { employeeId, deletedAt: now }
-        }
-      }
+          deletedFor: { employeeId, deletedAt: now },
+        },
+      },
     );
 
     // Invalidate caches
     cacheDel(CacheKeys.convMsgs(companyId, conversationId)).catch(() => {});
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
 
     return { success: true };
   });
 };
 
-
 /**
  * Add reaction to message (WhatsApp emoji reactions)
  */
 export const addReaction = async (
-  messageId, employeeId, employeeName, emoji, companyId
+  messageId,
+  employeeId,
+  employeeName,
+  emoji,
+  companyId,
 ) => {
   return runWithTenant(companyId, async () => {
     // Remove existing reaction from same user first (toggle)
     await Message.findOneAndUpdate(
       { id: messageId },
-      { $pull: { reactions: { employeeId } } }
+      { $pull: { reactions: { employeeId } } },
     );
 
     // Add new reaction
@@ -709,10 +825,10 @@ export const addReaction = async (
             employeeId,
             name: employeeName,
             emoji,
-            reactedAt: new Date()
-          }
-        }
-      }
+            reactedAt: new Date(),
+          },
+        },
+      },
     );
 
     return { success: true };
@@ -723,15 +839,18 @@ export const addReaction = async (
  * Edit message
  */
 export const editMessage = async (
-  messageId, employeeId, newContent, companyId
+  messageId,
+  employeeId,
+  newContent,
+  companyId,
 ) => {
   return runWithTenant(companyId, async () => {
     const message = await Message.findOne({ id: messageId });
-    if (!message) throw new Error('Message not found');
+    if (!message) throw new Error("Message not found");
     if (message.senderId !== employeeId)
-      throw new Error('Only sender can edit message');
-    if (message.type !== 'text')
-      throw new Error('Only text messages can be edited');
+      throw new Error("Only sender can edit message");
+    if (message.type !== "text")
+      throw new Error("Only text messages can be edited");
 
     const contentType = detectMarkdown(newContent);
     await Message.findOneAndUpdate(
@@ -744,15 +863,17 @@ export const editMessage = async (
         $push: {
           editHistory: {
             content: message.content,
-            editedAt: new Date()
-          }
-        }
-      }
+            editedAt: new Date(),
+          },
+        },
+      },
     );
 
     // Invalidate caches
-    cacheDel(CacheKeys.convMsgs(companyId, message.conversationId)).catch(() => {});
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDel(CacheKeys.convMsgs(companyId, message.conversationId)).catch(
+      () => {},
+    );
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
 
     return { success: true };
   });
@@ -762,14 +883,17 @@ export const editMessage = async (
  * Search messages in a conversation
  */
 export const searchMessages = async (
-  conversationId, query, employeeId, companyId
+  conversationId,
+  query,
+  employeeId,
+  companyId,
 ) => {
   return runWithTenant(companyId, async () => {
     const messages = await Message.find({
       conversationId,
-      content: { $regex: query, $options: 'i' },
+      content: { $regex: query, $options: "i" },
       isDeleted: false,
-      $nor: [{ 'deletedFor.employeeId': employeeId }]
+      $nor: [{ "deletedFor.employeeId": employeeId }],
     })
       .sort({ createdAt: -1 })
       .limit(50)
@@ -783,31 +907,33 @@ export const searchMessages = async (
  * Add members to group
  */
 export const addGroupMembers = async (
-  conversationId, adminId, newMembers, companyId
+  conversationId,
+  adminId,
+  newMembers,
+  companyId,
 ) => {
   return runWithTenant(companyId, async () => {
     const conv = await Conversation.findOne({ id: conversationId });
-    if (!conv || conv.type !== 'group')
-      throw new Error('Group not found');
+    if (!conv || conv.type !== "group") throw new Error("Group not found");
 
     const adminParticipant = conv.participants.find(
-      p => p.employeeId === adminId
+      (p) => p.employeeId === adminId,
     );
     if (!adminParticipant?.isAdmin)
-      throw new Error('Only admins can add members');
+      throw new Error("Only admins can add members");
 
     const validNewMembers = [];
     const addedNames = [];
 
     for (const member of newMembers) {
-      const exists = conv.participants.find(p => p.employeeId === member.id);
+      const exists = conv.participants.find((p) => p.employeeId === member.id);
       if (!exists) {
         validNewMembers.push({
           employeeId: member.id,
           name: member.name,
           avatar: member.avatar || null,
           joinedAt: new Date(),
-          isAdmin: false
+          isAdmin: false,
         });
         addedNames.push(member.name);
       }
@@ -821,11 +947,11 @@ export const addGroupMembers = async (
     const conversation = await Conversation.findOneAndUpdate(
       { id: conversationId },
       { $push: { participants: { $each: validNewMembers } } },
-      { new: true }
+      { new: true },
     ).lean();
 
     // Create a single batched system message
-    let content = '';
+    let content = "";
     if (addedNames.length === 1) {
       content = `${adminParticipant.name} added ${addedNames[0]}`;
     } else if (addedNames.length === 2) {
@@ -834,43 +960,43 @@ export const addGroupMembers = async (
       content = `${adminParticipant.name} added ${addedNames[0]}, ${addedNames[1]} and ${addedNames.length - 2} others`;
     }
 
-    const msgId = await generateCompanyUniqueId(companyId, 'messages');
+    const msgId = await generateCompanyUniqueId(companyId, "messages");
     const sysMsg = await Message.create({
       id: msgId,
       companyId,
       conversationId,
-      senderId: 'system',
-      senderName: 'System',
+      senderId: "system",
+      senderName: "System",
       content,
-      type: 'system',
+      type: "system",
       systemMeta: {
-        action: 'member_added',
+        action: "member_added",
         targetId: validNewMembers[0].employeeId,
-        targetName: addedNames.join(', ')
-      }
+        targetName: addedNames.join(", "),
+      },
     });
 
     // Broadcast system message to active sockets in room
     try {
       const io = getIO();
-      io.to(`conv:${conversationId}`).emit('new_message', {
+      io.to(`conv:${conversationId}`).emit("new_message", {
         id: msgId,
         conversationId,
-        senderId: 'system',
-        senderName: 'System',
+        senderId: "system",
+        senderName: "System",
         preview: sysMsg.content,
-        type: 'system',
+        type: "system",
         createdAt: sysMsg.createdAt,
-        _isOptimized: true
+        _isOptimized: true,
       });
     } catch (err) {}
 
     // Invalidate caches
     cacheDel(
       CacheKeys.groupMembers(companyId, conversationId),
-      CacheKeys.convMsgs(companyId, conversationId)
+      CacheKeys.convMsgs(companyId, conversationId),
     ).catch(() => {});
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
 
     return { success: true, addedMembers: addedNames, conversation };
   });
@@ -880,48 +1006,55 @@ export const addGroupMembers = async (
  * Remove member from group / Leave group
  */
 export const removeGroupMember = async (
-  conversationId, adminId, targetEmployeeId, companyId
+  conversationId,
+  adminId,
+  targetEmployeeId,
+  companyId,
 ) => {
   return runWithTenant(companyId, async () => {
     const conv = await Conversation.findOne({ id: conversationId });
-    if (!conv || conv.type !== 'group')
-      throw new Error('Group not found');
+    if (!conv || conv.type !== "group") throw new Error("Group not found");
 
     const isSelf = adminId === targetEmployeeId;
     let adminParticipant = null;
     if (!isSelf) {
       adminParticipant = conv.participants.find(
-        p => p.employeeId === adminId
+        (p) => p.employeeId === adminId,
       );
       if (!adminParticipant?.isAdmin)
-        throw new Error('Only admins can remove members');
+        throw new Error("Only admins can remove members");
     }
 
     const target = conv.participants.find(
-      p => p.employeeId === targetEmployeeId
+      (p) => p.employeeId === targetEmployeeId,
     );
-    if (!target) throw new Error('Member not found in group');
+    if (!target) throw new Error("Member not found in group");
 
     // Auto-promote logic if the leaving user is the last admin
     let autoPromotedMsg = null;
     let autoPromotedMemberId = null;
 
     if (target.isAdmin) {
-      const admins = conv.participants.filter(p => p.isAdmin);
+      const admins = conv.participants.filter((p) => p.isAdmin);
       if (admins.length === 1) {
         const otherParticipants = conv.participants.filter(
-          p => p.employeeId !== targetEmployeeId
+          (p) => p.employeeId !== targetEmployeeId,
         );
         if (otherParticipants.length > 0) {
           // Sort by joinedAt ascending to find the longest standing member
-          otherParticipants.sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt));
+          otherParticipants.sort(
+            (a, b) => new Date(a.joinedAt) - new Date(b.joinedAt),
+          );
           const longestStanding = otherParticipants[0];
           autoPromotedMemberId = longestStanding.employeeId;
 
           // Promote them in DB
           await Conversation.findOneAndUpdate(
-            { id: conversationId, 'participants.employeeId': longestStanding.employeeId },
-            { $set: { 'participants.$.isAdmin': true } }
+            {
+              id: conversationId,
+              "participants.employeeId": longestStanding.employeeId,
+            },
+            { $set: { "participants.$.isAdmin": true } },
           );
 
           autoPromotedMsg = `${longestStanding.name} has been promoted to Admin (auto-promoted)`;
@@ -929,79 +1062,79 @@ export const removeGroupMember = async (
       }
     }
 
-    const action = isSelf ? 'member_left' : 'member_removed';
+    const action = isSelf ? "member_left" : "member_removed";
     const content = isSelf
       ? `${target.name} left the group`
-      : `${adminParticipant ? adminParticipant.name : 'Admin'} removed ${target.name}`;
+      : `${adminParticipant ? adminParticipant.name : "Admin"} removed ${target.name}`;
 
     // Pull member out
     const updatedConv = await Conversation.findOneAndUpdate(
       { id: conversationId },
       { $pull: { participants: { employeeId: targetEmployeeId } } },
-      { new: true }
+      { new: true },
     ).lean();
 
     // Create system message for leave/remove
-    const msgId = await generateCompanyUniqueId(companyId, 'messages');
+    const msgId = await generateCompanyUniqueId(companyId, "messages");
     const sysMsg = await Message.create({
       id: msgId,
       companyId,
       conversationId,
-      senderId: 'system',
-      senderName: 'System',
+      senderId: "system",
+      senderName: "System",
       content,
-      type: 'system',
+      type: "system",
       systemMeta: {
         action,
         targetId: targetEmployeeId,
-        targetName: target.name
-      }
+        targetName: target.name,
+      },
     });
 
     // Broadcast leave/remove system message
     try {
       const io = getIO();
-      io.to(`conv:${conversationId}`).emit('new_message', {
+      io.to(`conv:${conversationId}`).emit("new_message", {
         id: sysMsg.id,
         conversationId,
-        senderId: 'system',
-        senderName: 'System',
+        senderId: "system",
+        senderName: "System",
         preview: sysMsg.content,
-        type: 'system',
+        type: "system",
         createdAt: sysMsg.createdAt,
-        _isOptimized: true
+        _isOptimized: true,
       });
     } catch (err) {}
 
     // Create and broadcast auto-promote system message if applicable
     if (autoPromotedMsg) {
-      const pMsgId = await generateCompanyUniqueId(companyId, 'messages');
+      const pMsgId = await generateCompanyUniqueId(companyId, "messages");
       const pSysMsg = await Message.create({
         id: pMsgId,
         companyId,
         conversationId,
-        senderId: 'system',
-        senderName: 'System',
+        senderId: "system",
+        senderName: "System",
         content: autoPromotedMsg,
-        type: 'system',
+        type: "system",
         systemMeta: {
-          action: 'admin_added',
+          action: "admin_added",
           targetId: autoPromotedMemberId,
-          targetName: autoPromotedMsg.split(' has been')[0]
-        }
+          targetName: autoPromotedMsg.split(" has been")[0],
+        },
       });
 
       try {
         const io = getIO();
-        io.to(`conv:${conversationId}`).emit('new_message', {
+        io.to(`conv:${conversationId}`).emit("new_message", {
           id: pSysMsg.id,
           conversationId,
-          senderId: 'system',
-          senderName: 'System',
+          senderId: "system",
+          senderName: "System",
           preview: pSysMsg.content,
-          type: 'system',
+          type: "system",
           createdAt: pSysMsg.createdAt,
-          _isOptimized: true
+          _isOptimized: true,
         });
       } catch (err) {}
     }
@@ -1009,9 +1142,9 @@ export const removeGroupMember = async (
     // Invalidate caches
     cacheDel(
       CacheKeys.groupMembers(companyId, conversationId),
-      CacheKeys.convMsgs(companyId, conversationId)
+      CacheKeys.convMsgs(companyId, conversationId),
     ).catch(() => {});
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
 
     return { success: true, conversation: updatedConv };
   });
@@ -1020,37 +1153,57 @@ export const removeGroupMember = async (
 /**
  * Update group details (name, description, avatar, settings)
  */
-export const updateGroupDetails = async (conversationId, adminId, groupData, companyId) => {
+export const updateGroupDetails = async (
+  conversationId,
+  adminId,
+  groupData,
+  companyId,
+) => {
   return runWithTenant(companyId, async () => {
     const conv = await Conversation.findOne({ id: conversationId });
-    if (!conv || conv.type !== 'group') throw new Error('Group not found');
+    if (!conv || conv.type !== "group") throw new Error("Group not found");
 
-    const adminParticipant = conv.participants.find(p => p.employeeId === adminId);
-    if (!adminParticipant?.isAdmin) throw new Error('Only admins can update group details');
+    const adminParticipant = conv.participants.find(
+      (p) => p.employeeId === adminId,
+    );
+    if (!adminParticipant?.isAdmin)
+      throw new Error("Only admins can update group details");
 
     const updates = {};
     const systemMessages = [];
 
     // 0. Promote Member to Admin
     if (groupData.promoteEmployeeId) {
-      const target = conv.participants.find(p => p.employeeId === groupData.promoteEmployeeId);
+      const target = conv.participants.find(
+        (p) => p.employeeId === groupData.promoteEmployeeId,
+      );
       if (target && !target.isAdmin) {
         await Conversation.findOneAndUpdate(
-          { id: conversationId, 'participants.employeeId': groupData.promoteEmployeeId },
-          { $set: { 'participants.$.isAdmin': true } }
+          {
+            id: conversationId,
+            "participants.employeeId": groupData.promoteEmployeeId,
+          },
+          { $set: { "participants.$.isAdmin": true } },
         );
-        systemMessages.push(`${adminParticipant.name} promoted ${target.name} to Admin`);
+        systemMessages.push(
+          `${adminParticipant.name} promoted ${target.name} to Admin`,
+        );
       }
     }
 
     // 1. Name update
     if (groupData.name && groupData.name.trim() !== conv.name) {
       updates.name = groupData.name.trim();
-      systemMessages.push(`${adminParticipant.name} changed the group name to "${updates.name}"`);
+      systemMessages.push(
+        `${adminParticipant.name} changed the group name to "${updates.name}"`,
+      );
     }
 
     // 2. Description update
-    if (groupData.description !== undefined && groupData.description !== conv.description) {
+    if (
+      groupData.description !== undefined &&
+      groupData.description !== conv.description
+    ) {
       updates.description = groupData.description || null;
     }
 
@@ -1058,13 +1211,20 @@ export const updateGroupDetails = async (conversationId, adminId, groupData, com
     if (groupData.avatar !== undefined && groupData.avatar !== conv.avatar) {
       let newAvatarUrl = groupData.avatar || null;
       let newAvatarFileId = null;
-      if (newAvatarUrl && newAvatarUrl.startsWith('data:') && newAvatarUrl.includes(';base64,')) {
+      if (
+        newAvatarUrl &&
+        newAvatarUrl.startsWith("data:") &&
+        newAvatarUrl.includes(";base64,")
+      ) {
         try {
-          const uploadResult = await uploadToImageKitDetailed(newAvatarUrl, `group_avatar_${conversationId}_${Date.now()}.jpg`);
+          const uploadResult = await uploadToImageKitDetailed(
+            newAvatarUrl,
+            `group_avatar_${conversationId}_${Date.now()}.jpg`,
+          );
           newAvatarUrl = uploadResult.url;
           newAvatarFileId = uploadResult.fileId;
         } catch (err) {
-          logger.error('[Chat] Group avatar upload failed:', err);
+          logger.error("[Chat] Group avatar upload failed:", err);
         }
       }
 
@@ -1074,27 +1234,37 @@ export const updateGroupDetails = async (conversationId, adminId, groupData, com
       updates.avatarImageKitFileId = newAvatarFileId;
 
       if (oldAvatarId) {
-        deleteFileFromImageKitById(oldAvatarId).catch(err => {
-          logger.error('[ImageKit] Failed to delete old avatar by ID:', err);
+        deleteFileFromImageKitById(oldAvatarId).catch((err) => {
+          logger.error("[ImageKit] Failed to delete old avatar by ID:", err);
         });
-      } else if (oldAvatar && oldAvatar.includes('imagekit.io')) {
-        deleteFromImageKit(oldAvatar).catch(err => {
-          logger.error('[ImageKit] Failed to delete old avatar:', err);
+      } else if (oldAvatar && oldAvatar.includes("imagekit.io")) {
+        deleteFromImageKit(oldAvatar).catch((err) => {
+          logger.error("[ImageKit] Failed to delete old avatar:", err);
         });
       }
 
-      systemMessages.push(`${adminParticipant.name} changed the group profile photo`);
+      systemMessages.push(
+        `${adminParticipant.name} changed the group profile photo`,
+      );
     }
 
     // 4. Settings update
     if (groupData.settings) {
       updates.settings = {
         ...conv.settings,
-        ...groupData.settings
+        ...groupData.settings,
       };
-      if (groupData.settings.onlyAdminsCanMessage !== undefined && groupData.settings.onlyAdminsCanMessage !== conv.settings?.onlyAdminsCanMessage) {
-        const settingText = groupData.settings.onlyAdminsCanMessage ? 'Admins Only' : 'All Participants';
-        systemMessages.push(`${adminParticipant.name} set group messages setting to: ${settingText}`);
+      if (
+        groupData.settings.onlyAdminsCanMessage !== undefined &&
+        groupData.settings.onlyAdminsCanMessage !==
+          conv.settings?.onlyAdminsCanMessage
+      ) {
+        const settingText = groupData.settings.onlyAdminsCanMessage
+          ? "Admins Only"
+          : "All Participants";
+        systemMessages.push(
+          `${adminParticipant.name} set group messages setting to: ${settingText}`,
+        );
       }
     }
 
@@ -1103,41 +1273,41 @@ export const updateGroupDetails = async (conversationId, adminId, groupData, com
     const updatedConv = await Conversation.findOneAndUpdate(
       { id: conversationId },
       { $set: updates },
-      { new: true }
+      { new: true },
     );
 
     // Write system messages
     for (const content of systemMessages) {
-      const msgId = await generateCompanyUniqueId(companyId, 'messages');
+      const msgId = await generateCompanyUniqueId(companyId, "messages");
       const sysMsg = await Message.create({
         id: msgId,
         companyId,
         conversationId,
-        senderId: 'system',
-        senderName: 'System',
+        senderId: "system",
+        senderName: "System",
         content,
-        type: 'system'
+        type: "system",
       });
 
       // Broadcast system message
       try {
         const io = getIO();
-        io.to(`conv:${conversationId}`).emit('new_message', {
+        io.to(`conv:${conversationId}`).emit("new_message", {
           id: sysMsg.id,
           conversationId,
-          senderId: 'system',
-          senderName: 'System',
+          senderId: "system",
+          senderName: "System",
           preview: sysMsg.content,
-          type: 'system',
+          type: "system",
           createdAt: sysMsg.createdAt,
-          _isOptimized: true
+          _isOptimized: true,
         });
       } catch (err) {}
     }
 
     // Invalidate caches
     cacheDel(CacheKeys.convMsgs(companyId, conversationId)).catch(() => {});
-    cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
+    cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
 
     return updatedConv;
   });
@@ -1146,12 +1316,16 @@ export const updateGroupDetails = async (conversationId, adminId, groupData, com
 /**
  * Pin a conversation for a specific employee
  */
-export const pinConversation = async (conversationId, employeeId, companyId) => {
+export const pinConversation = async (
+  conversationId,
+  employeeId,
+  companyId,
+) => {
   const result = await runWithTenant(companyId, async () => {
     return await Conversation.findOneAndUpdate(
       { id: conversationId },
       { $addToSet: { pinnedBy: { employeeId, pinnedAt: new Date() } } },
-      { new: true }
+      { new: true },
     );
   });
   cacheDel(CacheKeys.sidebar(companyId, employeeId)).catch(() => {});
@@ -1161,12 +1335,16 @@ export const pinConversation = async (conversationId, employeeId, companyId) => 
 /**
  * Unpin a conversation for a specific employee
  */
-export const unpinConversation = async (conversationId, employeeId, companyId) => {
+export const unpinConversation = async (
+  conversationId,
+  employeeId,
+  companyId,
+) => {
   const result = await runWithTenant(companyId, async () => {
     return await Conversation.findOneAndUpdate(
       { id: conversationId },
       { $pull: { pinnedBy: { employeeId } } },
-      { new: true }
+      { new: true },
     );
   });
   cacheDel(CacheKeys.sidebar(companyId, employeeId)).catch(() => {});
@@ -1181,7 +1359,7 @@ export const pinMessage = async (messageId, employeeId, companyId) => {
     return await Message.findOneAndUpdate(
       { id: messageId },
       { isPinned: true, pinnedBy: employeeId, pinnedAt: new Date() },
-      { new: true }
+      { new: true },
     );
   });
 };
@@ -1194,7 +1372,7 @@ export const unpinMessage = async (messageId, companyId) => {
     return await Message.findOneAndUpdate(
       { id: messageId },
       { isPinned: false, pinnedBy: null, pinnedAt: null },
-      { new: true }
+      { new: true },
     );
   });
 };
@@ -1207,7 +1385,7 @@ export const starMessage = async (messageId, employeeId, companyId) => {
     return await Message.findOneAndUpdate(
       { id: messageId },
       { $addToSet: { starredBy: employeeId } },
-      { new: true }
+      { new: true },
     );
   });
 };
@@ -1220,7 +1398,7 @@ export const unstarMessage = async (messageId, employeeId, companyId) => {
     return await Message.findOneAndUpdate(
       { id: messageId },
       { $pull: { starredBy: employeeId } },
-      { new: true }
+      { new: true },
     );
   });
 };
@@ -1235,13 +1413,13 @@ export const deleteMessagesBulk = async (messageIds, employeeId, companyId) => {
     await Message.updateMany(
       {
         id: { $in: messageIds },
-        'deletedFor.employeeId': { $ne: employeeId }
+        "deletedFor.employeeId": { $ne: employeeId },
       },
       {
         $push: {
-          deletedFor: { employeeId, deletedAt: now }
-        }
-      }
+          deletedFor: { employeeId, deletedAt: now },
+        },
+      },
     );
 
     return { success: true };
@@ -1256,15 +1434,22 @@ export const deleteMessagesBulk = async (messageIds, employeeId, companyId) => {
 export const deleteMessagePermanently = async (messageId, companyId) => {
   return runWithTenant(companyId, async () => {
     const message = await Message.findOne({ id: messageId });
-    if (!message) throw new Error('Message not found');
+    if (!message) throw new Error("Message not found");
 
     // 1. Delete attachment from ImageKit
     if (message.media) {
       if (message.media.imageKitFileId) {
-        logger.info(`[Chat] Deleting message attachment by file ID: ${message.media.imageKitFileId}`);
+        logger.info(
+          `[Chat] Deleting message attachment by file ID: ${message.media.imageKitFileId}`,
+        );
         await deleteFileFromImageKitById(message.media.imageKitFileId);
-      } else if (message.media.url && message.media.url.includes('imagekit.io')) {
-        logger.info(`[Chat] Deleting message attachment by URL: ${message.media.url}`);
+      } else if (
+        message.media.url &&
+        message.media.url.includes("imagekit.io")
+      ) {
+        logger.info(
+          `[Chat] Deleting message attachment by URL: ${message.media.url}`,
+        );
         await deleteFromImageKit(message.media.url);
       }
     }
@@ -1274,13 +1459,13 @@ export const deleteMessagePermanently = async (messageId, companyId) => {
     if (conv && conv.lastMessage?.messageId === messageId) {
       const nextLatest = await Message.findOne({
         conversationId: message.conversationId,
-        id: { $ne: messageId }
+        id: { $ne: messageId },
       }).sort({ createdAt: -1 });
 
       if (nextLatest) {
         const previewContent = nextLatest.isDeleted
           ? null
-          : nextLatest.type === 'text'
+          : nextLatest.type === "text"
             ? nextLatest.content
             : `📎 ${nextLatest.media?.fileName || nextLatest.type}`;
 
@@ -1294,15 +1479,15 @@ export const deleteMessagePermanently = async (messageId, companyId) => {
                 type: nextLatest.type,
                 senderId: nextLatest.senderId,
                 senderName: nextLatest.senderName,
-                sentAt: nextLatest.createdAt
-              }
-            }
-          }
+                sentAt: nextLatest.createdAt,
+              },
+            },
+          },
         );
       } else {
         await Conversation.findOneAndUpdate(
           { id: message.conversationId },
-          { $set: { lastMessage: null } }
+          { $set: { lastMessage: null } },
         );
       }
     }
@@ -1321,10 +1506,13 @@ export const deleteMessagePermanently = async (messageId, companyId) => {
  * from ImageKit in parallel/batches, deletes all messages & conversation from MongoDB,
  * and emits a socket event.
  */
-export const deleteConversationPermanently = async (conversationId, companyId) => {
+export const deleteConversationPermanently = async (
+  conversationId,
+  companyId,
+) => {
   return runWithTenant(companyId, async () => {
     const conv = await Conversation.findOne({ id: conversationId });
-    if (!conv) throw new Error('Conversation not found');
+    if (!conv) throw new Error("Conversation not found");
 
     // 1. Gather all messages in conversation
     const messages = await Message.find({ conversationId }).lean();
@@ -1335,7 +1523,7 @@ export const deleteConversationPermanently = async (conversationId, companyId) =
 
     if (conv.avatarImageKitFileId) {
       fileIdsToDelete.add(conv.avatarImageKitFileId);
-    } else if (conv.avatar && conv.avatar.includes('imagekit.io')) {
+    } else if (conv.avatar && conv.avatar.includes("imagekit.io")) {
       urlsToDelete.add(conv.avatar);
     }
 
@@ -1343,7 +1531,7 @@ export const deleteConversationPermanently = async (conversationId, companyId) =
       if (msg.media) {
         if (msg.media.imageKitFileId) {
           fileIdsToDelete.add(msg.media.imageKitFileId);
-        } else if (msg.media.url && msg.media.url.includes('imagekit.io')) {
+        } else if (msg.media.url && msg.media.url.includes("imagekit.io")) {
           urlsToDelete.add(msg.media.url);
         }
       }
@@ -1353,28 +1541,40 @@ export const deleteConversationPermanently = async (conversationId, companyId) =
     const fileIdsArray = Array.from(fileIdsToDelete);
     const urlsArray = Array.from(urlsToDelete);
 
-    logger.info(`[Chat] Permanent cleanup for conversation ${conversationId}: Deleting ${fileIdsArray.length} files by ID and ${urlsArray.length} files by URL...`);
+    logger.info(
+      `[Chat] Permanent cleanup for conversation ${conversationId}: Deleting ${fileIdsArray.length} files by ID and ${urlsArray.length} files by URL...`,
+    );
 
     const BATCH_SIZE = 10;
-    
+
     // Delete fileIds
     for (let i = 0; i < fileIdsArray.length; i += BATCH_SIZE) {
       const batch = fileIdsArray.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(fileId => 
-        deleteFileFromImageKitById(fileId).catch(err => 
-          logger.error(`[Chat] Failed to delete fileId ${fileId} during conversation cleanup:`, err)
-        )
-      ));
+      await Promise.all(
+        batch.map((fileId) =>
+          deleteFileFromImageKitById(fileId).catch((err) =>
+            logger.error(
+              `[Chat] Failed to delete fileId ${fileId} during conversation cleanup:`,
+              err,
+            ),
+          ),
+        ),
+      );
     }
 
     // Delete urls
     for (let i = 0; i < urlsArray.length; i += BATCH_SIZE) {
       const batch = urlsArray.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(url => 
-        deleteFromImageKit(url).catch(err => 
-          logger.error(`[Chat] Failed to delete url ${url} during conversation cleanup:`, err)
-        )
-      ));
+      await Promise.all(
+        batch.map((url) =>
+          deleteFromImageKit(url).catch((err) =>
+            logger.error(
+              `[Chat] Failed to delete url ${url} during conversation cleanup:`,
+              err,
+            ),
+          ),
+        ),
+      );
     }
 
     // 4. Delete all messages from MongoDB
@@ -1383,19 +1583,28 @@ export const deleteConversationPermanently = async (conversationId, companyId) =
     // 5. Delete conversation from MongoDB
     await Conversation.deleteOne({ id: conversationId });
 
-    logger.info(`[Chat] Permanently deleted conversation conversationId: ${conversationId} and all associated records.`);
+    logger.info(
+      `[Chat] Permanently deleted conversation conversationId: ${conversationId} and all associated records.`,
+    );
 
     // 6. Broadcast socket deletion event
     try {
       const io = getIO();
-      io.to(`conv:${conversationId}`).emit('conversation_deleted', { conversationId });
-      
+      io.to(`conv:${conversationId}`).emit("conversation_deleted", {
+        conversationId,
+      });
+
       // Also notify each participant directly so their UI updates
       for (const participant of conv.participants) {
-        io.to(`user:${participant.employeeId}`).emit('conversation_deleted', { conversationId });
+        io.to(`user:${participant.employeeId}`).emit("conversation_deleted", {
+          conversationId,
+        });
       }
     } catch (socketErr) {
-      logger.error('[Chat] Socket emission of conversation_deleted failed:', socketErr);
+      logger.error(
+        "[Chat] Socket emission of conversation_deleted failed:",
+        socketErr,
+      );
     }
 
     return { success: true };
@@ -1405,43 +1614,52 @@ export const deleteConversationPermanently = async (conversationId, companyId) =
 /**
  * Forward message to multiple target conversations
  */
-export const forwardMessage = async (messageId, targetConversationIds, forwardingUser, companyId) => {
+export const forwardMessage = async (
+  messageId,
+  targetConversationIds,
+  forwardingUser,
+  companyId,
+) => {
   return runWithTenant(companyId, async () => {
     // 1. Validate source message exists
     const sourceMessage = await Message.findOne({ id: messageId });
     if (!sourceMessage) {
-      throw new Error('Message not found');
+      throw new Error("Message not found");
     }
 
     // 2. Validate user has access to source conversation
     const sourceConv = await Conversation.findOne({
       id: sourceMessage.conversationId,
-      'participants.employeeId': forwardingUser.id
+      "participants.employeeId": forwardingUser.id,
     });
     if (!sourceConv) {
-      throw new Error('Access denied: You do not belong to the source conversation');
+      throw new Error(
+        "Access denied: You do not belong to the source conversation",
+      );
     }
 
     // 3. Validate user belongs to target conversations
     const targetConvs = await Conversation.find({
       id: { $in: targetConversationIds },
-      'participants.employeeId': forwardingUser.id
+      "participants.employeeId": forwardingUser.id,
     });
     if (targetConvs.length !== targetConversationIds.length) {
-      throw new Error('Access denied: You are not a participant in all selected conversations');
+      throw new Error(
+        "Access denied: You are not a participant in all selected conversations",
+      );
     }
 
     // 4. Increment forwardedCount on source message
     await Message.findOneAndUpdate(
       { id: sourceMessage.id },
-      { $inc: { forwardedCount: targetConversationIds.length } }
+      { $inc: { forwardedCount: targetConversationIds.length } },
     );
 
     const createdMessages = [];
 
     // 5. Create new messages copies
     for (const targetConv of targetConvs) {
-      const newMsgId = await generateCompanyUniqueId(companyId, 'messages');
+      const newMsgId = await generateCompanyUniqueId(companyId, "messages");
 
       let mediaObj = null;
       if (sourceMessage.media) {
@@ -1449,12 +1667,13 @@ export const forwardMessage = async (messageId, targetConversationIds, forwardin
           url: sourceMessage.media.url,
           fileName: sourceMessage.media.fileName,
           fileSize: sourceMessage.media.fileSize,
-          mimeType: sourceMessage.media.mimeType || sourceMessage.media.fileType,
+          mimeType:
+            sourceMessage.media.mimeType || sourceMessage.media.fileType,
           width: sourceMessage.media.width,
           height: sourceMessage.media.height,
           duration: sourceMessage.media.duration,
           imageKitFileId: sourceMessage.media.imageKitFileId,
-          imageKitFilePath: sourceMessage.media.imageKitFilePath
+          imageKitFilePath: sourceMessage.media.imageKitFilePath,
         };
       }
 
@@ -1465,10 +1684,10 @@ export const forwardMessage = async (messageId, targetConversationIds, forwardin
         senderId: forwardingUser.id,
         senderName: forwardingUser.name,
         senderAvatar: forwardingUser.avatar || null,
-        senderRole: forwardingUser.role || 'employee',
-        content: sourceMessage.content || '',
-        type: sourceMessage.type || 'text',
-        contentType: sourceMessage.contentType || 'plain',
+        senderRole: forwardingUser.role || "employee",
+        content: sourceMessage.content || "",
+        type: sourceMessage.type || "text",
+        contentType: sourceMessage.contentType || "plain",
         contentVersion: sourceMessage.contentVersion || 1,
         media: mediaObj,
         isForwarded: true,
@@ -1477,14 +1696,15 @@ export const forwardMessage = async (messageId, targetConversationIds, forwardin
           conversationId: sourceMessage.conversationId,
           messageId: sourceMessage.id,
           senderId: sourceMessage.senderId,
-          senderName: sourceMessage.senderName
-        }
+          senderName: sourceMessage.senderName,
+        },
       });
 
       // Update conversation lastMessage + lastActivityAt
-      const previewText = newMsg.type === 'text'
-        ? newMsg.content
-        : `📎 ${newMsg.media?.fileName || newMsg.type}`;
+      const previewText =
+        newMsg.type === "text"
+          ? newMsg.content
+          : `📎 ${newMsg.media?.fileName || newMsg.type}`;
 
       await Conversation.findOneAndUpdate(
         { id: targetConv.id },
@@ -1495,10 +1715,10 @@ export const forwardMessage = async (messageId, targetConversationIds, forwardin
             type: newMsg.type,
             senderId: forwardingUser.id,
             senderName: forwardingUser.name,
-            sentAt: new Date()
+            sentAt: new Date(),
           },
-          lastActivityAt: new Date()
-        }
+          lastActivityAt: new Date(),
+        },
       );
 
       createdMessages.push(newMsg);
@@ -1511,20 +1731,37 @@ export const forwardMessage = async (messageId, targetConversationIds, forwardin
 /**
  * Get all archived conversations for a user
  */
-export const getArchivedConversations = async (employeeId, companyId, role, branch) => {
+export const getArchivedConversations = async (
+  employeeId,
+  companyId,
+  role,
+  branch,
+) => {
   return runWithTenant(companyId, async () => {
-    const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
+    const isExcluded = [
+      "super_admin",
+      "company_admin",
+      "superadmin",
+      "companyadmin",
+    ].includes(role?.toLowerCase());
     const query = {
-      'participants.employeeId': employeeId,
+      "participants.employeeId": employeeId,
       isActive: true,
       isDeleted: { $ne: true },
-      archivedBy: { $elemMatch: { userId: employeeId } }
+      archivedBy: { $elemMatch: { userId: employeeId } },
     };
 
     if (!isExcluded && branch) {
       query.$or = [
-        { type: 'direct' },
-        { type: 'group', $or: [{ branch: branch }, { branch: { $exists: false } }, { branch: null }] }
+        { type: "direct" },
+        {
+          type: "group",
+          $or: [
+            { branch: branch },
+            { branch: { $exists: false } },
+            { branch: null },
+          ],
+        },
       ];
     }
 
@@ -1534,7 +1771,7 @@ export const getArchivedConversations = async (employeeId, companyId, role, bran
 
     // Add unread count and compute dynamic lastMessage for each conversation
     const convsWithUnread = await Promise.all(
-      conversations.map(conv => enrichConversationForUser(conv, employeeId))
+      conversations.map((conv) => enrichConversationForUser(conv, employeeId)),
     );
 
     return convsWithUnread;
@@ -1544,20 +1781,37 @@ export const getArchivedConversations = async (employeeId, companyId, role, bran
 /**
  * Get all hidden conversations for a user
  */
-export const getHiddenConversations = async (employeeId, companyId, role, branch) => {
+export const getHiddenConversations = async (
+  employeeId,
+  companyId,
+  role,
+  branch,
+) => {
   return runWithTenant(companyId, async () => {
-    const isExcluded = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
+    const isExcluded = [
+      "super_admin",
+      "company_admin",
+      "superadmin",
+      "companyadmin",
+    ].includes(role?.toLowerCase());
     const query = {
-      'participants.employeeId': employeeId,
+      "participants.employeeId": employeeId,
       isActive: true,
       isDeleted: { $ne: true },
-      hiddenBy: { $elemMatch: { userId: employeeId } }
+      hiddenBy: { $elemMatch: { userId: employeeId } },
     };
 
     if (!isExcluded && branch) {
       query.$or = [
-        { type: 'direct' },
-        { type: 'group', $or: [{ branch: branch }, { branch: { $exists: false } }, { branch: null }] }
+        { type: "direct" },
+        {
+          type: "group",
+          $or: [
+            { branch: branch },
+            { branch: { $exists: false } },
+            { branch: null },
+          ],
+        },
       ];
     }
 
@@ -1567,13 +1821,9 @@ export const getHiddenConversations = async (employeeId, companyId, role, branch
 
     // Add unread count and compute dynamic lastMessage for each conversation
     const convsWithUnread = await Promise.all(
-      conversations.map(conv => enrichConversationForUser(conv, employeeId))
+      conversations.map((conv) => enrichConversationForUser(conv, employeeId)),
     );
 
     return convsWithUnread;
   });
 };
-
-
-
-
