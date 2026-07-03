@@ -47,14 +47,16 @@ const EmployeeDashboard = () => {
     projectsList,
     documentsList,
     addToast,
-    leavePolicyConfigs = []
+    leavePolicyConfigs = [],
+    hasPermission
   } = useApp();
 
   useEffect(() => {
-    if (currentUserRole && currentUserRole !== 'employee') {
+    const hasSelf = hasPermission('dashboard', 'read', 'self');
+    if (currentUserRole && currentUserRole !== 'employee' && !hasSelf) {
       navigate('/', { replace: true });
     }
-  }, [currentUserRole, navigate]);
+  }, [currentUserRole, navigate, hasPermission]);
 
   // Filters State
   const [timePeriod, setTimePeriodState] = useState('today'); // today, week, month

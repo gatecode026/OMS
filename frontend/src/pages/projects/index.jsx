@@ -21,12 +21,57 @@ const Projects = () => {
   const { token, addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole, hasPermission, currentUser } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('project_management', 'read', 'company');
+    const hasSelfRead = hasPermission('project_management', 'read', 'self');
+
+    const saved = localStorage.getItem('perspective_projects');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('project_management', 'read', 'company');
+    const hasSelfRead = hasPermission('project_management', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
+
+  React.useEffect(() => {
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_projects', perspective);
+    }
+  }, [perspective, currentUserRole]);
+
+  React.useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('project_management', 'read', 'company');
+      const hasSelfRead = hasPermission('project_management', 'read', 'self');
+      const saved = localStorage.getItem('perspective_projects');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
+
   // State Management
   const [projects, setProjects] = useState([]);
 
   React.useEffect(() => {
     if (projectsList) {
-      if (currentUserRole === 'employee' && currentUser) {
+      if (isEmployeeView && currentUser) {
         const filtered = projectsList.filter(p => {
           const isManager = p.manager?.toLowerCase() === currentUser.name?.toLowerCase();
           const isLeader = p.leader?.toLowerCase() === currentUser.name?.toLowerCase();
@@ -49,7 +94,7 @@ const Projects = () => {
         setProjects(projectsList);
       }
     }
-  }, [projectsList, currentUserRole, currentUser, departments]);
+  }, [projectsList, currentUserRole, currentUser, departments, isEmployeeView]);
   const [filters, setFilters] = useState({
     search: '',
     status: 'All',
@@ -665,14 +710,39 @@ const Projects = () => {
         <div>
           <h1 style={{ margin: 0 }}>Active Projects Dashboard</h1>
           <p style={{ margin: 0, fontSize: '0.85rem' }}>
-            {currentUserRole === 'employee'
+            {isEmployeeView
               ? 'View your assigned projects, timelines, and tasks.'
               : 'Track and manage all company projects, timelines, tasks, and budgets.'}
           </p>
         </div>
 
         {/* Header Alerts Dropdown Button */}
-        <div style={{ position: 'relative', display: 'flex', gap: 10 }}>
+        <div style={{ position: 'relative', display: 'flex', gap: 10, alignItems: 'center' }}>
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
           <div className={styles.syncStatus} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: 'var(--radius-lg)' }}>
             <span className={styles.syncDot} />
             <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>SYSTEM ACTIVE</span>
@@ -681,7 +751,7 @@ const Projects = () => {
       </div>
 
       {/* Top Banner Alert Bar */}
-      {currentUserRole !== 'employee' && (
+      {isCompanyView && (
         <div className={styles.alertsBanner}>
           <div className={styles.alertsHeader}>
             <span className={styles.alertsTitle}>
@@ -706,7 +776,7 @@ const Projects = () => {
       )}
 
       {/* Section G - Quick Action Buttons Bar */}
-      {currentUserRole !== 'employee' && (
+      {isCompanyView && (
         <div className={styles.quickActionsRow}>
           {hasPermission('project_management', 'create') && (
             <>

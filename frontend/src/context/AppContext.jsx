@@ -643,7 +643,7 @@ export const AppProvider = ({ children }) => {
     }
   }, [token, currentUser]);
 
-  // Live socket notification listener to update global notifications in real time
+  // Live socket notification listener to update global notifications & announcements in real time
   useEffect(() => {
     if (!currentUser || !token) return;
     const socket = getSocket();
@@ -652,19 +652,31 @@ export const AppProvider = ({ children }) => {
     const handleNewNotification = (notif) => {
       console.log('[AppContext] Live socket notification received, refreshing notifications...');
       fetchNotifications();
+      if (notif && (notif.type === 'announcement' || notif.type === 'Announcement')) {
+        console.log('[AppContext] Announcement notification received, refreshing announcements...');
+        fetchAnnouncements();
+      }
     };
 
     const handleSync = (missedNotifs) => {
-      console.log('[AppContext] Live socket sync received, refreshing notifications...');
+      console.log('[AppContext] Live socket sync received, refreshing notifications & announcements...');
       fetchNotifications();
+      fetchAnnouncements();
+    };
+
+    const handleAnnouncementSync = () => {
+      console.log('[AppContext] Live socket announcement sync, refreshing announcements...');
+      fetchAnnouncements();
     };
 
     socket.on('notification:new', handleNewNotification);
     socket.on('notification:sync', handleSync);
+    socket.on('announcement:sync', handleAnnouncementSync);
 
     return () => {
       socket.off('notification:new', handleNewNotification);
       socket.off('notification:sync', handleSync);
+      socket.off('announcement:sync', handleAnnouncementSync);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, token]);
@@ -4437,7 +4449,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Check RBAC permission helper with Overrides support
-  const hasPermission = (module, action) => {
+  const hasPermission = (module, action, perspective = null) => {
     const normalizedRole = (currentUserRole || '').toLowerCase();
     
     // Super admin and company admin have permission for everything
@@ -4523,26 +4535,52 @@ export const AppProvider = ({ children }) => {
       'system_settings': 'settings',
       'document_management': 'documents',
       'notifications': 'notifications',
-      'announcements': 'announcements'
+      'announcements': 'announcements',
+      'meetings_calendar': 'meetings_calendar',
+      'work_reports': 'work_reports'
     };
 
-    const dbKey = MODULE_MAPPING[module] || module;
-    const isDbBacked = Object.values(MODULE_MAPPING).includes(dbKey) || Object.keys(MODULE_MAPPING).includes(module);
+    const HIERARCHICAL_MODULES = [
+      'attendance_management', 'attendance',
+      'leave_management', 'leaves',
+      'project_management', 'projects',
+      'task_monitoring', 'tasks',
+      'payroll_management', 'payroll',
+      'work_reports',
+      'meetings_calendar',
+      'announcements'
+    ];
+
+    const baseKey = MODULE_MAPPING[module] || module;
+
+    const isHierarchical = HIERARCHICAL_MODULES.includes(baseKey) || HIERARCHICAL_MODULES.includes(module);
+    const activePerspective = perspective || (currentUserRole === 'employee' ? 'self' : 'company');
+
+    const isDbBacked = Object.values(MODULE_MAPPING).includes(baseKey) || Object.keys(MODULE_MAPPING).includes(module);
 
     if (isDbBacked) {
       const roleObj = roles.find(r => r.id === rawUserRole) || 
                       roles.find(r => r.id === currentUserRole) || 
                       roles.find(r => getBaseRole(r.id) === currentUserRole);
       const permissions = roleObj?.permissions;
-      const dbPermission = permissions
-        ? (permissions[module] !== undefined ? permissions[module] : permissions[dbKey])
-        : undefined;
+      
+      let dbPermission;
+      if (permissions) {
+        if (isHierarchical && activePerspective === 'self') {
+          const selfModKey = `${module}_self`;
+          const selfBaseKey = `${baseKey}_self`;
+          dbPermission = permissions[selfModKey] !== undefined ? permissions[selfModKey] : 
+                         (permissions[selfBaseKey] !== undefined ? permissions[selfBaseKey] : 
+                         (permissions[module] !== undefined ? permissions[module] : permissions[baseKey]));
+        } else {
+          dbPermission = permissions[module] !== undefined ? permissions[module] : permissions[baseKey];
+        }
+      }
 
       if (dbPermission !== undefined) {
         const res = !!dbPermission?.[action];
         console.log('hasPermission DB-backed details:', {
           module,
-          dbKey,
           action,
           currentUserRole,
           result: res

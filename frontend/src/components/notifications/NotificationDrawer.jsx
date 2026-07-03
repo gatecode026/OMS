@@ -277,7 +277,9 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
     const title = (notif.title || '').toLowerCase();
     const data = notif.data || {};
 
-    if (type === 'leave' || category === 'leave' || msg.includes('leave') || title.includes('leave')) {
+    if (type === 'announcement' || type === 'broadcast' || category === 'announcement' || category === 'broadcast') {
+      navigate('/announcements');
+    } else if (type === 'leave' || category === 'leave' || msg.includes('leave') || title.includes('leave')) {
       navigate('/leaves');
     } else if (type === 'attendance' || category === 'attendance' || msg.includes('attendance') || msg.includes('punch') || msg.includes('late') || title.includes('attendance') || title.includes('punch') || title.includes('late')) {
       navigate('/attendance');
@@ -292,8 +294,6 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
       type.includes('group') || type.includes('user_') || category === 'message' || category === 'mention' || category === 'group'
     ) {
       navigate('/chat', { state: { conversationId: data.conversationId } });
-    } else if (type === 'announcement' || type === 'broadcast' || category === 'announcement' || category === 'broadcast') {
-      navigate('/announcements');
     } else {
       // Fallback: Always redirect to the main notification page
       navigate('/notifications', { state: { selectedNotifId: notifId } });

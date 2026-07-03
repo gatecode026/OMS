@@ -47,7 +47,55 @@ const TaskMonitoring = () => {
     hasPermission
   } = useApp();
 
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('task_monitoring', 'read', 'company');
+    const hasSelfRead = hasPermission('task_monitoring', 'read', 'self');
+
+    const saved = localStorage.getItem('perspective_tasks');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('task_monitoring', 'read', 'company');
+    const hasSelfRead = hasPermission('task_monitoring', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
+
+  useEffect(() => {
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_tasks', perspective);
+    }
+  }, [perspective, currentUserRole]);
+
+  useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('task_monitoring', 'read', 'company');
+      const hasSelfRead = hasPermission('task_monitoring', 'read', 'self');
+      const saved = localStorage.getItem('perspective_tasks');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
+
   const scopedEmployees = useMemo(() => {
+    if (isEmployeeView && currentUser) {
+      return employees.filter(e => e.id === currentUser?.id);
+    }
     if (!currentUserRole || currentUserRole === 'super_admin') return employees;
     if (currentUserRole === 'branch_admin') {
       return employees.filter(e => e.branch === currentUser?.branch);
@@ -55,13 +103,13 @@ const TaskMonitoring = () => {
     if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
       return employees.filter(e => e.department === currentUser?.department);
     }
-    if (currentUserRole === 'employee') {
-      return employees.filter(e => e.id === currentUser?.id);
-    }
     return employees;
-  }, [employees, currentUser, currentUserRole]);
+  }, [employees, currentUser, currentUserRole, isEmployeeView]);
 
   const scopedTasksList = useMemo(() => {
+    if (isEmployeeView && currentUser) {
+      return tasks.filter(t => t.assigneeId === currentUser?.id || t.assigneeName === currentUser?.name);
+    }
     if (!currentUserRole || currentUserRole === 'super_admin') return tasks;
     return tasks.filter(t => {
       const assignee = employees.find(e => e.id === t.assigneeId || e.name === t.assigneeName);
@@ -71,12 +119,9 @@ const TaskMonitoring = () => {
       if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
         return t.department === currentUser?.department || assignee?.department === currentUser?.department;
       }
-      if (currentUserRole === 'employee') {
-        return t.assigneeId === currentUser?.id || assignee?.id === currentUser?.id;
-      }
       return true;
     });
-  }, [tasks, employees, currentUser, currentUserRole]);
+  }, [tasks, employees, currentUser, currentUserRole, isEmployeeView]);
 
   // Active Main View: 'kanban', 'list', 'analytics'
   const [activeView, setActiveView] = useState('kanban');
@@ -608,8 +653,33 @@ const TaskMonitoring = () => {
           <p className="page-desc-text">Centralized tracking, team productivity rankings, and automation status monitoring</p>
         </div>
         <div className="flex-center gap-2 flex-wrap">
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
           <Button variant="ghost" onClick={() => setIsExportOpen(true)} icon={Download}>Export Report</Button>
-          {currentUserRole !== 'employee' && hasPermission('task_monitoring', 'create') && (
+          {isCompanyView && hasPermission('task_monitoring', 'create') && (
             <Button variant="primary" onClick={() => setIsCreateOpen(true)} icon={Plus}>Create Task</Button>
           )}
         </div>
@@ -702,7 +772,7 @@ const TaskMonitoring = () => {
       </div>
 
       {/* ── Section 4: View Toggle Toolbar ── */}
-      {currentUserRole !== 'employee' && (
+      {isCompanyView && (
         <div className="view-toggle-toolbar card glass flex-row justify-between flex-wrap gap-3">
           <div className="tab-buttons-group">
             <button className={`view-tab-btn ${activeView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveView('kanban')}>
@@ -791,7 +861,7 @@ const TaskMonitoring = () => {
 
       {/* ── Section 6-11: LIST VIEW ── */}
       {activeView === 'list' && (
-        currentUserRole === 'employee' ? (
+        isEmployeeView ? (
           <div className="personal-tasks-container flex-column gap-4">
             {filteredTasks.length > 0 ? (
               filteredTasks.map(task => {

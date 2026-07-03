@@ -83,7 +83,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 {/* ── Core ── */}
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/overview" element={<Overview />} />
-                <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+                <Route path="/employee-dashboard" element={<Dashboard />} />
 
                 {/* ── People ── */}
                 <Route path="/employees" element={<Employees />} />

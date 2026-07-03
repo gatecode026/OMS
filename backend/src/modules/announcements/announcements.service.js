@@ -73,6 +73,15 @@ export const createRecord = async (data, currentUser) => {
     logger.error('Failed to trigger broadcast announcement notification:', err);
   }
 
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    const companyId = currentUser?.companyId || 'COMP-001';
+    io.to(`company:${companyId}`).emit('announcement:sync');
+  } catch (socketErr) {
+    logger.debug(`[Announcements] Socket sync error: ${socketErr.message}`);
+  }
+
   return record;
 };
 
@@ -94,6 +103,15 @@ export const updateRecord = async (id, data, currentUser) => {
     });
   }
 
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    const companyId = currentUser?.companyId || 'COMP-001';
+    io.to(`company:${companyId}`).emit('announcement:sync');
+  } catch (socketErr) {
+    logger.debug(`[Announcements] Socket sync error: ${socketErr.message}`);
+  }
+
   return updated;
 };
 
@@ -109,6 +127,15 @@ export const deleteRecord = async (id, currentUser) => {
       newVal: 'Deleted',
       timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19)
     });
+  }
+
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    const companyId = currentUser?.companyId || 'COMP-001';
+    io.to(`company:${companyId}`).emit('announcement:sync');
+  } catch (socketErr) {
+    logger.debug(`[Announcements] Socket sync error: ${socketErr.message}`);
   }
 
   return deleted;

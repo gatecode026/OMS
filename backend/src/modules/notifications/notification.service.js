@@ -32,6 +32,8 @@
  *     Redis Pipeline batches LPUSH + INCR for thousands of users
  */
 
+import mongoose from 'mongoose';
+import Employee from '../employees/employees.model.js';
 import Notification, { deriveCategory } from './notification.model.js';
 import redis from '../../config/redis.js';
 import logger from '../../config/logger.js';
@@ -598,10 +600,14 @@ export const broadcastAnnouncement = async (companyId, senderId, title, message,
       const conn = await getTenantConnection(companyId);
       const NotificationModel = await getNotificationModel(companyId);
 
-      // 1. Fetch all active employees
-      const employees = await conn.collection('employees')
-        .find({ workStatus: { $ne: 'Terminated' } }, { projection: { id: 1 } })
-        .toArray();
+      // 1. Fetch all active employees using Mongoose Model
+      let EmployeeModel;
+      try {
+        EmployeeModel = conn.model('Employee');
+      } catch (err) {
+        EmployeeModel = conn.model('Employee', Employee.schema);
+      }
+      const employees = await EmployeeModel.find({ workStatus: { $ne: 'Terminated' } }).select('id').lean();
 
       const employeeIds = employees.map((emp) => emp.id).filter(Boolean);
 
@@ -614,20 +620,24 @@ export const broadcastAnnouncement = async (companyId, senderId, title, message,
       const category = deriveCategory('announcement');
 
       // 2. MongoDB batch insert
-      const notifDocs = employeeIds.map((empId) => ({
-        userId: empId,
-        companyId,
-        type: 'announcement',
-        category,
-        title,
-        message,
-        data: { ...data, senderId },
-        priority: 'high',
-        isRead: false,
-        read: false,
-        createdAt: now,
-        updatedAt: now,
-      }));
+      const notifDocs = employeeIds.map((empId) => {
+        const uniqueId = 'NTF-' + Math.floor(100 + Math.random() * 900) + Date.now().toString().slice(-3);
+        return {
+          id: uniqueId,
+          userId: empId,
+          companyId,
+          type: 'announcement',
+          category,
+          title,
+          message,
+          data: { ...data, senderId },
+          priority: 'high',
+          isRead: false,
+          read: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+      });
 
       const inserted = await NotificationModel.insertMany(notifDocs, { ordered: false });
 
