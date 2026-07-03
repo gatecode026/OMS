@@ -79,7 +79,7 @@ const ChatHeader = ({
                 : otherStatus === 'available'
                   ? otherIsOnChatScreen
                     ? 'Online'
-                    : 'Available and ready to take call'
+                    : 'Available'
                   : otherStatus === 'dnd'
                     ? 'Do Not Disturb'
                     : otherStatus.charAt(0).toUpperCase() + otherStatus.slice(1)

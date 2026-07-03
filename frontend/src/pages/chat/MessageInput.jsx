@@ -13,7 +13,7 @@ import useFileUpload from '../../hooks/useFileUpload';
 import AttachmentCard from '../../components/AttachmentCard';
 import FormattingToolbar from '../../components/FormattingToolbar';
 import MarkdownPreview from '../../components/MarkdownPreview';
-import { FileText, Image, Headphones, BarChart2, Calendar, CheckSquare } from 'lucide-react';
+import { FileText, Image, Headphones, BarChart2, Calendar, CheckSquare, Type } from 'lucide-react';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB Large File Support
 
@@ -59,6 +59,7 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
   const textareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const plusMenuRef = useRef(null);
+  const formattingToolbarRef = useRef(null);
 
   // Typing tracking refs
   const isTypingRef = useRef(false);
@@ -115,6 +116,10 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
       if (emojiPickerRef.current && 
           !emojiPickerRef.current.contains(e.target)) {
         setShowEmojiPicker(false);
+      }
+      if (formattingToolbarRef.current && 
+          !formattingToolbarRef.current.contains(e.target)) {
+        setShowToolbar(false);
       }
       if (plusMenuRef.current && 
           !plusMenuRef.current.contains(e.target) && 
@@ -418,22 +423,10 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
         </div>
       )}
 
-      {/* ── Rich Text Formatting Toolbar ── */}
-      {showToolbar && (
-        <FormattingToolbar
-          onFormat={handleFormat}
-          onTogglePreview={() => setIsPreviewMode(prev => !prev)}
-          isPreviewMode={isPreviewMode}
-          visibleMode={showToolbar}
-          onClose={() => {
-            setShowToolbar(false);
-            setIsPreviewMode(false);
-          }}
-        />
-      )}
+      {/* Rich Text Formatting Toolbar removed from above */}
 
       {/* Input composition row */}
-      <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '8px' }}>
         {/* ── Voice recorder (shown when recording) ────────────── */}
         {isRecording && (
           <VoiceRecorder
@@ -637,6 +630,81 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
               )}
             </div>
 
+            <div style={{ position: 'relative' }} ref={formattingToolbarRef}>
+              <button
+                className={`msg-input-attach-btn ${showToolbar ? 'active' : ''}`}
+                onClick={() => setShowToolbar(prev => !prev)}
+                title="Formatting Options (Aa)"
+                type="button"
+                style={{ 
+                  color: showToolbar 
+                    ? 'var(--chat-primary, #6366f1)' 
+                    : 'var(--text-muted, #94a3b8)',
+                  backgroundColor: showToolbar
+                    ? 'var(--chat-active-bg, #eef2ff)'
+                    : 'var(--chat-input-bg, #f8fafc)',
+                  border: showToolbar ? '1px solid var(--chat-primary, #6366f1)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Type size={18} />
+              </button>
+
+              {showToolbar && (
+                <div className="formatting-toolbar-popup animate-slide-down" style={{
+                  position: 'absolute',
+                  bottom: '56px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 1010,
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.1)',
+                  border: '1px solid var(--chat-border, #e2e8f0)',
+                  backgroundColor: 'var(--bg-card, #ffffff)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  minWidth: 'max-content'
+                }}>
+                  <style>{`
+                    .formatting-toolbar-popup .formatting-toolbar {
+                      border-bottom: none !important;
+                      background: transparent !important;
+                      padding: 4px 8px !important;
+                      width: 100% !important;
+                      gap: 6px !important;
+                    }
+                    .formatting-toolbar-popup .formatting-tool-btn {
+                      width: 30px !important;
+                      height: 30px !important;
+                      border-radius: 8px !important;
+                      transition: all 0.15s ease !important;
+                    }
+                    .formatting-toolbar-popup .formatting-tool-btn:hover {
+                      background-color: var(--chat-hover, #f1f5f9) !important;
+                      transform: translateY(-1px);
+                    }
+                  `}</style>
+                  <FormattingToolbar
+                    onFormat={handleFormat}
+                    onTogglePreview={() => setIsPreviewMode(prev => !prev)}
+                    isPreviewMode={isPreviewMode}
+                    visibleMode={showToolbar}
+                    onClose={() => {
+                      setShowToolbar(false);
+                      setIsPreviewMode(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
             {isPreviewMode ? (
               <div className="msg-input-preview-wrap" style={{ flex: 1, minHeight: '38px', boxSizing: 'border-box' }}>
                 <MarkdownPreview content={message} />
@@ -649,8 +717,6 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
                 value={message}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setShowToolbar(true)}
-                onClick={() => setShowToolbar(true)}
                 onBlur={handleBlur}
                 rows={1}
               />

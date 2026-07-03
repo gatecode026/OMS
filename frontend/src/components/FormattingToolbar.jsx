@@ -98,21 +98,7 @@ const FormattingToolbar = ({
         ))}
       </div>
 
-      <div className="formatting-toolbar-divider" />
 
-      {/* Preview toggle button */}
-      <button
-        className={`formatting-tool-preview-btn ${isPreviewMode ? 'active' : ''}`}
-        onClick={(e) => {
-          e.preventDefault();
-          onTogglePreview();
-        }}
-        title={isPreviewMode ? 'Back to Editor' : 'Show Live Preview'}
-        type="button"
-      >
-        {isPreviewMode ? <EyeOff size={15} /> : <Eye size={15} />}
-        <span>{isPreviewMode ? 'Editor' : 'Preview'}</span>
-      </button>
 
       {/* Close button */}
       {onClose && (

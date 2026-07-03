@@ -130,7 +130,6 @@ const ProfessionalPlacementCard = ({ user }) => {
           { label: 'Department', value: user.department || '—', icon: Building },
           { label: 'Team Name', value: user.team || '—', icon: User },
           { label: 'Reporting Team Leader', value: user.teamLeader || '—', icon: User },
-          { label: 'Reporting Project Manager', value: user.projectManager || '—', icon: User },
           { label: 'Office Location', value: user.branch || '—', icon: MapPin },
           { label: 'Employment Type', value: user.employeeType || '—', icon: Briefcase },
         ].map((cell, idx) => {

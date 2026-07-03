@@ -32,12 +32,12 @@ export const usePushNotifications = (currentUser) => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   // Check on mount or when user changes
   useEffect(() => {
     checkSubscription();
-  }, [currentUser, checkSubscription]);
+  }, [currentUser?.id, checkSubscription]);
 
   // Subscribe to push notifications
   const subscribe = useCallback(async () => {

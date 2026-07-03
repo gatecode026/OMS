@@ -251,15 +251,27 @@ export const getUserConversations = async (employeeId, companyId) => {
         isActive: true,
         isDeleted: { $ne: true },
         hiddenBy: { $not: { $elemMatch: { userId: employeeId } } },
-        archivedBy: { $not: { $elemMatch: { userId: employeeId } } },
-        deletedBy: { $not: { $elemMatch: { userId: employeeId, clearHistory: false } } }
+        archivedBy: { $not: { $elemMatch: { userId: employeeId } } }
       })
         .sort({ lastActivityAt: -1 })
         .lean();
 
+      // Filter: exclude if the user deleted the conversation and there has been no new activity since then
+      const activeConversations = conversations.filter(conv => {
+        const deleteEntry = conv.deletedBy?.find(d => d.userId?.toString() === employeeId?.toString());
+        if (deleteEntry && !deleteEntry.clearHistory) {
+          const lastActivityTime = new Date(conv.lastActivityAt || 0).getTime();
+          const deleteTime = new Date(deleteEntry.deletedAt).getTime();
+          if (lastActivityTime <= deleteTime) {
+            return false;
+          }
+        }
+        return true;
+      });
+
       // Add unread count and compute dynamic lastMessage for each conversation
       const convsWithUnread = await Promise.all(
-        conversations.map(conv => enrichConversationForUser(conv, employeeId))
+        activeConversations.map(conv => enrichConversationForUser(conv, employeeId))
       );
 
       return convsWithUnread;

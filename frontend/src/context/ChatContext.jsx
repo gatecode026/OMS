@@ -93,36 +93,36 @@ export const ChatProvider = ({ children }) => {
   const socketRef = useRef(null);
 
   // ── State ─────────────────────────────────────────────────────────────────
-  const [isConnected, setIsConnected]       = useState(false);
-  const [conversations, setConversations]   = useState([]);
-  const [activeConvId, setActiveConvId]     = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [conversations, setConversations] = useState([]);
+  const [activeConvId, setActiveConvId] = useState(null);
   const [archivedConversations, setArchivedConversations] = useState([]);
   const [isLoadingArchived, setIsLoadingArchived] = useState(false);
   const [hiddenConversations, setHiddenConversations] = useState([]);
   const [isLoadingHidden, setIsLoadingHidden] = useState(false);
-  const [messages, setMessages]             = useState({});
+  const [messages, setMessages] = useState({});
   // { convId: Message[] }
-  const [onlineUsers, setOnlineUsers]       = useState(new Map());
+  const [onlineUsers, setOnlineUsers] = useState(new Map());
   // Map<userId, { name, avatar, onlineAt }>
   const [currentUserStatus, setCurrentUserStatus] = useState({ status: 'available', emoji: null });
-  const [presenceMap, setPresenceMap]       = useState(new Map());
-  const [blockedUsers, setBlockedUsers]     = useState([]);
+  const [presenceMap, setPresenceMap] = useState(new Map());
+  const [blockedUsers, setBlockedUsers] = useState([]);
   const [blockedByUsers, setBlockedByUsers] = useState([]);
-  const [typingUsers, setTypingUsers]       = useState({});
+  const [typingUsers, setTypingUsers] = useState({});
   // { convId: [{ userId, name }] }
-  const [unreadCounts, setUnreadCounts]     = useState({});
+  const [unreadCounts, setUnreadCounts] = useState({});
   // { convId: number }
   const [unreadCountOnOpen, setUnreadCountOnOpen] = useState({});
   // { convId: number }
   const [isLoadingConvs, setIsLoadingConvs] = useState(false);
-  const [isLoadingMsgs, setIsLoadingMsgs]   = useState(false);
+  const [isLoadingMsgs, setIsLoadingMsgs] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState([]);
   const [totalPinned, setTotalPinned] = useState(0);
   const [pinnedPagination, setPinnedPagination] = useState({});
   const [isLoadingPinned, setIsLoadingPinned] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState({});
   // { convId: boolean }
-  const [messageCursors, setMessageCursors]   = useState({});
+  const [messageCursors, setMessageCursors] = useState({});
   // { convId: string }
   const [showMobileList, setShowMobileList] = useState(true);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
@@ -217,18 +217,21 @@ export const ChatProvider = ({ children }) => {
 
   // Web Push Notifications Hook
   const push = usePushNotifications(currentUser);
+  const hasAttemptedSubscribeRef = useRef(false);
 
   // Sync token to Cache Storage and auto-subscribe if permission is granted
   useEffect(() => {
-    if (token && currentUser) {
+    if (token && currentUser?.id) {
       notificationService.syncAuthToken(token);
-      if (push.permission === 'granted' && !push.isSubscribed && !push.loading) {
+      if (push.permission === 'granted' && !push.isSubscribed && !push.loading && !hasAttemptedSubscribeRef.current) {
+        hasAttemptedSubscribeRef.current = true;
         push.subscribe().catch(err => console.error('[ChatContext] Auto-subscribe failed:', err));
       }
     } else {
       notificationService.clearAuthToken();
+      hasAttemptedSubscribeRef.current = false;
     }
-  }, [token, currentUser, push.permission, push.isSubscribed, push.loading, push.subscribe]);
+  }, [token, currentUser?.id, push.permission, push.isSubscribed, push.loading, push.subscribe]);
 
   // Listen for background service worker postMessage events
   useEffect(() => {
@@ -550,24 +553,31 @@ export const ChatProvider = ({ children }) => {
     const failed = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(`chat_failed_msg_${currentUser.id}_`)) {
+      if (key && key.startsWith('chat_failed_msg_')) {
         try {
-          const msg = JSON.parse(localStorage.getItem(key));
-          if (msg && msg.convId === convId) {
-            failed.push({
-              id: msg.tempId,
-              tempId: msg.tempId,
-              conversationId: msg.convId,
-              senderId: currentUser.id,
-              senderName: currentUser.name,
-              senderAvatar: currentUser.avatar,
-              content: msg.content,
-              type: msg.type,
-              replyTo: msg.replyTo,
-              media: msg.media,
-              createdAt: msg.createdAt || new Date().toISOString(),
-              _deliveryStatus: 'failed'
-            });
+          const isOldFormatForMe = key.startsWith(`chat_failed_msg_${currentUser.id}_`);
+          const isNewFormat = key.startsWith('chat_failed_msg_temp_');
+          
+          if (isOldFormatForMe || isNewFormat) {
+            const msg = JSON.parse(localStorage.getItem(key));
+            if (msg && msg.convId === convId) {
+              if (!failed.some(f => f.tempId === msg.tempId)) {
+                failed.push({
+                  id: msg.tempId,
+                  tempId: msg.tempId,
+                  conversationId: msg.convId,
+                  senderId: currentUser.id,
+                  senderName: currentUser.name,
+                  senderAvatar: currentUser.avatar,
+                  content: msg.content,
+                  type: msg.type,
+                  replyTo: msg.replyTo,
+                  media: msg.media,
+                  createdAt: msg.createdAt || new Date().toISOString(),
+                  _deliveryStatus: 'failed'
+                });
+              }
+            }
           }
         } catch (e) {
           console.error('[Chat] Failed to parse cached failed message:', e);
@@ -590,12 +600,83 @@ export const ChatProvider = ({ children }) => {
         const { messages: msgs, pagination } = data.data;
         const failedMsgs = getFailedMessagesForConv(convId);
         setMessages(prev => {
-          if (!cursor) return { ...prev, [convId]: [...msgs, ...failedMsgs] };
+          if (!cursor) {
+            // Merge server messages with any optimistic/socket messages already in state.
+            // This prevents duplicates when new_message socket fires during the API fetch.
+            const existing = prev[convId] || [];
+            const existingIds = new Set(msgs.map(m => m.id));
+            const existingTempIds = new Set(msgs.map(m => m.tempId).filter(Boolean));
+
+            // Keep optimistic messages (tempId set, not yet confirmed) not yet in server response
+            const pendingOptimistic = existing.filter(m =>
+              m.tempId && !existingIds.has(m.id) && m._deliveryStatus === 'sending'
+            );
+
+            // Filter out failed messages that have already been saved on the server
+            const filteredFailedMsgs = failedMsgs.filter(m => {
+              const alreadyDelivered = existingIds.has(m.tempId) || 
+                existingTempIds.has(m.tempId) ||
+                msgs.some(serverMsg => {
+                  const senderMatch = serverMsg.senderId === m.senderId;
+                  const typeMatch = serverMsg.type === m.type;
+                  const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') === 
+                                       (m.content || '').trim().replace(/\r\n/g, '\n');
+                  
+                  const serverDate = new Date(serverMsg.createdAt);
+                  const localDate = m.createdAt ? new Date(m.createdAt) : new Date();
+                  const timeMatch = isNaN(serverDate.getTime()) || isNaN(localDate.getTime()) ||
+                    Math.abs(serverDate - localDate) < 86400000; // 24 hours threshold
+                  
+                  return senderMatch && typeMatch && contentMatch && timeMatch;
+                });
+              if (alreadyDelivered) {
+                // Clean up from localStorage
+                localStorage.removeItem(`chat_failed_msg_${m.tempId}`);
+                if (currentUser?.id) {
+                  localStorage.removeItem(`chat_failed_msg_${currentUser.id}_${m.tempId}`);
+                }
+                return false;
+              }
+              return true;
+            });
+
+            return { ...prev, [convId]: [...msgs, ...pendingOptimistic, ...filteredFailedMsgs] };
+          }
+
           // Older messages prepend (scroll-up = load older)
-          const existing = prev[convId] || [];
-          const filteredNew = msgs.filter(newM => !existing.some(m => m.id === newM.id));
-          const nonFailedExisting = existing.filter(m => m._deliveryStatus !== 'failed');
-          return { ...prev, [convId]: [...filteredNew, ...nonFailedExisting, ...failedMsgs] };
+          const existingMsgs = prev[convId] || [];
+          const existingIds = new Set(existingMsgs.map(m => m.id));
+          const existingTempIds = new Set(existingMsgs.map(m => m.tempId).filter(Boolean));
+          const filteredNew = msgs.filter(newM => !existingMsgs.some(m => m.id === newM.id));
+          const nonFailedExisting = existingMsgs.filter(m => m._deliveryStatus !== 'failed');
+          
+          const filteredFailedMsgs = failedMsgs.filter(m => {
+            const alreadyDelivered = existingIds.has(m.tempId) || 
+              existingTempIds.has(m.tempId) ||
+              existingMsgs.some(serverMsg => {
+                const senderMatch = serverMsg.senderId === m.senderId;
+                const typeMatch = serverMsg.type === m.type;
+                const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') === 
+                                     (m.content || '').trim().replace(/\r\n/g, '\n');
+                
+                const serverDate = new Date(serverMsg.createdAt);
+                const localDate = m.createdAt ? new Date(m.createdAt) : new Date();
+                const timeMatch = isNaN(serverDate.getTime()) || isNaN(localDate.getTime()) ||
+                  Math.abs(serverDate - localDate) < 86400000; // 24 hours threshold
+                
+                return senderMatch && typeMatch && contentMatch && timeMatch;
+              });
+            if (alreadyDelivered) {
+              localStorage.removeItem(`chat_failed_msg_${m.tempId}`);
+              if (currentUser?.id) {
+                localStorage.removeItem(`chat_failed_msg_${currentUser.id}_${m.tempId}`);
+              }
+              return false;
+            }
+            return true;
+          });
+
+          return { ...prev, [convId]: [...filteredNew, ...nonFailedExisting, ...filteredFailedMsgs] };
         });
         setHasMoreMessages(prev => ({
           ...prev, [convId]: pagination.hasMore
@@ -610,7 +691,7 @@ export const ChatProvider = ({ children }) => {
     } finally {
       setIsLoadingMsgs(false);
     }
-  }, [apiFetch, getFailedMessagesForConv]);
+  }, [apiFetch, getFailedMessagesForConv, currentUser]);
   useEffect(() => { fetchMessagesRef.current = fetchMessages; }, [fetchMessages]);
   // ── LOAD MORE (scroll up) ─────────────────────────────────────────────────
   const loadMoreMessages = useCallback(async (convId) => {
@@ -635,18 +716,22 @@ export const ChatProvider = ({ children }) => {
       await fetchMessages(convId, null);
     }
 
-    // Mark as read via REST + socket
-    await apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' });
-    
-    // Find last message ID from conversation preview
-    const conv = conversationsRef.current.find(c => c.id === convId);
-    const lastReadMessageId = conv?.lastMessage?.messageId;
+    // Only mark as read if there were actual unread messages for this user
+    // (prevents false "Seen" when the sender opens their own conversation)
+    if (currentUnread > 0) {
+      await apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' });
 
-    socketRef.current?.emit('mark_read', { conversationId: convId });
-    if (lastReadMessageId) {
-      socketRef.current?.emit('conversation:read', { conversationId: convId, lastReadMessageId });
+      // Find last message ID from conversation preview
+      const conv = conversationsRef.current.find(c => c.id === convId);
+      const lastReadMessageId = conv?.lastMessage?.messageId;
+
+      socketRef.current?.emit('mark_read', { conversationId: convId });
+      if (lastReadMessageId) {
+        socketRef.current?.emit('conversation:read', { conversationId: convId, lastReadMessageId });
+      }
     }
   }, [fetchMessages, apiFetch, unreadCounts]);
+
 
   // ── SEND MESSAGE ──────────────────────────────────────────────────────────
   const sendMessage = useCallback((convId, content,
@@ -694,7 +779,7 @@ export const ChatProvider = ({ children }) => {
     if (sendingTimeoutsRef.current[tempId]) {
       clearTimeout(sendingTimeoutsRef.current[tempId]);
     }
-    
+
     sendingTimeoutsRef.current[tempId] = setTimeout(() => {
       setMessages(prev => {
         const list = prev[convId] || [];
@@ -702,11 +787,11 @@ export const ChatProvider = ({ children }) => {
         if (msgIndex > -1 && list[msgIndex]._deliveryStatus === 'sending') {
           const updated = [...list];
           updated[msgIndex] = { ...updated[msgIndex], _deliveryStatus: 'failed' };
-          
+
           // Store in localStorage
           const failedMsg = { convId, content, type, replyTo, media, tempId, createdAt: tempMsg.createdAt };
           localStorage.setItem(`chat_failed_msg_${currentUser?.id}_${tempId}`, JSON.stringify(failedMsg));
-          
+
           return { ...prev, [convId]: updated };
         }
         return prev;
@@ -728,14 +813,16 @@ export const ChatProvider = ({ children }) => {
   // ── RETRY MESSAGE ──────────────────────────────────────────────────────────
   const retryMessage = useCallback((tempId) => {
     if (!currentUser?.id) return;
-    const key = `chat_failed_msg_${currentUser.id}_${tempId}`;
-    const stored = localStorage.getItem(key);
+    const key = `chat_failed_msg_${tempId}`;
+    const oldKey = `chat_failed_msg_${currentUser.id}_${tempId}`;
+    const stored = localStorage.getItem(key) || localStorage.getItem(oldKey);
     if (!stored) return;
 
     try {
       const msg = JSON.parse(stored);
       // Remove from localStorage first
       localStorage.removeItem(key);
+      localStorage.removeItem(oldKey);
       // Retry sending
       sendMessage(msg.convId, msg.content, msg.type, msg.replyTo, msg.media, tempId);
     } catch (e) {
@@ -1077,12 +1164,12 @@ export const ChatProvider = ({ children }) => {
         const thread = data.data;
         setActiveThread(thread);
         setThreadUnreadCounts(prev => ({ ...prev, [thread._id]: 0 }));
-        
+
         // Join socket room
         socketRef.current?.emit('join_thread', { threadId: thread._id });
 
         // Mark read
-        apiFetch(`/chat/threads/${thread._id}/read`, { method: 'POST' }).catch(() => {});
+        apiFetch(`/chat/threads/${thread._id}/read`, { method: 'POST' }).catch(() => { });
 
         // Load replies
         await fetchThreadReplies(thread._id, null);
@@ -1202,7 +1289,7 @@ export const ChatProvider = ({ children }) => {
       const data = await apiFetch('/chat/threads/activity');
       if (data.status === 'success') {
         setThreadActivityList(data.data || []);
-        
+
         // Calculate unread counts dictionary
         const counts = {};
         (data.data || []).forEach(t => {
@@ -1222,7 +1309,7 @@ export const ChatProvider = ({ children }) => {
       const data = await apiFetch(`/chat/threads/${threadId}/read`, { method: 'POST' });
       if (data.status === 'success') {
         setThreadUnreadCounts(prev => ({ ...prev, [threadId]: 0 }));
-        
+
         // Update local activity list count
         setThreadActivityList(prev => prev.map(t => t.threadId === threadId ? { ...t, unreadCount: 0 } : t));
       }
@@ -1249,13 +1336,13 @@ export const ChatProvider = ({ children }) => {
   const uploadProcess = useCallback(async (item) => {
     const { id, file } = item;
     const controller = new AbortController();
-    
+
     updateUploadItem(id, { controller, status: 'uploading', error: null, progress: 0 });
 
     try {
       // 1. Fetch ImageKit upload authentication details from the backend
       const authParams = await ImageKitUploadService.fetchAuthParams(token);
-      
+
       // 2. Perform direct upload to ImageKit
       const result = await ImageKitUploadService.upload(
         file,
@@ -1306,7 +1393,7 @@ export const ChatProvider = ({ children }) => {
     const isDuplicate = currentQueue.some(
       item => item.convId === convId && item.name === file.name && item.size === file.size && item.status !== 'failed'
     );
-    
+
     if (isDuplicate) {
       addToast?.('warning', `File "${file.name}" is already uploading or uploaded.`);
       return;
@@ -1329,7 +1416,7 @@ export const ChatProvider = ({ children }) => {
     };
 
     setUploadQueue(prev => [...prev, newItem]);
-    
+
     setTimeout(() => {
       uploadProcess(newItem);
     }, 0);
@@ -1502,7 +1589,7 @@ export const ChatProvider = ({ children }) => {
           if (msg.senderId !== me?.id) {
             socket.emit('message:delivered', { messageId: msg.id, conversationId: convId });
             const isChatPage = window.location.pathname.startsWith('/chat');
-            const isTabVisible = document.visibilityState === 'visible';
+            const isTabVisible = document.visibilityState === 'visible' && document.hasFocus();
             const isMobile = window.innerWidth <= 480;
             const isLookingAtChat = !isMobile || !showMobileListRef.current;
 
@@ -1677,12 +1764,15 @@ export const ChatProvider = ({ children }) => {
           clearTimeout(sendingTimeoutsRef.current[message.tempId]);
           delete sendingTimeoutsRef.current[message.tempId];
         }
-        localStorage.removeItem(`chat_failed_msg_${me.id}_${message.tempId}`);
+        localStorage.removeItem(`chat_failed_msg_${message.tempId}`);
+        if (me?.id) {
+          localStorage.removeItem(`chat_failed_msg_${me.id}_${message.tempId}`);
+        }
       }
 
       let fullMessage = message;
       const isChatPage = window.location.pathname.startsWith('/chat');
-      const isTabVisible = document.visibilityState === 'visible';
+      const isTabVisible = document.visibilityState === 'visible' && document.hasFocus();
       const isMobile = window.innerWidth <= 480;
       const isLookingAtChat = !isMobile || !showMobileListRef.current;
       const isCurrentActive = isChatPage && isLookingAtChat && activeConvIdRef.current === convId;
@@ -1803,10 +1893,10 @@ export const ChatProvider = ({ children }) => {
       // Append to messages state (only for active conversations or non-optimized messages)
       setMessages(prev => {
         const list = prev[convId] || [];
-        const existingIndex = list.findIndex(m => 
+        const existingIndex = list.findIndex(m =>
           (message.tempId && m.tempId === message.tempId) || m.id === message.id
         );
-        
+
         let newList;
         if (existingIndex > -1) {
           newList = [...list];
@@ -1934,7 +2024,7 @@ export const ChatProvider = ({ children }) => {
       // Increment unread count for this conversation only if not active and visible
       const isMuted = mutedConversationsRef.current.has(notification.conversationId);
       const isChatPage = window.location.pathname.startsWith('/chat');
-      const isTabVisible = document.visibilityState === 'visible';
+      const isTabVisible = document.visibilityState === 'visible' && document.hasFocus();
       const isMobile = window.innerWidth <= 480;
       const isLookingAtChat = !isMobile || !showMobileListRef.current;
       const isCurrentActive = isChatPage && isLookingAtChat && activeConvIdRef.current === notification.conversationId;
@@ -1964,7 +2054,7 @@ export const ChatProvider = ({ children }) => {
 
       // Desktop notification (only fires when Notification.permission === 'granted' and app is not focused)
       const isCurrentConv = activeConvIdRef.current === notification.conversationId;
-      
+
       if (!isCurrentConv && !isMuted) {
         const title = notification.conversationType === 'group'
           ? notification.conversationName
@@ -1987,8 +2077,6 @@ export const ChatProvider = ({ children }) => {
         });
       }
     });
-
-
     // ── Typing ────────────────────────────────────────────────────────────
     socket.on('user:typing', ({ userId, name, conversationId, isRecording }) => {
       setTypingUsers(prev => {
@@ -2086,7 +2174,10 @@ export const ChatProvider = ({ children }) => {
           clearTimeout(sendingTimeoutsRef.current[tempId]);
           delete sendingTimeoutsRef.current[tempId];
         }
-        localStorage.removeItem(`chat_failed_msg_${currentUserRef.current?.id}_${tempId}`);
+        localStorage.removeItem(`chat_failed_msg_${tempId}`);
+        if (currentUserRef.current?.id) {
+          localStorage.removeItem(`chat_failed_msg_${currentUserRef.current.id}_${tempId}`);
+        }
       }
 
       setMessages(prev => {
@@ -2111,10 +2202,10 @@ export const ChatProvider = ({ children }) => {
             if (msg.id === messageId) {
               const existingDeliveredTo = msg.deliveredTo || [];
               const alreadyDelivered = existingDeliveredTo.some(d => d.employeeId === userId);
-              const mergedDeliveredTo = alreadyDelivered 
-                ? existingDeliveredTo 
+              const mergedDeliveredTo = alreadyDelivered
+                ? existingDeliveredTo
                 : [...existingDeliveredTo, { employeeId: userId, deliveredAt }];
-              
+
               const currentStatus = msg._deliveryStatus;
               const newStatus = (currentStatus === 'seen') ? 'seen' : 'delivered';
 
@@ -2133,7 +2224,7 @@ export const ChatProvider = ({ children }) => {
     // ── Real-time Read Receipts (Phase 5) ──────────────────────────────────
     socket.on('conversation:read_update', ({ conversationId, userId, lastReadMessageId, readAt }) => {
       const me = currentUserRef.current;
-      
+
       // Multi-tab synchronization: clear unread count for the reading user
       if (userId === me?.id) {
         setUnreadCounts(prev => ({ ...prev, [conversationId]: 0 }));
@@ -2142,21 +2233,21 @@ export const ChatProvider = ({ children }) => {
       setMessages(prev => {
         const convMsgs = prev[conversationId] || [];
         const lastReadIdx = convMsgs.findIndex(m => m.id === lastReadMessageId);
-        
+
         return {
           ...prev,
           [conversationId]: convMsgs.map((msg, idx) => {
-            const isBeforeOrEqual = lastReadIdx !== -1 
-              ? idx <= lastReadIdx 
+            const isBeforeOrEqual = lastReadIdx !== -1
+              ? idx <= lastReadIdx
               : (msg.id === lastReadMessageId);
-            
+
             if (isBeforeOrEqual && msg.senderId !== userId) {
               const existingReadBy = msg.readBy || [];
               const alreadyRead = existingReadBy.some(r => r.employeeId === userId);
-              const mergedReadBy = alreadyRead 
-                ? existingReadBy 
+              const mergedReadBy = alreadyRead
+                ? existingReadBy
                 : [...existingReadBy, { employeeId: userId, userId, readAt }];
-              
+
               const isSentByMe = (msg.senderId === me?.id);
               const newDeliveryStatus = isSentByMe ? 'seen' : msg._deliveryStatus;
 
@@ -2180,14 +2271,14 @@ export const ChatProvider = ({ children }) => {
           clearTimeout(sendingTimeoutsRef.current[tempId]);
           delete sendingTimeoutsRef.current[tempId];
         }
-        
+
         setMessages(prev => {
           const list = prev[activeConvIdRef.current] || [];
           const msgIndex = list.findIndex(m => m.id === tempId);
           if (msgIndex > -1) {
             const updated = [...list];
             updated[msgIndex] = { ...updated[msgIndex], _deliveryStatus: 'failed' };
-            
+
             // Store failed message in localStorage
             const failedMsg = {
               convId: updated[msgIndex].conversationId,
@@ -2198,8 +2289,11 @@ export const ChatProvider = ({ children }) => {
               tempId,
               createdAt: updated[msgIndex].createdAt
             };
-            localStorage.setItem(`chat_failed_msg_${currentUserRef.current?.id}_${tempId}`, JSON.stringify(failedMsg));
-            
+            localStorage.setItem(`chat_failed_msg_${tempId}`, JSON.stringify(failedMsg));
+            if (currentUserRef.current?.id) {
+              localStorage.setItem(`chat_failed_msg_${currentUserRef.current.id}_${tempId}`, JSON.stringify(failedMsg));
+            }
+
             return { ...prev, [activeConvIdRef.current]: updated };
           }
           return prev;
@@ -2362,7 +2456,7 @@ export const ChatProvider = ({ children }) => {
         if (c.id === conversationId) {
           const pinnedList = c.pinnedBy || [];
           const exists = pinnedList.some(p => p.employeeId === pinnedBy);
-          const nextPinned = exists 
+          const nextPinned = exists
             ? pinnedList.map(p => p.employeeId === pinnedBy ? { ...p, pinnedAt } : p)
             : [...pinnedList, { employeeId: pinnedBy, pinnedAt }];
           return { ...c, pinnedBy: nextPinned };
@@ -2387,9 +2481,9 @@ export const ChatProvider = ({ children }) => {
         const convMsgs = prev[conversationId] || [];
         return {
           ...prev,
-          [conversationId]: convMsgs.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, isPinned: true, pinnedBy, pinnedAt } 
+          [conversationId]: convMsgs.map(msg =>
+            msg.id === messageId
+              ? { ...msg, isPinned: true, pinnedBy, pinnedAt }
               : msg
           )
         };
@@ -2405,9 +2499,9 @@ export const ChatProvider = ({ children }) => {
         const convMsgs = prev[conversationId] || [];
         return {
           ...prev,
-          [conversationId]: convMsgs.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, isPinned: false, pinnedBy: null, pinnedAt: null } 
+          [conversationId]: convMsgs.map(msg =>
+            msg.id === messageId
+              ? { ...msg, isPinned: false, pinnedBy: null, pinnedAt: null }
               : msg
           )
         };
@@ -2425,9 +2519,9 @@ export const ChatProvider = ({ children }) => {
         const convMsgs = prev[conversationId] || [];
         return {
           ...prev,
-          [conversationId]: convMsgs.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, starredBy: [...(msg.starredBy || []), starredBy] } 
+          [conversationId]: convMsgs.map(msg =>
+            msg.id === messageId
+              ? { ...msg, starredBy: [...(msg.starredBy || []), starredBy] }
               : msg
           )
         };
@@ -2439,9 +2533,9 @@ export const ChatProvider = ({ children }) => {
         const convMsgs = prev[conversationId] || [];
         return {
           ...prev,
-          [conversationId]: convMsgs.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, starredBy: (msg.starredBy || []).filter(u => u !== unstarredBy) } 
+          [conversationId]: convMsgs.map(msg =>
+            msg.id === messageId
+              ? { ...msg, starredBy: (msg.starredBy || []).filter(u => u !== unstarredBy) }
               : msg
           )
         };
@@ -2451,7 +2545,7 @@ export const ChatProvider = ({ children }) => {
     // ── Thread Socket Events ────────────────────────────────────────────────
     socket.on('thread:reply:new', ({ threadId, reply, tempId }) => {
       const me = currentUserRef.current;
-      
+
       // 1. If it's our own optimistic message, replace/update it
       if (tempId && reply.senderId === me?.id) {
         setActiveThreadReplies(prev => {
@@ -2472,9 +2566,9 @@ export const ChatProvider = ({ children }) => {
           if (prev.some(m => m.id === reply.id)) return prev;
           return [...prev, reply];
         });
-        
-        if (document.visibilityState === 'visible') {
-          apiFetchRef.current(`/chat/threads/${threadId}/read`, { method: 'POST' }).catch(() => {});
+
+        if (document.visibilityState === 'visible' && document.hasFocus()) {
+          apiFetchRef.current(`/chat/threads/${threadId}/read`, { method: 'POST' }).catch(() => { });
           socket.emit('mark_read_thread', { threadId });
         }
       } else {
@@ -2652,10 +2746,10 @@ export const ChatProvider = ({ children }) => {
   useEffect(() => {
     const handleVisibilityChange = (e) => {
       const isChatPage = window.location.pathname.startsWith('/chat');
-      const isTabVisible = document.visibilityState === 'visible';
+      const isTabVisible = document.visibilityState === 'visible' && document.hasFocus();
       const isMobile = window.innerWidth <= 480;
       const isLookingAtChat = !isMobile || !showMobileListRef.current;
-      
+
       console.log(`[Chat] Event "${e?.type}" triggered visibility handler:`, {
         visibilityState: document.visibilityState,
         pathname: window.location.pathname,
@@ -2668,7 +2762,7 @@ export const ChatProvider = ({ children }) => {
       if (isTabVisible && isChatPage && isLookingAtChat && activeConvIdRef.current) {
         const convId = activeConvIdRef.current;
         console.log('[Chat] Visibility handler marking active conversation as read:', convId);
-        
+
         // Find the last message in the active conversation
         const convMsgs = messagesRef.current[convId] || [];
         const lastMsg = convMsgs.length > 0 ? convMsgs[convMsgs.length - 1] : null;

@@ -175,7 +175,7 @@ export const performGlobalSearch = async ({ query, category = 'all', userId, pag
   // 4. CONTACTS SEARCH
   if (category === 'all' || category === 'contacts') {
     results.contacts = await Employee.find({
-      status: 'Active',
+      status: { $ne: 'Inactive' },
       id: { $ne: userId },
       $or: [
         { name: { $regex: q, $options: 'i' } },

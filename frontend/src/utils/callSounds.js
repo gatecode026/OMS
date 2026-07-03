@@ -11,6 +11,10 @@ class CallSounds {
     this.outgoingInterval = null;
     this.incomingOscillators = [];
     this.outgoingOscillators = [];
+    this.shouldRingIncoming = false;
+    this.shouldRingOutgoing = false;
+    this.resumeListener = null;
+    this.outgoingResumeListener = null;
   }
 
   init() {
@@ -46,11 +50,17 @@ class CallSounds {
 
   // 1. Play Incoming Ringtone (pulsed dual-frequency ring)
   startIncomingRing() {
+    this.stopAll();
+    this.shouldRingIncoming = true;
     try {
-      this.stopAll();
       this.init();
       
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        throw new Error('AudioContext suspended');
+      }
+
       const playRingCycle = () => {
+        if (!this.shouldRingIncoming) return;
         if (!this.audioCtx || this.audioCtx.state === 'suspended') return;
         
         const now = this.audioCtx.currentTime;
@@ -86,26 +96,35 @@ class CallSounds {
       playRingCycle();
       this.incomingInterval = setInterval(playRingCycle, 3000);
 
-      // If context is suspended (autoplay blocked), throw error to trigger interaction fallback
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        throw new Error('AudioContext suspended');
-      }
     } catch(err) {
       console.warn('[CallSounds] Autoplay blocked, trying on first user interaction');
-      const resume = () => {
-        this.startIncomingRing();
-        document.removeEventListener('click', resume);
-        document.removeEventListener('keydown', resume);
+      if (this.resumeListener) {
+        document.removeEventListener('click', this.resumeListener);
+        document.removeEventListener('keydown', this.resumeListener);
+      }
+      this.resumeListener = () => {
+        if (this.shouldRingIncoming) {
+          this.startIncomingRing();
+        }
+        document.removeEventListener('click', this.resumeListener);
+        document.removeEventListener('keydown', this.resumeListener);
+        this.resumeListener = null;
       };
-      document.addEventListener('click', resume, { once: true });
-      document.addEventListener('keydown', resume, { once: true });
+      document.addEventListener('click', this.resumeListener, { once: true });
+      document.addEventListener('keydown', this.resumeListener, { once: true });
     }
   }
 
   stopIncomingRing() {
+    this.shouldRingIncoming = false;
     if (this.incomingInterval) {
       clearInterval(this.incomingInterval);
       this.incomingInterval = null;
+    }
+    if (this.resumeListener) {
+      document.removeEventListener('click', this.resumeListener);
+      document.removeEventListener('keydown', this.resumeListener);
+      this.resumeListener = null;
     }
     this.incomingOscillators.forEach(t => {
       try { t.osc1.stop(); t.osc2.stop(); } catch(e){}
@@ -116,36 +135,67 @@ class CallSounds {
   // 2. Play Outgoing Ringback Tone ("ring... ring... ")
   startOutgoingRing() {
     this.stopAll();
-    this.init();
+    this.shouldRingOutgoing = true;
+    try {
+      this.init();
 
-    const playRingCycle = () => {
-      if (!this.audioCtx || this.audioCtx.state === 'suspended') return;
-      
-      const now = this.audioCtx.currentTime;
-      // Standard US Ringback: 440Hz + 480Hz, 1.5 seconds on, 3.5 seconds off
-      const tone = this.createTone(440, 480);
-      
-      tone.gainNode.gain.setValueAtTime(0, now);
-      tone.gainNode.gain.linearRampToValueAtTime(0.08, now + 0.1);
-      tone.gainNode.gain.setValueAtTime(0.08, now + 1.5);
-      tone.gainNode.gain.linearRampToValueAtTime(0, now + 1.6);
-      
-      tone.osc1.start(now);
-      tone.osc2.start(now);
-      tone.osc1.stop(now + 1.7);
-      tone.osc2.stop(now + 1.7);
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        throw new Error('AudioContext suspended');
+      }
 
-      this.outgoingOscillators.push(tone);
-    };
+      const playRingCycle = () => {
+        if (!this.shouldRingOutgoing) return;
+        if (!this.audioCtx || this.audioCtx.state === 'suspended') return;
+        
+        const now = this.audioCtx.currentTime;
+        // Standard US Ringback: 440Hz + 480Hz, 1.5 seconds on, 3.5 seconds off
+        const tone = this.createTone(440, 480);
+        
+        tone.gainNode.gain.setValueAtTime(0, now);
+        tone.gainNode.gain.linearRampToValueAtTime(0.08, now + 0.1);
+        tone.gainNode.gain.setValueAtTime(0.08, now + 1.5);
+        tone.gainNode.gain.linearRampToValueAtTime(0, now + 1.6);
+        
+        tone.osc1.start(now);
+        tone.osc2.start(now);
+        tone.osc1.stop(now + 1.7);
+        tone.osc2.stop(now + 1.7);
 
-    playRingCycle();
-    this.outgoingInterval = setInterval(playRingCycle, 5000);
+        this.outgoingOscillators.push(tone);
+      };
+
+      playRingCycle();
+      this.outgoingInterval = setInterval(playRingCycle, 5000);
+
+    } catch(err) {
+      console.warn('[CallSounds] Outgoing autoplay blocked, trying on first user interaction');
+      if (this.outgoingResumeListener) {
+        document.removeEventListener('click', this.outgoingResumeListener);
+        document.removeEventListener('keydown', this.outgoingResumeListener);
+      }
+      this.outgoingResumeListener = () => {
+        if (this.shouldRingOutgoing) {
+          this.startOutgoingRing();
+        }
+        document.removeEventListener('click', this.outgoingResumeListener);
+        document.removeEventListener('keydown', this.outgoingResumeListener);
+        this.outgoingResumeListener = null;
+      };
+      document.addEventListener('click', this.outgoingResumeListener, { once: true });
+      document.addEventListener('keydown', this.outgoingResumeListener, { once: true });
+    }
   }
 
   stopOutgoingRing() {
+    this.shouldRingOutgoing = false;
     if (this.outgoingInterval) {
       clearInterval(this.outgoingInterval);
       this.outgoingInterval = null;
+    }
+    if (this.outgoingResumeListener) {
+      document.removeEventListener('click', this.outgoingResumeListener);
+      document.removeEventListener('keydown', this.outgoingResumeListener);
+      this.outgoingResumeListener = null;
     }
     this.outgoingOscillators.forEach(t => {
       try { t.osc1.stop(); t.osc2.stop(); } catch(e){}
