@@ -10,26 +10,26 @@
  *   - conv:<conversationId>   → conversation-level room (messages)
  */
 
-import { runWithTenant } from "../../utils/tenantContext.js";
-import { getTenantConnection } from "../../utils/multidbConnection.js";
-import * as chatService from "./chat.service.js";
-import logger from "../../config/logger.js";
-import { verifySocketToken } from "../../middlewares/socketAuth.middleware.js";
-import redis from "../../config/redis.js";
-import Conversation from "./conversation.model.js";
-import Message from "./message.model.js";
-import { UserDevice } from "../security/security.model.js";
-import { uploadToImageKit } from "../../utils/imagekit.js";
-import Call from "./call.model.js";
-import { generateCompanyUniqueId } from "../../utils/idGenerator.js";
-import * as pushNotificationService from "../notifications/pushNotificationService.js";
-import presenceService from "./services/presence.service.js";
-import typingService from "./services/typing.service.js";
-import * as readReceiptService from "./services/readReceipt.service.js";
-import { registerNotificationSocketHandlers } from "./services/notification.socket.js";
-import { checkRateLimit } from "../../services/rateLimiter.service.js";
-import { CacheKeys, TTL, cacheGetOrSet } from "../../services/cache.service.js";
-import { incrementMetric } from "../../services/monitoring.service.js";
+import { runWithTenant } from '../../utils/tenantContext.js';
+import { getTenantConnection } from '../../utils/multidbConnection.js';
+import * as chatService from './chat.service.js';
+import logger from '../../config/logger.js';
+import { verifySocketToken } from '../../middlewares/socketAuth.middleware.js';
+import redis from '../../config/redis.js';
+import Conversation from './conversation.repository.js';
+import Message from './message.repository.js';
+import { UserDevice } from '../security/security.model.js';
+import { uploadToImageKit } from '../../utils/imagekit.js';
+import Call from './call.model.js';
+import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
+import * as pushNotificationService from '../notifications/pushNotificationService.js';
+import presenceService from './services/presence.service.js';
+import typingService from './services/typing.service.js';
+import * as readReceiptService from './services/readReceipt.service.js';
+import { registerNotificationSocketHandlers } from './services/notification.socket.js';
+import { checkRateLimit } from '../../services/rateLimiter.service.js';
+import { CacheKeys, TTL, cacheGetOrSet } from '../../services/cache.service.js';
+import { incrementMetric } from '../../services/monitoring.service.js';
 
 // ─── IN-MEMORY ONLINE USERS STORE ────────────────────────────────────────────
 // Structure: Map<companyId, Map<employeeId, { socketId, name, avatar, onlineAt }>>

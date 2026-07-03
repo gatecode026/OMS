@@ -5,27 +5,16 @@
  *   via runWithTenant() to ensure cross-tenant isolation.
  */
 
-import mongoose from "mongoose";
-import Conversation from "./conversation.model.js";
-import Message from "./message.model.js";
-import { generateCompanyUniqueId } from "../../utils/idGenerator.js";
-import { runWithTenant } from "../../utils/tenantContext.js";
-import { getIO } from "../../config/socket.js";
-import {
-  uploadToImageKit,
-  deleteFromImageKit,
-  uploadToImageKitDetailed,
-  deleteFileFromImageKitById,
-} from "../../utils/imagekit.js";
-import logger from "../../config/logger.js";
-import * as readReceiptService from "./services/readReceipt.service.js";
-import {
-  CacheKeys,
-  TTL,
-  cacheGetOrSet,
-  cacheDel,
-  cacheDelPattern,
-} from "../../services/cache.service.js";
+import mongoose from 'mongoose';
+import Conversation from './conversation.repository.js';
+import Message from './message.repository.js';
+import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
+import { runWithTenant } from '../../utils/tenantContext.js';
+import { getIO } from '../../config/socket.js';
+import { uploadToImageKit, deleteFromImageKit, uploadToImageKitDetailed, deleteFileFromImageKitById } from '../../utils/imagekit.js';
+import logger from '../../config/logger.js';
+import * as readReceiptService from './services/readReceipt.service.js';
+import { CacheKeys, TTL, cacheGetOrSet, cacheDel, cacheDelPattern } from '../../services/cache.service.js';
 
 /**
  * Detects if a text content contains Markdown syntax.

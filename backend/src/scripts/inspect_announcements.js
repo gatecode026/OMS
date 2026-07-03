@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 dotenv.config();
 
+import { setServers } from 'dns';
+setServers(['1.1.1.1']);
 import { getTenantConnection } from '../database/connectionManager.js';
 import { runWithTenant } from '../utils/tenantContext.js';
 import { Announcement, AnnouncementTrackingLog, AnnouncementAuditLog } from '../modules/announcements/announcement.model.js';

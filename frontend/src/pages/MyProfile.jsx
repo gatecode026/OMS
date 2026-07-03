@@ -28,6 +28,43 @@ const StatusBadge = ({ status }) => {
 };
 
 const ProfileHeroCard = ({ user }) => {
+  const handleDownloadQR = (employeeId, companyId) => {
+    try {
+      const data = JSON.stringify({ employeeId, companyId });
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data)}`;
+      
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // request CORS access
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const dataURL = canvas.toDataURL('image/png');
+          
+          const link = document.createElement('a');
+          link.href = dataURL;
+          link.download = `employee_qr_${employeeId}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } catch (canvasErr) {
+          console.error('Canvas export failed, falling back to direct tab:', canvasErr);
+          window.open(qrUrl, '_blank');
+        }
+      };
+      img.onerror = (err) => {
+        console.error('Failed to load QR image for canvas download, opening in new tab:', err);
+        window.open(qrUrl, '_blank');
+      };
+      img.src = qrUrl;
+    } catch (err) {
+      console.error('Failed to download QR code:', err);
+    }
+  };
+
   return (
     <div className="profile-hero-card">
       <div className="hero-card-banner" />
@@ -71,6 +108,41 @@ const ProfileHeroCard = ({ user }) => {
               <span className="hero-meta-value">{user.employeeType || '—'}</span>
             </div>
           </div>
+        </div>
+        <div className="hero-right-divider" />
+        <div className="hero-qr-col" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 10px', gap: '8px', zIndex: 5, minWidth: '120px' }}>
+          <div style={{ background: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify({ employeeId: user.employeeId || user.id, companyId: user.companyId || 'COMP-A' }))}`} 
+              alt="Profile QR Code" 
+              width="90" 
+              height="90" 
+              style={{ display: 'block', borderRadius: '4px' }} 
+            />
+          </div>
+          <button 
+            onClick={() => handleDownloadQR(user.employeeId || user.id, user.companyId || 'COMP-A')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--color-primary)',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              transition: 'background 0.2s'
+            }}
+            onMouseOver={e => e.currentTarget.style.background = 'rgba(217,70,239,0.05)'}
+            onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <Download size={12} /> Download QR
+          </button>
         </div>
       </div>
     </div>

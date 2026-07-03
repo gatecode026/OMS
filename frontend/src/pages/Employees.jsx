@@ -200,16 +200,12 @@ const AttBadge = ({ status }) => {
   );
 };
 
-// ─── Work Status Dot ─────────────────────────────────────────────────────────
 const WorkStatusDot = ({ status }) => {
   const map = {
-    'Active': { cls: 'dot-green', label: 'Active', pulse: false },
-    'Idle': { cls: 'dot-grey', label: 'Idle', pulse: false },
-    'In Meeting': { cls: 'dot-blue', label: 'In Meeting', pulse: false },
+    'Online': { cls: 'dot-green', label: 'Online', pulse: true },
     'Offline': { cls: 'dot-red', label: 'Offline', pulse: false },
-    'Working': { cls: 'dot-green', label: 'Working', pulse: true },
   };
-  const cfg = map[status] || { cls: 'dot-grey', label: status || '—', pulse: false };
+  const cfg = map[status] || { cls: 'dot-red', label: 'Offline', pulse: false };
   return (
     <span className={`work-status-cell ${cfg.cls}`}>
       <span className={`work-dot${cfg.pulse ? ' pulse-dot' : ''}`}></span>
@@ -252,7 +248,7 @@ const COLUMN_GROUPS = [
   { label: 'Identity', keys: ['name', 'id'] },
   { label: 'Role', keys: ['designation', 'department', 'branch', 'teamLeader', 'projectManager'] },
   { label: 'Contact', keys: ['phone', 'workEmail'] },
-  { label: 'Timeline', keys: ['joinDate', 'lastSeen'] },
+  { label: 'Timeline', keys: ['joinDate'] },
   { label: 'Status', keys: ['attendanceStatus', 'workStatus', 'accountStatus'] },
   { label: 'Punch Info', keys: ['todayPunchIn', 'todayPunchOut', 'todayWorkingHours'] },
   { label: 'Advanced', keys: ['employeeType', 'shift', 'experience', 'lastLogin', 'currentProjects', 'leaveBalance', 'productivityScore', 'performanceRating'] },
@@ -264,7 +260,7 @@ const COLUMN_LABELS = {
   phone: 'Contact Number', workEmail: 'Official Company Email', joinDate: 'Joining Date',
   attendanceStatus: 'Attendance Status', workStatus: 'Work Status', accountStatus: 'Employment Status',
   todayPunchIn: "Punch In Time", todayPunchOut: "Punch Out Time", todayWorkingHours: "Working Hours",
-  lastSeen: 'Last Seen', employeeType: 'Employee Type', shift: 'Shift Timing', experience: 'Experience', lastLogin: 'Last Login',
+  employeeType: 'Employee Type', shift: 'Shift Timing', experience: 'Experience', lastLogin: 'Last Login',
   currentProjects: 'Projects Count', leaveBalance: 'Leave Balance', productivityScore: 'Productivity',
   performanceRating: 'Performance Rating', actions: 'Actions'
 };
@@ -273,7 +269,7 @@ const DEFAULT_VISIBILITY = {
   name: true, id: true, designation: true, department: true,
   branch: true, teamLeader: false, projectManager: false, phone: false,
   workEmail: true, joinDate: false, attendanceStatus: true, todayPunchIn: true,
-  todayPunchOut: true, todayWorkingHours: true, lastSeen: true, workStatus: true,
+  todayPunchOut: true, todayWorkingHours: true, workStatus: true,
   accountStatus: true, employeeType: false, shift: false, experience: false,
   lastLogin: false, currentProjects: false, leaveBalance: false, productivityScore: false,
   performanceRating: false, actions: true
@@ -390,7 +386,10 @@ const Employees = () => {
 
   // ── Column visibility ──
   const [colVis, setColVis] = useState(() => {
-    try { return { ...DEFAULT_VISIBILITY, ...JSON.parse(localStorage.getItem(LS_KEY) || '{}') }; }
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+      return { ...DEFAULT_VISIBILITY, ...saved, department: true };
+    }
     catch { return DEFAULT_VISIBILITY; }
   });
   const [showTogglePanel, setShowTogglePanel] = useState(false);
@@ -403,6 +402,7 @@ const Employees = () => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
   const [wizardStep, setWizardStep] = useState(1);
   const [createdEmpInfo, setCreatedEmpInfo] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canNavigateToStep = (targetStep) => {
     if (targetStep <= wizardStep) return true;
@@ -1209,96 +1209,109 @@ const Employees = () => {
   };
 
   const handleFormSubmit = async () => {
-    const matchingRole = roles.find(r => r.id === formData.roleId) || {
-      id: formData.roleId || 'employee',
-      name: formData.roleId === 'manager' ? 'Manager' : (formData.roleId === 'team_leader' ? 'Team Leader' : (formData.roleId === 'branch_admin' ? 'Branch Admin' : 'Employee'))
-    };
-    
-    // Convert documents to base64
-    const docsToSave = [];
-    let avatarBase64 = '';
-    const profilePhoto = uploadedDocs.profilePhoto;
-    
-    if (profilePhoto) {
-      if (profilePhoto.isExisting) {
-        avatarBase64 = profilePhoto.downloadUrl;
-      } else if (profilePhoto instanceof File || profilePhoto instanceof Blob || (profilePhoto && typeof profilePhoto === 'object' && profilePhoto.name)) {
-        try {
-          avatarBase64 = await fileToBase64(profilePhoto);
-        } catch (err) {
-          console.error('Error converting profile photo:', err);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const matchingRole = roles.find(r => r.id === formData.roleId) || {
+        id: formData.roleId || 'employee',
+        name: formData.roleId === 'manager' ? 'Manager' : (formData.roleId === 'team_leader' ? 'Team Leader' : (formData.roleId === 'branch_admin' ? 'Branch Admin' : 'Employee'))
+      };
+      
+      // Convert documents to base64
+      const docsToSave = [];
+      let avatarBase64 = '';
+      const profilePhoto = uploadedDocs.profilePhoto;
+      
+      if (profilePhoto) {
+        if (profilePhoto.isExisting) {
+          avatarBase64 = profilePhoto.downloadUrl;
+        } else if (profilePhoto instanceof File || profilePhoto instanceof Blob || (profilePhoto && typeof profilePhoto === 'object' && profilePhoto.name)) {
+          try {
+            avatarBase64 = await fileToBase64(profilePhoto);
+          } catch (err) {
+            console.error('Error converting profile photo:', err);
+          }
         }
       }
-    }
 
-    for (const [key, file] of Object.entries(uploadedDocs)) {
-      if (!file || key === 'profilePhoto') continue;
-      
-      if (file.isExisting) {
-        docsToSave.push({
-          category: key,
-          fileName: file.name,
-          uploadDate: file.uploadDate || new Date().toISOString().split('T')[0],
-          fileType: file.type,
-          downloadUrl: file.downloadUrl
-        });
-      } else if (file instanceof File || file instanceof Blob || (file && typeof file === 'object' && file.name)) {
-        try {
-          const base64 = await fileToBase64(file);
+      for (const [key, file] of Object.entries(uploadedDocs)) {
+        if (!file || key === 'profilePhoto') continue;
+        
+        if (file.isExisting) {
           docsToSave.push({
             category: key,
             fileName: file.name,
-            uploadDate: new Date().toISOString().split('T')[0],
+            uploadDate: file.uploadDate || new Date().toISOString().split('T')[0],
             fileType: file.type,
-            downloadUrl: base64
+            downloadUrl: file.downloadUrl
           });
-        } catch (err) {
-          console.error(`Error converting document ${key}:`, err);
+        } else if (file instanceof File || file instanceof Blob || (file && typeof file === 'object' && file.name)) {
+          try {
+            const base64 = await fileToBase64(file);
+            docsToSave.push({
+              category: key,
+              fileName: file.name,
+              uploadDate: new Date().toISOString().split('T')[0],
+              fileType: file.type,
+              downloadUrl: base64
+            });
+          } catch (err) {
+            console.error(`Error converting document ${key}:`, err);
+          }
         }
       }
-    }
 
-    const isManager = matchingRole.id === 'manager';
-    const finalData = {
-      ...formData,
-      name: formData.name,
-      designation: isManager ? 'Manager' : formData.designation,
-      roleId: matchingRole.id,
-      role: matchingRole.name,
-      branch: formData.branch,
-      department: formData.department,
-      avatar: avatarBase64,
-      documents: docsToSave,
-      currentAddress: addressToString(formData.currentAddress),
-      permanentAddress: addressToString(formData.permanentAddress)
-    };
+      const isManager = matchingRole.id === 'manager';
+      const finalData = {
+        ...formData,
+        name: formData.name,
+        designation: isManager ? 'Manager' : formData.designation,
+        roleId: matchingRole.id,
+        role: matchingRole.name,
+        branch: formData.branch,
+        department: formData.department,
+        avatar: avatarBase64,
+        documents: docsToSave,
+        currentAddress: addressToString(formData.currentAddress),
+        permanentAddress: addressToString(formData.permanentAddress)
+      };
 
-    if (formMode === 'add') {
-      const finalEmail = finalData.officialEmail || `${formData.name.toLowerCase().split(' ').join('.')}@saas.io`;
-      // id is omitted — backend generates the company-scoped ID
-      const submittedData = { ...finalData, workEmail: finalEmail };
-      delete submittedData.id; // ensure no stale frontend id is sent
+      if (formMode === 'add') {
+        const finalEmail = finalData.officialEmail || `${formData.name.toLowerCase().split(' ').join('.')}@saas.io`;
+        // id is omitted — backend generates the company-scoped ID
+        const submittedData = { ...finalData, workEmail: finalEmail };
+        delete submittedData.id; // ensure no stale frontend id is sent
 
-      // Optimistically set placeholder; update with real id after API responds
-      setCreatedEmpInfo({
-        ...submittedData,
-        id: 'Generating...',
-        workEmail: finalEmail,
-        password: formData.password || 'temp@123'
-      });
+        // Optimistically set placeholder; update with real id after API responds
+        setCreatedEmpInfo({
+          ...submittedData,
+          id: 'Generating...',
+          workEmail: finalEmail,
+          password: formData.password || 'temp@123'
+        });
 
-      // addEmployee returns the savedEmp from the API (with backend-assigned id)
-      const savedEmp = await addEmployee(submittedData);
-      if (savedEmp) {
-        setCreatedEmpInfo(prev => ({ ...prev, id: savedEmp.id }));
+        // addEmployee returns the savedEmp from the API (with backend-assigned id)
+        const savedEmp = await addEmployee(submittedData);
+        if (savedEmp) {
+          setCreatedEmpInfo(prev => ({ ...prev, id: savedEmp.id }));
+        }
+      } else {
+        const success = await updateEmployee(selectedEmployeeId, finalData);
+        if (!success) {
+          setIsSubmitting(false);
+          return;
+        }
+        addToast('success', `Employee ${formData.name} updated successfully!`);
       }
-    } else {
-      updateEmployee(selectedEmployeeId, finalData);
-      addToast('success', `Employee ${formData.name} updated successfully!`);
+      setShowFormPanel(false);
+      setSlideOverOpen(false);
+      navigate('/employees');
+    } catch (err) {
+      console.error('Error submitting employee form:', err);
+      addToast('error', 'Failed to save employee details.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setShowFormPanel(false);
-    setSlideOverOpen(false);
-    navigate('/employees');
   };
 
 
@@ -1951,7 +1964,6 @@ const Employees = () => {
                   {colVis.todayPunchOut && renderTH("todayPunchOut", FIELD_LABELS.punchOutTime, true)}
                   {colVis.todayWorkingHours && renderTH("todayWorkingHours", FIELD_LABELS.workingHours, true)}
                   {colVis.attendanceStatus && renderTH("attendanceStatus", FIELD_LABELS.attendanceStatus, true)}
-                  {colVis.lastSeen && renderTH("lastSeen", "Last Seen", true)}
                   {colVis.workStatus && renderTH("workStatus", "Work Status", true)}
                   {colVis.accountStatus && renderTH("accountStatus", FIELD_LABELS.employmentStatus, true)}
                   <th className="col-actions">Actions</th>
@@ -2064,8 +2076,17 @@ const Employees = () => {
                         <AttBadge status={getTodayStatus(row)} />
                       </td>
                     )}
-                    {colVis.lastSeen && <td><span className="text-secondary-sm last-seen-cell"><Clock size={12} className="copy-cell-icon" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{row.lastSeen || '-'}</span></td>}
-                    {colVis.workStatus && <td><WorkStatusDot status={row.workStatus} /></td>}
+                    {colVis.workStatus && (
+                      <td>
+                        <WorkStatusDot
+                          status={(() => {
+                            const att = getTodayAttendance(row.id);
+                            const hasPunchedIn = att && att.punchIn && att.punchIn !== '--:--';
+                            return hasPunchedIn ? 'Online' : 'Offline';
+                          })()}
+                        />
+                      </td>
+                    )}
                     {colVis.accountStatus && <td><AccBadge status={row.accountStatus} /></td>}
                     <td className="col-actions">
                       <div className="table-actions-cell">
@@ -2343,7 +2364,7 @@ const Employees = () => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {formMode === 'edit' && (
-                <Button variant="primary" size="sm" icon={Save} onClick={handleFormSubmit}>
+                <Button variant="primary" size="sm" icon={Save} loading={isSubmitting} onClick={handleFormSubmit}>
                   Save
                 </Button>
               )}
@@ -2602,13 +2623,8 @@ const Employees = () => {
                           })()}
                         </select>
                       </div>
-                    {formData.roleId !== 'manager' && (
-                      <>
-                        {formData.roleId !== 'team_leader' && (
-                          <div className="form-field"><label>{FIELD_LABELS.teamLeader}</label><select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}><option value="">Select Team Leader</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
-                        )}
-                        <div className="form-field"><label>{FIELD_LABELS.projectManager}</label><select value={formData.projectManager} onChange={e => setFormData(p => ({ ...p, projectManager: e.target.value }))}><option value="">Select Project Manager</option>{managers.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
-                      </>
+                    {formData.roleId !== 'manager' && formData.roleId !== 'team_leader' && (
+                      <div className="form-field"><label>{FIELD_LABELS.teamLeader}</label><select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}><option value="">Select Team Leader</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
                     )}
                     <div className="form-field"><label>{FIELD_LABELS.joinDate} *</label><input type="date" value={formData.joinDate} onChange={e => setFormData(p => ({ ...p, joinDate: e.target.value }))} required /></div>
                     <div className="form-field"><label>{FIELD_LABELS.workLocation}</label><input type="text" placeholder="e.g. Tower B, 3rd Floor" value={formData.workLocation || ''} onChange={e => setFormData(p => ({ ...p, workLocation: e.target.value }))} /></div>
@@ -3008,9 +3024,9 @@ const Employees = () => {
             <div className="wizard-footer-buttons">
               {wizardStep > 1 && <Button variant="secondary" icon={ArrowLeft} onClick={handlePrevStep}>Back</Button>}
               {formMode === 'edit' && wizardStep < 7 && (
-                <Button variant="secondary" icon={Save} onClick={handleFormSubmit}>Save Changes</Button>
+                <Button variant="secondary" icon={Save} loading={isSubmitting} onClick={handleFormSubmit}>Save Changes</Button>
               )}
-              {wizardStep < 7 ? <Button variant="primary" onClick={handleNextStep} disabled={!isStepValid()}>Next Step</Button> : <Button variant="primary" onClick={handleFormSubmit}>{formMode === 'add' ? 'Create Employee' : 'Save Changes'}</Button>}
+              {wizardStep < 7 ? <Button variant="primary" onClick={handleNextStep} disabled={!isStepValid()}>Next Step</Button> : <Button variant="primary" loading={isSubmitting} onClick={handleFormSubmit}>{formMode === 'add' ? 'Create Employee' : 'Save Changes'}</Button>}
             </div>
           </div>
         </div>
@@ -3055,18 +3071,15 @@ const Employees = () => {
             <button className="id-card-close" onClick={() => { setShowIdCard(false); setIdCardEmployee(null); }}>✕</button>
             <div className="id-card-render-wrapper" ref={idCardRef}>
               <div className="id-card-front">
-                <div className="id-card-front-header-bg"><div className="id-card-watermark"></div></div>
-                <div className="id-card-front-pink-bg"></div>
-                <div className="id-card-logo-area"><svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg><div className="id-card-company-title">{idCardEmployee.companyName || generalSettings?.companyName || 'OMS Enterprise'}</div><div className="id-card-company-subtitle">{idCardEmployee.branch ? (idCardEmployee.branch.toLowerCase().includes('branch') ? idCardEmployee.branch : `${idCardEmployee.branch} Branch`) : 'Gatecode OMS'}</div></div>
+                <div className="id-card-logo-area"><svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="var(--color-primary)" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg><div className="id-card-company-title">{idCardEmployee.companyName || generalSettings?.companyName || 'OMS Enterprise'}</div><div className="id-card-company-subtitle">{idCardEmployee.branch ? (idCardEmployee.branch.toLowerCase().includes('branch') ? idCardEmployee.branch : `${idCardEmployee.branch} Branch`) : 'Gatecode OMS'}</div></div>
                 <div className="id-card-photo-wrap"><Avatar name={idCardEmployee.name} size="xl" className="id-card-photo-img" src={idCardEmployee.avatar || idCardEmployee.photoUrl} /></div>
                 <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(idCardEmployee.name)}</h2><p className="id-card-emp-role">{idCardEmployee.designation || idCardEmployee.role}</p></div>
                 <div className="id-card-details-grid"><div className="id-detail-label">ID NO</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.id}</div>{idCardEmployee.roleId !== 'manager' && (<><div className="id-detail-label">Dept.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.department}</div></>)}<div className="id-detail-label">Deg.</div><div className="id-detail-colon">:</div><div className="id-detail-value">{idCardEmployee.designation || idCardEmployee.role}</div></div>
               </div>
               <div className="id-card-back">
                 <div className="id-card-back-bullets"><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {idCardEmployee.companyName || generalSettings?.companyName || 'OMS Enterprise'} and must be returned on demand.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div><div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {idCardEmployee.branchAddress || getBranchAddress(idCardEmployee.branch, dbBranches)}</p></div></div>
-                <div className="id-card-back-middle"><div className="id-card-back-dates"><div className="id-date-row"><span className="id-date-label">Join Date:</span><span className="id-date-val">{fmtJoinDate(idCardEmployee.joinDate)}</span></div><div className="id-date-row"><span className="id-date-label">Expire Date:</span><span className="id-date-val">{idCardEmployee.contractEndDate ? fmtJoinDate(idCardEmployee.contractEndDate) : calculateExpiry(idCardEmployee.joinDate)}</span></div><div className="id-card-barcode-area"><svg viewBox="0 0 100 20" className="id-card-barcode-svg"><rect x="0" y="0" width="3" height="20" fill="#0f172a" /><rect x="5" y="0" width="1" height="20" fill="#0f172a" /><rect x="8" y="0" width="2" height="20" fill="#0f172a" /><rect x="12" y="0" width="4" height="20" fill="#0f172a" /><rect x="18" y="0" width="1" height="20" fill="#0f172a" /><rect x="21" y="0" width="2" height="20" fill="#0f172a" /><rect x="25" y="0" width="3" height="20" fill="#0f172a" /><rect x="30" y="0" width="1" height="20" fill="#0f172a" /><rect x="33" y="0" width="2" height="20" fill="#0f172a" /><rect x="37" y="0" width="5" height="20" fill="#0f172a" /><rect x="44" y="0" width="1" height="20" fill="#0f172a" /><rect x="47" y="0" width="3" height="20" fill="#0f172a" /><rect x="52" y="0" width="2" height="20" fill="#0f172a" /><rect x="56" y="0" width="4" height="20" fill="#0f172a" /><rect x="62" y="0" width="1" height="20" fill="#0f172a" /><rect x="65" y="0" width="2" height="20" fill="#0f172a" /><rect x="69" y="0" width="3" height="20" fill="#0f172a" /><rect x="74" y="0" width="1" height="20" fill="#0f172a" /><rect x="77" y="0" width="2" height="20" fill="#0f172a" /><rect x="81" y="0" width="5" height="20" fill="#0f172a" /><rect x="88" y="0" width="1" height="20" fill="#0f172a" /><rect x="91" y="0" width="3" height="20" fill="#0f172a" /><rect x="96" y="0" width="2" height="20" fill="#0f172a" /></svg><div className="id-card-barcode-text">*{idCardEmployee.id}*</div></div></div><div className="id-card-back-qr"><svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg"><rect x="0" y="0" width="28" height="28" fill="#0f172a" /><rect x="4" y="4" width="20" height="20" fill="#ffffff" /><rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="72" y="0" width="28" height="28" fill="#0f172a" /><rect x="76" y="4" width="20" height="20" fill="#ffffff" /><rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="0" y="72" width="28" height="28" fill="#0f172a" /><rect x="4" y="76" width="20" height="20" fill="#ffffff" /><rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" /><rect x="36" y="4" width="8" height="8" fill="#0f172a" /><rect x="52" y="4" width="8" height="8" fill="#0f172a" /><rect x="44" y="12" width="16" height="8" fill="#0f172a" /><rect x="36" y="24" width="8" height="8" fill="#0f172a" /><rect x="4" y="36" width="8" height="8" fill="#0f172a" /><rect x="16" y="44" width="8" height="8" fill="#0f172a" /><rect x="24" y="36" width="8" height="8" fill="#0f172a" /><rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" /><rect x="40" y="40" width="8" height="8" fill="#ffffff" /><rect x="60" y="36" width="8" height="8" fill="#0f172a" /><rect x="56" y="48" width="8" height="8" fill="#0f172a" /><rect x="36" y="56" width="8" height="8" fill="#0f172a" /><rect x="48" y="60" width="8" height="8" fill="#0f172a" /><rect x="76" y="36" width="8" height="8" fill="#0f172a" /><rect x="84" y="44" width="12" height="8" fill="#0f172a" /><rect x="72" y="56" width="8" height="16" fill="#0f172a" /><rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" /><rect x="36" y="76" width="12" height="8" fill="#0f172a" /><rect x="52" y="72" width="8" height="16" fill="#0f172a" /><rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" /><rect x="76" y="76" width="12" height="8" fill="#0f172a" /><rect x="84" y="84" width="12" height="8" fill="#0f172a" /></svg><span className="id-qr-label">SCAN ME</span></div></div>
+                <div className="id-card-back-middle"><div className="id-card-back-dates"><div className="id-date-row"><span className="id-date-label">Join Date:</span><span className="id-date-val">{fmtJoinDate(idCardEmployee.joinDate)}</span></div><div className="id-date-row"><span className="id-date-label">Expire Date:</span><span className="id-date-val">{idCardEmployee.contractEndDate ? fmtJoinDate(idCardEmployee.contractEndDate) : calculateExpiry(idCardEmployee.joinDate)}</span></div><div className="id-card-barcode-area"><svg viewBox="0 0 100 20" className="id-card-barcode-svg"><rect x="0" y="0" width="3" height="20" fill="#0f172a" /><rect x="5" y="0" width="1" height="20" fill="#0f172a" /><rect x="8" y="0" width="2" height="20" fill="#0f172a" /><rect x="12" y="0" width="4" height="20" fill="#0f172a" /><rect x="18" y="0" width="1" height="20" fill="#0f172a" /><rect x="21" y="0" width="2" height="20" fill="#0f172a" /><rect x="25" y="0" width="3" height="20" fill="#0f172a" /><rect x="30" y="0" width="1" height="20" fill="#0f172a" /><rect x="33" y="0" width="2" height="20" fill="#0f172a" /><rect x="37" y="0" width="5" height="20" fill="#0f172a" /><rect x="44" y="0" width="1" height="20" fill="#0f172a" /><rect x="47" y="0" width="3" height="20" fill="#0f172a" /><rect x="52" y="0" width="2" height="20" fill="#0f172a" /><rect x="56" y="0" width="4" height="20" fill="#0f172a" /><rect x="62" y="0" width="1" height="20" fill="#0f172a" /><rect x="65" y="0" width="2" height="20" fill="#0f172a" /><rect x="69" y="0" width="3" height="20" fill="#0f172a" /><rect x="74" y="0" width="1" height="20" fill="#0f172a" /><rect x="77" y="0" width="2" height="20" fill="#0f172a" /><rect x="81" y="0" width="5" height="20" fill="#0f172a" /><rect x="88" y="0" width="1" height="20" fill="#0f172a" /><rect x="91" y="0" width="3" height="20" fill="#0f172a" /><rect x="96" y="0" width="2" height="20" fill="#0f172a" /></svg><div className="id-card-barcode-text">*{idCardEmployee.id}*</div></div></div><div className="id-card-back-qr"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify({ employeeId: idCardEmployee.id, companyId: idCardEmployee.companyId || 'COMP-A' }))}`} alt="QR Code" width="95" height="95" className="id-card-qr-img" style={{ display: 'block', borderRadius: '4px' }} /><span className="id-qr-label">SCAN ME</span></div></div>
                 <div className="id-card-back-signature-area"><div className="id-signature-font">{idCardEmployee.teamLeader || idCardEmployee.reportingManager || 'Authorized Signatory'}</div><div className="id-signature-line"></div><div className="id-signature-label">Authorized Signatory</div></div>
-                <div className="id-card-back-bottom-bg"><div className="id-card-watermark"></div></div><div className="id-card-back-pink-bg"></div>
               </div>
             </div>
             <button className="id-card-download-btn" onClick={downloadIdCard}><Download size={16} /> Download ID Cards</button>

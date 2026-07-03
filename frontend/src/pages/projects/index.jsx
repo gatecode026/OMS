@@ -18,15 +18,60 @@ import ActivityFeed from '../../components/projects/ActivityFeed';
 
 
 const Projects = () => {
-  const { addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole, hasPermission, currentUser } = useApp();
+  const { token, addToast, employees, departments: rawDepartments, projectsList, addProject, updateProject, deleteProject, currentUserRole, hasPermission, currentUser } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
+
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('project_management', 'read', 'company');
+    const hasSelfRead = hasPermission('project_management', 'read', 'self');
+
+    const saved = localStorage.getItem('perspective_projects');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('project_management', 'read', 'company');
+    const hasSelfRead = hasPermission('project_management', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
+
+  React.useEffect(() => {
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_projects', perspective);
+    }
+  }, [perspective, currentUserRole]);
+
+  React.useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('project_management', 'read', 'company');
+      const hasSelfRead = hasPermission('project_management', 'read', 'self');
+      const saved = localStorage.getItem('perspective_projects');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
 
   // State Management
   const [projects, setProjects] = useState([]);
 
   React.useEffect(() => {
     if (projectsList) {
-      if (currentUserRole === 'employee' && currentUser) {
+      if (isEmployeeView && currentUser) {
         const filtered = projectsList.filter(p => {
           const isManager = p.manager?.toLowerCase() === currentUser.name?.toLowerCase();
           const isLeader = p.leader?.toLowerCase() === currentUser.name?.toLowerCase();
@@ -49,7 +94,7 @@ const Projects = () => {
         setProjects(projectsList);
       }
     }
-  }, [projectsList, currentUserRole, currentUser, departments]);
+  }, [projectsList, currentUserRole, currentUser, departments, isEmployeeView]);
   const [filters, setFilters] = useState({
     search: '',
     status: 'All',
@@ -69,7 +114,7 @@ const Projects = () => {
   
   // Form States for Modals
   const [newProjectForm, setNewProjectForm] = useState({
-    name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
+    name: '', client: '', department: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
   });
   const [assignTeamForm, setAssignTeamForm] = useState({ projectId: '', memberName: '' });
   const [selectedMembers, setSelectedMembers] = useState([]);
@@ -218,7 +263,6 @@ const Projects = () => {
       name: proj.name,
       client: proj.client || 'Google',
       department: proj.department,
-      manager: proj.manager,
       leader: proj.leader,
       startDate: proj.startDate,
       deadline: proj.deadline,
@@ -264,6 +308,20 @@ const Projects = () => {
 
     const success = await updateProject(projectId, updatedFields);
     if (success) {
+      const toggledTask = updatedTasks.find(t => t.id === taskId);
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: toggledTask.status })
+        });
+      } catch (err) {
+        console.error('Failed to sync task status update to tasks collection:', err);
+      }
+
       if (selectedProject && selectedProject.id === projectId) {
         setSelectedProject({ ...targetProj, ...updatedFields });
       }
@@ -290,15 +348,15 @@ const Projects = () => {
         description: newProjectForm.description,
         department: newProjectForm.department,
         client: newProjectForm.client || 'Internal',
-        manager: newProjectForm.manager,
+        manager: '',
         leader: newProjectForm.leader,
-        members: [newProjectForm.manager, newProjectForm.leader].filter(Boolean),
+        members: [newProjectForm.leader].filter(Boolean),
         priority: newProjectForm.priority,
         startDate: newProjectForm.startDate || new Date().toISOString().split('T')[0],
         deadline: newProjectForm.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         progress: 0,
         status: 'Pending',
-        tasksTotal: 1,
+        tasksTotal: 0,
         tasksDone: 0,
         workflowStage: 'Planning',
         pendingApprovals: 1,
@@ -307,15 +365,13 @@ const Projects = () => {
         milestonesCompleted: 0,
         milestonesTotal: 5,
         documents: [],
-        tasks: [
-          { id: `t-${nextId}-1`, title: 'Kickoff meeting and alignment', completed: false, dueDate: newProjectForm.startDate || new Date().toISOString().split('T')[0], priority: 'Medium' }
-        ]
+        tasks: []
       };
       await addProject(newProjObj);
     }
     setActiveModal(null);
     setNewProjectForm({
-      name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
+      name: '', client: '', department: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
     });
   };
 
@@ -396,6 +452,28 @@ const Projects = () => {
       progress
     });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            id: nextTaskId,
+            title: title.trim(),
+            description: addTaskForm.description || '',
+            status: 'To Do',
+            priority,
+            dueDate,
+            assigneeId,
+            assigneeName: selectedTaskEmployees.length > 0 ? selectedTaskEmployees.join(', ') : 'Unassigned'
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync task creation to tasks collection:', err);
+      }
+
       if (selectedProject && selectedProject.id === projectId) {
         setSelectedProject({ ...selectedProject, tasks: newTasks, tasksTotal, progress });
       }
@@ -631,11 +709,40 @@ const Projects = () => {
       <div className={styles.tableHeaderRow}>
         <div>
           <h1 style={{ margin: 0 }}>Active Projects Dashboard</h1>
-          <p style={{ margin: 0, fontSize: '0.85rem' }}>Track and manage all company projects, timelines, tasks, and budgets.</p>
+          <p style={{ margin: 0, fontSize: '0.85rem' }}>
+            {isEmployeeView
+              ? 'View your assigned projects, timelines, and tasks.'
+              : 'Track and manage all company projects, timelines, tasks, and budgets.'}
+          </p>
         </div>
 
         {/* Header Alerts Dropdown Button */}
-        <div style={{ position: 'relative', display: 'flex', gap: 10 }}>
+        <div style={{ position: 'relative', display: 'flex', gap: 10, alignItems: 'center' }}>
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
           <div className={styles.syncStatus} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', padding: '6px 12px', borderRadius: 'var(--radius-lg)' }}>
             <span className={styles.syncDot} />
             <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>SYSTEM ACTIVE</span>
@@ -644,60 +751,64 @@ const Projects = () => {
       </div>
 
       {/* Top Banner Alert Bar */}
-      <div className={styles.alertsBanner}>
-        <div className={styles.alertsHeader}>
-          <span className={styles.alertsTitle}>
-            <Bell size={16} /> Important Dashboard System Alerts
-          </span>
+      {isCompanyView && (
+        <div className={styles.alertsBanner}>
+          <div className={styles.alertsHeader}>
+            <span className={styles.alertsTitle}>
+              <Bell size={16} /> Important Dashboard System Alerts
+            </span>
+          </div>
+          <div className={styles.alertList}>
+            <div className={styles.alertItem}>
+              <span className={styles.alertDot} />
+              <span>Upcoming Deadlines: <strong>{stats.upcoming}</strong> projects need delivery this month.</span>
+            </div>
+            <div className={styles.alertItem}>
+              <span className={styles.alertDot} />
+              <span>Delayed Projects: <strong>{stats.delayed}</strong> databases and systems core lagging.</span>
+            </div>
+            <div className={styles.alertItem}>
+              <span className={styles.alertDot} />
+              <span>Approvals: <strong>8</strong> approvals pending from managers.</span>
+            </div>
+          </div>
         </div>
-        <div className={styles.alertList}>
-          <div className={styles.alertItem}>
-            <span className={styles.alertDot} />
-            <span>Upcoming Deadlines: <strong>{stats.upcoming}</strong> projects need delivery this month.</span>
-          </div>
-          <div className={styles.alertItem}>
-            <span className={styles.alertDot} />
-            <span>Delayed Projects: <strong>{stats.delayed}</strong> databases and systems core lagging.</span>
-          </div>
-          <div className={styles.alertItem}>
-            <span className={styles.alertDot} />
-            <span>Approvals: <strong>8</strong> approvals pending from managers.</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Section G - Quick Action Buttons Bar */}
-      <div className={styles.quickActionsRow}>
-        {hasPermission('project_management', 'create') && (
-          <>
-            <button className={`${styles.pageBtn} ${styles.primaryAction}`} onClick={() => { setSelectedProject(null); setActiveModal('create'); }}>
-              <Plus size={14} /> Create New Project
-            </button>
-            <button className={styles.pageBtn} onClick={() => setActiveModal('assign')}>
-              <Users size={14} /> Assign Team
-            </button>
-            <button className={styles.pageBtn} onClick={() => {
-              setAddTaskForm({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
-              setSelectedTaskEmployees([]);
-              setActiveModal('task');
-            }}>
-              <CheckSquare size={14} /> Add Tasks
-            </button>
-            <button className={styles.pageBtn} onClick={() => setActiveModal('document')}>
-              <FileText size={14} /> Upload Documents
-            </button>
-            <button className={styles.pageBtn} onClick={() => setActiveModal('report')}>
-              <BarChart2 size={14} /> Generate Reports
-            </button>
-          </>
-        )}
-        <button className={styles.pageBtn} onClick={handleExportCSV}>
-          <Download size={14} /> Export Data (CSV)
-        </button>
-        <button className={styles.pageBtn} onClick={handleViewAnalytics}>
-          <TrendingUp size={14} /> View Analytics
-        </button>
-      </div>
+      {isCompanyView && (
+        <div className={styles.quickActionsRow}>
+          {hasPermission('project_management', 'create') && (
+            <>
+              <button className={`${styles.pageBtn} ${styles.primaryAction}`} onClick={() => { setSelectedProject(null); setActiveModal('create'); }}>
+                <Plus size={14} /> Create New Project
+              </button>
+              <button className={styles.pageBtn} onClick={() => setActiveModal('assign')}>
+                <Users size={14} /> Assign Team
+              </button>
+              <button className={styles.pageBtn} onClick={() => {
+                setAddTaskForm({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
+                setSelectedTaskEmployees([]);
+                setActiveModal('task');
+              }}>
+                <CheckSquare size={14} /> Add Tasks
+              </button>
+              <button className={styles.pageBtn} onClick={() => setActiveModal('document')}>
+                <FileText size={14} /> Upload Documents
+              </button>
+              <button className={styles.pageBtn} onClick={() => setActiveModal('report')}>
+                <BarChart2 size={14} /> Generate Reports
+              </button>
+            </>
+          )}
+          <button className={styles.pageBtn} onClick={handleExportCSV}>
+            <Download size={14} /> Export Data (CSV)
+          </button>
+          <button className={styles.pageBtn} onClick={handleViewAnalytics}>
+            <TrendingUp size={14} /> View Analytics
+          </button>
+        </div>
+      )}
 
       {/* Section A — Top Summary Cards */}
       <div className={styles.summaryGrid}>
@@ -951,25 +1062,6 @@ const Projects = () => {
                   </div>
                 </div>
                 <div className={styles.basicGrid}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Project Manager</label>
-                    <select
-                      className={styles.filterSelect}
-                      style={{ width: '100%' }}
-                      value={newProjectForm.manager}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, manager: e.target.value })}
-                      required
-                    >
-                      <option value="">Select a manager...</option>
-                      {(employees || [])
-                        .filter(emp => emp.roleId === 'manager' || emp.role?.toLowerCase() === 'manager' || emp.designation?.toLowerCase().includes('manager'))
-                        .map(emp => (
-                          <option key={emp.id} value={emp.name}>
-                            {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
-                          </option>
-                        ))}
-                    </select>
-                  </div>
                   <div className={styles.formGroup}>
                     <label className={styles.formLabel}>Team Leader</label>
                     <select

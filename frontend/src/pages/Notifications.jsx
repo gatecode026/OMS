@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import './Notifications.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -71,6 +72,7 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#d
 
 const Notifications = () => {
   const isLoading = usePageLoading(600);
+  const location = useLocation();
   const { currentUserRole, currentUser, showConfirm, notifications, addNotification, updateNotification, deleteNotification, employees } = useApp();
 
   // Selected Month/Year
@@ -275,15 +277,45 @@ const Notifications = () => {
   // Audited Logs
   const [logs, setLogs] = useState([]);
 
-  // Computed / Filtered Notifications with Employee Inbox constraints
+  // Computed / Filtered Notifications with Employee Inbox and normalization constraints
   const filteredNotifications = useMemo(() => {
     const isEmployeeView = perspective === 'employee';
 
-    return notifications.filter(notif => {
+    const normalized = (notifications || []).map(notif => {
+      const id = notif.id || notif._id;
+      const isRead = notif.isRead || notif.read || false;
+      const createdAt = notif.createdAt || new Date().toISOString();
+      
+      const formattedDate = (() => {
+        const d = new Date(createdAt);
+        if (isNaN(d.getTime())) return 'Just now';
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+               d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      })();
+
+      return {
+        ...notif,
+        id,
+        title: notif.title || 'Notification',
+        message: notif.message || '',
+        category: notif.category || 'Company',
+        priority: notif.priority ? (notif.priority.charAt(0).toUpperCase() + notif.priority.slice(1).toLowerCase()) : 'Normal',
+        sentBy: notif.sentBy || notif.data?.senderName || 'System',
+        sentDate: notif.sentDate || formattedDate,
+        deliveryStatus: notif.deliveryStatus || 'Delivered',
+        readStatus: notif.readStatus || (isRead ? 'Read' : 'Unread'),
+        recipients: notif.recipients || 1,
+        recipientType: notif.recipientType || (notif.userId ? 'Individual' : 'All Employees'),
+        recipientRole: notif.recipientRole || '',
+        recipientId: notif.recipientId || notif.targetUserId || notif.forUserId || notif.userId || '',
+      };
+    });
+
+    return normalized.filter(notif => {
       // If we are in Employee View, filter notifications to only those meant for the employee
       if (isEmployeeView) {
-        const recipientId = notif.recipientId || notif.targetUserId || notif.forUserId;
-        const recipientRole = (notif.recipientRole || notif.targetRole || notif.recipientType || '').toLowerCase();
+        const recipientId = notif.recipientId;
+        const recipientRole = (notif.recipientRole || notif.recipientType || '').toLowerCase();
         const msg = (notif.message || notif.title || '').toLowerCase();
 
         let allowed = false;
@@ -297,7 +329,7 @@ const Notifications = () => {
           allowed = ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
         }
         // 3. Broadcast check
-        else if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
+        else if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole || recipientRole === 'all employees') {
           const isPersonalEmployeeMsg =
             msg.startsWith('your ') ||
             msg.includes('your leave') ||
@@ -342,6 +374,19 @@ const Notifications = () => {
       return true;
     });
   }, [notifications, searchQuery, filterCategory, filterPriority, filterStatus, perspective, currentUser, currentUserRole]);
+
+  // Hook to handle router state and open detailed view
+  useEffect(() => {
+    if (location.state && location.state.selectedNotifId) {
+      const notifId = location.state.selectedNotifId;
+      const found = (filteredNotifications || []).find(n => n.id === notifId);
+      if (found) {
+        setActiveTab('all-notifications');
+        setSelectedNotif(found);
+        setShowDetailModal(true);
+      }
+    }
+  }, [location.state, filteredNotifications]);
 
   // Dynamically configured columns for employee vs admin views
   const tableColumns = useMemo(() => {
@@ -768,8 +813,15 @@ const Notifications = () => {
   }, [notifications]);
 
   const dynamicStats = useMemo(() => {
+    const getRecipientsCount = (n) => {
+      if (!n) return 0;
+      // If system/broadcast/general announcement with no target user, assume sent to all employees
+      const isBroadcast = n.type === 'broadcast' || n.type === 'announcement' || (!n.userId && !n.recipientId && !n.targetUserId);
+      return isBroadcast ? (employees?.length || 1) : 1;
+    };
+
     // 1. Total Dispatch Logs
-    const totalDispatchesCount = notifications.reduce((sum, n) => sum + (n.recipients || 0), 0);
+    const totalDispatchesCount = notifications.reduce((sum, n) => sum + getRecipientsCount(n), 0);
 
     // 2. Trigger rules configured and active
     const totalTriggerRules = automationRules.reduce((sum, cat) => sum + cat.rules.length, 0);
@@ -777,31 +829,26 @@ const Notifications = () => {
 
     // 3. Dispatched Today
     const todayStr = new Date().toISOString().split('T')[0];
-    const todayNotifs = notifications.filter(n => (n.sentDate || '').startsWith(todayStr));
-    const dispatchedTodayCount = todayNotifs.reduce((sum, n) => sum + (n.recipients || 0), 0);
+    const todayNotifs = notifications.filter(n => (n.createdAt || n.sentDate || '').startsWith(todayStr));
+    const dispatchedTodayCount = todayNotifs.reduce((sum, n) => sum + getRecipientsCount(n), 0);
 
     // 4. Pending / Queued
-    const pendingNotifs = notifications.filter(n => ['Scheduled', 'Pending'].includes(n.deliveryStatus));
-    const pendingCount = pendingNotifs.reduce((sum, n) => sum + (n.recipients || 0), 0);
+    const pendingNotifs = notifications.filter(n => ['Scheduled', 'Pending'].includes(n.deliveryStatus || n.status));
+    const pendingCount = pendingNotifs.reduce((sum, n) => sum + getRecipientsCount(n), 0);
 
     // 5. Delivered Dispatches
-    const deliveredCount = notifications.reduce((sum, n) => sum + (n.delivered || 0), 0);
+    // All notifications stored in database are successfully delivered
+    const deliveredCount = notifications.reduce((sum, n) => sum + (n.failed ? 0 : getRecipientsCount(n)), 0);
 
     // 6. Read / Acknowledged
-    const readCount = notifications.reduce((sum, n) => sum + (typeof n.read === 'number' ? n.read : (n.read === true ? (n.recipients || 1) : 0)), 0);
+    const readCount = notifications.reduce((sum, n) => sum + ((n.isRead || n.read) ? getRecipientsCount(n) : 0), 0);
 
     // 7. Unread Notifications
     const unreadCount = Math.max(0, totalDispatchesCount - readCount);
 
     // 8. Delivery Success Rate
-    let totalDelivered = 0;
-    let totalFailed = 0;
-    notifications.forEach(n => {
-      totalDelivered += n.delivered || 0;
-      totalFailed += n.failed || 0;
-    });
-    const totalSent = totalDelivered + totalFailed;
-    const successRate = totalSent > 0 ? parseFloat(((totalDelivered / totalSent) * 100).toFixed(1)) : 100.0;
+    const totalSent = notifications.reduce((sum, n) => sum + getRecipientsCount(n), 0);
+    const successRate = totalSent > 0 ? parseFloat(((deliveredCount / totalSent) * 100).toFixed(1)) : 0.0;
 
     return {
       totalDispatchesCount,
@@ -815,7 +862,7 @@ const Notifications = () => {
       unreadCount,
       successRate
     };
-  }, [notifications, automationRules]);
+  }, [notifications, automationRules, employees]);
 
   const getPriorityStyle = (priority) => {
     switch (priority) {
@@ -1093,47 +1140,7 @@ const Notifications = () => {
 
               <div className="today-feed-list">
                 {(() => {
-                  const isAdminRole = ['super_admin', 'company_admin', 'branch_admin', 'dept_admin', 'manager', 'team_leader'].includes(currentUserRole);
-                  const myNotifications = notifications.filter(n => {
-                    const recipientId   = n.recipientId || n.targetUserId || n.forUserId;
-                    const recipientRole = (n.recipientRole || n.targetRole || n.recipientType || '').toLowerCase();
-                    const msg = (n.message || n.title || '').toLowerCase();
-
-                    // Rule 1: specific user
-                    if (recipientId) return recipientId === currentUser?.id;
-
-                    // Rule 2 — explicitly tagged as employee-only or staff
-                    if (recipientRole === 'employee' || recipientRole === 'employees' || recipientRole === 'all employees' || recipientRole === 'staff') {
-                      return ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
-                    }
-
-                    // Rule 3: admin-only
-                    if (recipientRole === 'admin' || recipientRole === 'super_admin' || recipientRole === 'manager' || recipientRole === 'team_leader') return isAdminRole;
-
-                    // Rule 4: global / broadcast notification (recipientRole is 'all', 'everyone', or empty)
-                    if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
-                      // If it's an employee-personal message, show to any non-super_admin staff user
-                      const isPersonalEmployeeMsg =
-                        msg.startsWith('your ') ||
-                        msg.includes('your leave') ||
-                        msg.includes('your request') ||
-                        msg.includes('your attendance') ||
-                        msg.includes('has been approved') ||
-                        msg.includes('has been rejected') ||
-                        msg.includes('note: approved') ||
-                        msg.includes('note: rejected');
-
-                      if (isPersonalEmployeeMsg) {
-                        return ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
-                      }
-
-                      // Broadcast / general notification → show to everyone
-                      return true;
-                    }
-
-                    // Fallback: match specific role
-                    return recipientRole === currentUserRole?.toLowerCase();
-                  }).slice(0, 5);
+                  const myNotifications = filteredNotifications.slice(0, 5);
 
 
                   return myNotifications.length > 0 ? myNotifications.map((feed, idx) => (

@@ -47,7 +47,55 @@ const TaskMonitoring = () => {
     hasPermission
   } = useApp();
 
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('task_monitoring', 'read', 'company');
+    const hasSelfRead = hasPermission('task_monitoring', 'read', 'self');
+
+    const saved = localStorage.getItem('perspective_tasks');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('task_monitoring', 'read', 'company');
+    const hasSelfRead = hasPermission('task_monitoring', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
+
+  useEffect(() => {
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_tasks', perspective);
+    }
+  }, [perspective, currentUserRole]);
+
+  useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('task_monitoring', 'read', 'company');
+      const hasSelfRead = hasPermission('task_monitoring', 'read', 'self');
+      const saved = localStorage.getItem('perspective_tasks');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
+
   const scopedEmployees = useMemo(() => {
+    if (isEmployeeView && currentUser) {
+      return employees.filter(e => e.id === currentUser?.id);
+    }
     if (!currentUserRole || currentUserRole === 'super_admin') return employees;
     if (currentUserRole === 'branch_admin') {
       return employees.filter(e => e.branch === currentUser?.branch);
@@ -55,13 +103,13 @@ const TaskMonitoring = () => {
     if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
       return employees.filter(e => e.department === currentUser?.department);
     }
-    if (currentUserRole === 'employee') {
-      return employees.filter(e => e.id === currentUser?.id);
-    }
     return employees;
-  }, [employees, currentUser, currentUserRole]);
+  }, [employees, currentUser, currentUserRole, isEmployeeView]);
 
   const scopedTasksList = useMemo(() => {
+    if (isEmployeeView && currentUser) {
+      return tasks.filter(t => t.assigneeId === currentUser?.id || t.assigneeName === currentUser?.name);
+    }
     if (!currentUserRole || currentUserRole === 'super_admin') return tasks;
     return tasks.filter(t => {
       const assignee = employees.find(e => e.id === t.assigneeId || e.name === t.assigneeName);
@@ -71,12 +119,9 @@ const TaskMonitoring = () => {
       if (currentUserRole === 'dept_admin' || currentUserRole === 'team_leader') {
         return t.department === currentUser?.department || assignee?.department === currentUser?.department;
       }
-      if (currentUserRole === 'employee') {
-        return t.assigneeId === currentUser?.id || assignee?.id === currentUser?.id;
-      }
       return true;
     });
-  }, [tasks, employees, currentUser, currentUserRole]);
+  }, [tasks, employees, currentUser, currentUserRole, isEmployeeView]);
 
   // Active Main View: 'kanban', 'list', 'analytics'
   const [activeView, setActiveView] = useState('kanban');
@@ -553,21 +598,17 @@ const TaskMonitoring = () => {
       if (!task) return;
       const currentStatus = getDisplayStatus(task.status);
       
-      // Enforce sequential transitions
-      if (currentStatus === 'To Do' && targetCol !== 'In Progress') {
-        if (addToast) addToast('warning', 'Tasks in "To Do" must first move to "In Progress".');
+      // Enforce sequential transitions: To Do → In Review → Done
+      if (currentStatus === 'To Do' && targetCol !== 'In Review') {
+        if (addToast) addToast('warning', 'Tasks in "To Do" must be submitted to "In Review" for Team Leader approval.');
         return;
       }
-      if (currentStatus === 'In Progress' && targetCol !== 'In Review') {
-        if (addToast) addToast('warning', 'Tasks in "In Progress" must be submitted to "In Review".');
-        return;
-      }
-      if (targetCol === 'Done' && currentUserRole === 'employee') {
-        if (addToast) addToast('warning', 'Only management can approve and set task to "Done".');
+      if (currentStatus === 'In Review' && targetCol === 'Done' && currentUserRole === 'employee') {
+        if (addToast) addToast('warning', 'Only the Project Manager can approve and move a task to "Done".');
         return;
       }
       if (currentStatus === 'In Review' && targetCol !== 'Done') {
-        if (addToast) addToast('warning', 'Tasks in "In Review" must be approved/completed to move to "Done".');
+        if (addToast) addToast('warning', 'Tasks in "In Review" can only move to "Done" after Project Manager approval.');
         return;
       }
       if (currentStatus === 'Done') {
@@ -578,12 +619,9 @@ const TaskMonitoring = () => {
       // Map display columns back to DB status keys
       let statusVal = 'todo';
       let progressVal = 0;
-      if (targetCol === 'In Progress') {
-        statusVal = 'in_progress';
-        progressVal = 10;
-      } else if (targetCol === 'In Review') {
+      if (targetCol === 'In Review') {
         statusVal = 'review';
-        progressVal = 90;
+        progressVal = 50;
       } else if (targetCol === 'Done') {
         statusVal = 'done';
         progressVal = 100;
@@ -597,7 +635,7 @@ const TaskMonitoring = () => {
       <div className="task-monitoring-page grid-gap">
         <div className="card" style={{ height: '80px' }}><Skeleton variant="rect" height="100%" /></div>
         <div className="kanban-grid">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="card column-card" style={{ height: '400px' }}><Skeleton variant="rect" height="100%" /></div>
           ))}
         </div>
@@ -615,8 +653,33 @@ const TaskMonitoring = () => {
           <p className="page-desc-text">Centralized tracking, team productivity rankings, and automation status monitoring</p>
         </div>
         <div className="flex-center gap-2 flex-wrap">
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
           <Button variant="ghost" onClick={() => setIsExportOpen(true)} icon={Download}>Export Report</Button>
-          {hasPermission('task_monitoring', 'create') && (
+          {isCompanyView && hasPermission('task_monitoring', 'create') && (
             <Button variant="primary" onClick={() => setIsCreateOpen(true)} icon={Plus}>Create Task</Button>
           )}
         </div>
@@ -709,35 +772,37 @@ const TaskMonitoring = () => {
       </div>
 
       {/* ── Section 4: View Toggle Toolbar ── */}
-      <div className="view-toggle-toolbar card glass flex-row justify-between flex-wrap gap-3">
-        <div className="tab-buttons-group">
-          <button className={`view-tab-btn ${activeView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveView('kanban')}>
-            <KanbanSquare size={16} />
-            <span>Board</span>
-          </button>
-          <button className={`view-tab-btn ${activeView === 'list' ? 'active' : ''}`} onClick={() => setActiveView('list')}>
-            <SlidersHorizontal size={16} />
-            <span>Data Lists View</span>
-          </button>
-          <button className={`view-tab-btn ${activeView === 'analytics' ? 'active' : ''}`} onClick={() => setActiveView('analytics')}>
-            <Clock size={16} />
-            <span>Analytics & Feeds</span>
-          </button>
-        </div>
-        <div className="flex-center gap-2">
-          {activeView === 'list' && (
-            <button className="toggle-cols-btn" onClick={() => setGanttViewEnabled(prev => !prev)}>
-              <span>{ganttViewEnabled ? '📊 Show Metrics Table' : '🗓️ Show Timeline (Gantt)'}</span>
+      {isCompanyView && (
+        <div className="view-toggle-toolbar card glass flex-row justify-between flex-wrap gap-3">
+          <div className="tab-buttons-group">
+            <button className={`view-tab-btn ${activeView === 'kanban' ? 'active' : ''}`} onClick={() => setActiveView('kanban')}>
+              <KanbanSquare size={16} />
+              <span>Board</span>
             </button>
-          )}
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Filtered: <strong>{filteredTasks.length}</strong> tasks</span>
+            <button className={`view-tab-btn ${activeView === 'list' ? 'active' : ''}`} onClick={() => setActiveView('list')}>
+              <SlidersHorizontal size={16} />
+              <span>Data Lists View</span>
+            </button>
+            <button className={`view-tab-btn ${activeView === 'analytics' ? 'active' : ''}`} onClick={() => setActiveView('analytics')}>
+              <Clock size={16} />
+              <span>Analytics & Feeds</span>
+            </button>
+          </div>
+          <div className="flex-center gap-2">
+            {activeView === 'list' && (
+              <button className="toggle-cols-btn" onClick={() => setGanttViewEnabled(prev => !prev)}>
+                <span>{ganttViewEnabled ? '📊 Show Metrics Table' : '🗓️ Show Timeline (Gantt)'}</span>
+              </button>
+            )}
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Filtered: <strong>{filteredTasks.length}</strong> tasks</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Section 5: KANBAN VIEW ── */}
       {activeView === 'kanban' && (
         <div className="kanban-grid">
-          {['To Do', 'In Progress', 'In Review', 'Done'].map(col => {
+          {['To Do', 'In Review', 'Done'].map(col => {
             const colTasks = filteredTasks.filter(t => getDisplayStatus(t.status) === col);
             return (
               <div
@@ -796,7 +861,7 @@ const TaskMonitoring = () => {
 
       {/* ── Section 6-11: LIST VIEW ── */}
       {activeView === 'list' && (
-        currentUserRole === 'employee' ? (
+        isEmployeeView ? (
           <div className="personal-tasks-container flex-column gap-4">
             {filteredTasks.length > 0 ? (
               filteredTasks.map(task => {
@@ -1451,10 +1516,7 @@ const TaskMonitoring = () => {
                         <Badge variant={app.status === 'Approved' ? 'success' : app.status === 'Rejected' ? 'danger' : 'warning'}>
                           {app.status}
                         </Badge>
-                        {app.status === 'Pending' && (
-                          (app.level === 1 && (currentUser?.id === selectedTask.assigneeId || currentUser?.name?.toLowerCase() === app.approver?.toLowerCase())) ||
-                          (app.level > 1 && currentUser?.name?.toLowerCase() === app.approver?.toLowerCase())
-                        ) && (
+                        {app.status === 'Pending' && currentUser?.name?.toLowerCase() === app.approver?.toLowerCase() && (
                           <div className="flex-center gap-1">
                             <button className="action-circle-btn approve-btn" onClick={() => handleApproveLevel(app.level)} title="Approve">✓</button>
                             <button className="action-circle-btn reject-btn" onClick={() => handleRejectLevel(app.level)} title="Reject">✗</button>

@@ -105,22 +105,65 @@ const Payroll = () => {
   const [month, setMonth] = useState('June');
   const [year, setYear] = useState('2026');
 
-  // Role Perspective override (defaults to currentUserRole, but can be switched)
-  const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('payroll_management', 'read', 'company');
+    const hasSelfRead = hasPermission('payroll_management', 'read', 'self');
+
+    const saved = localStorage.getItem('perspective_payroll');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('payroll_management', 'read', 'company');
+    const hasSelfRead = hasPermission('payroll_management', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
+
+  React.useEffect(() => {
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_payroll', perspective);
+    }
+  }, [perspective, currentUserRole]);
+
+  React.useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('payroll_management', 'read', 'company');
+      const hasSelfRead = hasPermission('payroll_management', 'read', 'self');
+      const saved = localStorage.getItem('perspective_payroll');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState(currentUserRole === 'employee' ? 'processing' : 'dashboard');
+  const [activeTab, setActiveTab] = useState('processing');
 
   React.useEffect(() => {
     fetchAttendance();
   }, []);
 
   React.useEffect(() => {
-    setPerspective(currentUserRole || 'super_admin');
-    if (currentUserRole === 'employee') {
+    if (perspective === 'self') {
       setActiveTab('processing');
+    } else {
+      setActiveTab('dashboard');
     }
-  }, [currentUserRole]);
+  }, [perspective]);
 
   React.useEffect(() => {
     if (currentUser?.branch && currentUserRole !== 'super_admin' && perspective !== 'super_admin') {
@@ -257,7 +300,7 @@ const Payroll = () => {
           p.employeeId === emp.employeeCode || 
           (p.employeeName && emp.name && p.employeeName.toLowerCase().replace(/\s+/g, ' ') === emp.name.toLowerCase().replace(/\s+/g, ' '))
         );
-        if (savedPayment) {
+        if (savedPayment && savedPayment.netSalary > 0) {
           return savedPayment;
         }
 
@@ -311,22 +354,22 @@ const Payroll = () => {
         };
       });
 
-    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return activeState;
+    if (perspective === 'self') {
+      return activeState.filter(p => p.employeeId === currentUser?.id);
+    }
+    if (!currentUserRole || currentUserRole === 'super_admin' || currentUserRole === 'company_admin') return activeState;
     return activeState.filter(p => {
       const emp = resolveEmployee(p.employeeId, p.employeeName);
-      if (perspective === 'employee' || currentUserRole === 'employee') {
-        return p.employeeId === currentUser?.id;
-      }
-      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+      if (currentUserRole === 'branch_admin') {
         return emp?.branch === currentUser?.branch;
       }
-      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+      if (currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
         if (currentUser?.branch) {
           return emp?.branch === currentUser?.branch;
         }
         return emp?.department === currentUser?.department;
       }
-      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+      if (currentUserRole === 'team_leader') {
         return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
       }
       return true;
@@ -334,22 +377,22 @@ const Payroll = () => {
   }, [payrollState, employees, currentUser, currentUserRole, perspective, month, year, salaryStructures, resolveEmployee]);
 
   const scopedReimbursements = useMemo(() => {
-    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return reimbursements;
+    if (perspective === 'self') {
+      return reimbursements.filter(r => r.employeeId === currentUser?.id);
+    }
+    if (!currentUserRole || currentUserRole === 'super_admin' || currentUserRole === 'company_admin') return reimbursements;
     return reimbursements.filter(r => {
       const emp = resolveEmployee(r.employeeId, r.employeeName);
-      if (perspective === 'employee' || currentUserRole === 'employee') {
-        return r.employeeId === currentUser?.id;
-      }
-      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+      if (currentUserRole === 'branch_admin') {
         return emp?.branch === currentUser?.branch;
       }
-      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+      if (currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
         if (currentUser?.branch) {
           return emp?.branch === currentUser?.branch;
         }
         return emp?.department === currentUser?.department;
       }
-      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+      if (currentUserRole === 'team_leader') {
         return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
       }
       return true;
@@ -357,22 +400,22 @@ const Payroll = () => {
   }, [reimbursements, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
  
   const scopedLoans = useMemo(() => {
-    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return loans;
+    if (perspective === 'self') {
+      return loans.filter(l => l.employeeId === currentUser?.id);
+    }
+    if (!currentUserRole || currentUserRole === 'super_admin' || currentUserRole === 'company_admin') return loans;
     return loans.filter(l => {
       const emp = resolveEmployee(l.employeeId, l.employeeName);
-      if (perspective === 'employee' || currentUserRole === 'employee') {
-        return l.employeeId === currentUser?.id;
-      }
-      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+      if (currentUserRole === 'branch_admin') {
         return emp?.branch === currentUser?.branch;
       }
-      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+      if (currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
         if (currentUser?.branch) {
           return emp?.branch === currentUser?.branch;
         }
         return emp?.department === currentUser?.department;
       }
-      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+      if (currentUserRole === 'team_leader') {
         return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
       }
       return true;
@@ -380,22 +423,22 @@ const Payroll = () => {
   }, [loans, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
  
   const scopedAdvances = useMemo(() => {
-    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return advances;
+    if (perspective === 'self') {
+      return advances.filter(a => a.employeeId === currentUser?.id);
+    }
+    if (!currentUserRole || currentUserRole === 'super_admin' || currentUserRole === 'company_admin') return advances;
     return advances.filter(a => {
       const emp = resolveEmployee(a.employeeId, a.employeeName);
-      if (perspective === 'employee' || currentUserRole === 'employee') {
-        return a.employeeId === currentUser?.id;
-      }
-      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+      if (currentUserRole === 'branch_admin') {
         return emp?.branch === currentUser?.branch;
       }
-      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+      if (currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
         if (currentUser?.branch) {
           return emp?.branch === currentUser?.branch;
         }
         return emp?.department === currentUser?.department;
       }
-      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+      if (currentUserRole === 'team_leader') {
         return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
       }
       return true;
@@ -403,22 +446,22 @@ const Payroll = () => {
   }, [advances, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
  
   const scopedBonuses = useMemo(() => {
-    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return bonuses;
+    if (perspective === 'self') {
+      return bonuses.filter(b => b.employeeId === currentUser?.id);
+    }
+    if (!currentUserRole || currentUserRole === 'super_admin' || currentUserRole === 'company_admin') return bonuses;
     return bonuses.filter(b => {
       const emp = resolveEmployee(b.employeeId, b.employeeName);
-      if (perspective === 'employee' || currentUserRole === 'employee') {
-        return b.employeeId === currentUser?.id;
-      }
-      if (perspective === 'branch_admin' || currentUserRole === 'branch_admin') {
+      if (currentUserRole === 'branch_admin') {
         return emp?.branch === currentUser?.branch;
       }
-      if (perspective === 'manager' || currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
+      if (currentUserRole === 'manager' || currentUserRole === 'dept_admin') {
         if (currentUser?.branch) {
           return emp?.branch === currentUser?.branch;
         }
         return emp?.department === currentUser?.department;
       }
-      if (perspective === 'team_leader' || currentUserRole === 'team_leader') {
+      if (currentUserRole === 'team_leader') {
         return emp?.department === currentUser?.department || emp?.team === currentUser?.team;
       }
       return true;
@@ -426,13 +469,11 @@ const Payroll = () => {
   }, [bonuses, employees, currentUser, currentUserRole, perspective, resolveEmployee]);
 
   const scopedAuditLogs = useMemo(() => {
-    if (!currentUserRole || currentUserRole === 'super_admin' || perspective === 'super_admin') return auditLogs;
-    return auditLogs.filter(log => {
-      if (perspective === 'employee' || currentUserRole === 'employee') {
-        return log.user === currentUser?.name;
-      }
-      return true;
-    });
+    if (perspective === 'self') {
+      return auditLogs.filter(log => log.user === currentUser?.name);
+    }
+    if (!currentUserRole || currentUserRole === 'super_admin' || currentUserRole === 'company_admin') return auditLogs;
+    return auditLogs;
   }, [auditLogs, currentUser, currentUserRole, perspective]);
 
   const monthMap = useMemo(() => ({
@@ -665,6 +706,88 @@ const Payroll = () => {
     });
   }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees, resolveEmployee]);
 
+  const employeeMonthlyPayslips = useMemo(() => {
+    if (!currentUser?.id) return {};
+
+    const months = ['June', 'May', 'April', 'March', 'February', 'January'];
+    const result = {};
+
+    months.forEach(m => {
+      // 1. Find if there is a saved/released payment for this month in payrollState
+      const saved = payrollState.find(p => p.month === m && p.year === year && (
+        p.employeeId === currentUser.id ||
+        (p.employeeName && currentUser.name && p.employeeName.toLowerCase() === currentUser.name.toLowerCase())
+      ));
+
+      if (saved && saved.netSalary > 0) {
+        result[m] = {
+          netSalary: saved.netSalary,
+          status: saved.status,
+          exists: true
+        };
+        return;
+      }
+
+      // 2. Otherwise calculate on the fly for this month
+      // Resolve employee
+      const emp = employees?.find(e => e.id === currentUser.id) || currentUser;
+      const empBasicSalary = Number(emp?.salaryAmount) || 0;
+      const struct = salaryStructures[emp.id || currentUser.id] || {
+        basic: empBasicSalary, hra: 0, travel: 0, medical: 0, special: 0, pf: 0, esi: 0, pt: 0, tds: 0
+      };
+
+      const monthStr = monthMap[m] || '06';
+      const prefix = `${year}-${monthStr}`;
+      const empRecords = (attendance || []).filter(
+        a => a.employeeId === (emp.id || currentUser.id) && a.date && a.date.startsWith(prefix)
+      );
+
+      let absentCount = 0;
+      let lateArrivalsCount = 0;
+      let overtimeHoursCount = 0;
+
+      if (empRecords.length > 0) {
+        absentCount = empRecords.filter(a => a.status === 'Absent').length;
+        lateArrivalsCount = empRecords.filter(a => a.status === 'Late').length;
+        overtimeHoursCount = empRecords.reduce((sum, a) => sum + (parseFloat(a.overtime) || 0), 0);
+      }
+
+      const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
+      const leaveDeduction = absentCount * Math.round((struct.basic || empBasicSalary) / 24);
+      const lateDeduction = lateArrivalsCount * attendanceConfigs.lateArrivalPenalty;
+      const overtimePay = overtimeHoursCount * attendanceConfigs.overtimeHourlyRate;
+
+      const approvedBonuses = bonuses
+        .filter(b => b.employeeId === (emp.id || currentUser.id) && (b.status === 'Super Admin Approved' || b.status === 'Released'))
+        .reduce((sum, curr) => sum + curr.amount, 0);
+
+      const approvedReimbursements = reimbursements
+        .filter(r => r.employeeId === (emp.id || currentUser.id) && (r.status === 'Approved' || r.status === 'Released'))
+        .reduce((sum, curr) => sum + curr.amount, 0);
+
+      const loanEMI = loans
+        .filter(l => l.employeeId === (emp.id || currentUser.id) && l.status === 'Approved')
+        .reduce((sum, curr) => sum + curr.emi, 0);
+
+      const advanceDeduct = advances
+        .filter(a => a.employeeId === (emp.id || currentUser.id) && a.status === 'Approved')
+        .reduce((sum, curr) => sum + curr.amount, 0);
+
+      const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
+      const totalDeductions = statutoryDeductions + leaveDeduction + lateDeduction + loanEMI + advanceDeduct;
+      const grossSalary = (struct.basic || empBasicSalary) + totalAllowances + overtimePay + approvedBonuses;
+      const netSalary = Math.max(0, grossSalary - totalDeductions);
+
+      result[m] = {
+        netSalary,
+        status: 'Pending',
+        exists: false
+      };
+    });
+
+    return result;
+  }, [payrollState, employees, currentUser, salaryStructures, attendance, year, monthMap, attendanceConfigs, bonuses, reimbursements, loans, advances]);
+
   // --- Executive Dashboard KPI aggregations ---
   const totalEmployees = calculatedPayrollData.length;
   const currentMonthCost = calculatedPayrollData.reduce((sum, curr) => sum + curr.netSalary, 0);
@@ -859,8 +982,8 @@ const Payroll = () => {
         }
       }
 
-      // If perspective is Employee, restrict view to current employee only
-      const matchesPerspective = perspective === 'employee' ? row.employeeId === (currentUser?.id || 'EMP-2026-001') : true;
+      // If perspective is Self, restrict view to current employee only
+      const matchesPerspective = perspective === 'self' ? row.employeeId === (currentUser?.id || 'EMP-2026-001') : true;
 
       return matchesSearch && matchesDept && matchesBranch && matchesStatus && matchesPerspective;
     });
@@ -868,13 +991,13 @@ const Payroll = () => {
 
   // Selected Employee Data for Details Tab
   const selectedEmployeeObj = useMemo(() => {
-    const targetId = selectedEmpId || (currentUserRole === 'employee' || perspective === 'employee' ? currentUser?.id : 'EMP-2026-002');
+    const targetId = selectedEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : 'EMP-2026-002');
     return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
   }, [calculatedPayrollData, selectedEmpId, currentUser, currentUserRole, perspective]);
 
   // Selected Employee Payslip Modal Data
   const payslipEmployeeObj = useMemo(() => {
-    const targetId = payslipEmpId || (currentUserRole === 'employee' || perspective === 'employee' ? currentUser?.id : 'EMP-2026-001');
+    const targetId = payslipEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : 'EMP-2026-001');
     return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
   }, [calculatedPayrollData, payslipEmpId, currentUser, currentUserRole, perspective]);
 
@@ -1016,6 +1139,31 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         </div>
 
         <div className="flex-center gap-3 wrap-content">
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
 
           <select value={month} onChange={(e) => setMonth(e.target.value)} className="payroll-selector">
             <option value="January">January</option>
@@ -1031,7 +1179,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
             <option value="2026">2026</option>
           </select>
 
-          {hasPermission('payroll_management', 'create') && (
+          {isCompanyView && hasPermission('payroll_management', 'create') && (
             <Button variant="primary" onClick={handleProcessPayroll} icon={Landmark}>
               Process Payroll
             </Button>
@@ -1042,13 +1190,13 @@ BANK PAYMENT & COMPLIANCE DETAIL:
       {/* Primary Navigation Tabs */}
       <div className="card tab-bar-card overflow-x-auto">
         <div className="payroll-tabs-list">
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('dashboard')} className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}><TrendingUp size={16} />Dashboard & Analytics</button>}
-          <button onClick={() => setActiveTab('processing')} className={`tab-btn ${activeTab === 'processing' ? 'active' : ''}`}><Sliders size={16} />{perspective === 'employee' ? 'My Payslips' : 'Processing Center'}</button>
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('structures')} className={`tab-btn ${activeTab === 'structures' ? 'active' : ''}`}><Settings size={16} />Salary Structures</button>}
-          <button onClick={() => setActiveTab('bonuses')} className={`tab-btn ${activeTab === 'bonuses' ? 'active' : ''}`}><Award size={16} />{perspective === 'employee' ? 'My Bonuses & Incentives' : 'Bonuses & Incentives'}</button>
-          <button onClick={() => setActiveTab('loans')} className={`tab-btn ${activeTab === 'loans' ? 'active' : ''}`}><Scale size={16} />{perspective === 'employee' ? 'My Loans & Advances' : 'Loans & Advances'}</button>
+          {perspective !== 'self' && <button onClick={() => setActiveTab('dashboard')} className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}><TrendingUp size={16} />Dashboard & Analytics</button>}
+          <button onClick={() => setActiveTab('processing')} className={`tab-btn ${activeTab === 'processing' ? 'active' : ''}`}><Sliders size={16} />{perspective === 'self' ? 'My Payslips' : 'Processing Center'}</button>
+          {perspective !== 'self' && <button onClick={() => setActiveTab('structures')} className={`tab-btn ${activeTab === 'structures' ? 'active' : ''}`}><Settings size={16} />Salary Structures</button>}
+          <button onClick={() => setActiveTab('bonuses')} className={`tab-btn ${activeTab === 'bonuses' ? 'active' : ''}`}><Award size={16} />{perspective === 'self' ? 'My Bonuses & Incentives' : 'Bonuses & Incentives'}</button>
+          <button onClick={() => setActiveTab('loans')} className={`tab-btn ${activeTab === 'loans' ? 'active' : ''}`}><Scale size={16} />{perspective === 'self' ? 'My Loans & Advances' : 'Loans & Advances'}</button>
           <button onClick={() => setActiveTab('calendar')} className={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`}><Calendar size={16} />Payroll Calendar</button>
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('audit')} className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}><Database size={16} />Audit Trails & Reports</button>}
+          {perspective !== 'self' && <button onClick={() => setActiveTab('audit')} className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}><Database size={16} />Audit Trails & Reports</button>}
         </div>
       </div>
 
@@ -1064,7 +1212,6 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               </div>
               <h3 className="stat-num">{formatCurrency(currentMonthCost)}</h3>
               <div className="flex-center justify-between font-small text-muted width-full">
-                <span>Prev Month: {formatCurrency(540000)}</span>
                 <span>Active Staff: {totalEmployees}</span>
               </div>
             </div>
@@ -1181,7 +1328,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
 
       {/* ==================== TAB CONTENT: PROCESSING CENTER ==================== */}
       {activeTab === 'processing' && (
-        perspective === 'employee' ? (
+        (perspective === 'self' || perspective === 'employee') ? (
           <div className="personal-payslip-layout animate-fade-in">
             {/* Left Sidebar: Select Month/Year or List of Past Payslips */}
             <div className="payslips-history-sidebar card glass flex-column gap-3">
@@ -1191,8 +1338,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <div className="payslip-periods-list">
                 {['June', 'May', 'April', 'March', 'February', 'January'].map(m => {
                   const isCurrent = month === m;
-                  // Find the payslip object for this month
-                  const periodObj = calculatedPayrollData.find(p => p.month === m && p.year === year);
+                  const periodObj = employeeMonthlyPayslips[m];
                   const isPaid = periodObj?.status === 'Released';
                   
                   return (
@@ -1439,7 +1585,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                                 Payslip
                               </Button>
                               
-                              {perspective !== 'employee' && (
+                              {perspective !== 'self' && perspective !== 'employee' && (
                                 <Button
                                   variant="secondary"
                                   size="sm"
@@ -1452,7 +1598,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                                 />
                               )}
 
-                              {perspective !== 'employee' && row.status !== 'Released' && (
+                              {perspective !== 'self' && perspective !== 'employee' && row.status !== 'Released' && (
                                 <button
                                   className="action-circle-btn success-btn"
                                   onClick={() => handleStatusChange(row.employeeId, 'Released')}
@@ -1658,10 +1804,10 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         <div className="flex-column grid-gap animate-fade-in">
           <div className="flex-center justify-between">
             <div>
-              <h3 className="card-sec-title" style={{ marginBottom: 2 }}>{perspective === 'employee' ? 'My Bonuses & Incentives' : 'Bonus & Incentives Dashboard'}</h3>
+              <h3 className="card-sec-title" style={{ marginBottom: 2 }}>{(perspective === 'self' || perspective === 'employee') ? 'My Bonuses & Incentives' : 'Bonus & Incentives Dashboard'}</h3>
               <p className="subtitle">Recommend performance awards, track verification flow milestones, and monitor disbursements.</p>
             </div>
-            {perspective !== 'employee' && hasPermission('payroll_management', 'create') && (
+            {perspective !== 'self' && perspective !== 'employee' && hasPermission('payroll_management', 'create') && (
               <Button variant="primary" size="sm" icon={Plus} onClick={() => {
                 setBonusForm({ employeeId: employees[0]?.id || '', amount: 10000, type: 'Performance Bonus', remarks: 'Q2 Performance target achievement', effectiveDate: '2026-06-12' });
                 setShowBonusModal(true);
@@ -1671,7 +1817,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
             )}
           </div>
 
-          {perspective === 'employee' ? (
+          {(perspective === 'self' || perspective === 'employee') ? (
             <div className="flex-column grid-gap animate-fade-in">
               {/* Summary Metrics Row */}
               <div className="bonuses-kpi-grid">
@@ -1894,10 +2040,10 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         <div className="flex-column grid-gap animate-fade-in">
           <div className="flex-center justify-between">
             <div>
-              <h3 className="card-sec-title" style={{ marginBottom: 2 }}>{perspective === 'employee' ? 'My Loans & Advances' : 'Loans & Salary Advances Ledger'}</h3>
+              <h3 className="card-sec-title" style={{ marginBottom: 2 }}>{(perspective === 'self' || perspective === 'employee') ? 'My Loans & Advances' : 'Loans & Salary Advances Ledger'}</h3>
               <p className="subtitle">Track outstanding agreements, check monthly recovery deductions, and apply for financial assistance.</p>
             </div>
-            {perspective !== 'employee' && (
+            {perspective !== 'self' && perspective !== 'employee' && (
               <Button
                 variant="primary"
                 size="sm"
@@ -1918,7 +2064,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
             )}
           </div>
 
-          {perspective === 'employee' ? (
+          {(perspective === 'self' || perspective === 'employee') ? (
             <div className="flex-column grid-gap animate-fade-in">
               {/* Employee Personal KPIs */}
               <div className="loans-kpi-grid">

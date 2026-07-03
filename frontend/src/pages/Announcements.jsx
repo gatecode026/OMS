@@ -39,7 +39,8 @@ import {
   Info,
   ExternalLink,
   Laptop,
-  ArrowUpRight
+  ArrowUpRight,
+  TrendingUp
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -62,17 +63,17 @@ import {
 const Announcements = () => {
   const isLoading = usePageLoading(600);
   const {
-    employees,
-    departments,
-    branches,
+    employees = [],
+    departments = [],
+    branches = [],
     showConfirm,
     currentUserRole,
     currentUserId,
     currentUser,
-    announcementsList: announcements,
-    emergencyAlert: activeEmergencyAlert,
-    announcementTrackingLogs: trackingLogs,
-    announcementAuditLogs: auditLogs,
+    announcementsList: announcements = [],
+    emergencyAlert: activeEmergencyAlert = { isActive: false, title: '', description: '', date: '' },
+    announcementTrackingLogs: trackingLogs = [],
+    announcementAuditLogs: auditLogs = [],
     createAnnouncement,
     updateAnnouncement,
     deleteAnnouncement,
@@ -81,18 +82,63 @@ const Announcements = () => {
     addAnnouncementComment,
     deleteAnnouncementComment,
     triggerEmergencyAlert,
-    viewAnnouncement
+    viewAnnouncement,
+    hasPermission
   } = useApp();
 
-  // Selected view perspective override
-  const [perspective, setPerspective] = useState(currentUserRole || 'super_admin');
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('announcements', 'read', 'company');
+    const hasSelfRead = hasPermission('announcements', 'read', 'self');
+
+    const saved = localStorage.getItem('perspective_announcements');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('announcements', 'read', 'company');
+    const hasSelfRead = hasPermission('announcements', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
 
   React.useEffect(() => {
-    setPerspective(currentUserRole || 'super_admin');
-  }, [currentUserRole]);
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_announcements', perspective);
+    }
+  }, [perspective, currentUserRole]);
+
+  React.useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('announcements', 'read', 'company');
+      const hasSelfRead = hasPermission('announcements', 'read', 'self');
+      const saved = localStorage.getItem('perspective_announcements');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
 
   // Sub-navigation tabs
   const [activeTab, setActiveTab] = useState('board');
+
+  React.useEffect(() => {
+    if (perspective === 'self') {
+      setActiveTab('board');
+    }
+  }, [perspective]);
 
   // Categorization inside notice board
   const [boardCategory, setBoardCategory] = useState('All');
@@ -106,7 +152,7 @@ const Announcements = () => {
   // Creation/Edit modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({
-    title: '', category: 'Company', priority: 'Medium', description: '', publishDate: '', expiryDate: '',
+    title: '', category: 'Company', priority: 'Medium', description: '', publishDate: new Date().toISOString().split('T')[0], expiryDate: '',
     audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
   });
 
@@ -120,6 +166,8 @@ const Announcements = () => {
 
   // Page toast alerts
   const [pageToasts, setPageToasts] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [postingComment, setPostingComment] = useState(false);
   const addPageToast = (type, message) => {
     const id = Date.now();
     setPageToasts(prev => [...prev, { id, type, message }]);
@@ -158,7 +206,7 @@ const Announcements = () => {
   }, [trackingLogs]);
 
   const unreadCount = useMemo(() => {
-    return announcements.filter(a => a.status === 'Published' && !a.acknowledgedUsers.includes(currentUserId)).length;
+    return announcements.filter(a => a.status === 'Published' && !(a.acknowledgedUsers || []).includes(currentUserId)).length;
   }, [announcements, currentUserId]);
 
   const priorityMap = {
@@ -209,12 +257,22 @@ const Announcements = () => {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    await createAnnouncement(createForm);
-    setShowCreateModal(false);
-    setCreateForm({
-      title: '', category: 'Company', priority: 'Medium', description: '', publishDate: '', expiryDate: '',
-      audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
-    });
+    setSubmitting(true);
+    try {
+      const created = await createAnnouncement(createForm);
+      if (created) {
+        setSelectedAnn(created);
+      }
+    } catch (err) {
+      console.error('Failed to create announcement:', err);
+    } finally {
+      setSubmitting(false);
+      setShowCreateModal(false);
+      setCreateForm({
+        title: '', category: 'Company', priority: 'Medium', description: '', publishDate: new Date().toISOString().split('T')[0], expiryDate: '',
+        audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
+      });
+    }
   };
 
   const handleEmergencyTrigger = async (type) => {
@@ -238,10 +296,17 @@ const Announcements = () => {
 
   const handleAddComment = async (e) => {
     e.preventDefault();
-    if (!newCommentText.trim()) return;
-    await addAnnouncementComment(selectedAnn.id, newCommentText);
-    setNewCommentText('');
-    addPageToast('success', 'Comment posted.');
+    if (!newCommentText.trim() || postingComment) return;
+    try {
+      setPostingComment(true);
+      await addAnnouncementComment(selectedAnn.id, newCommentText);
+      setNewCommentText('');
+      addPageToast('success', 'Comment posted.');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setPostingComment(false);
+    }
   };
 
   const handleDeleteComment = async (annId, commentId) => {
@@ -251,11 +316,13 @@ const Announcements = () => {
 
   // Filter Notice Board cards
   const filteredBoardData = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
     return announcements.filter(a => {
-      if (a.status !== 'Published') return false;
+      const isLive = a.status === 'Published' || (a.status === 'Scheduled' && (!a.publishDate || a.publishDate <= todayStr));
+      if (!isLive) return false;
       
       const matchesCat = boardCategory === 'All' ? true : a.category === boardCategory;
-      const matchesPerspective = (perspective === 'employee' || currentUserRole === 'employee')
+      const matchesPerspective = (perspective === 'self' || currentUserRole === 'employee')
         ? (a.audienceType === 'All' || 
            (a.audienceType === 'Department' && a.targetAudience?.toLowerCase() === currentUser?.department?.toLowerCase()) || 
            (a.audienceType === 'Branch' && a.targetAudience?.toLowerCase() === currentUser?.branch?.toLowerCase()))
@@ -268,9 +335,9 @@ const Announcements = () => {
   // Filter management center records
   const filteredManagementData = useMemo(() => {
     return announcements.filter(row => {
-      const matchesSearch = row.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            row.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            row.publishedBy.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = (row.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (row.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (row.publishedBy || '').toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesCat = filterCategory ? row.category === filterCategory : true;
       const matchesPriority = filterPriority ? row.priority === filterPriority : true;
@@ -374,8 +441,33 @@ const Announcements = () => {
         </div>
 
         <div className="flex-center gap-3 wrap-content">
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
 
-          {perspective !== 'employee' && (
+          {perspective !== 'self' && (
             <Button variant="primary" onClick={() => setShowCreateModal(true)} icon={Plus}>
               New Announcement
             </Button>
@@ -386,13 +478,13 @@ const Announcements = () => {
       {/* Primary Navigation Tabs */}
       <div className="card tab-bar-card overflow-x-auto">
         <div className="payroll-tabs-list">
-          <button onClick={() => setActiveTab('board')} className={`tab-btn ${activeTab === 'board' ? 'active' : ''}`}><Megaphone size={16} />Digital Notice Board</button>
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('management')} className={`tab-btn ${activeTab === 'management' ? 'active' : ''}`}><Sliders size={16} />Management Center</button>}
-          <button onClick={() => setActiveTab('analytics')} className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}><AreaChart size={16} />Reach & Engagement</button>
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('emergency')} className={`tab-btn ${activeTab === 'emergency' ? 'active' : ''}`}><ShieldAlert size={16} />Emergency Hub</button>}
-          {perspective !== 'employee' && <button onClick={() => setActiveTab('tracking')} className={`tab-btn ${activeTab === 'tracking' ? 'active' : ''}`}><Users size={16} />Compliance Audits</button>}
+          <button onClick={() => setActiveTab('board')} className={`tab-btn ${activeTab === 'board' ? 'active' : ''}`}><Megaphone size={16} />Notice Board</button>
+          {perspective !== 'self' && <button onClick={() => setActiveTab('management')} className={`tab-btn ${activeTab === 'management' ? 'active' : ''}`}><Sliders size={16} />Management Center</button>}
+          {perspective !== 'self' && <button onClick={() => setActiveTab('analytics')} className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}><TrendingUp size={16} />Analytics & Tracking</button>}
         </div>
       </div>
+
+
 
       {/* ==================== TAB CONTENT: Notice Board ==================== */}
       {activeTab === 'board' && (
@@ -419,7 +511,7 @@ const Announcements = () => {
               filteredBoardData.map(ann => {
                 const priorityConfig = priorityMap[ann.priority] || priorityMap.Normal;
                 const hasAcknowledgeRequired = ann.priority === 'Critical';
-                const alreadyAcknowledged = ann.acknowledgedUsers.includes(currentUserId);
+                const alreadyAcknowledged = (ann.acknowledgedUsers || []).includes(currentUserId);
 
                 return (
                   <div
@@ -443,12 +535,12 @@ const Announcements = () => {
                     </h3>
                     
                     <p className="notice-description-preview">
-                      {ann.description.substring(0, 180)}...
+                      {(ann.description || '').substring(0, 180)}...
                     </p>
 
-                    {ann.attachments.length > 0 && (
+                    {(ann.attachments || []).length > 0 && (
                       <div className="attachments-list-chips">
-                        {ann.attachments.map((file, idx) => (
+                        {(ann.attachments || []).map((file, idx) => (
                           <span key={idx} className="file-chip font-xsmall flex-center gap-1" onClick={() => addPageToast('success', `Downloading file: ${file}`)}>
                             <FileText size={12} /> {file}
                           </span>
@@ -471,7 +563,7 @@ const Announcements = () => {
                         <span className="views-count flex-center gap-1 font-xsmall text-muted"><Eye size={12} /> {ann.views}</span>
                         
                         <button
-                          className={`feedback-reaction-btn ${ann.likedBy.includes(currentUserId) ? 'liked' : ''}`}
+                          className={`feedback-reaction-btn ${(ann.likedBy || []).includes(currentUserId) ? 'liked' : ''}`}
                           onClick={() => handleLike(ann.id)}
                           title="Like Announcement"
                         >
@@ -483,7 +575,7 @@ const Announcements = () => {
                           onClick={() => handleSelectAnn(ann)}
                           title="View comments"
                         >
-                          <MessageSquare size={14} /> <span>{ann.comments.length}</span>
+                          <MessageSquare size={14} /> <span>{(ann.comments || []).length}</span>
                         </button>
 
                         {hasAcknowledgeRequired && (
@@ -514,7 +606,7 @@ const Announcements = () => {
       )}
 
       {/* ==================== TAB CONTENT: MANAGEMENT CENTER ==================== */}
-      {activeTab === 'management' && perspective !== 'employee' && (
+      {activeTab === 'management' && perspective !== 'self' && (
         <div className="flex-column grid-gap animate-fade-in">
           {/* Table Filters */}
           <div className="card filter-wrapper-card flex-column gap-3">
@@ -1002,9 +1094,10 @@ const Announcements = () => {
 
               <div className="grid-2-col gap-3">
                 <div>
-                  <label className="input-label">Publish Date (Leave blank for instant)</label>
+                  <label className="input-label">Publish Date</label>
                   <input
                     type="date"
+                    required
                     value={createForm.publishDate}
                     onChange={(e) => setCreateForm(prev => ({ ...prev, publishDate: e.target.value }))}
                     className="table-search-input width-full p-2"
@@ -1036,7 +1129,9 @@ const Announcements = () => {
 
             <div className="flex justify-end gap-3 border-top pt-4 mt-4">
               <Button variant="secondary" type="button" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-              <Button variant="primary" type="submit">Submit & Publish</Button>
+              <Button variant="primary" type="submit" disabled={submitting}>
+                {submitting ? 'Publishing...' : 'Submit & Publish'}
+              </Button>
             </div>
           </form>
         </div>
@@ -1089,25 +1184,25 @@ const Announcements = () => {
                     <span className="font-semibold text-danger">Mandatory Policy Read Confirmation</span>
                     <span className="font-xsmall text-muted">Acknowledged by {selectedAnnDetail.acknowledgements} colleagues</span>
                   </div>
-                  <Button
-                    variant={selectedAnnDetail.acknowledgedUsers.includes(currentUserId) ? 'secondary' : 'primary'}
-                    disabled={selectedAnnDetail.acknowledgedUsers.includes(currentUserId)}
+                   <Button
+                    variant={(selectedAnnDetail.acknowledgedUsers || []).includes(currentUserId) ? 'secondary' : 'primary'}
+                    disabled={(selectedAnnDetail.acknowledgedUsers || []).includes(currentUserId)}
                     onClick={() => handleAcknowledge(selectedAnnDetail.id)}
                     icon={CheckCircle}
                   >
-                    {selectedAnnDetail.acknowledgedUsers.includes(currentUserId) ? 'Already Acknowledged' : 'Click to Acknowledge'}
+                    {(selectedAnnDetail.acknowledgedUsers || []).includes(currentUserId) ? 'Already Acknowledged' : 'Click to Acknowledge'}
                   </Button>
                 </div>
               )}
 
               {/* Discussion Forum */}
               <div className="flex-column gap-3 border-top pt-4">
-                <span className="font-bold flex-center gap-1"><MessageSquare size={16} /> Notice Discussion Board ({selectedAnnDetail.comments.length})</span>
+                <span className="font-bold flex-center gap-1"><MessageSquare size={16} /> Notice Discussion Board ({(selectedAnnDetail.comments || []).length})</span>
                 
                 {/* Comments list */}
                 <div className="comments-box flex-column gap-3 max-height-comments">
-                  {selectedAnnDetail.comments.length > 0 ? (
-                    selectedAnnDetail.comments.map(c => (
+                  {(selectedAnnDetail.comments || []).length > 0 ? (
+                    (selectedAnnDetail.comments || []).map(c => (
                       <div key={c.id} className="comment-balloon flex-row gap-2 p-3 bg-secondary rounded position-relative">
                         <Avatar name={c.user} size="xs" />
                         <div className="flex-column flex-grow-1">
@@ -1139,7 +1234,9 @@ const Announcements = () => {
                     className="table-search-input flex-grow-1"
                     style={{ height: '36px' }}
                   />
-                  <Button variant="primary" type="submit" style={{ height: '36px' }} icon={Send}>Post</Button>
+                  <Button variant="primary" type="submit" style={{ height: '36px' }} icon={Send} disabled={postingComment}>
+                    {postingComment ? 'Posting...' : 'Post'}
+                  </Button>
                 </form>
               </div>
 

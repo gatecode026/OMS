@@ -383,10 +383,8 @@ const EmployeeDetail = () => {
               <button className="id-card-close" onClick={() => setShowIdCard(false)}>✕</button>
               <div className="id-card-render-wrapper" ref={idCardRef}>
                 <div className="id-card-front">
-                  <div className="id-card-front-header-bg"><div className="id-card-watermark"></div></div>
-                  <div className="id-card-front-pink-bg"></div>
                   <div className="id-card-logo-area">
-                    <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#ffffff" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg>
+                    <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="var(--color-primary)" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg>
                     <div className="id-card-company-title">{emp.companyName || generalSettings?.companyName || 'OMS Enterprise'}</div>
                     <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Gatecode OMS'}</div>
                   </div>
@@ -414,7 +412,7 @@ const EmployeeDetail = () => {
                       </div>
                     </div>
                     <div className="id-card-back-qr">
-                      <svg viewBox="0 0 100 100" width="40" height="40" className="id-card-qr-svg"><rect x="0" y="0" width="28" height="28" fill="#0f172a" /><rect x="4" y="4" width="20" height="20" fill="#ffffff" /><rect x="8" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="72" y="0" width="28" height="28" fill="#0f172a" /><rect x="76" y="4" width="20" height="20" fill="#ffffff" /><rect x="80" y="8" width="12" height="12" fill="var(--color-primary)" /><rect x="0" y="72" width="28" height="28" fill="#0f172a" /><rect x="4" y="76" width="20" height="20" fill="#ffffff" /><rect x="8" y="80" width="12" height="12" fill="var(--color-primary)" /><rect x="36" y="4" width="8" height="8" fill="#0f172a" /><rect x="52" y="4" width="8" height="8" fill="#0f172a" /><rect x="44" y="12" width="16" height="8" fill="#0f172a" /><rect x="36" y="24" width="8" height="8" fill="#0f172a" /><rect x="4" y="36" width="8" height="8" fill="#0f172a" /><rect x="16" y="44" width="8" height="8" fill="#0f172a" /><rect x="24" y="36" width="8" height="8" fill="#0f172a" /><rect x="36" y="36" width="16" height="16" fill="var(--color-primary)" /><rect x="40" y="40" width="8" height="8" fill="#ffffff" /><rect x="60" y="36" width="8" height="8" fill="#0f172a" /><rect x="56" y="48" width="8" height="8" fill="#0f172a" /><rect x="36" y="56" width="8" height="8" fill="#0f172a" /><rect x="48" y="60" width="8" height="8" fill="#0f172a" /><rect x="76" y="36" width="8" height="8" fill="#0f172a" /><rect x="84" y="44" width="12" height="8" fill="#0f172a" /><rect x="72" y="56" width="8" height="16" fill="#0f172a" /><rect x="88" y="60" width="8" height="8" fill="var(--color-primary)" /><rect x="36" y="76" width="12" height="8" fill="#0f172a" /><rect x="52" y="72" width="8" height="16" fill="#0f172a" /><rect x="64" y="80" width="8" height="8" fill="var(--color-primary)" /><rect x="76" y="76" width="12" height="8" fill="#0f172a" /><rect x="84" y="84" width="12" height="8" fill="#0f172a" /></svg>
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(JSON.stringify({ employeeId: emp.id, companyId: emp.companyId || 'COMP-A' }))}`} alt="QR Code" width="95" height="95" className="id-card-qr-img" style={{ display: 'block', borderRadius: '4px' }} />
                       <span className="id-qr-label">SCAN ME</span>
                     </div>
                   </div>
@@ -423,8 +421,6 @@ const EmployeeDetail = () => {
                     <div className="id-signature-line"></div>
                     <div className="id-signature-label">Authorized Signatory</div>
                   </div>
-                  <div className="id-card-back-bottom-bg"><div className="id-card-watermark"></div></div>
-                  <div className="id-card-back-pink-bg"></div>
                 </div>
               </div>
               <button className="id-card-download-btn" onClick={downloadIdCard}><Download size={16} /> Download ID Cards</button>

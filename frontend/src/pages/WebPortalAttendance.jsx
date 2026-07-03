@@ -160,7 +160,8 @@ const WebPortalAttendance = () => {
     addAttendanceRecord,
     deleteAttendanceRecord,
     addToast,
-    attendanceRules
+    attendanceRules,
+    currentUser
   } = useApp();
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
 
@@ -219,6 +220,90 @@ const WebPortalAttendance = () => {
   const [bulkActionModal, setBulkActionModal] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('Present');
   const [selectedForBulk, setSelectedForBulk] = useState([]);
+
+  // ── QR Code Scanner State & Logic ──
+  const qrInputRef = useRef(null);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [qrScanInput, setQrScanInput] = useState('');
+  const [qrScanLoading, setQrScanLoading] = useState(false);
+  const [qrScanResult, setQrScanResult] = useState(null);
+
+  // Keep input focused
+  useEffect(() => {
+    if (qrScannerOpen && qrInputRef.current) {
+      const timer = setInterval(() => {
+        if (document.activeElement !== qrInputRef.current) {
+          qrInputRef.current?.focus();
+        }
+      }, 500);
+      return () => clearInterval(timer);
+    }
+  }, [qrScannerOpen]);
+
+  const handleQrSubmit = async (e) => {
+    e.preventDefault();
+    if (!qrScanInput.trim()) return;
+
+    setQrScanLoading(true);
+    setQrScanResult(null);
+
+    try {
+      let parsedData;
+      const rawInput = qrScanInput.trim();
+
+      // Try parsing JSON from scanner (encoded as JSON in QR)
+      try {
+        parsedData = JSON.parse(rawInput);
+      } catch (jsonErr) {
+        // Fallback: If it's a raw string (just the ID), we will use it
+        parsedData = { employeeId: rawInput, companyId: currentUser?.companyId || 'COMP-A' };
+      }
+
+      const { employeeId, companyId } = parsedData;
+
+      if (!employeeId) {
+        throw new Error('Could not resolve employee ID from scanned data.');
+      }
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/qr-punch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ employeeId, companyId: companyId || currentUser?.companyId })
+      });
+
+      const resData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(resData.message || 'Server error occurred during scan validation.');
+      }
+
+      setQrScanResult({
+        success: resData.data.success,
+        message: resData.data.message
+      });
+
+      // Show toast
+      if (resData.data.success) {
+        addToast(resData.data.message, 'success');
+      } else {
+        addToast(resData.data.message, 'warning');
+      }
+
+    } catch (err) {
+      setQrScanResult({
+        success: false,
+        message: err.message || 'Failed to process QR Code scan.'
+      });
+      addToast(err.message || 'Failed to process QR Code scan.', 'error');
+    } finally {
+      setQrScanLoading(false);
+      setQrScanInput('');
+    }
+  };
 
   // ── Persist column visibility ──
   useEffect(() => {
@@ -424,7 +509,6 @@ const WebPortalAttendance = () => {
     });
   }, [employees, wpSearch, wpBranch, wpDept, wpStatus, wpWorkMode, wpState]);
 
-  // ── Statistics ──
   const stats = useMemo(() => {
     const todayRecords = attendance.filter(a => a.date === dateFilter);
     const webPortalToday = todayRecords.filter(a => a.source === 'Web Portal').length;
@@ -441,16 +525,45 @@ const WebPortalAttendance = () => {
       return mins !== null && mins <= lateThresholdMins;
     }).length;
 
+    // ── Yesterday comparison for trend arrows ──
+    const yesterday = new Date(dateFilter);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayRecords = attendance.filter(a => a.date === yesterdayStr);
+    const yesterdayPresent = yesterdayRecords.filter(a => a.status === 'Present' || a.status === 'Overtime').length;
+    const yesterdayMarked = yesterdayRecords.filter(a => a.source === 'Web Portal').length;
+    const yesterdayOnTime = yesterdayRecords.filter(a => {
+      if (!a.punchIn) return false;
+      const mins = timeToMinutes(a.punchIn);
+      return mins !== null && mins <= lateThresholdMins;
+    }).length;
+    const yesterdayAvgHours = yesterdayPresent > 0
+      ? Math.round(yesterdayRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0) / yesterdayPresent * 10) / 10
+      : 0;
+
+    const presentDelta = presentToday - yesterdayPresent;
+    const markedDelta = webPortalToday - yesterdayMarked;
+    const onTimeDelta = presentToday > 0 && yesterdayPresent > 0
+      ? Math.round((onTimeCount / presentToday) * 100) - Math.round((yesterdayOnTime / yesterdayPresent) * 100)
+      : 0;
+    const avgHoursNow = presentToday > 0 ? Math.round(todayRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0) / presentToday * 10) / 10 : 0;
+    const avgHoursDelta = Math.round((avgHoursNow - yesterdayAvgHours) * 10) / 10;
+
     return {
       webPortalToday,
       presentToday,
-      totalEmployees: wpFilteredEmployees.length, // filtered count shown in table header
+      totalEmployees: wpFilteredEmployees.length,
       completionRate,
-      pendingCount: Math.max(0, totalEmployees - webPortalToday), // never negative
+      pendingCount: Math.max(0, totalEmployees - webPortalToday),
       onTimeRate: presentToday > 0 ? Math.round((onTimeCount / presentToday) * 100) : 0,
-      avgHours: presentToday > 0 ? Math.round(todayRecords.reduce((sum, a) => sum + (a.totalHours || 0), 0) / presentToday * 10) / 10 : 0
+      avgHours: avgHoursNow,
+      // Trend deltas vs yesterday
+      presentDelta,
+      markedDelta,
+      onTimeDelta,
+      avgHoursDelta,
     };
-  }, [attendance, dateFilter, wpFilteredEmployees, employees]);
+  }, [attendance, dateFilter, wpFilteredEmployees, employees, attendanceRules]);
 
   // ── Change handlers ──
   const handleWpChange = (empId, field, value) => {
@@ -693,6 +806,9 @@ const WebPortalAttendance = () => {
           <Button variant="primary" onClick={() => setQuickFormOpen(true)} icon={Plus} size="sm">
             Quick Check-in
           </Button>
+          <Button variant="secondary" onClick={() => setQrScannerOpen(true)} icon={Fingerprint} size="sm">
+            Scan ID Card
+          </Button>
           <Button variant="secondary" onClick={handleExportCSV} icon={Download} size="sm">
             Export
           </Button>
@@ -717,7 +833,10 @@ const WebPortalAttendance = () => {
             <span className="wp-stat-label">Total Employees</span>
             <div className="wp-stat-progress"><div className="wp-stat-prog-fill" style={{ width: '100%', background: '#60a5fa' }} /></div>
           </div>
-          <div className="wp-stat-trend wp-trend-up"><TrendingUp size={13} /> <span>+12</span></div>
+          <div className={`wp-stat-trend ${stats.presentDelta >= 0 ? 'wp-trend-up' : 'wp-trend-down'}`}>
+            {stats.presentDelta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+            <span>{stats.presentDelta >= 0 ? '+' : ''}{stats.presentDelta} vs yesterday</span>
+          </div>
         </div>
 
         <div className="wp-stat-card wp-stat-marked">
@@ -747,7 +866,10 @@ const WebPortalAttendance = () => {
             <span className="wp-stat-label">Present Today</span>
             <div className="wp-stat-progress"><div className="wp-stat-prog-fill" style={{ width: stats.totalEmployees > 0 ? `${Math.round((stats.presentToday / stats.totalEmployees) * 100)}%` : '0%', background: '#a78bfa' }} /></div>
           </div>
-          <div className="wp-stat-trend wp-trend-up"><TrendingUp size={13} /> <span>+5</span></div>
+          <div className={`wp-stat-trend ${stats.presentDelta >= 0 ? 'wp-trend-up' : 'wp-trend-down'}`}>
+            {stats.presentDelta >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+            <span>{stats.presentDelta >= 0 ? '+' : ''}{stats.presentDelta} vs yesterday</span>
+          </div>
         </div>
 
         <div className="wp-stat-card wp-stat-ontime">
@@ -1265,6 +1387,95 @@ const WebPortalAttendance = () => {
         </div>
 
       </div>
+
+      {/* ═══ QR Code Scanner Modal ═══ */}
+      <Modal isOpen={qrScannerOpen} onClose={() => { setQrScannerOpen(false); setQrScanResult(null); setQrScanInput(''); }} title="Scan ID Card QR Code" size="md">
+        <div className="qr-scanner-modal-body" style={{ padding: '20px', textAlign: 'center' }}>
+          <div className="qr-scanner-visual" style={{ marginBottom: '20px' }}>
+            <div className="qr-scanner-box" style={{
+              width: '180px',
+              height: '180px',
+              border: '4px dashed var(--color-primary)',
+              borderRadius: '12px',
+              margin: '0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative',
+              overflow: 'hidden',
+              background: '#f8fafc'
+            }}>
+              <Fingerprint size={80} className="text-muted" style={{ opacity: 0.2 }} />
+              <div className="qr-scanner-laser" style={{
+                position: 'absolute',
+                width: '100%',
+                height: '4px',
+                background: 'var(--color-primary)',
+                boxShadow: '0 0 10px var(--color-primary)',
+                top: '10px',
+                left: 0,
+                animation: 'qrScannerLaserAnim 2s infinite linear'
+              }} />
+            </div>
+          </div>
+
+          <p style={{ fontWeight: 500, color: '#475569', marginBottom: '20px' }}>
+            Position the ID card QR code in front of the scanner.
+          </p>
+
+          <form onSubmit={handleQrSubmit}>
+            <input
+              ref={qrInputRef}
+              type="text"
+              value={qrScanInput}
+              onChange={e => setQrScanInput(e.target.value)}
+              placeholder="Scan or enter QR code string..."
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                textAlign: 'center',
+                fontSize: '1rem',
+                fontFamily: 'monospace',
+                marginBottom: '15px'
+              }}
+              autoFocus
+            />
+            <button type="submit" style={{ display: 'none' }} />
+          </form>
+
+          {qrScanLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--color-primary)', fontWeight: 600 }}>
+              <RefreshCw size={18} className="animate-spin" /> Processing Punch...
+            </div>
+          )}
+
+          {qrScanResult && (
+            <div className={`qr-result-box ${qrScanResult.success ? 'success' : 'error'}`} style={{
+              marginTop: '15px',
+              padding: '15px',
+              borderRadius: '8px',
+              background: qrScanResult.success ? '#f0fdf4' : '#fef2f2',
+              border: qrScanResult.success ? '1px solid #bbf7d0' : '1px solid #fecaca',
+              color: qrScanResult.success ? '#15803d' : '#b91c1c',
+              textAlign: 'left'
+            }}>
+              <div style={{ fontWeight: 700, fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                {qrScanResult.success ? <CheckCircle size={18} /> : <XCircle size={18} />}
+                {qrScanResult.success ? 'Punch Registered' : 'Punch Blocked'}
+              </div>
+              <div style={{ fontSize: '0.95rem', lineHeight: 1.4 }}>
+                {qrScanResult.message}
+              </div>
+            </div>
+          )}
+          
+          <div style={{ marginTop: '20px', fontSize: '0.8rem', color: '#64748b' }}>
+            Keep the terminal window active for automatic scanner input focusing.
+          </div>
+        </div>
+      </Modal>
 
       {/* ═══ Quick Check-in Modal ═══ */}
       <Modal isOpen={quickFormOpen} onClose={() => setQuickFormOpen(false)} title="Quick Check-in" size="md">

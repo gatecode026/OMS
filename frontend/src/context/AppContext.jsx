@@ -1,12 +1,43 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE, getBaseRole } from '../permissions/permissions';
-import { connectSocket, disconnectSocket } from '../lib/socketManager';
+import { connectSocket, disconnectSocket, getSocket } from '../lib/socketManager';
 
 const AppContext = createContext(undefined);
+
+const unescapeHtml = (str) => {
+  if (!str || typeof str !== 'string') return str;
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/');
+};
+
+export const normalizeDepartment = (dept) => {
+  if (!dept) return dept;
+  return {
+    ...dept,
+    name: unescapeHtml(dept.name),
+    branch: unescapeHtml(dept.branch),
+    head: unescapeHtml(dept.head)
+  };
+};
 
 export const normalizeEmployee = (emp) => {
   if (!emp) return emp;
   const normalized = { ...emp };
+
+  // Unescape XSS entity encoding on string attributes
+  normalized.name = unescapeHtml(normalized.name);
+  normalized.fullName = unescapeHtml(normalized.fullName);
+  normalized.designation = unescapeHtml(normalized.designation);
+  normalized.department = unescapeHtml(normalized.department);
+  normalized.branch = unescapeHtml(normalized.branch);
+  normalized.branchAgency = unescapeHtml(normalized.branchAgency);
+  normalized.teamLeader = unescapeHtml(normalized.teamLeader);
+  normalized.projectManager = unescapeHtml(normalized.projectManager);
 
   // 1. Employee ID / id / employeeId
   const idVal = normalized.id || normalized.employeeId;
@@ -612,6 +643,44 @@ export const AppProvider = ({ children }) => {
     }
   }, [token, currentUser]);
 
+  // Live socket notification listener to update global notifications & announcements in real time
+  useEffect(() => {
+    if (!currentUser || !token) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNewNotification = (notif) => {
+      console.log('[AppContext] Live socket notification received, refreshing notifications...');
+      fetchNotifications();
+      if (notif && (notif.type === 'announcement' || notif.type === 'Announcement')) {
+        console.log('[AppContext] Announcement notification received, refreshing announcements...');
+        fetchAnnouncements();
+      }
+    };
+
+    const handleSync = (missedNotifs) => {
+      console.log('[AppContext] Live socket sync received, refreshing notifications & announcements...');
+      fetchNotifications();
+      fetchAnnouncements();
+    };
+
+    const handleAnnouncementSync = () => {
+      console.log('[AppContext] Live socket announcement sync, refreshing announcements...');
+      fetchAnnouncements();
+    };
+
+    socket.on('notification:new', handleNewNotification);
+    socket.on('notification:sync', handleSync);
+    socket.on('announcement:sync', handleAnnouncementSync);
+
+    return () => {
+      socket.off('notification:new', handleNewNotification);
+      socket.off('notification:sync', handleSync);
+      socket.off('announcement:sync', handleAnnouncementSync);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, token]);
+
   // Auth Actions
   const login = async (email, password) => {
     if (!email || email.trim().length === 0) {
@@ -630,10 +699,15 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       });
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error('Server returned an invalid response. The backend may still be starting up — please wait a moment and try again.');
+      }
 
-      if (result.status !== 'success') {
-        throw new Error(result.message || 'Authentication failed');
+      if (!result || result.status !== 'success') {
+        throw new Error(result?.message || 'Authentication failed');
       }
 
       const { user, token } = result.data;
@@ -831,9 +905,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchSystemSettings();
-  }, [token]);
+  // fetchSystemSettings is now called inside the main 2-phase loadInitialData effect below
 
   const fetchBranches = async () => {
     if (!token) {
@@ -856,9 +928,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchBranches();
-  }, [token]);
+  // fetchBranches is now called inside the main 2-phase loadInitialData effect below
 
   const fetchDepartments = async () => {
     if (!token) {
@@ -873,7 +943,7 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setDepartments(result.data || []);
+        setDepartments((result.data || []).map(normalizeDepartment));
       }
     } catch (err) {
       console.error('Failed to fetch departments from backend:', err);
@@ -881,9 +951,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchDepartments();
-  }, [token]);
+  // fetchDepartments is now called inside the main 2-phase loadInitialData effect below
 
   const fetchTeams = async () => {
     if (!token) {
@@ -906,9 +974,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchTeams();
-  }, [token]);
+  // fetchTeams is now called inside the main 2-phase loadInitialData effect below
 
   const fetchProjects = async () => {
     if (!token) {
@@ -931,9 +997,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    fetchProjects();
-  }, [token]);
+  // fetchProjects is now called inside the main 2-phase loadInitialData effect below
 
   const fetchAttendance = async () => {
     if (!token) {
@@ -1185,7 +1249,7 @@ export const AppProvider = ({ children }) => {
 
       const newNotif = {
         id: `NTF-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
-        type: 'info',
+        type: 'system',
         title,
         message,
         time: new Date().toISOString(),
@@ -1543,6 +1607,31 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const addDailyReport = async (reportData) => {
+    if (!token) return null;
+    try {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/work-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(reportData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDailyReports();
+        return result.data;
+      } else {
+        throw new Error(result.message || 'Failed to submit work report');
+      }
+    } catch (err) {
+      console.error('Error submitting daily report:', err);
+      addToast('danger', err.message || 'Network error while submitting report.');
+      return null;
+    }
+  };
+
   const fetchAppraisalReviews = async () => {
     if (!token) {
       setAppraisalReviews([]);
@@ -1891,34 +1980,49 @@ export const AppProvider = ({ children }) => {
       return;
     }
     setInitialized(false);
+
     const loadInitialData = async () => {
+      // ─── Phase 1: Critical data — unblocks UI as soon as these complete ───
+      // These are the minimum needed to render the dashboard shell and sidebar.
       try {
         await Promise.allSettled([
           fetchEmployees(),
-          fetchAttendance(),
-          fetchLeaves(),
-          fetchLeavePolicies(),
-          fetchHolidays(),
-          fetchDailyReports(),
-          fetchAppraisalReviews(),
-          fetchPayrollData(),
-          fetchAnnouncements(),
-          fetchEmergencyAlert(),
-          fetchAnnouncementTracking(),
-          fetchAnnouncementAudits(),
-          fetchNotifications(),
-          fetchDocuments(),
-          fetchActivityLogs(),
           fetchRoles(),
-          fetchPermissionModules(),
-          fetchUserOverrides()
+          fetchBranches(),
+          fetchDepartments(),
+          fetchTeams(),
+          fetchSystemSettings(),
+          fetchNotifications()
         ]);
       } catch (err) {
-        console.error('Failed to load initial application state:', err);
+        console.error('[AppContext] Phase 1 load error:', err);
       } finally {
+        // Unlock the UI — dashboard is now visible
         setInitialized(true);
       }
+
+      // ─── Phase 2: Deferred data — loads silently in background ───
+      // These are heavy or less critical; they populate as the user navigates.
+      Promise.allSettled([
+        fetchAttendance(),
+        fetchLeaves(),
+        fetchLeavePolicies(),
+        fetchHolidays(),
+        fetchDailyReports(),
+        fetchAppraisalReviews(),
+        fetchPayrollData(),
+        fetchAnnouncements(),
+        fetchEmergencyAlert(),
+        fetchAnnouncementTracking(),
+        fetchAnnouncementAudits(),
+        fetchDocuments(),
+        fetchActivityLogs(),
+        fetchPermissionModules(),
+        fetchUserOverrides(),
+        fetchProjects()
+      ]).catch(err => console.error('[AppContext] Phase 2 load error:', err));
     };
+
     loadInitialData();
   }, [token]);
 
@@ -1976,7 +2080,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Logging Helper
-  const addActivityLog = async (action, module, status = 'success', details = '', target = '') => {
+  const addActivityLog = (action, module, status = 'success', details = '', target = '') => {
     const logId = `LOG-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
     const logData = {
       id: logId,
@@ -1989,23 +2093,20 @@ export const AppProvider = ({ children }) => {
       ip: '127.0.0.1'
     };
 
+    // Optimistic update — immediately add to local state so UI feels instant
+    setActivityLogs(prev => [logData, ...prev]);
+
     if (token) {
-      try {
-        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/activity-logs', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(logData)
-        });
-        fetchActivityLogs();
-      } catch (err) {
-        console.error('Failed to post activity log:', err);
-        setActivityLogs(prev => [logData, ...prev]);
-      }
-    } else {
-      setActivityLogs(prev => [logData, ...prev]);
+      // Fire-and-forget: do NOT await, do NOT re-fetch the whole list.
+      // This removes 2 blocking requests (POST + GET) from the login critical path.
+      fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/activity-logs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(logData)
+      }).catch(err => console.error('Failed to post activity log:', err));
     }
   };
 
@@ -2148,12 +2249,15 @@ export const AppProvider = ({ children }) => {
         addActivityLog(`Updated details for employee ID: ${id}`, 'Employees', 'success');
         addToast('success', 'Employee details updated successfully!');
         fetchBranches();
+        return true;
       } else {
         addToast('error', result.message || 'Failed to update employee in database');
+        return false;
       }
     } catch (err) {
       console.error('Error updating employee:', err);
       addToast('error', 'Network error while updating employee');
+      return false;
     }
   };
 
@@ -2645,6 +2749,19 @@ export const AppProvider = ({ children }) => {
     });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: status })
+        });
+      } catch (err) {
+        console.error('Failed to sync task progress update to tasks collection:', err);
+      }
+
       addActivityLog(`Updated task status to ${status} (${progress}%)`, 'Tasks', 'success');
       addToast('success', `Task updated successfully.`);
       return updatedTasks.find(t => t.id === id);
@@ -2860,10 +2977,10 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setDepartments(prev => [...prev, result.data]);
+        setDepartments(prev => [...prev, normalizeDepartment(result.data)]);
         addToast('success', `Department "${result.data.name}" added successfully!`);
         addActivityLog(`Added new department: ${result.data.name}`, 'Departments', 'success');
-        return result.data;
+        return normalizeDepartment(result.data);
       } else {
         addToast('error', result.message || 'Failed to add department');
       }
@@ -2885,9 +3002,9 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setDepartments(prev => prev.map(d => d.id === id ? result.data : d));
+        setDepartments(prev => prev.map(d => d.id === id ? normalizeDepartment(result.data) : d));
         addActivityLog(`Updated department ID: ${id}`, 'Departments', 'success');
-        return result.data;
+        return normalizeDepartment(result.data);
       } else {
         addToast('error', result.message || 'Failed to update department');
       }
@@ -3183,6 +3300,19 @@ export const AppProvider = ({ children }) => {
     });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+      } catch (err) {
+        console.error('Failed to sync task status update to tasks collection:', err);
+      }
+
       addActivityLog(`Moved task to ${newStatus}`, 'Tasks', 'success');
       addToast('success', `Task moved to ${newStatus}.`);
       return updatedTasks.find(t => t.id === id);
@@ -3229,9 +3359,8 @@ export const AppProvider = ({ children }) => {
       comments: [],
       attachments: [],
       approvals: [
-        { level: 1, role: 'Employee', approver: assignee ? assignee.name : 'Employee', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 2, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
-        { level: 3, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' }
+        { level: 1, role: 'Team Leader Approval', approver: project.leader || 'Team Leader', status: 'Pending', timestamp: '', remarks: '' },
+        { level: 2, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
         { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
@@ -3249,6 +3378,28 @@ export const AppProvider = ({ children }) => {
     });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            id: nextTaskId,
+            title: newTask.title,
+            description: newTask.description,
+            status: newTask.status,
+            priority: newTask.priority,
+            dueDate: newTask.dueDate,
+            assigneeId: newTask.assigneeId,
+            assigneeName: newTask.assigneeName
+          })
+        });
+      } catch (err) {
+        console.error('Failed to save task in tasks collection:', err);
+      }
+
       addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
       addToast('success', 'Task created successfully.');
 
@@ -3283,6 +3434,17 @@ export const AppProvider = ({ children }) => {
     });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+      } catch (err) {
+        console.error('Failed to delete task from tasks collection:', err);
+      }
+
       addActivityLog(`Deleted task "${id}"`, 'Tasks', 'danger');
       addToast('warning', `Task deleted.`);
     }
@@ -3316,6 +3478,22 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            assigneeId: assigneeId,
+            assigneeName: assigneeName
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync task reassignment to tasks collection:', err);
+      }
+
       addActivityLog(`Reassigned task ${taskId} to ${assigneeName}`, 'Tasks', 'info');
       addToast('info', `Task reassigned to ${assigneeName}`);
       return updatedTasks.find(t => t.id === taskId);
@@ -3348,6 +3526,21 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            dueDate: newDate
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync task deadline extension to tasks collection:', err);
+      }
+
       addActivityLog(`Extended deadline for task ${taskId} to ${newDate}`, 'Tasks', 'warning');
       addToast('success', `Extended deadline to ${newDate}`);
       return updatedTasks.find(t => t.id === taskId);
@@ -3380,6 +3573,21 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            priority: 'Critical'
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync task escalation to tasks collection:', err);
+      }
+
       addActivityLog(`Escalated task ${taskId} to Critical priority`, 'Tasks', 'danger');
       addToast('error', `Task ${taskId} escalated to Critical!`);
       return updatedTasks.find(t => t.id === taskId);
@@ -3477,8 +3685,10 @@ export const AppProvider = ({ children }) => {
       let finalStatus = t.status || 'To Do';
       const allCompleted = updatedApprovals.every(app => app.status === 'Approved');
       if (allCompleted) {
+        // L2 (Project Manager) approved — task is fully done
         finalStatus = 'Done';
-      } else if (level === 2) {
+      } else if (level === 1) {
+        // L1 (Team Leader) approved — keep in In Review awaiting Project Manager
         finalStatus = 'In Review';
       }
 
@@ -4239,7 +4449,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Check RBAC permission helper with Overrides support
-  const hasPermission = (module, action) => {
+  const hasPermission = (module, action, perspective = null) => {
     const normalizedRole = (currentUserRole || '').toLowerCase();
     
     // Super admin and company admin have permission for everything
@@ -4324,26 +4534,53 @@ export const AppProvider = ({ children }) => {
       'team_management': 'teams',
       'system_settings': 'settings',
       'document_management': 'documents',
-      'notifications': 'notifications'
+      'notifications': 'notifications',
+      'announcements': 'announcements',
+      'meetings_calendar': 'meetings_calendar',
+      'work_reports': 'work_reports'
     };
 
-    const dbKey = MODULE_MAPPING[module] || module;
-    const isDbBacked = Object.values(MODULE_MAPPING).includes(dbKey) || Object.keys(MODULE_MAPPING).includes(module);
+    const HIERARCHICAL_MODULES = [
+      'attendance_management', 'attendance',
+      'leave_management', 'leaves',
+      'project_management', 'projects',
+      'task_monitoring', 'tasks',
+      'payroll_management', 'payroll',
+      'work_reports',
+      'meetings_calendar',
+      'announcements'
+    ];
+
+    const baseKey = MODULE_MAPPING[module] || module;
+
+    const isHierarchical = HIERARCHICAL_MODULES.includes(baseKey) || HIERARCHICAL_MODULES.includes(module);
+    const activePerspective = perspective || (currentUserRole === 'employee' ? 'self' : 'company');
+
+    const isDbBacked = Object.values(MODULE_MAPPING).includes(baseKey) || Object.keys(MODULE_MAPPING).includes(module);
 
     if (isDbBacked) {
       const roleObj = roles.find(r => r.id === rawUserRole) || 
                       roles.find(r => r.id === currentUserRole) || 
                       roles.find(r => getBaseRole(r.id) === currentUserRole);
       const permissions = roleObj?.permissions;
-      const dbPermission = permissions
-        ? (permissions[module] !== undefined ? permissions[module] : permissions[dbKey])
-        : undefined;
+      
+      let dbPermission;
+      if (permissions) {
+        if (isHierarchical && activePerspective === 'self') {
+          const selfModKey = `${module}_self`;
+          const selfBaseKey = `${baseKey}_self`;
+          dbPermission = permissions[selfModKey] !== undefined ? permissions[selfModKey] : 
+                         (permissions[selfBaseKey] !== undefined ? permissions[selfBaseKey] : 
+                         (permissions[module] !== undefined ? permissions[module] : permissions[baseKey]));
+        } else {
+          dbPermission = permissions[module] !== undefined ? permissions[module] : permissions[baseKey];
+        }
+      }
 
       if (dbPermission !== undefined) {
         const res = !!dbPermission?.[action];
         console.log('hasPermission DB-backed details:', {
           module,
-          dbKey,
           action,
           currentUserRole,
           result: res
@@ -4373,11 +4610,36 @@ export const AppProvider = ({ children }) => {
 
   // Memoize the normalized employees array to prevent creating a new reference
   // on every render, which would cause all context consumers to re-render infinitely.
-  // Also dynamically resolve branch and department for manager roles.
+  // Also dynamically resolve branch and department for manager roles, and today's attendance details.
   const memoizedEmployees = useMemo(() => {
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+
     return (employees || []).map(emp => {
       const normalized = normalizeEmployee(emp);
-      if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager' || (normalized.roleId && normalized.roleId.includes('manager')) || (normalized.role && normalized.role.toLowerCase().includes('manager')))) {
+      if (!normalized) return normalized;
+
+      // Resolve today's attendance status dynamically
+      const todayRecord = (attendance || []).find(
+        record => record.employeeId === normalized.id && record.date === todayStr
+      );
+      if (todayRecord) {
+        normalized.attendanceStatus = todayRecord.status || 'Present';
+        normalized.todayPunchStatus = todayRecord.status === 'Absent' ? 'Not Punched' : 'Punched In';
+        normalized.todayPunchIn = todayRecord.punchIn || null;
+        normalized.todayPunchOut = todayRecord.punchOut || null;
+        normalized.todayWorkingHours = todayRecord.totalHours || 0;
+        normalized.punchIn = todayRecord.punchIn || null;
+        normalized.punchOut = todayRecord.punchOut || null;
+        normalized.totalHours = todayRecord.totalHours || 0;
+      }
+
+      if (normalized.roleId === 'manager' || normalized.role === 'Manager' || (normalized.roleId && normalized.roleId.includes('manager')) || (normalized.role && normalized.role.toLowerCase().includes('manager'))) {
         const hasNoBranch = !normalized.branch || normalized.branch === '—' || normalized.branch === '-';
         if (hasNoBranch) {
           const foundBranch = (branches || []).find(
@@ -4391,11 +4653,33 @@ export const AppProvider = ({ children }) => {
       }
       return normalized;
     });
-  }, [employees, branches, departments]);
+  }, [employees, branches, departments, attendance]);
 
   const memoizedCurrentUser = useMemo(() => {
     if (!currentUser) return null;
+    const todayStr = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })();
+
     const normalized = normalizeEmployee(currentUser);
+    const todayRecord = (attendance || []).find(
+      record => record.employeeId === normalized.id && record.date === todayStr
+    );
+    if (todayRecord) {
+      normalized.attendanceStatus = todayRecord.status || 'Present';
+      normalized.todayPunchStatus = todayRecord.status === 'Absent' ? 'Not Punched' : 'Punched In';
+      normalized.todayPunchIn = todayRecord.punchIn || null;
+      normalized.todayPunchOut = todayRecord.punchOut || null;
+      normalized.todayWorkingHours = todayRecord.totalHours || 0;
+      normalized.punchIn = todayRecord.punchIn || null;
+      normalized.punchOut = todayRecord.punchOut || null;
+      normalized.totalHours = todayRecord.totalHours || 0;
+    }
+
     if (normalized && (normalized.roleId === 'manager' || normalized.role === 'Manager' || (normalized.roleId && normalized.roleId.includes('manager')) || (normalized.role && normalized.role.toLowerCase().includes('manager')))) {
       const hasNoBranch = !normalized.branch || normalized.branch === '—' || normalized.branch === '-';
       if (hasNoBranch) {
@@ -4409,7 +4693,7 @@ export const AppProvider = ({ children }) => {
       }
     }
     return normalized;
-  }, [currentUser, branches, departments]);
+  }, [currentUser, branches, departments, attendance]);
 
 
   return (
@@ -4485,6 +4769,7 @@ export const AppProvider = ({ children }) => {
         deleteUserOverride,
         dailyReports,
         setDailyReports,
+        addDailyReport,
         updateDailyReportStatus,
         appraisalReviews,
         addAppraisalReview,

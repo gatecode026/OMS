@@ -3,6 +3,7 @@
  * @description Data Access layer for Employees module using Mongoose model.
  */
 
+import bcrypt from 'bcryptjs';
 import Employee from './employees.model.js';
 import Admin from '../admin/admin.model.js';
 import Company from '../companies/company.model.js';
@@ -11,10 +12,14 @@ import { processEmployeeAssets } from '../../utils/imagekit.js';
 import { getTenantId } from '../../utils/tenantContext.js';
 import { CacheKeys, TTL, cacheGetOrSet, cacheDel } from '../../services/cache.service.js';
 
+// Security and Query Builder Imports
+import { resolveSecurityContext } from '../../security/scopeEngine.js';
+import { validateRepositoryAccess, getQueryLogging } from '../../security/repositoryContract.js';
+import { EmployeeQueryBuilder } from './employees.queryBuilder.js';
+
 /**
  * Sync real-time employee counts back into Branch and Department stored fields.
  * This is a passive sync that runs after employee create/update/delete.
- * The primary accurate count comes from dynamic aggregation at query time.
  * @param {String} companyId - The tenant/company ID
  * @param {String[]} branchNames - Branch names whose count should be refreshed
  * @param {String[]} deptNames - Department names whose count should be refreshed
@@ -61,21 +66,34 @@ const syncBranchDeptCounts = async (companyId, branchNames = [], deptNames = [])
  */
 export const find = async (query = {}) => {
   const companyId = getTenantId();
-  const queryKeys = Object.keys(query).filter(k => k !== 'companyId');
+
+  const context = resolveSecurityContext();
+  const builder = new EmployeeQueryBuilder(context);
+  const filters = builder.buildReadQuery(query);
+
+  const queryKeys = Object.keys(filters).filter(k => k !== 'companyId');
   const isListQuery = queryKeys.length === 0;
+
+  if (getQueryLogging()) {
+    logger.info(`[DEBUGLOG] EmployeesRepository::find:
+    - Incoming Query: ${JSON.stringify(query)}
+    - Security Context: ${JSON.stringify(context || {})}
+    - Final Mongo Query: ${JSON.stringify(filters)}
+    - Decision: APPROVED`);
+  }
 
   if (isListQuery && companyId) {
     const cacheKey = CacheKeys.empList(companyId);
     return cacheGetOrSet(cacheKey, async () => {
       logger.info('EmployeesRepository::find querying employees from database...');
-      return Employee.find(query)
+      return Employee.find(filters)
         .select('-attendanceHistory -overtimeHistory -leaveHistory -taskHistory -activityLog -documents')
         .lean();
     }, TTL.EMPLOYEE_LIST);
   }
 
   logger.info('EmployeesRepository::find querying filtered employees from database...');
-  return Employee.find(query)
+  return Employee.find(filters)
     .select('-attendanceHistory -overtimeHistory -leaveHistory -taskHistory -activityLog -documents')
     .lean();
 };
@@ -86,36 +104,55 @@ export const find = async (query = {}) => {
  */
 export const findOne = async (id) => {
   const companyId = getTenantId();
+  const context = resolveSecurityContext();
+
+  const fetchUser = async () => {
+    let user = await Employee.findOne({ id }).lean();
+    if (!user) {
+      logger.info(`EmployeesRepository::findOne employee not found, querying admin with ID: ${id}`);
+      user = await Admin.findOne({ id }).lean();
+    }
+    if (!user && (id.startsWith('COMP-') || id.startsWith('comp-'))) {
+      logger.info(`EmployeesRepository::findOne user not found, querying company with ID: ${id}`);
+      const company = await Company.findOne({ id }).lean();
+      if (company) {
+        user = {
+          ...company,
+          roleId: 'company_admin',
+          role: 'CompanyAdmin',
+          companyId: company.id
+        };
+      }
+    }
+    return user;
+  };
+
+  let user;
   if (companyId) {
     const cacheKey = CacheKeys.user(companyId, id);
-    return cacheGetOrSet(cacheKey, async () => {
-      logger.info(`EmployeesRepository::findOne querying employee with ID: ${id}`);
-      let user = await Employee.findOne({ id });
-      if (!user) {
-        logger.info(`EmployeesRepository::findOne employee not found, querying admin with ID: ${id}`);
-        user = await Admin.findOne({ id });
-      }
-      if (!user && (id.startsWith('COMP-') || id.startsWith('comp-'))) {
-        logger.info(`EmployeesRepository::findOne user not found, querying company with ID: ${id}`);
-        const company = await Company.findOne({ id }).lean();
-        if (company) {
-          user = {
-            ...company,
-            roleId: 'company_admin',
-            role: 'CompanyAdmin',
-            companyId: company.id
-          };
-        }
-      }
-      return user;
-    }, TTL.USER_PROFILE);
+    user = await cacheGetOrSet(cacheKey, fetchUser, TTL.USER_PROFILE);
+  } else {
+    user = await fetchUser();
   }
 
-  logger.info(`EmployeesRepository::findOne querying employee without tenant context: ${id}`);
-  let user = await Employee.findOne({ id });
-  if (!user) {
-    user = await Admin.findOne({ id });
+  // Enforce repository scope validation for standard Employee records
+  if (user && user.roleId !== 'company_admin' && user.roleId !== 'super_admin' && user.branch !== undefined) {
+    if (context) {
+      await validateRepositoryAccess('read', user, {
+        ownerIdFields: ['id'],
+        moduleName: 'Employee'
+      });
+    }
   }
+
+  if (getQueryLogging()) {
+    logger.info(`[DEBUGLOG] EmployeesRepository::findOne:
+    - ID: ${id}
+    - Security Context: ${JSON.stringify(context || {})}
+    - Final Mongo Query: { id: "${id}" }
+    - Decision: APPROVED`);
+  }
+
   return user;
 };
 
@@ -125,6 +162,16 @@ export const findOne = async (id) => {
  */
 export const save = async (data) => {
   logger.info(`EmployeesRepository::save creating employee: ${data.name}`);
+  const context = resolveSecurityContext();
+
+  // Validate that user is allowed to create this employee under the specified branch/department scope
+  if (context) {
+    await validateRepositoryAccess('create', data, {
+      ownerIdFields: [],
+      moduleName: 'Employee'
+    });
+  }
+
   const processedData = await processEmployeeAssets(data);
   const employee = await Employee.create(processedData);
   try {
@@ -133,16 +180,22 @@ export const save = async (data) => {
   } catch (err) {
     logger.error('Error registering tenant user in registry:', err);
   }
+  
   // Passively sync stored branch/department counts
   syncBranchDeptCounts(employee.companyId, [employee.branch], [employee.department]);
 
   // Invalidate cache
   cacheDel(CacheKeys.empList(employee.companyId)).catch(() => {});
 
+  if (getQueryLogging()) {
+    logger.info(`[DEBUGLOG] EmployeesRepository::save:
+    - Input: ${JSON.stringify(data)}
+    - Security Context: ${JSON.stringify(context || {})}
+    - Decision: APPROVED`);
+  }
+
   return employee;
 };
-
-import bcrypt from 'bcryptjs';
 
 /**
  * Update an existing employee record
@@ -151,6 +204,32 @@ import bcrypt from 'bcryptjs';
  */
 export const update = async (id, data) => {
   logger.info(`EmployeesRepository::update updating employee with ID: ${id}`);
+  const context = resolveSecurityContext();
+
+  // Fetch the existing employee record to validate scope
+  const oldEmployee = await Employee.findOne({ id }).lean();
+
+  if (oldEmployee) {
+    if (context) {
+      await validateRepositoryAccess('update', oldEmployee, {
+        ownerIdFields: ['id'],
+        updatePayload: data,
+        moduleName: 'Employee'
+      });
+    }
+  }
+
+  // Also validate that the update payload does not move the employee outside the user's scope
+  if (context) {
+    if (data.branch !== undefined || data.department !== undefined) {
+      const mergedPayload = { ...oldEmployee, ...data };
+      await validateRepositoryAccess('update', mergedPayload, {
+        ownerIdFields: ['id'],
+        moduleName: 'Employee'
+      });
+    }
+  }
+
   const updateData = await processEmployeeAssets(data);
   if (updateData.password === '••••••••' || !updateData.password) {
     delete updateData.password;
@@ -160,7 +239,6 @@ export const update = async (id, data) => {
     updateData.password = await bcrypt.hash(updateData.password, salt);
   }
   
-  const oldEmployee = await Employee.findOne({ id }).lean();
   let updated = await Employee.findOneAndUpdate({ id }, updateData, { new: true, runValidators: true });
   
   if (updated && oldEmployee && oldEmployee.email !== updated.email) {
@@ -205,6 +283,7 @@ export const update = async (id, data) => {
       updated.companyId = updated.id;
     }
   }
+
   // Passively sync stored branch/department counts for old and new values
   if (updated) {
     const affectedBranches = [updated.branch, oldEmployee?.branch].filter(Boolean);
@@ -220,6 +299,15 @@ export const update = async (id, data) => {
       ).catch(() => {});
     }
   }
+
+  if (getQueryLogging()) {
+    logger.info(`[DEBUGLOG] EmployeesRepository::update:
+    - ID: ${id}
+    - Update Payload: ${JSON.stringify(data)}
+    - Security Context: ${JSON.stringify(context || {})}
+    - Decision: APPROVED`);
+  }
+
   return updated;
 };
 
@@ -229,7 +317,18 @@ export const update = async (id, data) => {
  */
 export const remove = async (id) => {
   logger.info(`EmployeesRepository::remove deleting employee with ID: ${id}`);
+  const context = resolveSecurityContext();
+
   const employee = await Employee.findOne({ id }).lean();
+  if (employee) {
+    if (context) {
+      await validateRepositoryAccess('delete', employee, {
+        ownerIdFields: ['id'],
+        moduleName: 'Employee'
+      });
+    }
+  }
+
   const deleted = await Employee.findOneAndDelete({ id });
   if (deleted && employee) {
     try {
@@ -252,6 +351,14 @@ export const remove = async (id) => {
       ).catch(() => {});
     }
   }
+
+  if (getQueryLogging()) {
+    logger.info(`[DEBUGLOG] EmployeesRepository::remove:
+    - ID: ${id}
+    - Security Context: ${JSON.stringify(context || {})}
+    - Decision: APPROVED`);
+  }
+
   return deleted;
 };
 

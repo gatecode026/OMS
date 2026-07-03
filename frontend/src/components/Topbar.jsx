@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import './Topbar.css';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
+import { getSocket } from '../lib/socketManager';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import Avatar from './common/Avatar';
 import Badge from './common/Badge';
@@ -91,6 +92,7 @@ const Topbar = ({ onMenuToggle }) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [meetingsOpen, setMeetingsOpen] = useState(false);
+  const [hasUnseenEvents, setHasUnseenEvents] = useState(false);
 
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
@@ -117,11 +119,40 @@ const Topbar = ({ onMenuToggle }) => {
     }
   };
 
+  // Fetch upcoming events on mount/token change
   useEffect(() => {
-    if (meetingsOpen) {
+    fetchUpcomingEvents();
+  }, [token]);
+
+  // Handle live socket event updates for Meetings/Events in real-time
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleEventSync = () => {
+      console.log('[Topbar] Live socket event sync, refreshing upcoming events...');
       fetchUpcomingEvents();
+      if (!meetingsOpen) {
+        setHasUnseenEvents(true);
+      }
+    };
+
+    socket.on('event:sync', handleEventSync);
+    socket.on('notification:new', handleEventSync);
+
+    return () => {
+      socket.off('event:sync', handleEventSync);
+      socket.off('notification:new', handleEventSync);
+    };
+  }, [token, meetingsOpen]);
+
+  const handleCalendarClick = () => {
+    const nextOpen = !meetingsOpen;
+    setMeetingsOpen(nextOpen);
+    if (nextOpen) {
+      setHasUnseenEvents(false);
     }
-  }, [meetingsOpen, token]);
+  };
 
   const upcomingMeetings = useMemo(() => upcomingEvents.filter(e => e.type === 'meeting'), [upcomingEvents]);
   const upcomingOthers = useMemo(() => upcomingEvents.filter(e => e.type !== 'meeting'), [upcomingEvents]);
@@ -395,10 +426,23 @@ const Topbar = ({ onMenuToggle }) => {
         <div className="topbar-dropdown-wrapper" ref={meetingsRef}>
           <button 
             className="topbar-icon-btn"
-            onClick={() => setMeetingsOpen(!meetingsOpen)}
+            onClick={handleCalendarClick}
             title="Meetings & Calendar"
+            style={{ position: 'relative' }}
           >
             <Calendar size={20} />
+            {hasUnseenEvents && upcomingEvents.length > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '6px',
+                right: '6px',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#ef4444',
+                border: '1.5px solid var(--bg-card, #0f172a)'
+              }} />
+            )}
           </button>
 
           {meetingsOpen && (

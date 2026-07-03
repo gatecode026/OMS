@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import './Attendance.css';
+import './EmployeeDashboard.css';
 import { useApp } from '../context/AppContext';
 import { FIELD_LABELS } from '../utils/fieldLabels';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +13,7 @@ import MonthlyDonutChart from '../components/MonthlyDonutChart';
 import LiveActivityFeed from '../components/LiveActivityFeed';
 import useMyAttendance from '../hooks/useMyAttendance';
 import usePageLoading from '../hooks/usePageLoading';
+import MarkAttendanceModal from '../components/employeeDashboard/modals/MarkAttendanceModal';
 import DataTable from '../components/common/DataTable';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
@@ -201,9 +203,10 @@ const Attendance = () => {
     addToast,
     currentUser,
     currentUserRole,
-    fetchAttendance,
     fetchEmployees,
-    attendanceRules
+    fetchAttendance,
+    attendanceRules,
+    hasPermission
   } = useApp();
 
   const [personalTab, setPersonalTab] = useState('today'); // today, 7days, month, custom
@@ -241,6 +244,16 @@ const Attendance = () => {
     refetch: personalRefetch
   } = useMyAttendance(personalFilters);
 
+  console.log('DEBUG Attendance.jsx: personalTodayRecord =', personalTodayRecord, 'loading =', personalLoading);
+
+  const canManageAttendance = useMemo(() => {
+    if (typeof hasPermission !== 'function') return true;
+    return hasPermission('attendance_management', 'create') || 
+           hasPermission('attendance_management', 'update') || 
+           hasPermission('attendance_management', 'approve') ||
+           hasPermission('attendance_management', 'delete');
+  }, [hasPermission]);
+
   const scopedEmployees = useMemo(() => {
     if (!currentUserRole || currentUserRole === 'super_admin') return employees;
     if (currentUserRole === 'branch_admin') {
@@ -255,8 +268,61 @@ const Attendance = () => {
     return employees;
   }, [employees, currentUser, currentUserRole]);
 
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('attendance_management', 'read', 'company');
+    const hasSelfRead = hasPermission('attendance_management', 'read', 'self');
+    
+    const saved = localStorage.getItem('perspective_attendance');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('attendance_management', 'read', 'company');
+    const hasSelfRead = hasPermission('attendance_management', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
+
+  useEffect(() => {
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_attendance', perspective);
+    }
+  }, [perspective, currentUserRole]);
+
+  useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('attendance_management', 'read', 'company');
+      const hasSelfRead = hasPermission('attendance_management', 'read', 'self');
+      const saved = localStorage.getItem('perspective_attendance');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
+
   // Active view tab state
-  const [activeSection, setActiveSection] = useState(currentUserRole === 'employee' ? 'records' : 'overview');
+  const [activeSection, setActiveSection] = useState('records');
+
+  useEffect(() => {
+    if (perspective === 'self') {
+      setActiveSection('records');
+    } else {
+      setActiveSection('overview');
+    }
+  }, [perspective]);
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -298,6 +364,7 @@ const Attendance = () => {
 
   // Mark Attendance state
   const [markModalOpen, setMarkModalOpen] = useState(false);
+  const [selfAttModalOpen, setSelfAttModalOpen] = useState(false);
   const [markFormData, setMarkFormData] = useState({
     employeeId: '',
     employeeName: '',
@@ -327,10 +394,10 @@ const Attendance = () => {
   }, [currentUser, currentUserRole]);
 
   useEffect(() => {
-    if (currentUserRole === 'employee') {
+    if (perspective === 'self') {
       setActiveSection('records');
     }
-  }, [currentUserRole]);
+  }, [perspective]);
 
   // Auto-calculate hours for Edit Modal
   useEffect(() => {
@@ -704,7 +771,7 @@ const Attendance = () => {
 
   // Process and Filter Attendance Ledger
   const ledgerData = useMemo(() => {
-    if (currentUserRole === 'employee') {
+    if (isEmployeeView) {
       const dates = getDatesRange(timeRangeFilter);
       const records = [];
       
@@ -859,7 +926,7 @@ const Attendance = () => {
         ? a.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           a.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
-      const matchesDate = (currentUserRole === 'employee' || !dateFilter) ? true : a.date === dateFilter;
+      const matchesDate = (isEmployeeView || !dateFilter) ? true : a.date === dateFilter;
       const matchesDept = deptFilter ? a.department === deptFilter : true;
       const matchesBranch = (() => {
         if (!branchFilter) return true;
@@ -972,7 +1039,7 @@ const Attendance = () => {
         ? a.employeeName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           a.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
         : true;
-      const matchesDate = (currentUserRole === 'employee' || !dateFilter) ? true : a.date === dateFilter;
+      const matchesDate = (isEmployeeView || !dateFilter) ? true : a.date === dateFilter;
       const matchesDept = deptFilter ? a.department === deptFilter : true;
       const matchesBranch = (() => {
         if (!branchFilter) return true;
@@ -1019,6 +1086,12 @@ const Attendance = () => {
   }, [scopedEmployees, searchQuery, deptFilter, branchFilter, shiftFilter]);
 
   const totalEmployees = filteredEmployeesCount;
+
+  const joinedThisMonth = useMemo(() => {
+    const currentYearMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+    return scopedEmployees.filter(e => e.joinDate && e.joinDate.startsWith(currentYearMonth)).length;
+  }, [scopedEmployees]);
+
   const totalPresent = useMemo(() => kpiFilteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length, [kpiFilteredAttendance]);
   const totalLate = useMemo(() => kpiFilteredAttendance.filter(a => a.status === 'Late').length, [kpiFilteredAttendance]);
   const totalAbsent = useMemo(() => kpiFilteredAttendance.filter(a => a.status === 'Absent').length, [kpiFilteredAttendance]);
@@ -1030,6 +1103,30 @@ const Attendance = () => {
     const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
     return Math.min(rawRate, 100);
   }, [totalEmployees, totalPresent, totalHalfDay, totalWFH]);
+
+  const rateComparison = useMemo(() => {
+    const today = new Date(dateFilter || getLocalDateString());
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const yesterdayRecords = (attendance || []).filter(a => a.date === yesterdayStr);
+    const scopedYesterdayRecords = yesterdayRecords.filter(a => {
+      const emp = scopedEmployees.find(e => e.id === a.employeeId);
+      return !!emp;
+    });
+
+    const yesterdayPresent = scopedYesterdayRecords.filter(a => ['Present', 'Overtime'].includes(a.status)).length;
+    const yesterdayHalfDay = scopedYesterdayRecords.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
+    const yesterdayWFH = scopedYesterdayRecords.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length;
+
+    const yesterdayRate = totalEmployees > 0 ? Math.round(((yesterdayPresent + yesterdayHalfDay + yesterdayWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
+    const rateDiff = attendanceRate - Math.min(yesterdayRate, 100);
+    return {
+      diff: rateDiff,
+      label: `${rateDiff >= 0 ? '+' : ''}${rateDiff}% vs yesterday`
+    };
+  }, [attendance, dateFilter, scopedEmployees, totalEmployees, attendanceRate]);
 
   // Get counts by status for clickable cards
   const statusCounts = useMemo(() => {
@@ -1240,7 +1337,7 @@ const Attendance = () => {
         )
       }
     ];
-    if (currentUserRole === 'employee') {
+    if (currentUserRole === 'employee' || !canManageAttendance) {
       return cols.filter(c => c.key !== 'actions');
     }
     return cols;
@@ -1323,7 +1420,7 @@ const Attendance = () => {
     addToast('success', 'Attendance report downloaded successfully.');
   };
 
-  if (currentUserRole === 'employee') {
+  if (isEmployeeView) {
     if (personalLoading && personalRecords.length === 0) {
       return (
         <div className="attendance-page flex-column grid-gap padding-4">
@@ -1364,7 +1461,32 @@ const Attendance = () => {
               <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Personal punch log, shift analytics &amp; work hours</p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {showPerspectiveDropdown && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+                <select
+                  value={perspective}
+                  onChange={(e) => setPerspective(e.target.value)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <option value="self">Self Info</option>
+                  <option value="company">Company Info</option>
+                </select>
+              </div>
+            )}
             <Button variant="secondary" onClick={personalRefetch} icon={RefreshCw} size="sm">Refresh</Button>
             <Button variant="outline" onClick={handleDownloadReport} icon={Download} size="sm">Download Report</Button>
           </div>
@@ -1582,6 +1704,31 @@ const Attendance = () => {
           </div>
         </div>
         <div className="att-header-actions">
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
           <Button variant="secondary" onClick={async () => {
             addToast('info', 'Refreshing live data...');
             await Promise.all([fetchAttendance(), fetchEmployees()]);
@@ -1589,7 +1736,7 @@ const Attendance = () => {
           }} icon={RefreshCw} size="sm">
             Refresh
           </Button>
-          {currentUserRole !== 'employee' && (
+          {isCompanyView && canManageAttendance && (
             <>
               <Button variant="secondary" onClick={() => setShiftModalOpen(true)} icon={Clock} size="sm">
                 Assign Shift
@@ -1602,7 +1749,12 @@ const Attendance = () => {
               </Button>
             </>
           )}
-          {currentUserRole !== 'employee' && (
+          {isCompanyView && currentUserRole !== 'company_admin' && currentUserRole !== 'super_admin' && currentUserRole !== 'SuperAdmin' && (
+            <Button variant="primary" onClick={() => setSelfAttModalOpen(true)} icon={Plus}>
+              Self Attendance
+            </Button>
+          )}
+          {isCompanyView && canManageAttendance && (
             <Button variant="primary" onClick={() => setMarkModalOpen(true)} icon={Plus}>
               Mark Attendance
             </Button>
@@ -1611,7 +1763,7 @@ const Attendance = () => {
       </div>
 
       {/* ═══ Work Mode Cards (Total/WFH/WFO/Hybrid) - CLICKABLE ═══ */}
-      {currentUserRole !== 'employee' && (
+      {isCompanyView && (
         <div className="att-workmode-strip">
           <div className="att-workmode-card att-workmode-total" onClick={() => navigateToRecordsWithFilter('workMode', '')}>
             <div className="att-workmode-icon"><Users size={24} /></div>
@@ -1653,7 +1805,7 @@ const Attendance = () => {
       )}
 
       {/* ═══ Top Summary KPI Cards - CLICKABLE ═══ */}
-      {currentUserRole !== 'employee' && (
+      {isCompanyView && (
         <div className="att-kpi-strip">
           <div className="att-kpi-card att-kpi-blue" onClick={() => navigateToRecordsWithFilter('status', '')} style={{ cursor: 'pointer' }}>
             <div className="att-kpi-header">
@@ -1662,8 +1814,8 @@ const Attendance = () => {
             </div>
             <div className="att-kpi-value">{totalEmployees.toLocaleString()}</div>
             <div className="att-kpi-sub">
-              <TrendingUp size={11} />
-              <span>+12 this month</span>
+              {joinedThisMonth >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              <span>{joinedThisMonth >= 0 ? `+${joinedThisMonth}` : joinedThisMonth} this month</span>
             </div>
           </div>
 
@@ -1742,8 +1894,8 @@ const Attendance = () => {
             </div>
             <div className="att-kpi-value">{attendanceRate}%</div>
             <div className="att-kpi-sub">
-              <TrendingUp size={11} />
-              <span>+2.1% vs last week</span>
+              {rateComparison.diff >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              <span>{rateComparison.label}</span>
             </div>
           </div>
         </div>
@@ -1752,10 +1904,10 @@ const Attendance = () => {
       {/* ═══ Section Navigation Tabs ═══ */}
       <div className="att-section-tabs">
         {[
-          currentUserRole !== 'employee' && { id: 'overview', label: 'Overview & Analytics', icon: BarChart2 },
+          isCompanyView && { id: 'overview', label: 'Overview & Analytics', icon: BarChart2 },
           { id: 'records', label: 'Attendance Records', icon: FileText },
-          currentUserRole !== 'employee' && { id: 'branches', label: 'Branch Management', icon: Building },
-          currentUserRole !== 'employee' && { id: 'reports', label: 'Reports & Export', icon: Download },
+          isCompanyView && { id: 'branches', label: 'Branch Management', icon: Building },
+          isCompanyView && { id: 'reports', label: 'Reports & Export', icon: Download },
         ].filter(Boolean).map(tab => {
           const Icon = tab.icon;
           return (
@@ -1885,7 +2037,7 @@ const Attendance = () => {
         <div className="att-records-section">
           {/* Filters Panel */}
           <div className="card att-filters-panel">
-            {currentUserRole === 'employee' ? (
+            {isEmployeeView ? (
               <div className="employee-filter-container">
                 <span className="employee-filter-label">
                   <Calendar size={16} style={{ color: 'var(--color-primary)' }} />
@@ -2557,6 +2709,17 @@ const Attendance = () => {
           </div>
         </div>
       </Modal>
+
+      <MarkAttendanceModal
+        isOpen={selfAttModalOpen}
+        onClose={() => {
+          setSelfAttModalOpen(false);
+          personalRefetch();
+          fetchAttendance();
+        }}
+        todayRecord={personalTodayRecord || {}}
+        currentUser={currentUser || {}}
+      />
 
       {/* Assign Shift Modal */}
       <Modal isOpen={shiftModalOpen} onClose={() => setShiftModalOpen(false)} title="Assign Shift Schedule" size="sm"

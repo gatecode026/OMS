@@ -34,6 +34,7 @@ const diffWorkingDays = (from, to, holidays = []) => {
 const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = [], editingLeave = null }) => {
   const { leaveRequests = [], currentUser, leavePolicyConfigs = [] } = useApp();
   const [form, setForm] = useState({ type: '', from: '', to: '', reason: '' });
+  const [customType, setCustomType] = useState('');
   const [days, setDays] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -79,22 +80,39 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
                          editingLeave.type === 'Sick Leave' ? 'SL' : 
                          editingLeave.type === 'Earned Leave' || editingLeave.type === 'PL' ? 'PL' : 
                          editingLeave.type;
-        setForm({
-          type: typeCode,
-          from: editingLeave.fromDate,
-          to: editingLeave.toDate,
-          reason: editingLeave.reason || '',
-        });
+        
+        const isStandard = ['CL', 'SL', 'PL', 'ML', 'Paternity', 'Other'].includes(typeCode) || 
+                           activePolicies.some(p => p.leaveCode === typeCode);
+        
+        if (isStandard) {
+          setForm({
+            type: typeCode,
+            from: editingLeave.fromDate,
+            to: editingLeave.toDate,
+            reason: editingLeave.reason || '',
+          });
+          setCustomType('');
+        } else {
+          setForm({
+            type: 'custom',
+            from: editingLeave.fromDate,
+            to: editingLeave.toDate,
+            reason: editingLeave.reason || '',
+          });
+          setCustomType(editingLeave.type);
+        }
       } else {
         setForm({ type: '', from: '', to: '', reason: '' });
+        setCustomType('');
       }
     } else {
       setForm({ type: '', from: '', to: '', reason: '' });
+      setCustomType('');
       setDays(0);
       setSuccess(false);
       setError('');
     }
-  }, [open, editingLeave]);
+  }, [open, editingLeave, activePolicies]);
 
   const selectedBalance = balances.find(b => {
     const t = (form.type || '').trim().toLowerCase();
@@ -106,6 +124,7 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
     e.preventDefault();
     setError('');
     if (!form.type || !form.type.trim()) { setError('Please select Leave Type.'); return; }
+    if (form.type === 'custom' && (!customType || !customType.trim())) { setError('Please specify custom Leave Type.'); return; }
     if (!form.from || !form.to) { setError('Please select From and To dates.'); return; }
     if (days <= 0) { setError('Date range has 0 working days. Please adjust.'); return; }
 
@@ -120,7 +139,7 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
       return;
     }
 
-    if (form.type !== 'UL' && form.type !== 'Other' && remaining !== null && remaining < days) {
+    if (form.type !== 'UL' && form.type !== 'Other' && form.type !== 'custom' && remaining !== null && remaining < days) {
       setError('Insufficient leave balance for the selected leave type.');
       return;
     }
@@ -136,9 +155,11 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
       return;
     }
 
+    const finalType = form.type === 'custom' ? customType : form.type;
+
     setSubmitting(true);
     try {
-      await onSubmit({ type: form.type, fromDate: form.from, toDate: form.to, days, reason: form.reason });
+      await onSubmit({ type: finalType, fromDate: form.from, toDate: form.to, days, reason: form.reason });
       setSuccess(true);
       setTimeout(() => { setSuccess(false); onClose(); }, 1800);
     } catch (err) {
@@ -230,7 +251,20 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
                     {p.leaveName} ({p.leaveCode})
                   </option>
                 ))}
+                <option value="custom">Other / Custom</option>
               </select>
+              {form.type === 'custom' && (
+                <div style={{ marginTop: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Enter custom leave type..."
+                    value={customType}
+                    onChange={e => setCustomType(e.target.value)}
+                    style={inputStyle}
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             {/* From Date */}
@@ -240,7 +274,16 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
                 type="date"
                 value={form.from}
                 min={new Date().toISOString().split('T')[0]}
-                onChange={e => setForm(p => ({ ...p, from: e.target.value }))}
+                onChange={e => {
+                  const val = e.target.value;
+                  setForm(p => {
+                    const next = { ...p, from: val };
+                    if (p.to && p.to < val) {
+                      next.to = '';
+                    }
+                    return next;
+                  });
+                }}
                 style={inputStyle}
               />
             </div>
@@ -251,9 +294,14 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
               <input
                 type="date"
                 value={form.to}
-                min={form.from || new Date().toISOString().split('T')[0]}
+                disabled={!form.from}
+                min={form.from}
                 onChange={e => setForm(p => ({ ...p, to: e.target.value }))}
-                style={inputStyle}
+                style={{
+                  ...inputStyle,
+                  opacity: form.from ? 1 : 0.6,
+                  cursor: form.from ? 'text' : 'not-allowed'
+                }}
               />
             </div>
 

@@ -1437,3 +1437,20 @@
   border-color: var(--color-primary);
 }
 
+/* ─── Profile Hero QR Code Layout ─── */
+.hero-qr-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  z-index: 5;
+  min-width: 120px;
+}
+
+@media (max-width: 768px) {
+  .hero-qr-col {
+    margin-top: var(--spacing-4);
+  }
+}
+

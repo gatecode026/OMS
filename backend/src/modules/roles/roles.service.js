@@ -5,6 +5,7 @@
 
 import repository from './roles.repository.js';
 import overridesRepository from './overrides.repository.js';
+import { clearPermissionCache } from '../../security/permissionMatrix.js';
 import logger from '../../config/logger.js';
 
 export const findAll = async (query) => {
@@ -19,12 +20,16 @@ export const findById = async (id) => {
 
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing RolesService::createRecord by user: ' + currentUser?.id);
-  return repository.save(data);
+  const result = await repository.save(data);
+  clearPermissionCache();
+  return result;
 };
 
 export const updateRecord = async (id, data, currentUser) => {
   logger.info('Executing RolesService::updateRecord for: ' + id + ' by user: ' + currentUser?.id);
-  return repository.update(id, data);
+  const result = await repository.update(id, data);
+  clearPermissionCache();
+  return result;
 };
 
 export const deleteRecord = async (id, currentUser) => {

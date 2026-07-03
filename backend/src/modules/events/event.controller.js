@@ -6,6 +6,7 @@
 import Event from './event.model.js';
 import Employee from '../employees/employees.model.js';
 import Admin from '../admin/admin.model.js';
+import Company from '../companies/company.model.js';
 import notificationRepository from '../notifications/notifications.repository.js';
 import SystemSettings from '../settings/settings.model.js';
 import logger from '../../config/logger.js';
@@ -68,13 +69,24 @@ const getCurrentTimeFormatted = () => {
 
 /**
  * Resolves a custom string user ID to a database document with its _id.
- * Queries Employee, falling back to Admin if not found.
+ * Queries Employee, falling back to Admin, and Company if not found.
  */
 const resolveUserByStringId = async (stringId) => {
   if (!stringId) return null;
   let user = await Employee.findOne({ id: stringId }).select('_id id name avatar photoUrl roleId').lean();
   if (!user) {
     user = await Admin.findOne({ id: stringId }).select('_id id name avatar photoUrl roleId').lean();
+  }
+  if (!user) {
+    const comp = await Company.findOne({ id: stringId }).select('_id id name').lean();
+    if (comp) {
+      user = {
+        _id: comp._id,
+        id: comp.id,
+        name: comp.name,
+        roleId: 'company_admin'
+      };
+    }
   }
   return user;
 };
@@ -86,7 +98,14 @@ const resolveUsersByStringIds = async (stringIds) => {
   if (!stringIds || stringIds.length === 0) return [];
   const employees = await Employee.find({ id: { $in: stringIds } }).select('_id id name avatar photoUrl roleId').lean();
   const admins = await Admin.find({ id: { $in: stringIds } }).select('_id id name avatar photoUrl roleId').lean();
-  return [...employees, ...admins];
+  const companies = await Company.find({ id: { $in: stringIds } }).select('_id id name').lean();
+  const mappedCompanies = companies.map(c => ({
+    _id: c._id,
+    id: c.id,
+    name: c.name,
+    roleId: 'company_admin'
+  }));
+  return [...employees, ...admins, ...mappedCompanies];
 };
 
 /**
@@ -570,6 +589,23 @@ export const createEvent = asyncHandler(async (req, res) => {
   if (warning) {
     responseData.warning = warning;
   }
+
+  // Socket.io Real-time Synchronizations
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    const companyId = req.user?.companyId || creator.companyId || 'COMP-001';
+    io.to(`company:${companyId}`).emit('event:sync');
+    if (matchedUsers && matchedUsers.length > 0) {
+      const attendeesStrings = matchedUsers.filter(u => u._id.toString() !== creator._id.toString()).map(u => u.id);
+      attendeesStrings.forEach(empId => {
+        io.to(`user:${empId}`).emit('notification:new');
+      });
+    }
+  } catch (socketErr) {
+    logger.debug(`[Events] Socket sync error: ${socketErr.message}`);
+  }
+
   return res.status(201).json(responseData);
 });
 
@@ -719,6 +755,33 @@ export const updateEvent = asyncHandler(async (req, res) => {
   if (warning) {
     responseData.warning = warning;
   }
+
+  // Socket.io Real-time Synchronizations
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    const companyId = req.user?.companyId || currentUser.companyId || 'COMP-001';
+    io.to(`company:${companyId}`).emit('event:sync');
+
+    // Notify creator if status changed
+    if (event.createdBy) {
+      const creatorDetails = await Employee.findById(event.createdBy).select('id') 
+        || await Admin.findById(event.createdBy).select('id');
+      if (creatorDetails) {
+        io.to(`user:${creatorDetails.id}`).emit('notification:new');
+      }
+    }
+
+    // Notify attendees
+    if (req.body.attendees && req.body.attendees.length > 0) {
+      req.body.attendees.forEach(empId => {
+        io.to(`user:${empId}`).emit('notification:new');
+      });
+    }
+  } catch (socketErr) {
+    logger.debug(`[Events] Socket sync error: ${socketErr.message}`);
+  }
+
   return res.status(200).json(responseData);
 });
 
@@ -745,6 +808,16 @@ export const deleteEvent = asyncHandler(async (req, res) => {
   }
 
   await Event.findByIdAndDelete(req.params.id);
+
+  // Socket.io Real-time Synchronizations
+  try {
+    const { getIO } = await import('../../config/socket.js');
+    const io = getIO();
+    const companyId = req.user?.companyId || currentUser.companyId || 'COMP-001';
+    io.to(`company:${companyId}`).emit('event:sync');
+  } catch (socketErr) {
+    logger.debug(`[Events] Socket sync error: ${socketErr.message}`);
+  }
 
   return res.status(200).json({ success: true, id: req.params.id });
 });

@@ -8,7 +8,7 @@ import logger from '../../config/logger.js';
 
 export const find = async (query = {}) => {
   logger.info('ActivityLogsRepository::find querying logs from database...');
-  return ActivityLog.find(query).sort({ createdAt: -1 });
+  return ActivityLog.find(query).sort({ createdAt: -1 }).limit(200);
 };
 
 export const findOne = async (id) => {

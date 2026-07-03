@@ -38,6 +38,10 @@ const VALID_TYPES = [
 
 const notificationSchema = new mongoose.Schema(
   {
+    id: {
+      type: String,
+      index: true,
+    },
     // ── TARGETING ──────────────────────────────────────────────────────────────
     userId: {
       type: String,

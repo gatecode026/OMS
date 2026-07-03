@@ -48,10 +48,13 @@ export const authenticate = async (req, res, next) => {
         email: decoded.email,
         role: decoded.role,
         companyId: decoded.companyId || 'COMP-DEFAULT',
-        name: decoded.name || 'Offline User'
+        name: decoded.name || 'Offline User',
+        branch: decoded.branch || null,
+        department: decoded.department || null,
+        team: decoded.team || null
       };
       logger.debug(`User authenticated offline successfully: ${req.user.name} (${req.user.role})`);
-      return await runWithTenant(req.user.companyId, next);
+      return await runWithTenant(req.user.companyId, next, false, req.user);
     }
 
     // Retrieve associated active account from matching collection
@@ -68,7 +71,22 @@ export const authenticate = async (req, res, next) => {
       // For employees, resolve the correct database connection before querying the model
       const companyId = decoded.companyId || 'COMP-DEFAULT';
       user = await runWithTenant(companyId, async () => {
-        return await Employee.findOne({ id: decoded.id }).select('id name email roleId status companyId branch').lean();
+        const emp = await Employee.findOne({ id: decoded.id }).select('id name email roleId status accountStatus companyId branch department team').lean();
+        if (emp && emp.roleId === 'team_leader') {
+          const teamEmps = await Employee.find({
+            $or: [
+              { team: emp.team },
+              { teamLeader: emp.id },
+              { teamLeader: emp.name }
+            ]
+          }).select('id').lean();
+          const teamEmployeeIds = teamEmps.map(e => e.id);
+          if (!teamEmployeeIds.includes(emp.id)) {
+            teamEmployeeIds.push(emp.id);
+          }
+          emp.teamEmployeeIds = teamEmployeeIds;
+        }
+        return emp;
       });
     }
 
@@ -79,7 +97,8 @@ export const authenticate = async (req, res, next) => {
       });
     }
 
-    if (user.status !== 'Active' && user.status !== 'On Leave') {
+    const accountStatus = (decoded.role === 'super_admin' || decoded.role === 'company_admin') ? user.status : user.accountStatus;
+    if (accountStatus !== 'Active') {
       return res.status(403).json({
         status: 'fail',
         message: 'Authentication failed. This account is inactive.',
@@ -93,12 +112,15 @@ export const authenticate = async (req, res, next) => {
       email: user.email,
       role: user.roleId,
       companyId: user.companyId || 'COMP-DEFAULT',
-      branch: user.branch
+      branch: user.branch,
+      department: user.department,
+      team: user.team,
+      teamEmployeeIds: user.teamEmployeeIds || []
     };
 
     const isSuperAdmin = user.roleId === 'super_admin';
     logger.debug(`User authenticated successfully: ${req.user.name} (${req.user.role})`);
-    await runWithTenant(req.user.companyId, next, isSuperAdmin);
+    await runWithTenant(req.user.companyId, next, isSuperAdmin, req.user);
   } catch (error) {
     logger.error('Authentication Middleware Error:', error);
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {

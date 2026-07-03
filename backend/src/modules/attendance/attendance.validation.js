@@ -25,7 +25,22 @@ export const updateSchema = (data) => {
   };
 };
 
+export const qrPunchSchema = (data) => {
+  const errors = [];
+  if (!data || !data.employeeId) {
+    errors.push('Employee ID is required for QR punch');
+  }
+  if (!data || !data.companyId) {
+    errors.push('Company ID is required for QR punch');
+  }
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
 export default {
   create: createSchema,
-  update: updateSchema
+  update: updateSchema,
+  qrPunch: qrPunchSchema
 };

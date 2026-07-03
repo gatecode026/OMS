@@ -15,7 +15,7 @@ import { useApp } from '../../context/AppContext';
 import {
   MessageSquare, AtSign, Megaphone, CheckSquare, Calendar,
   Paperclip, Users, Info, Bell, CheckCheck, ArrowRight,
-  Smile, Radio, UserPlus, UserMinus, Zap
+  Smile, Radio, UserPlus, UserMinus, Zap, ClipboardList, CreditCard, Clock
 } from 'lucide-react';
 import './NotificationComponents.css';
 
@@ -38,6 +38,9 @@ const TYPE_CONFIG = {
   user_added:    { icon: UserPlus,       bg: '#10b981', label: 'Added to Group' },
   user_removed:  { icon: UserMinus,      bg: '#ef4444', label: 'Removed from Group' },
   system:        { icon: Zap,            bg: '#64748b', label: 'System' },
+  leave:         { icon: ClipboardList,  bg: '#f97316', label: 'Leave' },
+  attendance:    { icon: Clock,          bg: '#0ea5e9', label: 'Attendance' },
+  payroll:       { icon: CreditCard,     bg: '#a855f7', label: 'Payroll' },
 };
 
 const getNotifConfig = (type) => TYPE_CONFIG[type] || { icon: Info, bg: '#64748b', label: 'Notification' };
@@ -93,24 +96,32 @@ const NotificationPanel = ({ notifications, onMarkAllRead, onClose, onOpenDrawer
       }).catch(() => {});
     }
 
-    // Navigate based on type
     const type = (notif.type || '').toLowerCase();
+    const category = (notif.category || '').toLowerCase();
+    const msg = (notif.message || '').toLowerCase();
+    const title = (notif.title || '').toLowerCase();
     const data = notif.data || {};
 
-    if (type.includes('message') || type === 'mention' || type === 'group_mention' || type === 'chat_invitation') {
-      navigate('/chat', { state: { conversationId: data.conversationId } });
-    } else if (type.includes('task')) {
-      navigate('/tasks');
-    } else if (type === 'meeting') {
-      navigate('/calendar');
-    } else if (type === 'announcement' || type === 'broadcast') {
+    if (type === 'announcement' || type === 'broadcast' || category === 'announcement' || category === 'broadcast') {
       navigate('/announcements');
-    } else if (type.includes('group') || type.includes('user_added') || type.includes('user_removed')) {
-      navigate('/chat', { state: { conversationId: data.conversationId } });
-    } else if (type === 'reaction') {
+    } else if (type === 'leave' || category === 'leave' || msg.includes('leave') || title.includes('leave')) {
+      navigate('/leaves');
+    } else if (type === 'attendance' || category === 'attendance' || msg.includes('attendance') || msg.includes('punch') || msg.includes('late') || title.includes('attendance') || title.includes('punch') || title.includes('late')) {
+      navigate('/attendance');
+    } else if (type.includes('task') || category === 'task' || msg.includes('task') || title.includes('task')) {
+      navigate('/tasks');
+    } else if (type === 'meeting' || category === 'meeting' || msg.includes('meeting') || title.includes('meeting')) {
+      navigate('/calendar');
+    } else if (type === 'payroll' || category === 'payroll' || msg.includes('payroll') || msg.includes('salary') || msg.includes('payslip') || title.includes('payroll') || title.includes('salary') || title.includes('payslip')) {
+      navigate('/payroll');
+    } else if (
+      type.includes('message') || type.includes('mention') || type === 'chat_invitation' || type === 'reaction' ||
+      type.includes('group') || type.includes('user_') || category === 'message' || category === 'mention' || category === 'group'
+    ) {
       navigate('/chat', { state: { conversationId: data.conversationId } });
     } else {
-      navigate('/notifications');
+      // Fallback: Always redirect to the main notification page
+      navigate('/notifications', { state: { selectedNotifId: notifId } });
     }
   };
 

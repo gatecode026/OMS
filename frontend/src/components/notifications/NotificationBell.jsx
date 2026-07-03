@@ -1,17 +1,11 @@
 /**
  * @file NotificationBell.jsx
- * @description Enterprise Notification Bell — Top-bar entry point.
- *
- *   Features:
- *   • Live unread badge (Redis-first count)
- *   • Bell ring animation on new notification
- *   • Auto-sync on socket connect/reconnect (server-driven)
- *   • Dropdown quick-view panel
- *   • Full notification center drawer
- *   • Keyboard accessible (Enter/Space to toggle)
+ * @description Enterprise Notification Bell — derives live notifications
+ *   from AppContext data (leaves, tasks, payroll, projects) when the
+ *   backend API returns empty results.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Bell } from 'lucide-react';
 import { getSocket } from '../../lib/socketManager';
 import { useApp } from '../../context/AppContext';
@@ -21,17 +15,247 @@ import './NotificationComponents.css';
 
 const API_BASE = window.API_URL || 'http://localhost:5000';
 
+// ── DERIVE NOTIFICATIONS FROM APP DATA ────────────────────────────────────────
+const deriveAppNotifications = ({ currentUser, currentUserRole, leaveRequests, projectsList, payroll, tasks }) => {
+  const notifications = [];
+
+  if (!currentUser) return notifications;
+
+  // ── 1. PENDING LEAVE REQUESTS (for admins / managers) ─────────────────────
+  if (currentUserRole !== 'employee') {
+    const pendingLeaves = (leaveRequests || []).filter(l => l.status === 'Pending');
+    pendingLeaves.slice(0, 3).forEach(leave => {
+      notifications.push({
+        id: `leave-${leave.id || leave._id}`,
+        type: 'system',
+        title: 'Leave Request Pending',
+        message: `${leave.employeeName || leave.name || 'An employee'} requested ${leave.leaveType || 'leave'} (${leave.startDate || ''} – ${leave.endDate || ''})`,
+        isRead: false,
+        priority: 'high',
+        createdAt: leave.createdAt || leave.appliedDate || new Date().toISOString(),
+        category: 'system',
+      });
+    });
+  }
+
+  // ── 2. MY OWN PENDING LEAVE (employee) ────────────────────────────────────
+  if (currentUserRole === 'employee') {
+    const myLeaves = (leaveRequests || []).filter(
+      l => l.employeeId === currentUser.id ||
+           l.employeeName?.toLowerCase() === currentUser.name?.toLowerCase()
+    );
+    myLeaves.filter(l => l.status === 'Pending').slice(0, 2).forEach(leave => {
+      notifications.push({
+        id: `myleave-${leave.id || leave._id}`,
+        type: 'system',
+        title: 'Leave Request Submitted',
+        message: `Your ${leave.leaveType || 'leave'} request is pending approval`,
+        isRead: false,
+        priority: 'normal',
+        createdAt: leave.createdAt || leave.appliedDate || new Date().toISOString(),
+        category: 'system',
+      });
+    });
+    // Approved / Rejected feedback
+    myLeaves.filter(l => l.status === 'Approved' || l.status === 'Rejected').slice(0, 1).forEach(leave => {
+      notifications.push({
+        id: `myleave-result-${leave.id || leave._id}`,
+        type: 'system',
+        title: `Leave ${leave.status}`,
+        message: `Your ${leave.leaveType || 'leave'} from ${leave.startDate || ''} to ${leave.endDate || ''} has been ${leave.status?.toLowerCase()}`,
+        isRead: false,
+        priority: leave.status === 'Rejected' ? 'high' : 'normal',
+        createdAt: leave.updatedAt || new Date().toISOString(),
+        category: 'system',
+      });
+    });
+  }
+
+  // ── 3. OVERDUE TASKS ASSIGNED TO ME ───────────────────────────────────────
+  const allProjTasks = (projectsList || []).flatMap(p =>
+    (p.tasks || []).map(t => ({ ...t, project: p.name }))
+  );
+  const myTasks = allProjTasks.filter(t =>
+    t.assigneeId === currentUser.id ||
+    t.assigneeName?.toLowerCase() === currentUser.name?.toLowerCase()
+  );
+  const overdueTasks = myTasks.filter(t => {
+    if (t.status === 'Done' || t.completed) return false;
+    if (!t.dueDate) return false;
+    return new Date(t.dueDate) < new Date();
+  });
+  overdueTasks.slice(0, 2).forEach(task => {
+    notifications.push({
+      id: `task-overdue-${task.id}`,
+      type: 'task',
+      title: 'Task Overdue',
+      message: `"${task.title}" in ${task.project} is past its due date`,
+      isRead: false,
+      priority: 'high',
+      createdAt: task.dueDate ? new Date(task.dueDate).toISOString() : new Date().toISOString(),
+      category: 'task',
+    });
+  });
+
+  // ── 4. TASKS IN REVIEW (awaiting my approval) ─────────────────────────────
+  if (['manager', 'team_leader', 'company_admin', 'super_admin', 'dept_admin'].includes(currentUserRole)) {
+    const pendingApproval = allProjTasks.filter(t => {
+      if (t.completed || t.status === 'Done') return false;
+      return (t.approvals || []).some(a =>
+        a.approverName?.toLowerCase() === currentUser.name?.toLowerCase() &&
+        a.status === 'Pending'
+      );
+    });
+    pendingApproval.slice(0, 2).forEach(task => {
+      notifications.push({
+        id: `task-approve-${task.id}`,
+        type: 'task_assigned',
+        title: 'Task Needs Your Approval',
+        message: `"${task.title}" in ${task.project} is waiting for your approval`,
+        isRead: false,
+        priority: 'high',
+        createdAt: new Date().toISOString(),
+        category: 'task',
+      });
+    });
+  }
+
+  // ── 5. TASKS IN REVIEW — MY OWN TASK SUBMITTED ────────────────────────────
+  if (currentUserRole === 'employee') {
+    const inReview = myTasks.filter(t => t.status === 'In Review' && !t.completed);
+    inReview.slice(0, 1).forEach(task => {
+      notifications.push({
+        id: `task-review-${task.id}`,
+        type: 'task',
+        title: 'Task In Review',
+        message: `"${task.title}" in ${task.project} is being reviewed by Team Leader`,
+        isRead: false,
+        priority: 'normal',
+        createdAt: new Date().toISOString(),
+        category: 'task',
+      });
+    });
+  }
+
+  // ── 6. PAYROLL PENDING (employee) ─────────────────────────────────────────
+  if (currentUserRole === 'employee' && payroll?.length) {
+    const myPayroll = payroll.filter(p =>
+      p.employeeId === currentUser.id ||
+      p.employeeName?.toLowerCase() === currentUser.name?.toLowerCase()
+    );
+    const unpaid = myPayroll.filter(p =>
+      p.status?.toLowerCase() === 'pending' || p.status?.toLowerCase() === 'unpaid'
+    );
+    unpaid.slice(0, 1).forEach(p => {
+      notifications.push({
+        id: `payroll-${p.id || p._id || p.month}`,
+        type: 'system',
+        title: 'Salary Pending',
+        message: `Your salary for ${p.month || p.period || 'this month'} is pending`,
+        isRead: false,
+        priority: 'high',
+        createdAt: new Date().toISOString(),
+        category: 'system',
+      });
+    });
+  }
+
+  // ── 7. PROJECT DEADLINE WARNING ───────────────────────────────────────────
+  const myProjects = (projectsList || []).filter(p =>
+    p.manager?.toLowerCase() === currentUser.name?.toLowerCase() ||
+    p.leader?.toLowerCase() === currentUser.name?.toLowerCase() ||
+    (p.members || []).some(m => m?.toLowerCase() === currentUser.name?.toLowerCase())
+  );
+  const nearDeadline = myProjects.filter(p => {
+    if (p.status === 'Completed') return false;
+    if (!p.deadline) return false;
+    const diffDays = (new Date(p.deadline) - new Date()) / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 3;
+  });
+  nearDeadline.slice(0, 2).forEach(p => {
+    const daysLeft = Math.ceil((new Date(p.deadline) - new Date()) / (1000 * 60 * 60 * 24));
+    notifications.push({
+      id: `project-deadline-${p.id}`,
+      type: 'system',
+      title: 'Project Deadline Soon',
+      message: `"${p.name}" is due on ${p.deadline} — ${daysLeft} day(s) left`,
+      isRead: false,
+      priority: 'high',
+      createdAt: new Date().toISOString(),
+      category: 'system',
+    });
+  });
+
+  // Sort: high priority first
+  return notifications.sort((a, b) => {
+    if (a.priority === 'high' && b.priority !== 'high') return -1;
+    if (b.priority === 'high' && a.priority !== 'high') return 1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+};
+
+// ── COMPONENT ─────────────────────────────────────────────────────────────────
 const NotificationBell = () => {
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notifications, setNotifications] = useState([]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isRinging, setIsRinging] = useState(false);
+  const [socketNotifications, setSocketNotifications] = useState([]);
+  const [readIds, setReadIds] = useState(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = user?.id;
+      if (userId) {
+        const stored = localStorage.getItem(`read_notification_ids:${userId}`);
+        return stored ? new Set(JSON.parse(stored)) : new Set();
+      }
+      return new Set();
+    } catch (e) {
+      return new Set();
+    }
+  });
 
-  const { token, currentUser } = useApp();
+  const {
+    token,
+    currentUser,
+    currentUserRole,
+    leaveRequests,
+    projectsList,
+    payroll,
+    tasks,
+    notifications: apiNotifications = [],
+    fetchNotifications,
+    markAllNotificationsRead,
+  } = useApp();
+
   const bellRef = useRef(null);
+  const prevDerivedCountRef = useRef(0);
+  const lastUserIdRef = useRef('');
 
-  // ── AUDIO CHIME ───────────────────────────────────────────────────────────
+  // Sync and load readIds scoped by currentUser.id to prevent mount-time race condition
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    // 1. If user transitioned or loaded, load their readIds from localStorage
+    if (lastUserIdRef.current !== currentUser.id) {
+      try {
+        const stored = localStorage.getItem(`read_notification_ids:${currentUser.id}`);
+        if (stored) {
+          setReadIds(new Set(JSON.parse(stored)));
+        } else {
+          setReadIds(new Set());
+        }
+      } catch (e) {}
+      lastUserIdRef.current = currentUser.id;
+      return;
+    }
+
+    // 2. Otherwise, sync changes to localStorage
+    try {
+      localStorage.setItem(`read_notification_ids:${currentUser.id}`, JSON.stringify(Array.from(readIds)));
+    } catch (e) {}
+  }, [readIds, currentUser]);
+
+  // ── AUDIO CHIME ──────────────────────────────────────────────────────────
   const playNotificationChime = useCallback(() => {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -48,78 +272,126 @@ const NotificationBell = () => {
         osc.start(startTime);
         osc.stop(startTime + duration);
       };
-      playTone(1046.5, ctx.currentTime, 0.12);       // C6
-      playTone(1318.51, ctx.currentTime + 0.08, 0.16); // E6
-    } catch (err) {
-      // AudioContext may be blocked before user interaction — safe to ignore
-    }
+      playTone(1046.5, ctx.currentTime, 0.12);
+      playTone(1318.51, ctx.currentTime + 0.08, 0.16);
+    } catch (err) {}
   }, []);
 
-  // ── BELL RING ANIMATION ───────────────────────────────────────────────────
   const triggerBellRing = useCallback(() => {
     setIsRinging(true);
     const t = setTimeout(() => setIsRinging(false), 700);
     return () => clearTimeout(t);
   }, []);
 
-  // ── API HELPERS ───────────────────────────────────────────────────────────
-  const fetchUnreadCount = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/notifications/unread-count`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
-      if (result.status === 'success' && result.data) {
-        setUnreadCount(result.data.count ?? 0);
-      }
-    } catch (err) {
-      // Non-critical — silently fail
-    }
-  }, [token]);
+  // ── DERIVED NOTIFICATIONS ─────────────────────────────────────────────────
+  const derivedNotifications = useMemo(() => {
+    return deriveAppNotifications({
+      currentUser,
+      currentUserRole,
+      leaveRequests,
+      projectsList,
+      payroll,
+      tasks,
+    });
+  }, [currentUser, currentUserRole, leaveRequests, projectsList, payroll, tasks]);
 
-  const fetchRecentNotifications = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/notifications?limit=5`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await res.json();
-      if (result.status === 'success' && result.data) {
-        setNotifications(result.data.notifications || []);
-      }
-    } catch (err) {
-      // Non-critical
+  // Ring when derived count increases
+  useEffect(() => {
+    if (derivedNotifications.length > prevDerivedCountRef.current && prevDerivedCountRef.current > 0) {
+      triggerBellRing();
     }
-  }, [token]);
+    prevDerivedCountRef.current = derivedNotifications.length;
+  }, [derivedNotifications.length, triggerBellRing]);
 
-  // ── MARK ALL AS READ ──────────────────────────────────────────────────────
+  // ── MERGE ALL NOTIFICATIONS ───────────────────────────────────────────────
+  const getFilteredNotifications = useCallback((list) => {
+    if (!currentUser) return [];
+    const isAdminRole = ['super_admin', 'admin', 'branch_admin'].includes(currentUserRole);
+
+    return list.filter(n => {
+      const recipientId   = n.recipientId || n.targetUserId || n.forUserId || n.userId;
+      const recipientRole = (n.recipientRole || n.targetRole || n.recipientType || '').toLowerCase();
+      const msg = (n.message || n.title || '').toLowerCase();
+
+      if (recipientId) {
+        return recipientId === currentUser?.id;
+      }
+
+      if (recipientRole === 'employee' || recipientRole === 'employees' || recipientRole === 'all employees' || recipientRole === 'staff') {
+        return ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
+      }
+
+      if (recipientRole === 'admin' || recipientRole === 'super_admin' || recipientRole === 'manager' || recipientRole === 'team_leader') {
+        return isAdminRole;
+      }
+
+      if (recipientRole === 'all' || recipientRole === 'everyone' || !recipientRole) {
+        const isPersonalEmployeeMsg =
+          msg.startsWith('your ') ||
+          msg.includes('your leave') ||
+          msg.includes('your request') ||
+          msg.includes('your attendance') ||
+          msg.includes('has been approved') ||
+          msg.includes('has been rejected') ||
+          msg.includes('has been rejected -') ||
+          msg.includes('note: approved') ||
+          msg.includes('note: rejected');
+
+        if (isPersonalEmployeeMsg) {
+          return ['employee', 'team_leader', 'manager', 'hr', 'dept_admin', 'branch_admin', 'company_admin'].includes(currentUserRole);
+        }
+
+        return true;
+      }
+
+      return recipientRole === currentUserRole?.toLowerCase();
+    });
+  }, [currentUser, currentUserRole]);
+
+  // ── MERGE ALL NOTIFICATIONS ───────────────────────────────────────────────
+  const allNotifications = useMemo(() => {
+    const filteredApi = getFilteredNotifications(apiNotifications);
+    const combined = [...socketNotifications, ...filteredApi, ...derivedNotifications];
+    const seen = new Set();
+    return combined
+      .filter(n => {
+        const id = n.id || n._id;
+        if (!id) return false;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map(n => ({
+        ...n,
+        isRead: readIds.has(n.id || n._id) ? true : (n.isRead || n.read || false),
+      }))
+      .sort((a, b) => {
+        if (a.priority === 'high' && b.priority !== 'high') return -1;
+        if (b.priority === 'high' && a.priority !== 'high') return 1;
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      })
+      .slice(0, 20);
+  }, [socketNotifications, apiNotifications, derivedNotifications, readIds, getFilteredNotifications]);
+
+  const unreadCount = useMemo(
+    () => allNotifications.filter(n => !n.isRead).length,
+    [allNotifications]
+  );
+
+  // ── MARK ALL READ ─────────────────────────────────────────────────────────
   const handleMarkAllRead = useCallback(async () => {
+    const allIds = new Set(allNotifications.map(n => n.id || n._id));
+    setReadIds(allIds);
+
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/v1/notifications/read-all`, {
+      await fetch(`${API_BASE}/api/v1/notifications/read-all`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` },
       });
-      const result = await res.json();
-      if (result.status === 'success') {
-        setUnreadCount(0);
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-        const socket = getSocket();
-        socket?.emit('notification:opened');
-      }
-    } catch (err) {
-      console.error('[NotificationBell] Mark all read failed:', err);
-    }
-  }, [token]);
-
-  // ── INITIAL LOAD ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (token) {
-      fetchUnreadCount();
-      fetchRecentNotifications();
-    }
-  }, [token, fetchUnreadCount, fetchRecentNotifications]);
+      if (markAllNotificationsRead) markAllNotificationsRead();
+    } catch (err) {}
+  }, [token, allNotifications, markAllNotificationsRead]);
 
   // ── SOCKET LISTENERS ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -127,83 +399,45 @@ const NotificationBell = () => {
     const socket = getSocket();
     if (!socket) return;
 
-    /**
-     * New notification arrived in real-time.
-     * Increment badge, prepend to list, animate bell.
-     */
     const handleNewNotification = (notif) => {
-      setUnreadCount((prev) => prev + 1);
-      setNotifications((prev) => {
+      setSocketNotifications(prev => {
         const merged = [notif, ...prev];
-        // Deduplicate by id
         const seen = new Set();
-        return merged.filter((n) => {
+        return merged.filter(n => {
           const id = n.id || n._id;
           if (seen.has(id)) return false;
           seen.add(id);
           return true;
-        }).slice(0, 5);
+        }).slice(0, 20);
       });
       triggerBellRing();
       playNotificationChime();
     };
 
-    /**
-     * Server pushes authoritative unread count
-     * (on connect, after mark-read via REST on another tab, etc.)
-     */
-    const handleUnreadCount = ({ count }) => {
-      setUnreadCount(typeof count === 'number' ? count : 0);
-    };
-
-    /**
-     * Server confirms all-read reset.
-     */
-    const handleUnreadReset = () => {
-      setUnreadCount(0);
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    };
-
-    /**
-     * Server pushes missed notifications from Redis queue on reconnect.
-     * Client deduplicates by id.
-     */
     const handleSync = (missedNotifs) => {
-      if (!missedNotifs || missedNotifs.length === 0) return;
-
-      setNotifications((prev) => {
+      if (!missedNotifs?.length) return;
+      setSocketNotifications(prev => {
         const merged = [...missedNotifs, ...prev];
         const seen = new Set();
-        return merged.filter((n) => {
+        return merged.filter(n => {
           const id = n.id || n._id;
           if (!id || seen.has(id)) return false;
           seen.add(id);
           return true;
-        }).slice(0, 5);
+        }).slice(0, 20);
       });
     };
 
     socket.on('notification:new', handleNewNotification);
-    socket.on('notification:unread_count', handleUnreadCount);
-    socket.on('notification:unread_reset', handleUnreadReset);
     socket.on('notification:sync', handleSync);
-
-    // On reconnect: re-fetch count as a safety fallback
-    const handleReconnect = () => {
-      fetchUnreadCount();
-    };
-    socket.on('connect', handleReconnect);
 
     return () => {
       socket.off('notification:new', handleNewNotification);
-      socket.off('notification:unread_count', handleUnreadCount);
-      socket.off('notification:unread_reset', handleUnreadReset);
       socket.off('notification:sync', handleSync);
-      socket.off('connect', handleReconnect);
     };
-  }, [currentUser, triggerBellRing, playNotificationChime, fetchUnreadCount]);
+  }, [currentUser, triggerBellRing, playNotificationChime]);
 
-  // ── CLICK OUTSIDE ─────────────────────────────────────────────────────────
+  // ── CLICK OUTSIDE ────────────────────────────────────────────────────────
   useEffect(() => {
     const clickOutside = (e) => {
       if (bellRef.current && !bellRef.current.contains(e.target)) {
@@ -214,23 +448,18 @@ const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', clickOutside);
   }, []);
 
-  // ── KEYBOARD ──────────────────────────────────────────────────────────────
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') setPanelOpen(false);
   };
 
-  // ── TOGGLE PANEL ──────────────────────────────────────────────────────────
   const handleTogglePanel = () => {
     const willOpen = !panelOpen;
     setPanelOpen(willOpen);
-
     if (willOpen) {
-      // Reset badge when opening
-      setUnreadCount(0);
-      fetchRecentNotifications();
-      // Notify server to reset Redis counter
+      if (fetchNotifications) fetchNotifications();
       const socket = getSocket();
       socket?.emit('notification:opened');
+      handleMarkAllRead();
     }
   };
 
@@ -255,7 +484,7 @@ const NotificationBell = () => {
 
       {panelOpen && (
         <NotificationPanel
-          notifications={notifications}
+          notifications={allNotifications.slice(0, 5)}
           onMarkAllRead={handleMarkAllRead}
           onClose={() => setPanelOpen(false)}
           onOpenDrawer={() => {

@@ -11,7 +11,8 @@ const Button = ({
   loading = false,
   icon: Icon,
   className = '',
-  id
+  id,
+  ...rest
 }) => {
   return (
     <button
@@ -20,6 +21,7 @@ const Button = ({
       className={`btn btn-${variant} btn-${size} ${loading ? 'btn-loading' : ''} ${className}`}
       onClick={onClick}
       disabled={disabled || loading}
+      {...rest}
     >
       {loading && <span className="btn-spinner"></span>}
       {!loading && Icon && <Icon size={size === 'sm' ? 14 : size === 'lg' ? 18 : 16} className="btn-icon" />}

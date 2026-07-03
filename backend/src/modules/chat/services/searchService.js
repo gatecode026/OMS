@@ -3,8 +3,8 @@
  * @description Service logic for global chat search across conversations, messages, files, and contacts.
  */
 
-import Conversation from '../conversation.model.js';
-import Message from '../message.model.js';
+import Conversation from '../conversation.repository.js';
+import Message from '../message.repository.js';
 import Employee from '../../employees/employees.model.js';
 import { getTenantId } from '../../../utils/tenantContext.js';
 

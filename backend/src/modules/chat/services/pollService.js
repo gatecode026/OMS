@@ -5,8 +5,8 @@
 
 import mongoose from 'mongoose';
 import Poll from '../models/Poll.js';
-import Message from '../message.model.js';
-import Conversation from '../conversation.model.js';
+import Message from '../message.repository.js';
+import Conversation from '../conversation.repository.js';
 import ActivityLog from '../../activity-logs/activity-log.model.js';
 import { createNotification } from '../../notifications/notifications.service.js';
 import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';

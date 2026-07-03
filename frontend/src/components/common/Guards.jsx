@@ -72,7 +72,7 @@ export const RoleGuard = ({ allowedRoles = [], children }) => {
 
     if (moduleKey) {
       // If granular matrix maps to this path, the database permissions matrix takes precedence.
-      isAuthorized = hasPermission(moduleKey, 'read');
+      isAuthorized = hasPermission(moduleKey, 'read', 'self') || hasPermission(moduleKey, 'read', 'company');
     } else {
       // Fallback: Resolve required role and use hierarchy check if no granular module maps to this route
       const requiredRole = getRequiredRoleForPath(location.pathname);
