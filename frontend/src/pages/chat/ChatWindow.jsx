@@ -220,11 +220,31 @@ const ChatWindow = ({ currentUser, onBack }) => {
   useEffect(() => {
     if (!activeConvId || !socket || !isConnected) return;
     const timer = setTimeout(() => {
-      updateReadReceipts();
-      socket.emit('mark_read', { conversationId: activeConvId });
+      if (document.visibilityState === 'visible' && document.hasFocus()) {
+        updateReadReceipts();
+        socket.emit('mark_read', { conversationId: activeConvId });
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [activeConvId, isConnected, socket, convMessages.length, updateReadReceipts]);
+
+  // Read receipt trigger on window focus and tab visibility change
+  useEffect(() => {
+    const handleFocusOrVisible = () => {
+      if (activeConvId && socket && isConnected && document.visibilityState === 'visible' && document.hasFocus()) {
+        updateReadReceipts();
+        socket.emit('mark_read', { conversationId: activeConvId });
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+
+    return () => {
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
+    };
+  }, [activeConvId, isConnected, socket, updateReadReceipts]);
 
   // Initialize unread count for banner AND capture the first-unread message id
   useEffect(() => {

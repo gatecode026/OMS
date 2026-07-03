@@ -7,12 +7,9 @@ import express from 'express';
 import controller from './appraisal-reviews.controller.js';
 import validation from './appraisal-reviews.validation.js';
 import { validateRequest } from '../../middlewares/validation.middleware.js';
-import { authenticate, restrictTo } from '../../middlewares/auth.middleware.js';
+import { restrictTo } from '../../middlewares/auth.middleware.js';
 
 const router = express.Router();
-
-// Secured routes boundary
-router.use(authenticate);
 
 router.route('/')
   .get(controller.getAll)

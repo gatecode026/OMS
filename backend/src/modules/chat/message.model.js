@@ -27,6 +27,7 @@ const messageSchema = new mongoose.Schema({
     unique: true,
     index: true
   },
+  tempId: { type: String, default: null },
   companyId: { type: String, index: true },
   conversationId: { type: String, required: true, index: true },
 

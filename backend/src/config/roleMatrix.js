@@ -8,7 +8,7 @@ export const roleMatrix = {
     allowedRoutes: [
       '/api/admin/*', '/api/auth/*',
       '/api/v1/companies/*', '/api/v1/admin/*', '/api/v1/auth/*',
-      '/api/v1/roles/*', '/api/v1/chat/*'
+      '/api/v1/roles/*', '/api/v1/chat/*', '/api/v1/appraisal-reviews/*'
     ],
     blockedRoutes: [
       '/api/employees/*', '/api/tasks/*', '/api/attendance/*', 
