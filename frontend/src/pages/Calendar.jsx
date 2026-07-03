@@ -52,6 +52,50 @@ const AVATAR_COLORS = ['#ec4899','#3b82f6','#10b981','#f59e0b','#8b5cf6','#06b6d
 export default function Calendar() {
   const isLoading = usePageLoading(600);
   const { token, addToast, showConfirm, employees = [], departments = [], currentUser = null, currentUserRole = '', attendanceRules = {}, hasPermission } = useApp();
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('meetings_calendar', 'read', 'company');
+    const hasSelfRead = hasPermission('meetings_calendar', 'read', 'self');
+
+    const saved = localStorage.getItem('perspective_meetings_calendar');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('meetings_calendar', 'read', 'company');
+    const hasSelfRead = hasPermission('meetings_calendar', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
+
+  useEffect(() => {
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_meetings_calendar', perspective);
+    }
+  }, [perspective, currentUserRole]);
+
+  useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('meetings_calendar', 'read', 'company');
+      const hasSelfRead = hasPermission('meetings_calendar', 'read', 'self');
+      const saved = localStorage.getItem('perspective_meetings_calendar');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
 
   const todayNavLabel = useMemo(() => {
     return new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
@@ -347,12 +391,21 @@ export default function Calendar() {
   const filteredEvents = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return events.filter((e) => {
+      if (isEmployeeView && currentUser) {
+        const isCreator = e.createdBy && (e.createdBy.id === currentUser.id || e.createdBy._id === currentUser._id);
+        const isAttendee = e.rawAttendees && e.rawAttendees.some(att => 
+          att.id === currentUser.id || 
+          att._id === currentUser._id || 
+          (att.name && currentUser.name && att.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+        );
+        if (!isCreator && !isAttendee) return false;
+      }
       const typeOk   = filterType === 'all' || e.type === filterType;
       const searchOk = !q || [e.title, e.description, e.location, e.attendees]
         .some((s) => s?.toLowerCase().includes(q));
       return typeOk && searchOk;
     });
-  }, [events, filterType, searchQuery]);
+  }, [events, filterType, searchQuery, isEmployeeView, currentUser]);
 
   const eventsByDate = useMemo(() => {
     const map = {};
@@ -366,10 +419,21 @@ export default function Calendar() {
   const upcomingEvents = useMemo(() => {
     const todayStr = formatDate(new Date());
     return [...events]
-      .filter((e) => e.date >= todayStr)
+      .filter((e) => {
+        if (isEmployeeView && currentUser) {
+          const isCreator = e.createdBy && (e.createdBy.id === currentUser.id || e.createdBy._id === currentUser._id);
+          const isAttendee = e.rawAttendees && e.rawAttendees.some(att => 
+            att.id === currentUser.id || 
+            att._id === currentUser._id || 
+            (att.name && currentUser.name && att.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+          );
+          if (!isCreator && !isAttendee) return false;
+        }
+        return e.date >= todayStr;
+      })
       .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
       .slice(0, 6);
-  }, [events]);
+  }, [events, isEmployeeView, currentUser]);
 
   const groupedAgendaEvents = useMemo(() => {
     const grouped = {};
@@ -679,6 +743,32 @@ export default function Calendar() {
         </div>
 
         <div className="cal-header-right">
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
+
           {/* View toggle */}
           <div className="cal-view-switcher" role="tablist" aria-label="Calendar view mode">
             <button
@@ -708,7 +798,7 @@ export default function Calendar() {
           </div>
 
           {/* New event button */}
-          {typeof hasPermission === 'function' && hasPermission('announcements', 'create') && (
+          {typeof hasPermission === 'function' && hasPermission('announcements', 'create', perspective) && (
             <button id="cal-new-event-btn" className="cal-new-btn" onClick={() => openAddEvent(selectedDate)}>
               <Plus size={16} />
               New Event

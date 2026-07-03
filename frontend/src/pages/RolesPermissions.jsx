@@ -166,6 +166,29 @@ const RolesPermissions = () => {
   const [selectedRoleId, setSelectedRoleId] = useState('branch_admin');
   const [localPermissions, setLocalPermissions] = useState({});
 
+  // Expandable modules list tracking
+  const [expandedModules, setExpandedModules] = useState({
+    attendance_management: true,
+    leave_management: true,
+    project_management: true,
+    task_monitoring: true,
+    payroll_management: true,
+    work_reports: true,
+    meetings_calendar: true,
+    announcements: true
+  });
+
+  const HIERARCHICAL_MODULES = [
+    'attendance_management',
+    'leave_management',
+    'project_management',
+    'task_monitoring',
+    'payroll_management',
+    'work_reports',
+    'meetings_calendar',
+    'announcements'
+  ];
+
   // Dynamic modules list state
   const [modulesList, setModulesList] = useState([
     { key: 'dashboard', label: 'Dashboard' },
@@ -182,6 +205,7 @@ const RolesPermissions = () => {
     { key: 'performance_analytics', label: 'Performance Analytics' },
     { key: 'payroll_management', label: 'Payroll Management' },
     { key: 'announcements', label: 'Announcements' },
+    { key: 'meetings_calendar', label: 'Meetings & Calendar' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'document_management', label: 'Document Management' },
     { key: 'role_permission', label: 'Role & Permission' },
@@ -208,6 +232,7 @@ const RolesPermissions = () => {
         'performance_analytics',
         'payroll_management',
         'announcements',
+        'meetings_calendar',
         'notifications',
         'document_management',
         'role_permission',
@@ -343,31 +368,36 @@ const RolesPermissions = () => {
     }
   };
 
-  const isRowAllChecked = (moduleKey) => {
-    const perms = localPermissions[moduleKey] || {};
+  const isRowKeyAllChecked = (rowKey) => {
+    const perms = localPermissions[rowKey] || {};
     return operations.every(op => !!perms[op.key]);
   };
 
   const isColumnAllChecked = (opKey) => {
     return modulesList.every(mod => {
+      if (HIERARCHICAL_MODULES.includes(mod.key)) {
+        const selfPerms = localPermissions[`${mod.key}_self`] || {};
+        const compPerms = localPermissions[mod.key] || {};
+        return !!selfPerms[opKey] && !!compPerms[opKey];
+      }
       const perms = localPermissions[mod.key] || {};
       return !!perms[opKey];
     });
   };
 
-  const handleRowToggle = async (moduleKey) => {
+  const handleRowKeyToggle = async (rowKey) => {
     if (selectedRoleId === 'super_admin') {
       addToast('warning', 'Super Admin permissions are permanently locked.');
       return;
     }
 
-    const modulePerms = localPermissions[moduleKey] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
+    const modulePerms = localPermissions[rowKey] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
     const allChecked = operations.every(op => !!modulePerms[op.key]);
     const nextVal = !allChecked;
 
     const updatedPermissions = {
       ...localPermissions,
-      [moduleKey]: operations.reduce((acc, op) => {
+      [rowKey]: operations.reduce((acc, op) => {
         acc[op.key] = nextVal;
         return acc;
       }, {})
@@ -390,19 +420,22 @@ const RolesPermissions = () => {
       return;
     }
 
-    const allChecked = modulesList.every(mod => {
-      const perms = localPermissions[mod.key] || {};
-      return !!perms[opKey];
-    });
+    const allChecked = isColumnAllChecked(opKey);
     const nextVal = !allChecked;
 
     const updatedPermissions = { ...localPermissions };
     modulesList.forEach(mod => {
-      const perms = updatedPermissions[mod.key] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
-      updatedPermissions[mod.key] = {
-        ...perms,
-        [opKey]: nextVal
-      };
+      if (HIERARCHICAL_MODULES.includes(mod.key)) {
+        const selfKey = `${mod.key}_self`;
+        const selfPerms = updatedPermissions[selfKey] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
+        updatedPermissions[selfKey] = { ...selfPerms, [opKey]: nextVal };
+
+        const compPerms = updatedPermissions[mod.key] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
+        updatedPermissions[mod.key] = { ...compPerms, [opKey]: nextVal };
+      } else {
+        const perms = updatedPermissions[mod.key] || { read: false, create: false, update: false, delete: false, approve: false, export: false };
+        updatedPermissions[mod.key] = { ...perms, [opKey]: nextVal };
+      }
     });
 
     setLocalPermissions(updatedPermissions);
@@ -1602,21 +1635,45 @@ const RolesPermissions = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {modulesList.map(mod => (
-                      <tr key={mod.key}>
-                        <td style={{ textAlign: 'left' }}>
-                          <div className="perm-module-icon font-bold" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {selectedRoleId !== 'super_admin' && (
-                              (() => {
-                                const rowAllChecked = isRowAllChecked(mod.key);
-                                return (
+                    {modulesList.flatMap(mod => {
+                      const isHierarchical = HIERARCHICAL_MODULES.includes(mod.key);
+                      const isExpanded = expandedModules[mod.key];
+                      
+                      // For hierarchical modules, we render the parent container row,
+                      // and if expanded, we render the two child rows.
+                      if (isHierarchical) {
+                        const parentRow = (
+                          <tr key={`${mod.key}_parent`} className="parent-module-row" style={{ background: 'var(--bg-elevated)', borderLeft: '3px solid var(--color-primary)' }}>
+                            <td colSpan={7} style={{ textAlign: 'left', padding: '12px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => setExpandedModules(prev => ({ ...prev, [mod.key]: !prev[mod.key] }))}>
+                                <span style={{ display: 'inline-flex', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', color: 'var(--text-muted)' }}>
+                                  ▶
+                                </span>
+                                <strong style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>{mod.label}</strong>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+
+                        if (!isExpanded) {
+                          return [parentRow];
+                        }
+
+                        const childRows = [
+                          { scopeKey: `${mod.key}_self`, label: 'Self Information' },
+                          { scopeKey: mod.key, label: 'Company Information' }
+                        ].map(({ scopeKey, label }) => (
+                          <tr key={`${scopeKey}_child`} className="child-module-row animate-fade-in" style={{ opacity: 0.9 }}>
+                            <td style={{ textAlign: 'left', paddingLeft: '32px' }}>
+                              <div className="perm-module-icon font-bold" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {selectedRoleId !== 'super_admin' && (
                                   <button
                                     type="button"
-                                    className={`action-circle-btn ${rowAllChecked ? 'success-btn' : ''}`}
-                                    title={rowAllChecked ? "Deselect all in row" : "Select all in row"}
+                                    className={`action-circle-btn ${isRowKeyAllChecked(scopeKey) ? 'success-btn' : ''}`}
+                                    title={isRowKeyAllChecked(scopeKey) ? "Deselect all in row" : "Select all in row"}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleRowToggle(mod.key);
+                                      handleRowKeyToggle(scopeKey);
                                     }}
                                     style={{
                                       width: 22,
@@ -1626,56 +1683,114 @@ const RolesPermissions = () => {
                                       display: 'inline-flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      background: rowAllChecked ? 'rgba(16,185,129,0.2)' : 'var(--color-neutral-light)',
-                                      borderColor: rowAllChecked ? '#10b981' : 'var(--border-color)',
-                                      color: rowAllChecked ? '#10b981' : 'var(--text-primary)',
+                                      background: isRowKeyAllChecked(scopeKey) ? 'rgba(16,185,129,0.2)' : 'var(--color-neutral-light)',
+                                      borderColor: isRowKeyAllChecked(scopeKey) ? '#10b981' : 'var(--border-color)',
+                                      color: isRowKeyAllChecked(scopeKey) ? '#10b981' : 'var(--text-primary)',
                                       cursor: 'pointer',
                                       borderRadius: '50%',
                                       transition: 'all 0.2s'
                                     }}
                                   >
-                                    <Check size={12} strokeWidth={rowAllChecked ? 3 : 2} />
+                                    <Check size={12} strokeWidth={isRowKeyAllChecked(scopeKey) ? 3 : 2} />
                                   </button>
-                                );
-                              })()
-                            )}
-                            <Sliders size={14} className="text-muted" />
-                            <span>{(mod.key === 'company_overview' && selectedRoleId !== 'super_admin' && selectedRoleId !== 'company_admin' && selectedRoleId !== 'SuperAdmin') ? 'Branch Overview' : mod.label}</span>
-                            {!['dashboard', 'company_overview', 'employee_management', 'agency_branch_management', 'department_management', 'team_management', 'attendance_management', 'leave_management', 'project_management', 'task_monitoring', 'work_reports', 'performance_analytics', 'payroll_management', 'announcements', 'notifications', 'document_management', 'role_permission', 'system_settings', 'security_audit_logs', 'profile_settings'].includes(mod.key) && (
-                              <button
-                                type="button"
-                                className="icon-action-btn icon-action-danger"
-                                style={{ marginLeft: 8, padding: 2, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
-                                title={`Delete ${mod.label} permission module`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeletePermissionModule(mod.key, mod.label);
-                                }}
-                              >
-                                <Trash2 size={13} style={{ color: '#ef4444' }} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        {operations.map(op => {
-                          const isChecked = selectedRoleId === 'super_admin' ? true : !!localPermissions[mod.key]?.[op.key];
-                          return (
-                            <td
-                              key={op.key}
-                              className="text-center"
-                              onClick={() => handleCheckboxToggle(mod.key, op.key)}
-                              style={{ cursor: selectedRoleId === 'super_admin' ? 'default' : 'pointer' }}
-                            >
-                              <div className="flex-center justify-center">
-                                <span className={`perm-chip ${isChecked ? 'pchip-full' : 'pchip-none'}`} style={{ minWidth: 42 }}>
-                                  {isChecked ? '✓' : '✗'}
-                                </span>
+                                )}
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', paddingLeft: '4px' }}>↳ {label}</span>
                               </div>
                             </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                            {operations.map(op => {
+                              const isChecked = selectedRoleId === 'super_admin' ? true : !!localPermissions[scopeKey]?.[op.key];
+                              return (
+                                <td
+                                  key={op.key}
+                                  className="text-center"
+                                  onClick={() => handleCheckboxToggle(scopeKey, op.key)}
+                                  style={{ cursor: selectedRoleId === 'super_admin' ? 'default' : 'pointer' }}
+                                >
+                                  <div className="flex-center justify-center">
+                                    <span className={`perm-chip ${isChecked ? 'pchip-full' : 'pchip-none'}`} style={{ minWidth: 42 }}>
+                                      {isChecked ? '✓' : '✗'}
+                                    </span>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ));
+
+                        return [parentRow, ...childRows];
+                      }
+
+                      // Normal flat rows
+                      return [
+                        <tr key={mod.key}>
+                          <td style={{ textAlign: 'left' }}>
+                            <div className="perm-module-icon font-bold" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {selectedRoleId !== 'super_admin' && (
+                                <button
+                                  type="button"
+                                  className={`action-circle-btn ${isRowKeyAllChecked(mod.key) ? 'success-btn' : ''}`}
+                                  title={isRowKeyAllChecked(mod.key) ? "Deselect all in row" : "Select all in row"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRowKeyToggle(mod.key);
+                                  }}
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    minWidth: 22,
+                                    padding: 0,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: isRowKeyAllChecked(mod.key) ? 'rgba(16,185,129,0.2)' : 'var(--color-neutral-light)',
+                                    borderColor: isRowKeyAllChecked(mod.key) ? '#10b981' : 'var(--border-color)',
+                                    color: isRowKeyAllChecked(mod.key) ? '#10b981' : 'var(--text-primary)',
+                                    cursor: 'pointer',
+                                    borderRadius: '50%',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  <Check size={12} strokeWidth={isRowKeyAllChecked(mod.key) ? 3 : 2} />
+                                </button>
+                              )}
+                              <Sliders size={14} className="text-muted" />
+                              <span>{(mod.key === 'company_overview' && selectedRoleId !== 'super_admin' && selectedRoleId !== 'company_admin' && selectedRoleId !== 'SuperAdmin') ? 'Branch Overview' : mod.label}</span>
+                              {!['dashboard', 'company_overview', 'employee_management', 'agency_branch_management', 'department_management', 'team_management', 'attendance_management', 'leave_management', 'project_management', 'task_monitoring', 'work_reports', 'performance_analytics', 'payroll_management', 'announcements', 'notifications', 'document_management', 'role_permission', 'system_settings', 'security_audit_logs', 'profile_settings'].includes(mod.key) && (
+                                <button
+                                  type="button"
+                                  className="icon-action-btn icon-action-danger"
+                                  style={{ marginLeft: 8, padding: 2, background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+                                  title={`Delete ${mod.label} permission module`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePermissionModule(mod.key, mod.label);
+                                  }}
+                                >
+                                  <Trash2 size={13} style={{ color: '#ef4444' }} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          {operations.map(op => {
+                            const isChecked = selectedRoleId === 'super_admin' ? true : !!localPermissions[mod.key]?.[op.key];
+                            return (
+                              <td
+                                key={op.key}
+                                className="text-center"
+                                onClick={() => handleCheckboxToggle(mod.key, op.key)}
+                                style={{ cursor: selectedRoleId === 'super_admin' ? 'default' : 'pointer' }}
+                              >
+                                <div className="flex-center justify-center">
+                                  <span className={`perm-chip ${isChecked ? 'pchip-full' : 'pchip-none'}`} style={{ minWidth: 42 }}>
+                                    {isChecked ? '✓' : '✗'}
+                                  </span>
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ];
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -98,14 +98,52 @@ const WorkReports = () => {
     return 'Employee';
   }, [currentUserRole]);
 
-  /* Simulated user perspective configuration */
-  const [userRole, setUserRole] = useState(initialUserRole);
+  const [perspective, setPerspective] = useState(() => {
+    if (currentUserRole === 'employee') return 'self';
+    const hasCompanyRead = hasPermission('work_report', 'read', 'company');
+    const hasSelfRead = hasPermission('work_report', 'read', 'self');
+
+    const saved = localStorage.getItem('perspective_work_reports');
+    if (saved === 'self' && hasSelfRead) return 'self';
+    if (saved === 'company' && hasCompanyRead) return 'company';
+
+    return hasCompanyRead ? 'company' : 'self';
+  });
+
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    const hasCompanyRead = hasPermission('work_report', 'read', 'company');
+    const hasSelfRead = hasPermission('work_report', 'read', 'self');
+    return hasCompanyRead && hasSelfRead;
+  }, [currentUserRole, hasPermission]);
 
   React.useEffect(() => {
-    setUserRole(initialUserRole);
-  }, [initialUserRole]);
+    if (currentUserRole !== 'employee') {
+      localStorage.setItem('perspective_work_reports', perspective);
+    }
+  }, [perspective, currentUserRole]);
 
-  const isEmployee = currentUserRole === 'employee' || userRole === 'Employee';
+  React.useEffect(() => {
+    if (currentUserRole === 'employee') {
+      setPerspective('self');
+    } else {
+      const hasCompanyRead = hasPermission('work_report', 'read', 'company');
+      const hasSelfRead = hasPermission('work_report', 'read', 'self');
+      const saved = localStorage.getItem('perspective_work_reports');
+      if (saved === 'self' && hasSelfRead) {
+        setPerspective('self');
+      } else if (saved === 'company' && hasCompanyRead) {
+        setPerspective('company');
+      } else {
+        setPerspective(hasCompanyRead ? 'company' : 'self');
+      }
+    }
+  }, [currentUserRole, hasPermission]);
+
+  const isEmployeeView = perspective === 'self';
+  const isCompanyView = perspective === 'company';
+
+  const isEmployee = isEmployeeView;
 
   const scopedEmployees = useMemo(() => {
     const activeRole = isEmployee ? 'employee' : currentUserRole;
@@ -965,6 +1003,31 @@ const WorkReports = () => {
               <p className="subtitle">Submit your daily work reports and track your submission history.</p>
             </div>
             <div className="flex-center gap-3">
+              {showPerspectiveDropdown && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+                  <select
+                    value={perspective}
+                    onChange={(e) => setPerspective(e.target.value)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                      outline: 'none',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <option value="self">Self Info</option>
+                    <option value="company">Company Info</option>
+                  </select>
+                </div>
+              )}
               <Button variant="ghost" size="sm" icon={Download} onClick={() => handleExportSystem('CSV')}>
                 {exporting ? 'Exporting...' : 'Export My Reports'}
               </Button>
@@ -1174,6 +1237,31 @@ const WorkReports = () => {
 
         {/* Dynamic Role Switcher & Tabs */}
         <div className="flex-center gap-3 flex-wrap">
+          {showPerspectiveDropdown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
+              <select
+                value={perspective}
+                onChange={(e) => setPerspective(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <option value="self">Self Info</option>
+                <option value="company">Company Info</option>
+              </select>
+            </div>
+          )}
 
           <div className="role-switcher-container">
             <span className="role-switcher-label">Time Period:</span>

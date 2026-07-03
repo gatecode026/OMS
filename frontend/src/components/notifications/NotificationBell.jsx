@@ -200,7 +200,19 @@ const NotificationBell = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isRinging, setIsRinging] = useState(false);
   const [socketNotifications, setSocketNotifications] = useState([]);
-  const [readIds, setReadIds] = useState(new Set());
+  const [readIds, setReadIds] = useState(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = user?.id;
+      if (userId) {
+        const stored = localStorage.getItem(`read_notification_ids:${userId}`);
+        return stored ? new Set(JSON.parse(stored)) : new Set();
+      }
+      return new Set();
+    } catch (e) {
+      return new Set();
+    }
+  });
 
   const {
     token,
@@ -217,6 +229,31 @@ const NotificationBell = () => {
 
   const bellRef = useRef(null);
   const prevDerivedCountRef = useRef(0);
+  const lastUserIdRef = useRef('');
+
+  // Sync and load readIds scoped by currentUser.id to prevent mount-time race condition
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    // 1. If user transitioned or loaded, load their readIds from localStorage
+    if (lastUserIdRef.current !== currentUser.id) {
+      try {
+        const stored = localStorage.getItem(`read_notification_ids:${currentUser.id}`);
+        if (stored) {
+          setReadIds(new Set(JSON.parse(stored)));
+        } else {
+          setReadIds(new Set());
+        }
+      } catch (e) {}
+      lastUserIdRef.current = currentUser.id;
+      return;
+    }
+
+    // 2. Otherwise, sync changes to localStorage
+    try {
+      localStorage.setItem(`read_notification_ids:${currentUser.id}`, JSON.stringify(Array.from(readIds)));
+    } catch (e) {}
+  }, [readIds, currentUser]);
 
   // ── AUDIO CHIME ──────────────────────────────────────────────────────────
   const playNotificationChime = useCallback(() => {
@@ -422,6 +459,7 @@ const NotificationBell = () => {
       if (fetchNotifications) fetchNotifications();
       const socket = getSocket();
       socket?.emit('notification:opened');
+      handleMarkAllRead();
     }
   };
 
