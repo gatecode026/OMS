@@ -35,6 +35,7 @@ const Documents = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadForm, setUploadForm] = useState({ name: '', type: 'PDF', category: isEmployee ? 'Project' : 'HR Policies', size: '1.2 MB' });
   const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Build a backend-proxied URL for a document (avoids CORS when fileUrl is external e.g. ImageKit)
   const getProxyUrl = (doc, download = false) => {
@@ -91,6 +92,7 @@ const Documents = () => {
     setShowUploadModal(false);
     setSelectedFile(null);
     setUploadForm({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
+    setIsUploading(false);
   };
 
   const handleFileChange = (e) => {
@@ -135,35 +137,43 @@ const Documents = () => {
       return;
     }
 
-    let fileBase64 = '';
-    if (selectedFile) {
-      try {
-        fileBase64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(selectedFile);
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = (error) => reject(error);
-        });
-      } catch (err) {
-        console.error('FileReader error:', err);
-        addToast('danger', 'Failed to read the selected file.');
-        return;
+    setIsUploading(true);
+    try {
+      let fileBase64 = '';
+      if (selectedFile) {
+        try {
+          fileBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(selectedFile);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (error) => reject(error);
+          });
+        } catch (err) {
+          console.error('FileReader error:', err);
+          addToast('danger', 'Failed to read the selected file.');
+          setIsUploading(false);
+          return;
+        }
       }
-    }
 
-    const docData = {
-      name: uploadForm.name,
-      type: uploadForm.type,
-      category: uploadForm.category,
-      size: uploadForm.size,
-      uploadedBy: currentUser?.name || 'Unknown',
-      uploadDate: new Date().toISOString().split('T')[0],
-      downloads: 0,
-      fileUrl: fileBase64,
-      branch: currentUser?.branch || ''
-    };
-    await addDocument(docData);
-    handleCloseModal();
+      const docData = {
+        name: uploadForm.name,
+        type: uploadForm.type,
+        category: uploadForm.category,
+        size: uploadForm.size,
+        uploadedBy: currentUser?.name || 'Unknown',
+        uploadDate: new Date().toISOString().split('T')[0],
+        downloads: 0,
+        fileUrl: fileBase64,
+        branch: currentUser?.branch || ''
+      };
+      await addDocument(docData);
+      handleCloseModal();
+    } catch (err) {
+      console.error('Upload document error:', err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDownloadFile = (doc) => {
@@ -448,7 +458,7 @@ const Documents = () => {
             <Button type="button" variant="secondary" onClick={handleCloseModal}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary">
+            <Button type="submit" variant="primary" disabled={isUploading} loading={isUploading}>
               Upload
             </Button>
           </div>

@@ -174,6 +174,9 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
     const restrictedFields = getRestrictedFields(moduleName, context.role);
     for (const field of restrictedFields) {
       if (updatePayload[field] !== undefined && String(updatePayload[field] ?? '') !== String(resource[field] ?? '')) {
+        if (moduleName === 'Attendance' && field === 'status' && updatePayload.punchOut !== undefined) {
+          continue;
+        }
         logSecurityEvent(context, moduleName, operation, SecurityEventTypes.FIELD_ACCESS_DENIED, 'DENIED', `Modification of protected field "${field}" blocked`, resource.id);
         const err = new Error(`Access denied: You are not authorized to modify the "${field}" field.`);
         err.statusCode = 403;
