@@ -192,19 +192,41 @@ const ProgressTracker = ({ items, percentage, nextStep }) => {
 };
 
 const ProfessionalPlacementCard = ({ user }) => {
+  const roleKey = (user.roleId || user.role || '').toLowerCase();
+  const designationLower = (user.designation || '').toLowerCase();
+
+  const isSuperAdmin = roleKey === 'super_admin' || roleKey === 'company_admin' || designationLower.includes('admin');
+  const isHR = roleKey === 'hr' || designationLower.includes('hr');
+  const isBranchAdmin = roleKey === 'branch_admin';
+  const isManager = roleKey === 'manager' || designationLower.includes('manager');
+  const isTeamLeader = roleKey === 'team_leader' || designationLower.includes('team leader') || designationLower.includes('team_leader');
+
+  const cells = [
+    { label: 'Employee ID', value: user.employeeId || user.id || '—', icon: Shield },
+    { label: 'Designation', value: user.designation || '—', icon: User },
+    { label: 'Department', value: user.department || '—', icon: Building },
+    { label: 'Team Name', value: user.team || '—', icon: User },
+    { label: 'Reporting Team Leader', value: user.teamLeader || '—', icon: User },
+    { label: 'Office Location', value: user.branch || '—', icon: MapPin },
+    { label: 'Employment Type', value: user.employeeType || '—', icon: Briefcase },
+  ].filter(cell => {
+    if (isManager) {
+      return ['Employee ID', 'Designation', 'Office Location'].includes(cell.label);
+    }
+    if (isSuperAdmin || isHR || isBranchAdmin) {
+      return !['Team Name', 'Reporting Team Leader'].includes(cell.label);
+    }
+    if (isTeamLeader) {
+      return cell.label !== 'Reporting Team Leader';
+    }
+    return true;
+  });
+
   return (
     <div className="professional-info-card">
       <h4><Briefcase size={16} /> Professional Placement</h4>
       <div className="info-table-grid">
-        {[
-          { label: 'Employee ID', value: user.employeeId || user.id || '—', icon: Shield },
-          { label: 'Designation', value: user.designation || '—', icon: User },
-          { label: 'Department', value: user.department || '—', icon: Building },
-          { label: 'Team Name', value: user.team || '—', icon: User },
-          { label: 'Reporting Team Leader', value: user.teamLeader || '—', icon: User },
-          { label: 'Office Location', value: user.branch || '—', icon: MapPin },
-          { label: 'Employment Type', value: user.employeeType || '—', icon: Briefcase },
-        ].map((cell, idx) => {
+        {cells.map((cell, idx) => {
           const Icon = cell.icon;
           return (
             <div key={idx} className="info-grid-cell">
@@ -448,6 +470,33 @@ const MyProfile = () => {
       return String(addr);
     };
 
+    const roleKey = (currentUser.roleId || currentUser.role || '').toLowerCase();
+    const designationLower = (currentUser.designation || '').toLowerCase();
+
+    const isSuperAdmin = roleKey === 'super_admin' || roleKey === 'company_admin' || designationLower.includes('admin');
+    const isHR = roleKey === 'hr' || designationLower.includes('hr');
+    const isBranchAdmin = roleKey === 'branch_admin';
+    const isManager = roleKey === 'manager' || designationLower.includes('manager');
+    const isTeamLeader = roleKey === 'team_leader' || designationLower.includes('team leader') || designationLower.includes('team_leader');
+
+    const pdfCells = [
+      { label: 'Designation', value: currentUser.designation || '—' },
+      { label: 'Department', value: currentUser.department || '—' },
+      { label: 'Office Location', value: currentUser.branch || '—' },
+      { label: 'Employment Type', value: currentUser.employeeType || '—' },
+      { label: 'Joining Date', value: currentUser.joinDate || '—' },
+      { label: 'Shift Timing', value: currentUser.shift || currentUser.shiftTiming || '—' }
+    ].filter(cell => {
+      if (isManager) {
+        return ['Designation', 'Office Location'].includes(cell.label);
+      }
+      return true;
+    });
+
+    const pdfCellsHTML = pdfCells.map(c => `
+      <div class="field"><span class="label">${c.label}</span><span class="value">${c.value}</span></div>
+    `).join('');
+
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       addToast('error', 'Popup blocked. Please allow popups to export PDF.');
@@ -489,12 +538,7 @@ const MyProfile = () => {
           <div class="section">
             <div class="section-title">Professional Placement</div>
             <div class="grid">
-              <div class="field"><span class="label">Designation</span><span class="value">${currentUser.designation || '—'}</span></div>
-              <div class="field"><span class="label">Department</span><span class="value">${currentUser.department || '—'}</span></div>
-              <div class="field"><span class="label">Office Location</span><span class="value">${currentUser.branch || '—'}</span></div>
-              <div class="field"><span class="label">Employment Type</span><span class="value">${currentUser.employeeType || '—'}</span></div>
-              <div class="field"><span class="label">Joining Date</span><span class="value">${currentUser.joinDate || '—'}</span></div>
-              <div class="field"><span class="label">Shift Timing</span><span class="value">${currentUser.shift || currentUser.shiftTiming || '—'}</span></div>
+              ${pdfCellsHTML}
             </div>
           </div>
 
@@ -555,6 +599,41 @@ const MyProfile = () => {
       return String(addr);
     };
 
+    const roleKey = (currentUser.roleId || currentUser.role || '').toLowerCase();
+    const designationLower = (currentUser.designation || '').toLowerCase();
+
+    const isSuperAdmin = roleKey === 'super_admin' || roleKey === 'company_admin' || designationLower.includes('admin');
+    const isHR = roleKey === 'hr' || designationLower.includes('hr');
+    const isBranchAdmin = roleKey === 'branch_admin';
+    const isManager = roleKey === 'manager' || designationLower.includes('manager');
+    const isTeamLeader = roleKey === 'team_leader' || designationLower.includes('team leader') || designationLower.includes('team_leader');
+
+    const wordCells = [
+      { label: 'Designation', value: currentUser.designation || '—' },
+      { label: 'Department', value: currentUser.department || '—' },
+      { label: 'Office Location', value: currentUser.branch || '—' },
+      { label: 'Employment Type', value: currentUser.employeeType || '—' },
+      { label: 'Joining Date', value: currentUser.joinDate || '—' },
+      { label: 'Shift Timing', value: currentUser.shift || currentUser.shiftTiming || '—' }
+    ].filter(cell => {
+      if (isManager) {
+        return ['Designation', 'Office Location'].includes(cell.label);
+      }
+      return true;
+    });
+
+    let wordRowsHTML = '';
+    for (let i = 0; i < wordCells.length; i += 2) {
+      const cell1 = wordCells[i];
+      const cell2 = wordCells[i + 1] || { label: '', value: '' };
+      wordRowsHTML += `
+        <tr>
+          <td><span class="label">${cell1.label}</span><span class="value">${cell1.value}</span></td>
+          <td>${cell2.label ? `<span class="label">${cell2.label}</span><span class="value">${cell2.value}</span>` : ''}</td>
+        </tr>
+      `;
+    }
+
     const htmlContent = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head>
@@ -585,18 +664,7 @@ const MyProfile = () => {
           <div class="section">
             <div class="section-title">Professional Placement</div>
             <table>
-              <tr>
-                <td><span class="label">Designation</span><span class="value">${currentUser.designation || '—'}</span></td>
-                <td><span class="label">Department</span><span class="value">${currentUser.department || '—'}</span></td>
-              </tr>
-              <tr>
-                <td><span class="label">Office Location</span><span class="value">${currentUser.branch || '—'}</span></td>
-                <td><span class="label">Employment Type</span><span class="value">${currentUser.employeeType || '—'}</span></td>
-              </tr>
-              <tr>
-                <td><span class="label">Joining Date</span><span class="value">${currentUser.joinDate || '—'}</span></td>
-                <td><span class="label">Shift Timing</span><span class="value">${currentUser.shift || currentUser.shiftTiming || '—'}</span></td>
-              </tr>
+              ${wordRowsHTML}
             </table>
           </div>
 

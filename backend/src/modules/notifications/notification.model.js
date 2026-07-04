@@ -41,6 +41,7 @@ const notificationSchema = new mongoose.Schema(
     id: {
       type: String,
       index: true,
+      default: () => new mongoose.Types.ObjectId().toString(),
     },
     // ── TARGETING ──────────────────────────────────────────────────────────────
     userId: {
@@ -156,6 +157,9 @@ notificationSchema.index(
  * Ensures consistent categorization without requiring callers to set it.
  */
 notificationSchema.pre("save", function (next) {
+  if (!this.id) {
+    this.id = this._id ? this._id.toString() : new mongoose.Types.ObjectId().toString();
+  }
   if (!this.isModified("type") && this.category !== "other") return next();
   this.category = deriveCategory(this.type);
   next();
@@ -167,6 +171,9 @@ notificationSchema.pre("save", function (next) {
 notificationSchema.pre("insertMany", function (next, docs) {
   if (Array.isArray(docs)) {
     docs.forEach((doc) => {
+      if (!doc.id) {
+        doc.id = doc._id ? doc._id.toString() : new mongoose.Types.ObjectId().toString();
+      }
       if (!doc.category || doc.category === "other") {
         doc.category = deriveCategory(doc.type);
       }
