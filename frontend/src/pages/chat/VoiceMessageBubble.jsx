@@ -77,6 +77,12 @@ const VoiceMessageBubble = ({ message: msg, isOwn }) => {
     };
   }, [src]);
 
+  useEffect(() => {
+    if (msg.media?.duration) {
+      setTotalDuration(msg.media.duration);
+    }
+  }, [msg.media?.duration]);
+
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || loadError) return;
