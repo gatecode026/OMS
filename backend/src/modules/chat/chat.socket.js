@@ -1052,7 +1052,12 @@ export const registerChatSocketHandlers = (io) => {
             });
             return;
           }
-          let uploadedMedia = media;
+          let uploadedMedia = media
+            ? {
+                ...media,
+                mimeType: media.fileType || media.mimeType || null,
+              }
+            : null;
           if (
             media &&
             media.url &&
@@ -1073,6 +1078,7 @@ export const registerChatSocketHandlers = (io) => {
               }
               uploadedMedia = {
                 ...media,
+                mimeType: media.fileType || media.mimeType || null,
                 url: resultUrl,
               };
             } catch (uploadErr) {
