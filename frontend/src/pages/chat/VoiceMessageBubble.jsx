@@ -46,7 +46,13 @@ const VoiceMessageBubble = ({ message: msg, isOwn }) => {
       setCurrentTime(0);
       audio.currentTime = 0;
     };
-    const onError = () => setLoadError(true);
+    const onError = (e) => {
+      const err = audio.error;
+      if (err && err.code === 1) {
+        return; // Ignore non-fatal aborted error
+      }
+      setLoadError(true);
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
