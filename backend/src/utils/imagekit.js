@@ -36,9 +36,10 @@ export const uploadToImageKit = async (base64Str, fileName) => {
     const base64Data = base64Str.includes(';base64,')
       ? base64Str.split(';base64,')[1]
       : base64Str;
+    const buffer = Buffer.from(base64Data, 'base64');
 
     const formData = new FormData();
-    formData.append('file', base64Data);
+    formData.append('file', new Blob([buffer]), name);
     formData.append('fileName', name);
     formData.append('folder', 'Office_managements');
     formData.append('useUniqueFileName', 'true');
@@ -195,9 +196,10 @@ export const uploadToImageKitDetailed = async (base64Str, fileName) => {
     const base64Data = base64Str.includes(';base64,')
       ? base64Str.split(';base64,')[1]
       : base64Str;
+    const buffer = Buffer.from(base64Data, 'base64');
 
     const formData = new FormData();
-    formData.append('file', base64Data);
+    formData.append('file', new Blob([buffer]), name);
     formData.append('fileName', name);
     formData.append('folder', 'Office_managements');
     formData.append('useUniqueFileName', 'true');
