@@ -721,19 +721,18 @@ export const ChatProvider = ({ children }) => {
       await fetchMessages(convId, null);
     }
 
-    // Only mark as read if there were actual unread messages for this user
-    // (prevents false "Seen" when the sender opens their own conversation)
-    if (currentUnread > 0) {
-      await apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' });
+    // Always mark as read when opening a conversation to ensure any unread messages are updated in DB
+    apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
+      console.error('[Chat] Error marking conversation as read:', err);
+    });
 
-      // Find last message ID from conversation preview
-      const conv = conversationsRef.current.find(c => c.id === convId);
-      const lastReadMessageId = conv?.lastMessage?.messageId;
+    // Find last message ID from conversation preview
+    const conv = conversationsRef.current.find(c => c.id === convId);
+    const lastReadMessageId = conv?.lastMessage?.messageId;
 
-      socketRef.current?.emit('mark_read', { conversationId: convId });
-      if (lastReadMessageId) {
-        socketRef.current?.emit('conversation:read', { conversationId: convId, lastReadMessageId });
-      }
+    socketRef.current?.emit('mark_read', { conversationId: convId });
+    if (lastReadMessageId) {
+      socketRef.current?.emit('conversation:read', { conversationId: convId, lastReadMessageId });
     }
   }, [fetchMessages, apiFetch, unreadCounts]);
 
@@ -2152,10 +2151,14 @@ export const ChatProvider = ({ children }) => {
         return {
           ...prev,
           [conversationId]: convMsgs.map(msg => {
+            // Only update seen status for messages read by someone other than the sender
+            const validReaders = readByArray.filter(r => r.employeeId !== msg.senderId);
+            if (validReaders.length === 0) return msg;
+
             if (msg.senderId === me?.id) {
               const existing = msg.readBy || [];
               const merged = [...existing];
-              readByArray.forEach(r => {
+              validReaders.forEach(r => {
                 if (!merged.some(er => er.employeeId === r.employeeId)) {
                   merged.push(r);
                 }
