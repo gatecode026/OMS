@@ -1124,6 +1124,7 @@ export const registerChatSocketHandlers = (io) => {
             senderAvatar: avatar,
             preview: previewText,
             type: savedMessage.type,
+            media: savedMessage.media || null,
             createdAt: savedMessage.createdAt,
             _isOptimized: true,
             tempId,
