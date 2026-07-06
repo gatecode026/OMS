@@ -13,7 +13,7 @@ import {
 } from '../../security/repositoryContract.js';
 import conversationRepository from './conversation.repository.js';
 
-export const find = async (query = {}) => {
+export const find = async (query = {}, options = {}) => {
   const context = resolveSecurityContext();
   sanitizeQueryOperators(query);
 
@@ -27,14 +27,26 @@ export const find = async (query = {}) => {
     query.conversationId = { $in: convIds };
   }
 
-  return Message.find(query);
+  let dbQuery = Message.find(query);
+  if (options.sort) dbQuery = dbQuery.sort(options.sort);
+  if (options.skip) dbQuery = dbQuery.skip(options.skip);
+  if (options.limit) dbQuery = dbQuery.limit(options.limit);
+  if (options.select) dbQuery = dbQuery.select(options.select);
+  if (options.lean) dbQuery = dbQuery.lean();
+
+  return dbQuery;
 };
 
-export const findOne = async (query = {}) => {
+export const findOne = async (query = {}, options = {}) => {
   const context = resolveSecurityContext();
   sanitizeQueryOperators(query);
 
-  const msg = await Message.findOne(query);
+  let dbQuery = Message.findOne(query);
+  if (options.sort) dbQuery = dbQuery.sort(options.sort);
+  if (options.select) dbQuery = dbQuery.select(options.select);
+  if (options.lean) dbQuery = dbQuery.lean();
+
+  const msg = await dbQuery;
   if (msg && context) {
     await conversationRepository.findOne({ id: msg.conversationId });
     await validateRepositoryAccess('read', msg, { 

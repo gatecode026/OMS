@@ -89,14 +89,15 @@ export const triggerPushNotificationJob = async (userId, companyId) => {
         );
         const lastReadAt = participant?.lastReadAt || new Date(0);
 
-        const unreadMessages = await Message.find({
-          conversationId: conv.id,
-          senderId: { $ne: userId },
-          isDeleted: false,
-          createdAt: { $gt: new Date(lastReadAt) },
-        })
-          .sort({ createdAt: 1 })
-          .lean();
+        const unreadMessages = await Message.find(
+          {
+            conversationId: conv.id,
+            senderId: { $ne: userId },
+            isDeleted: false,
+            createdAt: { $gt: new Date(lastReadAt) },
+          },
+          { sort: { createdAt: 1 }, lean: true }
+        );
 
         if (unreadMessages.length === 0) continue;
 
@@ -319,9 +320,10 @@ const verifyParticipantCached = async (companyId, conversationId, userId) => {
     cacheKey,
     async () => {
       return runWithTenant(companyId, async () => {
-        const conv = await Conversation.findOne({ id: conversationId })
-          .select("participants.employeeId")
-          .lean();
+        const conv = await Conversation.findOne(
+          { id: conversationId },
+          { select: "participants.employeeId", lean: true }
+        );
         return conv ? conv.participants.map((p) => p.employeeId) : [];
       });
     },
@@ -344,6 +346,18 @@ export const registerChatSocketHandlers = (io) => {
       statusEmoji,
     } = socket.user;
     socket.typingConvs = new Set();
+
+    const isSuperAdmin = ["super_admin", "superadmin"].includes(role?.toLowerCase());
+
+    // Intercept socket.on to bind AsyncLocalStorage tenant and user context automatically to all handlers
+    const originalOn = socket.on.bind(socket);
+    socket.on = (event, listener) => {
+      return originalOn(event, async (...args) => {
+        await runWithTenant(companyId, async () => {
+          return listener(...args);
+        }, isSuperAdmin, socket.user);
+      });
+    };
 
     logger.info(
       `[Chat] Connected: ${name} (${userId}) — Company: ${companyId} — Socket: ${socket.id}`,
@@ -1275,7 +1289,7 @@ export const registerChatSocketHandlers = (io) => {
           logger.error("[Chat] send_message error:", err);
           socket.emit("error", {
             event: "send_message",
-            message: "Failed to send message",
+            message: "Failed to send message: " + err.message,
           });
           socket.emit("message_error", {
             tempId,

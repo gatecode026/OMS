@@ -640,7 +640,10 @@ export const ChatProvider = ({ children }) => {
               return true;
             });
 
-            return { ...prev, [convId]: [...msgs, ...pendingOptimistic, ...filteredFailedMsgs] };
+            const merged = [...msgs, ...pendingOptimistic, ...filteredFailedMsgs];
+            // Always sort chronologically: oldest first, newest last
+            merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            return { ...prev, [convId]: merged };
           }
 
           // Older messages prepend (scroll-up = load older)
@@ -676,7 +679,10 @@ export const ChatProvider = ({ children }) => {
             return true;
           });
 
-          return { ...prev, [convId]: [...filteredNew, ...nonFailedExisting, ...filteredFailedMsgs] };
+          const paginatedMerge = [...filteredNew, ...nonFailedExisting, ...filteredFailedMsgs];
+          // Always sort chronologically: oldest first, newest last
+          paginatedMerge.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          return { ...prev, [convId]: paginatedMerge };
         });
         setHasMoreMessages(prev => ({
           ...prev, [convId]: pagination.hasMore

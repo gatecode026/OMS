@@ -87,11 +87,7 @@ export const getPinnedMessages = async (conversationId, employeeId, companyId, q
 
     // Execute queries
     const [messages, totalPinned] = await Promise.all([
-      Message.find(query)
-        .sort(sortObj)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+      Message.find(query, { sort: sortObj, skip, limit, lean: true }),
       Message.countDocuments(query)
     ]);
 

@@ -117,7 +117,7 @@ export const getThreadDetails = async (threadId, employeeId, companyId) => {
     const employeeMap = await resolveEmployeeDetails(allUserIds, companyId);
 
     // Fetch root message details
-    const rootMessage = await Message.findOne({ id: thread.rootMessageId }).lean();
+    const rootMessage = await Message.findOne({ id: thread.rootMessageId }, { lean: true });
     if (rootMessage && rootMessage.type === 'poll' && rootMessage.pollId) {
       const Poll = mongoose.model('Poll');
       let poll = await Poll.findById(rootMessage.pollId).lean();
@@ -186,10 +186,7 @@ export const getThreadReplies = async (threadId, employeeId, companyId, queryOpt
     }
 
     // Fetch replies in chronological order (oldest first)
-    const replies = await Message.find(query)
-      .sort({ _id: 1 })
-      .limit(limit + 1)
-      .lean();
+    const replies = await Message.find(query, { sort: { _id: 1 }, limit: limit + 1, lean: true });
 
     const pollIds = replies.filter(m => m.type === 'poll' && m.pollId).map(m => m.pollId);
     if (pollIds.length > 0) {
@@ -537,7 +534,7 @@ export const getThreadActivityList = async (employeeId, companyId) => {
     const rootMessageIds = threads.map(t => t.rootMessageId);
 
     // Fetch root messages
-    const rootMessages = await Message.find({ id: { $in: rootMessageIds } }).lean();
+    const rootMessages = await Message.find({ id: { $in: rootMessageIds } }, { lean: true });
     const rootMsgMap = rootMessages.reduce((acc, m) => {
       acc[m.id] = m;
       return acc;
@@ -627,10 +624,7 @@ export const searchThreads = async (employeeId, companyId, queryOptions = {}) =>
     }
 
     // 2. Fetch matched messages
-    const replies = await Message.find(messageFilter)
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
+    const replies = await Message.find(messageFilter, { sort: { createdAt: -1 }, limit: 50, lean: true });
 
     return replies;
   });

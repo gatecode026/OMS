@@ -239,7 +239,7 @@ const enrichConversationForUser = async (conv, employeeId) => {
     query.createdAt = { $gt: deleteEntry.deletedAt };
   }
 
-  const latestMsg = await Message.findOne(query).sort({ createdAt: -1 }).lean();
+  const latestMsg = await Message.findOne(query, { sort: { createdAt: -1 }, lean: true });
 
   let lastMessage = null;
   if (latestMsg) {
@@ -377,10 +377,7 @@ export const getMessages = async (
         query._id = { $lt: new mongoose.Types.ObjectId(cursor) };
       }
 
-      const messages = await Message.find(query)
-        .sort({ _id: -1 })
-        .limit(limit)
-        .lean();
+      const messages = await Message.find(query, null, { sort: { _id: -1 }, limit, lean: true });
 
       // Fetch and populate poll details for poll messages
       const pollIds = messages
@@ -889,15 +886,15 @@ export const searchMessages = async (
   companyId,
 ) => {
   return runWithTenant(companyId, async () => {
-    const messages = await Message.find({
-      conversationId,
-      content: { $regex: query, $options: "i" },
-      isDeleted: false,
-      $nor: [{ "deletedFor.employeeId": employeeId }],
-    })
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
+    const messages = await Message.find(
+      {
+        conversationId,
+        content: { $regex: query, $options: "i" },
+        isDeleted: false,
+        $nor: [{ "deletedFor.employeeId": employeeId }],
+      },
+      { sort: { createdAt: -1 }, limit: 50, lean: true }
+    );
 
     return messages;
   });
@@ -1457,10 +1454,13 @@ export const deleteMessagePermanently = async (messageId, companyId) => {
     // 2. Update conversation lastMessage preview if this message was the latest one
     const conv = await Conversation.findOne({ id: message.conversationId });
     if (conv && conv.lastMessage?.messageId === messageId) {
-      const nextLatest = await Message.findOne({
-        conversationId: message.conversationId,
-        id: { $ne: messageId },
-      }).sort({ createdAt: -1 });
+      const nextLatest = await Message.findOne(
+        {
+          conversationId: message.conversationId,
+          id: { $ne: messageId },
+        },
+        { sort: { createdAt: -1 } }
+      );
 
       if (nextLatest) {
         const previewContent = nextLatest.isDeleted
@@ -1515,7 +1515,7 @@ export const deleteConversationPermanently = async (
     if (!conv) throw new Error("Conversation not found");
 
     // 1. Gather all messages in conversation
-    const messages = await Message.find({ conversationId }).lean();
+    const messages = await Message.find({ conversationId }, { lean: true });
 
     // 2. Collect unique ImageKit File IDs and URLs to delete
     const fileIdsToDelete = new Set();
