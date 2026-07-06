@@ -540,10 +540,10 @@ export const getMessageDetail = async (messageId, employeeId, companyId) => {
 /**
  * Save message to DB (called by Socket.io handler)
  */
-export const saveMessage = async (messageData, companyId) => {
+export const saveMessage = async (messageData, companyId, existingConv = null) => {
   return runWithTenant(companyId, async () => {
     // Enforce onlyAdminsCanMessage settings
-    const conv = await Conversation.findOne({ id: messageData.conversationId });
+    const conv = existingConv || await Conversation.findOne({ id: messageData.conversationId });
     if (!conv) throw new Error("Conversation not found");
 
     if (conv.type === "group" && conv.settings?.onlyAdminsCanMessage) {
