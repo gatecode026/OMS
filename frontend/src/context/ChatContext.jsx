@@ -27,7 +27,6 @@ const ChatContext = createContext(null);
 const getApiUrl = () => window.API_URL || window.location.origin;
 
 // ─── Provider ────────────────────────────────────────────────────────────────
-
 export const ChatProvider = ({ children }) => {
   const { token, setToken, currentUser: simulatedUser, addToast } = useApp();
 
@@ -557,7 +556,7 @@ export const ChatProvider = ({ children }) => {
         try {
           const isOldFormatForMe = key.startsWith(`chat_failed_msg_${currentUser.id}_`);
           const isNewFormat = key.startsWith('chat_failed_msg_temp_');
-          
+
           if (isOldFormatForMe || isNewFormat) {
             const msg = JSON.parse(localStorage.getItem(key));
             if (msg && msg.convId === convId) {
@@ -614,19 +613,19 @@ export const ChatProvider = ({ children }) => {
 
             // Filter out failed messages that have already been saved on the server
             const filteredFailedMsgs = failedMsgs.filter(m => {
-              const alreadyDelivered = existingIds.has(m.tempId) || 
+              const alreadyDelivered = existingIds.has(m.tempId) ||
                 existingTempIds.has(m.tempId) ||
                 msgs.some(serverMsg => {
                   const senderMatch = serverMsg.senderId === m.senderId;
                   const typeMatch = serverMsg.type === m.type;
-                  const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') === 
-                                       (m.content || '').trim().replace(/\r\n/g, '\n');
-                  
+                  const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') ===
+                    (m.content || '').trim().replace(/\r\n/g, '\n');
+
                   const serverDate = new Date(serverMsg.createdAt);
                   const localDate = m.createdAt ? new Date(m.createdAt) : new Date();
                   const timeMatch = isNaN(serverDate.getTime()) || isNaN(localDate.getTime()) ||
                     Math.abs(serverDate - localDate) < 86400000; // 24 hours threshold
-                  
+
                   return senderMatch && typeMatch && contentMatch && timeMatch;
                 });
               if (alreadyDelivered) {
@@ -652,21 +651,21 @@ export const ChatProvider = ({ children }) => {
           const existingTempIds = new Set(existingMsgs.map(m => m.tempId).filter(Boolean));
           const filteredNew = msgs.filter(newM => !existingMsgs.some(m => m.id === newM.id));
           const nonFailedExisting = existingMsgs.filter(m => m._deliveryStatus !== 'failed');
-          
+
           const filteredFailedMsgs = failedMsgs.filter(m => {
-            const alreadyDelivered = existingIds.has(m.tempId) || 
+            const alreadyDelivered = existingIds.has(m.tempId) ||
               existingTempIds.has(m.tempId) ||
               existingMsgs.some(serverMsg => {
                 const senderMatch = serverMsg.senderId === m.senderId;
                 const typeMatch = serverMsg.type === m.type;
-                const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') === 
-                                     (m.content || '').trim().replace(/\r\n/g, '\n');
-                
+                const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') ===
+                  (m.content || '').trim().replace(/\r\n/g, '\n');
+
                 const serverDate = new Date(serverMsg.createdAt);
                 const localDate = m.createdAt ? new Date(m.createdAt) : new Date();
                 const timeMatch = isNaN(serverDate.getTime()) || isNaN(localDate.getTime()) ||
                   Math.abs(serverDate - localDate) < 86400000; // 24 hours threshold
-                
+
                 return senderMatch && typeMatch && contentMatch && timeMatch;
               });
             if (alreadyDelivered) {
