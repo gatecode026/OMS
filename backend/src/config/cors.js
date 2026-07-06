@@ -16,7 +16,15 @@ export const corsOptions = {
       'http://127.0.0.1:5173',
     ];
 
-    if (allowedOrigins.indexOf(origin) !== -1 || env.nodeEnv === 'development') {
+    const cleanHost = (url) => url ? url.replace(/^https?:\/\/(www\.)?/, '').split(':')[0] : '';
+    const requestHost = cleanHost(origin);
+    const clientHost = cleanHost(env.clientUrl);
+
+    const isMatch = allowedOrigins.includes(origin) || 
+                    (clientHost && requestHost === clientHost) || 
+                    env.nodeEnv === 'development';
+
+    if (isMatch) {
       callback(null, true);
     } else {
       callback(new Error('Cross-Origin Request Blocked by Security Policy'));

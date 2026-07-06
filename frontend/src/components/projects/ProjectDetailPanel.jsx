@@ -5,8 +5,10 @@ import {
   FileText, Download, TrendingUp, Clock, AlertTriangle, File
 } from 'lucide-react';
 import Avatar from '../common/Avatar';
+import { useApp } from '../../context/AppContext';
 
 const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
+  const { employees } = useApp();
   const [activeTab, setActiveTab] = useState('overview');
   const panelRef = useRef(null);
   const [animateState, setAnimateState] = useState('closed');
@@ -162,14 +164,7 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
               {/* Team Info */}
               <div className={styles.detailSection}>
                 <h4 className={styles.sectionHeader}>Team Information</h4>
-                <div className={styles.basicGrid} style={{ marginBottom: 12 }}>
-                  <div className={styles.detailField}>
-                    <span className={styles.detailLabel}>Project Manager</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                      <Avatar name={project.manager} size="xs" />
-                      <span className={styles.detailVal}>{project.manager}</span>
-                    </div>
-                  </div>
+                <div className={styles.basicGrid} style={{ marginBottom: 12, gridTemplateColumns: '1fr' }}>
                   <div className={styles.detailField}>
                     <span className={styles.detailLabel}>Team Leader</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
@@ -181,17 +176,21 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
 
                 <span className={styles.detailLabel}>Assigned Team ({project.members?.length || 0} Employees)</span>
                 <div className={styles.teamList}>
-                  {project.members && project.members.map((member, i) => (
-                    <div key={i} className={styles.teamMemberItem}>
-                      <Avatar name={member} size="xs" />
-                      <div className={styles.memberText}>
-                        <span className={styles.memberName}>{member}</span>
-                        <span className={styles.memberRole}>
-                          {i === 0 ? 'Lead Engineer' : i === 1 ? 'UI Designer' : 'Software Specialist'}
-                        </span>
+                  {project.members && project.members.map((member, i) => {
+                    const emp = (employees || []).find(e => e.name?.toLowerCase() === member.toLowerCase());
+                    const designation = emp?.designation || emp?.position || 'Software Specialist';
+                    return (
+                      <div key={i} className={styles.teamMemberItem}>
+                        <Avatar name={member} size="xs" />
+                        <div className={styles.memberText}>
+                          <span className={styles.memberName}>{member}</span>
+                          <span className={styles.memberRole}>
+                            {designation}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -263,44 +262,60 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
                   <div className={styles.workflowMetaCell}>
                     <span className={styles.workflowMetaLabel}>Performance Rate</span>
                     <span className={styles.workflowMetaVal} style={{ color: 'var(--color-primary)' }}>
-                      {project.productivityScore || 85}%
+                      {project.productivityScore || 0}%
                     </span>
                   </div>
                   <div className={styles.workflowMetaCell}>
                     <span className={styles.workflowMetaLabel}>Working Hours</span>
-                    <span className={styles.workflowMetaVal}><Clock size={12} style={{ display: 'inline', marginRight: 4 }} /> {project.workingHours || 240} hrs</span>
+                    <span className={styles.workflowMetaVal}><Clock size={12} style={{ display: 'inline', marginRight: 4 }} /> {project.workingHours || 0} hrs</span>
                   </div>
                   <div className={styles.workflowMetaCell}>
                     <span className={styles.workflowMetaLabel}>Task Success Rate</span>
                     <span className={styles.workflowMetaVal} style={{ color: 'var(--color-success)' }}>
-                      {Math.round((project.tasksDone / project.tasksTotal) * 100 || 0)}%
+                      {project.tasksTotal > 0 ? Math.round((project.tasksDone / project.tasksTotal) * 100) : 0}%
                     </span>
                   </div>
                 </div>
 
                 <span className={styles.detailLabel}>Employee Task Contribution</span>
                 <div className={styles.progressList}>
-                  {project.members && project.members.map((member, i) => {
-                    const contributions = [45, 25, 20, 10];
-                    const pct = contributions[i % contributions.length];
-                    return (
-                      <div key={i} className={styles.progressItem}>
-                        <div className={styles.progressLabelRow}>
-                          <span>{member}</span>
-                          <span>{pct}% contribution</span>
+                  {(() => {
+                    const memberTasks = project.tasks || [];
+                    const memberTaskCounts = {};
+                    let totalAssignedTaskHits = 0;
+
+                    (project.members || []).forEach(member => {
+                      const count = memberTasks.filter(t => 
+                        t.assignedTo?.some(name => name.toLowerCase() === member.toLowerCase()) || 
+                        (t.assigneeName && t.assigneeName.toLowerCase().includes(member.toLowerCase()))
+                      ).length;
+                      memberTaskCounts[member] = count;
+                      totalAssignedTaskHits += count;
+                    });
+
+                    return (project.members || []).map((member, i) => {
+                      const pct = totalAssignedTaskHits > 0 
+                        ? Math.round((memberTaskCounts[member] / totalAssignedTaskHits) * 100)
+                        : Math.round(100 / Math.max(1, project.members.length));
+                      return (
+                        <div key={i} className={styles.progressItem}>
+                          <div className={styles.progressLabelRow}>
+                            <span>{member}</span>
+                            <span>{pct}% contribution ({memberTaskCounts[member] || 0} tasks)</span>
+                          </div>
+                          <div className={styles.progressBarBg}>
+                            <div
+                              className={styles.progressBarFill}
+                              style={{
+                                width: `${pct}%`,
+                                backgroundColor: `hsl(${(i * 90) % 360}, 60%, 55%)`
+                              }}
+                            />
+                          </div>
                         </div>
-                        <div className={styles.progressBarBg}>
-                          <div
-                            className={styles.progressBarFill}
-                            style={{
-                              width: `${pct}%`,
-                              backgroundColor: `hsl(${(i * 90) % 360}, 60%, 55%)`
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 

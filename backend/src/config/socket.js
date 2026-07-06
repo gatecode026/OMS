@@ -21,8 +21,12 @@ export const initSocket = async (httpServer) => {
   io = new Server(httpServer, {
     cors: {
       origin: env.nodeEnv === 'production'
-        ? env.clientUrl
-        : '*', // Allow all origins in development for local network devices
+        ? [
+            env.clientUrl,
+            env.clientUrl ? env.clientUrl.replace('://', '://www.') : '',
+            env.clientUrl ? env.clientUrl.replace('://www.', '://') : ''
+          ].filter(Boolean)
+        : '*',
       methods: ['GET', 'POST'],
       credentials: true
     },
