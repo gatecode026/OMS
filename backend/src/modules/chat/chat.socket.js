@@ -1025,16 +1025,15 @@ export const registerChatSocketHandlers = (io) => {
           }
 
           // Room authorization check: Ensure user is a participant of this conversation
-          const isParticipant = await runWithTenant(companyId, async () => {
+          const conv = await runWithTenant(companyId, async () => {
             const conn = await getTenantConnection(companyId);
-            const conv = await conn.collection("conversations").findOne({
+            return conn.collection("conversations").findOne({
               id: conversationId,
               "participants.employeeId": userId,
             });
-            return !!conv;
           });
 
-          if (!isParticipant) {
+          if (!conv) {
             logger.warn(
               `[Socket.io] Room authorization bypass blocked: User ${userId} tried to send message to conv ${conversationId} they do not belong to`,
             );
@@ -1102,6 +1101,7 @@ export const registerChatSocketHandlers = (io) => {
               tempId,
             },
             companyId,
+            conv,
           );
 
           // Message fanout optimization: broadcast only messageId, conversationId, senderId, preview, and tempId
@@ -1126,17 +1126,8 @@ export const registerChatSocketHandlers = (io) => {
 
           // Broadcast to all participants' user rooms directly.
           // This avoids cluster-wide fetchSockets() / socketsJoin() and resolves live performance lags.
-          const convForJoin = await runWithTenant(companyId, async () => {
-            const conn = await getTenantConnection(companyId);
-            return conn
-              .collection("conversations")
-              .findOne(
-                { id: conversationId },
-                { projection: { participants: 1 } },
-              );
-          });
-          if (convForJoin?.participants) {
-            for (const p of convForJoin.participants) {
+          if (conv?.participants) {
+            for (const p of conv.participants) {
               io.to(`user:${p.employeeId}`).emit("new_message", msgPayload);
               io.to(`user:${p.employeeId}`).emit("message:new", msgPayload);
             }
@@ -1145,14 +1136,6 @@ export const registerChatSocketHandlers = (io) => {
           // Handle delivery receipts + notifications for offline participants
           await runWithTenant(companyId, async () => {
             const conn = await getTenantConnection(companyId);
-            const conv = await conn
-              .collection("conversations")
-              .findOne(
-                { id: conversationId },
-                { projection: { participants: 1, type: 1, name: 1 } },
-              );
-
-            if (!conv) return;
 
             const otherParticipants = conv.participants.filter(
               (p) => p.employeeId !== userId,

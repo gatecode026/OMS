@@ -281,12 +281,25 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
         return other?.name?.toLowerCase().includes(q);
       });
     } else {
-      if (!searchQuery.trim()) return callLogs;
-      const q = searchQuery.toLowerCase();
-      return callLogs.filter(call => {
-        const otherName = call.callerId === currentUser?.id ? call.calleeName : call.callerName;
-        return otherName?.toLowerCase().includes(q);
-      });
+      const list = searchQuery.trim()
+        ? callLogs.filter(call => {
+            const otherName = call.callerId === currentUser?.id ? call.calleeName : call.callerName;
+            return otherName?.toLowerCase().includes(searchQuery.toLowerCase());
+          })
+        : callLogs;
+
+      const groupedCalls = [];
+      const seenUsers = new Set();
+
+      for (const call of list) {
+        const isOutgoing = call.callerId === currentUser?.id;
+        const otherId = isOutgoing ? call.calleeId : call.callerId;
+        if (otherId && !seenUsers.has(otherId)) {
+          seenUsers.add(otherId);
+          groupedCalls.push(call);
+        }
+      }
+      return groupedCalls;
     }
   }, [conversations, callLogs, searchQuery, activeTab, currentUser?.id]);
 
