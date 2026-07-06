@@ -863,6 +863,11 @@ export const registerChatSocketHandlers = (io) => {
           socket.join(`conv:${conversationId}`);
           socket.emit("joined_conversation", { conversationId });
           logger.info(`[Chat] ${name} joined conv: ${conversationId}`);
+          
+          socket.activeConversationId = conversationId;
+          if (redis.isAvailable) {
+            await redis.set(`active_conv:${userId}`, conversationId, { EX: 86400 }).catch(() => {});
+          }
         });
       } catch (err) {
         logger.error("[Chat] join_conversation error:", err);
@@ -986,6 +991,12 @@ export const registerChatSocketHandlers = (io) => {
     socket.on("user_chatscreen_status", async ({ isOnChatScreen }) => {
       try {
         socket.isOnChatScreen = !!isOnChatScreen;
+        if (!isOnChatScreen) {
+          socket.activeConversationId = null;
+          if (redis.isAvailable) {
+            await redis.del(`active_conv:${userId}`).catch(() => {});
+          }
+        }
         await updateUserChatScreenPresence(userId, companyId, io);
       } catch (err) {
         logger.error("[Chat] user_chatscreen_status error:", err);
@@ -1113,9 +1124,8 @@ export const registerChatSocketHandlers = (io) => {
             replyTo: savedMessage.replyTo,
           };
 
-          // Ensure all online participants are in the conv room before broadcasting.
-          // This handles cases where a participant connected before the conversation existed,
-          // or where the auto-join at connection time failed for any reason.
+          // Broadcast to all participants' user rooms directly.
+          // This avoids cluster-wide fetchSockets() / socketsJoin() and resolves live performance lags.
           const convForJoin = await runWithTenant(companyId, async () => {
             const conn = await getTenantConnection(companyId);
             return conn
@@ -1127,27 +1137,10 @@ export const registerChatSocketHandlers = (io) => {
           });
           if (convForJoin?.participants) {
             for (const p of convForJoin.participants) {
-              const userSockets = await io
-                .in(`user:${p.employeeId}`)
-                .fetchSockets();
-              if (userSockets.length > 0) {
-                const isInRoom = (
-                  await io.in(`conv:${conversationId}`).fetchSockets()
-                ).some((s) => s.user?.id === p.employeeId);
-                if (!isInRoom) {
-                  await io
-                    .in(`user:${p.employeeId}`)
-                    .socketsJoin(`conv:${conversationId}`);
-                  logger.info(
-                    `[Chat] Late-joined user ${p.employeeId} to conv:${conversationId} before message broadcast`,
-                  );
-                }
-              }
+              io.to(`user:${p.employeeId}`).emit("new_message", msgPayload);
+              io.to(`user:${p.employeeId}`).emit("message:new", msgPayload);
             }
           }
-
-          io.to(`conv:${conversationId}`).emit("new_message", msgPayload);
-          io.to(`conv:${conversationId}`).emit("message:new", msgPayload);
 
           // Handle delivery receipts + notifications for offline participants
           await runWithTenant(companyId, async () => {
@@ -1180,17 +1173,27 @@ export const registerChatSocketHandlers = (io) => {
               employeesInfo.map((e) => [e.id, e.chatStatus]),
             );
 
-            // Fetch all socket IDs currently in the conversation room
-            const roomSockets = await io
-              .in(`conv:${conversationId}`)
-              .fetchSockets();
-            const usersInRoom = new Set(
-              roomSockets.map((s) => s.user?.id).filter(Boolean),
-            );
-
             for (const participant of otherParticipants) {
-              // If not in room — send personal notification
-              if (!usersInRoom.has(participant.employeeId)) {
+              // Cluster-safe fast active room check
+              let isLookingAtThisConv = false;
+              if (redis.isAvailable) {
+                const activeConv = await redis.get(`active_conv:${participant.employeeId}`).catch(() => null);
+                isLookingAtThisConv = (activeConv === conversationId);
+              } else {
+                const roomSockets = io.sockets.adapter.rooms.get(`conv:${conversationId}`);
+                if (roomSockets) {
+                  for (const socketId of roomSockets) {
+                    const s = io.sockets.sockets.get(socketId);
+                    if (s?.user?.id === participant.employeeId) {
+                      isLookingAtThisConv = true;
+                      break;
+                    }
+                  }
+                }
+              }
+
+              // If not looking at this room — send personal notification / push notification
+              if (!isLookingAtThisConv) {
                 // ── ENTERPRISE NOTIFICATION ENGINE INTEGRATION ─────────────────
                 try {
                   const notificationsService =
@@ -1239,10 +1242,17 @@ export const registerChatSocketHandlers = (io) => {
                   );
                 }
 
-                const targetSockets = await io
-                  .in(`user:${participant.employeeId}`)
-                  .fetchSockets();
-                if (targetSockets.length === 0) {
+                // Check online status cluster-safely via Redis or local adapter (replaces slow fetchSockets)
+                let isOnline = false;
+                if (redis.isAvailable) {
+                  const presence = await presenceService.getUserPresence(participant.employeeId);
+                  isOnline = (presence && presence.status === "online");
+                } else {
+                  const userRoom = io.sockets.adapter.rooms.get(`user:${participant.employeeId}`);
+                  isOnline = (userRoom && userRoom.size > 0);
+                }
+
+                if (!isOnline) {
                   const chatStatus =
                     employeeStatusMap.get(participant.employeeId) ||
                     "available";
@@ -1257,24 +1267,6 @@ export const registerChatSocketHandlers = (io) => {
                       `[Chat] Suppressed push notification for user ${participant.employeeId} due to DND status`,
                     );
                   }
-                } else {
-                  io.to(`user:${participant.employeeId}`).emit(
-                    "new_message_notification",
-                    {
-                      conversationId,
-                      conversationName:
-                        conv.type === "direct" ? name : conv.name,
-                      conversationType: conv.type,
-                      senderId: userId,
-                      senderName: name,
-                      senderAvatar: avatar,
-                      preview:
-                        type === "text"
-                          ? content?.substring(0, 100)
-                          : `📎 ${type}`,
-                      sentAt: new Date(),
-                    },
-                  );
                 }
               }
             }
@@ -2126,6 +2118,11 @@ export const registerChatSocketHandlers = (io) => {
       logger.info(
         `[Chat] Disconnected: ${name} (${userId}) — Reason: ${reason}`,
       );
+
+      socket.activeConversationId = null;
+      if (redis.isAvailable) {
+        await redis.del(`active_conv:${userId}`).catch(() => {});
+      }
 
       // Clean up chatscreen status on disconnect
       try {

@@ -377,7 +377,7 @@ export const getMessages = async (
         query._id = { $lt: new mongoose.Types.ObjectId(cursor) };
       }
 
-      const messages = await Message.find(query, null, { sort: { _id: -1 }, limit, lean: true });
+      const messages = await Message.find(query, { sort: { _id: -1 }, limit, lean: true });
 
       // Fetch and populate poll details for poll messages
       const pollIds = messages
