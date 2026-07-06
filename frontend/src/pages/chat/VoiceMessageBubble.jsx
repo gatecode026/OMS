@@ -20,7 +20,14 @@ const VoiceMessageBubble = ({ message: msg, isOwn }) => {
 
   const audioRef = useRef(null);
 
-  const src = msg.media?.url || msg.content;
+  const isValidUrl = (url) => {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('/');
+  };
+
+  const src = isValidUrl(msg.media?.url)
+    ? msg.media.url
+    : (isValidUrl(msg.content) ? msg.content : '');
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -28,7 +35,9 @@ const VoiceMessageBubble = ({ message: msg, isOwn }) => {
 
     // Explicitly load the audio source when it changes
     try {
-      audio.load();
+      if (src) {
+        audio.load();
+      }
     } catch (e) {
       console.warn('[VoiceMessage] Error loading audio:', e);
     }
@@ -47,6 +56,7 @@ const VoiceMessageBubble = ({ message: msg, isOwn }) => {
       audio.currentTime = 0;
     };
     const onError = (e) => {
+      if (!src) return; // Ignore errors if src is not populated yet
       const err = audio.error;
       if (err && err.code === 1) {
         return; // Ignore non-fatal aborted error
