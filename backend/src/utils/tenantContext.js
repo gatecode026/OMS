@@ -35,14 +35,20 @@ export const getActiveConnection = () => {
  */
 export const runWithTenant = async (tenantId, callback, isSuperAdmin = false, user = null) => {
   const connection = await getTenantConnection(tenantId);
-  return tenantStorage.run({ tenantId, connection, isSuperAdmin, user }, callback);
+  const store = tenantStorage.getStore();
+  const finalUser = user || store?.user || null;
+  const finalSuperAdmin = isSuperAdmin || store?.isSuperAdmin || false;
+  return tenantStorage.run({ tenantId, connection, isSuperAdmin: finalSuperAdmin, user: finalUser }, callback);
 };
 
 /**
  * Runs a callback synchronously if the connection is already resolved.
  */
 export const runWithTenantConnection = (tenantId, connection, callback, isSuperAdmin = false, user = null) => {
-  return tenantStorage.run({ tenantId, connection, isSuperAdmin, user }, callback);
+  const store = tenantStorage.getStore();
+  const finalUser = user || store?.user || null;
+  const finalSuperAdmin = isSuperAdmin || store?.isSuperAdmin || false;
+  return tenantStorage.run({ tenantId, connection, isSuperAdmin: finalSuperAdmin, user: finalUser }, callback);
 };
 
 /**

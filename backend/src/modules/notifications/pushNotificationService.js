@@ -102,7 +102,7 @@ export const sendNotificationToUser = async (employeeId, payload) => {
  */
 export const sendNotificationToConversation = async (conversationId, excludeEmployeeId, payload) => {
   try {
-    const conversation = await Conversation.findOne({ id: conversationId }).lean();
+    const conversation = await Conversation.findOne({ id: conversationId }, { lean: true });
     if (!conversation) {
       logger.warn(`[Push Service] Conversation ${conversationId} not found`);
       return;

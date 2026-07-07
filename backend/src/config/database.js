@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import dns, { setServers } from 'dns';
-setServers(['1.1.1.1']);
+setServers(['8.8.8.8', '1.1.1.1']);
 import bcrypt from 'bcryptjs';
 import env from './env.js';
 import logger from './logger.js';
@@ -9,6 +9,26 @@ import { PayrollConfig } from '../modules/payroll/payroll.model.js';
 import SystemSettings from '../modules/settings/settings.model.js';
 
 export let isDatabaseConnected = false;
+
+// Register connection lifecycle event listeners at module level so they are always active
+mongoose.connection.on('error', (err) => {
+  logger.error(`Database runtime connection error: ${err}`);
+});
+
+mongoose.connection.on('connected', () => {
+  logger.info('Database connection established.');
+  isDatabaseConnected = true;
+});
+
+mongoose.connection.on('reconnected', () => {
+  logger.info('Database reconnected.');
+  isDatabaseConnected = true;
+});
+
+mongoose.connection.on('disconnected', () => {
+  logger.warn('Database connection lost.');
+  isDatabaseConnected = false;
+});
 
 export const database = {
   /**
@@ -76,25 +96,6 @@ export const database = {
         await SystemSettings.create({ key: 'global', companyId: 'COMP-DEFAULT' });
         logger.info('Global system settings seeded successfully.');
       }
-
-      mongoose.connection.on('error', (err) => {
-        logger.error(`Database runtime connection error: ${err}`);
-      });
-
-      mongoose.connection.on('connected', () => {
-        logger.info('Database connection established.');
-        isDatabaseConnected = true;
-      });
-
-      mongoose.connection.on('reconnected', () => {
-        logger.info('Database reconnected.');
-        isDatabaseConnected = true;
-      });
-
-      mongoose.connection.on('disconnected', () => {
-        logger.warn('Database connection lost.');
-        isDatabaseConnected = false;
-      });
 
     } catch (error) {
       isDatabaseConnected = false;

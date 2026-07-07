@@ -27,7 +27,6 @@ const ChatContext = createContext(null);
 const getApiUrl = () => window.API_URL || window.location.origin;
 
 // ─── Provider ────────────────────────────────────────────────────────────────
-
 export const ChatProvider = ({ children }) => {
   const { token, setToken, currentUser: simulatedUser, addToast } = useApp();
 
@@ -557,7 +556,7 @@ export const ChatProvider = ({ children }) => {
         try {
           const isOldFormatForMe = key.startsWith(`chat_failed_msg_${currentUser.id}_`);
           const isNewFormat = key.startsWith('chat_failed_msg_temp_');
-          
+
           if (isOldFormatForMe || isNewFormat) {
             const msg = JSON.parse(localStorage.getItem(key));
             if (msg && msg.convId === convId) {
@@ -614,19 +613,19 @@ export const ChatProvider = ({ children }) => {
 
             // Filter out failed messages that have already been saved on the server
             const filteredFailedMsgs = failedMsgs.filter(m => {
-              const alreadyDelivered = existingIds.has(m.tempId) || 
+              const alreadyDelivered = existingIds.has(m.tempId) ||
                 existingTempIds.has(m.tempId) ||
                 msgs.some(serverMsg => {
                   const senderMatch = serverMsg.senderId === m.senderId;
                   const typeMatch = serverMsg.type === m.type;
-                  const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') === 
-                                       (m.content || '').trim().replace(/\r\n/g, '\n');
-                  
+                  const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') ===
+                    (m.content || '').trim().replace(/\r\n/g, '\n');
+
                   const serverDate = new Date(serverMsg.createdAt);
                   const localDate = m.createdAt ? new Date(m.createdAt) : new Date();
                   const timeMatch = isNaN(serverDate.getTime()) || isNaN(localDate.getTime()) ||
                     Math.abs(serverDate - localDate) < 86400000; // 24 hours threshold
-                  
+
                   return senderMatch && typeMatch && contentMatch && timeMatch;
                 });
               if (alreadyDelivered) {
@@ -640,7 +639,10 @@ export const ChatProvider = ({ children }) => {
               return true;
             });
 
-            return { ...prev, [convId]: [...msgs, ...pendingOptimistic, ...filteredFailedMsgs] };
+            const merged = [...msgs, ...pendingOptimistic, ...filteredFailedMsgs];
+            // Always sort chronologically: oldest first, newest last
+            merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            return { ...prev, [convId]: merged };
           }
 
           // Older messages prepend (scroll-up = load older)
@@ -649,21 +651,21 @@ export const ChatProvider = ({ children }) => {
           const existingTempIds = new Set(existingMsgs.map(m => m.tempId).filter(Boolean));
           const filteredNew = msgs.filter(newM => !existingMsgs.some(m => m.id === newM.id));
           const nonFailedExisting = existingMsgs.filter(m => m._deliveryStatus !== 'failed');
-          
+
           const filteredFailedMsgs = failedMsgs.filter(m => {
-            const alreadyDelivered = existingIds.has(m.tempId) || 
+            const alreadyDelivered = existingIds.has(m.tempId) ||
               existingTempIds.has(m.tempId) ||
               existingMsgs.some(serverMsg => {
                 const senderMatch = serverMsg.senderId === m.senderId;
                 const typeMatch = serverMsg.type === m.type;
-                const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') === 
-                                     (m.content || '').trim().replace(/\r\n/g, '\n');
-                
+                const contentMatch = (serverMsg.content || '').trim().replace(/\r\n/g, '\n') ===
+                  (m.content || '').trim().replace(/\r\n/g, '\n');
+
                 const serverDate = new Date(serverMsg.createdAt);
                 const localDate = m.createdAt ? new Date(m.createdAt) : new Date();
                 const timeMatch = isNaN(serverDate.getTime()) || isNaN(localDate.getTime()) ||
                   Math.abs(serverDate - localDate) < 86400000; // 24 hours threshold
-                
+
                 return senderMatch && typeMatch && contentMatch && timeMatch;
               });
             if (alreadyDelivered) {
@@ -676,7 +678,10 @@ export const ChatProvider = ({ children }) => {
             return true;
           });
 
-          return { ...prev, [convId]: [...filteredNew, ...nonFailedExisting, ...filteredFailedMsgs] };
+          const paginatedMerge = [...filteredNew, ...nonFailedExisting, ...filteredFailedMsgs];
+          // Always sort chronologically: oldest first, newest last
+          paginatedMerge.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          return { ...prev, [convId]: paginatedMerge };
         });
         setHasMoreMessages(prev => ({
           ...prev, [convId]: pagination.hasMore
@@ -716,19 +721,18 @@ export const ChatProvider = ({ children }) => {
       await fetchMessages(convId, null);
     }
 
-    // Only mark as read if there were actual unread messages for this user
-    // (prevents false "Seen" when the sender opens their own conversation)
-    if (currentUnread > 0) {
-      await apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' });
+    // Always mark as read when opening a conversation to ensure any unread messages are updated in DB
+    apiFetch(`/chat/conversations/${convId}/read`, { method: 'PATCH' }).catch(err => {
+      console.error('[Chat] Error marking conversation as read:', err);
+    });
 
-      // Find last message ID from conversation preview
-      const conv = conversationsRef.current.find(c => c.id === convId);
-      const lastReadMessageId = conv?.lastMessage?.messageId;
+    // Find last message ID from conversation preview
+    const conv = conversationsRef.current.find(c => c.id === convId);
+    const lastReadMessageId = conv?.lastMessage?.messageId;
 
-      socketRef.current?.emit('mark_read', { conversationId: convId });
-      if (lastReadMessageId) {
-        socketRef.current?.emit('conversation:read', { conversationId: convId, lastReadMessageId });
-      }
+    socketRef.current?.emit('mark_read', { conversationId: convId });
+    if (lastReadMessageId) {
+      socketRef.current?.emit('conversation:read', { conversationId: convId, lastReadMessageId });
     }
   }, [fetchMessages, apiFetch, unreadCounts]);
 
@@ -2147,10 +2151,14 @@ export const ChatProvider = ({ children }) => {
         return {
           ...prev,
           [conversationId]: convMsgs.map(msg => {
+            // Only update seen status for messages read by someone other than the sender
+            const validReaders = readByArray.filter(r => r.employeeId !== msg.senderId);
+            if (validReaders.length === 0) return msg;
+
             if (msg.senderId === me?.id) {
               const existing = msg.readBy || [];
               const merged = [...existing];
-              readByArray.forEach(r => {
+              validReaders.forEach(r => {
                 if (!merged.some(er => er.employeeId === r.employeeId)) {
                   merged.push(r);
                 }

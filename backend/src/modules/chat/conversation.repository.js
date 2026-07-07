@@ -35,11 +35,16 @@ export const find = (query = {}) => {
   return Conversation.find(scopedFilters);
 };
 
-export const findOne = async (query = {}) => {
+export const findOne = async (query = {}, options = {}) => {
   const context = resolveSecurityContext();
   sanitizeQueryOperators(query);
 
-  const conv = await Conversation.findOne(query);
+  let dbQuery = Conversation.findOne(query);
+  if (options.sort) dbQuery = dbQuery.sort(options.sort);
+  if (options.select) dbQuery = dbQuery.select(options.select);
+  if (options.lean) dbQuery = dbQuery.lean();
+
+  const conv = await dbQuery;
   if (conv && context) {
     validateParticipantOrAdminAccess(conv, context, 'read');
     await validateRepositoryAccess('read', conv, { moduleName: 'Chat' });

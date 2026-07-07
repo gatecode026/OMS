@@ -203,6 +203,12 @@ export const checkActionPermission = async (moduleName, role, action) => {
   // Super admin always has full access — non-negotiable safety net
   if (role === 'super_admin') return true;
 
+  // Chat bypass: Any authenticated role can perform actions on Chat, Conversation, Message, and Call.
+  // The repository layer enforces strict participant-scoped access validations.
+  if (['Chat', 'Conversation', 'Message', 'Call'].includes(moduleName)) {
+    return true;
+  }
+
   // Self-service bypass: Employees and Team Leaders can always create/read/update their own attendance and leave records.
   // The repository layer will enforce strict ownership mapping to ensure they only touch their own records.
   if (['Attendance', 'Leave'].includes(moduleName) && ['create', 'read', 'update'].includes(action)) {
