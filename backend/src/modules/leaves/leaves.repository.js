@@ -14,13 +14,17 @@ import {
   getQueryLogging 
 } from '../../security/repositoryContract.js';
 import { LeaveQueryBuilder } from './leaves.queryBuilder.js';
+import { checkActionPermission } from '../../security/permissionMatrix.js';
 
 /**
  * Validates that the active context is authorized to perform policy modifications.
  */
-const validatePolicyAdminAccess = (context) => {
+const validatePolicyAdminAccess = async (context) => {
   if (!context) return;
-  if (!context.isSuperAdmin && !context.isCompanyAdmin) {
+  if (context.isSuperAdmin || context.isCompanyAdmin) return;
+
+  const isAllowed = await checkActionPermission('Leave', context.role, 'update');
+  if (!isAllowed) {
     const err = new Error('Access denied: Only Administrators are authorized to modify Leave Policies.');
     err.statusCode = 403;
     throw err;
@@ -218,7 +222,7 @@ export const findPolicyById = async (id) => {
 
 export const savePolicy = async (data) => {
   const context = resolveSecurityContext();
-  validatePolicyAdminAccess(context);
+  await validatePolicyAdminAccess(context);
 
   logger.debug('Executing LeavesRepository::savePolicy', data);
   return Leave.create({ ...data, isPolicy: true });
@@ -226,7 +230,7 @@ export const savePolicy = async (data) => {
 
 export const updatePolicy = async (id, data) => {
   const context = resolveSecurityContext();
-  validatePolicyAdminAccess(context);
+  await validatePolicyAdminAccess(context);
 
   logger.debug('Executing LeavesRepository::updatePolicy for ID: ' + id, data);
   return Leave.findOneAndUpdate({ id, isPolicy: true }, data, { new: true });
@@ -234,7 +238,7 @@ export const updatePolicy = async (id, data) => {
 
 export const removePolicy = async (id) => {
   const context = resolveSecurityContext();
-  validatePolicyAdminAccess(context);
+  await validatePolicyAdminAccess(context);
 
   logger.debug('Executing LeavesRepository::removePolicy for ID: ' + id);
   return Leave.findOneAndDelete({ id, isPolicy: true });
@@ -242,7 +246,7 @@ export const removePolicy = async (id) => {
 
 export const resetPolicies = async () => {
   const context = resolveSecurityContext();
-  validatePolicyAdminAccess(context);
+  await validatePolicyAdminAccess(context);
 
   logger.debug('Executing LeavesRepository::resetPolicies');
   await Leave.deleteMany({ isPolicy: true }).setOptions({ bypassTenantScoping: true });

@@ -57,6 +57,9 @@ export const createRecord = async (data, currentUser) => {
   if (!data.appliedDate) {
     data.appliedDate = new Date().toISOString().split('T')[0];
   }
+  if (!data.department || !data.department.trim()) {
+    data.department = currentUser?.department || 'Administration';
+  }
   const record = await repository.save(data);
   if (record) {
     const title = 'New Leave Request';

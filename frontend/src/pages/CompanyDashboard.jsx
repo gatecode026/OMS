@@ -318,6 +318,7 @@ const CompanyDashboard = () => {
           present++;
         } else if (status === 'Late') {
           late++;
+          present++;
         } else if (['On Leave', 'Leave', 'Half Day', 'Half-Day'].includes(status)) {
           leave++;
         } else if (status === 'Absent') {
@@ -342,7 +343,7 @@ const CompanyDashboard = () => {
       }
     });
 
-    const accountedFor = present + late + leave;
+    const accountedFor = present + leave;
     const rate = activeEmployees.length > 0 ? Math.round((accountedFor / activeEmployees.length) * 100) : 0;
 
     return { present, late, leave, absent, rate };
@@ -527,28 +528,68 @@ const CompanyDashboard = () => {
 
   // Dynamic Chart Data
   const attendanceChartData = React.useMemo(() => {
-    if (!attendance || attendance.length === 0) {
-      return [];
-    }
+    if (!attendance || attendance.length === 0) return [];
+
+    const activeEmployees = (employees || []).filter(e => e.status !== 'Inactive');
+
+    // Build a set of dates from the attendance records (last 30 days max)
+    const dateSet = new Set(attendance.map(a => a.date ? a.date.slice(0, 10) : null).filter(Boolean));
+
     const groups = {};
+
+    // First, tally all existing attendance records
     attendance.forEach(att => {
-      const dateStr = att.date ? att.date.slice(5) : 'Unknown';
+      const dateStr = att.date ? att.date.slice(5) : null;
+      if (!dateStr) return;
       if (!groups[dateStr]) {
-        groups[dateStr] = { date: dateStr, present: 0, absent: 0, late: 0, leave: 0 };
+        groups[dateStr] = { date: dateStr, present: 0, absent: 0, late: 0, leave: 0, _fullDate: att.date ? att.date.slice(0, 10) : null };
       }
       const status = (att.status || '').toLowerCase();
-      if (status === 'present' || status === 'work from home') {
+      if (status === 'present' || status === 'work from home' || status === 'wfh' || status === 'overtime') {
         groups[dateStr].present++;
       } else if (status === 'absent') {
         groups[dateStr].absent++;
       } else if (status === 'late') {
         groups[dateStr].late++;
-      } else if (status === 'on leave' || status === 'leave' || status === 'half day') {
+        groups[dateStr].present++;
+      } else if (status === 'on leave' || status === 'leave' || status === 'half day' || status === 'half-day') {
         groups[dateStr].leave++;
       }
     });
+
+    // For each date, compute real absent = active employees - (present + late + leave + explicit_absent)
+    Object.values(groups).forEach(g => {
+      const fullDate = g._fullDate;
+      if (!fullDate) return;
+
+      // Find employees who have ANY record on this date
+      const attendedIds = new Set(
+        attendance
+          .filter(a => a.date && a.date.slice(0, 10) === fullDate)
+          .map(a => a.employeeId || a.employeeName)
+      );
+
+      // Count employees with no record at all on this date
+      let absent = 0;
+      activeEmployees.forEach(emp => {
+        const empKey = emp.id || emp.name;
+        if (!attendedIds.has(empKey)) {
+          // Check if they have an approved leave
+          const onLeave = (leaveRequests || []).some(r =>
+            (r.employeeId === emp.id || r.employeeName === emp.name) &&
+            r.status === 'Approved' &&
+            fullDate >= r.fromDate &&
+            fullDate <= r.toDate
+          );
+          if (!onLeave) absent++;
+        }
+      });
+      g.absent = absent;
+      delete g._fullDate;
+    });
+
     return Object.values(groups).sort((a, b) => a.date.localeCompare(b.date)).slice(-8);
-  }, [attendance]);
+  }, [attendance, employees, leaveRequests]);
 
   const attendanceSparkline = React.useMemo(() => {
     if (attendanceChartData && attendanceChartData.length > 0) {

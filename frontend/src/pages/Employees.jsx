@@ -2082,7 +2082,8 @@ const Employees = () => {
                           status={(() => {
                             const att = getTodayAttendance(row.id);
                             const hasPunchedIn = att && att.punchIn && att.punchIn !== '--:--';
-                            return hasPunchedIn ? 'Online' : 'Offline';
+                            const hasPunchedOut = att && att.punchOut && att.punchOut !== '--:--';
+                            return (hasPunchedIn && !hasPunchedOut) ? 'Online' : 'Offline';
                           })()}
                         />
                       </td>

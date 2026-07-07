@@ -21,7 +21,7 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole, currentUser } = useApp();
 
   // Real employee counts by branch (from actual employees data)
   const branchEmployeeCountMap = useMemo(() => {
@@ -2395,17 +2395,19 @@ const Branches = () => {
             <div className="card branch-detail-card">
               <div className="detail-card-header">
                 <h3 className="panel-title"><Eye size={16} /> Selected Branch Details</h3>
-                <select
-                  className="detail-branch-dropdown"
-                  value={selectedBranchId}
-                  onChange={(e) => setSelectedBranchId(e.target.value)}
-                >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.code}
-                    </option>
-                  ))}
-                </select>
+                {(currentUserRole === 'super_admin' || currentUserRole === 'company_admin') && (
+                  <select
+                    className="detail-branch-dropdown"
+                    value={selectedBranchId}
+                    onChange={(e) => setSelectedBranchId(e.target.value)}
+                  >
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.code}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="detail-tabs">

@@ -73,7 +73,7 @@ export const useMyAttendance = (filters = {}) => {
         }
       } catch (err) {
         // Fallback: calculate from recordsData
-        const present = recordsData.filter(r => r.status === 'Present' || r.status === 'Work From Home' || r.status === 'WFH').length;
+        const present = recordsData.filter(r => r.status === 'Present' || r.status === 'Work From Home' || r.status === 'WFH' || r.status === 'Late').length;
         const absent = recordsData.filter(r => r.status === 'Absent').length;
         const late = recordsData.filter(r => r.status === 'Late').length;
         const hoursRecords = recordsData.filter(r => r.totalHours > 0);

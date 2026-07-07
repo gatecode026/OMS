@@ -32,7 +32,7 @@ const MarkAttendanceModal = ({
 }) => {
   const { addAttendanceRecord, updateAttendanceRecord, addToast, attendanceRules } = useApp();
   const [action, setAction] = useState('in');
-  const [location, setLocation] = useState('Office');
+  const [location, setLocation] = useState('WFO');
   const [notes, setNotes] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -49,6 +49,11 @@ const MarkAttendanceModal = ({
       setAction('out');
     } else {
       setAction('in');
+    }
+    if (todayRecord.workMode) {
+      setLocation(todayRecord.workMode);
+    } else {
+      setLocation('WFO');
     }
   }, [todayRecord]);
 
@@ -200,13 +205,16 @@ const MarkAttendanceModal = ({
         {/* Location selection */}
         <div className="flex-column gap-1">
           <label className="attendance-field-label">Work Location</label>
-          <input
-            type="text"
+          <select
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Office, Remote, client site..."
             className="attendance-input"
-          />
+            style={{ cursor: 'pointer' }}
+          >
+            <option value="WFO">WFO</option>
+            <option value="WFH">WFH</option>
+            <option value="Hybrid">Hybrid</option>
+          </select>
         </div>
 
         {/* Notes */}

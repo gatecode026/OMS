@@ -93,7 +93,8 @@ const Overview = () => {
     employees,
     attendance,
     currentUserRole,
-    currentUser
+    currentUser,
+    leaveRequests
   } = useApp();
   const navigate = useNavigate();
   const loading = usePageLoading(600);
@@ -957,14 +958,30 @@ const Overview = () => {
   const attendanceMetrics = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
     const todayAttendance = (attendance || []).filter(a => a.date === today);
-    
+    const activeEmployees = (employees || []).filter(e => e.status !== 'Inactive');
+
     const presentCount = todayAttendance.filter(a =>
-      a.status === 'Present' || a.status === 'Work From Home' || a.status === 'WFH'
+      a.status === 'Present' || a.status === 'Work From Home' || a.status === 'WFH' || a.status === 'Late' || a.status === 'Overtime'
     ).length;
     const lateCount = todayAttendance.filter(a => a.status === 'Late').length;
-    const absentCount = todayAttendance.filter(a => a.status === 'Absent').length;
-    const leaveCount = todayAttendance.filter(a => a.status === 'On Leave' || a.status === 'Leave').length;
+    const leaveCount = todayAttendance.filter(a => a.status === 'On Leave' || a.status === 'Leave' || a.status === 'Half Day').length;
     const overtimeCount = todayAttendance.filter(a => a.status === 'Overtime').length;
+
+    // Real absent = active employees who have no attendance record today and no approved leave
+    const attendedIds = new Set(todayAttendance.map(a => a.employeeId || a.employeeName));
+    let absentCount = 0;
+    activeEmployees.forEach(emp => {
+      const empKey = emp.id || emp.name;
+      if (!attendedIds.has(empKey)) {
+        const onLeave = (leaveRequests || []).some(r =>
+          (r.employeeId === emp.id || r.employeeName === emp.name) &&
+          r.status === 'Approved' &&
+          today >= r.fromDate &&
+          today <= r.toDate
+        );
+        if (!onLeave) absentCount++;
+      }
+    });
 
     return {
       present: presentCount,
@@ -973,7 +990,7 @@ const Overview = () => {
       onLeave: leaveCount,
       overtime: overtimeCount
     };
-  }, [attendance]);
+  }, [attendance, employees, leaveRequests]);
 
   const weeklyAttendanceTrend = useMemo(() => {
     const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
