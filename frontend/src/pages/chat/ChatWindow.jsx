@@ -817,7 +817,15 @@ const ChatWindow = ({ currentUser, onBack }) => {
               {replyTo.senderName}
             </span>
             <span className="chat-reply-text">
-              {replyTo.content?.substring(0, 80)}
+              {replyTo.type === "audio" || replyTo.type === "voice" ? "🎤 Voice Message" :
+               replyTo.type === "image" ? "📷 Photo" :
+               replyTo.type === "video" ? "🎥 Video" :
+               replyTo.type === "file" ? `📎 ${replyTo.media?.fileName || "File"}` :
+               replyTo.content?.startsWith("data:") ? (
+                 replyTo.content.startsWith("data:audio") ? "🎤 Voice Message" :
+                 replyTo.content.startsWith("data:image") ? "📷 Photo" :
+                 replyTo.content.startsWith("data:video") ? "🎥 Video" : "📎 Attachment"
+               ) : replyTo.content?.substring(0, 80)}
             </span>
           </div>
           <button className="chat-reply-close" onClick={() => setReplyTo(null)}>✕</button>

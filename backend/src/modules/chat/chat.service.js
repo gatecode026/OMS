@@ -561,9 +561,24 @@ export const saveMessage = async (messageData, companyId, existingConv = null) =
     if (messageData.replyTo && typeof messageData.replyTo === "string") {
       const originalMsg = await Message.findOne({ id: messageData.replyTo });
       if (originalMsg) {
+        let replyContent = originalMsg.content || "";
+        if (originalMsg.type === "audio") {
+          replyContent = "🎤 Voice Message";
+        } else if (originalMsg.type === "image") {
+          replyContent = "📷 Photo";
+        } else if (originalMsg.type === "video") {
+          replyContent = "🎥 Video";
+        } else if (originalMsg.type === "file") {
+          replyContent = `📎 ${originalMsg.media?.fileName || "File"}`;
+        } else if (replyContent.startsWith("data:")) {
+          replyContent = replyContent.startsWith("data:audio") ? "🎤 Voice Message" :
+                         replyContent.startsWith("data:image") ? "📷 Photo" :
+                         replyContent.startsWith("data:video") ? "🎥 Video" : "📎 Attachment";
+        }
+
         replyToObject = {
           messageId: originalMsg.id,
-          content: originalMsg.content || "",
+          content: replyContent,
           senderId: originalMsg.senderId,
           senderName: originalMsg.senderName,
           type: originalMsg.type || "text",
