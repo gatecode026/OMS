@@ -8,6 +8,8 @@ import Counter from '../modules/counters/counter.model.js';
 import Company from '../modules/companies/company.model.js';
 import logger from '../config/logger.js';
 
+const companyPrefixCache = new Map();
+
 /**
  * Generates a company-wise unique code (e.g. ABC-EMP-001) for a given module.
  * @param {string} companyId - Tenant company identifier.
@@ -17,13 +19,17 @@ import logger from '../config/logger.js';
 export const generateCompanyUniqueId = async (companyId, module) => {
   const resolvedCompanyId = companyId || 'COMP-DEFAULT';
   
-  // Resolve company code/prefix from DB – fallback to subdomain or companyId suffix
-  const company = await Company.findOne({ id: resolvedCompanyId });
-  const code = (
-    company?.companyCode ||
-    company?.subdomain?.toUpperCase() ||
-    resolvedCompanyId.replace('COMP-', '').replace('-', '')
-  ).slice(0, 6).toUpperCase(); // cap at 6 chars for clean IDs
+  // Resolve company code/prefix from cache or DB
+  let code = companyPrefixCache.get(resolvedCompanyId);
+  if (!code) {
+    const company = await Company.findOne({ id: resolvedCompanyId });
+    code = (
+      company?.companyCode ||
+      company?.subdomain?.toUpperCase() ||
+      resolvedCompanyId.replace('COMP-', '').replace('-', '')
+    ).slice(0, 6).toUpperCase(); // cap at 6 chars for clean IDs
+    companyPrefixCache.set(resolvedCompanyId, code);
+  }
 
   // Module → short prefix mapping
   const prefixes = {

@@ -97,7 +97,7 @@ export const createPoll = async (pollData, creator, companyId) => {
     });
 
     // Create Message representation of type 'poll'
-    const msgId = await generateCompanyUniqueId(companyId, 'messages');
+    const msgId = new mongoose.Types.ObjectId().toString();
     const message = await Message.create({
       id: msgId,
       companyId,
