@@ -22,7 +22,10 @@ const ThreadPanel = ({ onClose }) => {
     followThread,
     unfollowThread,
     updateThreadStatus,
-    markThreadAsRead
+    markThreadAsRead,
+    conversations,
+    blockedUsers,
+    blockedByUsers
   } = useChat();
 
   const { currentUser, addToast } = useApp();
@@ -90,6 +93,12 @@ const ThreadPanel = ({ onClose }) => {
   }, [activeThreadReplies, searchQuery]);
 
   if (!activeThread) return null;
+
+  const conv = conversations.find(c => c.id === activeThread.conversationId);
+  const isDirect = conv?.type === 'direct';
+  const other = conv && currentUser ? conv.participants.find(p => p.employeeId !== currentUser.id) : null;
+  const isBlockedByMe = other?.employeeId ? blockedUsers.includes(other.employeeId) : false;
+  const hasBlockedMe = other?.employeeId ? blockedByUsers.includes(other.employeeId) : false;
 
   const rootMsg = activeThread.rootMessage || {};
 
@@ -308,6 +317,21 @@ const ThreadPanel = ({ onClose }) => {
           <div className="thread-closed-banner">
             <AlertCircle size={18} />
             <span>This thread has been closed. No further replies can be added.</span>
+          </div>
+        ) : isDirect && (isBlockedByMe || hasBlockedMe) ? (
+          <div className="thread-closed-banner" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 16px',
+            backgroundColor: 'var(--bg-card, #1e293b)',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color, #e2e8f0)',
+            color: 'var(--text-muted, #94a3b8)',
+            fontSize: '13px'
+          }}>
+            <AlertCircle size={16} />
+            <span>You cannot reply to this thread while the contact is blocked.</span>
           </div>
         ) : (
           <MessageInput 
