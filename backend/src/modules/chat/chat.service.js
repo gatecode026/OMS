@@ -185,7 +185,7 @@ export const createGroupConversation = async (
     });
 
     // System message: "John created group XYZ"
-    const msgId = await generateCompanyUniqueId(companyId, "messages");
+    const msgId = new mongoose.Types.ObjectId().toString();
     await Message.create({
       id: msgId,
       companyId,
@@ -555,7 +555,7 @@ export const saveMessage = async (messageData, companyId, existingConv = null) =
       }
     }
 
-    const msgId = await generateCompanyUniqueId(companyId, "messages");
+    const msgId = new mongoose.Types.ObjectId().toString();
 
     let replyToObject = null;
     if (messageData.replyTo && typeof messageData.replyTo === "string") {
@@ -611,12 +611,12 @@ export const saveMessage = async (messageData, companyId, existingConv = null) =
       },
     );
 
-    // Increment unread counts for other participants
-    await readReceiptService.incrementUnreadCounts(
+    // Increment unread counts for other participants (non-blocking)
+    readReceiptService.incrementUnreadCounts(
       messageData.conversationId,
       messageData.senderId,
       companyId,
-    );
+    ).catch(() => {});
 
     // Invalidate caches
     cacheDel(CacheKeys.convMsgs(companyId, messageData.conversationId)).catch(
@@ -957,7 +957,7 @@ export const addGroupMembers = async (
       content = `${adminParticipant.name} added ${addedNames[0]}, ${addedNames[1]} and ${addedNames.length - 2} others`;
     }
 
-    const msgId = await generateCompanyUniqueId(companyId, "messages");
+    const msgId = new mongoose.Types.ObjectId().toString();
     const sysMsg = await Message.create({
       id: msgId,
       companyId,
@@ -1072,7 +1072,7 @@ export const removeGroupMember = async (
     ).lean();
 
     // Create system message for leave/remove
-    const msgId = await generateCompanyUniqueId(companyId, "messages");
+    const msgId = new mongoose.Types.ObjectId().toString();
     const sysMsg = await Message.create({
       id: msgId,
       companyId,
@@ -1105,7 +1105,7 @@ export const removeGroupMember = async (
 
     // Create and broadcast auto-promote system message if applicable
     if (autoPromotedMsg) {
-      const pMsgId = await generateCompanyUniqueId(companyId, "messages");
+       const pMsgId = new mongoose.Types.ObjectId().toString();
       const pSysMsg = await Message.create({
         id: pMsgId,
         companyId,
@@ -1275,7 +1275,7 @@ export const updateGroupDetails = async (
 
     // Write system messages
     for (const content of systemMessages) {
-      const msgId = await generateCompanyUniqueId(companyId, "messages");
+      const msgId = new mongoose.Types.ObjectId().toString();
       const sysMsg = await Message.create({
         id: msgId,
         companyId,
@@ -1659,7 +1659,7 @@ export const forwardMessage = async (
 
     // 5. Create new messages copies
     for (const targetConv of targetConvs) {
-      const newMsgId = await generateCompanyUniqueId(companyId, "messages");
+      const newMsgId = new mongoose.Types.ObjectId().toString();
 
       let mediaObj = null;
       if (sourceMessage.media) {

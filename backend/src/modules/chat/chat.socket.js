@@ -1140,126 +1140,136 @@ export const registerChatSocketHandlers = (io) => {
             }
           }
 
-          // Handle delivery receipts + notifications for offline participants
-          await runWithTenant(companyId, async () => {
-            const conn = await getTenantConnection(companyId);
+          // Handle delivery receipts + notifications for offline participants (non-blocking in the background)
+          setImmediate(() => {
+            runWithTenant(companyId, async () => {
+              try {
+                const conn = await getTenantConnection(companyId);
 
-            const otherParticipants = conv.participants.filter(
-              (p) => p.employeeId !== userId,
-            );
+                const otherParticipants = conv.participants.filter(
+                  (p) => p.employeeId !== userId,
+                );
 
-            const otherParticipantIds = otherParticipants.map(
-              (p) => p.employeeId,
-            );
-            const employeesInfo = await conn
-              .collection("employees")
-              .find(
-                { id: { $in: otherParticipantIds } },
-                { projection: { id: 1, chatStatus: 1 } },
-              )
-              .toArray();
+                const otherParticipantIds = otherParticipants.map(
+                  (p) => p.employeeId,
+                );
+                const employeesInfo = await conn
+                  .collection("employees")
+                  .find(
+                    { id: { $in: otherParticipantIds } },
+                    { projection: { id: 1, chatStatus: 1 } },
+                  )
+                  .toArray();
 
-            const employeeStatusMap = new Map(
-              employeesInfo.map((e) => [e.id, e.chatStatus]),
-            );
+                const employeeStatusMap = new Map(
+                  employeesInfo.map((e) => [e.id, e.chatStatus]),
+                );
 
-            for (const participant of otherParticipants) {
-              // Cluster-safe fast active room check
-              let isLookingAtThisConv = false;
-              if (redis.isAvailable) {
-                const activeConv = await redis.get(`active_conv:${participant.employeeId}`).catch(() => null);
-                isLookingAtThisConv = (activeConv === conversationId);
-              } else {
-                const roomSockets = io.sockets.adapter.rooms.get(`conv:${conversationId}`);
-                if (roomSockets) {
-                  for (const socketId of roomSockets) {
-                    const s = io.sockets.sockets.get(socketId);
-                    if (s?.user?.id === participant.employeeId) {
-                      isLookingAtThisConv = true;
-                      break;
+                await Promise.all(
+                  otherParticipants.map(async (participant) => {
+                    // Cluster-safe fast active room check
+                    let isLookingAtThisConv = false;
+                    if (redis.isAvailable) {
+                      const activeConv = await redis.get(`active_conv:${participant.employeeId}`).catch(() => null);
+                      isLookingAtThisConv = (activeConv === conversationId);
+                    } else {
+                      const roomSockets = io.sockets.adapter.rooms.get(`conv:${conversationId}`);
+                      if (roomSockets) {
+                        for (const socketId of roomSockets) {
+                          const s = io.sockets.sockets.get(socketId);
+                          if (s?.user?.id === participant.employeeId) {
+                            isLookingAtThisConv = true;
+                            break;
+                          }
+                        }
+                      }
                     }
-                  }
-                }
+
+                    // If not looking at this room — send personal notification / push notification
+                    if (!isLookingAtThisConv) {
+                      // ── ENTERPRISE NOTIFICATION ENGINE INTEGRATION ─────────────────
+                      try {
+                        const notificationsService =
+                          await import("../notifications/notifications.service.js");
+                        // Detect mention: check if message content contains @UserName or @all or @everyone
+                        const isMention =
+                          content &&
+                          typeof content === "string" &&
+                          (content
+                            .toLowerCase()
+                            .includes(
+                              "@" +
+                                participant.name.toLowerCase().replace(/\s+/g, ""),
+                            ) ||
+                            content.toLowerCase().includes("@all") ||
+                            content.toLowerCase().includes("@everyone"));
+
+                        const notifType = isMention ? "mention" : "message";
+                        const notifTitle = isMention
+                          ? `Mentioned by ${name} in ${conv.type === "group" ? conv.name : "chat"}`
+                          : conv.type === "group"
+                            ? `New message in ${conv.name}`
+                            : `New message from ${name}`;
+
+                        await notificationsService.createNotification(
+                          participant.employeeId,
+                          companyId,
+                          {
+                            type: notifType,
+                            title: notifTitle,
+                            message:
+                              type === "text"
+                                ? content.substring(0, 150)
+                                : `📎 Shared a ${type}`,
+                            data: {
+                              conversationId,
+                              messageId: savedMessage.id,
+                              senderId: userId,
+                              senderName: name,
+                            },
+                          },
+                        );
+                      } catch (err) {
+                        logger.error(
+                          `[Chat Socket] Failed to trigger enterprise notification: ${err.message}`,
+                        );
+                      }
+
+                      // Check online status cluster-safely via Redis or local adapter
+                      let isOnline = false;
+                      if (redis.isAvailable) {
+                        const presence = await presenceService.getUserPresence(participant.employeeId);
+                        isOnline = (presence && presence.status === "online");
+                      } else {
+                        const userRoom = io.sockets.adapter.rooms.get(`user:${participant.employeeId}`);
+                        isOnline = (userRoom && userRoom.size > 0);
+                      }
+
+                      if (!isOnline) {
+                        const chatStatus =
+                          employeeStatusMap.get(participant.employeeId) ||
+                          "available";
+                        if (chatStatus !== "dnd") {
+                          queuePushNotification(
+                            participant.employeeId,
+                            conversationId,
+                            companyId,
+                          );
+                        } else {
+                          logger.info(
+                            `[Chat] Suppressed push notification for user ${participant.employeeId} due to DND status`,
+                          );
+                        }
+                      }
+                    }
+                  })
+                );
+              } catch (bgErr) {
+                logger.error(
+                  `[Chat Socket] Background notifications dispatch error: ${bgErr.message}`,
+                );
               }
-
-              // If not looking at this room — send personal notification / push notification
-              if (!isLookingAtThisConv) {
-                // ── ENTERPRISE NOTIFICATION ENGINE INTEGRATION ─────────────────
-                try {
-                  const notificationsService =
-                    await import("../notifications/notifications.service.js");
-                  // Detect mention: check if message content contains @UserName or @all or @everyone
-                  const isMention =
-                    content &&
-                    typeof content === "string" &&
-                    (content
-                      .toLowerCase()
-                      .includes(
-                        "@" +
-                          participant.name.toLowerCase().replace(/\s+/g, ""),
-                      ) ||
-                      content.toLowerCase().includes("@all") ||
-                      content.toLowerCase().includes("@everyone"));
-
-                  const notifType = isMention ? "mention" : "message";
-                  const notifTitle = isMention
-                    ? `Mentioned by ${name} in ${conv.type === "group" ? conv.name : "chat"}`
-                    : conv.type === "group"
-                      ? `New message in ${conv.name}`
-                      : `New message from ${name}`;
-
-                  await notificationsService.createNotification(
-                    participant.employeeId,
-                    companyId,
-                    {
-                      type: notifType,
-                      title: notifTitle,
-                      message:
-                        type === "text"
-                          ? content.substring(0, 150)
-                          : `📎 Shared a ${type}`,
-                      data: {
-                        conversationId,
-                        messageId: savedMessage.id,
-                        senderId: userId,
-                        senderName: name,
-                      },
-                    },
-                  );
-                } catch (err) {
-                  logger.error(
-                    `[Chat Socket] Failed to trigger enterprise notification: ${err.message}`,
-                  );
-                }
-
-                // Check online status cluster-safely via Redis or local adapter (replaces slow fetchSockets)
-                let isOnline = false;
-                if (redis.isAvailable) {
-                  const presence = await presenceService.getUserPresence(participant.employeeId);
-                  isOnline = (presence && presence.status === "online");
-                } else {
-                  const userRoom = io.sockets.adapter.rooms.get(`user:${participant.employeeId}`);
-                  isOnline = (userRoom && userRoom.size > 0);
-                }
-
-                if (!isOnline) {
-                  const chatStatus =
-                    employeeStatusMap.get(participant.employeeId) ||
-                    "available";
-                  if (chatStatus !== "dnd") {
-                    queuePushNotification(
-                      participant.employeeId,
-                      conversationId,
-                      companyId,
-                    );
-                  } else {
-                    logger.info(
-                      `[Chat] Suppressed push notification for user ${participant.employeeId} due to DND status`,
-                    );
-                  }
-                }
-              }
-            }
+            }).catch(() => {});
           });
           // Confirm delivery back to sender
           socket.emit("message_delivered", {
