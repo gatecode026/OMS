@@ -34,39 +34,37 @@ async function run() {
     });
 
     pageA.on('response', async response => {
-      if (response.status() === 500) {
-        console.log(`[A Response 500] URL: ${response.url()}`);
+      const status = response.status();
+      if (status >= 400) {
+        console.log(`[A Response ${status}] URL: ${response.url()}`);
         try {
           const text = await response.text();
-          console.log(`[A Response 500 Body] ${text}`);
+          console.log(`[A Response Body] ${text}`);
         } catch (e) {
-          console.log(`[A Response 500 Body Error] ${e.message}`);
+          // Response body read failed (e.g. status 401 with no body or preflight)
         }
       }
     });
 
     pageB.on('response', async response => {
-      if (response.status() === 500) {
-        console.log(`[B Response 500] URL: ${response.url()}`);
+      const status = response.status();
+      if (status >= 400) {
+        console.log(`[B Response ${status}] URL: ${response.url()}`);
         try {
           const text = await response.text();
-          console.log(`[B Response 500 Body] ${text}`);
+          console.log(`[B Response Body] ${text}`);
         } catch (e) {
-          console.log(`[B Response 500 Body Error] ${e.message}`);
+          // Response body read failed
         }
       }
     });
 
     // Capture console messages for debug
     pageA.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.log(`[A Error] ${msg.text()}`);
-      }
+      console.log(`[A Console ${msg.type()}] ${msg.text()}`);
     });
     pageB.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.log(`[B Error] ${msg.text()}`);
-      }
+      console.log(`[B Console ${msg.type()}] ${msg.text()}`);
     });
 
     // Login A (Geeta)
@@ -140,11 +138,10 @@ async function run() {
     await pageA.waitForSelector('.msg-input-textarea', { timeout: 10000 });
     await pageA.type('.msg-input-textarea', testMessage);
     
-    // Find and click send button
-    console.log('[Geeta] Clicking send button...');
-    await pageA.waitForSelector('.msg-input-send-active', { timeout: 10000 });
-    await pageA.click('.msg-input-send-active');
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Press Enter to send
+    console.log('[Geeta] Pressing Enter to send...');
+    await pageA.keyboard.press('Enter');
+    await new Promise(resolve => setTimeout(resolve, 3000));
     // Wait and check if message appears on Rahul's screen (real-time)
     console.log('[Rahul] Checking if message is received in real-time...');
     let messageReceived = false;

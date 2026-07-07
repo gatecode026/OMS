@@ -92,11 +92,7 @@ export const performGlobalSearch = async ({ query, category = 'all', userId, pag
           ]
         }
       ]
-    })
-    .sort({ createdAt: -1 })
-    .skip(skipNum)
-    .limit(limitNum)
-    .lean();
+    }, { sort: { createdAt: -1 }, skip: skipNum, limit: limitNum, lean: true });
 
     results.messages = matchedMessages
       .map(m => {
@@ -147,11 +143,7 @@ export const performGlobalSearch = async ({ query, category = 'all', userId, pag
           ]
         }
       ]
-    })
-    .sort({ createdAt: -1 })
-    .skip(skipNum)
-    .limit(limitNum)
-    .lean();
+    }, { sort: { createdAt: -1 }, skip: skipNum, limit: limitNum, lean: true });
 
     results.files = fileMessages.map(m => {
       const conv = myConversations.find(c => c.id === m.conversationId);

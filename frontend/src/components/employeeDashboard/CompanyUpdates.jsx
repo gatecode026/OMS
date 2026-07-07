@@ -98,7 +98,6 @@ const CompanyUpdates = () => {
 
   const handleTabClick = (tab) => {
     setActiveTab(tab);
-    addToast('info', `Filtered updates by: ${getTabLabel(tab)}`);
   };
 
   const currentList = updatesData[activeTab] || [];

@@ -33,8 +33,12 @@ export const uploadToImageKit = async (base64Str, fileName) => {
 
     logger.info(`[ImageKit] Uploading file "${name}" to folder "Office_managements"...`);
 
+    const base64Data = base64Str.includes(';base64,')
+      ? base64Str.split(';base64,')[1]
+      : base64Str;
+
     const formData = new FormData();
-    formData.append('file', base64Str);
+    formData.append('file', base64Data);
     formData.append('fileName', name);
     formData.append('folder', 'Office_managements');
     formData.append('useUniqueFileName', 'true');
@@ -188,8 +192,12 @@ export const uploadToImageKitDetailed = async (base64Str, fileName) => {
   try {
     const authHeader = 'Basic ' + Buffer.from(privateKey + ':').toString('base64');
     const name = fileName || `file_${Date.now()}`;
+    const base64Data = base64Str.includes(';base64,')
+      ? base64Str.split(';base64,')[1]
+      : base64Str;
+
     const formData = new FormData();
-    formData.append('file', base64Str);
+    formData.append('file', base64Data);
     formData.append('fileName', name);
     formData.append('folder', 'Office_managements');
     formData.append('useUniqueFileName', 'true');

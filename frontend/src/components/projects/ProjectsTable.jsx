@@ -115,9 +115,6 @@ const ProjectsTable = ({ projects, onView, onEdit, onAssignTeam }) => {
               <th className={styles.sortableHeader} onClick={() => handleSort('department')}>
                 <div className={styles.thContent}>Client / Dept {renderSortIndicator('department')}</div>
               </th>
-              <th className={styles.sortableHeader} onClick={() => handleSort('manager')}>
-                <div className={styles.thContent}>Manager {renderSortIndicator('manager')}</div>
-              </th>
               <th className={styles.sortableHeader} onClick={() => handleSort('leader')}>
                 <div className={styles.thContent}>Team Leader {renderSortIndicator('leader')}</div>
               </th>
@@ -163,7 +160,6 @@ const ProjectsTable = ({ projects, onView, onEdit, onAssignTeam }) => {
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{p.department}</span>
                       </div>
                     </td>
-                    <td>{p.manager}</td>
                     <td>{p.leader}</td>
                     <td>
                       <div className={styles.teamAvatarStack}>

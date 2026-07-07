@@ -185,7 +185,7 @@ export const createGroupConversation = async (
     });
 
     // System message: "John created group XYZ"
-    const msgId = await generateCompanyUniqueId(companyId, "messages");
+    const msgId = new mongoose.Types.ObjectId().toString();
     await Message.create({
       id: msgId,
       companyId,
@@ -239,7 +239,7 @@ const enrichConversationForUser = async (conv, employeeId) => {
     query.createdAt = { $gt: deleteEntry.deletedAt };
   }
 
-  const latestMsg = await Message.findOne(query).sort({ createdAt: -1 }).lean();
+  const latestMsg = await Message.findOne(query, { sort: { createdAt: -1 }, lean: true });
 
   let lastMessage = null;
   if (latestMsg) {
@@ -377,10 +377,7 @@ export const getMessages = async (
         query._id = { $lt: new mongoose.Types.ObjectId(cursor) };
       }
 
-      const messages = await Message.find(query)
-        .sort({ _id: -1 })
-        .limit(limit)
-        .lean();
+      const messages = await Message.find(query, { sort: { _id: -1 }, limit, lean: true });
 
       // Fetch and populate poll details for poll messages
       const pollIds = messages
@@ -543,10 +540,10 @@ export const getMessageDetail = async (messageId, employeeId, companyId) => {
 /**
  * Save message to DB (called by Socket.io handler)
  */
-export const saveMessage = async (messageData, companyId) => {
+export const saveMessage = async (messageData, companyId, existingConv = null) => {
   return runWithTenant(companyId, async () => {
     // Enforce onlyAdminsCanMessage settings
-    const conv = await Conversation.findOne({ id: messageData.conversationId });
+    const conv = existingConv || await Conversation.findOne({ id: messageData.conversationId });
     if (!conv) throw new Error("Conversation not found");
 
     if (conv.type === "group" && conv.settings?.onlyAdminsCanMessage) {
@@ -558,15 +555,30 @@ export const saveMessage = async (messageData, companyId) => {
       }
     }
 
-    const msgId = await generateCompanyUniqueId(companyId, "messages");
+    const msgId = new mongoose.Types.ObjectId().toString();
 
     let replyToObject = null;
     if (messageData.replyTo && typeof messageData.replyTo === "string") {
       const originalMsg = await Message.findOne({ id: messageData.replyTo });
       if (originalMsg) {
+        let replyContent = originalMsg.content || "";
+        if (originalMsg.type === "audio") {
+          replyContent = "🎤 Voice Message";
+        } else if (originalMsg.type === "image") {
+          replyContent = "📷 Photo";
+        } else if (originalMsg.type === "video") {
+          replyContent = "🎥 Video";
+        } else if (originalMsg.type === "file") {
+          replyContent = `📎 ${originalMsg.media?.fileName || "File"}`;
+        } else if (replyContent.startsWith("data:")) {
+          replyContent = replyContent.startsWith("data:audio") ? "🎤 Voice Message" :
+                         replyContent.startsWith("data:image") ? "📷 Photo" :
+                         replyContent.startsWith("data:video") ? "🎥 Video" : "📎 Attachment";
+        }
+
         replyToObject = {
           messageId: originalMsg.id,
-          content: originalMsg.content || "",
+          content: replyContent,
           senderId: originalMsg.senderId,
           senderName: originalMsg.senderName,
           type: originalMsg.type || "text",
@@ -614,12 +626,12 @@ export const saveMessage = async (messageData, companyId) => {
       },
     );
 
-    // Increment unread counts for other participants
-    await readReceiptService.incrementUnreadCounts(
+    // Increment unread counts for other participants (non-blocking)
+    readReceiptService.incrementUnreadCounts(
       messageData.conversationId,
       messageData.senderId,
       companyId,
-    );
+    ).catch(() => {});
 
     // Invalidate caches
     cacheDel(CacheKeys.convMsgs(companyId, messageData.conversationId)).catch(
@@ -889,15 +901,15 @@ export const searchMessages = async (
   companyId,
 ) => {
   return runWithTenant(companyId, async () => {
-    const messages = await Message.find({
-      conversationId,
-      content: { $regex: query, $options: "i" },
-      isDeleted: false,
-      $nor: [{ "deletedFor.employeeId": employeeId }],
-    })
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
+    const messages = await Message.find(
+      {
+        conversationId,
+        content: { $regex: query, $options: "i" },
+        isDeleted: false,
+        $nor: [{ "deletedFor.employeeId": employeeId }],
+      },
+      { sort: { createdAt: -1 }, limit: 50, lean: true }
+    );
 
     return messages;
   });
@@ -960,7 +972,7 @@ export const addGroupMembers = async (
       content = `${adminParticipant.name} added ${addedNames[0]}, ${addedNames[1]} and ${addedNames.length - 2} others`;
     }
 
-    const msgId = await generateCompanyUniqueId(companyId, "messages");
+    const msgId = new mongoose.Types.ObjectId().toString();
     const sysMsg = await Message.create({
       id: msgId,
       companyId,
@@ -1075,7 +1087,7 @@ export const removeGroupMember = async (
     ).lean();
 
     // Create system message for leave/remove
-    const msgId = await generateCompanyUniqueId(companyId, "messages");
+    const msgId = new mongoose.Types.ObjectId().toString();
     const sysMsg = await Message.create({
       id: msgId,
       companyId,
@@ -1108,7 +1120,7 @@ export const removeGroupMember = async (
 
     // Create and broadcast auto-promote system message if applicable
     if (autoPromotedMsg) {
-      const pMsgId = await generateCompanyUniqueId(companyId, "messages");
+       const pMsgId = new mongoose.Types.ObjectId().toString();
       const pSysMsg = await Message.create({
         id: pMsgId,
         companyId,
@@ -1278,7 +1290,7 @@ export const updateGroupDetails = async (
 
     // Write system messages
     for (const content of systemMessages) {
-      const msgId = await generateCompanyUniqueId(companyId, "messages");
+      const msgId = new mongoose.Types.ObjectId().toString();
       const sysMsg = await Message.create({
         id: msgId,
         companyId,
@@ -1457,10 +1469,13 @@ export const deleteMessagePermanently = async (messageId, companyId) => {
     // 2. Update conversation lastMessage preview if this message was the latest one
     const conv = await Conversation.findOne({ id: message.conversationId });
     if (conv && conv.lastMessage?.messageId === messageId) {
-      const nextLatest = await Message.findOne({
-        conversationId: message.conversationId,
-        id: { $ne: messageId },
-      }).sort({ createdAt: -1 });
+      const nextLatest = await Message.findOne(
+        {
+          conversationId: message.conversationId,
+          id: { $ne: messageId },
+        },
+        { sort: { createdAt: -1 } }
+      );
 
       if (nextLatest) {
         const previewContent = nextLatest.isDeleted
@@ -1515,7 +1530,7 @@ export const deleteConversationPermanently = async (
     if (!conv) throw new Error("Conversation not found");
 
     // 1. Gather all messages in conversation
-    const messages = await Message.find({ conversationId }).lean();
+    const messages = await Message.find({ conversationId }, { lean: true });
 
     // 2. Collect unique ImageKit File IDs and URLs to delete
     const fileIdsToDelete = new Set();
@@ -1659,7 +1674,7 @@ export const forwardMessage = async (
 
     // 5. Create new messages copies
     for (const targetConv of targetConvs) {
-      const newMsgId = await generateCompanyUniqueId(companyId, "messages");
+      const newMsgId = new mongoose.Types.ObjectId().toString();
 
       let mediaObj = null;
       if (sourceMessage.media) {

@@ -9,7 +9,7 @@ import Employee from '../employees/employees.model.js';
 import Company from '../companies/company.model.js';
 import env from '../../config/env.js';
 import logger from '../../config/logger.js';
-import { isDatabaseConnected } from '../../config/database.js';
+import mongoose from 'mongoose';
 
 /**
  * Handles credentials authentication, validates active accounts, and issues signed JWTs.
@@ -37,7 +37,7 @@ export const login = async (email, password, options = {}) => {
 
   console.log(`[DEBUG login] Email received: "${email}" | Password length: ${password ? password.length : 0} | Resolved Email: "${resolvedEmail}" | Company Code: "${companyCode}" | Subdomain: "${subdomain}"`);
 
-  if (!isDatabaseConnected) {
+  if (mongoose.connection.readyState !== 1) {
     logger.error('AuthService::login [Error] Database is not connected');
     const err = new Error('Database connection is offline. Please try again later.');
     err.statusCode = 500;

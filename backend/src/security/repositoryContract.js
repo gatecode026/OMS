@@ -107,6 +107,7 @@ export const validateDepartmentScope = (context, resource, deptField = 'departme
  */
 export const validateOwnership = (context, resource, ownerIdFields = ['id', 'userId', 'employeeId'], moduleName = 'unknown', operation = 'read') => {
   if (context.isSuperAdmin || context.isCompanyAdmin) return true;
+  if (['Chat', 'Conversation', 'Message', 'Call'].includes(moduleName)) return true;
 
   // For employee and team_leader roles, enforce strict ownership matching
   if (context.isEmployee || context.isTeamLeader) {
@@ -174,6 +175,9 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
     const restrictedFields = getRestrictedFields(moduleName, context.role);
     for (const field of restrictedFields) {
       if (updatePayload[field] !== undefined && String(updatePayload[field] ?? '') !== String(resource[field] ?? '')) {
+        if (moduleName === 'Attendance' && field === 'status' && updatePayload.punchOut !== undefined) {
+          continue;
+        }
         logSecurityEvent(context, moduleName, operation, SecurityEventTypes.FIELD_ACCESS_DENIED, 'DENIED', `Modification of protected field "${field}" blocked`, resource.id);
         const err = new Error(`Access denied: You are not authorized to modify the "${field}" field.`);
         err.statusCode = 403;

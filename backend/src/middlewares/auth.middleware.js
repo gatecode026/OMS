@@ -9,7 +9,7 @@ import Admin from '../modules/admin/admin.model.js';
 import Employee from '../modules/employees/employees.model.js';
 import Company from '../modules/companies/company.model.js';
 import logger from '../config/logger.js';
-import { isDatabaseConnected } from '../config/database.js';
+import mongoose from 'mongoose';
 import { runWithTenant } from '../utils/tenantContext.js';
 
 /**
@@ -42,7 +42,7 @@ export const authenticate = async (req, res, next) => {
     const decoded = jwt.verify(token, env.jwtSecret);
     
     // In offline sandbox mode, use the token payload directly
-    if (!isDatabaseConnected) {
+    if (mongoose.connection.readyState !== 1) {
       req.user = {
         id: decoded.id,
         email: decoded.email,

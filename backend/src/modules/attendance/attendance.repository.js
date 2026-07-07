@@ -147,7 +147,7 @@ export const update = async (id, data) => {
   if (context && context.isEmployee) {
     const restrictedFields = ['employeeId', 'branch', 'department', 'manager'];
     for (const field of restrictedFields) {
-      if (data[field] !== undefined) {
+      if (data[field] !== undefined && String(data[field] ?? '') !== String(record[field] ?? '')) {
         const err = new Error(`Access denied: You are not authorized to modify the "${field}" field.`);
         err.statusCode = 403;
         throw err;

@@ -21,7 +21,7 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole, currentUser } = useApp();
 
   // Real employee counts by branch (from actual employees data)
   const branchEmployeeCountMap = useMemo(() => {
@@ -2395,17 +2395,19 @@ const Branches = () => {
             <div className="card branch-detail-card">
               <div className="detail-card-header">
                 <h3 className="panel-title"><Eye size={16} /> Selected Branch Details</h3>
-                <select
-                  className="detail-branch-dropdown"
-                  value={selectedBranchId}
-                  onChange={(e) => setSelectedBranchId(e.target.value)}
-                >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.code}
-                    </option>
-                  ))}
-                </select>
+                {(currentUserRole === 'super_admin' || currentUserRole === 'company_admin') && (
+                  <select
+                    className="detail-branch-dropdown"
+                    value={selectedBranchId}
+                    onChange={(e) => setSelectedBranchId(e.target.value)}
+                  >
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.code}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="detail-tabs">
@@ -2414,9 +2416,6 @@ const Branches = () => {
                 </button>
                 <button className={`tab-btn ${activeTab === 'allocation' ? 'active' : ''}`} onClick={() => setActiveTab('allocation')}>
                   <Users size={13} /> Allocation
-                </button>
-                <button className={`tab-btn ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
-                  <Calendar size={13} /> Doc Vault
                 </button>
                 <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
                   <TrendingUp size={13} /> Analytics
@@ -2490,45 +2489,6 @@ const Branches = () => {
                   </div>
                 )}
 
-                {activeTab === 'documents' && (
-                  <div className="detail-section animate-fade-in">
-                    <h4><Calendar size={14} /> Branch Document Vault</h4>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '12px' }}>Browse compliance certificates, rental agreements, and operational policies for this location.</p>
-                    
-                    <div className="doc-vault-list">
-                      {(selectedBranch.documents || []).length === 0 ? (
-                        <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>No documents uploaded.</div>
-                      ) : (
-                        (selectedBranch.documents || []).map(doc => (
-                          <div key={doc} className="doc-vault-row">
-                            <span style={{ fontSize: '1.1rem' }}>📄</span>
-                            <span className="doc-name-text">{doc}</span>
-                            <div className="doc-vault-actions">
-                              <button className="doc-vault-download" onClick={() => handleDownloadDocument(doc)} title="Download Document" type="button">
-                                <Download size={12} />
-                              </button>
-                              <button className="doc-vault-delete" onClick={() => handleDeleteDocument(doc)} title="Delete Document" type="button">
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="doc-upload-form" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        icon={Plus} 
-                        onClick={() => fileInputRef.current?.click()}
-                        type="button"
-                      >
-                        Upload to Vault
-                      </Button>
-                    </div>
-                  </div>
-                )}
 
                 {activeTab === 'analytics' && (
                   <div className="detail-section animate-fade-in">
@@ -2667,81 +2627,12 @@ const Branches = () => {
                       ))}
                     </div>
                   )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Reports & Exports Panel */}
-          <div className="card reports-exports-card">
-            <h3 className="panel-title"><Download size={16} /> Reports & Document Exports</h3>
-            <div className="reports-grid-list">
-              <div className="report-export-row">
-                <div>
-                  <strong>Branch Summary Report</strong>
-                  <span>Consolidated stats of all operations</span>
-                </div>
-                <button className="btn-report-download" onClick={() => addToast('success', 'Downloading Branch Summary report (PDF)...')} title="Download PDF">
-                  PDF
-                </button>
-              </div>
-              <div className="report-export-row">
-                <div>
-                  <strong>Attendance & Absences Logs</strong>
-                  <span>Staff check-in logs & WFH audit</span>
-                </div>
-                <button className="btn-report-download" onClick={() => addToast('success', 'Downloading Attendance sheets (Excel)...')} title="Download Excel">
-                  XLSX
-                </button>
-              </div>
-              <div className="report-export-row">
-                <div>
-                  <strong>Productivity Audit Report</strong>
-                  <span>Task completion & project pipelines</span>
-                </div>
-                <button className="btn-report-download" onClick={handleExportCSV} title="Download CSV">
-                  CSV
-                </button>
               </div>
             </div>
-          </div>
-
-          {/* Recent Branch Activities Timeline */}
-          <div className="card activities-card">
-            <h3 className="panel-title"><Activity size={16} /> Recent Branch Activities</h3>
-            <div className="activities-timeline">
-              {activities.map(act => (
-                <div key={act.id} className="activity-timeline-item">
-                  <div className={`activity-pin pin-${act.type}`}></div>
-                  <div className="activity-timeline-content">
-                    <p>{act.text}</p>
-                    <span>{act.time}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Alerts & Notifications */}
-          <div className="card alerts-card">
-            <h3 className="panel-title"><AlertCircle size={16} /> Notifications & Alerts</h3>
-            <div className="alerts-list">
-              {dynamicAlerts.length > 0 ? (
-                dynamicAlerts.map(alert => (
-                  <div key={alert.id} className={`alert-item ${alert.type}`}>
-                    {alert.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-                    {alert.text}
-                  </div>
-                ))
-              ) : (
-                <div className="alert-item info" style={{ justifyContent: 'center' }}>
-                  <CheckCircle size={14} /> All branches operational, no pending alerts.
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       </div>
+    </div>
 
       {/* Footer Status */}
       <div className="branches-footer">

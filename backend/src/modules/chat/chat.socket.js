@@ -89,14 +89,15 @@ export const triggerPushNotificationJob = async (userId, companyId) => {
         );
         const lastReadAt = participant?.lastReadAt || new Date(0);
 
-        const unreadMessages = await Message.find({
-          conversationId: conv.id,
-          senderId: { $ne: userId },
-          isDeleted: false,
-          createdAt: { $gt: new Date(lastReadAt) },
-        })
-          .sort({ createdAt: 1 })
-          .lean();
+        const unreadMessages = await Message.find(
+          {
+            conversationId: conv.id,
+            senderId: { $ne: userId },
+            isDeleted: false,
+            createdAt: { $gt: new Date(lastReadAt) },
+          },
+          { sort: { createdAt: 1 }, lean: true }
+        );
 
         if (unreadMessages.length === 0) continue;
 
@@ -319,9 +320,10 @@ const verifyParticipantCached = async (companyId, conversationId, userId) => {
     cacheKey,
     async () => {
       return runWithTenant(companyId, async () => {
-        const conv = await Conversation.findOne({ id: conversationId })
-          .select("participants.employeeId")
-          .lean();
+        const conv = await Conversation.findOne(
+          { id: conversationId },
+          { select: "participants.employeeId", lean: true }
+        );
         return conv ? conv.participants.map((p) => p.employeeId) : [];
       });
     },
@@ -344,6 +346,18 @@ export const registerChatSocketHandlers = (io) => {
       statusEmoji,
     } = socket.user;
     socket.typingConvs = new Set();
+
+    const isSuperAdmin = ["super_admin", "superadmin"].includes(role?.toLowerCase());
+
+    // Intercept socket.on to bind AsyncLocalStorage tenant and user context automatically to all handlers
+    const originalOn = socket.on.bind(socket);
+    socket.on = (event, listener) => {
+      return originalOn(event, async (...args) => {
+        await runWithTenant(companyId, async () => {
+          return listener(...args);
+        }, isSuperAdmin, socket.user);
+      });
+    };
 
     logger.info(
       `[Chat] Connected: ${name} (${userId}) — Company: ${companyId} — Socket: ${socket.id}`,
@@ -849,6 +863,11 @@ export const registerChatSocketHandlers = (io) => {
           socket.join(`conv:${conversationId}`);
           socket.emit("joined_conversation", { conversationId });
           logger.info(`[Chat] ${name} joined conv: ${conversationId}`);
+          
+          socket.activeConversationId = conversationId;
+          if (redis.isAvailable) {
+            await redis.set(`active_conv:${userId}`, conversationId, { EX: 86400 }).catch(() => {});
+          }
         });
       } catch (err) {
         logger.error("[Chat] join_conversation error:", err);
@@ -972,6 +991,12 @@ export const registerChatSocketHandlers = (io) => {
     socket.on("user_chatscreen_status", async ({ isOnChatScreen }) => {
       try {
         socket.isOnChatScreen = !!isOnChatScreen;
+        if (!isOnChatScreen) {
+          socket.activeConversationId = null;
+          if (redis.isAvailable) {
+            await redis.del(`active_conv:${userId}`).catch(() => {});
+          }
+        }
         await updateUserChatScreenPresence(userId, companyId, io);
       } catch (err) {
         logger.error("[Chat] user_chatscreen_status error:", err);
@@ -1000,16 +1025,15 @@ export const registerChatSocketHandlers = (io) => {
           }
 
           // Room authorization check: Ensure user is a participant of this conversation
-          const isParticipant = await runWithTenant(companyId, async () => {
+          const conv = await runWithTenant(companyId, async () => {
             const conn = await getTenantConnection(companyId);
-            const conv = await conn.collection("conversations").findOne({
+            return conn.collection("conversations").findOne({
               id: conversationId,
               "participants.employeeId": userId,
             });
-            return !!conv;
           });
 
-          if (!isParticipant) {
+          if (!conv) {
             logger.warn(
               `[Socket.io] Room authorization bypass blocked: User ${userId} tried to send message to conv ${conversationId} they do not belong to`,
             );
@@ -1028,7 +1052,12 @@ export const registerChatSocketHandlers = (io) => {
             });
             return;
           }
-          let uploadedMedia = media;
+          let uploadedMedia = media
+            ? {
+                ...media,
+                mimeType: media.fileType || media.mimeType || null,
+              }
+            : null;
           if (
             media &&
             media.url &&
@@ -1049,6 +1078,7 @@ export const registerChatSocketHandlers = (io) => {
               }
               uploadedMedia = {
                 ...media,
+                mimeType: media.fileType || media.mimeType || null,
                 url: resultUrl,
               };
             } catch (uploadErr) {
@@ -1077,6 +1107,7 @@ export const registerChatSocketHandlers = (io) => {
               tempId,
             },
             companyId,
+            conv,
           );
 
           // Message fanout optimization: broadcast only messageId, conversationId, senderId, preview, and tempId
@@ -1093,177 +1124,152 @@ export const registerChatSocketHandlers = (io) => {
             senderAvatar: avatar,
             preview: previewText,
             type: savedMessage.type,
+            media: savedMessage.media || null,
             createdAt: savedMessage.createdAt,
             _isOptimized: true,
             tempId,
             replyTo: savedMessage.replyTo,
           };
 
-          // Ensure all online participants are in the conv room before broadcasting.
-          // This handles cases where a participant connected before the conversation existed,
-          // or where the auto-join at connection time failed for any reason.
-          const convForJoin = await runWithTenant(companyId, async () => {
-            const conn = await getTenantConnection(companyId);
-            return conn
-              .collection("conversations")
-              .findOne(
-                { id: conversationId },
-                { projection: { participants: 1 } },
-              );
-          });
-          if (convForJoin?.participants) {
-            for (const p of convForJoin.participants) {
-              const userSockets = await io
-                .in(`user:${p.employeeId}`)
-                .fetchSockets();
-              if (userSockets.length > 0) {
-                const isInRoom = (
-                  await io.in(`conv:${conversationId}`).fetchSockets()
-                ).some((s) => s.user?.id === p.employeeId);
-                if (!isInRoom) {
-                  await io
-                    .in(`user:${p.employeeId}`)
-                    .socketsJoin(`conv:${conversationId}`);
-                  logger.info(
-                    `[Chat] Late-joined user ${p.employeeId} to conv:${conversationId} before message broadcast`,
-                  );
-                }
-              }
+          // Broadcast to all participants' user rooms directly.
+          // This avoids cluster-wide fetchSockets() / socketsJoin() and resolves live performance lags.
+          if (conv?.participants) {
+            for (const p of conv.participants) {
+              io.to(`user:${p.employeeId}`).emit("new_message", msgPayload);
+              io.to(`user:${p.employeeId}`).emit("message:new", msgPayload);
             }
           }
 
-          io.to(`conv:${conversationId}`).emit("new_message", msgPayload);
-          io.to(`conv:${conversationId}`).emit("message:new", msgPayload);
+          // Handle delivery receipts + notifications for offline participants (non-blocking in the background)
+          setImmediate(() => {
+            runWithTenant(companyId, async () => {
+              try {
+                const conn = await getTenantConnection(companyId);
 
-          // Handle delivery receipts + notifications for offline participants
-          await runWithTenant(companyId, async () => {
-            const conn = await getTenantConnection(companyId);
-            const conv = await conn
-              .collection("conversations")
-              .findOne(
-                { id: conversationId },
-                { projection: { participants: 1, type: 1, name: 1 } },
-              );
+                const otherParticipants = conv.participants.filter(
+                  (p) => p.employeeId !== userId,
+                );
 
-            if (!conv) return;
+                const otherParticipantIds = otherParticipants.map(
+                  (p) => p.employeeId,
+                );
+                const employeesInfo = await conn
+                  .collection("employees")
+                  .find(
+                    { id: { $in: otherParticipantIds } },
+                    { projection: { id: 1, chatStatus: 1 } },
+                  )
+                  .toArray();
 
-            const otherParticipants = conv.participants.filter(
-              (p) => p.employeeId !== userId,
-            );
+                const employeeStatusMap = new Map(
+                  employeesInfo.map((e) => [e.id, e.chatStatus]),
+                );
 
-            const otherParticipantIds = otherParticipants.map(
-              (p) => p.employeeId,
-            );
-            const employeesInfo = await conn
-              .collection("employees")
-              .find(
-                { id: { $in: otherParticipantIds } },
-                { projection: { id: 1, chatStatus: 1 } },
-              )
-              .toArray();
+                await Promise.all(
+                  otherParticipants.map(async (participant) => {
+                    // Cluster-safe fast active room check
+                    let isLookingAtThisConv = false;
+                    if (redis.isAvailable) {
+                      const activeConv = await redis.get(`active_conv:${participant.employeeId}`).catch(() => null);
+                      isLookingAtThisConv = (activeConv === conversationId);
+                    } else {
+                      const roomSockets = io.sockets.adapter.rooms.get(`conv:${conversationId}`);
+                      if (roomSockets) {
+                        for (const socketId of roomSockets) {
+                          const s = io.sockets.sockets.get(socketId);
+                          if (s?.user?.id === participant.employeeId) {
+                            isLookingAtThisConv = true;
+                            break;
+                          }
+                        }
+                      }
+                    }
 
-            const employeeStatusMap = new Map(
-              employeesInfo.map((e) => [e.id, e.chatStatus]),
-            );
+                    // If not looking at this room — send personal notification / push notification
+                    if (!isLookingAtThisConv) {
+                      // ── ENTERPRISE NOTIFICATION ENGINE INTEGRATION ─────────────────
+                      try {
+                        const notificationsService =
+                          await import("../notifications/notifications.service.js");
+                        // Detect mention: check if message content contains @UserName or @all or @everyone
+                        const isMention =
+                          content &&
+                          typeof content === "string" &&
+                          (content
+                            .toLowerCase()
+                            .includes(
+                              "@" +
+                                participant.name.toLowerCase().replace(/\s+/g, ""),
+                            ) ||
+                            content.toLowerCase().includes("@all") ||
+                            content.toLowerCase().includes("@everyone"));
 
-            // Fetch all socket IDs currently in the conversation room
-            const roomSockets = await io
-              .in(`conv:${conversationId}`)
-              .fetchSockets();
-            const usersInRoom = new Set(
-              roomSockets.map((s) => s.user?.id).filter(Boolean),
-            );
+                        const notifType = isMention ? "mention" : "message";
+                        const notifTitle = isMention
+                          ? `Mentioned by ${name} in ${conv.type === "group" ? conv.name : "chat"}`
+                          : conv.type === "group"
+                            ? `New message in ${conv.name}`
+                            : `New message from ${name}`;
 
-            for (const participant of otherParticipants) {
-              // If not in room — send personal notification
-              if (!usersInRoom.has(participant.employeeId)) {
-                // ── ENTERPRISE NOTIFICATION ENGINE INTEGRATION ─────────────────
-                try {
-                  const notificationsService =
-                    await import("../notifications/notifications.service.js");
-                  // Detect mention: check if message content contains @UserName or @all or @everyone
-                  const isMention =
-                    content &&
-                    typeof content === "string" &&
-                    (content
-                      .toLowerCase()
-                      .includes(
-                        "@" +
-                          participant.name.toLowerCase().replace(/\s+/g, ""),
-                      ) ||
-                      content.toLowerCase().includes("@all") ||
-                      content.toLowerCase().includes("@everyone"));
+                        await notificationsService.createNotification(
+                          participant.employeeId,
+                          companyId,
+                          {
+                            type: notifType,
+                            title: notifTitle,
+                            message:
+                              type === "text"
+                                ? content.substring(0, 150)
+                                : `📎 Shared a ${type}`,
+                            data: {
+                              conversationId,
+                              messageId: savedMessage.id,
+                              senderId: userId,
+                              senderName: name,
+                            },
+                          },
+                        );
+                      } catch (err) {
+                        logger.error(
+                          `[Chat Socket] Failed to trigger enterprise notification: ${err.message}`,
+                        );
+                      }
 
-                  const notifType = isMention ? "mention" : "message";
-                  const notifTitle = isMention
-                    ? `Mentioned by ${name} in ${conv.type === "group" ? conv.name : "chat"}`
-                    : conv.type === "group"
-                      ? `New message in ${conv.name}`
-                      : `New message from ${name}`;
+                      // Check online status cluster-safely via Redis or local adapter
+                      let isOnline = false;
+                      if (redis.isAvailable) {
+                        const presence = await presenceService.getUserPresence(participant.employeeId);
+                        isOnline = (presence && presence.status === "online");
+                      } else {
+                        const userRoom = io.sockets.adapter.rooms.get(`user:${participant.employeeId}`);
+                        isOnline = (userRoom && userRoom.size > 0);
+                      }
 
-                  await notificationsService.createNotification(
-                    participant.employeeId,
-                    companyId,
-                    {
-                      type: notifType,
-                      title: notifTitle,
-                      message:
-                        type === "text"
-                          ? content.substring(0, 150)
-                          : `📎 Shared a ${type}`,
-                      data: {
-                        conversationId,
-                        messageId: savedMessage.id,
-                        senderId: userId,
-                        senderName: name,
-                      },
-                    },
-                  );
-                } catch (err) {
-                  logger.error(
-                    `[Chat Socket] Failed to trigger enterprise notification: ${err.message}`,
-                  );
-                }
-
-                const targetSockets = await io
-                  .in(`user:${participant.employeeId}`)
-                  .fetchSockets();
-                if (targetSockets.length === 0) {
-                  const chatStatus =
-                    employeeStatusMap.get(participant.employeeId) ||
-                    "available";
-                  if (chatStatus !== "dnd") {
-                    queuePushNotification(
-                      participant.employeeId,
-                      conversationId,
-                      companyId,
-                    );
-                  } else {
-                    logger.info(
-                      `[Chat] Suppressed push notification for user ${participant.employeeId} due to DND status`,
-                    );
-                  }
-                } else {
-                  io.to(`user:${participant.employeeId}`).emit(
-                    "new_message_notification",
-                    {
-                      conversationId,
-                      conversationName:
-                        conv.type === "direct" ? name : conv.name,
-                      conversationType: conv.type,
-                      senderId: userId,
-                      senderName: name,
-                      senderAvatar: avatar,
-                      preview:
-                        type === "text"
-                          ? content?.substring(0, 100)
-                          : `📎 ${type}`,
-                      sentAt: new Date(),
-                    },
-                  );
-                }
+                      if (!isOnline) {
+                        const chatStatus =
+                          employeeStatusMap.get(participant.employeeId) ||
+                          "available";
+                        if (chatStatus !== "dnd") {
+                          queuePushNotification(
+                            participant.employeeId,
+                            conversationId,
+                            companyId,
+                          );
+                        } else {
+                          logger.info(
+                            `[Chat] Suppressed push notification for user ${participant.employeeId} due to DND status`,
+                          );
+                        }
+                      }
+                    }
+                  })
+                );
+              } catch (bgErr) {
+                logger.error(
+                  `[Chat Socket] Background notifications dispatch error: ${bgErr.message}`,
+                );
               }
-            }
+            }).catch(() => {});
           });
           // Confirm delivery back to sender
           socket.emit("message_delivered", {
@@ -1275,7 +1281,7 @@ export const registerChatSocketHandlers = (io) => {
           logger.error("[Chat] send_message error:", err);
           socket.emit("error", {
             event: "send_message",
-            message: "Failed to send message",
+            message: "Failed to send message: " + err.message,
           });
           socket.emit("message_error", {
             tempId,
@@ -2112,6 +2118,11 @@ export const registerChatSocketHandlers = (io) => {
       logger.info(
         `[Chat] Disconnected: ${name} (${userId}) — Reason: ${reason}`,
       );
+
+      socket.activeConversationId = null;
+      if (redis.isAvailable) {
+        await redis.del(`active_conv:${userId}`).catch(() => {});
+      }
 
       // Clean up chatscreen status on disconnect
       try {

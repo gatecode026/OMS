@@ -89,7 +89,7 @@ const WorkReports = () => {
   const departments = useMemo(() => (rawDepartments || []).filter(d => d.status === 'Active'), [rawDepartments]);
   const loading = usePageLoading(800);
 
-  const initialUserRole = useMemo(() => {
+  const userRole = useMemo(() => {
     if (currentUserRole === 'super_admin') return 'Super Admin';
     if (currentUserRole === 'company_admin') return 'Company Admin';
     if (currentUserRole === 'branch_admin' || currentUserRole === 'dept_admin' || currentUserRole === 'hr') return 'HR/Admin';
@@ -100,8 +100,8 @@ const WorkReports = () => {
 
   const [perspective, setPerspective] = useState(() => {
     if (currentUserRole === 'employee') return 'self';
-    const hasCompanyRead = hasPermission('work_report', 'read', 'company');
-    const hasSelfRead = hasPermission('work_report', 'read', 'self');
+    const hasCompanyRead = hasPermission('work_reports', 'read', 'company');
+    const hasSelfRead = hasPermission('work_reports', 'read', 'self');
 
     const saved = localStorage.getItem('perspective_work_reports');
     if (saved === 'self' && hasSelfRead) return 'self';
@@ -112,8 +112,8 @@ const WorkReports = () => {
 
   const showPerspectiveDropdown = useMemo(() => {
     if (currentUserRole === 'employee') return false;
-    const hasCompanyRead = hasPermission('work_report', 'read', 'company');
-    const hasSelfRead = hasPermission('work_report', 'read', 'self');
+    const hasCompanyRead = hasPermission('work_reports', 'read', 'company');
+    const hasSelfRead = hasPermission('work_reports', 'read', 'self');
     return hasCompanyRead && hasSelfRead;
   }, [currentUserRole, hasPermission]);
 
@@ -127,8 +127,8 @@ const WorkReports = () => {
     if (currentUserRole === 'employee') {
       setPerspective('self');
     } else {
-      const hasCompanyRead = hasPermission('work_report', 'read', 'company');
-      const hasSelfRead = hasPermission('work_report', 'read', 'self');
+      const hasCompanyRead = hasPermission('work_reports', 'read', 'company');
+      const hasSelfRead = hasPermission('work_reports', 'read', 'self');
       const saved = localStorage.getItem('perspective_work_reports');
       if (saved === 'self' && hasSelfRead) {
         setPerspective('self');

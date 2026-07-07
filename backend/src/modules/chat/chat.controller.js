@@ -980,7 +980,7 @@ export const forwardMessage = asyncHandler(async (req, res) => {
       io.to(`conv:${convId}`).emit('message:new', newMsg);
 
       // Handle receipts + offline push notifications
-      const conv = await Conversation.findOne({ id: convId }).lean();
+      const conv = await Conversation.findOne({ id: convId }, { lean: true });
       if (conv) {
         const otherParticipants = conv.participants.filter(
           p => p.employeeId !== userId

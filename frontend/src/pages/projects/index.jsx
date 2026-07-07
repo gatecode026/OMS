@@ -114,14 +114,18 @@ const Projects = () => {
   
   // Form States for Modals
   const [newProjectForm, setNewProjectForm] = useState({
-    name: '', client: '', department: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
+    name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: '', status: 'Pending'
   });
   const [assignTeamForm, setAssignTeamForm] = useState({ projectId: '', memberName: '' });
   const [selectedMembers, setSelectedMembers] = useState([]);
+  const [assignTeamSearch, setAssignTeamSearch] = useState('');
+  const [createEmpSearch, setCreateEmpSearch] = useState('');
+  const [createSelectedMembers, setCreateSelectedMembers] = useState([]);
   const [addTaskForm, setAddTaskForm] = useState({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
   const [selectedTaskEmployees, setSelectedTaskEmployees] = useState([]);
   const [uploadDocForm, setUploadDocForm] = useState({ projectId: '', docName: '', docType: 'pdf', docSize: '0.8 MB' });
   const [reportForm, setReportForm] = useState({ projectId: '', reportType: 'progress', format: 'pdf' });
+  const [dateErrors, setDateErrors] = useState({ startDate: '', deadline: '' });
 
   // Filtering Calculation
   const filteredProjects = useMemo(() => {
@@ -263,12 +267,15 @@ const Projects = () => {
       name: proj.name,
       client: proj.client || 'Google',
       department: proj.department,
+      manager: proj.manager || '',
       leader: proj.leader,
       startDate: proj.startDate,
       deadline: proj.deadline,
       priority: proj.priority,
-      description: proj.description || ''
+      description: proj.description || '',
+      status: proj.status || 'Pending'
     });
+    setCreateSelectedMembers(proj.members || []);
     setSelectedProject(proj);
     setActiveModal('create'); // reuse create form for edit
   };
@@ -329,12 +336,56 @@ const Projects = () => {
     }
   };
 
+  // Date validation helpers
+  const getTodayStr = () => new Date().toISOString().split('T')[0];
+
+  const handleStartDateChange = (value) => {
+    const today = getTodayStr();
+    let err = '';
+    if (value && value < today) {
+      err = 'Start date cannot be in the past.';
+    }
+    // Reset deadline error if deadline is now valid
+    let deadlineErr = dateErrors.deadline;
+    if (newProjectForm.deadline && value && newProjectForm.deadline <= value) {
+      deadlineErr = 'Deadline must be after the start date.';
+    } else if (newProjectForm.deadline && value && newProjectForm.deadline > value) {
+      deadlineErr = '';
+    }
+    setDateErrors({ startDate: err, deadline: deadlineErr });
+    setNewProjectForm({ ...newProjectForm, startDate: value });
+  };
+
+  const handleDeadlineChange = (value) => {
+    let err = '';
+    if (value && newProjectForm.startDate && value <= newProjectForm.startDate) {
+      err = 'Deadline must be after the start date.';
+    } else if (value && !newProjectForm.startDate && value < getTodayStr()) {
+      err = 'Deadline must be a future date.';
+    }
+    setDateErrors({ ...dateErrors, deadline: err });
+    setNewProjectForm({ ...newProjectForm, deadline: value });
+  };
+
   // Create Project Form Submit
   const handleCreateProjectSubmit = async (e) => {
     e.preventDefault();
+    // Validate dates before submitting
+    const today = getTodayStr();
+    if (newProjectForm.startDate && newProjectForm.startDate < today) {
+      setDateErrors(prev => ({ ...prev, startDate: 'Start date cannot be in the past.' }));
+      return;
+    }
+    if (newProjectForm.deadline && newProjectForm.startDate && newProjectForm.deadline <= newProjectForm.startDate) {
+      setDateErrors(prev => ({ ...prev, deadline: 'Deadline must be after the start date.' }));
+      return;
+    }
     if (selectedProject) {
       // Edit mode
-      const success = await updateProject(selectedProject.id, newProjectForm);
+      const success = await updateProject(selectedProject.id, {
+        ...newProjectForm,
+        members: createSelectedMembers.length > 0 ? createSelectedMembers : (selectedProject.members || [])
+      });
       if (success) {
         setSelectedProject(null);
       }
@@ -342,15 +393,20 @@ const Projects = () => {
       // Create mode
       const count = projects.length;
       const nextId = `PRJ-${String(count + 1).padStart(3, '0')}`;
+      // Merge leader into members if not already included
+      const membersList = Array.from(new Set([
+        ...(newProjectForm.leader ? [newProjectForm.leader] : []),
+        ...createSelectedMembers
+      ]));
       const newProjObj = {
         id: nextId,
         name: newProjectForm.name,
         description: newProjectForm.description,
         department: newProjectForm.department,
         client: newProjectForm.client || 'Internal',
-        manager: '',
+        manager: currentUser.name || 'Unassigned',
         leader: newProjectForm.leader,
-        members: [newProjectForm.leader].filter(Boolean),
+        members: membersList,
         priority: newProjectForm.priority,
         startDate: newProjectForm.startDate || new Date().toISOString().split('T')[0],
         deadline: newProjectForm.deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -371,8 +427,11 @@ const Projects = () => {
     }
     setActiveModal(null);
     setNewProjectForm({
-      name: '', client: '', department: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: ''
+      name: '', client: '', department: '', manager: '', leader: '', startDate: '', deadline: '', priority: 'Medium', description: '', status: 'Pending'
     });
+    setCreateSelectedMembers([]);
+    setCreateEmpSearch('');
+    setDateErrors({ startDate: '', deadline: '' });
   };
 
   const handleToggleMemberSelection = (memberName) => {
@@ -1014,184 +1073,460 @@ const Projects = () => {
       </div>
 
       {/* MODAL 1: CREATE & EDIT PROJECT */}
-      {activeModal === 'create' && (
-        <div className={styles.modalBackdrop} onClick={(e) => e.target.classList.contains(styles.modalBackdrop) && setActiveModal(null)}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>{selectedProject ? 'Edit Project Details' : 'Create New Company Project'}</h3>
-              <button className={styles.closeBtn} onClick={() => setActiveModal(null)}><X size={18} /></button>
-            </div>
-            <form onSubmit={handleCreateProjectSubmit}>
-              <div className={styles.modalBody}>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Project Name</label>
-                  <input
-                    type="text"
-                    required
-                    className={styles.textInput}
-                    value={newProjectForm.name}
-                    onChange={(e) => setNewProjectForm({ ...newProjectForm, name: e.target.value })}
-                  />
-                </div>
-                <div className={styles.basicGrid}>
+      {activeModal === 'create' && (() => {
+        // Employees filtered by selected department + search
+        const createDept = newProjectForm.department || '';
+        const createFilteredEmps = (employees || []).filter(emp => {
+          const empDept = (emp.department || '').toLowerCase().trim();
+          const projDept = createDept.toLowerCase().trim();
+          const matchesDept = !projDept ||
+            empDept === projDept ||
+            empDept.includes(projDept) ||
+            projDept.includes(empDept);
+          const q = createEmpSearch.toLowerCase();
+          const matchesSearch = !q ||
+            (emp.name || '').toLowerCase().includes(q) ||
+            (emp.designation || emp.position || '').toLowerCase().includes(q);
+          return matchesDept && matchesSearch;
+        });
+        const allCreateSelected = createFilteredEmps.length > 0 && createFilteredEmps.every(e => createSelectedMembers.includes(e.name));
+
+        return (
+          <div className={styles.modalBackdrop} onClick={(e) => e.target.classList.contains(styles.modalBackdrop) && setActiveModal(null)}>
+            <div className={styles.modalContent} style={{ maxWidth: '580px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div className={styles.modalHeader} style={{ flexShrink: 0 }}>
+                <h3 className={styles.modalTitle}>{selectedProject ? 'Edit Project Details' : 'Create New Company Project'}</h3>
+                <button className={styles.closeBtn} onClick={() => { setActiveModal(null); setCreateEmpSearch(''); setCreateSelectedMembers([]); }}><X size={18} /></button>
+              </div>
+              <form onSubmit={handleCreateProjectSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <div className={styles.modalBody} style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
                   <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Client / Partner</label>
+                    <label className={styles.formLabel}>Project Name</label>
                     <input
                       type="text"
+                      required
                       className={styles.textInput}
-                      value={newProjectForm.client}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, client: e.target.value })}
+                      value={newProjectForm.name}
+                      onChange={(e) => setNewProjectForm({ ...newProjectForm, name: e.target.value })}
                     />
                   </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Department</label>
-                    <select
-                      className={styles.filterSelect}
-                      style={{ width: '100%' }}
-                      value={newProjectForm.department}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, department: e.target.value })}
-                      required
-                    >
-                      <option value="">Select a department...</option>
-                      {(departments || []).map(d => (
-                        <option key={d.id || d._id} value={d.name}>
-                          {d.name} ({d.departmentCode})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className={styles.basicGrid}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Team Leader</label>
-                    <select
-                      className={styles.filterSelect}
-                      style={{ width: '100%' }}
-                      value={newProjectForm.leader}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, leader: e.target.value })}
-                      required
-                    >
-                      <option value="">Select a team leader...</option>
-                      {(employees || [])
-                        .filter(emp => emp.roleId === 'team_leader' || emp.role?.toLowerCase().includes('leader') || emp.designation?.toLowerCase().includes('leader') || emp.designation?.toLowerCase().includes('lead'))
-                        .map(emp => (
-                          <option key={emp.id} value={emp.name}>
-                            {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
+                  <div className={styles.basicGrid}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Client / Partner</label>
+                      <input
+                        type="text"
+                        className={styles.textInput}
+                        value={newProjectForm.client}
+                        onChange={(e) => setNewProjectForm({ ...newProjectForm, client: e.target.value })}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Department</label>
+                      <select
+                        className={styles.filterSelect}
+                        style={{ width: '100%' }}
+                        value={newProjectForm.department}
+                        onChange={(e) => {
+                          setNewProjectForm({ ...newProjectForm, department: e.target.value, leader: '' });
+                          setCreateSelectedMembers([]);
+                          setCreateEmpSearch('');
+                        }}
+                        required
+                      >
+                        <option value="">Select a department...</option>
+                        {(departments || []).map(d => (
+                          <option key={d.id || d._id} value={d.name}>
+                            {d.name} ({d.departmentCode})
                           </option>
                         ))}
-                    </select>
+                      </select>
+                    </div>
                   </div>
-                </div>
-                <div className={styles.basicGrid}>
+                  {/* Team Leader — only show after department is selected */}
+                  {createDept && (
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Team Leader</label>
+                      <select
+                        className={styles.filterSelect}
+                        style={{ width: '100%' }}
+                        value={newProjectForm.leader}
+                        onChange={(e) => setNewProjectForm({ ...newProjectForm, leader: e.target.value })}
+                        required
+                      >
+                        <option value="">Select a team leader...</option>
+                        {(employees || [])
+                          .filter(emp => {
+                            // Must be from the selected department
+                            const empDept = (emp.department || '').toLowerCase().trim();
+                            const selDept = createDept.toLowerCase().trim();
+                            const inDept = empDept === selDept || empDept.includes(selDept) || selDept.includes(empDept);
+                            // Must have a leader role/designation
+                            const isLeader = emp.roleId === 'team_leader' ||
+                              emp.role?.toLowerCase().includes('leader') ||
+                              emp.designation?.toLowerCase().includes('leader') ||
+                              emp.designation?.toLowerCase().includes('lead');
+                            return inDept && isLeader;
+                          })
+                          .map(emp => (
+                            <option key={emp.id} value={emp.name}>
+                              {emp.name} — {emp.designation || emp.position || 'Staff'} ({emp.id})
+                            </option>
+                          ))}
+                      </select>
+                      {createDept && (employees || []).filter(emp => {
+                        const empDept = (emp.department || '').toLowerCase().trim();
+                        const selDept = createDept.toLowerCase().trim();
+                        const inDept = empDept === selDept || empDept.includes(selDept) || selDept.includes(empDept);
+                        const isLeader = emp.roleId === 'team_leader' || emp.role?.toLowerCase().includes('leader') || emp.designation?.toLowerCase().includes('leader') || emp.designation?.toLowerCase().includes('lead');
+                        return inDept && isLeader;
+                      }).length === 0 && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-warning, #f59e0b)', marginTop: '2px' }}>
+                          ⚠ No team leaders found in the <strong>{createDept}</strong> department.
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── ASSIGN TEAM MEMBERS ── */}
                   <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Start Date</label>
-                    <input
-                      type="date"
-                      className={styles.textInput}
-                      value={newProjectForm.startDate}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, startDate: e.target.value })}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <label className={styles.formLabel} style={{ margin: 0 }}>
+                        Assign Team Members
+                        {createDept && <span style={{ color: 'var(--color-primary)', marginLeft: 6 }}>— {createDept}</span>}
+                        {createSelectedMembers.length > 0 && (
+                          <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.75rem' }}>
+                            ({createSelectedMembers.length} selected)
+                          </span>
+                        )}
+                      </label>
+                      {createFilteredEmps.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allNames = createFilteredEmps.map(e => e.name);
+                            if (allCreateSelected) {
+                              setCreateSelectedMembers(prev => prev.filter(n => !allNames.includes(n)));
+                            } else {
+                              setCreateSelectedMembers(prev => Array.from(new Set([...prev, ...allNames])));
+                            }
+                          }}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '0.72rem', fontWeight: '600', cursor: 'pointer', padding: '2px 8px', borderRadius: '4px' }}
+                        >
+                          {allCreateSelected ? 'Deselect All' : 'Select All'}
+                        </button>
+                      )}
+                    </div>
+
+                    {!createDept ? (
+                      <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}>
+                        Please select a department above to see available employees.
+                      </div>
+                    ) : (
+                      <>
+                        {/* Search bar */}
+                        <div style={{ position: 'relative', marginBottom: '8px' }}>
+                          <input
+                            type="text"
+                            placeholder="Search by name or designation..."
+                            className={styles.textInput}
+                            value={createEmpSearch}
+                            onChange={(e) => setCreateEmpSearch(e.target.value)}
+                            style={{ paddingLeft: '34px', fontSize: '0.82rem' }}
+                          />
+                          <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                          </span>
+                        </div>
+
+                        {/* Employee list */}
+                        {createFilteredEmps.length === 0 ? (
+                          <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}>
+                            No employees found in <strong>{createDept}</strong> department.
+                          </div>
+                        ) : (
+                          <div className={styles.employeeCheckboxList} style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                            {createFilteredEmps.map(emp => {
+                              const isChecked = createSelectedMembers.includes(emp.name);
+                              return (
+                                <div
+                                  key={emp.id}
+                                  className={styles.employeeCheckboxItem}
+                                  onClick={() => {
+                                    setCreateSelectedMembers(prev =>
+                                      prev.includes(emp.name)
+                                        ? prev.filter(n => n !== emp.name)
+                                        : [...prev, emp.name]
+                                    );
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className={styles.employeeCheckbox}
+                                    checked={isChecked}
+                                    readOnly
+                                  />
+                                  <div className={styles.employeeText}>
+                                    <span className={styles.employeeName}>{emp.name}</span>
+                                    <span className={styles.employeeDetails}>
+                                      {emp.designation || emp.position || 'Staff'} · {emp.department || createDept}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div className={styles.basicGrid}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Start Date</label>
+                      <input
+                        type="date"
+                        className={styles.textInput}
+                        min={getTodayStr()}
+                        value={newProjectForm.startDate}
+                        onChange={(e) => handleStartDateChange(e.target.value)}
+                      />
+                      {dateErrors.startDate && (
+                        <span style={{ color: 'var(--color-danger)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                          ⚠ {dateErrors.startDate}
+                        </span>
+                      )}
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Deadline</label>
+                      <input
+                        type="date"
+                        className={styles.textInput}
+                        min={newProjectForm.startDate ? (() => { const d = new Date(newProjectForm.startDate); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })() : getTodayStr()}
+                        value={newProjectForm.deadline}
+                        onChange={(e) => handleDeadlineChange(e.target.value)}
+                      />
+                      {dateErrors.deadline && (
+                        <span style={{ color: 'var(--color-danger)', fontSize: '0.75rem', marginTop: '4px', display: 'block' }}>
+                          ⚠ {dateErrors.deadline}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.basicGrid}>
+                    <div className={styles.formGroup}>
+                      <label className={styles.formLabel}>Priority Level</label>
+                      <select
+                        className={styles.filterSelect}
+                        style={{ width: '100%' }}
+                        value={newProjectForm.priority}
+                        onChange={(e) => setNewProjectForm({ ...newProjectForm, priority: e.target.value })}
+                      >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                      </select>
+                    </div>
+                    {selectedProject && (
+                      <div className={styles.formGroup}>
+                        <label className={styles.formLabel}>Project Status</label>
+                        <select
+                          className={styles.filterSelect}
+                          style={{ width: '100%' }}
+                          value={newProjectForm.status}
+                          onChange={(e) => setNewProjectForm({ ...newProjectForm, status: e.target.value })}
+                        >
+                          <option value="Pending">Pending</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Active">Active</option>
+                          <option value="Completed">Completed</option>
+                          <option value="Delayed">Delayed</option>
+                          <option value="On Hold">On Hold</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label className={styles.formLabel}>Project Description</label>
+                    <textarea
+                      className={styles.textArea}
+                      value={newProjectForm.description}
+                      onChange={(e) => setNewProjectForm({ ...newProjectForm, description: e.target.value })}
                     />
                   </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Deadline</label>
-                    <input
-                      type="date"
-                      className={styles.textInput}
-                      value={newProjectForm.deadline}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, deadline: e.target.value })}
-                    />
-                  </div>
                 </div>
-                <div className={styles.basicGrid}>
+                <div className={styles.modalFooter} style={{ flexShrink: 0 }}>
+                  <button type="button" className={styles.pageBtn} onClick={() => { setActiveModal(null); setCreateEmpSearch(''); setCreateSelectedMembers([]); }}>Cancel</button>
+                  <button type="submit" className={`${styles.pageBtn} ${styles.primaryAction}`}>
+                    {selectedProject ? 'Save Changes' : 'Initialize Project'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MODAL 2: ASSIGN TEAM */}
+      {activeModal === 'assign' && (() => {
+        // Get the selected project's department to filter employees
+        const assignTargetProj = projects.find(p => p.id === assignTeamForm.projectId);
+        const assignDeptName = assignTargetProj?.department || '';
+
+        // Filter employees: match department of the selected project + search query
+        const assignFilteredEmps = (employees || []).filter(emp => {
+          // Department match: project.department is stored as dept.name (e.g. "IT")
+          // emp.department is also the dept name — use includes() for robustness
+          const empDept = (emp.department || '').toLowerCase().trim();
+          const projDept = assignDeptName.toLowerCase().trim();
+          const matchesDept = !projDept ||
+            empDept === projDept ||
+            empDept.includes(projDept) ||
+            projDept.includes(empDept);
+
+          const q = assignTeamSearch.toLowerCase();
+          const matchesSearch = !q ||
+            (emp.name || '').toLowerCase().includes(q) ||
+            (emp.designation || emp.position || '').toLowerCase().includes(q) ||
+            (emp.department || '').toLowerCase().includes(q);
+          return matchesDept && matchesSearch;
+        });
+
+        // Group filtered employees by department
+        const empsByDept = assignFilteredEmps.reduce((acc, emp) => {
+          const dept = emp.department || 'Other';
+          if (!acc[dept]) acc[dept] = [];
+          acc[dept].push(emp);
+          return acc;
+        }, {});
+
+        const totalFiltered = assignFilteredEmps.length;
+        const selectedCount = selectedMembers.length;
+
+        return (
+          <div className={styles.modalBackdrop} onClick={(e) => e.target.classList.contains(styles.modalBackdrop) && setActiveModal(null)}>
+            <div className={styles.modalContent} style={{ maxWidth: '560px' }}>
+              <div className={styles.modalHeader}>
+                <h3 className={styles.modalTitle}>Assign Team Members</h3>
+                <button className={styles.closeBtn} onClick={() => { setActiveModal(null); setAssignTeamSearch(''); }}><X size={18} /></button>
+              </div>
+              <form onSubmit={handleAssignTeamSubmit}>
+                <div className={styles.modalBody}>
                   <div className={styles.formGroup}>
-                    <label className={styles.formLabel}>Priority Level</label>
+                    <label className={styles.formLabel}>Target Project</label>
                     <select
                       className={styles.filterSelect}
                       style={{ width: '100%' }}
-                      value={newProjectForm.priority}
-                      onChange={(e) => setNewProjectForm({ ...newProjectForm, priority: e.target.value })}
+                      value={assignTeamForm.projectId}
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        setAssignTeamForm({ ...assignTeamForm, projectId: selectedId });
+                        const targetProj = projects.find(p => p.id === selectedId);
+                        setSelectedMembers(targetProj ? targetProj.members : []);
+                        setAssignTeamSearch('');
+                      }}
                     >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Urgent">Urgent</option>
+                      <option value="">Select a project...</option>
+                      {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
                     </select>
                   </div>
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Project Description</label>
-                  <textarea
-                    className={styles.textArea}
-                    value={newProjectForm.description}
-                    onChange={(e) => setNewProjectForm({ ...newProjectForm, description: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className={styles.modalFooter}>
-                <button type="button" className={styles.pageBtn} onClick={() => setActiveModal(null)}>Cancel</button>
-                <button type="submit" className={`${styles.pageBtn} ${styles.primaryAction}`}>
-                  {selectedProject ? 'Save Changes' : 'Initialize Project'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* MODAL 2: ASSIGN TEAM */}
-      {activeModal === 'assign' && (
-        <div className={styles.modalBackdrop} onClick={(e) => e.target.classList.contains(styles.modalBackdrop) && setActiveModal(null)}>
-          <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Assign Team Members</h3>
-              <button className={styles.closeBtn} onClick={() => setActiveModal(null)}><X size={18} /></button>
-            </div>
-            <form onSubmit={handleAssignTeamSubmit}>
-              <div className={styles.modalBody}>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Target Project</label>
-                  <select
-                    className={styles.filterSelect}
-                    style={{ width: '100%' }}
-                    value={assignTeamForm.projectId}
-                    onChange={(e) => {
-                      const selectedId = e.target.value;
-                      setAssignTeamForm({ ...assignTeamForm, projectId: selectedId });
-                      const targetProj = projects.find(p => p.id === selectedId);
-                      setSelectedMembers(targetProj ? targetProj.members : []);
-                    }}
-                  >
-                    <option value="">Select a project...</option>
-                    {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
-                  </select>
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Select Employees</label>
                   {assignTeamForm.projectId ? (
-                    <div className={styles.employeeCheckboxList}>
-                      {(employees || []).map(emp => {
-                        const isChecked = selectedMembers.includes(emp.name);
-                        return (
-                          <div 
-                            key={emp.id} 
-                            className={styles.employeeCheckboxItem}
-                            onClick={() => handleToggleMemberSelection(emp.name)}
-                          >
-                            <input
-                              type="checkbox"
-                              className={styles.employeeCheckbox}
-                              checked={isChecked}
-                              readOnly
-                            />
-                            <div className={styles.employeeText}>
-                              <span className={styles.employeeName}>{emp.name}</span>
-                              <span className={styles.employeeDetails}>
-                                {emp.designation || emp.position || 'Staff'} ({emp.id})
-                              </span>
+                    <div className={styles.formGroup}>
+                      {/* Header row: label + selected count + select-all */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <label className={styles.formLabel} style={{ margin: 0 }}>
+                          Employees — {assignDeptName ? <span style={{ color: 'var(--color-primary)' }}>{assignDeptName} Dept</span> : 'All Departments'}
+                          {selectedCount > 0 && <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 500, fontSize: '0.75rem' }}>({selectedCount} selected)</span>}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allNames = assignFilteredEmps.map(e => e.name);
+                            const allSelected = allNames.every(n => selectedMembers.includes(n));
+                            if (allSelected) {
+                              setSelectedMembers(prev => prev.filter(n => !allNames.includes(n)));
+                            } else {
+                              setSelectedMembers(prev => Array.from(new Set([...prev, ...allNames])));
+                            }
+                          }}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '0.72rem', fontWeight: '600', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px' }}
+                        >
+                          {assignFilteredEmps.length > 0 && assignFilteredEmps.every(e => selectedMembers.includes(e.name)) ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+
+                      {/* Search bar */}
+                      <div style={{ position: 'relative', marginBottom: '10px' }}>
+                        <input
+                          type="text"
+                          placeholder="Search by name, role or department..."
+                          className={styles.textInput}
+                          value={assignTeamSearch}
+                          onChange={(e) => setAssignTeamSearch(e.target.value)}
+                          style={{ paddingLeft: '34px', fontSize: '0.82rem' }}
+                        />
+                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                        </span>
+                      </div>
+
+                      {/* Department-grouped employee list */}
+                      {totalFiltered === 0 ? (
+                        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}>
+                          No employees found matching your search.
+                        </div>
+                      ) : (
+                        <div className={styles.employeeCheckboxList} style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                          {Object.entries(empsByDept).map(([dept, deptEmps]) => (
+                            <div key={dept}>
+                              {/* Department header */}
+                              <div style={{
+                                padding: '6px 10px',
+                                background: 'var(--bg-elevated)',
+                                borderRadius: 'var(--radius-sm)',
+                                fontSize: '0.72rem',
+                                fontWeight: '700',
+                                color: 'var(--color-primary)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                marginBottom: '4px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                              }}>
+                                <span>📁 {dept}</span>
+                                <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{deptEmps.length} employee{deptEmps.length !== 1 ? 's' : ''}</span>
+                              </div>
+                              {deptEmps.map(emp => {
+                                const isChecked = selectedMembers.includes(emp.name);
+                                return (
+                                  <div
+                                    key={emp.id}
+                                    className={styles.employeeCheckboxItem}
+                                    onClick={() => handleToggleMemberSelection(emp.name)}
+                                    style={{ marginLeft: '4px' }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className={styles.employeeCheckbox}
+                                      checked={isChecked}
+                                      readOnly
+                                    />
+                                    <div className={styles.employeeText}>
+                                      <span className={styles.employeeName}>{emp.name}</span>
+                                      <span className={styles.employeeDetails}>
+                                        {emp.designation || emp.position || 'Staff'} · {emp.department || 'N/A'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </div>
-                        );
-                      })}
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
@@ -1199,17 +1534,17 @@ const Projects = () => {
                     </div>
                   )}
                 </div>
-              </div>
-              <div className={styles.modalFooter}>
-                <button type="button" className={styles.pageBtn} onClick={() => setActiveModal(null)}>Cancel</button>
-                <button type="submit" className={`${styles.pageBtn} ${styles.primaryAction}`} disabled={!assignTeamForm.projectId}>
-                  Save Team Assignments
-                </button>
-              </div>
-            </form>
+                <div className={styles.modalFooter}>
+                  <button type="button" className={styles.pageBtn} onClick={() => { setActiveModal(null); setAssignTeamSearch(''); }}>Cancel</button>
+                  <button type="submit" className={`${styles.pageBtn} ${styles.primaryAction}`} disabled={!assignTeamForm.projectId}>
+                    Save Team Assignments ({selectedCount})
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL 3: ADD TASK */}
       {activeModal === 'task' && (

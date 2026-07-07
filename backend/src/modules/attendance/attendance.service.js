@@ -94,7 +94,7 @@ export const findSummary = async (employeeId, month) => {
   const to = `${month}-31`; // mongo will compare string gte/lte lexicographically, which works for 31 days.
   const records = await repository.find({ employeeId, from, to });
   
-  const presentDays = records.filter(r => r.status === 'Present' || r.status === 'Work From Home' || r.status === 'WFH').length;
+  const presentDays = records.filter(r => r.status === 'Present' || r.status === 'Work From Home' || r.status === 'WFH' || r.status === 'Late').length;
   const absentDays = records.filter(r => r.status === 'Absent').length;
   const lateDays = records.filter(r => r.status === 'Late').length;
   

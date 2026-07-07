@@ -7,6 +7,7 @@ import Avatar from '../components/common/Avatar';
 import Button from '../components/common/Button';
 import SlideOver from '../components/common/SlideOver';
 import Skeleton from '../components/common/Skeleton';
+import { getBaseRole } from '../permissions/permissions';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   RadarChart, PolarGrid, PolarAngleAxis, Radar, LineChart, Line, AreaChart, Area
@@ -57,6 +58,10 @@ const Performance = () => {
     currentUserId
   } = useApp();
   const currentUser = useMemo(() => (contextEmployees || []).find(e => e.id === currentUserId), [contextEmployees, currentUserId]);
+  const isGlobalRole = useMemo(() => {
+    const base = getBaseRole(currentUserRole);
+    return base === 'super_admin' || base === 'company_admin' || base === 'hr';
+  }, [currentUserRole]);
   const departments = useMemo(() => (contextDepartments || []).filter(d => d.status === 'Active'), [contextDepartments]);
   const isLoading = usePageLoading(800);
 
@@ -111,9 +116,7 @@ const Performance = () => {
 
   /* Master States */
   const [employees, setEmployees] = useState([]);
-  const [goals, setGoals] = useState([]);
   const [reviews, setReviews] = useState([]);
-  const [pips, setPips] = useState([]);
 
   // Sync employees from context
   React.useEffect(() => {
@@ -192,7 +195,11 @@ const Performance = () => {
   // Derived Performance Charts / Rankings Datasets
   const DEPT_PERF_DATA = useMemo(() => {
     return (departments || []).map(d => {
-      const deptEmployees = employees.filter(e => e.department === d.name);
+      const deptEmployees = employees.filter(e => {
+        if (e.department !== d.name) return false;
+        if (!isGlobalRole && currentUser && currentUser.branch && e.branch !== currentUser.branch) return false;
+        return true;
+      });
       const totalScore = deptEmployees.reduce((sum, e) => sum + (e.productivity || 0), 0);
       const avg = deptEmployees.length > 0 ? Math.round(totalScore / deptEmployees.length) : 0;
       return {
@@ -201,7 +208,7 @@ const Performance = () => {
         color: d.color || 'var(--color-primary)'
       };
     });
-  }, [departments, employees]);
+  }, [departments, employees, isGlobalRole, currentUser]);
 
   const MONTHLY_TREND_DYNAMIC = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
@@ -277,7 +284,7 @@ const Performance = () => {
         color: b.color || 'var(--color-primary)'
       };
     });
-  }, [branches, contextEmployees, tasks, attendance]);
+  }, [branches, contextEmployees, tasks, attendance, isGlobalRole, currentUser]);
 
   const branchSubtitle = useMemo(() => {
     const names = (branches || []).map(b => b.name).slice(0, 3).join(' vs ');
@@ -294,26 +301,26 @@ const Performance = () => {
   }, [projectsList]);
 
   const COMPETENCY_RADAR = useMemo(() => {
-    if (!employees || employees.length === 0) {
+    const branchEmployeesList = employees.filter(e => {
+      if (!isGlobalRole && currentUser && currentUser.branch && e.branch !== currentUser.branch) return false;
+      return true;
+    });
+
+    if (!branchEmployeesList || branchEmployeesList.length === 0) {
       return [
         { subject: 'Productivity', score: 0, fullMark: 100 },
         { subject: 'Attendance', score: 0, fullMark: 100 },
         { subject: 'Efficiency', score: 0, fullMark: 100 },
         { subject: 'Quality', score: 0, fullMark: 100 },
-        { subject: 'Goal Achieved', score: 0, fullMark: 100 },
         { subject: 'Collaboration', score: 0, fullMark: 100 }
       ];
     }
-    const count = employees.length;
-    const avgProd = Math.round(employees.reduce((s, e) => s + (e.productivity || 0), 0) / count);
-    const avgAtt = Math.round(employees.reduce((s, e) => s + (e.attendance || e.attendancePct || 0), 0) / count);
-    const avgEff = Math.round(employees.reduce((s, e) => s + (e.efficiency || 0), 0) / count);
-    const avgQual = Math.round(employees.reduce((s, e) => s + (e.quality || 0), 0) / count);
+    const count = branchEmployeesList.length;
+    const avgProd = Math.round(branchEmployeesList.reduce((s, e) => s + (e.productivity || 0), 0) / count);
+    const avgAtt = Math.round(branchEmployeesList.reduce((s, e) => s + (e.attendance || e.attendancePct || 0), 0) / count);
+    const avgEff = Math.round(branchEmployeesList.reduce((s, e) => s + (e.efficiency || 0), 0) / count);
+    const avgQual = Math.round(branchEmployeesList.reduce((s, e) => s + (e.quality || 0), 0) / count);
     
-    const avgGoalProgress = goals.length > 0
-      ? Math.round(goals.reduce((s, g) => s + Math.min(100, Math.round((g.currentProgress / g.targetValue) * 100)), 0) / goals.length)
-      : 0;
-
     const avgCollab = reviews.length > 0 
       ? Math.round(reviews.reduce((s, r) => s + (r.rating === 'Outstanding' ? 95 : r.rating === 'Excellent' ? 88 : r.rating === 'Good' ? 80 : 70), 0) / reviews.length) 
       : 80;
@@ -323,40 +330,11 @@ const Performance = () => {
       { subject: 'Attendance', score: avgAtt, fullMark: 100 },
       { subject: 'Efficiency', score: avgEff, fullMark: 100 },
       { subject: 'Quality', score: avgQual, fullMark: 100 },
-      { subject: 'Goal Achieved', score: avgGoalProgress, fullMark: 100 },
       { subject: 'Collaboration', score: avgCollab, fullMark: 100 }
     ];
-  }, [employees, goals, reviews]);
+  }, [employees, reviews, isGlobalRole, currentUser]);
 
-  // Fetch goals and pips from API
-  const fetchGoalsAndPips = async () => {
-    if (!token) return;
-    try {
-      // Fetch goals
-      const goalsRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/performance/goals', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const goalsData = await goalsRes.json();
-      if (goalsData.status === 'success') {
-        setGoals(goalsData.data || []);
-      }
-
-      // Fetch pips
-      const pipsRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/performance/pips', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const pipsData = await pipsRes.json();
-      if (pipsData.status === 'success') {
-        setPips(pipsData.data || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch goals and pips:', err);
-    }
-  };
-
-  React.useEffect(() => {
-    fetchGoalsAndPips();
-  }, [token]);
+  // No goals or pips fetches required
 
 
 
@@ -366,6 +344,12 @@ const Performance = () => {
   const [ratingFilter, setRatingFilter] = useState('All');
   const [branchFilter, setBranchFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+
+  React.useEffect(() => {
+    if (!isGlobalRole && currentUser && currentUser.branch) {
+      setBranchFilter(currentUser.branch);
+    }
+  }, [isGlobalRole, currentUser]);
   const [sortCol, setSortCol] = useState('kpiScore');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(1);
@@ -377,161 +361,17 @@ const Performance = () => {
   /* Slide-over employee detailed review profile */
   const [selectedEmp, setSelectedEmp] = useState(null);
 
-  /* OKR Goal wizard forms states */
-  const [showGoalModal, setShowGoalModal] = useState(false);
-  const [goalForm, setGoalForm] = useState({
-    title: '', description: '', type: 'Individual', startDate: '', dueDate: '',
-    targetValue: 100, currentProgress: 0, assignee: '', department: ''
-  });
-
   /* Appraisal Review form states */
   const [reviewForm, setReviewForm] = useState({
     employeeName: '', type: 'Quarterly', period: 'Q2 2026', rating: 'Excellent',
     notes: '', feedback: '', recommendations: ''
   });
 
-  /* PIP wizard form states */
-  const [pipForm, setPipForm] = useState({
-    employeeName: '', issuesIdentified: '', improvementTargets: '',
-    reviewPeriod: '30 Days', actionPlan: ''
-  });
-
   /* Simulated reports export action state */
   const [exporting, setExporting] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  /* ── State Helpers ────────────────────────────────────────── */
-  const addAuditLog = async (action, target, oldVal, newVal) => {
-    if (addActivityLog) {
-      await addActivityLog(action, target, 'success', newVal, oldVal);
-    }
-  };
-
-  const pushAlert = async (message, type) => {
-    if (addNotification) {
-      await addNotification({
-        title: type,
-        message,
-        type: 'info',
-        iconName: 'Settings'
-      });
-    }
-  };
-
-
-
-  /* Weights update submission */
-  const handleSaveWeights = (e) => {
-    e.preventDefault();
-    const sum = editWeights.productivity + editWeights.attendance + editWeights.efficiency + editWeights.quality;
-    if (sum !== 100) {
-      addToast('danger', `Weights sum must equal exactly 100% (Current sum: ${sum}%).`);
-      return;
-    }
-
-    setWeights(editWeights);
-    const oldValString = `Prod: ${weights.productivity}%, Att: ${weights.attendance}%, Eff: ${weights.efficiency}%, Qual: ${weights.quality}%`;
-    const newValString = `Prod: ${editWeights.productivity}%, Att: ${editWeights.attendance}%, Eff: ${editWeights.efficiency}%, Qual: ${editWeights.quality}%`;
-
-    // Recalculate kpi scores for all employees in state
-    setEmployees(prev =>
-      prev.map(emp => ({
-        ...emp,
-        kpiScore: calculateFinalScore(emp, editWeights)
-      }))
-    );
-
-    addAuditLog('Weight Configuration Update', 'Org KPI System', oldValString, newValString);
-    pushAlert('System KPI framework weights updated. Overall scores recalculated.', 'KPI Config Update');
-    addToast('success', 'KPI Framework weights updated and employee scores recalculated successfully.');
-  };
-
-  /* Reset Weights */
-  const handleResetWeights = () => {
-    setEditWeights({ ...weights });
-    addToast('info', 'Weights form reset to current values.');
-  };
-
-  /* OKR Goal wizard submit */
-  const handleGoalSubmit = async (e) => {
-    e.preventDefault();
-    if (!goalForm.title.trim() || !goalForm.assignee.trim()) {
-      addToast('danger', 'Please enter a goal title and select an assignee.');
-      return;
-    }
-
-    const payload = {
-      title: goalForm.title,
-      description: goalForm.description,
-      type: goalForm.type,
-      startDate: goalForm.startDate || new Date().toISOString().split('T')[0],
-      dueDate: goalForm.dueDate || new Date().toISOString().split('T')[0],
-      targetValue: Number(goalForm.targetValue),
-      currentProgress: Number(goalForm.currentProgress),
-      status: Number(goalForm.currentProgress) >= Number(goalForm.targetValue) ? 'Completed' : 'In Progress',
-      assignee: goalForm.assignee,
-      department: goalForm.department
-    };
-
-    try {
-      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/performance/goals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        addToast('success', `Goal "${goalForm.title}" assigned successfully.`);
-        fetchGoalsAndPips();
-      } else {
-        addToast('danger', result.message || 'Failed to assign goal.');
-      }
-    } catch (err) {
-      console.error('Failed to create goal:', err);
-      addToast('danger', 'Error creating goal.');
-    }
-    
-    // Reset goal form
-    setGoalForm({
-      title: '', description: '', type: 'Individual', startDate: '', dueDate: '',
-      targetValue: 100, currentProgress: 0, assignee: '', department: ''
-    });
-    setShowGoalModal(false);
-  };
-
-  /* OKR progress incremental booster */
-  const incrementGoalProgress = async (id) => {
-    const goal = goals.find(g => g.id === id || g._id === id);
-    if (!goal) return;
-
-    const nextVal = Math.min(goal.targetValue, goal.currentProgress + 10);
-    const isDone = nextVal >= goal.targetValue;
-    const payload = {
-      currentProgress: nextVal,
-      status: isDone ? 'Completed' : 'In Progress'
-    };
-
-    const targetId = goal._id || goal.id;
-    try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/performance/goals/${targetId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        addToast('info', 'Goal progress updated by +10%');
-        fetchGoalsAndPips();
-      }
-    } catch (err) {
-      console.error('Failed to update goal progress:', err);
-    }
-  };
+  // Helper functions cleaned up
 
   /* Appraisal Review submission */
   const handleReviewSubmit = async (e) => {
@@ -541,6 +381,7 @@ const Performance = () => {
       return;
     }
 
+    setIsSubmittingReview(true);
     try {
       await addAppraisalReview({
         employeeName: reviewForm.employeeName,
@@ -579,109 +420,12 @@ const Performance = () => {
       setSelectedEmp(null);
     } catch (err) {
       console.error('Failed to submit appraisal review:', err);
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
-  /* PIP Resolution actions */
-  const resolvePip = async (pipId, name) => {
-    try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/performance/pips/${pipId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        const emp = employees.find(e => e.name === name);
-        if (emp && updateEmployee) {
-          await updateEmployee(emp.id, {
-            status: 'Active',
-            productivity: Math.min(100, emp.productivity + 20),
-            quality: Math.min(100, emp.quality + 15)
-          });
-        }
-        addToast('success', `Performance Improvement Plan resolved. ${name} is now restored to Active status.`);
-        fetchGoalsAndPips();
-      }
-    } catch (err) {
-      console.error('Failed to resolve PIP:', err);
-    }
-  };
-
-  /* PIP Escalation logic */
-  const escalatePip = async (pipId, name) => {
-    try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/performance/pips/${pipId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'Escalated' })
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        addToast('warning', `PIP for ${name} escalated to HR Board.`);
-        fetchGoalsAndPips();
-      }
-    } catch (err) {
-      console.error('Failed to escalate PIP:', err);
-    }
-  };
-
-  /* Create new PIP submission */
-  const handlePipSubmit = async (e) => {
-    e.preventDefault();
-    if (!pipForm.employeeName.trim() || !pipForm.issuesIdentified.trim()) {
-      addToast('danger', 'Please select an employee and describe performance issues.');
-      return;
-    }
-
-    const payload = {
-      employeeName: pipForm.employeeName,
-      issuesIdentified: pipForm.issuesIdentified,
-      improvementTargets: pipForm.improvementTargets,
-      reviewPeriod: pipForm.reviewPeriod,
-      actionPlan: pipForm.actionPlan,
-      status: 'Active',
-      reviewer: userRole === 'Super Admin' ? 'Super Admin' : (currentUser?.name || 'Manager'),
-      dateCreated: new Date().toISOString().split('T')[0]
-    };
-
-    try {
-      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/performance/pips', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        addToast('warning', `PIP successfully issued to ${pipForm.employeeName}. Status changed to PIP.`);
-        
-        // Change employee status in table to PIP
-        const emp = employees.find(e => e.name === pipForm.employeeName);
-        if (emp && updateEmployee) {
-          await updateEmployee(emp.id, { status: 'PIP' });
-        }
-        
-        fetchGoalsAndPips();
-      }
-    } catch (err) {
-      console.error('Failed to create PIP:', err);
-    }
-
-    // Reset PIP Form
-    setPipForm({
-      employeeName: '', issuesIdentified: '', improvementTargets: '',
-      reviewPeriod: '30 Days', actionPlan: ''
-    });
-
-    setSelectedEmp(null);
-  };
+  // PIP handlers cleaned up
 
   /* Export Action */
   const triggerExport = (fmt) => {
@@ -697,6 +441,7 @@ const Performance = () => {
     // Filter to role view
     const visibleEmployees = employees.filter(e => {
       if (userRole === 'Employee') return e.id === currentUserId;
+      if (!isGlobalRole && currentUser && currentUser.branch && e.branch !== currentUser.branch) return false;
       return true;
     });
 
@@ -715,7 +460,6 @@ const Performance = () => {
     const assignedTasks = visibleEmployees.reduce((s, r) => s + r.tasksAssigned, 0);
     const taskCompletionRate = assignedTasks > 0 ? Math.round((completedTasks / assignedTasks) * 100) : 0;
 
-    const activeGoalsCount = goals.length;
     const reviewsCompletedCount = reviews.length;
 
     // Calculate project success rate as average project progress
@@ -738,13 +482,12 @@ const Performance = () => {
       avgProductivity,
       taskCompletionRate,
       avgAttendance,
-      activeGoalsCount,
       reviewsCompletedCount,
       projectSuccessRate,
       topDeptName,
       topDeptScore
     };
-  }, [employees, goals, reviews, userRole, projectsList, departments]);
+  }, [employees, reviews, userRole, projectsList, departments, isGlobalRole, currentUser]);
 
   /* ── Filtered & Sorted Employees list ────────────────────── */
   const filteredEmployees = useMemo(() => {
@@ -853,7 +596,7 @@ const Performance = () => {
       <div className="perf-header flex-row justify-between flex-wrap gap-4">
         <div className="perf-title-section">
           <h2>Performance & KPI Analytics</h2>
-          <p className="perf-subtitle">Track organizational competency indexes, OKR goals, performance logs, reviews, and PIPs.</p>
+          <p className="perf-subtitle">Track organizational competency indexes and appraisal reviews.</p>
         </div>
 
         {/* Dynamic Role Selector / Perspective */}
@@ -877,11 +620,7 @@ const Performance = () => {
         {[
           { id: 'dashboard', label: 'Executive Dashboard', icon: <BarChart3 size={15} />, visible: true },
           { id: 'directory', label: 'Rankings Directory', icon: <Users size={15} />, visible: true },
-          { id: 'goals', label: 'OKR Goals', icon: <Target size={15} />, visible: true },
-          { id: 'reviews', label: 'Appraisal Reviews', icon: <Star size={15} />, visible: true },
-          { id: 'framework', label: 'Scoring Framework', icon: <Settings size={15} />, visible: userRole !== 'Employee' },
-          { id: 'pips', label: 'Performance PIPs', icon: <AlertTriangle size={15} />, visible: userRole !== 'Employee' },
-          { id: 'audits', label: 'Alerts & Audits', icon: <Activity size={15} />, visible: true }
+          { id: 'reviews', label: 'Appraisal Reviews', icon: <Star size={15} />, visible: true }
         ].filter(t => t.visible).map(t => (
           <button
             key={t.id}
@@ -939,12 +678,6 @@ const Performance = () => {
               <span className="card-lbl-gray">Top Performing Dept</span>
               <div className="card-value-display text-orange">{stats.topDeptName}</div>
               <span className="card-sub-desc">Score: {stats.topDeptScore}% this month</span>
-            </div>
-
-            <div className="card perf-stat-card border-left-neutral">
-              <span className="card-lbl-gray">Active KPI Goals</span>
-              <div className="card-value-display text-white">{stats.activeGoalsCount} OKRs</div>
-              <span className="card-sub-desc">Assigned framework targets</span>
             </div>
 
             <div className="card perf-stat-card border-left-blue">
@@ -1033,23 +766,25 @@ const Performance = () => {
             </div>
 
             {/* Branch rankings comparative chart */}
-            <div className="card padding-5">
-              <span className="perf-chart-title">Branch Success & Performance Index</span>
-              <p className="subtitle" style={{ marginBottom: 12 }}>{branchSubtitle}</p>
-              <div className="reports-chart-container" style={{ height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={BRANCH_RANKINGS} barSize={18} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis type="number" stroke="var(--text-muted)" fontSize={10} domain={[0, 100]} />
-                    <YAxis type="category" dataKey="name" stroke="var(--text-muted)" fontSize={10} width={80} />
-                    <Tooltip {...CHART_TT} />
-                    <Legend iconSize={8} wrapperStyle={{ fontSize: '0.72rem' }} />
-                    <Bar name="Overall Score" dataKey="score" fill="var(--color-primary)" radius={[0, 4, 4, 0]} />
-                    <Bar name="Project Success Rate" dataKey="successRate" fill="var(--accent-blue-solid)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+            {isGlobalRole && (
+              <div className="card padding-5">
+                <span className="perf-chart-title">Branch Success & Performance Index</span>
+                <p className="subtitle" style={{ marginBottom: 12 }}>{branchSubtitle}</p>
+                <div className="reports-chart-container" style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={BRANCH_RANKINGS} barSize={18} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis type="number" stroke="var(--text-muted)" fontSize={10} domain={[0, 100]} />
+                      <YAxis type="category" dataKey="name" stroke="var(--text-muted)" fontSize={10} width={80} />
+                      <Tooltip {...CHART_TT} />
+                      <Legend iconSize={8} wrapperStyle={{ fontSize: '0.72rem' }} />
+                      <Bar name="Overall Score" dataKey="score" fill="var(--color-primary)" radius={[0, 4, 4, 0]} />
+                      <Bar name="Project Success Rate" dataKey="successRate" fill="var(--accent-blue-solid)" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Project performance scoreboard */}
@@ -1130,16 +865,18 @@ const Performance = () => {
                     ))}
                   </select>
 
-                  <select
-                    value={branchFilter}
-                    onChange={(e) => { setBranchFilter(e.target.value); setPage(1); }}
-                    className="reports-select-filter"
-                  >
-                    <option value="All">All Branches</option>
-                    {(branches || []).map(b => (
-                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
+                  {isGlobalRole && (
+                    <select
+                      value={branchFilter}
+                      onChange={(e) => { setBranchFilter(e.target.value); setPage(1); }}
+                      className="reports-select-filter"
+                    >
+                      <option value="All">All Branches</option>
+                      {(branches || []).map(b => (
+                        <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
+                  )}
 
                   <select
                     value={ratingFilter}
@@ -1167,8 +904,15 @@ const Performance = () => {
                 </>
               )}
 
-              {(searchQuery || deptFilter !== 'All' || ratingFilter !== 'All' || branchFilter !== 'All' || statusFilter !== 'All') && (
-                <Button variant="ghost" size="xs" onClick={() => { setSearchQuery(''); setDeptFilter('All'); setRatingFilter('All'); setBranchFilter('All'); setStatusFilter('All'); setPage(1); }}>
+              {(searchQuery || deptFilter !== 'All' || ratingFilter !== 'All' || branchFilter !== (isGlobalRole ? 'All' : (currentUser?.branch || 'All')) || statusFilter !== 'All') && (
+                <Button variant="ghost" size="xs" onClick={() => {
+                  setSearchQuery('');
+                  setDeptFilter('All');
+                  setRatingFilter('All');
+                  setBranchFilter(!isGlobalRole && currentUser && currentUser.branch ? currentUser.branch : 'All');
+                  setStatusFilter('All');
+                  setPage(1);
+                }}>
                   Clear Filters
                 </Button>
               )}
@@ -1317,341 +1061,7 @@ const Performance = () => {
         </div>
       )}
 
-      {/* ── TAB 3: KPI CONFIG WEIGHTS ── */}
-      {activeTab === 'framework' && userRole !== 'Employee' && (
-        <form onSubmit={handleSaveWeights} className="card flex-column padding-5 animate-slide-up">
-          <span className="perf-chart-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 10 }}>KPI Weights Scoring Framework Editor</span>
-          <p className="subtitle" style={{ marginTop: 6, marginBottom: 12 }}>Adjust scoring weight configurations. The sum must equal exactly 100%. Changing weights dynamically updates final KPI scores across all employee listings.</p>
-
-          <div className="kpi-weight-editor-container">
-            {/* Left panel sliders */}
-            <div className="flex-column gap-4" style={{ flex: 1 }}>
-              <div className="slider-group-item">
-                <div className="flex-row justify-between align-center">
-                  <label className="reports-form-lbl">Productivity Score Weight</label>
-                  <strong>{editWeights.productivity}%</strong>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={editWeights.productivity}
-                  onChange={(e) => setEditWeights(prev => ({ ...prev, productivity: Number(e.target.value) }))}
-                  className="kpi-weight-slider"
-                />
-                <span className="table-sub-text">Weighted based on Completed Tasks & Daily Log submission rates.</span>
-              </div>
-
-              <div className="slider-group-item">
-                <div className="flex-row justify-between align-center">
-                  <label className="reports-form-lbl">Attendance Score Weight</label>
-                  <strong>{editWeights.attendance}%</strong>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={editWeights.attendance}
-                  onChange={(e) => setEditWeights(prev => ({ ...prev, attendance: Number(e.target.value) }))}
-                  className="kpi-weight-slider"
-                />
-                <span className="table-sub-text">Weighted based on Punctuality ratios and Presence percentages.</span>
-              </div>
-
-              <div className="slider-group-item">
-                <div className="flex-row justify-between align-center">
-                  <label className="reports-form-lbl">Efficiency Score Weight</label>
-                  <strong>{editWeights.efficiency}%</strong>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={editWeights.efficiency}
-                  onChange={(e) => setEditWeights(prev => ({ ...prev, efficiency: Number(e.target.value) }))}
-                  className="kpi-weight-slider"
-                />
-                <span className="table-sub-text">Weighted based on Task Completion speed vs Sprint deadlines.</span>
-              </div>
-
-              <div className="slider-group-item">
-                <div className="flex-row justify-between align-center">
-                  <label className="reports-form-lbl">Quality Score Weight</label>
-                  <strong>{editWeights.quality}%</strong>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={editWeights.quality}
-                  onChange={(e) => setEditWeights(prev => ({ ...prev, quality: Number(e.target.value) }))}
-                  className="kpi-weight-slider"
-                />
-                <span className="table-sub-text">Weighted based on Manager appraisal ratings and Client feedback logs.</span>
-              </div>
-
-              {/* Total indicator status */}
-              {(() => {
-                const total = editWeights.productivity + editWeights.attendance + editWeights.efficiency + editWeights.quality;
-                return (
-                  <div
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      fontSize: '0.8rem',
-                      background: total === 100 ? 'rgba(16,185,129,0.05)' : 'rgba(239,68,68,0.05)',
-                      border: `1px dashed ${total === 100 ? 'var(--color-success)' : 'var(--color-danger)'}`,
-                      color: total === 100 ? 'var(--color-success)' : 'var(--color-danger)',
-                      fontWeight: 600
-                    }}
-                  >
-                    📊 Total Configured Sum: {total}% {total === 100 ? '(Valid Config)' : `(Invalid: Must sum to 100%)`}
-                  </div>
-                );
-              })()}
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                <Button type="button" variant="ghost" onClick={handleResetWeights}>Reset</Button>
-                <Button type="submit" variant="primary">Save Configuration & Recalculate</Button>
-              </div>
-            </div>
-
-            {/* Right panel visual calculations preview */}
-            <div className="kpi-calculation-formula-box flex-column gap-3">
-              <span className="reports-form-lbl" style={{ fontWeight: 700, color: 'var(--color-primary)' }}>Scoring Calculations Flow Engine</span>
-              
-              <div className="formula-block-wrap">
-                <span className="formula-title">Productivity Calculation:</span>
-                <span className="formula-text">P_Score = (Tasks Completed / Tasks Assigned) * 100</span>
-              </div>
-
-              <div className="formula-block-wrap">
-                <span className="formula-title">Combined Final Scoring Engine:</span>
-                <span className="formula-text" style={{ fontStyle: 'italic' }}>
-                  Final Score = (P_Score * {editWeights.productivity}%) + (A_Score * {editWeights.attendance}%) + (E_Score * {editWeights.efficiency}%) + (Q_Score * {editWeights.quality}%)
-                </span>
-              </div>
-
-              <div className="formula-simulation-preview" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, marginTop: 5 }}>
-                <span className="reports-form-lbl" style={{ fontWeight: 600 }}>Simulated recalculation for {simulatedEmp.name}:</span>
-                <div className="flex-row justify-between text-secondary-sm" style={{ marginTop: 6 }}>
-                  <span>Productivity: {simulatedEmp.productivity} * {editWeights.productivity}%</span>
-                  <span>= {parseFloat((simulatedEmp.productivity * editWeights.productivity / 100).toFixed(1))}</span>
-                </div>
-                <div className="flex-row justify-between text-secondary-sm">
-                  <span>Attendance: {simulatedEmp.attendance} * {editWeights.attendance}%</span>
-                  <span>= {parseFloat((simulatedEmp.attendance * editWeights.attendance / 100).toFixed(1))}</span>
-                </div>
-                <div className="flex-row justify-between text-secondary-sm">
-                  <span>Efficiency: {simulatedEmp.efficiency} * {editWeights.efficiency}%</span>
-                  <span>= {parseFloat((simulatedEmp.efficiency * editWeights.efficiency / 100).toFixed(1))}</span>
-                </div>
-                <div className="flex-row justify-between text-secondary-sm">
-                  <span>Quality: {simulatedEmp.quality} * {editWeights.quality}%</span>
-                  <span>= {parseFloat((simulatedEmp.quality * editWeights.quality / 100).toFixed(1))}</span>
-                </div>
-                <div className="flex-row justify-between" style={{ borderTop: '1px dashed var(--border-color)', marginTop: 6, paddingTop: 4, fontWeight: 700, color: 'var(--color-success)' }}>
-                  <span>Simulated Overall score:</span>
-                  <span>
-                    {Math.round((simulatedEmp.productivity * editWeights.productivity + simulatedEmp.attendance * editWeights.attendance + simulatedEmp.efficiency * editWeights.efficiency + simulatedEmp.quality * editWeights.quality) / 100)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* ── TAB 4: GOAL & OKR MANAGEMENT ── */}
-      {activeTab === 'goals' && (
-        <div className="flex-column gap-4 animate-slide-up">
-          <div className="flex-row justify-between align-center flex-wrap gap-2">
-            <div>
-              <span className="perf-chart-title">OKR & Performance Goals</span>
-              <p className="subtitle">Set, view, track and update key targets for employees, teams, and departments.</p>
-            </div>
-            {/* Trigger modal */}
-            {userRole !== 'Employee' && (
-              <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowGoalModal(true)}>
-                Create New OKR Goal
-              </Button>
-            )}
-          </div>
-
-          {/* Goals cards grid */}
-          <div className="goals-cards-grid">
-            {goals.map((g) => {
-              const percent = Math.min(100, Math.round((g.currentProgress / g.targetValue) * 100));
-              let statusClass = 'goal-badge-inprogress';
-              if (g.status === 'Completed') statusClass = 'goal-badge-completed';
-              else if (g.status === 'Overdue') statusClass = 'goal-badge-overdue';
-
-              return (
-                <div key={g.id} className="card goal-card flex-column justify-between">
-                  <div className="flex-column gap-2">
-                    <div className="flex-row justify-between align-center">
-                      <Badge variant="neutral">{g.type} Goal</Badge>
-                      <span className={`goal-status-lbl ${statusClass}`}>{g.status}</span>
-                    </div>
-
-                    <strong className="goal-title-txt">{g.title}</strong>
-                    <p className="goal-desc-txt">{g.description}</p>
-                  </div>
-
-                  <div className="goal-progress-section" style={{ marginTop: 14 }}>
-                    <div className="flex-row justify-between align-center text-secondary-sm" style={{ marginBottom: 6 }}>
-                      <span>Progress: <strong>{g.currentProgress}</strong> / {g.targetValue}</span>
-                      <strong>{percent}%</strong>
-                    </div>
-
-                    <div className="goal-bar-track">
-                      <div
-                        className="goal-bar-fill"
-                        style={{
-                          width: `${percent}%`,
-                          background: g.status === 'Completed' ? 'var(--color-success)' : 'var(--color-primary)'
-                        }}
-                      />
-                    </div>
-
-                    <div className="flex-row justify-between align-center" style={{ marginTop: 10, borderTop: '1px solid var(--border-color)', paddingTop: 8 }}>
-                      <span className="table-sub-text">Due: {g.dueDate} | Owner: <strong>{g.assignee}</strong></span>
-                      {g.status !== 'Completed' && (userRole !== 'Employee') && (
-                        <button
-                          type="button"
-                          className="goal-increment-btn"
-                          onClick={() => incrementGoalProgress(g.id)}
-                        >
-                          +10% Progress 🚀
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Goal creation modal */}
-          {showGoalModal && (
-            <div className="modal-overlay-custom" onClick={(e) => e.target === e.currentTarget && setShowGoalModal(false)}>
-              <div className="card modal-body-custom flex-column padding-5">
-                <div className="flex-row justify-between align-center" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: 10 }}>
-                  <span className="perf-chart-title">Create New OKR Goal</span>
-                  <button className="goal-close-modal-btn" onClick={() => setShowGoalModal(false)}><X size={16} /></button>
-                </div>
-
-                <form onSubmit={handleGoalSubmit} className="flex-column gap-3" style={{ marginTop: 10 }}>
-                  <div className="form-group-item">
-                    <label className="reports-form-lbl">Goal Title *</label>
-                    <input
-                      type="text"
-                      className="reports-form-input"
-                      placeholder="e.g. Optimize Database Indexes"
-                      value={goalForm.title}
-                      onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group-item">
-                    <label className="reports-form-lbl">Goal Description</label>
-                    <textarea
-                      className="reports-form-textarea"
-                      rows={2}
-                      placeholder="Describe target objectives and measurable key results..."
-                      value={goalForm.description}
-                      onChange={(e) => setGoalForm(prev => ({ ...prev, description: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="reports-form-grid">
-                    <div className="form-group-item">
-                      <label className="reports-form-lbl">Goal Scope / Type</label>
-                      <select
-                        className="reports-form-input"
-                        value={goalForm.type}
-                        onChange={(e) => setGoalForm(prev => ({ ...prev, type: e.target.value }))}
-                      >
-                        <option>Individual</option>
-                        <option>Team</option>
-                        <option>Department</option>
-                        <option>Project</option>
-                      </select>
-                    </div>
-
-                    <div className="form-group-item">
-                      <label className="reports-form-lbl">Associated Department</label>
-                      <select
-                        className="reports-form-input"
-                        value={goalForm.department}
-                        onChange={(e) => setGoalForm(prev => ({ ...prev, department: e.target.value }))}
-                      >
-                        {(departments || []).map(d => (
-                          <option key={d.id || d.name} value={d.name}>{d.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="reports-form-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                    <div className="form-group-item">
-                      <label className="reports-form-lbl">Target Value</label>
-                      <input
-                        type="number"
-                        className="reports-form-input"
-                        value={goalForm.targetValue}
-                        onChange={(e) => setGoalForm(prev => ({ ...prev, targetValue: Number(e.target.value) }))}
-                      />
-                    </div>
-
-                    <div className="form-group-item">
-                      <label className="reports-form-lbl">Start Date</label>
-                      <input
-                        type="date"
-                        className="reports-form-input"
-                        value={goalForm.startDate}
-                        onChange={(e) => setGoalForm(prev => ({ ...prev, startDate: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="form-group-item">
-                      <label className="reports-form-lbl">Due Date</label>
-                      <input
-                        type="date"
-                        className="reports-form-input"
-                        value={goalForm.dueDate}
-                        onChange={(e) => setGoalForm(prev => ({ ...prev, dueDate: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-group-item">
-                    <label className="reports-form-lbl">Owner / Assignee *</label>
-                    <select
-                      className="reports-form-input"
-                      value={goalForm.assignee}
-                      onChange={(e) => setGoalForm(prev => ({ ...prev, assignee: e.target.value }))}
-                      required
-                    >
-                      <option value="">— Select Assignee —</option>
-                      {employees.map(emp => (
-                        <option key={emp.id} value={emp.name}>{emp.name} ({emp.designation})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-                    <Button type="button" variant="ghost" onClick={() => setShowGoalModal(false)}>Cancel</Button>
-                    <Button type="submit" variant="primary">Assign OKR Goal</Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-        </div>
-      )}
+      {/* Tab 3 & 4 removed */}
 
       {/* ── TAB 5: PERFORMANCE REVIEWS ── */}
       {activeTab === 'reviews' && (
@@ -1764,7 +1174,7 @@ const Performance = () => {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-                  <Button type="submit" variant="primary">Submit Review Evaluation</Button>
+                  <Button type="submit" variant="primary" disabled={isSubmittingReview} loading={isSubmittingReview}>Submit Review Evaluation</Button>
                 </div>
               </form>
             )}
@@ -1799,234 +1209,7 @@ const Performance = () => {
         </div>
       )}
 
-      {/* ── TAB 6: PERFORMANCE IMPROVEMENT PLANS ── */}
-      {activeTab === 'pips' && userRole !== 'Employee' && (
-        <div className="reports-kpi-grid animate-slide-up">
-          
-          {/* Active PIP list */}
-          <div className="card padding-5">
-            <span className="perf-chart-title">Active Performance Improvement Plans (PIP)</span>
-            <p className="subtitle" style={{ marginBottom: 10 }}>Track and assist employees currently on structured recovery targets.</p>
-            
-            <div className="flex-column gap-3">
-              {pips.length > 0 ? pips.map(p => (
-                <div key={p.id} className="pip-card-item flex-column gap-3 padding-4">
-                  <div className="flex-row justify-between align-center">
-                    <div>
-                      <strong className="text-white" style={{ fontSize: '0.95rem' }}>{p.employeeName}</strong>
-                      <span className="table-sub-text">Plan ID: {p.id} | Opened: {p.dateCreated}</span>
-                    </div>
-                    <Badge variant={p.status === 'Escalated' ? 'danger' : 'warning'}>{p.status}</Badge>
-                  </div>
-
-                  <div className="flex-column gap-2 text-secondary-sm">
-                    <div>
-                      <strong style={{ color: 'var(--color-danger)' }}>Issues Identified:</strong>
-                      <p style={{ margin: '2px 0 0 0' }}>{p.issuesIdentified}</p>
-                    </div>
-
-                    <div>
-                      <strong style={{ color: 'var(--color-success)' }}>Improvement Targets:</strong>
-                      <p style={{ margin: '2px 0 0 0' }}>{p.improvementTargets}</p>
-                    </div>
-
-                    <div>
-                      <strong>Action Plan:</strong>
-                      <p style={{ margin: '2px 0 0 0' }}>{p.actionPlan}</p>
-                    </div>
-
-                    <div>
-                      <strong>Review Period:</strong>
-                      <p style={{ margin: '2px 0 0 0' }}>{p.reviewPeriod}</p>
-                    </div>
-                  </div>
-
-                  {/* Actions resolutions */}
-                  <div className="flex-row justify-between align-center" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 10, marginTop: 6 }}>
-                    <span className="table-sub-text">Assigned Reviewer: <strong>{p.reviewer}</strong></span>
-                    <div className="flex-center gap-2">
-                      {p.status !== 'Escalated' && (
-                        <button
-                          type="button"
-                          className="pip-action-btn btn-escalate"
-                          onClick={() => escalatePip(p.id, p.employeeName)}
-                        >
-                          Escalate to HR
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="pip-action-btn btn-resolve"
-                        onClick={() => resolvePip(p.id, p.employeeName)}
-                      >
-                        Resolve PIP (Goals Met) ✓
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )) : (
-                <div style={{ padding: '32px', border: '1px dashed var(--border-color)', borderRadius: '8px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                  🎉 No employees currently registered on Performance Improvement Plans.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Issue New PIP form */}
-          <div className="card padding-5">
-            <span className="perf-chart-title">Issue Performance Improvement Plan</span>
-            <p className="subtitle" style={{ marginBottom: 12 }}>Open a structured PIP recovery plan for underperforming employees.</p>
-
-            <form onSubmit={handlePipSubmit} className="flex-column gap-3">
-              <div className="form-group-item">
-                <label className="reports-form-lbl">Select Employee *</label>
-                <select
-                  className="reports-form-input"
-                  value={pipForm.employeeName}
-                  onChange={(e) => setPipForm(prev => ({ ...prev, employeeName: e.target.value }))}
-                  required
-                >
-                  <option value="">— Select Employee —</option>
-                  {employees.filter(e => e.kpiScore < 75).map(emp => (
-                    <option key={emp.id} value={emp.name}>{emp.name} (Score: {emp.kpiScore}% • {emp.department})</option>
-                  ))}
-                </select>
-                <span className="table-sub-text">Only employees with score below 75% are eligible for PIP tracking.</span>
-              </div>
-
-              <div className="form-group-item">
-                <label className="reports-form-lbl">Issues Identified *</label>
-                <textarea
-                  className="reports-form-textarea"
-                  rows={2}
-                  placeholder="Describe specific performance gaps, backlogs, punctuality delays..."
-                  value={pipForm.issuesIdentified}
-                  onChange={(e) => setPipForm(prev => ({ ...prev, issuesIdentified: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="form-group-item">
-                <label className="reports-form-lbl">Improvement Targets & Deliverables *</label>
-                <textarea
-                  className="reports-form-textarea"
-                  rows={2}
-                  placeholder="Measurable objectives required to pass plan (e.g. 80% task completion)..."
-                  value={pipForm.improvementTargets}
-                  onChange={(e) => setPipForm(prev => ({ ...prev, improvementTargets: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="reports-form-grid">
-                <div className="form-group-item">
-                  <label className="reports-form-lbl">Plan Review Duration</label>
-                  <select
-                    className="reports-form-input"
-                    value={pipForm.reviewPeriod}
-                    onChange={(e) => setPipForm(prev => ({ ...prev, reviewPeriod: e.target.value }))}
-                  >
-                    <option>30 Days</option>
-                    <option>45 Days</option>
-                    <option>60 Days</option>
-                    <option>90 Days</option>
-                  </select>
-                </div>
-
-                <div className="form-group-item">
-                  <label className="reports-form-lbl">Recovery Action Plan Description</label>
-                  <input
-                    type="text"
-                    className="reports-form-input"
-                    placeholder="e.g. Daily mentoring Standups"
-                    value={pipForm.actionPlan}
-                    onChange={(e) => setPipForm(prev => ({ ...prev, actionPlan: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-                <Button type="submit" variant="primary">Issue Warning & Active PIP</Button>
-              </div>
-            </form>
-          </div>
-
-        </div>
-      )}
-
-      {/* ── TAB 7: ALERTS & SECURITY AUDITS ── */}
-      {activeTab === 'audits' && (
-        <div className="reports-kpi-grid animate-slide-up">
-          
-          {/* Notifications Alerts Inbox */}
-          <div className="card padding-5">
-            <div className="flex-row justify-between align-center" style={{ marginBottom: 12 }}>
-              <span className="perf-chart-title">System Performance Alerts Feed</span>
-              <button
-                type="button"
-                className="view-link-btn"
-                onClick={async () => {
-                  if (markAllNotificationsRead) {
-                    await markAllNotificationsRead();
-                  }
-                  addToast('success', 'All notifications marked as read.');
-                }}
-              >
-                Mark all as read
-              </button>
-            </div>
-
-            <div className="flex-column gap-3">
-              {alerts.map(a => (
-                <div key={a.id} className={`notification-item flex-row justify-between padding-3 ${!a.read ? 'unread' : ''}`}>
-                  <div className="flex-center gap-2">
-                    {!a.read && <span className="notification-unread-dot" />}
-                    <span className="notification-message-text">{a.message}</span>
-                  </div>
-                  <span className="notification-time-lbl">{a.date}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Audit Trail List */}
-          <div className="card padding-5">
-            <span className="perf-chart-title">Framework Settings Audit Logs</span>
-            <p className="subtitle" style={{ marginBottom: 10 }}>Logs of modifications, score recalculations, evaluations, and PIP creations.</p>
-            
-            <div className="reports-table-wrap">
-              <table className="perf-data-table">
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>User</th>
-                    <th>Action Done</th>
-                    <th>Target Value Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditLogs.map(log => (
-                    <tr key={log.id}>
-                      <td style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>{log.timestamp}</td>
-                      <td><strong>{log.user}</strong></td>
-                      <td>
-                        <Badge variant={log.action.includes('Review') || log.action.includes('Appraisal') ? 'success' : log.action.includes('Weight') ? 'info' : 'warning'}>
-                          {log.action}
-                        </Badge>
-                      </td>
-                      <td style={{ fontSize: '0.78rem' }}>
-                        <span className="table-dept-text">{log.target}</span>
-                        <span className="table-sub-text">Old: {log.oldVal} • New: {log.newVal}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        </div>
-      )}
+      {/* Tab 6 & 7 removed */}
 
       {/* ── Drilldown Slideover Detail Panel Drawer ── */}
       <SlideOver
@@ -2088,28 +1271,6 @@ const Performance = () => {
               </div>
             </div>
 
-            {/* OKR goals currently assigned */}
-            <div className="drawer-content-box">
-              <span className="box-title">OKR Goals Assigned</span>
-              <div className="flex-column gap-2" style={{ marginTop: 6 }}>
-                {goals.filter(g => g.assignee === selectedEmp.name).length > 0 ? (
-                  goals.filter(g => g.assignee === selectedEmp.name).map(g => (
-                    <div key={g.id} className="flex-column gap-1 padding-2" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
-                      <div className="flex-row justify-between text-secondary-sm">
-                        <strong>{g.title}</strong>
-                        <span>{g.status}</span>
-                      </div>
-                      <div className="goal-bar-track" style={{ height: 4 }}>
-                        <div style={{ width: `${Math.round((g.currentProgress / g.targetValue)*100)}%`, height: '100%', background: 'var(--color-primary)' }} />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="table-sub-text">No active goals assigned to this employee.</p>
-                )}
-              </div>
-            </div>
-
             {/* Reviews currently registered */}
             <div className="drawer-content-box">
               <span className="box-title">Appraisal Reviews</span>
@@ -2134,36 +1295,18 @@ const Performance = () => {
             {userRole !== 'Employee' && (
               <div className="drawer-review-inputs-wrapper" style={{ borderTop: '1px solid var(--border-color)', paddingTop: 14 }}>
                 <span className="box-title" style={{ fontSize: '0.85rem', color: 'var(--color-primary)' }}>Quick Actions: Setup Performance Plan</span>
-
-                {selectedEmp.status === 'PIP' ? (
-                  <div style={{ padding: '12px', background: 'rgba(239,68,68,0.05)', border: '1px dashed var(--color-danger)', borderRadius: '8px', color: 'var(--color-danger)', fontSize: '0.8rem', fontWeight: 600, textAlign: 'center' }}>
-                    ⚠️ This employee is currently registered in an Active PIP improvement plan. Manage their resolution status under the PIP Tab.
-                  </div>
-                ) : (
-                  <div className="flex-row justify-between gap-3" style={{ marginTop: 10 }}>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => {
-                        setActiveTab('reviews');
-                        setSelectedEmp(null);
-                      }}
-                    >
-                      Write Appraisal Review
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      style={{ color: 'var(--color-warning)', border: '1px solid var(--color-warning)' }}
-                      onClick={() => {
-                        setActiveTab('pips');
-                        setSelectedEmp(null);
-                      }}
-                    >
-                      Issue Warning / PIP
-                    </Button>
-                  </div>
-                )}
+                <div className="flex-row justify-start gap-3" style={{ marginTop: 10 }}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setActiveTab('reviews');
+                      setSelectedEmp(null);
+                    }}
+                  >
+                    Write Appraisal Review
+                  </Button>
+                </div>
               </div>
             )}
 
