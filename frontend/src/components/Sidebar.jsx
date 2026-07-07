@@ -114,8 +114,7 @@ const menuStructure = [
   {
     title: 'Account',
     items: [
-      { name: 'Profile Settings', icon: UserSquare2, path: '/my-profile' },
-      { name: 'Logout', icon: LogOut, path: '/logout', isDanger: true }
+      { name: 'Profile Settings', icon: UserSquare2, path: '/my-profile' }
     ]
   }
 ];

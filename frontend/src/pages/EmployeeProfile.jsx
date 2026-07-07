@@ -287,7 +287,7 @@ const EmployeeProfile = () => {
   }, [empAttendance, activeTab, today]);
 
   // ── Stats ──
-  const presentDays = empAttendance.filter(a => a.status === 'Present' || a.status === 'WFH').length;
+  const presentDays = empAttendance.filter(a => a.status === 'Present' || a.status === 'WFH' || a.status === 'Late').length;
   const absentDays = empAttendance.filter(a => a.status === 'Absent').length;
   const lateDays = empAttendance.filter(a => a.status === 'Late').length;
   const avgHours = empAttendance.length > 0

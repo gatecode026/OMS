@@ -1204,7 +1204,7 @@ const LeaveManagement = () => {
           id: `LR-${Math.floor(100 + Math.random() * 900)}`,
           employeeId: currentUser.id,
           employeeName: currentUser.name,
-          department: currentUser.department || '',
+          department: currentUser.department || 'Administration',
           type: typeLabel,
           fromDate: formData.fromDate,
           toDate: formData.toDate,
