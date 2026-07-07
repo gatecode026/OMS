@@ -74,7 +74,8 @@ const ChatWindow = ({ currentUser, onBack }) => {
     unreadCountOnOpen,
     highlightedMessageId, setHighlightedMessageId,
     pinnedMessages, totalPinned, loadPinnedMessages,
-    activeThread, closeThread
+    activeThread, closeThread,
+    blockedUsers, blockedByUsers, unblockUser
   } = useChat();
 
   const { initiateCall, callState } = useCall();
@@ -823,13 +824,54 @@ const ChatWindow = ({ currentUser, onBack }) => {
         </div>
       )}
 
-      {/* ── MESSAGE INPUT ────────────────────────────────────────── */}
-      <MessageInput
-        activeConvId={activeConvId}
-        onSend={handleSend}
-        onTypingStart={(isRecording) => handleTypingStart(activeConvId, isRecording)}
-        onTypingStop={() => handleTypingStop(activeConvId)}
-      />
+      {/* ── MESSAGE INPUT / BLOCKED CONTACT BANNER ── */}
+      {isDirect && (blockedUsers.includes(other?.employeeId) || blockedByUsers.includes(other?.employeeId)) ? (
+        <div className="chat-blocked-banner" style={{
+          padding: '20px',
+          textAlign: 'center',
+          backgroundColor: 'var(--bg-card, #1e293b)',
+          borderTop: '1px solid var(--border-color, #e2e8f0)',
+          color: 'var(--text-muted, #94a3b8)',
+          fontSize: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          {blockedUsers.includes(other?.employeeId) ? (
+            <>
+              <span>🚫 You have blocked this contact. Unblock them to send messages.</span>
+              <button 
+                onClick={() => unblockUser(other?.employeeId)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: 'var(--color-primary, #6366f1)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-primary-hover, #4f46e5)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--color-primary, #6366f1)'}
+              >
+                Unblock {displayName}
+              </button>
+            </>
+          ) : (
+            <span>🚫 You cannot reply to this conversation.</span>
+          )}
+        </div>
+      ) : (
+        <MessageInput
+          activeConvId={activeConvId}
+          onSend={handleSend}
+          onTypingStart={(isRecording) => handleTypingStart(activeConvId, isRecording)}
+          onTypingStop={() => handleTypingStop(activeConvId)}
+        />
+      )}
 
       {/* ── SIDEBAR (info panel) ─────────────────────────────────── */}
       {showSidebar && (
