@@ -107,7 +107,8 @@ export const validateDepartmentScope = (context, resource, deptField = 'departme
  */
 export const validateOwnership = (context, resource, ownerIdFields = ['id', 'userId', 'employeeId'], moduleName = 'unknown', operation = 'read') => {
   if (context.isSuperAdmin || context.isCompanyAdmin) return true;
-  if (['Chat', 'Conversation', 'Message', 'Call'].includes(moduleName)) return true;
+  if (['Chat', 'Conversation', 'Message', 'Call', 'Projects'].includes(moduleName)) return true;
+  if (moduleName === 'Tasks' && resource && (resource.tasks !== undefined || (resource.constructor && resource.constructor.modelName === 'Project'))) return true;
 
   // For employee and team_leader roles, enforce strict ownership matching
   if (context.isEmployee || context.isTeamLeader) {
@@ -149,14 +150,25 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
   } = options;
 
   // Delegate project task updates to 'Tasks' module check if appropriate
+  // tasksTotal is included because addTask sends { tasks, tasksTotal, progress } when creating a task
   if (moduleName === 'Projects' && operation === 'update' && updatePayload) {
     const isTaskOnlyUpdate = Object.keys(updatePayload).every(key =>
-      ['tasks', 'tasksDone', 'progress', 'status'].includes(key)
+      ['tasks', 'tasksDone', 'tasksTotal', 'progress', 'status'].includes(key)
     );
     if (isTaskOnlyUpdate) {
-      const hasTaskUpdatePerm = await checkActionPermission('Tasks', context.role, 'update');
-      if (hasTaskUpdatePerm) {
+      // Determine whether this is a task creation or task update:
+      // If the payload contains 'tasks' and 'tasksTotal', it's likely a task being added (create)
+      const isTaskCreate = updatePayload.tasksTotal !== undefined && updatePayload.tasks !== undefined;
+      const taskAction = isTaskCreate ? 'create' : 'update';
+      const hasTaskPerm = await checkActionPermission('Tasks', context.role, taskAction);
+      if (hasTaskPerm) {
         moduleName = 'Tasks';
+      } else {
+        // Fallback: check update permission as well
+        const hasTaskUpdatePerm = await checkActionPermission('Tasks', context.role, 'update');
+        if (hasTaskUpdatePerm) {
+          moduleName = 'Tasks';
+        }
       }
     }
   }

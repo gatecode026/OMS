@@ -48,6 +48,26 @@
   width: 100%;
 }
 
+.kanban-grid-5col {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--spacing-4);
+  align-items: flex-start;
+  width: 100%;
+}
+
+@media (max-width: 1440px) {
+  .kanban-grid-5col {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .kanban-grid-5col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 1200px) {
   .kanban-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -55,7 +75,7 @@
 }
 
 @media (max-width: 640px) {
-  .kanban-grid {
+  .kanban-grid, .kanban-grid-5col {
     grid-template-columns: 1fr;
   }
 }
@@ -97,10 +117,67 @@
   border-radius: var(--radius-full);
 }
 
-.dot-var-todo { background-color: var(--color-neutral); }
-.dot-var-inprogress { background-color: var(--color-primary); }
+.dot-var-pendingacceptance { background-color: var(--color-neutral); }
+.dot-var-todo { background-color: var(--color-primary); }
+.dot-var-inprogress { background-color: var(--color-warning); }
 .dot-var-inreview { background-color: var(--color-purple); }
-.dot-var-done { background-color: var(--color-success); }
+.dot-var-completed { background-color: var(--color-success); }
+
+/* Lifecycle action button rows */
+.lifecycle-actions-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.lifecycle-waiting-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+  margin-top: 12px;
+}
+
+.pulse-icon {
+  animation: pulse-animation 2s infinite;
+}
+
+@keyframes pulse-animation {
+  0% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.7; }
+}
+
+.lifecycle-completed-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-success);
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.timeline-dot-icon {
+  box-shadow: 0 0 0 4px var(--bg-card);
+  transition: all 0.2s ease;
+}
+
+.timeline-item:hover .timeline-dot-icon {
+  transform: scale(1.15);
+}
+
+.attachment-upload-trigger:hover {
+  color: var(--color-primary-hover) !important;
+}
 
 .column-card-count {
   font-size: 0.75rem;
