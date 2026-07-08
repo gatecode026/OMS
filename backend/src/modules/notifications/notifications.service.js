@@ -25,14 +25,27 @@ export const createRecord = async (data, currentUser) => {
   logger.info('Executing NotificationsService::createRecord by user: ' + currentUser?.id);
   let effectiveType = data.type || 'system';
   if (effectiveType === 'info') effectiveType = 'system';
+  
+  const recipientUserId = data.recipientId || data.userId || currentUser?.id;
+  const metadata = data.data || {};
+
+  // Extract entity fields if they exist at root of payload
+  if (data.taskId && !metadata.taskId) metadata.taskId = data.taskId;
+  if (data.meetingId && !metadata.meetingId) metadata.meetingId = data.meetingId;
+  if (data.leaveId && !metadata.leaveId) metadata.leaveId = data.leaveId;
+  if (data.conversationId && !metadata.conversationId) metadata.conversationId = data.conversationId;
+  if (data.entityId && !metadata.entityId) metadata.entityId = data.entityId;
+  if (data.action && !metadata.action) metadata.action = data.action;
+
   return notificationService.createNotification(
-    data.userId || currentUser?.id,
+    recipientUserId,
     currentUser?.companyId,
     {
       type: effectiveType,
       title: data.title,
       message: data.message,
-      data: data.data || {},
+      data: metadata,
+      priority: data.priority,
     }
   );
 };

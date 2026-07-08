@@ -64,14 +64,10 @@ const EmployeeDashboard = () => {
 
   const setTimePeriod = (val) => {
     setTimePeriodState(val);
-    const label = val === 'today' ? 'Today' : val === 'week' ? 'This Week' : 'This Month';
-    addToast('info', `Filtered activities by: ${label}`);
   };
 
   const setProjectFilter = (val) => {
     setProjectFilterState(val);
-    const label = val === 'all' ? 'All Projects' : val === 'active' ? 'Active Projects' : 'Completed Projects';
-    addToast('info', `Filtered projects by: ${label}`);
   };
 
   // Modals Open State

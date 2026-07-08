@@ -8,6 +8,7 @@ import logger from '../../config/logger.js';
 import { createNotification } from '../notifications/notifications.service.js';
 import { getTenantConnection } from '../../utils/multidbConnection.js';
 import { runWithTenant } from '../../utils/tenantContext.js';
+import { emitEntitySync } from '../../services/sync.service.js';
 
 const notifyAdminsAndManagers = async (companyId, title, message, data = {}) => {
   try {
@@ -60,6 +61,14 @@ export const createRecord = async (data, currentUser) => {
     const title = 'Employee Punched In';
     const message = `${record.employeeName} (${record.department}) punched in at ${record.punchIn} on ${record.date} (${record.workMode || 'Office'}).${record.notes ? ' Notes: ' + record.notes : ''}`;
     await notifyAdminsAndManagers(currentUser.companyId, title, message, { attendanceId: record.id });
+    
+    if (currentUser?.companyId) {
+      emitEntitySync(currentUser.companyId, {
+        module: 'attendance',
+        action: 'create',
+        data: record
+      });
+    }
   }
   return record;
 };
@@ -71,13 +80,29 @@ export const updateRecord = async (id, data, currentUser) => {
     const title = 'Employee Punched Out';
     const message = `${record.employeeName} (${record.department}) punched out at ${record.punchOut} on ${record.date}. Total Hours: ${record.totalHours} hrs.${record.notes ? ' Notes: ' + record.notes : ''}`;
     await notifyAdminsAndManagers(currentUser.companyId, title, message, { attendanceId: record.id });
+    
+    if (currentUser?.companyId) {
+      emitEntitySync(currentUser.companyId, {
+        module: 'attendance',
+        action: 'update',
+        data: record
+      });
+    }
   }
   return record;
 };
 
 export const deleteRecord = async (id, currentUser) => {
   logger.info('Executing AttendanceService::deleteRecord for: ' + id + ' by user: ' + currentUser?.id);
-  return repository.remove(id);
+  const record = await repository.remove(id);
+  if (record && currentUser?.companyId) {
+    emitEntitySync(currentUser.companyId, {
+      module: 'attendance',
+      action: 'delete',
+      data: id
+    });
+  }
+  return record;
 };
 
 export const findToday = async (employeeId) => {

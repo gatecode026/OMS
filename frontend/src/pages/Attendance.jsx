@@ -212,28 +212,24 @@ const Attendance = () => {
   const [personalTab, setPersonalTab] = useState('today'); // today, 7days, month, custom
   const [customRange, setCustomRange] = useState({ from: '', to: '' });
 
-  // Compute date range for useMyAttendance hook based on selected tab
-  const personalFilters = useMemo(() => {
+  // Compute date range for useMyAttendance hook to load broad chart data (always last 30 days by default, or custom range)
+  const personalFiltersForFetch = useMemo(() => {
     const today = new Date();
-    const getFormattedDate = (d) => d.toISOString().split('T')[0];
+    const getFormattedDate = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${date}`;
+    };
     
-    if (personalTab === 'today') {
-      const todayStr = getFormattedDate(today);
-      return { from: todayStr, to: todayStr };
-    }
-    if (personalTab === '7days') {
-      const start = new Date(today);
-      start.setDate(today.getDate() - 7);
-      return { from: getFormattedDate(start), to: getFormattedDate(today) };
-    }
-    if (personalTab === 'month') {
-      const start = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { from: getFormattedDate(start), to: getFormattedDate(today) };
-    }
-    if (personalTab === 'custom') {
+    if (personalTab === 'custom' && customRange.from && customRange.to) {
       return { from: customRange.from, to: customRange.to };
     }
-    return {};
+    
+    // Fetch last 30 days to fully populate all graphs
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    return { from: getFormattedDate(thirtyDaysAgo), to: getFormattedDate(today) };
   }, [personalTab, customRange]);
 
   const {
@@ -242,7 +238,35 @@ const Attendance = () => {
     summary: personalSummary,
     records: personalRecords,
     refetch: personalRefetch
-  } = useMyAttendance(personalFilters);
+  } = useMyAttendance(personalFiltersForFetch);
+
+  // Locally filter records for display in logs and feeds based on selected tab
+  const filteredRecords = useMemo(() => {
+    const today = new Date();
+    const getFormattedDate = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${date}`;
+    };
+    const todayStr = getFormattedDate(today);
+
+    if (personalTab === 'today') {
+      return personalRecords.filter(r => r.date === todayStr);
+    }
+    if (personalTab === '7days') {
+      const start = new Date(today);
+      start.setDate(today.getDate() - 7);
+      const startStr = getFormattedDate(start);
+      return personalRecords.filter(r => r.date >= startStr && r.date <= todayStr);
+    }
+    if (personalTab === 'month') {
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const startStr = getFormattedDate(startOfMonth);
+      return personalRecords.filter(r => r.date >= startStr && r.date <= todayStr);
+    }
+    return personalRecords;
+  }, [personalRecords, personalTab]);
 
   console.log('DEBUG Attendance.jsx: personalTodayRecord =', personalTodayRecord, 'loading =', personalLoading);
 
@@ -1401,7 +1425,7 @@ const Attendance = () => {
   // ─── Helper: Export CSV ───
   const handleDownloadReport = () => {
     const rows = [['Date', 'Status', 'Punch In', 'Punch Out', 'Work Hours', 'Source']];
-    personalRecords.forEach(r => {
+    filteredRecords.forEach(r => {
       rows.push([
         r.date || '', r.status || '',
         r.punchIn || '--:--', r.punchOut || '--:--',
@@ -1645,9 +1669,9 @@ const Attendance = () => {
                 <FileText size={15} style={{ color: 'var(--color-primary)' }} />
                 Attendance Log
               </h3>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{personalRecords.length} record(s)</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{filteredRecords.length} record(s)</span>
             </div>
-            {personalRecords.length === 0 ? (
+            {filteredRecords.length === 0 ? (
               <div style={{
                 background: 'var(--bg-card)',
                 border: '0.5px solid var(--border-color)',
@@ -1660,14 +1684,14 @@ const Attendance = () => {
                 No records found for the selected period
               </div>
             ) : (
-              personalRecords.map(rec => (
+              filteredRecords.map(rec => (
                 <AttendanceDayCard key={rec.id} record={rec} />
               ))
             )}
           </div>
 
           {/* Live Activity Feed */}
-          <LiveActivityFeed records={personalRecords} />
+          <LiveActivityFeed records={filteredRecords} />
         </div>
       </div>
     );

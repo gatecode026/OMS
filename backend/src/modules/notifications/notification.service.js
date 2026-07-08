@@ -143,6 +143,49 @@ export const createNotification = async (userId, companyId, { type, title, messa
       const effectivePriority = priority || (HIGH_PRIORITY_TYPES.has(type) ? 'high' : 'normal');
       const category = deriveCategory(type);
 
+      // ── DUPLICATE PREVENTION ───────────────────────────────────────────────
+      // Uniquely identify by: Recipient User (userId) + Type (type) + Entity ID + Action
+      const entityId = data.taskId || data.meetingId || data.leaveId || data.conversationId || data.entityId || data.id || '';
+      const action = data.action || type || '';
+
+      if (entityId) {
+        const query = {
+          userId,
+          companyId,
+          type,
+          $or: [
+            { 'data.taskId': entityId },
+            { 'data.meetingId': entityId },
+            { 'data.leaveId': entityId },
+            { 'data.conversationId': entityId },
+            { 'data.entityId': entityId }
+          ]
+        };
+        if (action) {
+          query['data.action'] = action;
+        }
+
+        const existing = await NotificationModel.findOne(query).lean();
+        if (existing) {
+          logger.info(`[Notification Engine] Suppressed duplicate notification for user ${userId}, entity ${entityId}, action ${action}`);
+          return existing;
+        }
+      }
+
+      // Short 5-second debounce check on Title + Message + Recipient to prevent fast retries
+      const sameRecent = await NotificationModel.findOne({
+        userId,
+        companyId,
+        type,
+        title,
+        message,
+        createdAt: { $gte: new Date(Date.now() - 5000) }
+      }).lean();
+      if (sameRecent) {
+        logger.info(`[Notification Engine] Suppressed identical notification within 5s window for user ${userId}`);
+        return sameRecent;
+      }
+
       // 1. Persist to MongoDB
       const notifDoc = await NotificationModel.create({
         userId,
@@ -190,8 +233,12 @@ export const createNotification = async (userId, companyId, { type, title, messa
       try {
         const io = getIO();
         io.to(`user:${userId}`).emit('notification:new', payload);
+
+        // Push updated unread count to sync counts immediately
+        const newCount = await getUnreadCount(userId, companyId);
+        io.to(`user:${userId}`).emit('notification:unread_count', { count: newCount });
       } catch (ioErr) {
-        logger.debug(`[Notification] Socket.IO unavailable: ${ioErr.message}`);
+        logger.debug(`[Notification] Socket.IO unread count emit failed: ${ioErr.message}`);
       }
 
       logger.debug(`[Notification] Created ${type} notification for user ${userId}`);

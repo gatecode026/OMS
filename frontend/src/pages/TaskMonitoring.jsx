@@ -155,6 +155,18 @@ const TaskMonitoring = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
+  // Sync selectedTask with latest projectsList data in real-time
+  useEffect(() => {
+    if (!selectedTask?.id) return;
+    const project = (projectsList || []).find(p => p && Array.isArray(p.tasks) && p.tasks.some(t => t && t.id === selectedTask.id));
+    if (project) {
+      const task = project.tasks.find(t => t && t.id === selectedTask.id);
+      if (task) {
+        setSelectedTask(task);
+      }
+    }
+  }, [projectsList, selectedTask?.id]);
+
   // Overdue Actions Modal States
   const [actionTaskId, setActionTaskId] = useState(null);
   const [isReassignOpen, setIsReassignOpen] = useState(false);

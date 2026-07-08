@@ -38,7 +38,6 @@ const NotificationsCenter = ({
 
   const handleCategoryClick = (cat) => {
     setActiveCategory(cat);
-    addToast('info', `Filtered notifications by: ${cat}`);
   };
 
   const getNotificationIcon = (type, message = '') => {
