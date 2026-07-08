@@ -772,6 +772,12 @@ export const AppProvider = ({ children }) => {
       setEmployees([]);
       return;
     }
+    const cached = localStorage.getItem('swr_employees');
+    if (cached) {
+      try {
+        setEmployees(JSON.parse(cached).map(normalizeEmployee));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/employees', {
         headers: {
@@ -786,11 +792,13 @@ export const AppProvider = ({ children }) => {
 
       const result = await response.json();
       if (result.status === 'success') {
-        setEmployees((result.data || []).map(normalizeEmployee));
+        const normalized = (result.data || []).map(normalizeEmployee);
+        setEmployees(normalized);
+        localStorage.setItem('swr_employees', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch employees from backend:', err);
-      setEmployees([]);
+      if (!cached) setEmployees([]);
     }
   };
 
@@ -843,6 +851,20 @@ export const AppProvider = ({ children }) => {
 
   const fetchSystemSettings = async () => {
     if (!token) return;
+    const cached = localStorage.getItem('swr_system_settings');
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        const mergedGeneral = {
+          ...(data.generalSettings || {}),
+          companyName: data.companyProfile?.companyName || data.generalSettings?.companyName || 'Gatecode OMS'
+        };
+        setGeneralSettingsState(mergedGeneral);
+        if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);
+        if (data.securitySettings) setSecuritySettingsState(data.securitySettings);
+        if (data.attendanceRules) setAttendanceRulesState(data.attendanceRules);
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/settings', {
         headers: {
@@ -864,6 +886,7 @@ export const AppProvider = ({ children }) => {
           setAttendanceRulesState(data.attendanceRules);
           localStorage.setItem('saas_attendance_rules', JSON.stringify(data.attendanceRules));
         }
+        localStorage.setItem('swr_system_settings', JSON.stringify(data));
       }
     } catch (err) {
       console.error('Failed to fetch system settings from database:', err);
@@ -912,6 +935,12 @@ export const AppProvider = ({ children }) => {
       setBranches([]);
       return;
     }
+    const cached = localStorage.getItem('swr_branches');
+    if (cached) {
+      try {
+        setBranches(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/branches', {
         headers: {
@@ -921,10 +950,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setBranches(result.data || []);
+        localStorage.setItem('swr_branches', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch branches from backend:', err);
-      setBranches([]);
+      if (!cached) setBranches([]);
     }
   };
 
@@ -935,6 +965,12 @@ export const AppProvider = ({ children }) => {
       setDepartments([]);
       return;
     }
+    const cached = localStorage.getItem('swr_departments');
+    if (cached) {
+      try {
+        setDepartments(JSON.parse(cached).map(normalizeDepartment));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/departments', {
         headers: {
@@ -943,11 +979,13 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setDepartments((result.data || []).map(normalizeDepartment));
+        const normalized = (result.data || []).map(normalizeDepartment);
+        setDepartments(normalized);
+        localStorage.setItem('swr_departments', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch departments from backend:', err);
-      setDepartments([]);
+      if (!cached) setDepartments([]);
     }
   };
 
@@ -958,6 +996,12 @@ export const AppProvider = ({ children }) => {
       setTeams([]);
       return;
     }
+    const cached = localStorage.getItem('swr_teams');
+    if (cached) {
+      try {
+        setTeams(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/teams', {
         headers: {
@@ -967,10 +1011,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setTeams(result.data || []);
+        localStorage.setItem('swr_teams', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch teams from backend:', err);
-      setTeams([]);
+      if (!cached) setTeams([]);
     }
   };
 
@@ -981,6 +1026,12 @@ export const AppProvider = ({ children }) => {
       setProjectsList([]);
       return;
     }
+    const cached = localStorage.getItem('swr_projects');
+    if (cached) {
+      try {
+        setProjectsList(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/projects', {
         headers: {
@@ -990,10 +1041,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setProjectsList(result.data || []);
+        localStorage.setItem('swr_projects', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch projects from backend:', err);
-      setProjectsList([]);
+      if (!cached) setProjectsList([]);
     }
   };
 
@@ -1046,6 +1098,12 @@ export const AppProvider = ({ children }) => {
       setLeavePolicyConfigs([]);
       return;
     }
+    const cached = localStorage.getItem('swr_leave_policies');
+    if (cached) {
+      try {
+        setLeavePolicyConfigs(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/leaves/policies', {
         headers: {
@@ -1055,10 +1113,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setLeavePolicyConfigs(result.data || []);
+        localStorage.setItem('swr_leave_policies', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch leave policies from backend:', err);
-      setLeavePolicyConfigs([]);
+      if (!cached) setLeavePolicyConfigs([]);
     }
   };
 
@@ -1066,6 +1125,12 @@ export const AppProvider = ({ children }) => {
     if (!token) {
       setHolidaysList([]);
       return;
+    }
+    const cached = localStorage.getItem('swr_holidays');
+    if (cached) {
+      try {
+        setHolidaysList(JSON.parse(cached));
+      } catch (e) {}
     }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/holidays', {
@@ -1076,10 +1141,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setHolidaysList(result.data || []);
+        localStorage.setItem('swr_holidays', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch holidays from backend:', err);
-      setHolidaysList([]);
+      if (!cached) setHolidaysList([]);
     }
   };
 
@@ -1350,6 +1416,12 @@ export const AppProvider = ({ children }) => {
       setRoles([]);
       return;
     }
+    const cached = localStorage.getItem('swr_roles');
+    if (cached) {
+      try {
+        setRoles(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles', {
         headers: {
@@ -1359,10 +1431,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setRoles(result.data || []);
+        localStorage.setItem('swr_roles', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch roles:', err);
-      setRoles([]);
+      if (!cached) setRoles([]);
     }
   };
 
@@ -1370,6 +1443,12 @@ export const AppProvider = ({ children }) => {
     if (!token) {
       setPermissionModules([]);
       return;
+    }
+    const cached = localStorage.getItem('swr_permission_modules');
+    if (cached) {
+      try {
+        setPermissionModules(JSON.parse(cached));
+      } catch (e) {}
     }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles/permissions-modules', {
@@ -1380,10 +1459,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setPermissionModules(result.data || []);
+        localStorage.setItem('swr_permission_modules', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch permission modules:', err);
-      setPermissionModules([]);
+      if (!cached) setPermissionModules([]);
     }
   };
 
@@ -3349,10 +3429,12 @@ export const AppProvider = ({ children }) => {
       completed: false,
       dueDate: taskData.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       priority: taskData.priority || 'Medium',
-      status: 'To Do',
+      status: 'Pending Acceptance',
       overdue: false,
       assigneeId: taskData.assigneeId || '',
       assigneeName: assignee ? assignee.name : 'Unassigned',
+      assignedById: currentUser?.id || '',
+      assignedByName: currentUser?.name || 'System',
       description: taskData.description || '',
       estimatedHours: Number(taskData.estimatedHours) || 20,
       progress: 0,
@@ -3363,7 +3445,7 @@ export const AppProvider = ({ children }) => {
         { level: 2, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
-        { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
+        { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'assigned', details: `Task assigned by ${currentUser?.name || 'System'}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
       ]
     };
 
@@ -3779,7 +3861,268 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const getTaskStats = () => {
+  // ── TASK LIFECYCLE FUNCTIONS ──────────────────────────────────────────────
+
+  /**
+   * Accept Task: Pending Acceptance → To Do
+   * Only callable by the task assignee.
+   */
+  const acceptTask = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'To Do',
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'accepted', details: `Task accepted by ${currentUser?.name}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addToast('success', 'Task accepted! You can now start working.');
+      addActivityLog(`Accepted task ${taskId}`, 'Tasks', 'success');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Accepted',
+        message: `${currentUser?.name} has accepted the task "${updatedTasks.find(t => t.id === taskId)?.title}".`,
+        recipientId: updatedTasks.find(t => t.id === taskId)?.assignedById,
+        recipientRole: 'manager',
+        category: 'Project'
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Reject Task: stays at Pending Acceptance with rejection reason
+   * Only callable by the task assignee.
+   */
+  const rejectTask = async (taskId, reason) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'Pending Acceptance',
+        rejectionReason: reason || 'No reason provided',
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'rejected', details: `Task rejected by ${currentUser?.name}. Reason: ${reason || 'No reason provided'}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addToast('warning', 'Task rejected. The assigner has been notified.');
+      addActivityLog(`Rejected task ${taskId}`, 'Tasks', 'warning');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Rejected',
+        message: `${currentUser?.name} rejected the task "${updatedTasks.find(t => t.id === taskId)?.title}". Reason: ${reason || 'No reason provided'}.`,
+        recipientId: updatedTasks.find(t => t.id === taskId)?.assignedById,
+        recipientRole: 'manager',
+        category: 'Project'
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Start Work: To Do → In Progress
+   * Only callable by the task assignee.
+   */
+  const startWork = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'In Progress',
+        progress: Math.max(t.progress || 0, 10),
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'started', details: `Work started by ${currentUser?.name}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addToast('success', 'Work started! Good luck.');
+      addActivityLog(`Started work on task ${taskId}`, 'Tasks', 'success');
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Send to Review: In Progress → In Review
+   * Only callable by the task assignee.
+   * Notifies the original assigner.
+   */
+  const sendToReview = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'In Review',
+        progress: Math.max(t.progress || 0, 80),
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'sent_to_review', details: `Sent to review by ${currentUser?.name}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const task = project.tasks.find(t => t.id === taskId);
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addToast('info', 'Task submitted for review. Waiting for approval...');
+      addActivityLog(`Sent task ${taskId} to review`, 'Tasks', 'info');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Ready for Review',
+        message: `${currentUser?.name} has submitted "${task?.title}" for your review.`,
+        recipientId: task?.assignedById,
+        recipientRole: 'manager',
+        category: 'Project'
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Approve Task: In Review → Completed
+   * Only callable by the original assigner (task.assignedById === currentUser.id).
+   */
+  const approveTask = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const task = project.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Strict identity check — only original assigner can approve
+    let isReviewer = false;
+    if (task.assignedById) {
+      isReviewer = task.assignedById === currentUser?.id;
+    } else {
+      const assignerLog = task.activityLog?.find(log => log.action === 'assigned');
+      isReviewer = assignerLog ? assignerLog.userName === currentUser?.name : false;
+    }
+
+    if (!isReviewer) {
+      addToast('error', 'Only the original task assigner can approve this task.');
+      return;
+    }
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'Completed',
+        completed: true,
+        progress: 100,
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'approved', details: `Task approved and completed by ${currentUser?.name}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const tasksDone = updatedTasks.filter(t => t.completed).length;
+    const progressTotal = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
+
+    const success = await updateProject(project.id, {
+      tasks: updatedTasks,
+      tasksDone,
+      progress: progressTotal,
+      status: progressTotal === 100 ? 'Completed' : project.status
+    });
+
+    if (success) {
+      addToast('success', 'Task approved and marked as Completed! 🎉');
+      addActivityLog(`Approved task ${taskId}`, 'Tasks', 'success');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Approved!',
+        message: `Your task "${task?.title}" has been approved and marked as Completed by ${currentUser?.name}.`,
+        recipientId: task?.assigneeId,
+        recipientRole: 'employee',
+        category: 'Project'
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Reviewer Reassign: In Review → In Progress (with mandatory comment)
+   * Only callable by the original assigner (task.assignedById === currentUser.id).
+   */
+  const reassignToInProgress = async (taskId, comment) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const task = project.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Strict identity check — only original assigner can reassign from review
+    let isReviewer = false;
+    if (task.assignedById) {
+      isReviewer = task.assignedById === currentUser?.id;
+    } else {
+      const assignerLog = task.activityLog?.find(log => log.action === 'assigned');
+      isReviewer = assignerLog ? assignerLog.userName === currentUser?.name : false;
+    }
+
+    if (!isReviewer) {
+      addToast('error', 'Only the original task assigner can reassign this task.');
+      return;
+    }
+
+    if (!comment || !comment.trim()) {
+      addToast('error', 'A review comment is required when reassigning.');
+      return;
+    }
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'In Progress',
+        reviewComment: comment.trim(),
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'reassigned_for_rework', details: `Sent back for rework by ${currentUser?.name}. Comment: ${comment.trim()}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addToast('warning', 'Task sent back for rework. Employee has been notified.');
+      addActivityLog(`Reassigned task ${taskId} for rework`, 'Tasks', 'warning');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Needs Rework',
+        message: `Your task "${task?.title}" has been sent back for rework. Reviewer comment: ${comment.trim()}.`,
+        recipientId: task?.assigneeId,
+        recipientRole: 'employee',
+        category: 'Project'
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  const getTaskStats = React.useCallback(() => {
     const total = tasks.length;
     const active = tasks.filter(t => t.status === 'In Progress' || t.status === 'in_progress').length;
     const completed = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
@@ -3788,9 +4131,9 @@ export const AppProvider = ({ children }) => {
     const overdue = tasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, active, completed, pending, overdue, completionRate };
-  };
+  }, [tasks]);
 
-  const getEmployeeTaskSummary = (employeeId) => {
+  const getEmployeeTaskSummary = React.useCallback((employeeId) => {
     const empTasks = tasks.filter(t => t.assigneeId === employeeId);
     const assigned = empTasks.length;
     const completed = empTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
@@ -3799,9 +4142,9 @@ export const AppProvider = ({ children }) => {
     const overdue = empTasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
     const productivity = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
     return { assigned, completed, pending, overdue, productivity };
-  };
+  }, [tasks]);
 
-  const getTeamTaskRanking = () => {
+  const getTeamTaskRanking = React.useCallback(() => {
     const teamMap = {};
     employees.forEach(emp => {
       if (!emp.team) return;
@@ -3822,9 +4165,9 @@ export const AppProvider = ({ children }) => {
       const productivity = t.totalTasks > 0 ? Math.round((t.completedTasks / t.totalTasks) * 100) : 0;
       return { ...t, productivity };
     }).sort((a, b) => b.productivity - a.productivity);
-  };
+  }, [employees, getEmployeeTaskSummary]);
 
-  const getDepartmentTaskAnalytics = () => {
+  const getDepartmentTaskAnalytics = React.useCallback(() => {
     const deptMap = {};
     const activeDeptNames = new Set((departments || []).filter(d => d.status === 'Active').map(d => d.name));
     employees.forEach(emp => {
@@ -3847,9 +4190,9 @@ export const AppProvider = ({ children }) => {
       const completionRate = d.totalTasks > 0 ? Math.round((d.completed / d.totalTasks) * 100) : 0;
       return { ...d, completionRate };
     });
-  };
+  }, [employees, departments, getEmployeeTaskSummary]);
 
-  const getWorkloadDistribution = () => {
+  const getWorkloadDistribution = React.useCallback(() => {
     return employees.map(emp => {
       const stats = getEmployeeTaskSummary(emp.id);
       let workloadStatus = 'Normal';
@@ -3866,7 +4209,7 @@ export const AppProvider = ({ children }) => {
         workloadStatus
       };
     });
-  };
+  }, [employees, getEmployeeTaskSummary]);
 
   // Payroll Handlers
   const runPayroll = (month, year) => {
@@ -4821,6 +5164,12 @@ export const AppProvider = ({ children }) => {
         addTaskComment,
         approveTaskLevel,
         rejectTaskLevel,
+        acceptTask,
+        rejectTask,
+        startWork,
+        sendToReview,
+        approveTask,
+        reassignToInProgress,
         getTaskStats,
         getEmployeeTaskSummary,
         getTeamTaskRanking,

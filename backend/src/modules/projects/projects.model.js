@@ -150,6 +150,14 @@ const projectSchema = new mongoose.Schema({
       type: String,
       default: 'Unassigned'
     },
+    assignedById: {
+      type: String,
+      default: ''
+    },
+    assignedByName: {
+      type: String,
+      default: 'System'
+    },
     description: {
       type: String,
       default: ''

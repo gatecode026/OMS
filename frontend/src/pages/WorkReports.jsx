@@ -206,6 +206,8 @@ const WorkReports = () => {
     }));
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!formData.project.trim()) {
@@ -241,6 +243,9 @@ const WorkReports = () => {
       ]
     };
 
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
       const result = await addDailyReport(payload);
       if (result) {
@@ -253,6 +258,8 @@ const WorkReports = () => {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1125,8 +1132,8 @@ const WorkReports = () => {
                 </div>
 
                 <div style={{ marginTop: 12 }}>
-                  <Button type="submit" variant="primary" icon={Send} fullWidth>
-                    Submit Daily Work Report
+                  <Button type="submit" variant="primary" icon={Send} fullWidth disabled={isSubmitting}>
+                    {isSubmitting ? 'Submitting...' : 'Submit Daily Work Report'}
                   </Button>
                 </div>
               </form>

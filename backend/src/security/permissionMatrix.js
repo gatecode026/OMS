@@ -211,7 +211,7 @@ export const checkActionPermission = async (moduleName, role, action) => {
 
   // Self-service bypass: Employees and Team Leaders can always create/read/update their own attendance and leave records.
   // The repository layer will enforce strict ownership mapping to ensure they only touch their own records.
-  if (['Attendance', 'Leave'].includes(moduleName) && ['create', 'read', 'update'].includes(action)) {
+  if (['Attendance', 'Leave', 'Tasks'].includes(moduleName) && ['create', 'read', 'update'].includes(action)) {
     if (role === 'employee' || role === 'team_leader') return true;
   }
 
