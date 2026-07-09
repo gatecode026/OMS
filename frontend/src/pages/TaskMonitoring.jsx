@@ -640,12 +640,20 @@ const TaskMonitoring = () => {
     }
   };
 
+  const [isPostingComment, setIsPostingComment] = useState(false);
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
+
   const handleAddCommentSubmit = async () => {
-    if (!newCommentText.trim()) return;
-    const updatedTask = await addTaskComment(selectedTask.id, newCommentText, currentUser?.name || 'Unknown', currentUser?.role || 'Super Admin');
-    setNewCommentText('');
-    if (updatedTask) {
-      setSelectedTask(updatedTask);
+    if (!newCommentText.trim() || isPostingComment) return;
+    setIsPostingComment(true);
+    try {
+      const updatedTask = await addTaskComment(selectedTask.id, newCommentText, currentUser?.name || 'Unknown', currentUser?.role || 'Super Admin');
+      setNewCommentText('');
+      if (updatedTask) {
+        setSelectedTask(updatedTask);
+      }
+    } finally {
+      setIsPostingComment(false);
     }
   };
 
@@ -1818,7 +1826,7 @@ const TaskMonitoring = () => {
                       onChange={e => setNewCommentText(e.target.value)}
                       style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}
                     />
-                    <Button variant="primary" size="sm" onClick={handleAddCommentSubmit} icon={Send}>Post</Button>
+                     <Button variant="primary" size="sm" onClick={handleAddCommentSubmit} icon={Send} disabled={isPostingComment || !newCommentText.trim()}>Post</Button>
                   </div>
                 </div>
 
@@ -1826,11 +1834,16 @@ const TaskMonitoring = () => {
 
               <div className="slide-over-footer flex-row justify-between">
                 <Button variant="secondary" onClick={() => setIsDetailOpen(false)}>Close</Button>
-                {hasPermission('task_monitoring', 'delete') && (
-                  <Button variant="danger" onClick={() => {
+                {currentUserRole !== 'employee' && hasPermission('task_monitoring', 'delete') && (
+                  <Button variant="danger" disabled={isDeletingTask} onClick={() => {
                     showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, async () => {
-                      await deleteTask(selectedTask.id);
-                      setIsDetailOpen(false);
+                      setIsDeletingTask(true);
+                      try {
+                        await deleteTask(selectedTask.id);
+                        setIsDetailOpen(false);
+                      } finally {
+                        setIsDeletingTask(false);
+                      }
                     }, 'danger');
                   }} icon={Trash2}>Delete</Button>
                 )}

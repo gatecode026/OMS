@@ -3629,7 +3629,7 @@ export const AppProvider = ({ children }) => {
     }
 
     projectId = project.id;
-    const nextTaskId = `t-${projectId}-${project.tasks.length + 1}`;
+    const nextTaskId = `t-${projectId}-${project.tasks.length + 1}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const assignee = employees.find(e => e.id === taskData.assigneeId);
 
@@ -3660,46 +3660,51 @@ export const AppProvider = ({ children }) => {
     };
 
     const newTasks = [...(project.tasks || []), newTask];
-    const success = await updateProject(projectId, { tasks: newTasks });
+    
+    // Optimistically update projectsList state immediately to make it feel instant
+    setProjectsList(prev => prev.map(p => p.id === projectId ? { ...p, tasks: newTasks } : p));
 
-    if (success) {
-      try {
-        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            id: nextTaskId,
-            title: newTask.title,
-            description: newTask.description,
-            status: newTask.status,
-            priority: newTask.priority,
-            dueDate: newTask.dueDate,
-            assigneeId: newTask.assigneeId,
-            assigneeName: newTask.assigneeName
-          })
-        });
-      } catch (err) {
-        console.error('Failed to save task in tasks collection:', err);
+    // Asynchronously perform backend updates
+    (async () => {
+      const success = await updateProject(projectId, { tasks: newTasks });
+      if (success) {
+        try {
+          await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              id: nextTaskId,
+              title: newTask.title,
+              description: newTask.description,
+              status: newTask.status,
+              priority: newTask.priority,
+              dueDate: newTask.dueDate,
+              assigneeId: newTask.assigneeId,
+              assigneeName: newTask.assigneeName
+            })
+          });
+        } catch (err) {
+          console.error('Failed to save task in tasks collection:', err);
+        }
+
+        // Trigger Automatic Notification
+        triggerAutomaticNotification('TSK-01', {
+          title: 'New Task Assigned',
+          message: `You have been assigned a new task: "${newTask.title}" in project "${project.name}". Due Date: ${newTask.dueDate || 'No due date'}.`,
+          recipientId: newTask.assigneeId,
+          recipientRole: 'employee',
+          category: 'Project',
+          data: { taskId: newTask.id, action: 'assigned' }
+        }).catch(err => console.error('Failed to trigger automatic notification:', err));
       }
+    })();
 
-      addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
-      addToast('success', 'Task created successfully.');
-
-      // Trigger Automatic Notification
-      await triggerAutomaticNotification('TSK-01', {
-        title: 'New Task Assigned',
-        message: `You have been assigned a new task: "${newTask.title}" in project "${project.name}". Due Date: ${newTask.dueDate || 'No due date'}.`,
-        recipientId: newTask.assigneeId,
-        recipientRole: 'employee',
-        category: 'Project',
-        data: { taskId: newTask.id, action: 'assigned' }
-      });
-
-      return newTask;
-    }
+    addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
+    addToast('success', 'Task created successfully.');
+    return newTask;
   };
 
   const deleteTask = async (id) => {
@@ -3707,23 +3712,29 @@ export const AppProvider = ({ children }) => {
     if (!project) return;
 
     const newTasks = project.tasks.filter(t => t.id !== id);
-    const success = await updateProject(project.id, { tasks: newTasks });
+    
+    // Optimistically update projectsList state immediately to make it feel instant
+    setProjectsList(prev => prev.map(p => p.id === project.id ? { ...p, tasks: newTasks } : p));
 
-    if (success) {
-      try {
-        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      } catch (err) {
-        console.error('Failed to delete task from tasks collection:', err);
+    // Asynchronously perform backend deletes
+    (async () => {
+      const success = await updateProject(project.id, { tasks: newTasks });
+      if (success) {
+        try {
+          await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        } catch (err) {
+          console.error('Failed to delete task from tasks collection:', err);
+        }
+        addActivityLog(`Deleted task "${id}"`, 'Tasks', 'danger');
       }
+    })();
 
-      addActivityLog(`Deleted task "${id}"`, 'Tasks', 'danger');
-      addToast('warning', `Task deleted.`);
-    }
+    addToast('warning', `Task deleted.`);
   };
 
   const reassignTask = async (taskId, assigneeId, assigneeName) => {
