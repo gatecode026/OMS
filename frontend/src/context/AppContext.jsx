@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE, getBaseRole } from '../permissions/permissions';
 import { connectSocket, disconnectSocket, getSocket } from '../lib/socketManager';
 
@@ -197,6 +197,7 @@ export const normalizeEmployee = (emp) => {
 };
 
 export const AppProvider = ({ children }) => {
+  const activeActionsRef = useRef({});
   const [employees, setEmployees] = useState([]);
   const [branches, setBranches] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -643,6 +644,16 @@ export const AppProvider = ({ children }) => {
     }
   }, [token, currentUser]);
 
+  // Keep action references fresh for socket events without triggering re-connection effects
+  useEffect(() => {
+    activeActionsRef.current = {
+      fetchProjects,
+      fetchEmployees,
+      fetchLeaves,
+      fetchAttendance
+    };
+  });
+
   // Live socket notification listener to update global notifications & announcements in real time
   useEffect(() => {
     if (!currentUser || !token) return;
@@ -669,14 +680,155 @@ export const AppProvider = ({ children }) => {
       fetchAnnouncements();
     };
 
+    const handleEntitySync = ({ module, action, data }) => {
+      console.log(`[Sync Engine] Live entity:sync event received: ${module}:${action}`, data);
+      if (!data) return;
+
+      switch (module) {
+        case 'projects':
+          if (action === 'create') {
+            setProjectsList(prev => {
+              if (prev.some(p => p.id === data.id || p._id === data._id)) return prev;
+              const next = [data, ...prev];
+              localStorage.setItem('swr_projects', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'update') {
+            setProjectsList(prev => {
+              const next = prev.map(p => (p.id === data.id || p._id === data._id) ? { ...p, ...data } : p);
+              localStorage.setItem('swr_projects', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setProjectsList(prev => {
+              const next = prev.filter(p => p.id !== id && p._id !== id);
+              localStorage.setItem('swr_projects', JSON.stringify(next));
+              return next;
+            });
+          }
+          break;
+
+        case 'leaves':
+          if (action === 'create') {
+            setLeaveRequests(prev => {
+              if (prev.some(l => l.id === data.id || l._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setLeaveRequests(prev => prev.map(l => (l.id === data.id || l._id === data._id) ? { ...l, ...data } : l));
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setLeaveRequests(prev => prev.filter(l => l.id !== id && l._id !== id));
+          }
+          break;
+
+        case 'attendance':
+          if (action === 'create') {
+            setAttendance(prev => {
+              if (prev.some(a => a.id === data.id || a._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setAttendance(prev => prev.map(a => (a.id === data.id || a._id === data._id) ? { ...a, ...data } : a));
+          }
+          break;
+
+        case 'employees':
+          if (action === 'create') {
+            setEmployees(prev => {
+              if (prev.some(e => e.id === data.id || e._id === data._id)) return prev;
+              const next = [data, ...prev];
+              localStorage.setItem('swr_employees', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'update') {
+            setEmployees(prev => {
+              const next = prev.map(e => (e.id === data.id || e._id === data._id) ? { ...e, ...data } : e);
+              localStorage.setItem('swr_employees', JSON.stringify(next));
+              return next;
+            });
+          }
+          break;
+
+        case 'departments':
+          if (action === 'create') {
+            setDepartments(prev => {
+              if (prev.some(d => d.id === data.id || d._id === data._id)) return prev;
+              const next = [data, ...prev];
+              localStorage.setItem('swr_departments', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'update') {
+            setDepartments(prev => {
+              const next = prev.map(d => (d.id === data.id || d._id === data._id) ? { ...d, ...data } : d);
+              localStorage.setItem('swr_departments', JSON.stringify(next));
+              return next;
+            });
+          }
+          break;
+
+        case 'teams':
+          if (action === 'create') {
+            setTeams(prev => {
+              if (prev.some(t => t.id === data.id || t._id === data._id)) return prev;
+              const next = [data, ...prev];
+              localStorage.setItem('swr_teams', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'update') {
+            setTeams(prev => {
+              const next = prev.map(t => (t.id === data.id || t._id === data._id) ? { ...t, ...data } : t);
+              localStorage.setItem('swr_teams', JSON.stringify(next));
+              return next;
+            });
+          }
+          break;
+
+        case 'activityLogs':
+          if (action === 'create') {
+            setActivityLogs(prev => [data, ...prev].slice(0, 100));
+          }
+          break;
+
+        case 'announcements':
+          if (action === 'create') {
+            setAnnouncementsList(prev => {
+              if (prev.some(a => a.id === data.id || a._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setAnnouncementsList(prev => prev.map(a => (a.id === data.id || a._id === data._id) ? { ...a, ...data } : a));
+          }
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    const handleConnect = () => {
+      console.log('[Sync Engine] Socket connected/reconnected. Running silent state revalidation.');
+      if (token) {
+        if (activeActionsRef.current.fetchProjects) activeActionsRef.current.fetchProjects();
+        if (activeActionsRef.current.fetchEmployees) activeActionsRef.current.fetchEmployees();
+        if (activeActionsRef.current.fetchLeaves) activeActionsRef.current.fetchLeaves();
+        if (activeActionsRef.current.fetchAttendance) activeActionsRef.current.fetchAttendance();
+      }
+    };
+
+    socket.on('connect', handleConnect);
     socket.on('notification:new', handleNewNotification);
     socket.on('notification:sync', handleSync);
     socket.on('announcement:sync', handleAnnouncementSync);
+    socket.on('entity:sync', handleEntitySync);
 
     return () => {
+      socket.off('connect', handleConnect);
       socket.off('notification:new', handleNewNotification);
       socket.off('notification:sync', handleSync);
       socket.off('announcement:sync', handleAnnouncementSync);
+      socket.off('entity:sync', handleEntitySync);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, token]);
@@ -2818,15 +2970,8 @@ export const AppProvider = ({ children }) => {
       return t;
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progressTotal = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress: progressTotal,
-      status: progressTotal === 100 ? 'Completed' : project.status
-    });
+    // Delegate progress and status recalculation to the backend pre-save hook
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       try {
@@ -3369,15 +3514,7 @@ export const AppProvider = ({ children }) => {
       return t;
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       try {
@@ -3449,15 +3586,8 @@ export const AppProvider = ({ children }) => {
       ]
     };
 
-    const newTasks = [...project.tasks, newTask];
-    const tasksTotal = project.tasksTotal + 1;
-    const progress = Math.round((project.tasksDone / tasksTotal) * 100);
-
-    const success = await updateProject(projectId, {
-      tasks: newTasks,
-      tasksTotal,
-      progress
-    });
+    const newTasks = [...(project.tasks || []), newTask];
+    const success = await updateProject(projectId, { tasks: newTasks });
 
     if (success) {
       try {
@@ -3503,17 +3633,7 @@ export const AppProvider = ({ children }) => {
     if (!project) return;
 
     const newTasks = project.tasks.filter(t => t.id !== id);
-    const tasksTotal = Math.max(0, project.tasksTotal - 1);
-    const tasksDone = newTasks.filter(t => t.completed).length;
-    const progress = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: newTasks,
-      tasksTotal,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: newTasks });
 
     if (success) {
       try {
@@ -3793,15 +3913,7 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       addToast('success', `Level ${level} Approval submitted.`);
@@ -3845,15 +3957,7 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       addToast('error', `Approval rejected at Level ${level}.`);
@@ -4040,15 +4144,7 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progressTotal = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress: progressTotal,
-      status: progressTotal === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       addToast('success', 'Task approved and marked as Completed! 🎉');
@@ -4754,20 +4850,15 @@ export const AppProvider = ({ children }) => {
 
   // Notifications Handlers
   const markAllNotificationsRead = async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications(prev => prev.map(n => ({ ...n, read: true, isRead: true })));
     addToast('info', 'All notifications marked as read.');
     try {
-      const unread = notifications.filter(n => !n.read);
-      await Promise.all(unread.map(n => {
-        return fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${n.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ read: true, readStatus: 'Read', readTime: 'Just now' })
-        });
-      }));
+      await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/read-all`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       await fetchNotifications();
     } catch (err) {
       console.error(err);
@@ -4775,15 +4866,13 @@ export const AppProvider = ({ children }) => {
   };
 
   const markNotificationRead = async (id) => {
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    setNotifications(prev => prev.map(n => ((n.id === id || n._id === id) ? { ...n, read: true, isRead: true } : n)));
     try {
-      await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${id}`, {
-        method: 'PUT',
+      await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${id}/read`, {
+        method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ read: true, readStatus: 'Read', readTime: 'Just now' })
+        }
       });
       await fetchNotifications();
     } catch (err) {

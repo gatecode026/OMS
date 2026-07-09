@@ -1276,7 +1276,6 @@ const WorkReports = () => {
               value={timeFilter}
               onChange={(e) => {
                 setTimeFilter(e.target.value);
-                addToast('info', `Filtered data for time range: ${e.target.value}`);
               }}
               className="role-selector-input"
             >
@@ -1727,7 +1726,6 @@ const WorkReports = () => {
                       if (cell.day) {
                         setDateFilter(cell.dateStr);
                         setActiveTab('directory');
-                        addToast('info', `Filtered reports for date: ${cell.dateStr}`);
                       }
                     }}
                   >

@@ -7,6 +7,7 @@ import repository from './leaves.repository.js';
 import logger from '../../config/logger.js';
 import { createNotification } from '../notifications/notifications.service.js';
 import { getTenantConnection } from '../../utils/multidbConnection.js';
+import { emitEntitySync } from '../../services/sync.service.js';
 
 const notifyAdminsAndManagers = async (companyId, title, message, data = {}) => {
   try {
@@ -65,6 +66,14 @@ export const createRecord = async (data, currentUser) => {
     const title = 'New Leave Request';
     const message = `${record.employeeName} (${record.department}) has applied for ${record.type} from ${record.fromDate} to ${record.toDate} (${record.days} days). Reason: ${record.reason}`;
     await notifyAdminsAndManagers(currentUser.companyId, title, message, { leaveId: record.id });
+    
+    if (currentUser?.companyId) {
+      emitEntitySync(currentUser.companyId, {
+        module: 'leaves',
+        action: 'create',
+        data: record
+      });
+    }
   }
   return record;
 };
@@ -85,13 +94,29 @@ export const updateRecord = async (id, data, currentUser) => {
     } catch (err) {
       logger.error('Error generating notification for leave update: ' + err.message);
     }
+    
+    if (currentUser?.companyId) {
+      emitEntitySync(currentUser.companyId, {
+        module: 'leaves',
+        action: 'update',
+        data: record
+      });
+    }
   }
   return record;
 };
 
 export const deleteRecord = async (id, currentUser) => {
   logger.info('Executing LeavesService::deleteRecord for: ' + id + ' by user: ' + currentUser?.id);
-  return repository.remove(id);
+  const record = await repository.remove(id);
+  if (record && currentUser?.companyId) {
+    emitEntitySync(currentUser.companyId, {
+      module: 'leaves',
+      action: 'delete',
+      data: id
+    });
+  }
+  return record;
 };
 
 export const findAllPolicies = async () => {

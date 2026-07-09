@@ -112,7 +112,7 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [newIds, setNewIds] = useState(new Set()); // Track newly-arrived items
 
-  const { token, currentUser } = useApp();
+  const { token, currentUser, fetchNotifications: refreshGlobalNotifications } = useApp();
   const navigate = useNavigate();
   const observerRef = useRef();
   const listRef = useRef();
@@ -149,6 +149,16 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
       fetchNotifications(1, activeFilter, false);
     }
   }, [isOpen, activeFilter, fetchNotifications]);
+
+  // Sync last_opened_notifications timestamp when full NotificationDrawer opens
+  useEffect(() => {
+    if (isOpen && currentUser?.id) {
+      localStorage.setItem(`last_opened_notifications:${currentUser.id}`, new Date().toISOString());
+      if (refreshGlobalNotifications) {
+        refreshGlobalNotifications();
+      }
+    }
+  }, [isOpen, currentUser, refreshGlobalNotifications]);
 
   // ── REAL-TIME PREPEND ────────────────────────────────────────────────────
   useEffect(() => {
@@ -220,6 +230,7 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
         setNotifications((prev) =>
           prev.map((n) => (n.id || n._id) === notifId ? { ...n, isRead: true } : n)
         );
+        if (refreshGlobalNotifications) refreshGlobalNotifications();
       }
     } catch (err) {
       console.error('[NotificationDrawer] Mark read failed:', err);
@@ -237,6 +248,7 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
         setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
         const socket = getSocket();
         socket?.emit('notification:opened');
+        if (refreshGlobalNotifications) refreshGlobalNotifications();
       }
     } catch (err) {
       console.error('[NotificationDrawer] Mark all read failed:', err);
@@ -265,10 +277,13 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
 
     // Mark as read
     if (notifId && !notif.isRead) {
-      fetch(`${API_BASE}/api/v1/notifications/${notifId}/read`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {});
+      try {
+        await fetch(`${API_BASE}/api/v1/notifications/${notifId}/read`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (refreshGlobalNotifications) refreshGlobalNotifications();
+      } catch (err) {}
     }
 
     const type = (notif.type || '').toLowerCase();

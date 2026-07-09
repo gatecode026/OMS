@@ -5,6 +5,7 @@
 
 import repository from './projects.repository.js';
 import logger from '../../config/logger.js';
+import { emitEntitySync } from '../../services/sync.service.js';
 
 export const findAll = async (query, currentUser) => {
   logger.info('Executing ProjectsService::findAll query');
@@ -78,17 +79,41 @@ export const findById = async (id, currentUser) => {
 
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing ProjectsService::createRecord by user: ' + currentUser?.id);
-  return repository.save(data);
+  const record = await repository.save(data);
+  if (record && currentUser?.companyId) {
+    emitEntitySync(currentUser.companyId, {
+      module: 'projects',
+      action: 'create',
+      data: record
+    });
+  }
+  return record;
 };
 
 export const updateRecord = async (id, data, currentUser) => {
   logger.info('Executing ProjectsService::updateRecord for: ' + id + ' by user: ' + currentUser?.id);
-  return repository.update(id, data);
+  const record = await repository.update(id, data);
+  if (record && currentUser?.companyId) {
+    emitEntitySync(currentUser.companyId, {
+      module: 'projects',
+      action: 'update',
+      data: record
+    });
+  }
+  return record;
 };
 
 export const deleteRecord = async (id, currentUser) => {
   logger.info('Executing ProjectsService::deleteRecord for: ' + id + ' by user: ' + currentUser?.id);
-  return repository.remove(id);
+  const record = await repository.remove(id);
+  if (record && currentUser?.companyId) {
+    emitEntitySync(currentUser.companyId, {
+      module: 'projects',
+      action: 'delete',
+      data: id
+    });
+  }
+  return record;
 };
 
 export default {

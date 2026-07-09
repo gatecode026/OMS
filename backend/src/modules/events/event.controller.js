@@ -8,6 +8,7 @@ import Employee from '../employees/employees.model.js';
 import Admin from '../admin/admin.model.js';
 import Company from '../companies/company.model.js';
 import notificationRepository from '../notifications/notifications.repository.js';
+import notificationService from '../notifications/notification.service.js';
 import SystemSettings from '../settings/settings.model.js';
 import logger from '../../config/logger.js';
 import asyncHandler from '../../utils/asyncHandler.js';
@@ -568,15 +569,15 @@ export const createEvent = asyncHandler(async (req, res) => {
           ? `${creator.name} has requested a meeting: "${title}" on ${date} at ${startTime}. Please approve or decline.`
           : `${creator.name} has scheduled a new ${type}: "${title}" on ${date} at ${startTime}.`;
 
-        await notificationRepository.save({
-          type: 'system',
+        await notificationService.createNotification(attendeeId, req.user?.companyId || 'COMP-001', {
+          type: 'meeting',
           title: titleMsg,
           message: bodyMsg,
-          recipientType: 'employee',
-          recipientId: attendeeId,
-          forUserId: attendeeId,
-          sentBy: creator.id,
-          sentDate: getTodayString()
+          data: {
+            meetingId: newEvent.id,
+            action: 'created',
+            senderName: creator.name
+          }
         });
       }
     } catch (notifErr) {
@@ -689,15 +690,15 @@ export const updateEvent = asyncHandler(async (req, res) => {
           || await Admin.findById(event.createdBy).select('id name').lean();
         if (creatorDetails) {
           const actionWord = newStatus === 'confirmed' ? 'approved' : newStatus === 'declined' ? 'declined' : 'updated';
-          await notificationRepository.save({
-            type: 'system',
+          await notificationService.createNotification(creatorDetails.id, req.user?.companyId || 'COMP-001', {
+            type: 'meeting',
             title: `Meeting Request ${newStatus === 'confirmed' ? 'Approved' : 'Declined'}`,
             message: `${currentUser.name} has ${actionWord} your meeting request: "${event.title}" on ${event.date} at ${event.startTime}.`,
-            recipientType: 'employee',
-            recipientId: creatorDetails.id,
-            forUserId: creatorDetails.id,
-            sentBy: currentUser.id,
-            sentDate: getTodayString()
+            data: {
+              meetingId: event.id,
+              action: newStatus === 'confirmed' ? 'approved' : 'declined',
+              senderName: currentUser.name
+            }
           });
         }
       } catch (err) {
@@ -722,15 +723,15 @@ export const updateEvent = asyncHandler(async (req, res) => {
     try {
       for (const attendeeId of attendeeStringIds) {
         if (attendeeId === req.user.id) continue;
-        await notificationRepository.save({
-          type: 'system',
+        await notificationService.createNotification(attendeeId, req.user?.companyId || 'COMP-001', {
+          type: 'meeting',
           title: 'Event Details Updated',
           message: `${currentUser.name} has updated details for the event: "${event.title}".`,
-          recipientType: 'employee',
-          recipientId: attendeeId,
-          forUserId: attendeeId,
-          sentBy: currentUser.id,
-          sentDate: getTodayString()
+          data: {
+            meetingId: event.id,
+            action: 'updated',
+            senderName: currentUser.name
+          }
         });
       }
     } catch (notifErr) {
@@ -807,6 +808,31 @@ export const deleteEvent = asyncHandler(async (req, res) => {
     return res.status(403).json({ error: "Not authorized to modify this event" });
   }
 
+  // Notify attendees and creator before deleting
+  try {
+    const participantIds = [event.createdBy, ...(event.attendees || [])];
+    const participants = await Employee.find({ _id: { $in: participantIds } }).select('id').lean()
+      || await Admin.find({ _id: { $in: participantIds } }).select('id').lean();
+    
+    const participantStringIds = participants.map(p => p.id).filter(Boolean);
+    
+    for (const attendeeId of participantStringIds) {
+      if (attendeeId === req.user.id) continue;
+      await notificationService.createNotification(attendeeId, req.user?.companyId || 'COMP-001', {
+        type: 'meeting',
+        title: 'Meeting Cancelled',
+        message: `${currentUser.name} has cancelled the meeting: "${event.title}" on ${event.date} at ${event.startTime}.`,
+        data: {
+          meetingId: event.id,
+          action: 'cancelled',
+          senderName: currentUser.name
+        }
+      });
+    }
+  } catch (err) {
+    logger.error('Failed to notify participants on meeting cancellation:', err);
+  }
+
   await Event.findByIdAndDelete(req.params.id);
 
   // Socket.io Real-time Synchronizations
@@ -815,6 +841,14 @@ export const deleteEvent = asyncHandler(async (req, res) => {
     const io = getIO();
     const companyId = req.user?.companyId || currentUser.companyId || 'COMP-001';
     io.to(`company:${companyId}`).emit('event:sync');
+
+    // Also push notification:new to all participants
+    const participantIds = [event.createdBy, ...(event.attendees || [])];
+    const participants = await Employee.find({ _id: { $in: participantIds } }).select('id').lean()
+      || await Admin.find({ _id: { $in: participantIds } }).select('id').lean();
+    participants.forEach(p => {
+      io.to(`user:${p.id}`).emit('notification:new');
+    });
   } catch (socketErr) {
     logger.debug(`[Events] Socket sync error: ${socketErr.message}`);
   }

@@ -7,6 +7,7 @@ import Event from './event.model.js';
 import Employee from '../employees/employees.model.js';
 import Admin from '../admin/admin.model.js';
 import notificationRepository from '../notifications/notifications.repository.js';
+import notificationService from '../notifications/notification.service.js';
 import logger from '../../config/logger.js';
 
 /**
@@ -119,15 +120,15 @@ const processReminders = async (events, remindedField, minutesString) => {
 
     for (const recipientId of recipients) {
       try {
-        await notificationRepository.save({
-          type: 'system',
+        await notificationService.createNotification(recipientId, event.companyId || 'COMP-001', {
+          type: 'meeting',
           title: `Meeting Reminder (${minutesString})`,
           message: `Reminder: The ${event.type} "${event.title}" is starting in ${minutesString} at ${event.startTime}.`,
-          recipientType: 'employee',
-          recipientId: recipientId,
-          forUserId: recipientId,
-          sentBy: creatorId,
-          sentDate: todayStr
+          data: {
+            meetingId: event.id || event._id.toString(),
+            action: 'reminder',
+            senderName: creatorId
+          }
         });
       } catch (err) {
         logger.error(`Failed sending reminder notification to recipient ${recipientId} for event ${event._id}:`, err);
