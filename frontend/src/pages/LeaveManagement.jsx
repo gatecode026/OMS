@@ -1217,7 +1217,6 @@ const LeaveManagement = () => {
         addLeaveRequest(newRequest);
         addToast('success', 'Leave request submitted successfully.');
       }
-      if (fetchLeaves) fetchLeaves(); // Refresh the list from the server
     };
 
     const handleEmpCancel = (leaveId) => {
@@ -1229,7 +1228,6 @@ const LeaveManagement = () => {
           if (leave) {
             updateLeaveRequest(leaveId, { ...leave, status: 'Cancelled' });
             addToast('success', 'Leave request cancelled.');
-            if (fetchLeaves) fetchLeaves(); // Refresh the list from the server
           }
         },
         'danger'

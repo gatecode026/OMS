@@ -208,6 +208,8 @@ const WorkReports = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
+  const submittingRef = useRef(false);
+  const auditingRef = useRef(false);
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -248,7 +250,8 @@ const WorkReports = () => {
       ]
     };
 
-    if (isSubmitting) return;
+    if (isSubmitting || submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -264,6 +267,7 @@ const WorkReports = () => {
     } catch (err) {
       console.error(err);
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -747,7 +751,8 @@ const WorkReports = () => {
 
   /* Audit details action */
   const triggerAuditAction = async (actionType) => {
-    if (!selectedReport || isAuditing) return;
+    if (!selectedReport || isAuditing || auditingRef.current) return;
+    auditingRef.current = true;
     setIsAuditing(true);
     try {
       let updatedStatus = 'Submitted';
@@ -772,6 +777,7 @@ const WorkReports = () => {
         setEvaluationFeedback('');
       }
     } finally {
+      auditingRef.current = false;
       setIsAuditing(false);
     }
   };

@@ -7,7 +7,6 @@ import Skeleton from '../components/common/Skeleton';
 
 // Subwidgets
 import DashboardHeader from '../components/employeeDashboard/DashboardHeader';
-import DashboardFilters from '../components/employeeDashboard/DashboardFilters';
 import TopSummaryCards from '../components/employeeDashboard/TopSummaryCards';
 import MyAttendanceWidget from '../components/employeeDashboard/MyAttendanceWidget';
 import TodayTasksWidget from '../components/employeeDashboard/TodayTasksWidget';
@@ -257,13 +256,7 @@ const EmployeeDashboard = () => {
       {/* SECTION: Page Header */}
       <DashboardHeader currentUser={currentUser} />
 
-      {/* SECTION: Sticky Filters Bar */}
-      <DashboardFilters
-        timePeriod={timePeriod}
-        setTimePeriod={setTimePeriod}
-        projectFilter={projectFilter}
-        setProjectFilter={setProjectFilter}
-      />
+
 
       {/* SECTION 1: Top Summary Cards (6 personal stats cards) */}
       <TopSummaryCards

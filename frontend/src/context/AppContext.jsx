@@ -2954,7 +2954,10 @@ export const AppProvider = ({ children }) => {
 
       const result = await response.json();
       if (result.status === 'success') {
-        setLeaveRequests(prev => [result.data, ...prev]);
+        setLeaveRequests(prev => {
+          if (prev.some(l => l.id === result.data.id)) return prev;
+          return [result.data, ...prev];
+        });
 
         // If the leave is pre-approved (assigned directly by Admin), update employee status to 'On Leave'
         if (result.data.status === 'Approved') {
