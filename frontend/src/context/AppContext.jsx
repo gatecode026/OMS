@@ -2970,15 +2970,8 @@ export const AppProvider = ({ children }) => {
       return t;
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progressTotal = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress: progressTotal,
-      status: progressTotal === 100 ? 'Completed' : project.status
-    });
+    // Delegate progress and status recalculation to the backend pre-save hook
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       try {
@@ -3521,15 +3514,7 @@ export const AppProvider = ({ children }) => {
       return t;
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       try {
@@ -3601,15 +3586,8 @@ export const AppProvider = ({ children }) => {
       ]
     };
 
-    const newTasks = [...project.tasks, newTask];
-    const tasksTotal = project.tasksTotal + 1;
-    const progress = Math.round((project.tasksDone / tasksTotal) * 100);
-
-    const success = await updateProject(projectId, {
-      tasks: newTasks,
-      tasksTotal,
-      progress
-    });
+    const newTasks = [...(project.tasks || []), newTask];
+    const success = await updateProject(projectId, { tasks: newTasks });
 
     if (success) {
       try {
@@ -3655,17 +3633,7 @@ export const AppProvider = ({ children }) => {
     if (!project) return;
 
     const newTasks = project.tasks.filter(t => t.id !== id);
-    const tasksTotal = Math.max(0, project.tasksTotal - 1);
-    const tasksDone = newTasks.filter(t => t.completed).length;
-    const progress = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: newTasks,
-      tasksTotal,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: newTasks });
 
     if (success) {
       try {
@@ -3945,15 +3913,7 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       addToast('success', `Level ${level} Approval submitted.`);
@@ -3997,15 +3957,7 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       addToast('error', `Approval rejected at Level ${level}.`);
@@ -4192,15 +4144,7 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progressTotal = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress: progressTotal,
-      status: progressTotal === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       addToast('success', 'Task approved and marked as Completed! 🎉');

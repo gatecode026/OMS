@@ -303,17 +303,9 @@ const Projects = () => {
       }
       return t;
     });
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = targetProj.tasksTotal > 0 ? Math.round((tasksDone / targetProj.tasksTotal) * 100) : 0;
-    
-    const updatedFields = {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : (targetProj.status === 'Completed' ? 'In Progress' : targetProj.status)
-    };
 
-    const success = await updateProject(projectId, updatedFields);
+    // Delegate progress and status calculation to the backend pre-save hook
+    const success = await updateProject(projectId, { tasks: updatedTasks });
     if (success) {
       const toggledTask = updatedTasks.find(t => t.id === taskId);
       try {
@@ -330,7 +322,9 @@ const Projects = () => {
       }
 
       if (selectedProject && selectedProject.id === projectId) {
-        setSelectedProject({ ...targetProj, ...updatedFields });
+        // Refresh selectedProject from the updated projects list — backend response carries correct progress/status
+        const freshProj = projects.find(p => p.id === projectId);
+        if (freshProj) setSelectedProject({ ...freshProj, tasks: updatedTasks });
       }
       addToast('success', 'Task progress updated!');
     }
@@ -381,7 +375,14 @@ const Projects = () => {
       return;
     }
     if (selectedProject) {
-      // Edit mode
+      // Edit mode — guard against manually marking Completed when tasks are unfinished
+      if (newProjectForm.status === 'Completed') {
+        const unfinishedTasks = (selectedProject.tasks || []).filter(t => !t.completed);
+        if (unfinishedTasks.length > 0) {
+          addToast('error', `Cannot mark project as Completed — ${unfinishedTasks.length} task(s) are still unfinished. Complete all tasks first.`);
+          return;
+        }
+      }
       const success = await updateProject(selectedProject.id, {
         ...newProjectForm,
         members: createSelectedMembers.length > 0 ? createSelectedMembers : (selectedProject.members || [])
@@ -502,14 +503,7 @@ const Projects = () => {
         assigneeId
       }
     ];
-    const tasksTotal = targetProj.tasksTotal + 1;
-    const progress = Math.round((targetProj.tasksDone / tasksTotal) * 100);
-
-    const success = await updateProject(projectId, {
-      tasks: newTasks,
-      tasksTotal,
-      progress
-    });
+    const success = await updateProject(projectId, { tasks: newTasks });
     if (success) {
       try {
         await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
@@ -534,7 +528,7 @@ const Projects = () => {
       }
 
       if (selectedProject && selectedProject.id === projectId) {
-        setSelectedProject({ ...selectedProject, tasks: newTasks, tasksTotal, progress });
+        setSelectedProject({ ...selectedProject, tasks: newTasks });
       }
     }
     setActiveModal(null);
