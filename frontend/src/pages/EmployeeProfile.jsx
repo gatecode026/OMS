@@ -448,7 +448,7 @@ const EmployeeProfile = () => {
                 <button className="ep-idcard-btn" onClick={() => setShowIdCard(true)}>
                   <Download size={13} /> ID Card
                 </button>
-                {(currentUserRole !== 'employee') && (
+                {(currentUserRole !== 'employee' && emp.status !== 'Inactive' && emp.accountStatus !== 'Inactive') && (
                   <button className="ep-edit-btn" onClick={() => navigate(`/employees?edit=${emp.id}`)}>
                     <Edit2 size={13} /> Edit
                   </button>
@@ -485,6 +485,35 @@ const EmployeeProfile = () => {
         <div className="ep-body ep-overview-tab-grid">
           {/* LEFT COLUMN: Company Info, Today's Timeline */}
           <div className="ep-col-left-wide">
+            {/* Exit Details Card */}
+            {(emp.status === 'Inactive' || emp.accountStatus === 'Inactive') && (
+              <div className="card ep-info-card border-danger" style={{ borderLeft: '4px solid var(--color-danger, #ef4444)', marginBottom: '16px' }}>
+                <div className="ep-card-header ep-header-danger" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-danger, #ef4444)' }}>
+                  <AlertTriangle size={15} /> Exit Details (Inactive Profile)
+                </div>
+                <div className="ep-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Exit Date</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{emp.exitInfo?.exitDate || '—'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Last Working Day</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{emp.exitInfo?.lastWorkingDay || '—'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Exit Reason</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{emp.exitInfo?.exitReason || '—'}</strong>
+                  </div>
+                  {emp.exitInfo?.exitNotes && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'var(--bg-elevated)', padding: '10px', borderRadius: '6px', marginTop: '6px' }}>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600 }}>Exit Notes:</span>
+                      <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>{emp.exitInfo.exitNotes}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Company Info */}
             <div className="card ep-info-card">
               <div className="ep-card-header ep-header-primary">

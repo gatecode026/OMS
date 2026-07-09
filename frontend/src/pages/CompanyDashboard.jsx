@@ -252,6 +252,15 @@ const CompanyDashboard = () => {
 
   // Stats Calculations
   const totalEmployeesCount = employees.length;
+  const activeEmployeesCount = employees.filter(e => e.accountStatus === 'Active' || e.status === 'Active' || (e.status !== 'Inactive' && e.accountStatus !== 'Inactive')).length;
+  const inactiveEmployeesCount = employees.filter(e => e.accountStatus === 'Inactive' || e.status === 'Inactive').length;
+  const exitedThisMonthCount = employees.filter(e => {
+    const exitDateStr = e.exitInfo?.exitDate;
+    if (!exitDateStr) return false;
+    const date = new Date(exitDateStr);
+    const now = new Date();
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+  }).length;
   const activeProjectsCount = projectsList ? projectsList.filter(p => p.status === 'In Progress' || p.status === 'Active').length : 0;
 
   // Use LOCAL date string (not UTC) to avoid IST timezone offset issues.
@@ -732,8 +741,8 @@ const CompanyDashboard = () => {
           sparklineData={employeesSparkline}
           onClick={() => navigate('/employees')}
           subMetrics={[
-            { label: 'Active', value: employees.filter(e => e.status !== 'Inactive').length, icon: UserCheck },
-            { label: 'New', value: newEmployeesCount, icon: UserPlus }
+            { label: 'Active', value: activeEmployeesCount, icon: UserCheck },
+            { label: 'Inactive', value: inactiveEmployeesCount, icon: UserPlus }
           ]}
           variant="employees"
         />

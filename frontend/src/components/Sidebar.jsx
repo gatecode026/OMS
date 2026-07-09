@@ -49,7 +49,15 @@ const menuStructure = [
   {
     title: 'People',
     items: [
-      { name: 'Employee Management', icon: Users, path: '/employees' },
+      {
+        name: 'Employee Management',
+        icon: Users,
+        path: '/employees',
+        subItems: [
+          { name: 'Active Employees', path: '/employees' },
+          { name: 'Inactive Employees', path: '/employees/inactive' }
+        ]
+      },
       { name: 'Agency Branch Management', icon: Network, path: '/branches' },
       { name: 'Department Management', icon: GitMerge, path: '/departments' },
       {

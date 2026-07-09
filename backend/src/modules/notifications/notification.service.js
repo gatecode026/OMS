@@ -133,6 +133,13 @@ export const createNotification = async (userId, companyId, { type, title, messa
     try {
       const NotificationModel = await getNotificationModel(companyId);
 
+      // Suppress notifications for inactive employees
+      const employee = await Employee.findOne({ id: userId }).select('accountStatus status').lean();
+      if (employee && (employee.accountStatus === 'Inactive' || employee.status === 'Inactive')) {
+        logger.debug(`[Notification] Suppressed notification for inactive user ${userId}`);
+        return null;
+      }
+
       // Check user preferences (Redis-cached)
       const prefs = await getUserPreferences(userId);
       if (!isAllowedByPrefs(prefs, type)) {

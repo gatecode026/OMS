@@ -821,6 +821,18 @@ export const AppProvider = ({ children }) => {
               localStorage.setItem('swr_employees', JSON.stringify(next));
               return next;
             });
+          } else if (action === 'deactivate') {
+            setEmployees(prev => {
+              const next = prev.map(e => (e.id === data || e._id === data) ? { ...e, accountStatus: 'Inactive', status: 'Inactive' } : e);
+              localStorage.setItem('swr_employees', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'restore') {
+            setEmployees(prev => {
+              const next = prev.map(e => (e.id === data.id || e._id === data._id) ? data : e);
+              localStorage.setItem('swr_employees', JSON.stringify(next));
+              return next;
+            });
           }
           break;
 
@@ -2581,56 +2593,64 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const deactivateEmployee = async (id) => {
+  const fetchOpenWork = async (id) => {
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}/open-work`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      return result.status === 'success' ? result.data : null;
+    } catch (err) {
+      console.error('Error fetching open work:', err);
+      return null;
+    }
+  };
+
+  const deactivateEmployee = async (id, exitData) => {
     const emp = employees.find(e => e.id === id);
-    if (!emp) return;
+    if (!emp) return false;
 
     try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
-        method: 'PUT',
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}/deactivate`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ status: 'Inactive' })
+        body: JSON.stringify(exitData)
       });
       const result = await response.json();
       if (result.status === 'success') {
-        const updatedEmp = normalizeEmployee(result.data);
         setEmployees(prev =>
-          prev.map(e => (e.id === id ? updatedEmp : e))
+          prev.map(e => (e.id === id ? { ...e, accountStatus: 'Inactive', status: 'Inactive', exitInfo: result.data.exitInfo } : e))
         );
         addActivityLog(`Deactivated employee: ${emp.name}`, 'Employees', 'danger');
         addToast('warning', `Employee ${emp.name} has been deactivated.`);
-
-        // Trigger Automatic Notification
-        await triggerAutomaticNotification('HR-02', {
-          title: 'Employee Account Deactivated',
-          message: `The employee account for ${emp.name} (${emp.id}) has been deactivated.`,
-          recipientRole: 'admin',
-          category: 'HR'
-        });
+        return true;
       } else {
-        addToast('error', result.message || 'Failed to deactivate employee in database');
+        addToast('error', result.message || 'Failed to deactivate employee');
+        return false;
       }
     } catch (err) {
       console.error('Error deactivating employee:', err);
       addToast('error', 'Network error while deactivating employee');
+      return false;
     }
   };
 
-  const activateEmployee = async (id) => {
+  const restoreEmployee = async (id) => {
     const emp = employees.find(e => e.id === id);
-    if (!emp) return;
+    if (!emp) return false;
 
     try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
-        method: 'PUT',
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}/restore`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'Active' })
+        }
       });
       const result = await response.json();
       if (result.status === 'success') {
@@ -2638,16 +2658,21 @@ export const AppProvider = ({ children }) => {
         setEmployees(prev =>
           prev.map(e => (e.id === id ? updatedEmp : e))
         );
-        addActivityLog(`Activated employee: ${emp.name}`, 'Employees', 'success');
-        addToast('success', `Employee ${emp.name} has been activated.`);
+        addActivityLog(`Restored employee: ${emp.name}`, 'Employees', 'success');
+        addToast('success', `Employee ${emp.name} has been restored.`);
+        return true;
       } else {
-        addToast('error', result.message || 'Failed to activate employee in database');
+        addToast('error', result.message || 'Failed to restore employee');
+        return false;
       }
     } catch (err) {
-      console.error('Error activating employee:', err);
-      addToast('error', 'Network error while activating employee');
+      console.error('Error restoring employee:', err);
+      addToast('error', 'Network error while restoring employee');
+      return false;
     }
   };
+
+  const activateEmployee = restoreEmployee;
 
   const bulkAssignRole = async (ids, roleId) => {
     const roleObj = roles.find(r => r.id === roleId);
@@ -5261,6 +5286,10 @@ export const AppProvider = ({ children }) => {
     });
   }, [employees, branches, departments, attendance]);
 
+  const activeEmployees = useMemo(() => {
+    return memoizedEmployees.filter(e => e.accountStatus === 'Active' || e.status === 'Active' || (e.status !== 'Inactive' && e.accountStatus !== 'Inactive'));
+  }, [memoizedEmployees]);
+
   const memoizedCurrentUser = useMemo(() => {
     if (!currentUser) return null;
     const todayStr = (() => {
@@ -5305,7 +5334,9 @@ export const AppProvider = ({ children }) => {
   return (
     <AppContext.Provider
       value={{
-        employees: memoizedEmployees,
+        employees: activeEmployees,
+        allEmployees: memoizedEmployees,
+        activeEmployees,
         branches,
         addBranch,
         updateBranch,
@@ -5397,6 +5428,8 @@ export const AppProvider = ({ children }) => {
         updateEmployee,
         deactivateEmployee,
         activateEmployee,
+        restoreEmployee,
+        fetchOpenWork,
         bulkAssignRole,
         bulkTransferDept,
         bulkUpdateStatus,
