@@ -107,8 +107,14 @@ export const validateDepartmentScope = (context, resource, deptField = 'departme
  */
 export const validateOwnership = (context, resource, ownerIdFields = ['id', 'userId', 'employeeId'], moduleName = 'unknown', operation = 'read') => {
   if (context.isSuperAdmin || context.isCompanyAdmin) return true;
-  if (['Chat', 'Conversation', 'Message', 'Call', 'Projects'].includes(moduleName)) return true;
+  if (['Chat', 'Conversation', 'Message', 'Call'].includes(moduleName) && operation === 'read') return true;
+  if (moduleName === 'Projects') return true;
   if (moduleName === 'Tasks' && resource && (resource.tasks !== undefined || (resource.constructor && resource.constructor.modelName === 'Project'))) return true;
+
+  // Allow Team Leaders to manage tasks assigned to their team members
+  if (context.isTeamLeader && moduleName === 'Tasks' && context.teamEmployeeIds && context.teamEmployeeIds.includes(resource.assigneeId)) {
+    return true;
+  }
 
   // For employee and team_leader roles, enforce strict ownership matching
   if (context.isEmployee || context.isTeamLeader) {

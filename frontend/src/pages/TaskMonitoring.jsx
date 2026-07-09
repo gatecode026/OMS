@@ -197,6 +197,24 @@ const TaskMonitoring = () => {
     assigneeId: ''
   });
 
+  // Filter assignees to only show members of the selected project
+  const filteredAssignees = useMemo(() => {
+    if (!createForm.projectId) return [];
+    const selectedProj = (projectsList || []).find(p => p.id === createForm.projectId);
+    if (!selectedProj) return [];
+    const projectMembers = selectedProj.members || [];
+    const projectLeader = selectedProj.leader;
+    const projectManager = selectedProj.manager;
+    
+    return scopedEmployees.filter(emp => {
+      const empNameLower = (emp.name || '').trim().toLowerCase();
+      const isMember = projectMembers.some(m => (m || '').trim().toLowerCase() === empNameLower);
+      const isLeader = projectLeader && (projectLeader || '').trim().toLowerCase() === empNameLower;
+      const isManager = projectManager && (projectManager || '').trim().toLowerCase() === empNameLower;
+      return isMember || isLeader || isManager;
+    });
+  }, [createForm.projectId, projectsList, scopedEmployees]);
+
   // Lifecycle Modal States
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -1842,7 +1860,7 @@ const TaskMonitoring = () => {
             <label>Target Project *</label>
             <select
               value={createForm.projectId}
-              onChange={e => setCreateForm(prev => ({ ...prev, projectId: e.target.value }))}
+              onChange={e => setCreateForm(prev => ({ ...prev, projectId: e.target.value, assigneeId: '' }))}
               required
             >
               <option value="">Select a project...</option>
@@ -1889,7 +1907,7 @@ const TaskMonitoring = () => {
               onChange={e => setCreateForm(prev => ({ ...prev, assigneeId: e.target.value }))}
             >
               <option value="">Unassigned</option>
-              {(scopedEmployees || []).map(emp => (
+              {(filteredAssignees || []).map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
               ))}
             </select>

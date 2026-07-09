@@ -654,6 +654,61 @@ export const AppProvider = ({ children }) => {
     };
   });
 
+  const playNotificationChime = () => {
+    try {
+      const settingsStr = localStorage.getItem('oms_notification_settings');
+      const settings = settingsStr ? JSON.parse(settingsStr) : { desktop: true, sound: true, preview: true };
+      if (settings.sound === false) return;
+
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration, vol = 0.08) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      playTone(1046.5, ctx.currentTime, 0.12);
+      playTone(1318.51, ctx.currentTime + 0.08, 0.16);
+    } catch (err) {}
+  };
+
+  const showDesktopNotification = (notif) => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    try {
+      const omsSettingsStr = localStorage.getItem('oms_notification_settings');
+      const omsSettings = omsSettingsStr ? JSON.parse(omsSettingsStr) : { desktop: true, sound: true, preview: true };
+      if (omsSettings.desktop === false) return;
+
+      const title = notif.title || 'New Notification';
+      const body = omsSettings.preview !== false ? (notif.message || '') : 'New notification';
+      
+      const notification = new Notification(title, {
+        body: body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: notif.id || notif._id,
+        renotify: true
+      });
+
+      notification.onclick = (e) => {
+        e.preventDefault();
+        window.focus();
+        notification.close();
+      };
+    } catch (err) {
+      console.warn('[Desktop Notification] Failed to trigger native alert:', err);
+    }
+  };
+
   // Live socket notification listener to update global notifications & announcements in real time
   useEffect(() => {
     if (!currentUser || !token) return;
@@ -661,9 +716,26 @@ export const AppProvider = ({ children }) => {
     if (!socket) return;
 
     const handleNewNotification = (notif) => {
-      console.log('[AppContext] Live socket notification received, refreshing notifications...');
-      fetchNotifications();
-      if (notif && (notif.type === 'announcement' || notif.type === 'Announcement')) {
+      console.log('[AppContext] Live socket notification received:', notif);
+      if (!notif) return;
+
+      // Update local state list instantly (deduplicated by id)
+      setNotifications(prev => {
+        const id = notif.id || notif._id;
+        if (prev.some(n => (n.id || n._id) === id)) return prev;
+        return [notif, ...prev];
+      });
+
+      // Show in-app Toast
+      addToast('info', `${notif.title}: ${notif.message}`);
+
+      // Play soft sound chime
+      playNotificationChime();
+
+      // Show Native Desktop Notification
+      showDesktopNotification(notif);
+
+      if (notif.type === 'announcement' || notif.type === 'Announcement') {
         console.log('[AppContext] Announcement notification received, refreshing announcements...');
         fetchAnnouncements();
       }
@@ -1446,7 +1518,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const triggerAutomaticNotification = async (ruleId, { title, message, recipientId, recipientRole, category }) => {
+  const triggerAutomaticNotification = async (ruleId, { title, message, recipientId, recipientRole, category, data }) => {
     try {
       const savedRules = localStorage.getItem('automation_rules');
       let isEnabled = true;
@@ -1492,7 +1564,8 @@ export const AppProvider = ({ children }) => {
             : (employees ? employees.length : 1)
         ),
         read: 0,
-        failed: 0
+        failed: 0,
+        data: data || {}
       };
 
       await addNotification(newNotif);
@@ -3621,7 +3694,8 @@ export const AppProvider = ({ children }) => {
         message: `You have been assigned a new task: "${newTask.title}" in project "${project.name}". Due Date: ${newTask.dueDate || 'No due date'}.`,
         recipientId: newTask.assigneeId,
         recipientRole: 'employee',
-        category: 'Project'
+        category: 'Project',
+        data: { taskId: newTask.id, action: 'assigned' }
       });
 
       return newTask;
@@ -3989,6 +4063,19 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'To Do' })
+        });
+      } catch (err) {
+        console.error('Failed to sync task acceptance to tasks collection:', err);
+      }
+
       addToast('success', 'Task accepted! You can now start working.');
       addActivityLog(`Accepted task ${taskId}`, 'Tasks', 'success');
       await triggerAutomaticNotification('TSK-01', {
@@ -3996,7 +4083,8 @@ export const AppProvider = ({ children }) => {
         message: `${currentUser?.name} has accepted the task "${updatedTasks.find(t => t.id === taskId)?.title}".`,
         recipientId: updatedTasks.find(t => t.id === taskId)?.assignedById,
         recipientRole: 'manager',
-        category: 'Project'
+        category: 'Project',
+        data: { taskId, action: 'accepted' }
       });
       return updatedTasks.find(t => t.id === taskId);
     }
@@ -4025,6 +4113,19 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'Pending Acceptance' })
+        });
+      } catch (err) {
+        console.error('Failed to sync task rejection to tasks collection:', err);
+      }
+
       addToast('warning', 'Task rejected. The assigner has been notified.');
       addActivityLog(`Rejected task ${taskId}`, 'Tasks', 'warning');
       await triggerAutomaticNotification('TSK-01', {
@@ -4032,7 +4133,8 @@ export const AppProvider = ({ children }) => {
         message: `${currentUser?.name} rejected the task "${updatedTasks.find(t => t.id === taskId)?.title}". Reason: ${reason || 'No reason provided'}.`,
         recipientId: updatedTasks.find(t => t.id === taskId)?.assignedById,
         recipientRole: 'manager',
-        category: 'Project'
+        category: 'Project',
+        data: { taskId, action: 'rejected' }
       });
       return updatedTasks.find(t => t.id === taskId);
     }
@@ -4061,6 +4163,19 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'In Progress', progress: Math.max(updatedTasks.find(t => t.id === taskId)?.progress || 0, 10) })
+        });
+      } catch (err) {
+        console.error('Failed to sync work start to tasks collection:', err);
+      }
+
       addToast('success', 'Work started! Good luck.');
       addActivityLog(`Started work on task ${taskId}`, 'Tasks', 'success');
       return updatedTasks.find(t => t.id === taskId);
@@ -4092,6 +4207,19 @@ export const AppProvider = ({ children }) => {
     const task = project.tasks.find(t => t.id === taskId);
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'In Review', progress: Math.max(updatedTasks.find(t => t.id === taskId)?.progress || 0, 80) })
+        });
+      } catch (err) {
+        console.error('Failed to sync review submission to tasks collection:', err);
+      }
+
       addToast('info', 'Task submitted for review. Waiting for approval...');
       addActivityLog(`Sent task ${taskId} to review`, 'Tasks', 'info');
       await triggerAutomaticNotification('TSK-01', {
@@ -4099,7 +4227,8 @@ export const AppProvider = ({ children }) => {
         message: `${currentUser?.name} has submitted "${task?.title}" for your review.`,
         recipientId: task?.assignedById,
         recipientRole: 'manager',
-        category: 'Project'
+        category: 'Project',
+        data: { taskId, action: 'sent_to_review' }
       });
       return updatedTasks.find(t => t.id === taskId);
     }
@@ -4147,6 +4276,19 @@ export const AppProvider = ({ children }) => {
     const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'Completed' })
+        });
+      } catch (err) {
+        console.error('Failed to sync task approval to tasks collection:', err);
+      }
+
       addToast('success', 'Task approved and marked as Completed! 🎉');
       addActivityLog(`Approved task ${taskId}`, 'Tasks', 'success');
       await triggerAutomaticNotification('TSK-01', {
@@ -4154,7 +4296,8 @@ export const AppProvider = ({ children }) => {
         message: `Your task "${task?.title}" has been approved and marked as Completed by ${currentUser?.name}.`,
         recipientId: task?.assigneeId,
         recipientRole: 'employee',
-        category: 'Project'
+        category: 'Project',
+        data: { taskId, action: 'approved' }
       });
       return updatedTasks.find(t => t.id === taskId);
     }
@@ -4205,6 +4348,19 @@ export const AppProvider = ({ children }) => {
 
     const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'In Progress' })
+        });
+      } catch (err) {
+        console.error('Failed to sync task rework reassignment to tasks collection:', err);
+      }
+
       addToast('warning', 'Task sent back for rework. Employee has been notified.');
       addActivityLog(`Reassigned task ${taskId} for rework`, 'Tasks', 'warning');
       await triggerAutomaticNotification('TSK-01', {
@@ -4212,7 +4368,8 @@ export const AppProvider = ({ children }) => {
         message: `Your task "${task?.title}" has been sent back for rework. Reviewer comment: ${comment.trim()}.`,
         recipientId: task?.assigneeId,
         recipientRole: 'employee',
-        category: 'Project'
+        category: 'Project',
+        data: { taskId, action: 'reassigned' }
       });
       return updatedTasks.find(t => t.id === taskId);
     }
@@ -4807,7 +4964,8 @@ export const AppProvider = ({ children }) => {
           message: `Your daily work report for ${updatedReport.date} has been reviewed and marked as "${status}". Feedback: ${feedback || 'None'}`,
           recipientId: updatedReport.employeeId,
           recipientRole: 'employee',
-          category: 'Project'
+          category: 'Project',
+          data: { entityId: id, action: 'report_updated' }
         });
 
         return updatedReport;

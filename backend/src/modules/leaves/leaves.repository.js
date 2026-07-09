@@ -23,6 +23,14 @@ const validatePolicyAdminAccess = async (context) => {
   if (!context) return;
   if (context.isSuperAdmin || context.isCompanyAdmin) return;
 
+  // Employees and Team Leaders are never allowed to modify global leave policies
+  if (context.role === 'employee' || context.role === 'team_leader') {
+    const err = new Error('Access denied: Only Administrators are authorized to modify Leave Policies.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Check dynamic DB action-level permissions for other roles
   const isAllowed = await checkActionPermission('Leave', context.role, 'update');
   if (!isAllowed) {
     const err = new Error('Access denied: Only Administrators are authorized to modify Leave Policies.');
