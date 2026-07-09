@@ -512,6 +512,20 @@ const Employees = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Deactivation wizard states
+  const [deactivatingEmployee, setDeactivatingEmployee] = useState(null);
+  const [deactivateStep, setDeactivateStep] = useState(1);
+  const [exitFormData, setExitFormData] = useState({
+    lastWorkingDay: '',
+    exitDate: '',
+    exitReason: 'Resignation',
+    exitNotes: ''
+  });
+  const [checkingOpenWork, setCheckingOpenWork] = useState(false);
+  const [openWork, setOpenWork] = useState(null);
+  const [reassignTarget, setReassignTarget] = useState('');
+  const [reassignSubmit, setReassignSubmit] = useState(false);
+
   // --- Form Inline Validation Booleans ---
   const dupEmail = formData.email && employees.some(e => (e.email === formData.email || e.workEmail === formData.email) && e.id !== selectedEmployeeId);
   const dupPhone = formData.phone && employees.some(e => e.phone === formData.phone && e.id !== selectedEmployeeId);
@@ -865,6 +879,7 @@ const Employees = () => {
   };
 
   const filteredEmployees = employees.filter(e => {
+    if (e.accountStatus === 'Inactive' || e.status === 'Inactive') return false;
     const ms = e.name.toLowerCase().includes(searchTerm.toLowerCase()) || e.id.toLowerCase().includes(searchTerm.toLowerCase());
     const md = deptFilter ? e.department === deptFilter : true;
     const mb = (() => {
@@ -1328,8 +1343,63 @@ const Employees = () => {
     addToast('success', `Generated ID: ${newId}`);
   };
 
-  const handleDeactivate = (id, name) => {
-    showConfirm('Deactivate Employee', `Are you sure you want to deactivate ${name}?`, () => deactivateEmployee(id), 'danger');
+  const handleDeactivate = async (id, name) => {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+    setDeactivatingEmployee(emp);
+    setDeactivateStep(1);
+    setExitFormData({
+      lastWorkingDay: new Date().toISOString().split('T')[0],
+      exitDate: new Date().toISOString().split('T')[0],
+      exitReason: 'Resignation',
+      exitNotes: ''
+    });
+    setOpenWork(null);
+    setReassignTarget('');
+    setCheckingOpenWork(true);
+    try {
+      const stats = await fetchOpenWork(id);
+      setOpenWork(stats);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCheckingOpenWork(false);
+    }
+  };
+
+  const submitDeactivation = async () => {
+    if (!deactivatingEmployee) return;
+
+    setReassignSubmit(true);
+    try {
+      const payload = {
+        lastWorkingDay: exitFormData.lastWorkingDay,
+        exitDate: exitFormData.exitDate,
+        exitReason: exitFormData.exitReason,
+        exitNotes: exitFormData.exitNotes
+      };
+
+      const hasWork = (openWork?.pendingTasks?.length > 0) || (openWork?.activeProjects?.length > 0);
+      if (hasWork) {
+        if (!reassignTarget) {
+          addToast('warning', 'Please select an active employee to reassign pending tasks and projects to.');
+          setReassignSubmit(false);
+          return;
+        }
+        payload.taskReassignments = { allTo: reassignTarget };
+        payload.projectReassignments = { allTo: reassignTarget };
+      }
+
+      const success = await deactivateEmployee(deactivatingEmployee.id, payload);
+      if (success) {
+        setDeactivatingEmployee(null);
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('error', 'Failed to deactivate employee.');
+    } finally {
+      setReassignSubmit(false);
+    }
   };
 
   const handleActivate = (id, name) => {
@@ -3084,6 +3154,139 @@ const Employees = () => {
               </div>
             </div>
             <button className="id-card-download-btn" onClick={downloadIdCard}><Download size={16} /> Download ID Cards</button>
+          </div>
+        </div>
+      )}
+      {/* ── Deactivation Wizard Modal ── */}
+      {deactivatingEmployee && (
+        <div className="id-card-overlay" style={{ zIndex: 1100 }}>
+          <div className="id-card-modal" style={{ width: '480px', maxWidth: '90%', padding: '24px', borderRadius: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', textAlign: 'left' }} onClick={e => e.stopPropagation()}>
+            <div className="flex-row justify-between align-center mb-3 pb-2" style={{ borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Deactivate Employee Wizard</h3>
+              <button onClick={() => setDeactivatingEmployee(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px', background: 'var(--bg-elevated)', padding: '10px 14px', borderRadius: '6px', borderLeft: '3px solid var(--color-danger, #ef4444)' }}>
+              Deactivating <strong>{deactivatingEmployee.name} ({deactivatingEmployee.id})</strong>. This will block their system access and disconnect all active socket sessions immediately.
+            </div>
+
+            {deactivateStep === 1 && (
+              <div className="flex-column" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Exit Date</label>
+                  <input
+                    type="date"
+                    value={exitFormData.exitDate}
+                    onChange={e => setExitFormData(prev => ({ ...prev, exitDate: e.target.value }))}
+                    style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-elevated)', color: 'var(--text-primary)', width: '100%', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Last Working Day</label>
+                  <input
+                    type="date"
+                    value={exitFormData.lastWorkingDay}
+                    onChange={e => setExitFormData(prev => ({ ...prev, lastWorkingDay: e.target.value }))}
+                    style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-elevated)', color: 'var(--text-primary)', width: '100%', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Exit Reason</label>
+                  <select
+                    value={exitFormData.exitReason}
+                    onChange={e => setExitFormData(prev => ({ ...prev, exitReason: e.target.value }))}
+                    style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-elevated)', color: 'var(--text-primary)', width: '100%', outline: 'none' }}
+                  >
+                    <option value="Resignation">Resignation</option>
+                    <option value="Termination">Termination</option>
+                    <option value="Contract End">Contract End</option>
+                    <option value="Retirement">Retirement</option>
+                    <option value="Abandonment">Abandonment</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Exit Notes (Optional)</label>
+                  <textarea
+                    placeholder="Enter additional exit remarks..."
+                    value={exitFormData.exitNotes}
+                    onChange={e => setExitFormData(prev => ({ ...prev, exitNotes: e.target.value }))}
+                    style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-elevated)', color: 'var(--text-primary)', width: '100%', minHeight: '80px', outline: 'none', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button onClick={() => setDeactivatingEmployee(null)} className="success-btn" style={{ padding: '8px 16px', background: 'var(--bg-hover)', color: 'var(--text-primary)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+                  <button onClick={() => setDeactivateStep(2)} className="success-btn success-btn-primary" style={{ padding: '8px 16px', background: 'var(--color-primary-dark)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Next: Work Check</button>
+                </div>
+              </div>
+            )}
+
+            {deactivateStep === 2 && (
+              <div className="flex-column" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {checkingOpenWork ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+                    <div className="loading-spinner"></div>
+                    <p style={{ marginTop: '12px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Checking pending tasks & projects...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      <strong>Pending Work Summary:</strong>
+                      <ul style={{ margin: '8px 0 0 16px', padding: 0, listStyle: 'disc' }}>
+                        <li>Pending Tasks: {openWork?.pendingTasks?.length || 0}</li>
+                        <li>Active Projects: {openWork?.activeProjects?.length || 0}</li>
+                        <li>Future Meetings: {openWork?.futureEvents?.length || 0}</li>
+                      </ul>
+                    </div>
+
+                    {((openWork?.pendingTasks?.length > 0) || (openWork?.activeProjects?.length > 0)) ? (
+                      <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', padding: '14px', background: 'var(--bg-elevated)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--color-warning, #f59e0b)', fontSize: '0.8rem', fontWeight: 700 }}>
+                          <AlertTriangle size={16} /> Reassignment Required
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 12px 0' }}>
+                          This employee is currently associated with active tasks or projects. You must select an active employee to inherit their workload before completing deactivation.
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Assign All Work To</label>
+                          <select
+                            value={reassignTarget}
+                            onChange={e => setReassignTarget(e.target.value)}
+                            style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-primary)', width: '100%', outline: 'none' }}
+                          >
+                            <option value="">-- Select Active Employee --</option>
+                            {employees.filter(e => e.id !== deactivatingEmployee.id && e.accountStatus === 'Active').map(e => (
+                              <option key={e.id} value={e.id}>{e.name} ({e.id})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-success, #10b981)', fontSize: '0.85rem', fontWeight: 600, background: 'rgba(16, 185, 129, 0.05)', padding: '10px 12px', borderRadius: '6px' }}>
+                        <CheckCircle size={16} /> No active tasks or projects. Ready to deactivate.
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <button onClick={() => setDeactivateStep(1)} className="success-btn" style={{ padding: '8px 16px', background: 'var(--bg-hover)', color: 'var(--text-primary)', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
+                      <button
+                        onClick={submitDeactivation}
+                        disabled={reassignSubmit || (((openWork?.pendingTasks?.length > 0) || (openWork?.activeProjects?.length > 0)) && !reassignTarget)}
+                        className="success-btn success-btn-danger"
+                        style={{ padding: '8px 16px', background: 'var(--color-danger, #ef4444)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', opacity: (reassignSubmit || (((openWork?.pendingTasks?.length > 0) || (openWork?.activeProjects?.length > 0)) && !reassignTarget)) ? 0.6 : 1 }}
+                      >
+                        {reassignSubmit ? 'Deactivating...' : 'Complete Deactivation'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

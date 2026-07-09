@@ -15,6 +15,7 @@ export const ROUTE_PERMISSIONS = {
 
   // Branch Admin and above
   '/employees': ROLES.BRANCH_ADMIN,
+  '/employees/inactive': ROLES.BRANCH_ADMIN,
   '/employees/add': ROLES.BRANCH_ADMIN,
   '/employees/:id': ROLES.BRANCH_ADMIN,
   '/attendance': ROLES.EMPLOYEE,
@@ -90,6 +91,7 @@ export const PATH_TO_MODULE = {
   '/employee-dashboard': 'dashboard',
   '/overview': 'company_overview',
   '/employees': 'employee_management',
+  '/employees/inactive': 'employee_management',
   '/employees/add': 'employee_management',
   '/employees/:id': 'employee_management',
   '/employee-profile/:id': 'employee_management',

@@ -120,6 +120,20 @@ const employeeSchema = new mongoose.Schema({
   },
   probationEndDate: String,
   contractEndDate: String,
+  exitInfo: {
+    lastWorkingDay: String,
+    exitDate: String,
+    exitReason: {
+      type: String,
+      enum: ['Resignation', 'Termination', 'Contract End', 'Retirement', 'Abandonment', 'Other', '—'],
+      default: '—'
+    },
+    exitNotes: String,
+    deactivatedAt: Date,
+    deactivatedBy: String,
+    restoredAt: Date,
+    restoredBy: String
+  },
 
   // Bank details
   bankName: String,

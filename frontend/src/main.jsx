@@ -23,6 +23,7 @@ import Login from './pages/Login';
 // ─── Lazy Loaded Admin & Feature Pages ─────────────────────────────────────────
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Employees = lazy(() => import('./pages/Employees'));
+const InactiveEmployees = lazy(() => import('./pages/InactiveEmployees'));
 const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'));
 const Attendance = lazy(() => import('./pages/Attendance'));
 const WebPortalAttendance = lazy(() => import('./pages/WebPortalAttendance'));
@@ -87,6 +88,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
                 {/* ── People ── */}
                 <Route path="/employees" element={<Employees />} />
+                <Route path="/employees/inactive" element={<InactiveEmployees />} />
                 <Route path="/employees/add" element={<Employees />} />
                 <Route path="/employees/:id" element={<EmployeeProfile />} />
                 <Route path="/employee-profile/:id" element={<EmployeeProfile />} />
