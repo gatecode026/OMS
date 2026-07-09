@@ -162,6 +162,9 @@ export const update = async (id, data) => {
     const restrictedFields = ['approver', 'status', 'approvedBy', 'approvalDate'];
     for (const field of restrictedFields) {
       if (data[field] !== undefined) {
+        if (field === 'status' && data[field] === 'Cancelled') {
+          continue;
+        }
         const err = new Error(`Access denied: You are not authorized to modify the "${field}" field.`);
         err.statusCode = 403;
         throw err;
