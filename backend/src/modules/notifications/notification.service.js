@@ -370,28 +370,10 @@ export const getUnreadCount = async (userId, companyId) => {
   return runWithTenant(companyId, async () => {
     const NotificationModel = await getNotificationModel(companyId);
     const count = await NotificationModel.countDocuments({
-      $and: [
-        {
-          $or: [
-            { userId },
-            { recipientId: userId },
-            { forUserId: userId },
-            { targetUserId: userId },
-            { 
-              $and: [
-                { userId: { $in: [null, ""] } },
-                { recipientId: { $in: [null, ""] } },
-                { forUserId: { $in: [null, ""] } }
-              ]
-            }
-          ]
-        },
-        {
-          $or: [
-            { isRead: false },
-            { read: false }
-          ]
-        }
+      userId,
+      $or: [
+        { isRead: false },
+        { read: false }
       ]
     });
 
@@ -469,34 +451,14 @@ export const getNotifications = async (userId, companyId, page = 1, limit = 20, 
   return runWithTenant(companyId, async () => {
     const NotificationModel = await getNotificationModel(companyId);
 
-    const query = {
-      $and: [
-        {
-          $or: [
-            { userId },
-            { recipientId: userId },
-            { forUserId: userId },
-            { targetUserId: userId },
-            { 
-              $and: [
-                { userId: { $in: [null, ""] } },
-                { recipientId: { $in: [null, ""] } },
-                { forUserId: { $in: [null, ""] } }
-              ]
-            }
-          ]
-        }
-      ]
-    };
+    const query = { userId };
 
     if (categoryFilter && categoryFilter !== 'all') {
       // Support both category field and type field for backwards compatibility
-      query.$and.push({
-        $or: [
-          { category: categoryFilter },
-          { type: categoryFilter },
-        ]
-      });
+      query.$or = [
+        { category: categoryFilter },
+        { type: categoryFilter },
+      ];
     }
 
     const skip = (page - 1) * limit;
@@ -534,19 +496,14 @@ export const markAsRead = async (id, userId, companyId) => {
 
     const doc = await NotificationModel.findOneAndUpdate(
       { 
-        _id: id,
-        $or: [
-          { userId },
-          { recipientId: userId },
-          { forUserId: userId },
-          { targetUserId: userId },
-          { 
-            $and: [
-              { userId: { $in: [null, ""] } },
-              { recipientId: { $in: [null, ""] } },
-              { forUserId: { $in: [null, ""] } }
-            ]
-          }
+        $and: [
+          {
+            $or: [
+              { _id: mongoose.isValidObjectId(id) ? id : undefined },
+              { id: id }
+            ].filter(Boolean)
+          },
+          { userId }
         ]
       },
       { $set: { isRead: true, read: true } },
@@ -577,28 +534,10 @@ export const markAllAsRead = async (userId, companyId) => {
     const NotificationModel = await getNotificationModel(companyId);
 
     const query = {
-      $and: [
-        {
-          $or: [
-            { userId },
-            { recipientId: userId },
-            { forUserId: userId },
-            { targetUserId: userId },
-            { 
-              $and: [
-                { userId: { $in: [null, ""] } },
-                { recipientId: { $in: [null, ""] } },
-                { forUserId: { $in: [null, ""] } }
-              ]
-            }
-          ]
-        },
-        {
-          $or: [
-            { isRead: false },
-            { read: false }
-          ]
-        }
+      userId,
+      $or: [
+        { isRead: false },
+        { read: false }
       ]
     };
 
@@ -618,7 +557,17 @@ export const markAllAsRead = async (userId, companyId) => {
 export const deleteNotification = async (id, userId, companyId) => {
   return runWithTenant(companyId, async () => {
     const NotificationModel = await getNotificationModel(companyId);
-    const doc = await NotificationModel.findOneAndDelete({ _id: id, userId });
+    const doc = await NotificationModel.findOneAndDelete({
+      $and: [
+        {
+          $or: [
+            { _id: mongoose.isValidObjectId(id) ? id : undefined },
+            { id: id }
+          ].filter(Boolean)
+        },
+        { userId }
+      ]
+    });
     return doc;
   });
 };

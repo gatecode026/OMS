@@ -22,20 +22,24 @@ const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const bellRef = useRef(null);
 
+  const prevUnreadCountRef = useRef(0);
+
+  const triggerBellRing = useCallback(() => {
+    setIsRinging(true);
+    const t = setTimeout(() => setIsRinging(false), 700);
+    return () => clearTimeout(t);
+  }, []);
+
   // Sync and update unread count whenever apiNotifications changes
   useEffect(() => {
-    if (!currentUser?.id) return;
-    const lastOpenedStr = localStorage.getItem(`last_opened_notifications:${currentUser.id}`);
-    const lastOpened = lastOpenedStr ? new Date(lastOpenedStr) : new Date(0);
-
-    const count = apiNotifications.filter(n => {
-      if (n.isRead || n.read) return false;
-      const created = new Date(n.createdAt || n.time || Date.now());
-      return created > lastOpened;
-    }).length;
-
+    const count = apiNotifications.filter(n => !(n.isRead || n.read)).length;
     setUnreadCount(count);
-  }, [apiNotifications, currentUser]);
+
+    if (count > prevUnreadCountRef.current) {
+      triggerBellRing();
+    }
+    prevUnreadCountRef.current = count;
+  }, [apiNotifications, triggerBellRing]);
 
   // ── AUDIO CHIME ──────────────────────────────────────────────────────────
   const playNotificationChime = useCallback(() => {
@@ -57,12 +61,6 @@ const NotificationBell = () => {
       playTone(1046.5, ctx.currentTime, 0.12);
       playTone(1318.51, ctx.currentTime + 0.08, 0.16);
     } catch (err) {}
-  }, []);
-
-  const triggerBellRing = useCallback(() => {
-    setIsRinging(true);
-    const t = setTimeout(() => setIsRinging(false), 700);
-    return () => clearTimeout(t);
   }, []);
 
   // ── FILTER AND SORT NOTIFICATIONS ─────────────────────────────────────────
@@ -90,45 +88,6 @@ const NotificationBell = () => {
     }
   }, [markAllNotificationsRead]);
 
-  // ── SOCKET LISTENERS ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!currentUser) return;
-    const socket = getSocket();
-    if (!socket) return;
-
-    const handleNewNotification = (notif) => {
-      if (fetchNotifications) fetchNotifications();
-      triggerBellRing();
-      playNotificationChime();
-    };
-
-    const handleSync = (missedNotifs) => {
-      if (fetchNotifications) fetchNotifications();
-    };
-
-    const handleUnreadCount = (data) => {
-      if (data && typeof data.count === 'number') {
-        setUnreadCount(data.count);
-      }
-    };
-
-    const handleUnreadReset = () => {
-      setUnreadCount(0);
-    };
-
-    socket.on('notification:new', handleNewNotification);
-    socket.on('notification:sync', handleSync);
-    socket.on('notification:unread_count', handleUnreadCount);
-    socket.on('notification:unread_reset', handleUnreadReset);
-
-    return () => {
-      socket.off('notification:new', handleNewNotification);
-      socket.off('notification:sync', handleSync);
-      socket.off('notification:unread_count', handleUnreadCount);
-      socket.off('notification:unread_reset', handleUnreadReset);
-    };
-  }, [currentUser, fetchNotifications, triggerBellRing, playNotificationChime]);
-
   // ── CLICK OUTSIDE ────────────────────────────────────────────────────────
   useEffect(() => {
     const clickOutside = (e) => {
@@ -151,11 +110,6 @@ const NotificationBell = () => {
       if (fetchNotifications) fetchNotifications();
       const socket = getSocket();
       socket?.emit('notification:opened');
-
-      if (currentUser?.id) {
-        localStorage.setItem(`last_opened_notifications:${currentUser.id}`, new Date().toISOString());
-        setUnreadCount(0);
-      }
     }
   };
 
