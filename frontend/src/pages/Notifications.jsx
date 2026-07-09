@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import './Notifications.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -50,6 +50,7 @@ import {
   MinusCircle,
   PlusCircle
 } from 'lucide-react';
+import { decodeHTMLEntities } from '../utils/stringUtils';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -73,6 +74,7 @@ const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#d
 const Notifications = () => {
   const isLoading = usePageLoading(600);
   const location = useLocation();
+  const navigate = useNavigate();
   const { currentUserRole, currentUser, showConfirm, notifications, addNotification, updateNotification, deleteNotification, employees } = useApp();
 
   // Selected Month/Year
@@ -384,9 +386,11 @@ const Notifications = () => {
         setActiveTab('all-notifications');
         setSelectedNotif(found);
         setShowDetailModal(true);
+        // Clear history state to prevent reopening on browser refresh
+        navigate(location.pathname, { replace: true, state: {} });
       }
     }
-  }, [location.state, filteredNotifications]);
+  }, [location.state, filteredNotifications, location.pathname, navigate]);
 
   // Dynamically configured columns for employee vs admin views
   const tableColumns = useMemo(() => {
@@ -1155,7 +1159,7 @@ const Notifications = () => {
                             {feed.deliveryStatus || 'Delivered'}
                           </Badge>
                         </div>
-                        <p className="feed-msg">{feed.message}</p>
+                        <p className="feed-msg">{decodeHTMLEntities(feed.message)}</p>
                         <div className="feed-meta">
                           <span className="flex-center gap-1"><Clock size={11} /> {feed.sentDate || feed.timestamp || 'Just now'}</span>
                           <span>•</span>
@@ -1650,7 +1654,7 @@ const Notifications = () => {
               {/* Body message */}
               <div className="mb-4 p-3" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                 <strong style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Dispatched Message Content</strong>
-                <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>{selectedNotif.message}</p>
+                 <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-primary)', lineHeight: 1.5 }}>{decodeHTMLEntities(selectedNotif.message)}</p>
               </div>
 
               {/* Details grid */}

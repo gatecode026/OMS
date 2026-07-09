@@ -106,6 +106,7 @@ export const PATH_TO_MODULE = {
   '/work-reports': 'work_reports',
   '/performance': 'performance_analytics',
   '/payroll': 'payroll_management',
+  '/calendar': 'meetings_calendar',
   '/announcements': 'announcements',
   '/notifications': 'notifications',
   '/documents': 'document_management',

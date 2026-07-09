@@ -207,6 +207,7 @@ const WorkReports = () => {
   };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAuditing, setIsAuditing] = useState(false);
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
@@ -220,6 +221,10 @@ const WorkReports = () => {
     }
     if (!formData.majorAccomplishments.trim()) {
       addToast('warning', 'Please list your major accomplishments.');
+      return;
+    }
+    if (Number(formData.tasksCompleted) > Number(formData.tasksAssigned)) {
+      addToast('warning', 'Completed tasks cannot exceed assigned tasks.');
       return;
     }
 
@@ -742,28 +747,32 @@ const WorkReports = () => {
 
   /* Audit details action */
   const triggerAuditAction = async (actionType) => {
-    if (!selectedReport) return;
-    
-    let updatedStatus = 'Submitted';
+    if (!selectedReport || isAuditing) return;
+    setIsAuditing(true);
+    try {
+      let updatedStatus = 'Submitted';
 
-    if (actionType === 'Approve') {
-      updatedStatus = 'Approved';
-    } else if (actionType === 'Reject') {
-      updatedStatus = 'Rejected';
-    } else if (actionType === 'Changes') {
-      updatedStatus = 'Changes Requested';
-    } else if (actionType === 'Escalate') {
-      updatedStatus = 'Escalated';
-    }
+      if (actionType === 'Approve') {
+        updatedStatus = 'Approved';
+      } else if (actionType === 'Reject') {
+        updatedStatus = 'Rejected';
+      } else if (actionType === 'Changes') {
+        updatedStatus = 'Changes Requested';
+      } else if (actionType === 'Escalate') {
+        updatedStatus = 'Escalated';
+      }
 
-    const updatedReport = await updateDailyReportStatus(selectedReport.id, updatedStatus, evaluationFeedback);
-    if (updatedReport) {
-      addAuditLog(actionType === 'Approve' ? 'Approval' : 'Rejection', selectedReport.id, `Report status updated to ${updatedStatus} by ${userRole}`);
-      pushNotification(`Report ${selectedReport.id} was ${updatedStatus.toLowerCase()} by manager.`);
+      const updatedReport = await updateDailyReportStatus(selectedReport.id, updatedStatus, evaluationFeedback);
+      if (updatedReport) {
+        addAuditLog(actionType === 'Approve' ? 'Approval' : 'Rejection', selectedReport.id, `Report status updated to ${updatedStatus} by ${userRole}`);
+        pushNotification(`Report ${selectedReport.id} was ${updatedStatus.toLowerCase()} by manager.`);
 
-      // Reset drawer state
-      setSelectedReport(null);
-      setEvaluationFeedback('');
+        // Reset drawer state
+        setSelectedReport(null);
+        setEvaluationFeedback('');
+      }
+    } finally {
+      setIsAuditing(false);
     }
   };
 
@@ -2158,24 +2167,28 @@ const WorkReports = () => {
                 <div className="reports-drawer-action-buttons">
                   <button
                     className="review-action-btn changes-btn"
+                    disabled={isAuditing}
                     onClick={() => triggerAuditAction('Changes')}
                   >
                     Request Changes
                   </button>
                   <button
                     className="review-action-btn escalate-btn"
+                    disabled={isAuditing}
                     onClick={() => triggerAuditAction('Escalate')}
                   >
                     Escalate
                   </button>
                   <button
                     className="review-action-btn reject-btn"
+                    disabled={isAuditing}
                     onClick={() => triggerAuditAction('Reject')}
                   >
                     Reject
                   </button>
                   <button
                     className="review-action-btn approve-btn"
+                    disabled={isAuditing}
                     onClick={() => triggerAuditAction('Approve')}
                   >
                     Approve Daily Report
