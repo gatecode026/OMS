@@ -18,6 +18,7 @@ import {
   Paperclip, Users, Info, Smile, Radio, UserPlus, UserMinus, Zap
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { decodeHTMLEntities } from '../../utils/stringUtils';
 import { useNavigate } from 'react-router-dom';
 import { getSocket } from '../../lib/socketManager';
 import './NotificationComponents.css';
@@ -439,7 +440,7 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
                       className="notif-item-msg"
                       style={{ fontSize: '0.78rem', whiteSpace: 'normal', overflow: 'visible' }}
                     >
-                      {n.message}
+                      {decodeHTMLEntities(n.message)}
                     </p>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>

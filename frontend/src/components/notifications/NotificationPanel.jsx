@@ -7,6 +7,7 @@ import {
   Smile, Radio, UserPlus, UserMinus, Zap, ClipboardList, CreditCard, Clock
 } from 'lucide-react';
 import './NotificationComponents.css';
+import { decodeHTMLEntities } from '../../utils/stringUtils';
 
 // ── TYPE ICON MAP ─────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
@@ -198,7 +199,7 @@ const NotificationPanel = ({ notifications, onMarkAllRead, onClose, onOpenDrawer
                       <NotifIcon type={n.type} />
                       <div className="notif-item-content">
                         <h5 className="notif-item-title" style={{ fontWeight: !n.isRead ? 700 : 500 }}>{n.title}</h5>
-                        <p className="notif-item-msg">{n.message}</p>
+                        <p className="notif-item-msg">{decodeHTMLEntities(n.message)}</p>
                         <div className="notif-item-footer">
                           <span className="notif-item-time">{formatTime(n.createdAt)}</span>
                           {!n.isRead && <span className="notif-item-dot" style={{

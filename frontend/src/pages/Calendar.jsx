@@ -321,7 +321,7 @@ export default function Calendar() {
   // ── Role-based action access ──
   const canModify = useCallback((evt) => {
     if (!evt || !currentUser) return false;
-    const hasWritePermission = typeof hasPermission === 'function' && (hasPermission('announcements', 'update') || hasPermission('announcements', 'delete'));
+    const hasWritePermission = typeof hasPermission === 'function' && (hasPermission('meetings_calendar', 'update') || hasPermission('meetings_calendar', 'delete'));
     if (!hasWritePermission) return false;
 
     const isAdmin = currentUserRole === 'super_admin' || currentUserRole === 'admin' || currentUserRole === 'branch_admin' || currentUserRole === 'hr' || currentUserRole === 'hr_manager';
@@ -482,7 +482,7 @@ export default function Calendar() {
 
   // ── Event handlers ──
   const openAddEvent = useCallback((date = new Date()) => {
-    if (typeof hasPermission === 'function' && !hasPermission('announcements', 'create')) {
+    if (typeof hasPermission === 'function' && !hasPermission('meetings_calendar', 'create')) {
       return;
     }
     setFormState({ ...BLANK_FORM, date: formatDate(date) });
@@ -642,7 +642,7 @@ export default function Calendar() {
 
   const handleCellClick     = (date) => {
     setSelectedDate(date);
-    if (typeof hasPermission === 'function' && hasPermission('announcements', 'create')) {
+    if (typeof hasPermission === 'function' && hasPermission('meetings_calendar', 'create')) {
       openAddEvent(date);
     }
   };
@@ -798,7 +798,7 @@ export default function Calendar() {
           </div>
 
           {/* New event button */}
-          {typeof hasPermission === 'function' && hasPermission('announcements', 'create', perspective) && (
+          {typeof hasPermission === 'function' && hasPermission('meetings_calendar', 'create', perspective) && (
             <button id="cal-new-event-btn" className="cal-new-btn" onClick={() => openAddEvent(selectedDate)}>
               <Plus size={16} />
               New Event
@@ -1005,7 +1005,7 @@ export default function Calendar() {
                       <span className={`cal-date-num ${isToday ? 'cal-date-num--today' : ''}`}>
                         {cell.date.getDate()}
                       </span>
-                      {ds >= todayStr && typeof hasPermission === 'function' && hasPermission('announcements', 'create') && (
+                      {ds >= todayStr && typeof hasPermission === 'function' && hasPermission('meetings_calendar', 'create') && (
                         <button
                           className="cal-cell-add-btn"
                           title="Add event on this day"
@@ -1109,7 +1109,7 @@ export default function Calendar() {
                         </div>
                       ))}
 
-                      {ds >= todayStr && typeof hasPermission === 'function' && hasPermission('announcements', 'create') && (
+                      {ds >= todayStr && typeof hasPermission === 'function' && hasPermission('meetings_calendar', 'create') && (
                         <div className="cal-week-add-slot" onClick={() => handleCellClick(date)}>
                           <Plus size={12} /> Add
                         </div>

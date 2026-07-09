@@ -650,7 +650,8 @@ export const AppProvider = ({ children }) => {
       fetchProjects,
       fetchEmployees,
       fetchLeaves,
-      fetchAttendance
+      fetchAttendance,
+      fetchDailyReports
     };
   });
 
@@ -862,8 +863,7 @@ export const AppProvider = ({ children }) => {
             setActivityLogs(prev => [data, ...prev].slice(0, 100));
           }
           break;
-
-        case 'announcements':
+         case 'announcements':
           if (action === 'create') {
             setAnnouncementsList(prev => {
               if (prev.some(a => a.id === data.id || a._id === data._id)) return prev;
@@ -871,6 +871,20 @@ export const AppProvider = ({ children }) => {
             });
           } else if (action === 'update') {
             setAnnouncementsList(prev => prev.map(a => (a.id === data.id || a._id === data._id) ? { ...a, ...data } : a));
+          }
+          break;
+
+        case 'workReports':
+          if (action === 'create') {
+            setDailyReports(prev => {
+              if (prev.some(r => r.id === data.id || r._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setDailyReports(prev => prev.map(r => (r.id === data.id || r._id === data._id) ? { ...r, ...data } : r));
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setDailyReports(prev => prev.filter(r => r.id !== id && r._id !== id));
           }
           break;
 
@@ -886,6 +900,7 @@ export const AppProvider = ({ children }) => {
         if (activeActionsRef.current.fetchEmployees) activeActionsRef.current.fetchEmployees();
         if (activeActionsRef.current.fetchLeaves) activeActionsRef.current.fetchLeaves();
         if (activeActionsRef.current.fetchAttendance) activeActionsRef.current.fetchAttendance();
+        if (activeActionsRef.current.fetchDailyReports) activeActionsRef.current.fetchDailyReports();
       }
     };
 
@@ -5124,6 +5139,8 @@ export const AppProvider = ({ children }) => {
 
     // Map frontend module keys to backend DB permission keys
     const MODULE_MAPPING = {
+      'dashboard': 'dashboard',
+      'company_overview': 'company_overview',
       'employee_management': 'employees',
       'attendance_management': 'attendance',
       'leave_management': 'leaves',
@@ -5138,7 +5155,11 @@ export const AppProvider = ({ children }) => {
       'notifications': 'notifications',
       'announcements': 'announcements',
       'meetings_calendar': 'meetings_calendar',
-      'work_reports': 'work_reports'
+      'work_reports': 'work_reports',
+      'performance_analytics': 'performance_analytics',
+      'role_permission': 'role_permission',
+      'security_audit_logs': 'security_audit_logs',
+      'profile_settings': 'profile_settings'
     };
 
     const HIERARCHICAL_MODULES = [
@@ -5179,30 +5200,14 @@ export const AppProvider = ({ children }) => {
       }
 
       if (dbPermission !== undefined) {
-        const res = !!dbPermission?.[action];
-        console.log('hasPermission DB-backed details:', {
-          module,
-          action,
-          currentUserRole,
-          result: res
-        });
-        return res;
+        return !!dbPermission?.[action];
       }
     }
 
     // Fallback: Resolve required role and use hierarchy check if module is not DB-backed or is not found in roles Obj
     const route = Object.keys(PATH_TO_MODULE).find(key => PATH_TO_MODULE[key] === module);
     if (route) {
-      const requiredRole = getRequiredRoleForPath(route);
-      const res = hasRoleAccess(currentUserRole, requiredRole);
-      console.log('hasPermission fallback hierarchy details:', {
-        module,
-        action,
-        currentUserRole,
-        requiredRole,
-        result: res
-      });
-      return res;
+      return hasRoleAccess(currentUserRole, getRequiredRoleForPath(route));
     }
 
     return true;
