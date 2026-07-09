@@ -483,7 +483,7 @@ const Projects = () => {
     const targetProj = projects.find(p => p.id === projectId);
     if (!targetProj) return;
 
-    const nextTaskId = `t-${projectId}-${targetProj.tasks.length + 1}`;
+    const nextTaskId = `t-${projectId}-${targetProj.tasks.length + 1}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const firstEmpName = selectedTaskEmployees[0];
     const firstEmp = (employees || []).find(e => (e.name || '').toLowerCase() === (firstEmpName || '').toLowerCase());
     const assigneeId = firstEmp ? firstEmp.id : '';
@@ -503,34 +503,38 @@ const Projects = () => {
         assigneeId
       }
     ];
-    const success = await updateProject(projectId, { tasks: newTasks });
-    if (success) {
-      try {
-        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            id: nextTaskId,
-            title: title.trim(),
-            description: addTaskForm.description || '',
-            status: 'To Do',
-            priority,
-            dueDate,
-            assigneeId,
-            assigneeName: selectedTaskEmployees.length > 0 ? selectedTaskEmployees.join(', ') : 'Unassigned'
-          })
-        });
-      } catch (err) {
-        console.error('Failed to sync task creation to tasks collection:', err);
-      }
-
-      if (selectedProject && selectedProject.id === projectId) {
-        setSelectedProject({ ...selectedProject, tasks: newTasks });
-      }
+    // Optimistically update the selected project's task list in local state immediately
+    if (selectedProject && selectedProject.id === projectId) {
+      setSelectedProject({ ...selectedProject, tasks: newTasks });
     }
+
+    // Run database calls in the background asynchronously
+    (async () => {
+      const success = await updateProject(projectId, { tasks: newTasks });
+      if (success) {
+        try {
+          await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              id: nextTaskId,
+              title: title.trim(),
+              description: addTaskForm.description || '',
+              status: 'To Do',
+              priority,
+              dueDate,
+              assigneeId,
+              assigneeName: selectedTaskEmployees.length > 0 ? selectedTaskEmployees.join(', ') : 'Unassigned'
+            })
+          });
+        } catch (err) {
+          console.error('Failed to sync task creation to tasks collection:', err);
+        }
+      }
+    })();
     setActiveModal(null);
   };
 

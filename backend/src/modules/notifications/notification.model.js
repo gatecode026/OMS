@@ -59,6 +59,7 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
+      lowercase: true,
       enum: VALID_TYPES,
       index: true,
     },
@@ -68,6 +69,7 @@ const notificationSchema = new mongoose.Schema(
      */
     category: {
       type: String,
+      lowercase: true,
       enum: [
         "message",
         "mention",
@@ -118,6 +120,7 @@ const notificationSchema = new mongoose.Schema(
     /** 'high' for mentions, announcements; 'normal' for everything else */
     priority: {
       type: String,
+      lowercase: true,
       enum: ["normal", "high"],
       default: "normal",
     },
