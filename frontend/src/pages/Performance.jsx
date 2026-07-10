@@ -7,6 +7,7 @@ import Avatar from '../components/common/Avatar';
 import Button from '../components/common/Button';
 import SlideOver from '../components/common/SlideOver';
 import Skeleton from '../components/common/Skeleton';
+import Modal from '../components/common/Modal';
 import { getBaseRole } from '../permissions/permissions';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -92,6 +93,13 @@ const Performance = () => {
 
   /* Sub-Navigation workspace tabs */
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, directory, framework, goals, reviews, pips, audits
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportOptions, setExportOptions] = useState({
+    reportType: 'All Employees',
+    employeeId: '',
+    dateRange: 'AllTime',
+    format: 'CSV'
+  });
 
   /* Weights framework states */
   const [weights, setWeights] = useState({
@@ -428,12 +436,178 @@ const Performance = () => {
   // PIP handlers cleaned up
 
   /* Export Action */
-  const triggerExport = (fmt) => {
-    setExporting(true);
-    setTimeout(() => {
-      setExporting(false);
-      addToast('success', `KPI & Performance analytics report exported successfully in ${fmt} format.`);
-    }, 1500);
+  /* Export Action */
+  const triggerExport = () => {
+    setIsExportOpen(true);
+  };
+
+  const handleExportSubmit = (e) => {
+    e.preventDefault();
+    const { reportType, employeeId, dateRange, format } = exportOptions;
+
+    // Filter employees based on selected employee and date scope
+    let targets = [...employees];
+    if (reportType === 'Specific Employee' && employeeId) {
+      targets = targets.filter(emp => emp.id === employeeId);
+    }
+
+    // Filter by Date Scope using emp.lastReviewDate
+    const now = new Date();
+    targets = targets.filter(emp => {
+      if (dateRange === 'AllTime' || dateRange === 'All') return true;
+      if (!emp.lastReviewDate) return false;
+      const reviewDate = new Date(emp.lastReviewDate);
+      const diffTime = Math.abs(now - reviewDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (dateRange === 'Today') return diffDays <= 1;
+      if (dateRange === 'Weekly') return diffDays <= 7;
+      if (dateRange === 'Monthly') return diffDays <= 30;
+      if (dateRange === 'Yearly') return diffDays <= 365;
+      return true;
+    });
+
+    const filename = `Performance_KPI_Report_${new Date().toISOString().split('T')[0]}`;
+
+    if (format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${filename}</title>
+            <style>
+              body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                color: #1e293b;
+                margin: 40px;
+                background-color: #ffffff;
+              }
+              h2 {
+                color: #0f172a;
+                border-bottom: 2px solid #e2e8f0;
+                padding-bottom: 12px;
+                margin-bottom: 20px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              th, td {
+                border: 1px solid #cbd5e1;
+                padding: 10px 12px;
+                text-align: left;
+                font-size: 0.85rem;
+              }
+              th {
+                background-color: #f1f5f9;
+                font-weight: 600;
+              }
+              .score-badge {
+                font-weight: bold;
+                color: #059669;
+              }
+              .meta-info {
+                font-size: 0.85rem;
+                color: #64748b;
+                margin-bottom: 30px;
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Enterprise Performance & KPI Analytics Report</h2>
+            <div class="meta-info">
+              <strong>Generated At:</strong> ${new Date().toLocaleString()}<br/>
+              <strong>Date Scope:</strong> ${dateRange}<br/>
+              <strong>Scope:</strong> ${reportType === 'Specific Employee' ? 'Single Employee Appraisal' : 'Organization-wide Audit'}
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Department</th>
+                  <th>Designation</th>
+                  <th>KPI Score</th>
+                  <th>Productivity</th>
+                  <th>Attendance</th>
+                  <th>Tasks Assigned</th>
+                  <th>Tasks Completed</th>
+                  <th>Last Review</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${targets.map(emp => `
+                  <tr>
+                    <td>${emp.id}</td>
+                    <td><strong>${emp.name}</strong></td>
+                    <td>${emp.department || 'N/A'}</td>
+                    <td>${emp.designation || 'N/A'}</td>
+                    <td><span class="score-badge">${emp.kpiScore}%</span></td>
+                    <td>${emp.productivity}%</td>
+                    <td>${emp.attendancePct || 90}%</td>
+                    <td>${emp.tasksAssigned || 0}</td>
+                    <td>${emp.tasksCompleted || 0}</td>
+                    <td>${emp.lastReviewDate || 'Never Reviewed'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(() => window.close(), 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setIsExportOpen(false);
+      return;
+    }
+
+    // CSV / Excel formats
+    const headers = [
+      ['KPI PERFORMANCE EXPORT REPORT'],
+      ['Report Type', reportType.toUpperCase()],
+      ['Date Scope', dateRange],
+      ['Generated At', new Date().toLocaleString()],
+      [],
+      ['Employee ID', 'Name', 'Department', 'Designation', 'KPI Score (%)', 'Productivity (%)', 'Attendance (%)', 'Tasks Assigned', 'Tasks Completed', 'Last Review Date']
+    ];
+
+    targets.forEach(emp => {
+      headers.push([
+        emp.id,
+        emp.name,
+        emp.department || 'N/A',
+        emp.designation || 'N/A',
+        `${emp.kpiScore}%`,
+        `${emp.productivity}%`,
+        `${emp.attendancePct || 90}%`,
+        emp.tasksAssigned || 0,
+        emp.tasksCompleted || 0,
+        emp.lastReviewDate || 'Never'
+      ]);
+    });
+
+    const fileContent = "\ufeff" + headers.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const mimeType = format === 'Excel' ? 'application/vnd.ms-excel;charset=utf-8;' : 'text/csv;charset=utf-8;';
+    const fileExtension = format === 'Excel' ? 'xls' : 'csv';
+
+    const blob = new Blob([fileContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${filename}.${fileExtension}`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    addToast('success', `${format} report exported successfully!`);
+    setIsExportOpen(false);
   };
 
   /* ── Derived Statistics ───────────────────────────────────── */
@@ -1313,6 +1487,121 @@ const Performance = () => {
           </div>
         )}
       </SlideOver>
+
+      {/* ── Export Results Modal Form ── */}
+      {isExportOpen && (
+        <Modal
+          isOpen={isExportOpen}
+          onClose={() => setIsExportOpen(false)}
+          title="Export Performance & KPI Analytics Report"
+        >
+          <form onSubmit={handleExportSubmit}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Report Type</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.reportType}
+                  onChange={(e) => setExportOptions({
+                    ...exportOptions,
+                    reportType: e.target.value,
+                    employeeId: e.target.value === 'All Employees' ? '' : exportOptions.employeeId || (employees[0]?.id || '')
+                  })}
+                >
+                  <option value="All Employees">All Employees KPI Audit</option>
+                  <option value="Specific Employee">Specific Employee Evaluation</option>
+                </select>
+              </div>
+
+              {exportOptions.reportType === 'Specific Employee' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Select Employee</label>
+                  <select
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                    value={exportOptions.employeeId}
+                    onChange={(e) => setExportOptions({ ...exportOptions, employeeId: e.target.value })}
+                    required
+                  >
+                    <option value="">— Select Employee —</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.department} • {emp.designation})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Date Scope (Last Appraisal Date)</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.dateRange}
+                  onChange={(e) => setExportOptions({ ...exportOptions, dateRange: e.target.value })}
+                >
+                  <option value="AllTime">All Time</option>
+                  <option value="Today">Today</option>
+                  <option value="Weekly">Weekly (Last 7 Days)</option>
+                  <option value="Monthly">Monthly (Last 30 Days)</option>
+                  <option value="Yearly">Yearly (Last 365 Days)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Export Format</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.format}
+                  onChange={(e) => setExportOptions({ ...exportOptions, format: e.target.value })}
+                >
+                  <option value="CSV">Standard CSV File (.csv)</option>
+                  <option value="Excel">Microsoft Excel Sheet (.xls)</option>
+                  <option value="PDF">Adobe PDF Document (.pdf)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <Button type="button" variant="ghost" onClick={() => setIsExportOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary">
+                  Compile & Export
+                </Button>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
 
     </div>
   );

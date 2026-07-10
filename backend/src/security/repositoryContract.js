@@ -190,6 +190,15 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
 
   // 2. Validate Field Level Constraints on Updates
   if (operation === 'update' && updatePayload) {
+    try {
+      const fs = await import('fs');
+      const logMsg = `[${new Date().toISOString()}] moduleName: ${moduleName}, role: ${context.role}, updatePayload: ${JSON.stringify(updatePayload)}\n`;
+      fs.appendFileSync('security_debug.log', logMsg);
+      const restrictedFields = getRestrictedFields(moduleName, context.role);
+      fs.appendFileSync('security_debug.log', `[${new Date().toISOString()}] restrictedFields: ${JSON.stringify(restrictedFields)}\n`);
+    } catch (e) {
+      console.error('Failed to write security debug log:', e);
+    }
     const restrictedFields = getRestrictedFields(moduleName, context.role);
     for (const field of restrictedFields) {
       if (updatePayload[field] !== undefined && String(updatePayload[field] ?? '') !== String(resource[field] ?? '')) {

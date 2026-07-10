@@ -263,7 +263,8 @@ const TaskMonitoring = () => {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [projectFilter, setProjectFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('due_today');
+  const [customDateFilter, setCustomDateFilter] = useState('');
 
   // Sort states for List Tables
   const [teamSortKey, setTeamSortKey] = useState('productivity');
@@ -326,7 +327,7 @@ const TaskMonitoring = () => {
     description: '',
     dueDate: '',
     priority: 'Medium',
-    assigneeId: ''
+    assigneeIds: []
   });
 
   // Filter assignees to only show members of the selected project
@@ -350,9 +351,10 @@ const TaskMonitoring = () => {
 
   // Filter assignees to only show members of the selected project for editing
   const filteredAssigneesForEdit = useMemo(() => {
-    const projId = editForm.projectId || selectedTask?.projectId;
-    if (!projId) return [];
-    const selectedProj = (projectsList || []).find(p => p.id === projId);
+    if (!selectedTask) return [];
+    const selectedProj = (projectsList || []).find(p => 
+      p && Array.isArray(p.tasks) && p.tasks.some(t => t && t.id === selectedTask.id)
+    );
     if (!selectedProj) return [];
     const projectMembers = selectedProj.members || [];
     const projectLeader = selectedProj.leader;
@@ -365,7 +367,7 @@ const TaskMonitoring = () => {
       const isManager = projectManager && (projectManager || '').trim().toLowerCase() === empNameLower;
       return isMember || isLeader || isManager;
     });
-  }, [editForm.projectId, selectedTask?.projectId, projectsList, scopedEmployees]);
+  }, [selectedTask, projectsList, scopedEmployees]);
 
   // Lifecycle Modal States
   const [isRejectOpen, setIsRejectOpen] = useState(false);
@@ -387,7 +389,8 @@ const TaskMonitoring = () => {
   const [exportOptions, setExportOptions] = useState({
     reportType: 'Task Report',
     dateRange: 'Last 30 days',
-    format: 'CSV'
+    format: 'CSV',
+    employeeId: ''
   });
 
   // Dynamic Date Check constant
@@ -507,11 +510,20 @@ const TaskMonitoring = () => {
       if (dateFilter !== 'all') {
         const createdDate = t.createdAt?.split('T')[0];
         if (dateFilter === 'today' && createdDate !== todayStr) return false;
+        if (dateFilter === 'due_today' && t.dueDate !== todayStr) return false;
+        if (dateFilter === 'due_this_week') {
+          const today = new Date(todayStr);
+          const taskDate = new Date(t.dueDate);
+          const diffTime = taskDate - today;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays < 0 || diffDays > 7) return false;
+        }
+        if (dateFilter === 'custom' && customDateFilter && t.dueDate !== customDateFilter) return false;
       }
 
       return true;
     });
-  }, [scopedTasksList, activeCardFilter, searchTerm, statusFilter, priorityFilter, deptFilter, projectFilter, dateFilter]);
+  }, [scopedTasksList, activeCardFilter, searchTerm, statusFilter, priorityFilter, deptFilter, projectFilter, dateFilter, customDateFilter]);
 
   // Calculate tables data dynamically
   const employeeSummaries = useMemo(() => {
@@ -676,13 +688,35 @@ const TaskMonitoring = () => {
     if (!editForm.title.trim() || isEditingTaskDetails) return;
     setIsEditingTaskDetails(true);
     try {
+      const primaryAssigneeId = editForm.assigneeIds && editForm.assigneeIds.length > 0
+        ? editForm.assigneeIds[0]
+        : '';
+
       const success = await editTask(selectedTask.id, {
         title: editForm.title.trim(),
         description: editForm.description.trim(),
         dueDate: editForm.dueDate,
         priority: editForm.priority,
-        assigneeId: editForm.assigneeId
+        assigneeId: primaryAssigneeId
       });
+
+      if (success && editForm.assigneeIds && editForm.assigneeIds.length > 1) {
+        const extraAssigneeIds = editForm.assigneeIds.slice(1);
+        const parentProject = projectsList.find(p => p.tasks.some(t => t.id === selectedTask.id));
+        if (parentProject) {
+          for (const assigneeId of extraAssigneeIds) {
+            await addTask({
+              projectId: parentProject.id,
+              title: editForm.title.trim(),
+              description: editForm.description.trim(),
+              dueDate: editForm.dueDate,
+              priority: editForm.priority,
+              assigneeId
+            });
+          }
+        }
+      }
+
       if (success) {
         setIsEditOpen(false);
       }
@@ -703,7 +737,11 @@ const TaskMonitoring = () => {
 
     if (reportType === 'Task Report') {
       headers = ['Task ID', 'Title', 'Project', 'Assignee Name', 'Department', 'Due Date', 'Priority', 'Progress (%)', 'Status', 'Overdue'];
-      rows = filteredTasks.map(t => [
+      let targetTasks = filteredTasks;
+      if (exportOptions.employeeId) {
+        targetTasks = targetTasks.filter(t => t.assigneeId === exportOptions.employeeId);
+      }
+      rows = targetTasks.map(t => [
         t.id || '',
         t.title || '',
         t.project || '',
@@ -717,7 +755,11 @@ const TaskMonitoring = () => {
       ]);
     } else if (reportType === 'Employee Report') {
       headers = ['Employee ID', 'Employee Name', 'Department', 'Branch', 'Total Tasks', 'Completed', 'Pending', 'Overdue', 'Productivity Score (%)', 'Performance Rating'];
-      rows = employeeSummaries.map(emp => [
+      let targetEmployees = employeeSummaries;
+      if (exportOptions.employeeId) {
+        targetEmployees = targetEmployees.filter(emp => emp.id === exportOptions.employeeId);
+      }
+      rows = targetEmployees.map(emp => [
         emp.id || '',
         emp.name || '',
         emp.department || '',
@@ -1169,12 +1211,33 @@ const TaskMonitoring = () => {
             <option value="">All Projects</option>
             {projectSummaries.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
-          <select value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
+          <select value={dateFilter} onChange={e => { setDateFilter(e.target.value); if (e.target.value !== 'custom') setCustomDateFilter(''); }}>
             <option value="all">All Dates</option>
             <option value="today">Created Today</option>
+            <option value="due_today">Due Today</option>
+            <option value="due_this_week">Due This Week</option>
+            <option value="custom">Select Custom Date...</option>
           </select>
-          {(searchTerm || statusFilter || priorityFilter || deptFilter || projectFilter || dateFilter !== 'all' || activeCardFilter !== 'all') && (
-            <Button variant="ghost" onClick={() => { setSearchTerm(''); setStatusFilter(''); setPriorityFilter(''); setDeptFilter(''); setProjectFilter(''); setDateFilter('all'); setActiveCardFilter('all'); }}>Clear</Button>
+          {dateFilter === 'custom' && (
+            <input
+              type="date"
+              value={customDateFilter}
+              max={todayStr}
+              onChange={e => setCustomDateFilter(e.target.value)}
+              style={{
+                padding: '10px 14px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-primary)',
+                fontSize: '0.875rem',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            />
+          )}
+          {(searchTerm || statusFilter || priorityFilter || deptFilter || projectFilter || dateFilter !== 'due_today' || customDateFilter || activeCardFilter !== 'all') && (
+            <Button variant="ghost" onClick={() => { setSearchTerm(''); setStatusFilter(''); setPriorityFilter(''); setDeptFilter(''); setProjectFilter(''); setDateFilter('due_today'); setCustomDateFilter(''); setActiveCardFilter('all'); }}>Clear</Button>
           )}
         </div>
       </div>
@@ -2036,7 +2099,7 @@ const TaskMonitoring = () => {
                         description: selectedTask.description || '',
                         dueDate: selectedTask.dueDate,
                         priority: selectedTask.priority || 'Medium',
-                        assigneeId: selectedTask.assigneeId || ''
+                        assigneeIds: selectedTask.assigneeId ? [selectedTask.assigneeId] : []
                       });
                       setIsEditOpen(true);
                     }} icon={Edit}>Edit</Button>
@@ -2198,25 +2261,12 @@ const TaskMonitoring = () => {
           </div>
           <div className="form-field">
             <label>Assign To</label>
-            <select
-              value={editForm.assigneeId}
-              onChange={e => setEditForm(prev => ({ ...prev, assigneeId: e.target.value }))}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: 'var(--bg-elevated, #1e293b)',
-                border: '1px solid var(--border-color, #334155)',
-                borderRadius: '6px',
-                color: 'var(--text-primary, #f8fafc)',
-                fontSize: '0.875rem',
-                outline: 'none'
-              }}
-            >
-              <option value="">Unassigned</option>
-              {(filteredAssigneesForEdit || []).map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
-              ))}
-            </select>
+            <MultiSelectDropdown
+              options={(filteredAssigneesForEdit || []).map(emp => ({ value: emp.id, label: `${emp.name} (${emp.id})` }))}
+              selectedValues={editForm.assigneeIds || []}
+              onChange={vals => setEditForm(prev => ({ ...prev, assigneeIds: vals }))}
+              placeholder="Select assignee(s)..."
+            />
           </div>
         </div>
       </Modal>
@@ -2243,6 +2293,17 @@ const TaskMonitoring = () => {
               <option value="Team Report">Team Performance Analysis</option>
             </select>
           </div>
+          {exportOptions.reportType !== 'Team Report' && currentUserRole !== 'employee' && (
+            <div className="form-field">
+              <label>Select Employee</label>
+              <select value={exportOptions.employeeId} onChange={e => setExportOptions(prev => ({ ...prev, employeeId: e.target.value }))}>
+                <option value="">All Employees</option>
+                {scopedEmployees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="form-field">
             <label>Date Scope</label>
             <select value={exportOptions.dateRange} onChange={e => setExportOptions(prev => ({ ...prev, dateRange: e.target.value }))}>

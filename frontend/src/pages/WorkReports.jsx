@@ -276,6 +276,13 @@ const WorkReports = () => {
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, directory, submit, calendar, analytics, leaderboards, logs
 
   const [timeFilter, setTimeFilter] = useState('AllTime'); // 'AllTime' | 'Today' | 'Weekly' | 'Monthly' | 'Yearly'
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportOptions, setExportOptions] = useState({
+    reportType: 'All Reports',
+    employeeId: '',
+    dateRange: 'AllTime',
+    format: 'CSV'
+  });
 
   const reports = useMemo(() => {
     let filtered = rawReports;
@@ -824,11 +831,53 @@ const WorkReports = () => {
   };
 
   /* Export system trigger */
-  const handleExportSystem = (format) => {
-    if (filtered.length === 0) {
-      addToast('warning', 'No reports available to export.');
+  const handleExportSystem = (options) => {
+    const reportType = options.reportType;
+    const format = options.format;
+    const dateRange = options.dateRange;
+    const employeeId = options.employeeId;
+
+    let targetReports = reports; // already scoped by role
+
+    if (reportType === 'Employee Report' && employeeId) {
+      targetReports = targetReports.filter(r => r.employeeId === employeeId);
+    }
+
+    if (dateRange !== 'AllTime') {
+      const parseDate = (dStr) => {
+        if (!dStr) return new Date();
+        const [y, m, d] = dStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      };
+      const refDate = parseDate(new Date().toISOString().slice(0, 10));
+
+      targetReports = targetReports.filter(r => {
+        if (!r.date) return false;
+        const rDate = parseDate(r.date);
+        const diffTime = refDate.getTime() - rDate.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+        if (dateRange === 'Today') {
+          return r.date === new Date().toISOString().slice(0, 10);
+        }
+        if (dateRange === 'Weekly') {
+          return diffDays >= 0 && diffDays < 7;
+        }
+        if (dateRange === 'Monthly') {
+          return diffDays >= 0 && diffDays < 30;
+        }
+        if (dateRange === 'Yearly') {
+          return diffDays >= 0 && diffDays < 365;
+        }
+        return true;
+      });
+    }
+
+    if (targetReports.length === 0) {
+      addToast('warning', 'No reports available to export for the selected filters.');
       return;
     }
+    
     setExporting(true);
     setTimeout(() => {
       try {
@@ -851,7 +900,7 @@ const WorkReports = () => {
           'Remarks/Feedback'
         ];
 
-        const rows = filtered.map(r => [
+        const rows = targetReports.map(r => [
           r.id || '',
           r.employeeId || '',
           r.employeeName || '',
@@ -870,26 +919,65 @@ const WorkReports = () => {
           (r.feedback || r.remarks || '').replace(/"/g, '""')
         ]);
 
-        const csvContent = [
-          headers.join(','),
-          ...rows.map(row => row.map(val => `"${val}"`).join(','))
-        ].join('\n');
+        if (format === 'PDF') {
+          const printWindow = window.open('', '_blank');
+          if (printWindow) {
+            const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+            const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+            printWindow.document.write(`
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <title>Work Reports Export</title>
+                  <style>
+                    body { font-family: sans-serif; padding: 20px; color: #334155; }
+                    h1 { color: #0f172a; margin-bottom: 5px; }
+                    p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                    td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                    tr:nth-child(even) td { background-color: #f8fafc; }
+                  </style>
+                </head>
+                <body>
+                  <h1>Work Reports Export</h1>
+                  <p>Generated on: ${new Date().toLocaleString()} | Scope: ${dateRange}</p>
+                  <table>
+                    <thead><tr>${tableHeadersHTML}</tr></thead>
+                    <tbody>${tableRowsHTML}</tbody>
+                  </table>
+                  <script>
+                    window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+                  </script>
+                </body>
+              </html>
+            `);
+            printWindow.document.close();
+            addToast('success', 'PDF Print window opened.');
+          }
+        } else {
+          const csvContent = "\ufeff" + [
+            headers.join(','),
+            ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+          ].join('\n');
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `work_reports_export_${new Date().toISOString().slice(0, 10)}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', `work_reports_export_${new Date().toISOString().slice(0, 10)}.${format === 'Excel' ? 'xls' : 'csv'}`);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
 
+          const msg = isEmployee
+            ? `My Work Reports exported successfully in ${format} format.`
+            : `Daily Work Reports exported successfully in ${format} format.`;
+          addToast('success', msg);
+        }
         setExporting(false);
-        const msg = isEmployee
-          ? `My Work Reports exported successfully in ${format} format.`
-          : `Daily Work Reports exported successfully in ${format} format.`;
-        addToast('success', msg);
       } catch (err) {
         console.error('Failed to export reports:', err);
         setExporting(false);
@@ -1050,7 +1138,7 @@ const WorkReports = () => {
                   </select>
                 </div>
               )}
-              <Button variant="ghost" size="sm" icon={Download} onClick={() => handleExportSystem('CSV')}>
+              <Button variant="ghost" size="sm" icon={Download} onClick={() => setIsExportOpen(true)}>
                 {exporting ? 'Exporting...' : 'Export My Reports'}
               </Button>
             </div>
@@ -1302,7 +1390,7 @@ const WorkReports = () => {
             </select>
           </div>
           
-          <Button variant="ghost" size="sm" icon={Download} onClick={() => handleExportSystem('CSV')}>
+          <Button variant="ghost" size="sm" icon={Download} onClick={() => setIsExportOpen(true)}>
             {exporting ? 'Exporting...' : (isEmployee ? 'Export My Reports' : 'Export Directory')}
           </Button>
         </div>
@@ -2206,6 +2294,106 @@ const WorkReports = () => {
           </div>
         )}
       </SlideOver>
+
+      {/* ── Export Work Reports Modal ── */}
+      <Modal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        title="Export Daily Work Reports"
+        size="sm"
+        footer={
+          <div className="modal-actions-wrapper" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <Button variant="secondary" onClick={() => setIsExportOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={() => { handleExportSystem(exportOptions); setIsExportOpen(false); }}>Export Report</Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+          <div className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Report Type</label>
+            <select
+              value={exportOptions.reportType}
+              onChange={e => setExportOptions(prev => ({ ...prev, reportType: e.target.value }))}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem'
+              }}
+            >
+              <option value="All Reports">All Work Reports</option>
+              <option value="Employee Report">Employee Work Reports</option>
+            </select>
+          </div>
+
+          {exportOptions.reportType === 'Employee Report' && !isEmployee && (
+            <div className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Employee</label>
+              <select
+                value={exportOptions.employeeId}
+                onChange={e => setExportOptions(prev => ({ ...prev, employeeId: e.target.value }))}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem'
+                }}
+              >
+                <option value="">-- Choose Employee --</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Date Scope</label>
+            <select
+              value={exportOptions.dateRange}
+              onChange={e => setExportOptions(prev => ({ ...prev, dateRange: e.target.value }))}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem'
+              }}
+            >
+              <option value="AllTime">All Time</option>
+              <option value="Today">Today</option>
+              <option value="Weekly">Weekly (Last 7 Days)</option>
+              <option value="Monthly">Monthly (Last 30 Days)</option>
+              <option value="Yearly">Yearly (Last 365 Days)</option>
+            </select>
+          </div>
+
+          <div className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Download Format</label>
+            <select
+              value={exportOptions.format}
+              onChange={e => setExportOptions(prev => ({ ...prev, format: e.target.value }))}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem'
+              }}
+            >
+              <option value="CSV">Comma Separated (CSV)</option>
+              <option value="Excel">Microsoft Excel (XLS)</option>
+              <option value="PDF">Document Format (PDF)</option>
+            </select>
+          </div>
+        </div>
+      </Modal>
 
     </div>
   );
