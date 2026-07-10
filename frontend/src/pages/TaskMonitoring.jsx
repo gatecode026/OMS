@@ -13,10 +13,129 @@ import {
 import {
   KanbanSquare, Plus, AlertCircle, Calendar, Flag, Trophy, Award, Search,
   SlidersHorizontal, ChevronDown, ChevronUp, UserCheck, Clock, RefreshCw, Send,
-  CheckSquare, MessageSquare, Download, PanelRightClose, Trash2, Eye, User, FileCode, Check, X,
+  CheckSquare, MessageSquare, Download, PanelRightClose, Trash2, Eye, User, FileCode, Check, X, Edit,
   AlertTriangle, Play, HelpCircle, ThumbsUp, RotateCcw, Hourglass, ClipboardCheck,
   CheckCircle2, XCircle, ArrowRight, Activity, Zap, Star
 } from 'lucide-react';
+
+const MultiSelectDropdown = ({ options, selectedValues, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = React.useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleToggle = (val) => {
+    if (selectedValues.includes(val)) {
+      onChange(selectedValues.filter(v => v !== val));
+    } else {
+      onChange([...selectedValues, val]);
+    }
+  };
+
+  const displayText = selectedValues.length > 0 
+    ? options.filter(o => selectedValues.includes(o.value)).map(o => o.label).join(', ')
+    : placeholder;
+
+  return (
+    <div ref={containerRef} className="custom-multiselect-container" style={{ position: 'relative', width: '100%' }}>
+      <div 
+        className="custom-multiselect-trigger" 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'var(--bg-elevated, #1e293b)',
+          border: '1px solid var(--border-color, #334155)',
+          borderRadius: '6px',
+          color: selectedValues.length > 0 ? 'var(--text-primary, #f8fafc)' : 'var(--text-muted, #64748b)',
+          padding: '10px 14px',
+          fontSize: '0.875rem',
+          cursor: 'pointer',
+          userSelect: 'none',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          minHeight: '40px'
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90%' }}>{displayText}</span>
+        <ChevronDown size={16} style={{ color: 'var(--text-muted, #64748b)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none' }} />
+      </div>
+
+      {isOpen && (
+        <div 
+          className="custom-multiselect-dropdown" 
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            background: 'var(--bg-elevated, #1e293b)',
+            border: '1px solid var(--border-color, #334155)',
+            borderRadius: '6px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15)',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            zIndex: 1000,
+            padding: '4px'
+          }}
+        >
+          {options.length === 0 ? (
+            <div style={{ padding: '8px 12px', fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>No options available</div>
+          ) : (
+            options.map(opt => {
+              const isChecked = selectedValues.includes(opt.value);
+              return (
+                <label 
+                  key={opt.value} 
+                  className="custom-multiselect-item"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary, #f8fafc)',
+                    transition: 'background 0.15s',
+                    margin: '2px 0',
+                    userSelect: 'none'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={isChecked} 
+                    onChange={() => handleToggle(opt.value)}
+                    style={{
+                      cursor: 'pointer',
+                      accentColor: 'var(--color-primary, #6366f1)',
+                      width: '14px',
+                      height: '14px',
+                      margin: 0
+                    }}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const TaskMonitoring = () => {
   const isLoading = usePageLoading(600);
@@ -30,6 +149,7 @@ const TaskMonitoring = () => {
     updateTaskProgress,
     addTask,
     deleteTask,
+    editTask,
     reassignTask,
     extendTaskDeadline,
     escalateTask,
@@ -190,17 +310,49 @@ const TaskMonitoring = () => {
 
   // Create Task Form State
   const [createForm, setCreateForm] = useState({
-    projectId: '',
+    projectIds: [],
     title: '',
     dueDate: new Date().toISOString().split('T')[0],
+    priority: 'Medium',
+    assigneeIds: []
+  });
+
+  // Edit Task Form State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isEditingTaskDetails, setIsEditingTaskDetails] = useState(false);
+  const [editForm, setEditForm] = useState({
+    projectId: '',
+    title: '',
+    description: '',
+    dueDate: '',
     priority: 'Medium',
     assigneeId: ''
   });
 
   // Filter assignees to only show members of the selected project
   const filteredAssignees = useMemo(() => {
-    if (!createForm.projectId) return [];
-    const selectedProj = (projectsList || []).find(p => p.id === createForm.projectId);
+    if (!createForm.projectIds || createForm.projectIds.length === 0) return [];
+    const allEmailsOrNames = new Set();
+    createForm.projectIds.forEach(projId => {
+      const selectedProj = (projectsList || []).find(p => p.id === projId);
+      if (selectedProj) {
+        (selectedProj.members || []).forEach(m => allEmailsOrNames.add((m || '').trim().toLowerCase()));
+        if (selectedProj.leader) allEmailsOrNames.add(selectedProj.leader.trim().toLowerCase());
+        if (selectedProj.manager) allEmailsOrNames.add(selectedProj.manager.trim().toLowerCase());
+      }
+    });
+
+    return scopedEmployees.filter(emp => {
+      const empNameLower = (emp.name || '').trim().toLowerCase();
+      return allEmailsOrNames.has(empNameLower);
+    });
+  }, [createForm.projectIds, projectsList, scopedEmployees]);
+
+  // Filter assignees to only show members of the selected project for editing
+  const filteredAssigneesForEdit = useMemo(() => {
+    const projId = editForm.projectId || selectedTask?.projectId;
+    if (!projId) return [];
+    const selectedProj = (projectsList || []).find(p => p.id === projId);
     if (!selectedProj) return [];
     const projectMembers = selectedProj.members || [];
     const projectLeader = selectedProj.leader;
@@ -213,7 +365,7 @@ const TaskMonitoring = () => {
       const isManager = projectManager && (projectManager || '').trim().toLowerCase() === empNameLower;
       return isMember || isLeader || isManager;
     });
-  }, [createForm.projectId, projectsList, scopedEmployees]);
+  }, [editForm.projectId, selectedTask?.projectId, projectsList, scopedEmployees]);
 
   // Lifecycle Modal States
   const [isRejectOpen, setIsRejectOpen] = useState(false);
@@ -226,10 +378,10 @@ const TaskMonitoring = () => {
 
   // When projectsList loads, default the select option
   useEffect(() => {
-    if (projectsList && projectsList.length > 0 && !createForm.projectId) {
-      setCreateForm(prev => ({ ...prev, projectId: projectsList[0].id }));
+    if (projectsList && projectsList.length > 0 && (!createForm.projectIds || createForm.projectIds.length === 0)) {
+      setCreateForm(prev => ({ ...prev, projectIds: [projectsList[0].id] }));
     }
-  }, [projectsList]);
+  }, [projectsList, createForm.projectIds]);
 
   // Export Options State
   const [exportOptions, setExportOptions] = useState({
@@ -481,22 +633,63 @@ const TaskMonitoring = () => {
 
   // Form submits handlers
   const handleCreateTask = async () => {
-    if (!createForm.projectId || !createForm.title.trim() || isCreating) return;
+    if (!createForm.projectIds || createForm.projectIds.length === 0 || !createForm.title.trim() || isCreating) return;
     setIsCreating(true);
     try {
-      await addTask(createForm);
+      for (const projectId of createForm.projectIds) {
+        if (createForm.assigneeIds && createForm.assigneeIds.length > 0) {
+          for (const assigneeId of createForm.assigneeIds) {
+            await addTask({
+              projectId,
+              title: createForm.title.trim(),
+              dueDate: createForm.dueDate,
+              priority: createForm.priority,
+              assigneeId
+            });
+          }
+        } else {
+          await addTask({
+            projectId,
+            title: createForm.title.trim(),
+            dueDate: createForm.dueDate,
+            priority: createForm.priority,
+            assigneeId: ''
+          });
+        }
+      }
       setIsCreateOpen(false);
       setCreateForm({
-        projectId: projectsList[0]?.id || '',
+        projectIds: [projectsList[0]?.id || ''],
         title: '',
         dueDate: new Date().toISOString().split('T')[0],
         priority: 'Medium',
-        assigneeId: ''
+        assigneeIds: []
       });
     } catch (err) {
       console.error(err);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleEditTaskSubmit = async () => {
+    if (!editForm.title.trim() || isEditingTaskDetails) return;
+    setIsEditingTaskDetails(true);
+    try {
+      const success = await editTask(selectedTask.id, {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        dueDate: editForm.dueDate,
+        priority: editForm.priority,
+        assigneeId: editForm.assigneeId
+      });
+      if (success) {
+        setIsEditOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsEditingTaskDetails(false);
     }
   };
 
@@ -1834,19 +2027,34 @@ const TaskMonitoring = () => {
 
               <div className="slide-over-footer flex-row justify-between">
                 <Button variant="secondary" onClick={() => setIsDetailOpen(false)}>Close</Button>
-                {currentUserRole !== 'employee' && hasPermission('task_monitoring', 'delete') && (
-                  <Button variant="danger" disabled={isDeletingTask} onClick={() => {
-                    showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, async () => {
-                      setIsDeletingTask(true);
-                      try {
-                        await deleteTask(selectedTask.id);
-                        setIsDetailOpen(false);
-                      } finally {
-                        setIsDeletingTask(false);
-                      }
-                    }, 'danger');
-                  }} icon={Trash2}>Delete</Button>
-                )}
+                <div className="flex-row gap-2">
+                  {currentUserRole !== 'employee' && (
+                    <Button variant="primary" onClick={() => {
+                      setEditForm({
+                        projectId: selectedTask.projectId || '',
+                        title: selectedTask.title,
+                        description: selectedTask.description || '',
+                        dueDate: selectedTask.dueDate,
+                        priority: selectedTask.priority || 'Medium',
+                        assigneeId: selectedTask.assigneeId || ''
+                      });
+                      setIsEditOpen(true);
+                    }} icon={Edit}>Edit</Button>
+                  )}
+                  {currentUserRole !== 'employee' && hasPermission('task_monitoring', 'delete') && (
+                    <Button variant="danger" disabled={isDeletingTask} onClick={() => {
+                      showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, async () => {
+                        setIsDeletingTask(true);
+                        try {
+                          await deleteTask(selectedTask.id);
+                          setIsDetailOpen(false);
+                        } finally {
+                          setIsDeletingTask(false);
+                        }
+                      }, 'danger');
+                    }} icon={Trash2}>Delete</Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1862,7 +2070,7 @@ const TaskMonitoring = () => {
         footer={
           <div className="modal-actions-wrapper">
             <Button variant="secondary" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleCreateTask} disabled={!createForm.projectId || !createForm.title.trim() || isCreating}>
+            <Button variant="primary" onClick={handleCreateTask} disabled={!createForm.projectIds || createForm.projectIds.length === 0 || !createForm.title.trim() || isCreating}>
                {isCreating ? 'Creating...' : 'Create Task'}
             </Button>
           </div>
@@ -1871,16 +2079,12 @@ const TaskMonitoring = () => {
         <div className="create-task-form-body">
           <div className="form-field">
             <label>Target Project *</label>
-            <select
-              value={createForm.projectId}
-              onChange={e => setCreateForm(prev => ({ ...prev, projectId: e.target.value, assigneeId: '' }))}
-              required
-            >
-              <option value="">Select a project...</option>
-              {(projectsList || []).map(p => (
-                <option key={p.id} value={p.id}>{p.id} - {p.name}</option>
-              ))}
-            </select>
+            <MultiSelectDropdown
+              options={(projectsList || []).map(p => ({ value: p.id, label: `${p.id} - ${p.name}` }))}
+              selectedValues={createForm.projectIds || []}
+              onChange={vals => setCreateForm(prev => ({ ...prev, projectIds: vals, assigneeIds: [] }))}
+              placeholder="Select project(s)..."
+            />
           </div>
           <div className="form-field">
             <label>Task Title *</label>
@@ -1915,12 +2119,101 @@ const TaskMonitoring = () => {
           </div>
           <div className="form-field">
             <label>Assign To</label>
+            <MultiSelectDropdown
+              options={(filteredAssignees || []).map(emp => ({ value: emp.id, label: `${emp.name} (${emp.id})` }))}
+              selectedValues={createForm.assigneeIds || []}
+              onChange={vals => setCreateForm(prev => ({ ...prev, assigneeIds: vals }))}
+              placeholder="Select assignee(s)..."
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Edit Task Modal ── */}
+      <Modal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        title="Edit Project Task"
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleEditTaskSubmit} disabled={!editForm.title.trim() || isEditingTaskDetails}>
+               {isEditingTaskDetails ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="create-task-form-body">
+          <div className="form-field">
+            <label>Task Title *</label>
+            <input
+              type="text"
+              placeholder="Task Title"
+              value={editForm.title}
+              onChange={e => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label>Description</label>
+            <textarea
+              placeholder="No description provided."
+              value={editForm.description}
+              onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+              rows={4}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: 'var(--bg-elevated, #1e293b)',
+                border: '1px solid var(--border-color, #334155)',
+                borderRadius: '6px',
+                color: 'var(--text-primary, #f8fafc)',
+                fontSize: '0.875rem',
+                resize: 'vertical',
+                outline: 'none'
+              }}
+            />
+          </div>
+          <div className="form-field">
+            <label>Task Due Date *</label>
+            <input
+              type="date"
+              value={editForm.dueDate}
+              onChange={e => setEditForm(prev => ({ ...prev, dueDate: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label>Priority</label>
             <select
-              value={createForm.assigneeId}
-              onChange={e => setCreateForm(prev => ({ ...prev, assigneeId: e.target.value }))}
+              value={editForm.priority}
+              onChange={e => setEditForm(prev => ({ ...prev, priority: e.target.value }))}
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Critical">Critical</option>
+            </select>
+          </div>
+          <div className="form-field">
+            <label>Assign To</label>
+            <select
+              value={editForm.assigneeId}
+              onChange={e => setEditForm(prev => ({ ...prev, assigneeId: e.target.value }))}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: 'var(--bg-elevated, #1e293b)',
+                border: '1px solid var(--border-color, #334155)',
+                borderRadius: '6px',
+                color: 'var(--text-primary, #f8fafc)',
+                fontSize: '0.875rem',
+                outline: 'none'
+              }}
             >
               <option value="">Unassigned</option>
-              {(filteredAssignees || []).map(emp => (
+              {(filteredAssigneesForEdit || []).map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
               ))}
             </select>
