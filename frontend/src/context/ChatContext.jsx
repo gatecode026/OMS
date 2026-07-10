@@ -2311,6 +2311,9 @@ export const ChatProvider = ({ children }) => {
 
     socket.on('message_error', handleSendError);
     socket.on('message_upload_error', handleSendError);
+    socket.on('error', (err) => {
+      console.error('[Chat Socket] Global error event received:', err);
+    });
 
     // ── Conversation Cleared ──────────────────────────────────────────────
     socket.on('conversation:cleared', ({ conversationId }) => {
