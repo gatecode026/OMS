@@ -52,6 +52,19 @@ export const restore = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Employee restored successfully');
 });
 
+export const updateAvatar = asyncHandler(async (req, res) => {
+  const { avatar, photoUrl } = req.body;
+  if (!avatar && !photoUrl) {
+    return res.status(400).json({ status: 'fail', message: 'No avatar URL provided.' });
+  }
+  // Self-ownership check: any authenticated employee can only update their own avatar
+  if (req.params.id !== req.user.id) {
+    return res.status(403).json({ status: 'fail', message: 'Access denied: You can only update your own profile photo.' });
+  }
+  const data = await service.updateAvatarRecord(req.params.id, { avatar, photoUrl }, req.user);
+  return successResponse(res, data, 'Profile photo updated successfully');
+});
+
 export default {
   getAll,
   getById,
@@ -61,5 +74,6 @@ export default {
   getPublicData,
   getOpenWork,
   deactivate,
-  restore
+  restore,
+  updateAvatar
 };

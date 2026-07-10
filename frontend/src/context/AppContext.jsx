@@ -182,7 +182,8 @@ export const normalizeEmployee = (emp) => {
   normalized.mfaEnabled = normalized.mfaEnabled || { email: false, mobile: false, authenticator: false };
 
   // General fields
-  normalized.photoUrl = normalized.photoUrl || normalized.avatar || null;
+  normalized.avatar = unescapeHtml(normalized.avatar || null);
+  normalized.photoUrl = unescapeHtml(normalized.photoUrl || normalized.avatar || null);
   normalized.dob = normalized.dob || '';
   normalized.maritalStatus = normalized.maritalStatus || '';
   normalized.bloodGroup = normalized.bloodGroup || '';
@@ -503,7 +504,7 @@ export const AppProvider = ({ children }) => {
       const savedUserStr = localStorage.getItem('saas_user');
       if (savedUserStr) {
         try {
-          const savedUser = JSON.parse(savedUserStr);
+          const savedUser = normalizeEmployee(JSON.parse(savedUserStr));
           if (savedUser && savedUser.id === currentUserId && (savedUser.roleId === rawUserRole || savedUser.roleId === currentUserRole || getBaseRole(savedUser.roleId) === currentUserRole)) {
             setCurrentUser(savedUser);
             return;
@@ -518,7 +519,7 @@ export const AppProvider = ({ children }) => {
     let savedSuperAdmin = null;
     if (savedUserStr) {
       try {
-        const u = JSON.parse(savedUserStr);
+        const u = normalizeEmployee(JSON.parse(savedUserStr));
         if (u && u.roleId === 'super_admin') {
           savedSuperAdmin = u;
         }
@@ -978,7 +979,8 @@ export const AppProvider = ({ children }) => {
         throw new Error(result?.message || 'Authentication failed');
       }
 
-      const { user, token } = result.data;
+      const { user: rawUser, token } = result.data;
+      const user = normalizeEmployee(rawUser);
 
       // Save real credentials and token
       localStorage.setItem('saas_token', token);
@@ -2580,6 +2582,18 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Error creating employee:', err);
       addToast('error', 'Network error while creating employee');
+    }
+  };
+
+  // Local-only avatar patch — updates state + localStorage without any API call
+  const patchCurrentUserAvatar = (id, avatarUrl) => {
+    setEmployees(prev =>
+      prev.map(e => e.id === id ? { ...e, avatar: avatarUrl, photoUrl: avatarUrl } : e)
+    );
+    if (currentUser && (currentUser.id === id || currentUser.employeeId === id)) {
+      const updated = { ...currentUser, avatar: avatarUrl, photoUrl: avatarUrl };
+      setCurrentUser(updated);
+      localStorage.setItem('saas_user', JSON.stringify(updated));
     }
   };
 
@@ -5541,6 +5555,7 @@ export const AppProvider = ({ children }) => {
         closeConfirm,
         addEmployee,
         updateEmployee,
+        patchCurrentUserAvatar,
         deactivateEmployee,
         activateEmployee,
         restoreEmployee,

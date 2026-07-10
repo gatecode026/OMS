@@ -29,5 +29,6 @@ router.route('/:id')
 router.get('/:id/open-work', checkPermission('Employees', 'read'), controller.getOpenWork);
 router.post('/:id/deactivate', checkPermission('Employees', 'delete'), controller.deactivate);
 router.post('/:id/restore', checkPermission('Employees', 'delete'), controller.restore);
+router.patch('/:id/avatar', controller.updateAvatar);
 
 export default router;
