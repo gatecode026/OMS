@@ -1039,16 +1039,15 @@ const TaskMonitoring = () => {
         </div>
       );
       if (status === 'In Progress') return (
-        <div className="lifecycle-actions-row">
-          <Button {...btnProps} variant="info" onClick={() => handleSendToReview(task.id)} icon={Send}>
-            {isLoading ? 'Submitting...' : 'Send to Review'}
-          </Button>
+        <div className="lifecycle-waiting-msg" style={{ background: 'rgba(217, 70, 239, 0.05)', borderColor: 'rgba(217, 70, 239, 0.1)' }}>
+          <Hourglass size={14} style={{ color: 'var(--color-primary)' }} className="pulse-icon" />
+          <span style={{ fontSize: '0.8rem' }}>Submit daily work report to complete this task.</span>
         </div>
       );
       if (status === 'In Review') return (
         <div className="lifecycle-waiting-msg">
           <Hourglass size={14} className="pulse-icon" />
-          <span>Waiting for review by {task.assignedByName || 'the assigner'}...</span>
+          <span>Waiting for daily report review approval...</span>
         </div>
       );
       if (status === 'Completed') return (
@@ -1058,17 +1057,13 @@ const TaskMonitoring = () => {
         </div>
       );
     }
-
-    // REVIEWER ACTIONS (original assigner only)
+ 
+    // REVIEWER ACTIONS
     if (isReviewer) {
       if (status === 'In Review') return (
-        <div className="lifecycle-actions-row">
-          <Button {...btnProps} variant="success" onClick={() => handleApproveTask(task.id)} icon={ThumbsUp}>
-            {isLoading ? 'Approving...' : 'Approve'}
-          </Button>
-          <Button {...btnProps} variant="warning" onClick={() => handleReviewReassignOpen(task.id)} icon={RotateCcw}>
-            Reassign
-          </Button>
+        <div className="lifecycle-waiting-msg">
+          <Hourglass size={14} className="pulse-icon" />
+          <span>Approve the corresponding Daily Work Report to complete this task.</span>
         </div>
       );
     }
@@ -1081,8 +1076,8 @@ const TaskMonitoring = () => {
     return (
       <div className="task-monitoring-page grid-gap">
         <div className="card" style={{ height: '80px' }}><Skeleton variant="rect" height="100%" /></div>
-        <div className="kanban-grid-5col">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="kanban-grid-4col">
+          {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="card column-card" style={{ height: '400px' }}><Skeleton variant="rect" height="100%" /></div>
           ))}
         </div>
@@ -1272,12 +1267,11 @@ const TaskMonitoring = () => {
 
       {/* ── Section 5: KANBAN VIEW ── */}
       {activeView === 'kanban' && (
-        <div className="kanban-grid-5col">
+        <div className="kanban-grid-4col">
           {[
             { label: 'Pending Acceptance', dotClass: 'dot-var-pendingacceptance' },
             { label: 'To Do', dotClass: 'dot-var-todo' },
             { label: 'In Progress', dotClass: 'dot-var-inprogress' },
-            { label: 'In Review', dotClass: 'dot-var-inreview' },
             { label: 'Completed', dotClass: 'dot-var-completed' }
           ].map(({ label, dotClass }) => {
             const colTasks = filteredTasks.filter(t => getDisplayStatus(t.status) === label);

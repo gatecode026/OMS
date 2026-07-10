@@ -56,14 +56,22 @@
   width: 100%;
 }
 
+.kanban-grid-4col {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-4);
+  align-items: flex-start;
+  width: 100%;
+}
+
 @media (max-width: 1440px) {
-  .kanban-grid-5col {
+  .kanban-grid-5col, .kanban-grid-4col {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
 @media (max-width: 1024px) {
-  .kanban-grid-5col {
+  .kanban-grid-5col, .kanban-grid-4col {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -75,7 +83,7 @@
 }
 
 @media (max-width: 640px) {
-  .kanban-grid, .kanban-grid-5col {
+  .kanban-grid, .kanban-grid-5col, .kanban-grid-4col {
     grid-template-columns: 1fr;
   }
 }
