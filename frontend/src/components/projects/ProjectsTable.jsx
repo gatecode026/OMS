@@ -224,13 +224,6 @@ const ProjectsTable = ({ projects, onView, onEdit, onAssignTeam }) => {
                             >
                               <Edit2 size={13} />
                             </button>
-                            <button
-                              className={`${styles.actionBtn} ${styles.actionBtnAssign}`}
-                              onClick={() => onAssignTeam(p)}
-                              title="Assign Team"
-                            >
-                              <Users size={13} />
-                            </button>
                           </>
                         )}
                       </div>

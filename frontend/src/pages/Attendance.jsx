@@ -388,6 +388,13 @@ const Attendance = () => {
 
   // Mark Attendance state
   const [markModalOpen, setMarkModalOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportOptions, setExportOptions] = useState({
+    reportType: 'All Employees',
+    employeeId: '',
+    dateRange: 'AllTime',
+    format: 'CSV'
+  });
   const [selfAttModalOpen, setSelfAttModalOpen] = useState(false);
   const [markFormData, setMarkFormData] = useState({
     employeeId: '',
@@ -590,6 +597,181 @@ const Attendance = () => {
     const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     setMarkFormData(prev => ({ ...prev, punchOut: timeString }));
     addToast('info', `Punch Out time set to ${timeString}`);
+  };
+
+  const handleExportSubmit = (e) => {
+    e.preventDefault();
+    const { reportType, employeeId, dateRange, format } = exportOptions;
+
+    let targets = [...attendance];
+    if (reportType === 'Specific Employee' && employeeId) {
+      targets = targets.filter(rec => rec.employeeId === employeeId);
+    }
+
+    const now = new Date();
+    targets = targets.filter(rec => {
+      if (dateRange === 'AllTime' || dateRange === 'All') return true;
+      if (!rec.date) return false;
+      const recDate = new Date(rec.date);
+      const diffTime = Math.abs(now - recDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (dateRange === 'Today') return diffDays <= 1;
+      if (dateRange === 'Weekly') return diffDays <= 7;
+      if (dateRange === 'Monthly') return diffDays <= 30;
+      if (dateRange === 'Yearly') return diffDays <= 365;
+      return true;
+    });
+
+    targets.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const filename = `Attendance_Report_${new Date().toISOString().split('T')[0]}`;
+
+    if (format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${filename}</title>
+            <style>
+              body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                color: #1e293b;
+                margin: 40px;
+                background-color: #ffffff;
+              }
+              h2 {
+                color: #0f172a;
+                border-bottom: 2px solid #e2e8f0;
+                padding-bottom: 12px;
+                margin-bottom: 20px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              th, td {
+                border: 1px solid #cbd5e1;
+                padding: 10px 12px;
+                text-align: left;
+                font-size: 0.85rem;
+              }
+              th {
+                background-color: #f1f5f9;
+                font-weight: 600;
+              }
+              .status-present {
+                color: #059669;
+                font-weight: bold;
+              }
+              .status-absent {
+                color: #dc2626;
+                font-weight: bold;
+              }
+              .meta-info {
+                font-size: 0.85rem;
+                color: #64748b;
+                margin-bottom: 30px;
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Workforce Attendance Management Report</h2>
+            <div class="meta-info">
+              <strong>Generated At:</strong> ${new Date().toLocaleString()}<br/>
+              <strong>Date Scope:</strong> ${dateRange}<br/>
+              <strong>Scope:</strong> ${reportType === 'Specific Employee' ? 'Single Employee Timesheet' : 'Organization-wide Log Audit'}
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Punch In</th>
+                  <th>Punch Out</th>
+                  <th>Total Hours</th>
+                  <th>Source</th>
+                  <th>Work Mode</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${targets.map(rec => {
+                  const emp = (employees || []).find(e => e.id === rec.employeeId);
+                  const name = rec.employeeName || (emp ? emp.name : 'Unknown');
+                  return `
+                    <tr>
+                      <td>${rec.employeeId}</td>
+                      <td><strong>${name}</strong></td>
+                      <td>${rec.date}</td>
+                      <td><span class="${rec.status === 'Present' || rec.status === 'Late' ? 'status-present' : 'status-absent'}">${rec.status}</span></td>
+                      <td>${rec.punchIn || '--:--'}</td>
+                      <td>${rec.punchOut || '--:--'}</td>
+                      <td>${rec.totalHours || '00:00'}</td>
+                      <td>${rec.source || 'Biometric'}</td>
+                      <td>${rec.workMode || 'WFO'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(() => window.close(), 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setIsExportOpen(false);
+      return;
+    }
+
+    const headers = [
+      ['WORKFORCE ATTENDANCE EXPORT REPORT'],
+      ['Report Type', reportType.toUpperCase()],
+      ['Date Scope', dateRange],
+      ['Generated At', new Date().toLocaleString()],
+      [],
+      ['Employee ID', 'Name', 'Date', 'Status', 'Punch In', 'Punch Out', 'Total Hours', 'Source', 'Work Mode']
+    ];
+
+    targets.forEach(rec => {
+      const emp = (employees || []).find(e => e.id === rec.employeeId);
+      const name = rec.employeeName || (emp ? emp.name : 'Unknown');
+      headers.push([
+        rec.employeeId,
+        name,
+        rec.date,
+        rec.status,
+        rec.punchIn || '--:--',
+        rec.punchOut || '--:--',
+        rec.totalHours || '00:00',
+        rec.source || 'Biometric',
+        rec.workMode || 'WFO'
+      ]);
+    });
+
+    const fileContent = "\ufeff" + headers.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const mimeType = format === 'Excel' ? 'application/vnd.ms-excel;charset=utf-8;' : 'text/csv;charset=utf-8;';
+    const fileExtension = format === 'Excel' ? 'xls' : 'csv';
+
+    const blob = new Blob([fileContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${filename}.${fileExtension}`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    addToast('success', `${format} report exported successfully!`);
+    setIsExportOpen(false);
   };
 
   const handleMarkSubmit = () => {
@@ -1076,7 +1258,9 @@ const Attendance = () => {
       const matchesStatus = statusFilter 
         ? (statusFilter.toLowerCase() === 'on leave'
             ? (a.status?.toLowerCase() === 'on leave' || a.status?.toLowerCase() === 'leave' || a.status?.toLowerCase().includes('leave'))
-            : a.status?.toLowerCase() === statusFilter.toLowerCase()
+            : statusFilter.toLowerCase() === 'present'
+              ? (a.status?.toLowerCase() === 'present' || a.status?.toLowerCase() === 'late')
+              : a.status?.toLowerCase() === statusFilter.toLowerCase()
           )
         : true;
       const matchesSource = sourceFilter ? a.source?.toLowerCase() === sourceFilter.toLowerCase() : true;
@@ -1124,9 +1308,9 @@ const Attendance = () => {
   const totalHalfDay = useMemo(() => kpiFilteredAttendance.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length, [kpiFilteredAttendance]);
   
   const attendanceRate = useMemo(() => {
-    const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
+    const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalLate + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
     return Math.min(rawRate, 100);
-  }, [totalEmployees, totalPresent, totalHalfDay, totalWFH]);
+  }, [totalEmployees, totalPresent, totalLate, totalHalfDay, totalWFH]);
 
   const rateComparison = useMemo(() => {
     const today = new Date(dateFilter || getLocalDateString());
@@ -1141,10 +1325,11 @@ const Attendance = () => {
     });
 
     const yesterdayPresent = scopedYesterdayRecords.filter(a => ['Present', 'Overtime'].includes(a.status)).length;
+    const yesterdayLate = scopedYesterdayRecords.filter(a => a.status === 'Late').length;
     const yesterdayHalfDay = scopedYesterdayRecords.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
     const yesterdayWFH = scopedYesterdayRecords.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length;
 
-    const yesterdayRate = totalEmployees > 0 ? Math.round(((yesterdayPresent + yesterdayHalfDay + yesterdayWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
+    const yesterdayRate = totalEmployees > 0 ? Math.round(((yesterdayPresent + yesterdayLate + yesterdayHalfDay + yesterdayWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
     const rateDiff = attendanceRate - Math.min(yesterdayRate, 100);
     return {
       diff: rateDiff,
@@ -1155,7 +1340,7 @@ const Attendance = () => {
   // Get counts by status for clickable cards
   const statusCounts = useMemo(() => {
     return {
-      present: totalPresent,
+      present: totalPresent + totalLate,
       absent: totalAbsent,
       late: totalLate,
       leave: totalLeave,
@@ -1783,6 +1968,11 @@ const Attendance = () => {
               Mark Attendance
             </Button>
           )}
+          {isCompanyView && canManageAttendance && (
+            <Button variant="outline" onClick={() => setIsExportOpen(true)} icon={Download}>
+              Export Details
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1974,7 +2164,7 @@ const Attendance = () => {
                     <circle cx="60" cy="60" r="50" fill="none"
                       stroke="url(#presentGrad)"
                       strokeWidth="10"
-                      strokeDasharray={`${(statusCounts.present / Math.max(filteredAttendance.length, 1)) * 314} 314`}
+                      strokeDasharray={`${(attendanceRate / 100) * 314} 314`}
                       strokeLinecap="round"
                       transform="rotate(-90 60 60)"
                     />
@@ -2903,6 +3093,120 @@ const Attendance = () => {
             );
           })}
         </div>
+      {/* ── Export Results Modal Form ── */}
+      {isExportOpen && (
+        <Modal
+          isOpen={isExportOpen}
+          onClose={() => setIsExportOpen(false)}
+          title="Export Workforce Attendance Report"
+        >
+          <form onSubmit={handleExportSubmit}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Report Type</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.reportType}
+                  onChange={(e) => setExportOptions({
+                    ...exportOptions,
+                    reportType: e.target.value,
+                    employeeId: e.target.value === 'All Employees' ? '' : exportOptions.employeeId || (employees[0]?.id || '')
+                  })}
+                >
+                  <option value="All Employees">All Employees Timesheets</option>
+                  <option value="Specific Employee">Specific Employee Timesheet</option>
+                </select>
+              </div>
+
+              {exportOptions.reportType === 'Specific Employee' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Select Employee</label>
+                  <select
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                    value={exportOptions.employeeId}
+                    onChange={(e) => setExportOptions({ ...exportOptions, employeeId: e.target.value })}
+                    required
+                  >
+                    <option value="">— Select Employee —</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.department} • {emp.designation})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Date Scope</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.dateRange}
+                  onChange={(e) => setExportOptions({ ...exportOptions, dateRange: e.target.value })}
+                >
+                  <option value="AllTime">All Time</option>
+                  <option value="Today">Today</option>
+                  <option value="Weekly">Weekly (Last 7 Days)</option>
+                  <option value="Monthly">Monthly (Last 30 Days)</option>
+                  <option value="Yearly">Yearly (Last 365 Days)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Export Format</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.format}
+                  onChange={(e) => setExportOptions({ ...exportOptions, format: e.target.value })}
+                >
+                  <option value="CSV">Standard CSV File (.csv)</option>
+                  <option value="Excel">Microsoft Excel Sheet (.xls)</option>
+                  <option value="PDF">Adobe PDF Document (.pdf)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <Button type="button" variant="ghost" onClick={() => setIsExportOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary">
+                  Compile & Export
+                </Button>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
       </div>
 
     </div>
