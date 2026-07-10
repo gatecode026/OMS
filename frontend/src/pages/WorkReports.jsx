@@ -187,6 +187,26 @@ const WorkReports = () => {
     return count;
   };
 
+  const getAssignedTasksForProject = (projectName) => {
+    if (!projectName) return [];
+    const normalizeName = (name) => {
+      if (!name) return '';
+      return name.trim().replace(/\s+/g, ' ').toLowerCase();
+    };
+    const normCurrentUserName = normalizeName(currentUser?.name);
+    
+    const proj = (projectsList || []).find(p => p.name === projectName);
+    if (!proj || !proj.tasks) return [];
+    
+    return proj.tasks.filter(t => {
+      const isCurrentUserAssigned = (t.assignedTo && t.assignedTo.map(normalizeName).includes(normCurrentUserName)) ||
+                                     (t.assigneeName && normalizeName(t.assigneeName).includes(normCurrentUserName)) ||
+                                     (t.assigneeId && currentUser && t.assigneeId === currentUser.id);
+      const isNotCompleted = t.status !== 'Completed' && t.status !== 'Done' && !t.completed;
+      return isCurrentUserAssigned && isNotCompleted;
+    });
+  };
+
   const [formData, setFormData] = useState({
     date: new Date().toISOString().slice(0, 10),
     project: '',
@@ -196,6 +216,8 @@ const WorkReports = () => {
     majorAccomplishments: ''
   });
 
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+
   const handleProjectChange = (projectName) => {
     const assignedTasks = getAssignedTasksCountForProject(projectName);
     setFormData(prev => ({
@@ -203,6 +225,21 @@ const WorkReports = () => {
       project: projectName,
       tasksAssigned: assignedTasks,
       tasksCompleted: 0
+    }));
+    setSelectedTaskIds([]);
+  };
+
+  const handleTaskCheckboxChange = (taskId, checked) => {
+    let nextIds = [];
+    if (checked) {
+      nextIds = [...selectedTaskIds, taskId];
+    } else {
+      nextIds = selectedTaskIds.filter(id => id !== taskId);
+    }
+    setSelectedTaskIds(nextIds);
+    setFormData(prev => ({
+      ...prev,
+      tasksCompleted: nextIds.length
     }));
   };
 
@@ -232,6 +269,7 @@ const WorkReports = () => {
 
     const payload = {
       ...formData,
+      completedTaskIds: selectedTaskIds,
       employeeId: currentUser?.employeeId || currentUser?.id || 'GATECO-EMP-001',
       employeeName: currentUser?.name || 'Employee',
       department: currentUser?.department || 'IT',
@@ -263,6 +301,7 @@ const WorkReports = () => {
           summary: '',
           majorAccomplishments: ''
         }));
+        setSelectedTaskIds([]);
       }
     } catch (err) {
       console.error(err);
@@ -1180,6 +1219,48 @@ const WorkReports = () => {
                     </select>
                   </div>
                 </div>
+ 
+                {/* Active Tasks Checklist (Only if project is selected) */}
+                {formData.project && (
+                  <div className="form-group-item">
+                    <label className="reports-form-lbl" style={{ marginBottom: '8px', display: 'block' }}>
+                      Select Completed Tasks
+                    </label>
+                    {getAssignedTasksForProject(formData.project).length > 0 ? (
+                      <div className="flex-column gap-2" style={{
+                        maxHeight: '150px',
+                        overflowY: 'auto',
+                        padding: '10px',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--bg-card)'
+                      }}>
+                        {getAssignedTasksForProject(formData.project).map(task => (
+                          <label key={task.id} className="flex-row align-center gap-2" style={{
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            padding: '4px 0'
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedTaskIds.includes(task.id)}
+                              onChange={(e) => handleTaskCheckboxChange(task.id, e.target.checked)}
+                              style={{
+                                cursor: 'pointer',
+                                accentColor: 'var(--color-primary)'
+                              }}
+                            />
+                            <span>{task.title} <strong style={{ color: 'var(--text-muted)' }}>({task.id})</strong></span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted" style={{ padding: '4px 0' }}>
+                        No active assigned tasks found for this project.
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Row 2: Timings & Hours */}
 
