@@ -23,7 +23,7 @@ import Modal from '../components/common/Modal';
 import {
   Download, Calendar, Filter, Edit2, Search, Clock, Plus,
   AlertCircle, Sparkles, Check, CheckCircle2, UserCheck,
-  UserMinus, ShieldAlert, Award, ArrowUpRight, ShieldCheck,
+  UserMinus, ShieldAlert, Award, ArrowUpRight, ShieldCheck, Shield,
   Activity, MapPin, Globe, Zap, Bell, BarChart2, FileText,
   RefreshCw, Settings, Users, Cpu, TrendingUp, TrendingDown,
   ChevronRight, AlertTriangle, CheckSquare, Coffee, Home,
@@ -206,11 +206,40 @@ const Attendance = () => {
     fetchEmployees,
     fetchAttendance,
     attendanceRules,
-    hasPermission
+    hasPermission,
+    correctionRequests,
+    fetchCorrectionRequests,
+    token
   } = useApp();
 
   const [personalTab, setPersonalTab] = useState('today'); // today, 7days, month, custom
   const [customRange, setCustomRange] = useState({ from: '', to: '' });
+
+  const [queueFilterTab, setQueueFilterTab] = useState('active'); // 'active' or 'history'
+
+  const filteredQueueRequests = useMemo(() => {
+    const list = correctionRequests || [];
+    if (queueFilterTab === 'active') {
+      return list.filter(r => ['Pending', 'Under Review', 'More Information Required'].includes(r.status));
+    }
+    return list.filter(r => ['Approved', 'Rejected', 'Cancelled'].includes(r.status));
+  }, [correctionRequests, queueFilterTab]);
+
+  // Attendance Correction workflow states
+  const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
+  const [correctionForm, setCorrectionForm] = useState({
+    date: '',
+    correctionType: 'Manual Attendance Request',
+    requestedPunchIn: '09:30',
+    requestedPunchOut: '18:00',
+    requestedStatus: 'Present',
+    requestedShift: 'Day Shift',
+    reason: '',
+    remarks: ''
+  });
+  const [selectedCorrection, setSelectedCorrection] = useState(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [detailRemarks, setDetailRemarks] = useState('');
 
   // Compute date range for useMyAttendance hook to load broad chart data (always last 30 days by default, or custom range)
   const personalFiltersForFetch = useMemo(() => {
@@ -364,7 +393,7 @@ const Attendance = () => {
     if (currentUser && currentUserRole && currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin') {
       setBranchFilter(currentUser.branch || '');
     }
-  }, [currentUser, currentUserRole]);
+  }, [currentUser?.branch, currentUserRole]);
   const [shiftFilter, setShiftFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
@@ -413,16 +442,35 @@ const Attendance = () => {
 
   useEffect(() => {
     if (currentUser && currentUserRole === 'employee') {
-      setMarkFormData(prev => ({
-        ...prev,
-        employeeId: currentUser.id,
-        employeeName: currentUser.name,
-        department: currentUser.department || '',
-        branch: currentUser.branch || '',
-        workMode: currentUser.workMode || 'Work From Office'
-      }));
+      setMarkFormData(prev => {
+        const nextData = {
+          ...prev,
+          employeeId: currentUser.id,
+          employeeName: currentUser.name,
+          department: currentUser.department || '',
+          branch: currentUser.branch || '',
+          workMode: currentUser.workMode || 'Work From Office'
+        };
+        if (
+          prev.employeeId === nextData.employeeId &&
+          prev.employeeName === nextData.employeeName &&
+          prev.department === nextData.department &&
+          prev.branch === nextData.branch &&
+          prev.workMode === nextData.workMode
+        ) {
+          return prev;
+        }
+        return nextData;
+      });
     }
-  }, [currentUser, currentUserRole]);
+  }, [
+    currentUser?.id,
+    currentUser?.name,
+    currentUser?.department,
+    currentUser?.branch,
+    currentUser?.workMode,
+    currentUserRole
+  ]);
 
   useEffect(() => {
     if (perspective === 'self') {
@@ -914,6 +962,196 @@ const Attendance = () => {
 
   const handleRequestAttendance = () => {
     addToast('success', 'Attendance check-in reminder request broadcasted to all active employees.');
+  };
+
+  const parseTimeToHours = (timeStr) => {
+    if (!timeStr || timeStr === '--:--') return 0;
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return 0;
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    return h + m / 60;
+  };
+
+  const convertTo24Hour = (timeStr) => {
+    if (!timeStr || timeStr === '--:--') return '';
+    if (/^\d{2}:\d{2}$/.test(timeStr)) return timeStr;
+
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
+    if (match) {
+      let hrs = parseInt(match[1], 10);
+      const mins = match[2];
+      const ampm = match[3].toUpperCase();
+      if (ampm === 'PM' && hrs !== 12) hrs += 12;
+      if (ampm === 'AM' && hrs === 12) hrs = 0;
+      return `${String(hrs).padStart(2, '0')}:${mins}`;
+    }
+
+    const parts = timeStr.trim().split(':');
+    if (parts.length >= 2) {
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (!isNaN(h) && !isNaN(m)) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+    }
+    return '';
+  };
+
+  const handleOpenCorrection = (record = null) => {
+    console.log('DEBUG handleOpenCorrection record:', record);
+    if (record) {
+      const punchIn24 = convertTo24Hour(record.punchIn);
+      const punchOut24 = convertTo24Hour(record.punchOut);
+      setCorrectionForm({
+        date: record.date || '',
+        correctionType: record.punchIn === '--:--' || record.punchOut === '--:--' ? 'Forgot to Punch' : 'Wrong Punch In Time',
+        requestedPunchIn: punchIn24 || '09:30',
+        requestedPunchOut: punchOut24 || '18:00',
+        requestedStatus: record.status || 'Present',
+        requestedShift: record.shift || 'Day Shift',
+        reason: '',
+        remarks: ''
+      });
+    } else {
+      const todayStr = new Date().toISOString().split('T')[0];
+      setCorrectionForm({
+        date: todayStr,
+        correctionType: 'Manual Attendance Request',
+        requestedPunchIn: '09:30',
+        requestedPunchOut: '18:00',
+        requestedStatus: 'Present',
+        requestedShift: 'Day Shift',
+        reason: '',
+        remarks: ''
+      });
+    }
+    setSelectedCorrection(null);
+    setIsCorrectionOpen(true);
+  };
+
+  const handleSubmitCorrection = async (e) => {
+    e.preventDefault();
+
+    if (!correctionForm.date) {
+      addToast('error', 'Date is required.');
+      return;
+    }
+
+    if (!correctionForm.reason) {
+      addToast('error', 'Reason is required.');
+      return;
+    }
+
+    const inHours = parseTimeToHours(correctionForm.requestedPunchIn);
+    const outHours = parseTimeToHours(correctionForm.requestedPunchOut);
+    if (inHours >= outHours) {
+      addToast('error', 'Requested Punch Out time must be after Punch In time.');
+      return;
+    }
+
+    try {
+      const isResubmit = selectedCorrection && selectedCorrection.status === 'More Information Required';
+      const url = isResubmit 
+        ? (window.API_URL || 'http://localhost:5000') + `/api/v1/attendance-corrections/${selectedCorrection.id}`
+        : (window.API_URL || 'http://localhost:5000') + '/api/v1/attendance-corrections';
+      const method = isResubmit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(correctionForm)
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        addToast('success', isResubmit ? 'Correction request resubmitted.' : 'Correction request submitted successfully.');
+        setIsCorrectionOpen(false);
+        setSelectedCorrection(null);
+        if (fetchCorrectionRequests) fetchCorrectionRequests();
+      } else {
+        addToast('error', result.message || 'Failed to submit correction request.');
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('error', 'Network error occurred.');
+    }
+  };
+
+  const handleActionCorrection = async (actionType) => {
+    if (!selectedCorrection) return;
+
+    if (!detailRemarks && actionType !== 'approve') {
+      addToast('error', 'Comments/Remarks are required for this action.');
+      return;
+    }
+
+    try {
+      const res = await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/attendance-corrections/${selectedCorrection.id}/${actionType}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ comments: detailRemarks })
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        addToast('success', `Request successfully ${actionType}d.`);
+        setIsDetailOpen(false);
+        setSelectedCorrection(null);
+        setDetailRemarks('');
+        if (fetchCorrectionRequests) fetchCorrectionRequests();
+        if (fetchAttendance) fetchAttendance();
+        if (personalRefetch) personalRefetch();
+      } else {
+        addToast('error', result.message || `Failed to ${actionType} request.`);
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('error', 'Network error occurred.');
+    }
+  };
+
+  const handleCancelCorrection = async (correctionId) => {
+    if (!window.confirm('Are you sure you want to cancel this correction request?')) return;
+    try {
+      const res = await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/attendance-corrections/${correctionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'Cancelled', remarks: 'Cancelled by employee' })
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        addToast('success', 'Correction request cancelled.');
+        if (fetchCorrectionRequests) fetchCorrectionRequests();
+      } else {
+        addToast('error', result.message || 'Failed to cancel request.');
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('error', 'Network error occurred.');
+    }
+  };
+
+  const handleResubmitCorrection = (req) => {
+    setCorrectionForm({
+      date: req.date,
+      correctionType: req.correctionType,
+      requestedPunchIn: req.requestedPunchIn,
+      requestedPunchOut: req.requestedPunchOut,
+      requestedStatus: req.requestedStatus,
+      requestedShift: req.requestedShift,
+      reason: req.reason,
+      remarks: req.remarks || ''
+    });
+    setSelectedCorrection(req);
+    setIsCorrectionOpen(true);
   };
 
   const handleApproveAll = async () => {
@@ -1629,6 +1867,353 @@ const Attendance = () => {
     addToast('success', 'Attendance report downloaded successfully.');
   };
 
+  const renderCorrectionForm = () => {
+    return (
+      <form onSubmit={handleSubmitCorrection}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Correction Date</label>
+              <input
+                type="date"
+                required
+                disabled={!!selectedCorrection}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+                value={correctionForm.date}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, date: e.target.value })}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Correction Type</label>
+              <select
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+                value={correctionForm.correctionType}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, correctionType: e.target.value })}
+              >
+                <option value="Missing Punch In">Missing Punch In</option>
+                <option value="Missing Punch Out">Missing Punch Out</option>
+                <option value="Wrong Punch In Time">Wrong Punch In Time</option>
+                <option value="Wrong Punch Out Time">Wrong Punch Out Time</option>
+                <option value="Forgot to Punch">Forgot to Punch</option>
+                <option value="Wrong Working Hours">Wrong Working Hours</option>
+                <option value="Wrong Shift">Wrong Shift</option>
+                <option value="Wrong Attendance Status">Wrong Attendance Status</option>
+                <option value="Wrong Break Time">Wrong Break Time</option>
+                <option value="Wrong Overtime">Wrong Overtime</option>
+                <option value="Manual Attendance Request">Manual Attendance Request</option>
+                <option value="Work From Home Correction">Work From Home Correction</option>
+                <option value="Field Visit Attendance">Field Visit Attendance</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Requested Punch In Time</label>
+              <input
+                type="time"
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+                value={correctionForm.requestedPunchIn}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, requestedPunchIn: e.target.value })}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Requested Punch Out Time</label>
+              <input
+                type="time"
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+                value={correctionForm.requestedPunchOut}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, requestedPunchOut: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Requested Status</label>
+              <select
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+                value={correctionForm.requestedStatus}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, requestedStatus: e.target.value })}
+              >
+                <option value="Present">Present</option>
+                <option value="Late">Late</option>
+                <option value="Absent">Absent</option>
+                <option value="Half Day">Half Day</option>
+                <option value="Work From Home">Work From Home</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Requested Shift</label>
+              <select
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+                value={correctionForm.requestedShift}
+                onChange={(e) => setCorrectionForm({ ...correctionForm, requestedShift: e.target.value })}
+              >
+                <option value="Day Shift">Day Shift (09:30 AM – 06:00 PM)</option>
+                <option value="Night Shift">Night Shift (09:30 PM – 06:00 AM)</option>
+                <option value="Early Shift">Early Shift (07:00 AM – 03:30 PM)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Reason for Correction</label>
+            <textarea
+              required
+              rows="3"
+              placeholder="Explain why this correction is needed..."
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem',
+                outline: 'none',
+                resize: 'vertical'
+              }}
+              value={correctionForm.reason}
+              onChange={(e) => setCorrectionForm({ ...correctionForm, reason: e.target.value })}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Additional Comments (Optional)</label>
+            <textarea
+              rows="2"
+              placeholder="Any extra remarks..."
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem',
+                outline: 'none',
+                resize: 'vertical'
+              }}
+              value={correctionForm.remarks}
+              onChange={(e) => setCorrectionForm({ ...correctionForm, remarks: e.target.value })}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+            <Button type="button" variant="ghost" onClick={() => {
+              setIsCorrectionOpen(false);
+              setSelectedCorrection(null);
+            }}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary">
+              {selectedCorrection ? "Resubmit Request" : "Submit Request"}
+            </Button>
+          </div>
+        </div>
+      </form>
+    );
+  };
+
+  const renderCorrectionDetails = () => {
+    if (!selectedCorrection) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '8px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+          <div>
+            <strong style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>{selectedCorrection.employeeName}</strong>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
+              ID: {selectedCorrection.employeeId} • {selectedCorrection.department} ({selectedCorrection.branch})
+            </span>
+          </div>
+          <span className={`ep-badge ${
+            selectedCorrection.status === 'Approved' ? 'ep-badge-success' :
+            selectedCorrection.status === 'Rejected' ? 'ep-badge-danger' :
+            selectedCorrection.status === 'More Information Required' ? 'ep-badge-warning' :
+            'ep-badge-info'
+          }`} style={{ alignSelf: 'flex-start', padding: '4px 8px', borderRadius: '4px' }}>
+            {selectedCorrection.status}
+          </span>
+        </div>
+
+        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '16px' }}>
+          <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>
+            Before vs Requested Comparison
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div style={{ borderRight: '1px dashed var(--border-color)', paddingRight: '12px' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>CURRENT RECORD</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', fontSize: '0.8rem' }}>
+                <span>Punch In:</span><strong>{selectedCorrection.currentPunchIn}</strong>
+                <span>Punch Out:</span><strong>{selectedCorrection.currentPunchOut}</strong>
+                <span>Status:</span><strong>{selectedCorrection.currentStatus}</strong>
+                <span>Shift:</span><strong>{selectedCorrection.currentShift || '—'}</strong>
+                <span>Hours:</span><strong>{selectedCorrection.currentTotalHours} hrs</strong>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '8px' }}>REQUESTED CHANGE</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', fontSize: '0.8rem' }}>
+                <span>Punch In:</span><strong style={{ color: 'var(--color-primary)' }}>{selectedCorrection.requestedPunchIn}</strong>
+                <span>Punch Out:</span><strong style={{ color: 'var(--color-primary)' }}>{selectedCorrection.requestedPunchOut}</strong>
+                <span>Status:</span><strong style={{ color: 'var(--color-primary)' }}>{selectedCorrection.requestedStatus}</strong>
+                <span>Shift:</span><strong style={{ color: 'var(--color-primary)' }}>{selectedCorrection.requestedShift || '—'}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Reason for request:</span>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--text-primary)', background: 'var(--bg-elevated)', padding: '10px', borderRadius: '6px', border: '0.5px solid var(--border-color)' }}>
+            {selectedCorrection.reason}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Request Activity Timeline:</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingLeft: '8px', borderLeft: '2px solid var(--border-color)' }}>
+            {(selectedCorrection.timeline || []).map((t, idx) => (
+              <div key={idx} style={{ fontSize: '0.8rem', position: 'relative' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <strong style={{ color: 'var(--text-primary)' }}>{t.action}</strong>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{new Date(t.timestamp).toLocaleString()}</span>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>By: {t.actorName} ({t.actorRole})</span>
+                {t.comments && (
+                  <p style={{ margin: '4px 0 0 0', fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: '0.78rem' }}>
+                    " {t.comments} "
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+          {(selectedCorrection.status === 'Pending' || selectedCorrection.status === 'Under Review') && hasPermission('attendance_management', 'approve') ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Remarks / Comments (Required for Reject / More Info)</label>
+                <textarea
+                  rows="2"
+                  placeholder="Add approval remarks or comments..."
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                    resize: 'vertical'
+                  }}
+                  value={detailRemarks}
+                  onChange={(e) => setDetailRemarks(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  className="success-btn"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer' }}
+                  onClick={() => {
+                    setIsDetailOpen(false);
+                    setSelectedCorrection(null);
+                    setDetailRemarks('');
+                  }}
+                >
+                  Close
+                </button>
+                <button
+                  className="success-btn"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--color-warning)', color: 'var(--color-warning)', background: 'transparent', cursor: 'pointer' }}
+                  onClick={() => handleActionCorrection('more-info')}
+                >
+                  Request Info
+                </button>
+                <button
+                  className="success-btn success-btn-danger"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', cursor: 'pointer' }}
+                  onClick={() => handleActionCorrection('reject')}
+                >
+                  Reject
+                </button>
+                <button
+                  className="success-btn success-btn-primary"
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', cursor: 'pointer' }}
+                  onClick={() => handleActionCorrection('approve')}
+                >
+                  Approve Request
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                className="success-btn"
+                style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer' }}
+                onClick={() => {
+                  setIsDetailOpen(false);
+                  setSelectedCorrection(null);
+                  setDetailRemarks('');
+                }}
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   if (isEmployeeView) {
     if (personalLoading && personalRecords.length === 0) {
       return (
@@ -1869,15 +2454,140 @@ const Attendance = () => {
                 No records found for the selected period
               </div>
             ) : (
-              filteredRecords.map(rec => (
-                <AttendanceDayCard key={rec.id} record={rec} />
-              ))
+              filteredRecords.map(rec => {
+                const hasPending = (correctionRequests || []).some(
+                  req => req.date === rec.date && req.employeeId === currentUser?.id && ['Pending', 'Under Review'].includes(req.status)
+                );
+                return (
+                  <AttendanceDayCard
+                    key={rec.id}
+                    record={rec}
+                    onRequestCorrection={hasPending ? null : handleOpenCorrection}
+                  />
+                );
+              })
             )}
           </div>
 
           {/* Live Activity Feed */}
           <LiveActivityFeed records={filteredRecords} />
         </div>
+
+        {/* ── Correction Requests History ── */}
+        <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FileText size={15} style={{ color: 'var(--color-success)' }} />
+              Correction Requests History
+            </h3>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              {(correctionRequests || []).filter(r => r.employeeId === currentUser?.id).length} request(s) total
+            </span>
+          </div>
+
+          {((correctionRequests || []).filter(r => r.employeeId === currentUser?.id).length === 0) ? (
+            <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              No correction requests submitted yet.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', paddingBottom: '8px' }}>
+                    <th style={{ padding: '10px 8px' }}>Date</th>
+                    <th style={{ padding: '10px 8px' }}>Correction Type</th>
+                    <th style={{ padding: '10px 8px' }}>Requested Punch</th>
+                    <th style={{ padding: '10px 8px' }}>Status</th>
+                    <th style={{ padding: '10px 8px' }}>Submitted On</th>
+                    <th style={{ padding: '10px 8px' }}>Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(correctionRequests || [])
+                    .filter(r => r.employeeId === currentUser?.id)
+                    .map((req) => {
+                      let statusBadge = 'ep-badge-info';
+                      if (req.status === 'Approved') statusBadge = 'ep-badge-success';
+                      if (req.status === 'Rejected') statusBadge = 'ep-badge-danger';
+                      if (req.status === 'Cancelled') statusBadge = 'ep-badge-muted';
+                      if (req.status === 'More Information Required') statusBadge = 'ep-badge-warning';
+
+                      return (
+                        <tr 
+                          key={req.id} 
+                          style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
+                          onClick={() => {
+                            setSelectedCorrection(req);
+                            setIsDetailOpen(true);
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-elevated)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-primary)' }}>{req.date}</td>
+                          <td style={{ padding: '10px 8px' }}>{req.correctionType}</td>
+                          <td style={{ padding: '10px 8px' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>In:</span> <strong>{req.requestedPunchIn}</strong> • <span style={{ color: 'var(--text-secondary)' }}>Out:</span> <strong>{req.requestedPunchOut}</strong>
+                          </td>
+                          <td style={{ padding: '10px 8px' }}>
+                            <span className={`ep-badge ${statusBadge}`} style={{ fontSize: '0.68rem', padding: '3px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                              {req.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 8px', color: 'var(--text-muted)' }}>
+                            {new Date(req.createdAt).toLocaleDateString()}
+                          </td>
+                          <td style={{ padding: '10px 8px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={req.reason}>
+                            {req.reason}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ── Modals for Employee View ── */}
+        <MarkAttendanceModal
+          isOpen={selfAttModalOpen}
+          onClose={() => {
+            setSelfAttModalOpen(false);
+            personalRefetch();
+            fetchAttendance();
+          }}
+          todayRecord={personalTodayRecord || {}}
+          currentUser={currentUser || {}}
+        />
+
+        {isCorrectionOpen && (
+          <Modal
+            isOpen={isCorrectionOpen}
+            onClose={() => {
+              setIsCorrectionOpen(false);
+              setSelectedCorrection(null);
+            }}
+            title={selectedCorrection ? "Resubmit Attendance Correction Request" : "Request Attendance Correction"}
+            size="md"
+          >
+            {renderCorrectionForm()}
+          </Modal>
+        )}
+
+        {isDetailOpen && selectedCorrection && (
+          <Modal
+            isOpen={isDetailOpen}
+            onClose={() => {
+              setIsDetailOpen(false);
+              setSelectedCorrection(null);
+              setDetailRemarks('');
+            }}
+            title="Attendance Correction Request Details"
+            size="lg"
+          >
+            {renderCorrectionDetails()}
+          </Modal>
+        )}
       </div>
     );
   }
@@ -2120,6 +2830,8 @@ const Attendance = () => {
         {[
           isCompanyView && { id: 'overview', label: 'Overview & Analytics', icon: BarChart2 },
           { id: 'records', label: 'Attendance Records', icon: FileText },
+          hasPermission('attendance_management', 'approve') && { id: 'corrections', label: 'Correction Requests', icon: Shield },
+          !isCompanyView && { id: 'my-requests', label: 'My Corrections', icon: FileText },
           isCompanyView && { id: 'branches', label: 'Branch Management', icon: Building },
           isCompanyView && { id: 'reports', label: 'Reports & Export', icon: Download },
         ].filter(Boolean).map(tab => {
@@ -2395,6 +3107,279 @@ const Attendance = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MY CORRECTION REQUESTS ═══ */}
+      {activeSection === 'my-requests' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>My Correction Requests</h3>
+            <button
+              className="success-btn success-btn-primary"
+              onClick={() => handleOpenCorrection(null)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <span>+ New Correction Request</span>
+            </button>
+          </div>
+
+          <div className="card" style={{ padding: '20px' }}>
+            {(!correctionRequests || correctionRequests.filter(r => r.employeeId === currentUser?.id).length === 0) ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                No attendance correction requests submitted yet.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', paddingBottom: '10px' }}>
+                      <th style={{ padding: '12px' }}>Date</th>
+                      <th style={{ padding: '12px' }}>Type</th>
+                      <th style={{ padding: '12px' }}>Requested Timing/Status</th>
+                      <th style={{ padding: '12px' }}>Submitted On</th>
+                      <th style={{ padding: '12px' }}>Status</th>
+                      <th style={{ padding: '12px' }}>Approver</th>
+                      <th style={{ padding: '12px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {correctionRequests
+                      .filter(r => r.employeeId === currentUser?.id)
+                      .map(req => {
+                        let statusBadge = 'ep-badge-info';
+                        if (req.status === 'Approved') statusBadge = 'ep-badge-success';
+                        if (req.status === 'Rejected') statusBadge = 'ep-badge-danger';
+                        if (req.status === 'Cancelled') statusBadge = 'ep-badge-muted';
+                        if (req.status === 'More Information Required') statusBadge = 'ep-badge-warning';
+
+                        return (
+                          <tr key={req.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '12px', fontWeight: 500 }}>
+                              {new Date(req.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </td>
+                            <td style={{ padding: '12px' }}>{req.correctionType}</td>
+                            <td style={{ padding: '12px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <span>🕒 {req.requestedPunchIn} – {req.requestedPunchOut}</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Status: <strong>{req.requestedStatus}</strong></span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '12px', color: 'var(--text-secondary)' }}>
+                              {new Date(req.createdAt).toLocaleDateString()}
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              <span className={`ep-badge ${statusBadge}`} style={{ fontSize: '0.72rem', padding: '4px 8px', borderRadius: '4px', fontWeight: 600 }}>
+                                {req.status}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', color: 'var(--text-secondary)' }}>
+                              {req.approvedBy || req.timeline.find(t => t.action === 'Approved' || t.action === 'Rejected' || t.action === 'More Info Requested')?.actorName || '—'}
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                  className="success-btn"
+                                  style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer' }}
+                                  onClick={() => {
+                                    setSelectedCorrection(req);
+                                    setIsDetailOpen(true);
+                                  }}
+                                >
+                                  View
+                                </button>
+                                {req.status === 'Pending' && (
+                                  <button
+                                    className="success-btn success-btn-danger"
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px', border: '1px solid var(--color-danger)', background: 'transparent', color: 'var(--color-danger)', cursor: 'pointer' }}
+                                    onClick={() => handleCancelCorrection(req.id)}
+                                  >
+                                    Cancel
+                                  </button>
+                                )}
+                                {req.status === 'More Information Required' && (
+                                  <button
+                                    className="success-btn success-btn-primary"
+                                    style={{ padding: '4px 8px', fontSize: '0.75rem', borderRadius: '4px', cursor: 'pointer' }}
+                                    onClick={() => handleResubmitCorrection(req)}
+                                  >
+                                    Resubmit
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ APPROVER CORRECTION REQUESTS ═══ */}
+      {activeSection === 'corrections' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* KPI widgets */}
+          <div className="att-kpis-wrapper" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+            <div className="card att-kpi-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Pending Requests</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--color-primary)' }}>
+                  {(correctionRequests || []).filter(r => r.status === 'Pending' || r.status === 'Under Review').length}
+                </span>
+                <span className="ep-badge ep-badge-warning" style={{ fontSize: '0.7rem' }}>Action Required</span>
+              </div>
+            </div>
+            <div className="card att-kpi-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Approved Requests</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--color-success)' }}>
+                  {(correctionRequests || []).filter(r => r.status === 'Approved').length}
+                </span>
+                <span className="ep-badge ep-badge-success" style={{ fontSize: '0.7rem' }}>Total Approved</span>
+              </div>
+            </div>
+            <div className="card att-kpi-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>More Info Requested</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--color-warning)' }}>
+                  {(correctionRequests || []).filter(r => r.status === 'More Information Required').length}
+                </span>
+                <span className="ep-badge ep-badge-info" style={{ fontSize: '0.7rem' }}>Awaiting Reply</span>
+              </div>
+            </div>
+            <div className="card att-kpi-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600 }}>Rejected Requests</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--color-danger)' }}>
+                  {(correctionRequests || []).filter(r => r.status === 'Rejected').length}
+                </span>
+                <span className="ep-badge ep-badge-danger" style={{ fontSize: '0.7rem' }}>Rejected</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Requests Table */}
+          <div className="card" style={{ padding: '20px' }}>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Correction Requests Queue</h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{filteredQueueRequests.length} Request(s) shown</span>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', padding: '3px', borderRadius: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setQueueFilterTab('active')}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    background: queueFilterTab === 'active' ? 'var(--color-primary)' : 'transparent',
+                    color: queueFilterTab === 'active' ? '#fff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Active Requests ({(correctionRequests || []).filter(r => ['Pending', 'Under Review', 'More Information Required'].includes(r.status)).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQueueFilterTab('history')}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    background: queueFilterTab === 'history' ? 'var(--color-primary)' : 'transparent',
+                    color: queueFilterTab === 'history' ? '#fff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  History ({(correctionRequests || []).filter(r => ['Approved', 'Rejected', 'Cancelled'].includes(r.status)).length})
+                </button>
+              </div>
+            </div>
+
+            {(!filteredQueueRequests || filteredQueueRequests.length === 0) ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                {queueFilterTab === 'active' ? 'No active correction requests in the queue.' : 'No historical requests found.'}
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)', paddingBottom: '10px' }}>
+                      <th style={{ padding: '12px' }}>Employee</th>
+                      <th style={{ padding: '12px' }}>Branch / Dept</th>
+                      <th style={{ padding: '12px' }}>Date</th>
+                      <th style={{ padding: '12px' }}>Correction Type</th>
+                      <th style={{ padding: '12px' }}>Reason</th>
+                      <th style={{ padding: '12px' }}>Status</th>
+                      <th style={{ padding: '12px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredQueueRequests.map(req => {
+                      let statusBadge = 'ep-badge-info';
+                      if (req.status === 'Approved') statusBadge = 'ep-badge-success';
+                      if (req.status === 'Rejected') statusBadge = 'ep-badge-danger';
+                      if (req.status === 'Cancelled') statusBadge = 'ep-badge-muted';
+                      if (req.status === 'More Information Required') statusBadge = 'ep-badge-warning';
+
+                      return (
+                        <tr key={req.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{req.employeeName}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ID: {req.employeeId}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span>{req.branch || '—'}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{req.department || '—'}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px', fontWeight: 500 }}>
+                            {new Date(req.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </td>
+                          <td style={{ padding: '12px' }}>{req.correctionType}</td>
+                          <td style={{ padding: '12px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {req.reason}
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <span className={`ep-badge ${statusBadge}`} style={{ fontSize: '0.72rem', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                              {req.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <button
+                              className="success-btn success-btn-primary"
+                              style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '4px' }}
+                              onClick={() => {
+                                setSelectedCorrection(req);
+                                setIsDetailOpen(true);
+                              }}
+                            >
+                              {queueFilterTab === 'active' ? 'Review Request' : 'View Details'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3205,6 +4190,37 @@ const Attendance = () => {
               </div>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* ── Attendance Correction Form Modal ── */}
+      {isCorrectionOpen && (
+        <Modal
+          isOpen={isCorrectionOpen}
+          onClose={() => {
+            setIsCorrectionOpen(false);
+            setSelectedCorrection(null);
+          }}
+          title={selectedCorrection ? "Resubmit Attendance Correction Request" : "Request Attendance Correction"}
+          size="md"
+        >
+          {renderCorrectionForm()}
+        </Modal>
+      )}
+
+      {/* ── Attendance Correction Request Detail Modal ── */}
+      {isDetailOpen && selectedCorrection && (
+        <Modal
+          isOpen={isDetailOpen}
+          onClose={() => {
+            setIsDetailOpen(false);
+            setSelectedCorrection(null);
+            setDetailRemarks('');
+          }}
+          title="Attendance Correction Request Details"
+          size="lg"
+        >
+          {renderCorrectionDetails()}
         </Modal>
       )}
       </div>
