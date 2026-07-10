@@ -4,7 +4,7 @@ import { getTenantId, getActiveConnection, isSuperAdminRequest } from './tenantC
 // List of tenant-scoped models that require database-level isolation
 const tenantScopedModelNames = new Set([
   'Employee', 'Branch', 'Department', 'Team', 'Project', 
-  'Attendance', 'Leave', 'Holiday', 'PayrollGrade', 
+  'Attendance', 'AttendanceCorrection', 'Leave', 'Holiday', 'PayrollGrade', 
   'PayrollReimbursement', 'PayrollLoanAdvance', 'PayrollBonus', 
   'PayrollPayment', 'PayrollConfig', 'AppraisalReview', 
   'WorkReport', 'ActivityLog', 'Event', 'Announcement', 

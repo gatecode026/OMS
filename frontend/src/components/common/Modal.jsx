@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import './Modal.css';
 import { X } from 'lucide-react';
 
@@ -40,7 +41,7 @@ const Modal = ({
     }
   };
 
-  return (
+  return createPortal(
     <div className="modal-backdrop animate-fade-in" onClick={handleBackdropClick}>
       <div ref={modalRef} className={`modal-container modal-${size} animate-slide-up`}>
         <div className="modal-header">
@@ -60,7 +61,8 @@ const Modal = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

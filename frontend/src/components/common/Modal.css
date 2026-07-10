@@ -8,9 +8,10 @@
   backdrop-filter: blur(4px);
   z-index: 1200;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: var(--spacing-4);
+  overflow-y: auto;
+  padding: 40px var(--spacing-4);
 }
 
 .modal-container {
@@ -20,6 +21,7 @@
   box-shadow: var(--shadow-xl);
   display: flex;
   flex-direction: column;
+  margin: auto;
   max-height: calc(100vh - 80px);
   width: 100%;
   overflow: hidden;

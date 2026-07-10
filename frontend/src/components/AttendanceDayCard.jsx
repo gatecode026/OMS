@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 
-export const AttendanceDayCard = ({ record }) => {
+export const AttendanceDayCard = ({ record, onRequestCorrection }) => {
   const s = (record?.status || '').toLowerCase();
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -178,14 +178,47 @@ export const AttendanceDayCard = ({ record }) => {
 
       {/* Card Content */}
       <div className="flex-column w-full padding-4" style={{ padding: 'var(--space-4)', gap: 'var(--space-2)' }}>
-        <div className="flex-row justify-between align-center">
+        <div className="flex-row justify-between align-center" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-primary)' }}>
             {formattedDate}
           </span>
-          <span className={`ep-badge ${badgeClass}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-            <StatusIcon size={12} />
-            {statusText}{lateOffsetStr}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {onRequestCorrection && (
+              <button
+                className="success-btn"
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '0.68rem',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border-color)',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRequestCorrection(record);
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-elevated)';
+                  e.currentTarget.style.color = 'var(--color-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
+                }}
+              >
+                ✏️ Request Correction
+              </button>
+            )}
+            <span className={`ep-badge ${badgeClass}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+              <StatusIcon size={12} />
+              {statusText}{lateOffsetStr}
+            </span>
+          </div>
         </div>
 
         {s === 'absent' ? (

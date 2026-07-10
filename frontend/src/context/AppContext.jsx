@@ -233,6 +233,7 @@ export const AppProvider = ({ children }) => {
   const [permissionModules, setPermissionModules] = useState([]);
   const [userOverrides, setUserOverrides] = useState([]);
   const [dailyReports, setDailyReports] = useState([]);
+  const [correctionRequests, setCorrectionRequests] = useState([]);
   const [appraisalReviews, setAppraisalReviews] = useState([]);
   const [announcementsList, setAnnouncementsList] = useState([]);
   const [emergencyAlert, setEmergencyAlert] = useState({ isActive: false, title: '', description: '', date: '' });
@@ -651,7 +652,8 @@ export const AppProvider = ({ children }) => {
       fetchEmployees,
       fetchLeaves,
       fetchAttendance,
-      fetchDailyReports
+      fetchDailyReports,
+      fetchCorrectionRequests
     };
   });
 
@@ -900,6 +902,20 @@ export const AppProvider = ({ children }) => {
           }
           break;
 
+        case 'attendance-corrections':
+          if (action === 'create') {
+            setCorrectionRequests(prev => {
+              if (prev.some(r => r.id === data.id || r._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setCorrectionRequests(prev => prev.map(r => (r.id === data.id || r._id === data._id) ? { ...r, ...data } : r));
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setCorrectionRequests(prev => prev.filter(r => r.id !== id && r._id !== id));
+          }
+          break;
+
         default:
           break;
       }
@@ -913,6 +929,7 @@ export const AppProvider = ({ children }) => {
         if (activeActionsRef.current.fetchLeaves) activeActionsRef.current.fetchLeaves();
         if (activeActionsRef.current.fetchAttendance) activeActionsRef.current.fetchAttendance();
         if (activeActionsRef.current.fetchDailyReports) activeActionsRef.current.fetchDailyReports();
+        if (activeActionsRef.current.fetchCorrectionRequests) activeActionsRef.current.fetchCorrectionRequests();
       }
     };
 
@@ -1939,6 +1956,27 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const fetchCorrectionRequests = async () => {
+    if (!token) {
+      setCorrectionRequests([]);
+      return;
+    }
+    try {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/attendance-corrections', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setCorrectionRequests(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch attendance corrections from backend:', err);
+      setCorrectionRequests([]);
+    }
+  };
+
   const addDailyReport = async (reportData) => {
     if (!token) return null;
     try {
@@ -2351,7 +2389,8 @@ export const AppProvider = ({ children }) => {
         fetchActivityLogs(),
         fetchPermissionModules(),
         fetchUserOverrides(),
-        fetchProjects()
+        fetchProjects(),
+        fetchCorrectionRequests()
       ]).catch(err => console.error('[AppContext] Phase 2 load error:', err));
     };
 
@@ -5482,6 +5521,8 @@ export const AppProvider = ({ children }) => {
         setDailyReports,
         addDailyReport,
         updateDailyReportStatus,
+        correctionRequests,
+        fetchCorrectionRequests,
         appraisalReviews,
         addAppraisalReview,
         toasts,
