@@ -127,7 +127,7 @@ export const validateOwnership = (context, resource, ownerIdFields = ['id', 'use
     }
     if (!hasMatch) {
       logSecurityEvent(context, moduleName, operation, SecurityEventTypes.OWNERSHIP_DENIED, 'DENIED', 'Access Denied: Ownership verification failed', resource.id);
-      const err = new Error("Access denied: You are not authorized to update or delete another employee's record.");
+      const err = new Error(`Access denied: You are not authorized to update or delete another employee's record. [Debug: moduleName="${moduleName}", operation="${operation}", resourceId="${resource?.id}", role="${context?.role}"]`);
       err.statusCode = 403;
       throw err;
     }
