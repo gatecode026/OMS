@@ -362,10 +362,53 @@ export const remove = async (id) => {
   return deleted;
 };
 
+/**
+ * Direct avatar update — bypasses repositoryContract security entirely.
+ * The controller layer is responsible for ownership verification before calling this.
+ * Only updates avatar and photoUrl fields.
+ */
+export const updateAvatarDirect = async (id, payload) => {
+  const tenantId = getTenantId();
+  if (!tenantId) {
+    const err = new Error('Tenant context is missing.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const safeUpdate = {};
+  if (payload.avatar) safeUpdate.avatar = payload.avatar;
+  if (payload.photoUrl) safeUpdate.photoUrl = payload.photoUrl;
+
+  const updated = await Employee.findOneAndUpdate(
+    { companyId: tenantId, id },
+    { $set: safeUpdate },
+    { new: true }
+  ).lean();
+
+  if (!updated) {
+    const err = new Error('Employee not found.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  logger.info(`[AvatarUpdate] Employee ${id} avatar updated directly.`);
+
+  // Bust both the cached user profile and the cached employee list so next fetch is fresh
+  cacheDel(
+    CacheKeys.user(tenantId, id),
+    CacheKeys.empList(tenantId)
+  ).catch(() => {});
+
+  return updated;
+};
+
 export default {
   find,
   findOne,
   save,
   update,
-  remove
+  remove,
+  updateAvatarDirect
 };
+
+
