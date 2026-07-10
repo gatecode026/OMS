@@ -3780,6 +3780,77 @@ export const AppProvider = ({ children }) => {
     addToast('warning', `Task deleted.`);
   };
 
+  const editTask = async (taskId, updatedFields) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return false;
+
+    let assigneeName = 'Unassigned';
+    let department = 'Unassigned';
+    if (updatedFields.assigneeId) {
+      const assignee = employees.find(e => e.id === updatedFields.assigneeId);
+      if (assignee) {
+        assigneeName = assignee.name;
+        department = assignee.department;
+      }
+    }
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === taskId) {
+        const prevAssigneeId = t.assigneeId;
+        const newLog = [];
+        if (updatedFields.assigneeId !== undefined && updatedFields.assigneeId !== prevAssigneeId) {
+          newLog.push({
+            id: `act-${Math.random().toString(36).substring(2, 9)}`,
+            action: 'assigned',
+            details: `Task reassigned to ${assigneeName}`,
+            timestamp: new Date().toISOString(),
+            userName: currentUser?.name || 'System'
+          });
+        }
+        return {
+          ...t,
+          title: updatedFields.title ?? t.title,
+          description: updatedFields.description ?? t.description,
+          priority: updatedFields.priority ?? t.priority,
+          dueDate: updatedFields.dueDate ?? t.dueDate,
+          assigneeId: updatedFields.assigneeId !== undefined ? updatedFields.assigneeId : t.assigneeId,
+          assigneeName: updatedFields.assigneeId !== undefined ? assigneeName : t.assigneeName,
+          department: updatedFields.assigneeId !== undefined ? department : t.department,
+          activityLog: [...(t.activityLog || []), ...newLog]
+        };
+      }
+      return t;
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      const updatedTask = updatedTasks.find(t => t.id === taskId);
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            title: updatedTask.title,
+            description: updatedTask.description,
+            priority: updatedTask.priority,
+            dueDate: updatedTask.dueDate,
+            assigneeId: updatedTask.assigneeId,
+            assigneeName: updatedTask.assigneeName,
+            status: updatedTask.status
+          })
+        });
+      } catch (err) {
+        console.error('Failed to update task in tasks collection:', err);
+      }
+      addToast('success', 'Task updated successfully.');
+      return true;
+    }
+    return false;
+  };
+
   const reassignTask = async (taskId, assigneeId, assigneeName) => {
     const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
     if (!project) return;
@@ -5456,6 +5527,7 @@ export const AppProvider = ({ children }) => {
         updateTaskProgress,
         addTask,
         deleteTask,
+        editTask,
         reassignTask,
         extendTaskDeadline,
         escalateTask,
