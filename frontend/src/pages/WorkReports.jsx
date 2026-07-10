@@ -53,6 +53,7 @@ const getStatusBadgeVariant = (status) => {
     case 'Submitted': return 'warning';
     case 'Changes Requested': return 'danger';
     case 'Escalated': return 'info';
+    case 'Under Process': return 'info';
     case 'Rejected': return 'danger';
     default: return 'neutral';
   }
@@ -614,7 +615,7 @@ const WorkReports = () => {
       // Status filters
       if (statusFilter !== 'All') {
         if (statusFilter === 'Flagged') {
-          if (r.status !== 'Changes Requested' && r.status !== 'Escalated') return false;
+          if (r.status !== 'Changes Requested' && r.status !== 'Escalated' && r.status !== 'Under Process') return false;
         } else if (r.status !== statusFilter) {
           return false;
         }
@@ -636,7 +637,7 @@ const WorkReports = () => {
   /* Auto Calculations derived states */
   const stats = useMemo(() => {
     const total = filtered.length;
-    const pending = filtered.filter(r => r.status === 'Submitted' || r.status === 'Escalated').length;
+    const pending = filtered.filter(r => r.status === 'Submitted' || r.status === 'Escalated' || r.status === 'Under Process').length;
     const approved = filtered.filter(r => r.status === 'Approved').length;
     const rejected = filtered.filter(r => r.status === 'Rejected' || r.status === 'Changes Requested').length;
     
@@ -810,7 +811,7 @@ const WorkReports = () => {
       } else if (actionType === 'Changes') {
         updatedStatus = 'Changes Requested';
       } else if (actionType === 'Escalate') {
-        updatedStatus = 'Escalated';
+        updatedStatus = 'Under Process';
       }
 
       const updatedReport = await updateDailyReportStatus(selectedReport.id, updatedStatus, evaluationFeedback);
@@ -1352,7 +1353,7 @@ const WorkReports = () => {
                   <option>Submitted</option>
                   <option>Approved</option>
                   <option>Changes Requested</option>
-                  <option>Escalated</option>
+                  <option>Under Process</option>
                   <option>Rejected</option>
                 </select>
               </div>
@@ -1638,7 +1639,7 @@ const WorkReports = () => {
                 <option>Submitted</option>
                 <option>Approved</option>
                 <option>Changes Requested</option>
-                <option>Escalated</option>
+                <option>Under Process</option>
                 <option>Rejected</option>
               </select>
 
@@ -2352,7 +2353,7 @@ const WorkReports = () => {
                     disabled={isAuditing}
                     onClick={() => triggerAuditAction('Escalate')}
                   >
-                    Escalate
+                    Under Process
                   </button>
                   <button
                     className="review-action-btn reject-btn"

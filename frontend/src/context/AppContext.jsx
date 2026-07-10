@@ -5136,15 +5136,15 @@ export const AppProvider = ({ children }) => {
         addActivityLog(`Updated report ${id} status to ${status}`, 'Work Reports', 'success');
         addToast('success', `Report ${id} successfully updated to ${status}.`);
 
-        // Trigger Automatic Notification for work report review status update
-        await triggerAutomaticNotification('TSK-03', {
+        // Trigger Automatic Notification for work report review status update (fire-and-forget, non-blocking)
+        triggerAutomaticNotification('TSK-03', {
           title: 'Daily Work Report Status Updated',
           message: `Your daily work report for ${updatedReport.date} has been reviewed and marked as "${status}". Feedback: ${feedback || 'None'}`,
           recipientId: updatedReport.employeeId,
           recipientRole: 'employee',
           category: 'Project',
           data: { entityId: id, action: 'report_updated' }
-        });
+        }).catch(() => {});
 
         return updatedReport;
       } else {
