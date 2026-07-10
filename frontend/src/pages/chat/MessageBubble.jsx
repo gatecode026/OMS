@@ -580,7 +580,17 @@ const MessageBubble = ({
             }}
           >
             <div className="msg-reply-bar" />
-            <div className="msg-reply-text">{msg.replyTo.content?.substring(0, 60)}</div>
+            <div className="msg-reply-text">
+              {msg.replyTo.type === "audio" || msg.replyTo.type === "voice" ? "🎤 Voice Message" :
+               msg.replyTo.type === "image" ? "📷 Photo" :
+               msg.replyTo.type === "video" ? "🎥 Video" :
+               msg.replyTo.type === "file" ? `📎 ${msg.replyTo.media?.fileName || "File"}` :
+               msg.replyTo.content?.startsWith("data:") ? (
+                 msg.replyTo.content.startsWith("data:audio") ? "🎤 Voice Message" :
+                 msg.replyTo.content.startsWith("data:image") ? "📷 Photo" :
+                 msg.replyTo.content.startsWith("data:video") ? "🎥 Video" : "📎 Attachment"
+               ) : msg.replyTo.content?.substring(0, 60)}
+            </div>
           </div>
         )}
 

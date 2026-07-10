@@ -273,7 +273,7 @@ export const sendThreadReply = async (threadId, senderId, senderName, senderAvat
     const { content, type = 'text', media = null, tempId = null } = replyData;
 
     // Generate unique message ID
-    const newMsgId = await generateCompanyUniqueId(companyId, 'messages');
+    const newMsgId = new mongoose.Types.ObjectId().toString();
     const contentType = type === 'text' ? detectMarkdown(content) : 'plain';
 
     // Create the message reply document
