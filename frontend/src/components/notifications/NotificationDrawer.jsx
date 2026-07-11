@@ -131,7 +131,17 @@ const NotificationDrawer = ({ isOpen, onClose }) => {
       const result = await res.json();
       if (result.status === 'success' && result.data) {
         const { notifications: items, pagination } = result.data;
-        setNotifications((prev) => append ? [...prev, ...items] : items);
+        setNotifications((prev) => {
+          const combined = append ? [...prev, ...items] : items;
+          const seen = new Set();
+          return combined.filter(n => {
+            const id = n.id || n._id;
+            if (!id) return true;
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          });
+        });
         setHasMore(pageNum < (pagination?.pages || 1));
       }
     } catch (err) {

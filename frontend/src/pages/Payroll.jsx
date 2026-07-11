@@ -1328,32 +1328,32 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         (perspective === 'self' || perspective === 'employee') ? (
           <div className="personal-payslip-layout animate-fade-in">
             {/* Left Sidebar: Select Month/Year or List of Past Payslips */}
-            <div className="payslips-history-sidebar card glass flex-column gap-3">
+            <div className="payslips-history-sidebar card glass flex-column gap-3" style={{ minWidth: '280px' }}>
               <h4 className="payslip-title">My Pay Statements</h4>
               <p className="font-xsmall text-muted" style={{ marginTop: -8 }}>Select a pay period to view and download your statement.</p>
               
-              <div className="payslip-periods-list">
-                {['June', 'May', 'April', 'March', 'February', 'January'].map(m => {
-                  const isCurrent = month === m;
-                  const periodObj = employeeMonthlyPayslips[m];
-                  const isPaid = periodObj?.status === 'Released';
-                  
-                  return (
-                    <div
-                      key={m}
-                      className={`payslip-period-item ${isCurrent ? 'active' : ''}`}
-                      onClick={() => setMonth(m)}
-                    >
-                      <div className="flex-column gap-1">
-                        <span className="period-month">{m} {year}</span>
-                        <span className="period-net">{periodObj ? formatCurrency(periodObj.netSalary) : '-'}</span>
-                      </div>
-                      <Badge variant={isPaid ? 'success' : 'warning'}>
-                        {isPaid ? 'Paid' : 'Pending'}
-                      </Badge>
-                    </div>
-                  );
-                })}
+              <div className="flex-column gap-1" style={{ marginTop: '8px' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.05em' }}>
+                  Select Pay Period
+                </label>
+                <select
+                  value={month}
+                  onChange={(e) => setMonth(e.target.value)}
+                  className="payroll-selector"
+                  style={{ width: '100%', cursor: 'pointer' }}
+                >
+                  {['June', 'May', 'April', 'March', 'February', 'January'].map(m => {
+                    const periodObj = employeeMonthlyPayslips[m];
+                    const isPaid = periodObj?.status === 'Released';
+                    const netSalary = periodObj ? formatCurrency(periodObj.netSalary) : '-';
+                    const statusText = isPaid ? 'Paid' : 'Pending';
+                    return (
+                      <option key={m} value={m}>
+                        {m} {year} — {netSalary} ({statusText})
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
             </div>
 

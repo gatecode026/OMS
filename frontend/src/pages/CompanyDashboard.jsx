@@ -184,6 +184,7 @@ const CompanyDashboard = () => {
     }
   }, [currentUserRole, navigate, hasPermission]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [reportDateFilter, setReportDateFilter] = useState('');
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
 
@@ -680,7 +681,7 @@ const CompanyDashboard = () => {
     });
   }, [branches, employees, branchScores]);
 
-  const reports = dailyReports || [];
+  const reports = (dailyReports || []).filter(r => !reportDateFilter || r.date === reportDateFilter);
 
   const handleReportAction = (id, nextStatus, isModal = false) => {
     const report = reports.find(r => r.id === id);
@@ -1111,10 +1112,36 @@ const CompanyDashboard = () => {
 
       {/* 4. Work Reports table grid */}
       <div className="card table-card animate-slide-up">
-        <div className="table-card-header">
+        <div className="table-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <h3 className="card-title">Work Reports Summary</h3>
             <span className="chart-subtitle">Audit entries submitted by active workspace employees</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Filter Date:</span>
+            <input
+              type="date"
+              value={reportDateFilter}
+              onChange={(e) => setReportDateFilter(e.target.value)}
+              style={{
+                background: 'var(--bg-card-hover, rgba(255,255,255,0.02))',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                color: 'var(--text-main)',
+                padding: '6px 12px',
+                fontSize: '0.85rem',
+                outline: 'none'
+              }}
+            />
+            {reportDateFilter && (
+              <button
+                className="text-btn"
+                onClick={() => setReportDateFilter('')}
+                style={{ fontSize: '0.8rem', color: 'var(--color-primary)', cursor: 'pointer', background: 'none', border: 'none' }}
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
 
@@ -1124,10 +1151,8 @@ const CompanyDashboard = () => {
               <tr>
                 <th>Employee</th>
                 <th>Assigned Project</th>
-                <th>Hours Logged</th>
                 <th>Action Report Summary</th>
                 <th>Status</th>
-                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1143,9 +1168,6 @@ const CompanyDashboard = () => {
                     <Badge variant="purple">{report.project || '-'}</Badge>
                   </td>
                   <td>
-                    <strong>{report.hours ?? report.workingHours ?? '-'} hrs</strong>
-                  </td>
-                  <td>
                     <p className="report-summary-text" style={{ maxWidth: '400px' }}>{report.summary || '-'}</p>
                   </td>
                   <td>
@@ -1155,34 +1177,6 @@ const CompanyDashboard = () => {
                     }>
                       {report.status || '-'}
                     </Badge>
-                  </td>
-                  <td className="text-right">
-                    <div className="flex-center gap-2 justify-end">
-                      <button
-                        className="circle-action-btn btn-success-circle"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReportAction(report.id, 'Approved');
-                        }}
-                        title="Approve Report"
-                        disabled={report.status === 'Approved'}
-                        style={{ opacity: report.status === 'Approved' ? 0.4 : 1 }}
-                      >
-                        <Check size={14} />
-                      </button>
-                      <button
-                        className="circle-action-btn btn-danger-circle"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReportAction(report.id, 'Flagged');
-                        }}
-                        title="Flag Report"
-                        disabled={report.status === 'Flagged'}
-                        style={{ opacity: report.status === 'Flagged' ? 0.4 : 1 }}
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
                   </td>
                 </tr>
               ))}

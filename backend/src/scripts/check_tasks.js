@@ -19,7 +19,7 @@ async function check() {
   if (tasks.length > 0) {
     console.log('Example task fields:', Object.keys(tasks[0]));
     tasks.forEach(t => {
-      console.log(`Task: "${t.title}", Status: "${t.status}", Assignee: "${t.assigneeName}", Assignee ID: "${t.assigneeId}"`);
+      console.log(`Task: "${t.title}", DueDate: "${t.dueDate}", Status: "${t.status}", Assignee: "${t.assigneeName}"`);
     });
   }
   

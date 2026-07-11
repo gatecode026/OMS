@@ -22,7 +22,7 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole, currentUser } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole, currentUser, leaveRequests } = useApp();
 
   // Real employee counts by branch (from actual employees data)
   const branchEmployeeCountMap = useMemo(() => {
@@ -38,6 +38,49 @@ const Branches = () => {
 
   const getRealEmpCount = (branchName) => {
     return branchEmployeeCountMap[(branchName || '').trim().toLowerCase()] || 0;
+  };
+
+  const getBranchOnLeaveCount = (branchName) => {
+    if (!branchName) return 0;
+    const branchEmployees = (employees || []).filter(e => 
+      e?.status !== 'Inactive' && 
+      (e?.branch || '').trim().toLowerCase() === branchName.trim().toLowerCase()
+    );
+    
+    // Get today's local date string YYYY-MM-DD
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    
+    return branchEmployees.filter(emp => {
+      if (emp.status === 'On Leave') return true;
+      return (leaveRequests || []).some(l => 
+        l.employeeId === emp.id && 
+        l.status === 'Approved' && 
+        todayStr >= l.fromDate && 
+        todayStr <= (l.toDate || l.fromDate)
+      );
+    }).length;
+  };
+
+  const getBranchTeamLeadersCount = (branchName) => {
+    if (!branchName) return 0;
+    return (employees || []).filter(e => 
+      e?.status !== 'Inactive' && 
+      (e?.branch || '').trim().toLowerCase() === branchName.trim().toLowerCase() &&
+      ((e?.designation || '').toLowerCase().includes('team leader') || (e?.roleId || '').toLowerCase() === 'team_leader')
+    ).length;
+  };
+
+  const getBranchProjectManagersCount = (branchName) => {
+    if (!branchName) return 0;
+    return (employees || []).filter(e => 
+      e?.status !== 'Inactive' && 
+      (e?.branch || '').trim().toLowerCase() === branchName.trim().toLowerCase() &&
+      ((e?.designation || '').toLowerCase().includes('project manager') || (e?.designation || '').toLowerCase().includes('manager') || (e?.roleId || '').toLowerCase() === 'manager')
+    ).length;
   };
 
   const generatedEmployeeId = useMemo(() => {
@@ -2048,7 +2091,7 @@ const Branches = () => {
             <div>
               <h3>Total Headcount</h3>
               <p className="val">{getRealEmpCount(selectedBranch.name)} Employees</p>
-              <p className="sub">{selectedBranch.employeesOnLeave || 0} Currently on Leave</p>
+              <p className="sub">{getBranchOnLeaveCount(selectedBranch.name)} Currently on Leave</p>
             </div>
           </div>
           <div className="stat-card card">
@@ -2611,9 +2654,9 @@ const Branches = () => {
                     <h4><Users size={14} /> Staff Allocation Overview</h4>
                     <div className="stats-mini-grid">
                       <div className="stat-mini"><span>Employees</span><strong>{getRealEmpCount(selectedBranch.name)}</strong></div>
-                      <div className="stat-mini"><span>On Leave</span><strong>{selectedBranch.employeesOnLeave}</strong></div>
-                      <div className="stat-mini"><span>Team Leaders</span><strong>{selectedBranch.teamLeaders}</strong></div>
-                      <div className="stat-mini"><span>Project Mgrs</span><strong>{selectedBranch.projectManagers}</strong></div>
+                      <div className="stat-mini"><span>On Leave</span><strong>{getBranchOnLeaveCount(selectedBranch.name)}</strong></div>
+                      <div className="stat-mini"><span>Team Leaders</span><strong>{getBranchTeamLeadersCount(selectedBranch.name) || selectedBranch.teamLeaders || 0}</strong></div>
+                      <div className="stat-mini"><span>Project Mgrs</span><strong>{getBranchProjectManagersCount(selectedBranch.name) || selectedBranch.projectManagers || 0}</strong></div>
                     </div>
 
                     <h4 style={{ marginTop: '16px' }}>Departments Distribution</h4>
@@ -2674,9 +2717,17 @@ const Branches = () => {
                           <div className="progress-label"><span>Present Rate</span><strong>{selectedBranch.attendance}%</strong></div>
                           <div className="progress-bar" style={{ height: '6px' }}><div className="progress-fill" style={{ width: `${selectedBranch.attendance}%`, background: selectedBranch.attendance >= 94 ? '#10b981' : '#f59e0b' }}></div></div>
                           <div className="attendance-mini-stats" style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.78rem', marginTop: '10px' }}>
-                            <span>✅ Present: <strong>{Math.round(getRealEmpCount(selectedBranch.name) * selectedBranch.attendance / 100)}</strong> staff</span>
-                            <span>❌ Absent: <strong>{Math.round(getRealEmpCount(selectedBranch.name) * (100 - selectedBranch.attendance) / 100)}</strong> staff</span>
-                            <span>🌴 On Leave: <strong>{selectedBranch.employeesOnLeave}</strong> staff</span>
+                            <span>✅ Present: <strong>{(() => {
+                              const total = getRealEmpCount(selectedBranch.name);
+                              return Math.round(total * selectedBranch.attendance / 100);
+                            })()}</strong> staff</span>
+                            <span>❌ Absent: <strong>{(() => {
+                              const total = getRealEmpCount(selectedBranch.name);
+                              const present = Math.round(total * selectedBranch.attendance / 100);
+                              const leave = getBranchOnLeaveCount(selectedBranch.name);
+                              return Math.max(0, total - present - leave);
+                            })()}</strong> staff</span>
+                            <span>🌴 On Leave: <strong>{getBranchOnLeaveCount(selectedBranch.name)}</strong> staff</span>
                           </div>
                         </div>
                       </div>

@@ -165,52 +165,58 @@ const WorkReports = () => {
     });
   }, [employees, currentUser, currentUserRole, isEmployee]);
 
-  const getAssignedTasksCountForProject = (projectName) => {
-    if (!projectName) return 0;
-    const normalizeName = (name) => {
-      if (!name) return '';
-      return name.trim().replace(/\s+/g, ' ').toLowerCase();
-    };
-    const normCurrentUserName = normalizeName(currentUser?.name);
-    
-    const proj = (projectsList || []).find(p => p.name === projectName);
-    if (!proj || !proj.tasks) return 0;
-    
-    let count = 0;
-    proj.tasks.forEach(t => {
-      const isCurrentUserAssigned = (t.assignedTo && t.assignedTo.map(normalizeName).includes(normCurrentUserName)) ||
-                                     (t.assigneeName && normalizeName(t.assigneeName).includes(normCurrentUserName)) ||
-                                     (t.assigneeId && currentUser && t.assigneeId === currentUser.id);
-      if (isCurrentUserAssigned) {
-        count++;
-      }
-    });
-    return count;
+  const getTodayStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
-  const getAssignedTasksForProject = (projectName) => {
-    if (!projectName) return [];
+  const getAssignedTasksCountForDate = (dateStr) => {
+    return getAssignedTasksForDate(dateStr).length;
+  };
+
+  const getAssignedTasksForDate = (dateStr) => {
+    if (!dateStr) return [];
     const normalizeName = (name) => {
       if (!name) return '';
       return name.trim().replace(/\s+/g, ' ').toLowerCase();
     };
-    const normCurrentUserName = normalizeName(currentUser?.name);
+    const normCurrentUserName = normalizeName(currentUser?.name || currentUser?.fullName);
+    const currentUserId = currentUser?.id || currentUser?.employeeId;
+    if (!normCurrentUserName && !currentUserId) return [];
     
-    const proj = (projectsList || []).find(p => p.name === projectName);
-    if (!proj || !proj.tasks) return [];
-    
-    return proj.tasks.filter(t => {
-      const isCurrentUserAssigned = (t.assignedTo && t.assignedTo.map(normalizeName).includes(normCurrentUserName)) ||
-                                     (t.assigneeName && normalizeName(t.assigneeName).includes(normCurrentUserName)) ||
-                                     (t.assigneeId && currentUser && t.assigneeId === currentUser.id);
-      const isNotCompleted = t.status !== 'Completed' && t.status !== 'Done' && !t.completed;
-      return isCurrentUserAssigned && isNotCompleted;
+    const allTasks = [];
+    (projectsList || []).forEach(proj => {
+      if (!proj.tasks) return;
+      proj.tasks.forEach(t => {
+        const isNameMatched = normCurrentUserName && (
+          (t.assignedTo && t.assignedTo.map(normalizeName).includes(normCurrentUserName)) ||
+          (t.assigneeName && (normalizeName(t.assigneeName) === normCurrentUserName || normalizeName(t.assigneeName).includes(normCurrentUserName)))
+        );
+        const isIdMatched = currentUserId && (
+          (t.assigneeId && t.assigneeId === currentUserId) ||
+          (t.assignedToIds && t.assignedToIds.includes(currentUserId))
+        );
+        const isCurrentUserAssigned = isNameMatched || isIdMatched;
+        const isDateMatched = t.dueDate === dateStr;
+        const isNotCompleted = t.status !== 'Completed' && t.status !== 'Done' && !t.completed;
+        
+        if (isCurrentUserAssigned && isDateMatched && isNotCompleted) {
+          allTasks.push({
+            ...t,
+            projectName: proj.name
+          });
+        }
+      });
     });
+    return allTasks;
   };
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().slice(0, 10),
-    project: '',
+    date: new Date().toLocaleDateString('en-CA'),
+    project: 'General',
     tasksAssigned: 0,
     tasksCompleted: 0,
     summary: '',
@@ -219,12 +225,32 @@ const WorkReports = () => {
 
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
 
-  const handleProjectChange = (projectName) => {
-    const assignedTasks = getAssignedTasksCountForProject(projectName);
+  React.useEffect(() => {
+    if (currentUser && projectsList && projectsList.length > 0) {
+      const todayStr = getTodayStr();
+      const tasks = getAssignedTasksForDate(todayStr);
+      const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).filter(Boolean);
+      const projectVal = uniqueProjects.length > 0 ? uniqueProjects.join(', ') : 'General';
+      setFormData(prev => ({
+        ...prev,
+        date: todayStr,
+        project: projectVal,
+        tasksAssigned: tasks.length
+      }));
+    }
+  }, [currentUser, projectsList]);
+
+  const handleDateChange = (newDate) => {
+    const tasks = getAssignedTasksForDate(newDate);
+    const assignedCount = tasks.length;
+    const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).filter(Boolean);
+    const projectVal = uniqueProjects.length > 0 ? uniqueProjects.join(', ') : 'General';
+    
     setFormData(prev => ({
       ...prev,
-      project: projectName,
-      tasksAssigned: assignedTasks,
+      date: newDate,
+      project: projectVal,
+      tasksAssigned: assignedCount,
       tasksCompleted: 0
     }));
     setSelectedTaskIds([]);
@@ -238,9 +264,22 @@ const WorkReports = () => {
       nextIds = selectedTaskIds.filter(id => id !== taskId);
     }
     setSelectedTaskIds(nextIds);
+    
+    const allTasks = getAssignedTasksForDate(formData.date);
+    const selectedProjects = nextIds.map(id => {
+      const task = allTasks.find(t => t.id === id);
+      return task ? task.projectName : '';
+    }).filter(Boolean);
+    
+    const uniqueProjects = Array.from(new Set(selectedProjects));
+    const defaultProjects = Array.from(new Set(allTasks.map(t => t.projectName))).filter(Boolean);
+    const defaultProjectVal = defaultProjects.length > 0 ? defaultProjects.join(', ') : 'General';
+    const projectVal = uniqueProjects.length > 0 ? uniqueProjects.join(', ') : defaultProjectVal;
+    
     setFormData(prev => ({
       ...prev,
-      tasksCompleted: nextIds.length
+      tasksCompleted: nextIds.length,
+      project: projectVal
     }));
   };
 
@@ -251,6 +290,11 @@ const WorkReports = () => {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    const todayStr = getTodayStr();
+    if (formData.date > todayStr) {
+      addToast('warning', 'Report date cannot be in the future.');
+      return;
+    }
     if (!formData.project.trim()) {
       addToast('warning', 'Please specify the project name.');
       return;
@@ -297,11 +341,14 @@ const WorkReports = () => {
       const result = await addDailyReport(payload);
       if (result) {
         addToast('success', 'Daily work report submitted successfully!');
-        setFormData(prev => ({
-          ...prev,
+        setFormData({
+          date: getTodayStr(),
+          project: '',
+          tasksAssigned: 0,
+          tasksCompleted: 0,
           summary: '',
           majorAccomplishments: ''
-        }));
+        });
         setSelectedTaskIds([]);
       }
     } catch (err) {
@@ -1201,67 +1248,81 @@ const WorkReports = () => {
                       type="date"
                       className="reports-form-input"
                       value={formData.date}
-                      onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                      onChange={(e) => handleDateChange(e.target.value)}
+                      max={getTodayStr()}
                       required
                     />
                   </div>
                   <div className="form-group-item">
                     <label className="reports-form-lbl">Project Name / Client *</label>
-                    <select
+                    <input
+                      type="text"
                       className="reports-form-input"
                       value={formData.project}
-                      onChange={(e) => handleProjectChange(e.target.value)}
-                      required
-                    >
-                      <option value="">— Select Project —</option>
-                      {(projectsList || []).map(p => (
-                        <option key={p.id || p.name} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
+                      readOnly
+                      placeholder="No project associated"
+                    />
                   </div>
                 </div>
  
-                {/* Active Tasks Checklist (Only if project is selected) */}
-                {formData.project && (
-                  <div className="form-group-item">
-                    <label className="reports-form-lbl" style={{ marginBottom: '8px', display: 'block' }}>
-                      Select Completed Tasks
-                    </label>
-                    {getAssignedTasksForProject(formData.project).length > 0 ? (
-                      <div className="flex-column gap-2" style={{
-                        maxHeight: '150px',
-                        overflowY: 'auto',
-                        padding: '10px',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-md)',
-                        background: 'var(--bg-card)'
-                      }}>
-                        {getAssignedTasksForProject(formData.project).map(task => (
-                          <label key={task.id} className="flex-row align-center gap-2" style={{
-                            fontSize: '0.85rem',
+                {/* Active Tasks Checklist */}
+                <div className="form-group-item">
+                  <label className="reports-form-lbl" style={{ marginBottom: '8px', display: 'block' }}>
+                    Select Completed Tasks
+                  </label>
+                  {getAssignedTasksForDate(formData.date).length > 0 ? (
+                    <div className="flex-column gap-2" style={{
+                      maxHeight: '150px',
+                      overflowY: 'auto',
+                      padding: '10px',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--bg-card)'
+                    }}>
+                      {getAssignedTasksForDate(formData.date).map(task => (
+                        <div key={task.id} style={{
+                          display: 'flex',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'flex-start',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          padding: '6px 0',
+                          width: '100%'
+                        }}>
+                          <input
+                            type="checkbox"
+                            id={`task-${task.id}`}
+                            checked={selectedTaskIds.includes(task.id)}
+                            onChange={(e) => handleTaskCheckboxChange(task.id, e.target.checked)}
+                            style={{
+                              cursor: 'pointer',
+                              accentColor: 'var(--color-primary)',
+                              width: 'auto',
+                              margin: 0
+                            }}
+                          />
+                          <label htmlFor={`task-${task.id}`} style={{
                             cursor: 'pointer',
-                            padding: '4px 0'
+                            margin: 0,
+                            fontSize: '0.85rem',
+                            textTransform: 'none',
+                            color: 'var(--text-primary)',
+                            display: 'inline',
+                            fontWeight: 'normal',
+                            letterSpacing: 'normal'
                           }}>
-                            <input
-                              type="checkbox"
-                              checked={selectedTaskIds.includes(task.id)}
-                              onChange={(e) => handleTaskCheckboxChange(task.id, e.target.checked)}
-                              style={{
-                                cursor: 'pointer',
-                                accentColor: 'var(--color-primary)'
-                              }}
-                            />
-                            <span>{task.title} <strong style={{ color: 'var(--text-muted)' }}>({task.id})</strong></span>
+                            {task.title} <strong style={{ color: 'var(--text-muted)' }}>({task.id})</strong>
                           </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted" style={{ padding: '4px 0' }}>
-                        No active assigned tasks found for this project.
-                      </div>
-                    )}
-                  </div>
-                )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted" style={{ padding: '4px 0' }}>
+                      No active assigned tasks found for this date.
+                    </div>
+                  )}
+                </div>
 
                 {/* Row 2: Timings & Hours */}
 

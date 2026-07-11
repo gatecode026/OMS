@@ -5458,6 +5458,17 @@ export const AppProvider = ({ children }) => {
   }, [currentUser, branches, departments, attendance]);
 
 
+  const uniqueNotifications = useMemo(() => {
+    const seen = new Set();
+    return (notifications || []).filter(n => {
+      const id = n.id || n._id;
+      if (!id) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [notifications]);
+
   return (
     <AppContext.Provider
       value={{
@@ -5507,7 +5518,7 @@ export const AppProvider = ({ children }) => {
         updatePayrollConfig,
         token,
         setToken,
-        notifications,
+        notifications: uniqueNotifications,
         setNotifications,
         fetchNotifications,
         addNotification,
