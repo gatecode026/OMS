@@ -45,7 +45,7 @@ export const createSchema = (data) => {
       }
 
       const diffTime = end.getTime() - start.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays > 365) {
         errors.push('Leave request duration cannot exceed 365 days');
       }
@@ -77,7 +77,7 @@ export const updateSchema = (data) => {
       }
 
       const diffTime = end.getTime() - start.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays > 365) {
         errors.push('Leave request duration cannot exceed 365 days');
       }
