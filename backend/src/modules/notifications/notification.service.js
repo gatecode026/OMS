@@ -152,7 +152,7 @@ export const createNotification = async (userId, companyId, { type, title, messa
 
       // ── DUPLICATE PREVENTION ───────────────────────────────────────────────
       // Uniquely identify by: Recipient User (userId) + Type (type) + Entity ID + Action
-      const entityId = data.taskId || data.meetingId || data.leaveId || data.conversationId || data.entityId || data.id || '';
+      const entityId = data.taskId || data.meetingId || data.leaveId || data.conversationId || data.entityId || data.correctionId || data.id || '';
       const action = data.action || type || '';
 
       if (entityId) {
@@ -165,7 +165,8 @@ export const createNotification = async (userId, companyId, { type, title, messa
             { 'data.meetingId': entityId },
             { 'data.leaveId': entityId },
             { 'data.conversationId': entityId },
-            { 'data.entityId': entityId }
+            { 'data.entityId': entityId },
+            { 'data.correctionId': entityId }
           ]
         };
         if (action) {

@@ -283,7 +283,16 @@ const Notifications = () => {
   const filteredNotifications = useMemo(() => {
     const isEmployeeView = perspective === 'employee';
 
-    const normalized = (notifications || []).map(notif => {
+    const seenIds = new Set();
+    const uniqueNotifs = (notifications || []).filter(notif => {
+      const id = notif.id || notif._id;
+      if (!id) return true;
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
+    });
+
+    const normalized = uniqueNotifs.map(notif => {
       const id = notif.id || notif._id;
       const isRead = notif.isRead || notif.read || false;
       const createdAt = notif.createdAt || new Date().toISOString();

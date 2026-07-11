@@ -209,6 +209,7 @@ const Attendance = () => {
     hasPermission,
     correctionRequests,
     fetchCorrectionRequests,
+    leaveRequests,
     token
   } = useApp();
 
@@ -1215,6 +1216,16 @@ const Attendance = () => {
 
   // Process and Filter Attendance Ledger
   const ledgerData = useMemo(() => {
+    const hasApprovedLeave = (empId, dateStr) => {
+      if (!empId || !dateStr) return false;
+      return (leaveRequests || []).some(l => 
+        l.employeeId === empId && 
+        l.status === 'Approved' && 
+        dateStr >= l.fromDate && 
+        dateStr <= l.toDate
+      );
+    };
+
     if (isEmployeeView) {
       const dates = getDatesRange(timeRangeFilter);
       const records = [];
@@ -1230,7 +1241,10 @@ const Attendance = () => {
           empRecords.forEach(item => {
             const empDetails = currentUser;
             let status = item.status;
-            if ((status === 'On Leave' || status === 'Leave') && empDetails && empDetails.leaveHistory) {
+            const isOnLeave = hasApprovedLeave(item.employeeId || empDetails?.id, item.date);
+            if (isOnLeave && (status === 'Absent' || status === 'On Leave' || status === 'Leave')) {
+              status = 'On Leave';
+            } else if ((status === 'On Leave' || status === 'Leave') && empDetails && empDetails.leaveHistory) {
               const foundLeave = empDetails.leaveHistory.find(l => 
                 l.status === 'Approved' && 
                 item.date >= l.fromDate && 
@@ -1262,6 +1276,7 @@ const Attendance = () => {
         } else {
           // Virtual Absent record
           const emp = currentUser;
+          const isOnLeave = hasApprovedLeave(emp?.id || currentUser?.id, date);
           records.push({
             id: `ABS-${emp?.id || 'emp'}-${date}`,
             employeeId: emp?.id || '',
@@ -1269,7 +1284,7 @@ const Attendance = () => {
             department: emp?.department || '',
             branch: emp?.branch || '',
             date: date,
-            status: 'Absent',
+            status: isOnLeave ? 'On Leave' : 'Absent',
             punchIn: '--:--',
             punchOut: '--:--',
             totalHours: 0,
@@ -1307,7 +1322,10 @@ const Attendance = () => {
     const records = dayRecords.map(item => {
       const empDetails = (scopedEmployees || []).find(e => e.id === item.employeeId || e.name === item.employeeName);
       let status = item.status;
-      if ((status === 'On Leave' || status === 'Leave') && empDetails && empDetails.leaveHistory) {
+      const isOnLeave = hasApprovedLeave(item.employeeId || empDetails?.id, item.date);
+      if (isOnLeave && (status === 'Absent' || status === 'On Leave' || status === 'Leave')) {
+        status = 'On Leave';
+      } else if ((status === 'On Leave' || status === 'Leave') && empDetails && empDetails.leaveHistory) {
         const foundLeave = empDetails.leaveHistory.find(l => 
           l.status === 'Approved' && 
           item.date >= l.fromDate && 
@@ -1334,12 +1352,13 @@ const Attendance = () => {
       };
     });
     
-    // 4. For any employee in scopedEmployees who doesn't have a record on this date, create a virtual 'Absent' record
+    // 4. For any employee in scopedEmployees who doesn't have a record on this date, create a virtual 'Absent' or 'On Leave' record
     const markedEmpIds = new Set(records.map(r => r.employeeId));
     
     (scopedEmployees || []).forEach(emp => {
       if (!emp || markedEmpIds.has(emp.id)) return;
       
+      const isOnLeave = hasApprovedLeave(emp.id, dateFilter);
       records.push({
         id: `ABS-${emp.id}-${dateFilter}`,
         employeeId: emp.id,
@@ -1350,7 +1369,7 @@ const Attendance = () => {
         punchIn: '--:--',
         punchOut: '--:--',
         totalHours: 0,
-        status: 'Absent',
+        status: isOnLeave ? 'On Leave' : 'Absent',
         source: 'System',
         breakTime: '45 mins',
         workMode: emp.workMode || 'WFO',
@@ -1361,7 +1380,7 @@ const Attendance = () => {
     });
     
     return records;
-  }, [attendance, employees, scopedEmployees, currentUserRole, currentUser, dateFilter, timeRangeFilter]);
+  }, [attendance, employees, scopedEmployees, currentUserRole, currentUser, dateFilter, timeRangeFilter, leaveRequests]);
 
   // Filtered attendance for KPIs (ignores statusFilter and workModeFilter so counts don't zero out on card selection)
   const kpiFilteredAttendance = useMemo(() => {
@@ -1538,7 +1557,7 @@ const Attendance = () => {
     return scopedEmployees.filter(e => e.joinDate && e.joinDate.startsWith(currentYearMonth)).length;
   }, [scopedEmployees]);
 
-  const totalPresent = useMemo(() => kpiFilteredAttendance.filter(a => ['Present', 'Overtime'].includes(a.status)).length, [kpiFilteredAttendance]);
+  const totalPresent = useMemo(() => kpiFilteredAttendance.filter(a => ['Present', 'Overtime', 'Late'].includes(a.status)).length, [kpiFilteredAttendance]);
   const totalLate = useMemo(() => kpiFilteredAttendance.filter(a => a.status === 'Late').length, [kpiFilteredAttendance]);
   const totalAbsent = useMemo(() => kpiFilteredAttendance.filter(a => a.status === 'Absent').length, [kpiFilteredAttendance]);
   const totalLeave = useMemo(() => kpiFilteredAttendance.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length, [kpiFilteredAttendance]);
@@ -1546,9 +1565,9 @@ const Attendance = () => {
   const totalHalfDay = useMemo(() => kpiFilteredAttendance.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length, [kpiFilteredAttendance]);
   
   const attendanceRate = useMemo(() => {
-    const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalLate + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
+    const rawRate = totalEmployees > 0 ? Math.round(((totalPresent + totalHalfDay + totalWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
     return Math.min(rawRate, 100);
-  }, [totalEmployees, totalPresent, totalLate, totalHalfDay, totalWFH]);
+  }, [totalEmployees, totalPresent, totalHalfDay, totalWFH]);
 
   const rateComparison = useMemo(() => {
     const today = new Date(dateFilter || getLocalDateString());
@@ -1562,12 +1581,11 @@ const Attendance = () => {
       return !!emp;
     });
 
-    const yesterdayPresent = scopedYesterdayRecords.filter(a => ['Present', 'Overtime'].includes(a.status)).length;
-    const yesterdayLate = scopedYesterdayRecords.filter(a => a.status === 'Late').length;
+    const yesterdayPresent = scopedYesterdayRecords.filter(a => ['Present', 'Overtime', 'Late'].includes(a.status)).length;
     const yesterdayHalfDay = scopedYesterdayRecords.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
     const yesterdayWFH = scopedYesterdayRecords.filter(a => ['Work From Home', 'WFH'].includes(a.status)).length;
 
-    const yesterdayRate = totalEmployees > 0 ? Math.round(((yesterdayPresent + yesterdayLate + yesterdayHalfDay + yesterdayWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
+    const yesterdayRate = totalEmployees > 0 ? Math.round(((yesterdayPresent + yesterdayHalfDay + yesterdayWFH) / Math.max(totalEmployees, 1)) * 100) : 0;
     const rateDiff = attendanceRate - Math.min(yesterdayRate, 100);
     return {
       diff: rateDiff,
@@ -1578,7 +1596,7 @@ const Attendance = () => {
   // Get counts by status for clickable cards
   const statusCounts = useMemo(() => {
     return {
-      present: totalPresent + totalLate,
+      present: totalPresent,
       absent: totalAbsent,
       late: totalLate,
       leave: totalLeave,

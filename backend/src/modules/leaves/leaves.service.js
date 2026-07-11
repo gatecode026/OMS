@@ -53,6 +53,83 @@ export const findById = async (id) => {
   return repository.findOne(id);
 };
 
+const syncLeavesToAttendance = async (record, currentUser) => {
+  if (record.status !== 'Approved') return;
+  
+  try {
+    const companyId = currentUser?.companyId || record.companyId;
+    if (!companyId) return;
+
+    const conn = await getTenantConnection(companyId);
+    
+    // Resolve employee details to get department, branch, etc.
+    const employee = await conn.collection('employees').findOne({ id: record.employeeId });
+    const dept = record.department || employee?.department || '';
+    const branch = record.branch || employee?.branch || '';
+    const empName = record.employeeName || employee?.name || 'Employee';
+
+    // Get dates in range
+    const getDatesInRange = (fromDateStr, toDateStr) => {
+      const dates = [];
+      const start = new Date(fromDateStr);
+      const end = new Date(toDateStr);
+      while (start <= end) {
+        const yyyy = start.getFullYear();
+        const mm = String(start.getMonth() + 1).padStart(2, '0');
+        const dd = String(start.getDate()).padStart(2, '0');
+        dates.push(`${yyyy}-${mm}-${dd}`);
+        start.setDate(start.getDate() + 1);
+      }
+      return dates;
+    };
+
+    const dates = getDatesInRange(record.fromDate, record.toDate || record.fromDate);
+
+    for (const date of dates) {
+      // Check if record exists
+      const existing = await conn.collection('attendance').findOne({
+        employeeId: record.employeeId,
+        date: date
+      });
+
+      if (existing) {
+        // Update status to On Leave
+        await conn.collection('attendance').updateOne(
+          { _id: existing._id },
+          { $set: { status: 'On Leave' } }
+        );
+        logger.info(`Updated existing attendance to 'On Leave' for employee ${record.employeeId} on ${date}`);
+      } else {
+        // Create new record
+        const attId = `ATT-${record.employeeId}-${date}`;
+        await conn.collection('attendance').insertOne({
+          id: attId,
+          employeeId: record.employeeId,
+          employeeName: empName,
+          department: dept,
+          branch: branch,
+          date: date,
+          punchIn: '--:--',
+          punchOut: '--:--',
+          totalHours: 0,
+          status: 'On Leave',
+          source: 'System',
+          breakTime: '45 mins',
+          workMode: employee?.workMode || 'WFO',
+          shift: employee?.shift || 'Flexible Shift',
+          overtime: '0 hrs',
+          companyId: companyId,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        logger.info(`Created new 'On Leave' attendance record for employee ${record.employeeId} on ${date}`);
+      }
+    }
+  } catch (err) {
+    logger.error('Error syncing leave to attendance: ' + err.message);
+  }
+};
+
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing LeavesService::createRecord by user: ' + currentUser?.id);
   if (!data.appliedDate) {
@@ -67,6 +144,11 @@ export const createRecord = async (data, currentUser) => {
     const message = `${record.employeeName} (${record.department}) has applied for ${record.type} from ${record.fromDate} to ${record.toDate} (${record.days} days). Reason: ${record.reason}`;
     await notifyAdminsAndManagers(currentUser.companyId, title, message, { leaveId: record.id });
     
+    // Auto-sync approved leave to attendance
+    if (record.status === 'Approved') {
+      await syncLeavesToAttendance(record, currentUser);
+    }
+
     if (currentUser?.companyId) {
       emitEntitySync(currentUser.companyId, {
         module: 'leaves',
@@ -95,6 +177,11 @@ export const updateRecord = async (id, data, currentUser) => {
       logger.error('Error generating notification for leave update: ' + err.message);
     }
     
+    // Auto-sync approved leave to attendance
+    if (record.status === 'Approved') {
+      await syncLeavesToAttendance(record, currentUser);
+    }
+
     if (currentUser?.companyId) {
       emitEntitySync(currentUser.companyId, {
         module: 'leaves',

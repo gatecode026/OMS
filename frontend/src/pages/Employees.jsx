@@ -1763,7 +1763,7 @@ const Employees = () => {
   const totalEmp = filteredEmployees.length;
   const presentCount = filteredEmployees.filter(e => {
     const status = getTodayStatus(e);
-    return ['Present', 'Overtime', 'Half Day', 'Half-Day', 'Work From Home', 'WFH'].includes(status);
+    return ['Present', 'Overtime', 'Half Day', 'Half-Day', 'Work From Home', 'WFH', 'Late'].includes(status);
   }).length;
   const absentCount = filteredEmployees.filter(e => {
     const status = getTodayStatus(e);

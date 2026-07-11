@@ -88,7 +88,7 @@ const Teams = () => {
   const attendanceTrendData = useMemo(() => {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const activeEmps = (employees || []).filter(e => e.status !== 'Inactive');
-    const presentEmps = activeEmps.filter(e => e.attendanceStatus === 'Present' || e.attendanceStatus === 'Punched In');
+    const presentEmps = activeEmps.filter(e => e.attendanceStatus === 'Present' || e.attendanceStatus === 'Punched In' || e.attendanceStatus === 'Late');
     const baseRate = activeEmps.length > 0 ? Math.round((presentEmps.length / activeEmps.length) * 100) : 92;
     
     return days.map((day, idx) => {

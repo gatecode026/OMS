@@ -23,48 +23,48 @@ export const createRecord = async (data, currentUser) => {
   logger.info('Executing WorkReportsService::createRecord by user: ' + currentUser?.id);
   const record = await repository.save(data);
 
-  // If daily report is created with completedTaskIds, transition those tasks to 'In Review'
+  // If daily report is created with completedTaskIds, transition those tasks to 'In Review' in background
   if (record && record.completedTaskIds && record.completedTaskIds.length > 0) {
-    try {
-      logger.info(`[ReportSubmission] Report ${record.id} created, transitioning tasks to 'In Review': ${JSON.stringify(record.completedTaskIds)}`);
-      for (const taskId of record.completedTaskIds) {
-        // 1. Update standalone Task collection
-        await Task.updateOne(
-          { id: taskId },
+    // Run in background without awaiting so the API returns instantly to the user
+    (async () => {
+      try {
+        logger.info(`[ReportSubmission] Report ${record.id} created, transitioning tasks to 'In Review' in background: ${JSON.stringify(record.completedTaskIds)}`);
+        
+        // 1. Update standalone Task collection in bulk
+        await Task.updateMany(
+          { id: { $in: record.completedTaskIds } },
           { $set: { status: 'In Review', progress: 80 } }
         );
 
-        // 2. Find and update embedded tasks inside Project collection
-        const project = await Project.findOne({ 'tasks.id': taskId });
-        if (project) {
-          project.tasks = project.tasks.map(t => {
-            if (t.id === taskId) {
-              return {
-                ...t,
-                status: 'In Review',
-                progress: 80,
-                activityLog: [
-                  ...(t.activityLog || []),
-                  {
-                    id: `act-${Math.random().toString(36).substring(2, 9)}`,
-                    action: 'sent_to_review',
-                    details: `Task sent to review automatically via daily work report submission by ${currentUser?.name || 'Employee'}`,
-                    timestamp: new Date().toISOString(),
-                    userName: currentUser?.name || 'System'
-                  }
-                ]
-              };
+        // 2. Find and update embedded tasks inside Project collection grouped by project
+        const projects = await Project.find({ 'tasks.id': { $in: record.completedTaskIds } });
+        for (const project of projects) {
+          let modified = false;
+          project.tasks.forEach(t => {
+            if (record.completedTaskIds.includes(t.id)) {
+              t.status = 'In Review';
+              t.progress = 80;
+              t.activityLog = t.activityLog || [];
+              t.activityLog.push({
+                id: `act-${Math.random().toString(36).substring(2, 9)}`,
+                action: 'sent_to_review',
+                details: `Task sent to review automatically via daily work report submission by ${currentUser?.name || 'Employee'}`,
+                timestamp: new Date().toISOString(),
+                userName: currentUser?.name || 'System'
+              });
+              modified = true;
             }
-            return t;
           });
-          project.markModified('tasks');
-          await project.save();
-          logger.info(`[ReportSubmission] Auto-transitioned task ${taskId} to In Review`);
+          if (modified) {
+            project.markModified('tasks');
+            await project.save();
+          }
         }
+        logger.info(`[ReportSubmission] Auto-transitioned tasks for report ${record.id} completed successfully in background`);
+      } catch (err) {
+        logger.error('Error transitioning tasks to In Review in background:', err);
       }
-    } catch (err) {
-      logger.error('Error transitioning tasks to In Review on report creation:', err);
-    }
+    })();
   }
 
   if (record && currentUser?.companyId) {
