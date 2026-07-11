@@ -23,20 +23,27 @@ export const createSchema = (data) => {
   }
 
   if (data.fromDate && data.toDate) {
-    if (data.toDate < data.fromDate) {
-      errors.push('End date cannot be before start date');
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    if (data.fromDate < today) {
-      errors.push('Start date cannot be before today');
-    }
-
     const start = new Date(data.fromDate);
     const end = new Date(data.toDate);
+
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       errors.push('Invalid date format');
     } else {
+      if (end < start) {
+        errors.push('End date cannot be before start date');
+      }
+
+      // Check if fromDate is before today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const startCopy = new Date(start);
+      startCopy.setHours(0, 0, 0, 0);
+
+      if (startCopy < today) {
+        errors.push('Start date cannot be before today');
+      }
+
       const diffTime = end.getTime() - start.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       if (diffDays > 365) {
@@ -59,15 +66,16 @@ export const updateSchema = (data) => {
   }
 
   if (data.fromDate && data.toDate) {
-    if (data.toDate < data.fromDate) {
-      errors.push('End date cannot be before start date');
-    }
-
     const start = new Date(data.fromDate);
     const end = new Date(data.toDate);
+
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       errors.push('Invalid date format');
     } else {
+      if (end < start) {
+        errors.push('End date cannot be before start date');
+      }
+
       const diffTime = end.getTime() - start.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       if (diffDays > 365) {
