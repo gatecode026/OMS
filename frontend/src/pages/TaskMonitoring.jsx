@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './TaskMonitoring.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -172,7 +173,10 @@ const TaskMonitoring = () => {
     showConfirm,
     addToast,
     projectsList,
-    hasPermission
+    hasPermission,
+    updateProject,
+    addDocument,
+    token
   } = useApp();
 
   const [perspective, setPerspective] = useState(() => {
@@ -263,8 +267,8 @@ const TaskMonitoring = () => {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [projectFilter, setProjectFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('due_today');
-  const [customDateFilter, setCustomDateFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('custom');
+  const [customDateFilter, setCustomDateFilter] = useState(new Date().toISOString().split('T')[0]);
 
   // Sort states for List Tables
   const [teamSortKey, setTeamSortKey] = useState('productivity');
@@ -896,11 +900,44 @@ const TaskMonitoring = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    let fileBase64 = '';
+    try {
+      fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (error) => reject(error);
+      });
+    } catch (err) {
+      console.error('FileReader error:', err);
+      addToast('danger', 'Failed to read the selected file.');
+      return;
+    }
+
+    const docName = file.name;
+    const docType = file.name.split('.').pop() || 'file';
+    const docSize = `${(file.size / 1024).toFixed(1)} KB`;
+
+    const docData = {
+      name: docName,
+      type: docType,
+      category: 'Project',
+      size: docSize,
+      uploadedBy: currentUser?.name || 'Employee',
+      uploadDate: new Date().toISOString().split('T')[0],
+      downloads: 0,
+      fileUrl: fileBase64,
+      remarks: `Uploaded for task: ${selectedTask.title}`
+    };
+
+    const result = await addDocument(docData);
+    if (!result) return;
+
     const newAttachment = {
-      id: `att-${Math.random().toString(36).substring(2, 9)}`,
-      name: file.name,
-      size: `${(file.size / 1024).toFixed(1)} KB`,
-      url: '#'
+      id: result.id || `att-${Math.random().toString(36).substring(2, 9)}`,
+      name: docName,
+      size: docSize,
+      url: result.fileUrl || result.downloadUrl || fileBase64
     };
 
     const project = projectsList.find(p => p.tasks.some(t => t.id === selectedTask.id));
@@ -932,6 +969,45 @@ const TaskMonitoring = () => {
       const updatedT = updatedTasks.find(t => t.id === selectedTask.id);
       setSelectedTask(updatedT);
     }
+  };
+
+  const handleRemoveAttachment = async (attachmentId, attachmentName) => {
+    showConfirm(
+      'Remove Attachment',
+      `Are you sure you want to remove the attachment "${attachmentName}"?`,
+      async () => {
+        const project = projectsList.find(p => p.tasks.some(t => t.id === selectedTask.id));
+        if (!project) return;
+
+        const updatedTasks = project.tasks.map(t => {
+          if (t.id === selectedTask.id) {
+            return {
+              ...t,
+              attachments: (t.attachments || []).filter(att => att.id !== attachmentId),
+              activityLog: [
+                ...(t.activityLog || []),
+                {
+                  id: `act-${Math.random().toString(36).substring(2, 9)}`,
+                  action: 'attachment_removed',
+                  details: `Removed attachment: ${attachmentName}`,
+                  timestamp: new Date().toISOString(),
+                  userName: currentUser?.name || 'System'
+                }
+              ]
+            };
+          }
+          return t;
+        });
+
+        const success = await updateProject(project.id, { tasks: updatedTasks });
+        if (success) {
+          addToast('warning', 'Attachment removed successfully.');
+          const updatedT = updatedTasks.find(t => t.id === selectedTask.id);
+          setSelectedTask(updatedT);
+        }
+      },
+      'danger'
+    );
   };
 
   const handleApproveLevel = async (level) => {
@@ -1207,11 +1283,8 @@ const TaskMonitoring = () => {
             {projectSummaries.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
           <select value={dateFilter} onChange={e => { setDateFilter(e.target.value); if (e.target.value !== 'custom') setCustomDateFilter(''); }}>
-            <option value="all">All Dates</option>
-            <option value="today">Created Today</option>
-            <option value="due_today">Due Today</option>
-            <option value="due_this_week">Due This Week</option>
-            <option value="custom">Select Custom Date...</option>
+            <option value="custom">Custom Date</option>
+            <option value="all">All Tasks</option>
           </select>
           {dateFilter === 'custom' && (
             <input
@@ -1231,8 +1304,8 @@ const TaskMonitoring = () => {
               }}
             />
           )}
-          {(searchTerm || statusFilter || priorityFilter || deptFilter || projectFilter || dateFilter !== 'due_today' || customDateFilter || activeCardFilter !== 'all') && (
-            <Button variant="ghost" onClick={() => { setSearchTerm(''); setStatusFilter(''); setPriorityFilter(''); setDeptFilter(''); setProjectFilter(''); setDateFilter('due_today'); setCustomDateFilter(''); setActiveCardFilter('all'); }}>Clear</Button>
+          {(searchTerm || statusFilter || priorityFilter || deptFilter || projectFilter || dateFilter !== 'custom' || customDateFilter !== todayStr || activeCardFilter !== 'all') && (
+            <Button variant="ghost" onClick={() => { setSearchTerm(''); setStatusFilter(''); setPriorityFilter(''); setDeptFilter(''); setProjectFilter(''); setDateFilter('custom'); setCustomDateFilter(todayStr); setActiveCardFilter('all'); }}>Clear</Button>
           )}
         </div>
       </div>
@@ -1871,7 +1944,7 @@ const TaskMonitoring = () => {
         const statusLabel = isReassignedStatus ? 'Reassigned' : getDisplayStatus(selectedTask.status);
         const statusVariant = isReassignedStatus ? 'danger' : getStatusVariant(selectedTask.status);
 
-        return (
+        return createPortal(
           <div className="slide-over-overlay" onClick={() => setIsDetailOpen(false)}>
             <div className="slide-over-card" onClick={e => e.stopPropagation()}>
               <div className="slide-over-header flex-column gap-2">
@@ -1988,7 +2061,62 @@ const TaskMonitoring = () => {
                       selectedTask.attachments.map(att => (
                         <div key={att.id} className="attachment-file-row flex-row justify-between align-center" style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.01)' }}>
                           <span style={{ color: 'var(--text-secondary)' }}>📎 {att.name} <small style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>({att.size})</small></span>
-                          <a href={att.url} download className="toggle-cols-btn" style={{ padding: '4px 8px', fontSize: '0.75rem', textDecoration: 'none' }}>Download</a>
+                          <div className="flex-row gap-2">
+                            <button
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = att.url;
+                                link.target = '_blank';
+                                link.rel = 'noopener noreferrer';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="toggle-cols-btn"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(att.url);
+                                  const blob = await res.blob();
+                                  const blobUrl = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = blobUrl;
+                                  link.download = att.name || 'file';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(blobUrl);
+                                } catch (e) {
+                                  const link = document.createElement('a');
+                                  link.href = att.url;
+                                  link.download = att.name || 'file';
+                                  link.target = '_blank';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }
+                              }}
+                              className="toggle-cols-btn"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}
+                            >
+                              Download
+                            </button>
+                            {getDisplayStatus(selectedTask.status) === 'In Progress' && isTaskAssignee(selectedTask) && (
+                              <button
+                                onClick={() => handleRemoveAttachment(att.id, att.name)}
+                                className="toggle-cols-btn"
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -2114,7 +2242,8 @@ const TaskMonitoring = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
 
