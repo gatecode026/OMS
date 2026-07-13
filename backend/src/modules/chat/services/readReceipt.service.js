@@ -68,19 +68,18 @@ export const markMessageDelivered = async (messageId, userId, companyId) => {
             deliveredAt
           };
 
-          const senderSockets = await io.in(senderRoom).fetchSockets();
-          if (senderSockets.length > 0) {
-            io.to(senderRoom).emit('message:delivery_update', deliveryUpdatePayload);
-            logger.debug(`[ReadReceipt] Emitted message:delivery_update for ${messageId} to sender ${msg.senderId}`);
-          } else {
-            // Sender is offline, queue the delivery receipt
-            if (redis.isAvailable) {
+          io.to(senderRoom).emit('message:delivery_update', deliveryUpdatePayload);
+          logger.debug(`[ReadReceipt] Emitted message:delivery_update for ${messageId} to sender ${msg.senderId}`);
+
+          if (redis.isAvailable) {
+            const senderSockets = await io.in(senderRoom).fetchSockets();
+            if (senderSockets.length === 0) {
               const pendingKey = `pending_delivery:${msg.senderId}`;
               const receipt = {
                 type: 'delivery_update',
                 payload: deliveryUpdatePayload
               };
-              await redis.rPush(pendingKey, JSON.stringify(receipt));
+              await redis.rPush(pendingKey, JSON.stringify(receipt)).catch(() => {});
               logger.debug(`[ReadReceipt] Queued pending delivery update for offline sender ${msg.senderId}`);
             }
           }
