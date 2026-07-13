@@ -6,14 +6,21 @@ const AppContext = createContext(undefined);
 
 const unescapeHtml = (str) => {
   if (!str || typeof str !== 'string') return str;
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/');
+  let curr = str;
+  for (let i = 0; i < 10; i++) {
+    const next = curr
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&#x2F;/g, '/');
+    if (next === curr) break;
+    curr = next;
+  }
+  return curr;
 };
+
 
 export const normalizeDepartment = (dept) => {
   if (!dept) return dept;
@@ -197,6 +204,71 @@ export const normalizeEmployee = (emp) => {
   return normalized;
 };
 
+export const normalizeProject = (proj) => {
+  if (!proj) return proj;
+  const unescape = unescapeHtml;
+  return {
+    ...proj,
+    name: unescape(proj.name),
+    description: unescape(proj.description),
+    manager: unescape(proj.manager),
+    leader: unescape(proj.leader),
+    department: unescape(proj.department),
+    branch: unescape(proj.branch),
+    members: Array.isArray(proj.members) ? proj.members.map(m => unescape(m)) : proj.members,
+    documents: Array.isArray(proj.documents) ? proj.documents.map(doc => {
+      if (!doc) return doc;
+      return {
+        ...doc,
+        name: unescape(doc.name),
+        downloadUrl: unescape(doc.downloadUrl)
+      };
+    }) : proj.documents,
+    tasks: Array.isArray(proj.tasks) ? proj.tasks.map(t => {
+      if (!t) return t;
+      return {
+        ...t,
+        title: unescape(t.title),
+        description: unescape(t.description),
+        assigneeName: unescape(t.assigneeName),
+        assignedTo: Array.isArray(t.assignedTo) ? t.assignedTo.map(a => unescape(a)) : t.assignedTo,
+        comments: Array.isArray(t.comments) ? t.comments.map(c => {
+          if (!c) return c;
+          return {
+            ...c,
+            userName: unescape(c.userName),
+            comment: unescape(c.comment)
+          };
+        }) : t.comments,
+        attachments: Array.isArray(t.attachments) ? t.attachments.map(att => {
+          if (!att) return att;
+          return {
+            ...att,
+            name: unescape(att.name),
+            url: unescape(att.url)
+          };
+        }) : t.attachments,
+        activityLog: Array.isArray(t.activityLog) ? t.activityLog.map(act => {
+          if (!act) return act;
+          return {
+            ...act,
+            details: unescape(act.details),
+            userName: unescape(act.userName)
+          };
+        }) : t.activityLog,
+        approvals: Array.isArray(t.approvals) ? t.approvals.map(app => {
+          if (!app) return app;
+          return {
+            ...app,
+            approver: unescape(app.approver),
+            remarks: unescape(app.remarks)
+          };
+        }) : t.approvals
+      };
+    }) : proj.tasks
+  };
+};
+
 export const AppProvider = ({ children }) => {
   const activeActionsRef = useRef({});
   const [employees, setEmployees] = useState([]);
@@ -209,7 +281,17 @@ export const AppProvider = ({ children }) => {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [leavePolicyConfigs, setLeavePolicyConfigs] = useState([]);
   const [holidaysList, setHolidaysList] = useState([]);
-  const [projectsList, setProjectsList] = useState([]);
+  const [projectsList, setProjectsListRaw] = useState([]);
+  const setProjectsList = useCallback((val) => {
+    setProjectsListRaw(prev => {
+      const nextVal = typeof val === 'function' ? val(prev) : val;
+      if (Array.isArray(nextVal)) {
+        return nextVal.map(normalizeProject);
+      }
+      return nextVal;
+    });
+  }, []);
+
 
   const [payroll, setPayroll] = useState([]);
   const [payrollGrades, setPayrollGrades] = useState([]);

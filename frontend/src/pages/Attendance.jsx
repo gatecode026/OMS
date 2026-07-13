@@ -241,6 +241,7 @@ const Attendance = () => {
   const [selectedCorrection, setSelectedCorrection] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [detailRemarks, setDetailRemarks] = useState('');
+  const [correctionSubmitting, setCorrectionSubmitting] = useState(false);
 
   // Compute date range for useMyAttendance hook to load broad chart data (always last 30 days by default, or custom range)
   const personalFiltersForFetch = useMemo(() => {
@@ -1083,12 +1084,14 @@ const Attendance = () => {
 
   const handleActionCorrection = async (actionType) => {
     if (!selectedCorrection) return;
+    if (correctionSubmitting) return;
 
     if (!detailRemarks && actionType !== 'approve') {
       addToast('error', 'Comments/Remarks are required for this action.');
       return;
     }
 
+    setCorrectionSubmitting(true);
     try {
       const res = await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/attendance-corrections/${selectedCorrection.id}/${actionType}`, {
         method: 'POST',
@@ -1100,10 +1103,11 @@ const Attendance = () => {
       });
       const result = await res.json();
       if (result.status === 'success') {
-        addToast('success', `Request successfully ${actionType}d.`);
+        addToast('success', `Request successfully ${actionType === 'approve' ? 'approved' : actionType === 'reject' ? 'rejected' : 'updated'}.`);
         setIsDetailOpen(false);
         setSelectedCorrection(null);
         setDetailRemarks('');
+        // Refresh data without waiting — close modal immediately
         if (fetchCorrectionRequests) fetchCorrectionRequests();
         if (fetchAttendance) fetchAttendance();
         if (personalRefetch) personalRefetch();
@@ -1113,6 +1117,8 @@ const Attendance = () => {
     } catch (err) {
       console.error(err);
       addToast('error', 'Network error occurred.');
+    } finally {
+      setCorrectionSubmitting(false);
     }
   };
 
@@ -2180,8 +2186,10 @@ const Attendance = () => {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button
                   className="success-btn"
-                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', cursor: 'pointer' }}
+                  disabled={correctionSubmitting}
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'transparent', cursor: correctionSubmitting ? 'not-allowed' : 'pointer', opacity: correctionSubmitting ? 0.5 : 1 }}
                   onClick={() => {
+                    if (correctionSubmitting) return;
                     setIsDetailOpen(false);
                     setSelectedCorrection(null);
                     setDetailRemarks('');
@@ -2191,24 +2199,27 @@ const Attendance = () => {
                 </button>
                 <button
                   className="success-btn"
-                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--color-warning)', color: 'var(--color-warning)', background: 'transparent', cursor: 'pointer' }}
+                  disabled={correctionSubmitting}
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid var(--color-warning)', color: 'var(--color-warning)', background: 'transparent', cursor: correctionSubmitting ? 'not-allowed' : 'pointer', opacity: correctionSubmitting ? 0.5 : 1 }}
                   onClick={() => handleActionCorrection('more-info')}
                 >
-                  Request Info
+                  {correctionSubmitting ? '...' : 'Request Info'}
                 </button>
                 <button
                   className="success-btn success-btn-danger"
-                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', cursor: 'pointer' }}
+                  disabled={correctionSubmitting}
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', cursor: correctionSubmitting ? 'not-allowed' : 'pointer', opacity: correctionSubmitting ? 0.5 : 1 }}
                   onClick={() => handleActionCorrection('reject')}
                 >
-                  Reject
+                  {correctionSubmitting ? '...' : 'Reject'}
                 </button>
                 <button
                   className="success-btn success-btn-primary"
-                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', cursor: 'pointer' }}
+                  disabled={correctionSubmitting}
+                  style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px', cursor: correctionSubmitting ? 'not-allowed' : 'pointer', opacity: correctionSubmitting ? 0.5 : 1 }}
                   onClick={() => handleActionCorrection('approve')}
                 >
-                  Approve Request
+                  {correctionSubmitting ? 'Processing...' : 'Approve Request'}
                 </button>
               </div>
             </div>
