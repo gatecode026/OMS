@@ -46,13 +46,34 @@ const ChatHeader = ({
 
       {/* Avatar */}
       <div className="chat-win-avatar-wrap">
-        {avatarSrc ? (
-          <img src={avatarSrc} alt={displayName} className="chat-win-avatar-img" />
-        ) : (
-          <div className="chat-win-avatar-letter" style={{ backgroundColor: getAvatarBg(displayName) }}>
-            {avatarLetter}
-          </div>
-        )}
+        {(() => {
+          const hasValidAvatar = avatarSrc && 
+                                 typeof avatarSrc === 'string' &&
+                                 avatarSrc.trim() !== '' &&
+                                 avatarSrc !== 'null' &&
+                                 avatarSrc !== 'undefined';
+          return hasValidAvatar ? (
+            <>
+              <img 
+                src={avatarSrc} 
+                alt={displayName} 
+                className="chat-win-avatar-img" 
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  const sib = e.target.nextSibling;
+                  if (sib) sib.style.display = 'flex';
+                }}
+              />
+              <div className="chat-win-avatar-letter" style={{ display: 'none', backgroundColor: getAvatarBg(displayName) }}>
+                {avatarLetter}
+              </div>
+            </>
+          ) : (
+            <div className="chat-win-avatar-letter" style={{ backgroundColor: getAvatarBg(displayName) }}>
+              {avatarLetter}
+            </div>
+          );
+        })()}
         {isDirect && (
           <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', border: '2px solid var(--bg-card, #fff)', borderRadius: '50%' }}>
             <StatusDot status={otherStatus} size={10} />
