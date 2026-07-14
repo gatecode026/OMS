@@ -12,7 +12,7 @@ export const ImageKitUploadService = {
    * @returns {Promise<Object>} ImageKit auth parameters { token, expire, signature, publicKey }
    */
   async fetchAuthParams(authToken) {
-    const response = await fetch(`${getApiUrl()}/api/v1/chat/imagekit/auth`, {
+    const response = await fetch(`${getApiUrl()}/api/v1/chat/imagekit/auth?t=${Date.now()}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`
       }
