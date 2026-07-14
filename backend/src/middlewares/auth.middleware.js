@@ -149,3 +149,28 @@ export const restrictTo = (...allowedRoles) => {
     next();
   };
 };
+
+export const checkPermission = (moduleName, action) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          status: 'fail',
+          message: 'Authentication failed.'
+        });
+      }
+      const { checkActionPermission } = await import('../security/permissionMatrix.js');
+      const hasPerm = await checkActionPermission(moduleName, req.user.role, action);
+      if (!hasPerm) {
+        logger.warn(`Permission check failed for user: ${req.user?.name}. Role: ${req.user?.role}. Module: ${moduleName}, Action: ${action}`);
+        return res.status(403).json({
+          status: 'fail',
+          message: 'Access forbidden. You do not possess the required system permissions to access this domain.',
+        });
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};

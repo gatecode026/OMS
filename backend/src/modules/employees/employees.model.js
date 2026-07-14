@@ -120,6 +120,20 @@ const employeeSchema = new mongoose.Schema({
   },
   probationEndDate: String,
   contractEndDate: String,
+  exitInfo: {
+    lastWorkingDay: String,
+    exitDate: String,
+    exitReason: {
+      type: String,
+      enum: ['Resignation', 'Termination', 'Contract End', 'Retirement', 'Abandonment', 'Other', '—'],
+      default: '—'
+    },
+    exitNotes: String,
+    deactivatedAt: Date,
+    deactivatedBy: String,
+    restoredAt: Date,
+    restoredBy: String
+  },
 
   // Bank details
   bankName: String,
@@ -135,6 +149,35 @@ const employeeSchema = new mongoose.Schema({
   overtimeEligibility: {
     type: Boolean,
     default: false
+  },
+  taxRegime: {
+    type: String,
+    enum: ['Old', 'New', '—'],
+    default: 'New'
+  },
+  pfUan: {
+    type: String,
+    default: ''
+  },
+  pfContribution: {
+    type: Boolean,
+    default: true
+  },
+  hra: {
+    type: Number,
+    default: 0
+  },
+  travel: {
+    type: Number,
+    default: 0
+  },
+  medical: {
+    type: Number,
+    default: 0
+  },
+  special: {
+    type: Number,
+    default: 0
   },
 
   // Identity documents

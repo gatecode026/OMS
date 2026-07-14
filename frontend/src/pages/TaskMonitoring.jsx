@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './TaskMonitoring.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -13,9 +14,129 @@ import {
 import {
   KanbanSquare, Plus, AlertCircle, Calendar, Flag, Trophy, Award, Search,
   SlidersHorizontal, ChevronDown, ChevronUp, UserCheck, Clock, RefreshCw, Send,
-  CheckSquare, MessageSquare, Download, PanelRightClose, Trash2, Eye, User, FileCode, Check, X,
-  AlertTriangle, Play, HelpCircle
+  CheckSquare, MessageSquare, Download, PanelRightClose, Trash2, Eye, User, FileCode, Check, X, Edit,
+  AlertTriangle, Play, HelpCircle, ThumbsUp, RotateCcw, Hourglass, ClipboardCheck,
+  CheckCircle2, XCircle, ArrowRight, Activity, Zap, Star
 } from 'lucide-react';
+
+const MultiSelectDropdown = ({ options, selectedValues, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = React.useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleToggle = (val) => {
+    if (selectedValues.includes(val)) {
+      onChange(selectedValues.filter(v => v !== val));
+    } else {
+      onChange([...selectedValues, val]);
+    }
+  };
+
+  const displayText = selectedValues.length > 0 
+    ? options.filter(o => selectedValues.includes(o.value)).map(o => o.label).join(', ')
+    : placeholder;
+
+  return (
+    <div ref={containerRef} className="custom-multiselect-container" style={{ position: 'relative', width: '100%' }}>
+      <div 
+        className="custom-multiselect-trigger" 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'var(--bg-elevated, #1e293b)',
+          border: '1px solid var(--border-color, #334155)',
+          borderRadius: '6px',
+          color: selectedValues.length > 0 ? 'var(--text-primary, #f8fafc)' : 'var(--text-muted, #64748b)',
+          padding: '10px 14px',
+          fontSize: '0.875rem',
+          cursor: 'pointer',
+          userSelect: 'none',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          minHeight: '40px'
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90%' }}>{displayText}</span>
+        <ChevronDown size={16} style={{ color: 'var(--text-muted, #64748b)', transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none' }} />
+      </div>
+
+      {isOpen && (
+        <div 
+          className="custom-multiselect-dropdown" 
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            background: 'var(--bg-elevated, #1e293b)',
+            border: '1px solid var(--border-color, #334155)',
+            borderRadius: '6px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15)',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            zIndex: 1000,
+            padding: '4px'
+          }}
+        >
+          {options.length === 0 ? (
+            <div style={{ padding: '8px 12px', fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>No options available</div>
+          ) : (
+            options.map(opt => {
+              const isChecked = selectedValues.includes(opt.value);
+              return (
+                <label 
+                  key={opt.value} 
+                  className="custom-multiselect-item"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-primary, #f8fafc)',
+                    transition: 'background 0.15s',
+                    margin: '2px 0',
+                    userSelect: 'none'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={isChecked} 
+                    onChange={() => handleToggle(opt.value)}
+                    style={{
+                      cursor: 'pointer',
+                      accentColor: 'var(--color-primary, #6366f1)',
+                      width: '14px',
+                      height: '14px',
+                      margin: 0
+                    }}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const TaskMonitoring = () => {
   const isLoading = usePageLoading(600);
@@ -29,6 +150,7 @@ const TaskMonitoring = () => {
     updateTaskProgress,
     addTask,
     deleteTask,
+    editTask,
     reassignTask,
     extendTaskDeadline,
     escalateTask,
@@ -36,6 +158,13 @@ const TaskMonitoring = () => {
     addTaskComment,
     approveTaskLevel,
     rejectTaskLevel,
+    // New lifecycle functions
+    acceptTask,
+    rejectTask,
+    startWork,
+    sendToReview,
+    approveTask,
+    reassignToInProgress,
     getTaskStats,
     getEmployeeTaskSummary,
     getTeamTaskRanking,
@@ -44,7 +173,10 @@ const TaskMonitoring = () => {
     showConfirm,
     addToast,
     projectsList,
-    hasPermission
+    hasPermission,
+    updateProject,
+    addDocument,
+    token
   } = useApp();
 
   const [perspective, setPerspective] = useState(() => {
@@ -135,7 +267,8 @@ const TaskMonitoring = () => {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [projectFilter, setProjectFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('custom');
+  const [customDateFilter, setCustomDateFilter] = useState(new Date().toISOString().split('T')[0]);
 
   // Sort states for List Tables
   const [teamSortKey, setTeamSortKey] = useState('productivity');
@@ -146,6 +279,18 @@ const TaskMonitoring = () => {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+
+  // Sync selectedTask with latest projectsList data in real-time
+  useEffect(() => {
+    if (!selectedTask?.id) return;
+    const project = (projectsList || []).find(p => p && Array.isArray(p.tasks) && p.tasks.some(t => t && t.id === selectedTask.id));
+    if (project) {
+      const task = project.tasks.find(t => t && t.id === selectedTask.id);
+      if (task) {
+        setSelectedTask(task);
+      }
+    }
+  }, [projectsList, selectedTask?.id]);
 
   // Overdue Actions Modal States
   const [actionTaskId, setActionTaskId] = useState(null);
@@ -165,27 +310,89 @@ const TaskMonitoring = () => {
   // Expandable Rows in Employee Table
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null);
 
+  // Loading state when creating a task to prevent double submissions
+  const [isCreating, setIsCreating] = useState(false);
+
   // Create Task Form State
   const [createForm, setCreateForm] = useState({
     projectId: '',
     title: '',
     dueDate: new Date().toISOString().split('T')[0],
     priority: 'Medium',
-    assigneeId: ''
+    assigneeIds: []
   });
+
+  // Edit Task Form State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isEditingTaskDetails, setIsEditingTaskDetails] = useState(false);
+  const [editForm, setEditForm] = useState({
+    projectId: '',
+    title: '',
+    description: '',
+    dueDate: '',
+    priority: 'Medium',
+    assigneeIds: []
+  });
+
+  // Filter assignees to only show members of the selected project
+  const filteredAssignees = useMemo(() => {
+    if (!createForm.projectId) return [];
+    const allEmailsOrNames = new Set();
+    const selectedProj = (projectsList || []).find(p => p.id === createForm.projectId);
+    if (selectedProj) {
+      (selectedProj.members || []).forEach(m => allEmailsOrNames.add((m || '').trim().toLowerCase()));
+      if (selectedProj.leader) allEmailsOrNames.add(selectedProj.leader.trim().toLowerCase());
+      if (selectedProj.manager) allEmailsOrNames.add(selectedProj.manager.trim().toLowerCase());
+    }
+
+    return scopedEmployees.filter(emp => {
+      const empNameLower = (emp.name || '').trim().toLowerCase();
+      return allEmailsOrNames.has(empNameLower);
+    });
+  }, [createForm.projectId, projectsList, scopedEmployees]);
+
+  // Filter assignees to only show members of the selected project for editing
+  const filteredAssigneesForEdit = useMemo(() => {
+    if (!selectedTask) return [];
+    const selectedProj = (projectsList || []).find(p => 
+      p && Array.isArray(p.tasks) && p.tasks.some(t => t && t.id === selectedTask.id)
+    );
+    if (!selectedProj) return [];
+    const projectMembers = selectedProj.members || [];
+    const projectLeader = selectedProj.leader;
+    const projectManager = selectedProj.manager;
+    
+    return scopedEmployees.filter(emp => {
+      const empNameLower = (emp.name || '').trim().toLowerCase();
+      const isMember = projectMembers.some(m => (m || '').trim().toLowerCase() === empNameLower);
+      const isLeader = projectLeader && (projectLeader || '').trim().toLowerCase() === empNameLower;
+      const isManager = projectManager && (projectManager || '').trim().toLowerCase() === empNameLower;
+      return isMember || isLeader || isManager;
+    });
+  }, [selectedTask, projectsList, scopedEmployees]);
+
+  // Lifecycle Modal States
+  const [isRejectOpen, setIsRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectTaskId, setRejectTaskId] = useState(null);
+  const [isReviewReassignOpen, setIsReviewReassignOpen] = useState(false);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewReassignTaskId, setReviewReassignTaskId] = useState(null);
+  const [loadingAction, setLoadingAction] = useState(null); // taskId of task being actioned
 
   // When projectsList loads, default the select option
   useEffect(() => {
     if (projectsList && projectsList.length > 0 && !createForm.projectId) {
       setCreateForm(prev => ({ ...prev, projectId: projectsList[0].id }));
     }
-  }, [projectsList]);
+  }, [projectsList, createForm.projectId]);
 
   // Export Options State
   const [exportOptions, setExportOptions] = useState({
     reportType: 'Task Report',
     dateRange: 'Last 30 days',
-    format: 'CSV'
+    format: 'CSV',
+    employeeId: ''
   });
 
   // Dynamic Date Check constant
@@ -193,30 +400,33 @@ const TaskMonitoring = () => {
 
   // Helper mapping helpers for Status Columns
   const getDisplayStatus = (statusVal) => {
-    switch (statusVal.toLowerCase()) {
+    if (!statusVal) return 'Pending Acceptance';
+    switch (statusVal.toLowerCase().trim()) {
+      case 'pending acceptance':
+      case 'pending_acceptance':
+        return 'Pending Acceptance';
       case 'todo':
       case 'assigned':
       case 'to do':
         return 'To Do';
       case 'in progress':
       case 'in_progress':
-        return 'In Progress';
       case 'in review':
       case 'under_review':
       case 'review':
-        return 'In Review';
+        return 'In Progress';
       case 'done':
       case 'completed':
-        return 'Done';
+        return 'Completed';
       case 'pending_approval':
       case 'pending approval':
-        return 'Pending Approval';
+        return 'Pending Acceptance';
       case 'overdue':
         return 'Overdue';
       case 'cancelled':
         return 'Cancelled';
       default:
-        return 'To Do';
+        return 'Pending Acceptance';
     }
   };
 
@@ -232,19 +442,31 @@ const TaskMonitoring = () => {
   const getStatusVariant = (status) => {
     const disp = getDisplayStatus(status);
     switch (disp) {
-      case 'Done': return 'success';
-      case 'In Progress': return 'primary';
+      case 'Completed': return 'success';
+      case 'In Progress': return 'warning';
       case 'In Review': return 'info';
-      case 'Pending Approval': return 'warning';
+      case 'To Do': return 'primary';
+      case 'Pending Acceptance': return 'neutral';
       case 'Overdue': return 'danger';
       case 'Cancelled': return 'neutral';
       default: return 'neutral';
     }
   };
 
+  // Helper: is the current user the task's original assigner?
+  const isTaskReviewer = (task) => {
+    if (task?.assignedById) return task.assignedById === currentUser?.id;
+    // Fallback for existing tasks: check the first entry in activityLog
+    const assignerLog = task?.activityLog?.find(log => log.action === 'assigned');
+    return assignerLog ? assignerLog.userName === currentUser?.name : false;
+  };
+
+  // Helper: is the current user the task's assignee?
+  const isTaskAssignee = (task) => task?.assigneeId && task.assigneeId === currentUser?.id;
+
   const isTaskOverdue = (task) => {
     const status = getDisplayStatus(task.status);
-    if (status === 'Done') return false;
+    if (status === 'Completed') return false;
     return task.dueDate < todayStr;
   };
 
@@ -252,8 +474,8 @@ const TaskMonitoring = () => {
   const stats = useMemo(() => {
     const total = scopedTasksList.length;
     const active = scopedTasksList.filter(t => getDisplayStatus(t.status) === 'In Progress').length;
-    const completed = scopedTasksList.filter(t => getDisplayStatus(t.status) === 'Done').length;
-    const pending = scopedTasksList.filter(t => getDisplayStatus(t.status) === 'To Do').length;
+    const completed = scopedTasksList.filter(t => getDisplayStatus(t.status) === 'Completed').length;
+    const pending = scopedTasksList.filter(t => getDisplayStatus(t.status) === 'To Do' || getDisplayStatus(t.status) === 'Pending Acceptance').length;
     const overdue = scopedTasksList.filter(isTaskOverdue).length;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, active, completed, pending, overdue, completionRate };
@@ -264,8 +486,8 @@ const TaskMonitoring = () => {
     return scopedTasksList.filter(t => {
       // 1. Interactive top card filter
       if (activeCardFilter === 'active' && getDisplayStatus(t.status) !== 'In Progress') return false;
-      if (activeCardFilter === 'completed' && getDisplayStatus(t.status) !== 'Done') return false;
-      if (activeCardFilter === 'pending' && getDisplayStatus(t.status) !== 'To Do') return false;
+      if (activeCardFilter === 'completed' && getDisplayStatus(t.status) !== 'Completed') return false;
+      if (activeCardFilter === 'pending' && !['To Do', 'Pending Acceptance'].includes(getDisplayStatus(t.status))) return false;
       if (activeCardFilter === 'overdue' && !isTaskOverdue(t)) return false;
 
       // 2. Search Box
@@ -289,11 +511,20 @@ const TaskMonitoring = () => {
       if (dateFilter !== 'all') {
         const createdDate = t.createdAt?.split('T')[0];
         if (dateFilter === 'today' && createdDate !== todayStr) return false;
+        if (dateFilter === 'due_today' && t.dueDate !== todayStr) return false;
+        if (dateFilter === 'due_this_week') {
+          const today = new Date(todayStr);
+          const taskDate = new Date(t.dueDate);
+          const diffTime = taskDate - today;
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays < 0 || diffDays > 7) return false;
+        }
+        if (dateFilter === 'custom' && customDateFilter && t.dueDate !== customDateFilter) return false;
       }
 
       return true;
     });
-  }, [scopedTasksList, activeCardFilter, searchTerm, statusFilter, priorityFilter, deptFilter, projectFilter, dateFilter]);
+  }, [scopedTasksList, activeCardFilter, searchTerm, statusFilter, priorityFilter, deptFilter, projectFilter, dateFilter, customDateFilter]);
 
   // Calculate tables data dynamically
   const employeeSummaries = useMemo(() => {
@@ -415,16 +646,85 @@ const TaskMonitoring = () => {
 
   // Form submits handlers
   const handleCreateTask = async () => {
-    if (!createForm.projectId || !createForm.title.trim()) return;
-    await addTask(createForm);
-    setIsCreateOpen(false);
-    setCreateForm({
-      projectId: projectsList[0]?.id || '',
-      title: '',
-      dueDate: new Date().toISOString().split('T')[0],
-      priority: 'Medium',
-      assigneeId: ''
-    });
+    if (!createForm.projectId || !createForm.title.trim() || isCreating) return;
+    setIsCreating(true);
+    try {
+      const projectId = createForm.projectId;
+      if (createForm.assigneeIds && createForm.assigneeIds.length > 0) {
+        for (const assigneeId of createForm.assigneeIds) {
+          await addTask({
+            projectId,
+            title: createForm.title.trim(),
+            dueDate: createForm.dueDate,
+            priority: createForm.priority,
+            assigneeId
+          });
+        }
+      } else {
+        await addTask({
+          projectId,
+          title: createForm.title.trim(),
+          dueDate: createForm.dueDate,
+          priority: createForm.priority,
+          assigneeId: ''
+        });
+      }
+      setIsCreateOpen(false);
+      setCreateForm({
+        projectId: projectsList[0]?.id || '',
+        title: '',
+        dueDate: new Date().toISOString().split('T')[0],
+        priority: 'Medium',
+        assigneeIds: []
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleEditTaskSubmit = async () => {
+    if (!editForm.title.trim() || isEditingTaskDetails) return;
+    setIsEditingTaskDetails(true);
+    try {
+      const primaryAssigneeId = editForm.assigneeIds && editForm.assigneeIds.length > 0
+        ? editForm.assigneeIds[0]
+        : '';
+
+      const success = await editTask(selectedTask.id, {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        dueDate: editForm.dueDate,
+        priority: editForm.priority,
+        assigneeId: primaryAssigneeId
+      });
+
+      if (success && editForm.assigneeIds && editForm.assigneeIds.length > 1) {
+        const extraAssigneeIds = editForm.assigneeIds.slice(1);
+        const parentProject = projectsList.find(p => p.tasks.some(t => t.id === selectedTask.id));
+        if (parentProject) {
+          for (const assigneeId of extraAssigneeIds) {
+            await addTask({
+              projectId: parentProject.id,
+              title: editForm.title.trim(),
+              description: editForm.description.trim(),
+              dueDate: editForm.dueDate,
+              priority: editForm.priority,
+              assigneeId
+            });
+          }
+        }
+      }
+
+      if (success) {
+        setIsEditOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsEditingTaskDetails(false);
+    }
   };
 
   const handleExport = () => {
@@ -437,7 +737,11 @@ const TaskMonitoring = () => {
 
     if (reportType === 'Task Report') {
       headers = ['Task ID', 'Title', 'Project', 'Assignee Name', 'Department', 'Due Date', 'Priority', 'Progress (%)', 'Status', 'Overdue'];
-      rows = filteredTasks.map(t => [
+      let targetTasks = filteredTasks;
+      if (exportOptions.employeeId) {
+        targetTasks = targetTasks.filter(t => t.assigneeId === exportOptions.employeeId);
+      }
+      rows = targetTasks.map(t => [
         t.id || '',
         t.title || '',
         t.project || '',
@@ -451,7 +755,11 @@ const TaskMonitoring = () => {
       ]);
     } else if (reportType === 'Employee Report') {
       headers = ['Employee ID', 'Employee Name', 'Department', 'Branch', 'Total Tasks', 'Completed', 'Pending', 'Overdue', 'Productivity Score (%)', 'Performance Rating'];
-      rows = employeeSummaries.map(emp => [
+      let targetEmployees = employeeSummaries;
+      if (exportOptions.employeeId) {
+        targetEmployees = targetEmployees.filter(emp => emp.id === exportOptions.employeeId);
+      }
+      rows = targetEmployees.map(emp => [
         emp.id || '',
         emp.name || '',
         emp.department || '',
@@ -567,13 +875,135 @@ const TaskMonitoring = () => {
     }
   };
 
+  const [isPostingComment, setIsPostingComment] = useState(false);
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
+
   const handleAddCommentSubmit = async () => {
-    if (!newCommentText.trim()) return;
-    const updatedTask = await addTaskComment(selectedTask.id, newCommentText, currentUser?.name || 'Unknown', currentUser?.role || 'Super Admin');
-    setNewCommentText('');
-    if (updatedTask) {
-      setSelectedTask(updatedTask);
+    if (!newCommentText.trim() || isPostingComment) return;
+    setIsPostingComment(true);
+    try {
+      const updatedTask = await addTaskComment(selectedTask.id, newCommentText, currentUser?.name || 'Unknown', currentUser?.role || 'Super Admin');
+      setNewCommentText('');
+      if (updatedTask) {
+        setSelectedTask(updatedTask);
+      }
+    } finally {
+      setIsPostingComment(false);
     }
+  };
+
+  const handleUploadAttachment = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    let fileBase64 = '';
+    try {
+      fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (error) => reject(error);
+      });
+    } catch (err) {
+      console.error('FileReader error:', err);
+      addToast('danger', 'Failed to read the selected file.');
+      return;
+    }
+
+    const docName = file.name;
+    const docType = file.name.split('.').pop() || 'file';
+    const docSize = `${(file.size / 1024).toFixed(1)} KB`;
+
+    const docData = {
+      name: docName,
+      type: docType,
+      category: 'Project',
+      size: docSize,
+      uploadedBy: currentUser?.name || 'Employee',
+      uploadDate: new Date().toISOString().split('T')[0],
+      downloads: 0,
+      fileUrl: fileBase64,
+      remarks: `Uploaded for task: ${selectedTask.title}`
+    };
+
+    const result = await addDocument(docData);
+    if (!result) return;
+
+    const newAttachment = {
+      id: result.id || `att-${Math.random().toString(36).substring(2, 9)}`,
+      name: docName,
+      size: docSize,
+      url: result.fileUrl || result.downloadUrl || fileBase64
+    };
+
+    const project = projectsList.find(p => p.tasks.some(t => t.id === selectedTask.id));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === selectedTask.id) {
+        return {
+          ...t,
+          attachments: [...(t.attachments || []), newAttachment],
+          activityLog: [
+            ...(t.activityLog || []),
+            {
+              id: `act-${Math.random().toString(36).substring(2, 9)}`,
+              action: 'attachment_uploaded',
+              details: `Uploaded attachment: ${file.name}`,
+              timestamp: new Date().toISOString(),
+              userName: currentUser?.name || 'System'
+            }
+          ]
+        };
+      }
+      return t;
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      addToast('success', 'Attachment uploaded successfully.');
+      const updatedT = updatedTasks.find(t => t.id === selectedTask.id);
+      setSelectedTask(updatedT);
+    }
+  };
+
+  const handleRemoveAttachment = async (attachmentId, attachmentName) => {
+    showConfirm(
+      'Remove Attachment',
+      `Are you sure you want to remove the attachment "${attachmentName}"?`,
+      async () => {
+        const project = projectsList.find(p => p.tasks.some(t => t.id === selectedTask.id));
+        if (!project) return;
+
+        const updatedTasks = project.tasks.map(t => {
+          if (t.id === selectedTask.id) {
+            return {
+              ...t,
+              attachments: (t.attachments || []).filter(att => att.id !== attachmentId),
+              activityLog: [
+                ...(t.activityLog || []),
+                {
+                  id: `act-${Math.random().toString(36).substring(2, 9)}`,
+                  action: 'attachment_removed',
+                  details: `Removed attachment: ${attachmentName}`,
+                  timestamp: new Date().toISOString(),
+                  userName: currentUser?.name || 'System'
+                }
+              ]
+            };
+          }
+          return t;
+        });
+
+        const success = await updateProject(project.id, { tasks: updatedTasks });
+        if (success) {
+          addToast('warning', 'Attachment removed successfully.');
+          const updatedT = updatedTasks.find(t => t.id === selectedTask.id);
+          setSelectedTask(updatedT);
+        }
+      },
+      'danger'
+    );
   };
 
   const handleApproveLevel = async (level) => {
@@ -586,62 +1016,148 @@ const TaskMonitoring = () => {
     if (updatedTask) setSelectedTask(updatedTask);
   };
 
-  const handleDragStart = (e, taskId) => {
-    e.dataTransfer.setData('text/plain', taskId);
+  // ── Lifecycle Action Handlers ──────────────────────────────────────────────
+
+  const handleAcceptTask = async (taskId) => {
+    setLoadingAction(taskId);
+    const updatedTask = await acceptTask(taskId);
+    setLoadingAction(null);
+    if (updatedTask && selectedTask?.id === taskId) setSelectedTask(updatedTask);
   };
 
-  const handleDrop = async (e, targetCol) => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData('text/plain');
-    if (taskId) {
-      const task = (tasks || []).find(t => t.id === taskId);
-      if (!task) return;
-      const currentStatus = getDisplayStatus(task.status);
-      
-      // Enforce sequential transitions: To Do → In Review → Done
-      if (currentStatus === 'To Do' && targetCol !== 'In Review') {
-        if (addToast) addToast('warning', 'Tasks in "To Do" must be submitted to "In Review" for Team Leader approval.');
-        return;
-      }
-      if (currentStatus === 'In Review' && targetCol === 'Done' && currentUserRole === 'employee') {
-        if (addToast) addToast('warning', 'Only the Project Manager can approve and move a task to "Done".');
-        return;
-      }
-      if (currentStatus === 'In Review' && targetCol !== 'Done') {
-        if (addToast) addToast('warning', 'Tasks in "In Review" can only move to "Done" after Project Manager approval.');
-        return;
-      }
-      if (currentStatus === 'Done') {
-        if (addToast) addToast('warning', 'Completed tasks cannot be moved.');
-        return;
-      }
-      
-      // Map display columns back to DB status keys
-      let statusVal = 'todo';
-      let progressVal = 0;
-      if (targetCol === 'In Review') {
-        statusVal = 'review';
-        progressVal = 50;
-      } else if (targetCol === 'Done') {
-        statusVal = 'done';
-        progressVal = 100;
-      }
-      await updateTaskProgress(taskId, statusVal, progressVal, task.remarks || '');
+  const handleRejectTaskOpen = (taskId) => {
+    setRejectTaskId(taskId);
+    setRejectReason('');
+    setIsRejectOpen(true);
+  };
+
+  const handleRejectTaskSubmit = async () => {
+    if (!rejectReason.trim()) { addToast('error', 'Please provide a rejection reason.'); return; }
+    setLoadingAction(rejectTaskId);
+    const updatedTask = await rejectTask(rejectTaskId, rejectReason);
+    setLoadingAction(null);
+    setIsRejectOpen(false);
+    setRejectReason('');
+    if (updatedTask && selectedTask?.id === rejectTaskId) setSelectedTask(updatedTask);
+    setRejectTaskId(null);
+  };
+
+  const handleStartWork = async (taskId) => {
+    setLoadingAction(taskId);
+    const updatedTask = await startWork(taskId);
+    setLoadingAction(null);
+    if (updatedTask && selectedTask?.id === taskId) setSelectedTask(updatedTask);
+  };
+
+  const handleSendToReview = async (taskId) => {
+    setLoadingAction(taskId);
+    const updatedTask = await sendToReview(taskId);
+    setLoadingAction(null);
+    if (updatedTask && selectedTask?.id === taskId) setSelectedTask(updatedTask);
+  };
+
+  const handleApproveTask = async (taskId) => {
+    showConfirm('Approve Task', 'Are you sure you want to approve this task and mark it as Completed?', async () => {
+      setLoadingAction(taskId);
+      const updatedTask = await approveTask(taskId);
+      setLoadingAction(null);
+      if (updatedTask && selectedTask?.id === taskId) setSelectedTask(updatedTask);
+    }, 'primary');
+  };
+
+  const handleReviewReassignOpen = (taskId) => {
+    setReviewReassignTaskId(taskId);
+    setReviewComment('');
+    setIsReviewReassignOpen(true);
+  };
+
+  const handleReviewReassignSubmit = async () => {
+    if (!reviewComment.trim()) { addToast('error', 'A review comment is required.'); return; }
+    setLoadingAction(reviewReassignTaskId);
+    const updatedTask = await reassignToInProgress(reviewReassignTaskId, reviewComment);
+    setLoadingAction(null);
+    setIsReviewReassignOpen(false);
+    setReviewComment('');
+    if (updatedTask && selectedTask?.id === reviewReassignTaskId) setSelectedTask(updatedTask);
+    setReviewReassignTaskId(null);
+  };
+
+  // Helper: render role-based action buttons for a task (used in card + drawer)
+  const renderLifecycleActions = (task, size = 'sm', variant = 'button') => {
+    const status = getDisplayStatus(task.status);
+    const isAssignee = isTaskAssignee(task);
+    const isReviewer = isTaskReviewer(task);
+    const isLoading = loadingAction === task.id;
+
+    const btnProps = { size, disabled: isLoading };
+
+    // ASSIGNEE ACTIONS
+    if (isAssignee) {
+      if (status === 'Pending Acceptance') return (
+        <div className="lifecycle-actions-row">
+          <Button {...btnProps} variant="primary" onClick={() => handleAcceptTask(task.id)} icon={CheckCircle2}>
+            {isLoading ? 'Processing...' : 'Accept Task'}
+          </Button>
+          <Button {...btnProps} variant="danger" onClick={() => handleRejectTaskOpen(task.id)} icon={XCircle}>
+            Reject Task
+          </Button>
+        </div>
+      );
+      if (status === 'To Do') return (
+        <div className="lifecycle-actions-row">
+          <Button {...btnProps} variant="primary" onClick={() => handleStartWork(task.id)} icon={Play}>
+            {isLoading ? 'Starting...' : 'Start Work'}
+          </Button>
+        </div>
+      );
+      if (status === 'In Progress') return (
+        <div className="lifecycle-waiting-msg" style={{ background: 'rgba(217, 70, 239, 0.05)', borderColor: 'rgba(217, 70, 239, 0.1)' }}>
+          <Hourglass size={14} style={{ color: 'var(--color-primary)' }} className="pulse-icon" />
+          <span style={{ fontSize: '0.8rem' }}>Submit daily work report to complete this task.</span>
+        </div>
+      );
+      if (status === 'In Review') return (
+        <div className="lifecycle-waiting-msg">
+          <Hourglass size={14} className="pulse-icon" />
+          <span>Waiting for daily report review approval...</span>
+        </div>
+      );
+      if (status === 'Completed') return (
+        <div className="lifecycle-completed-msg">
+          <CheckCircle2 size={14} />
+          <span>Task Completed</span>
+        </div>
+      );
     }
+ 
+    // REVIEWER ACTIONS
+    if (isReviewer) {
+      if (status === 'In Review') return (
+        <div className="lifecycle-waiting-msg">
+          <Hourglass size={14} className="pulse-icon" />
+          <span>Approve the corresponding Daily Work Report to complete this task.</span>
+        </div>
+      );
+    }
+
+    // No actions available (viewer)
+    return null;
   };
 
   if (isLoading) {
     return (
       <div className="task-monitoring-page grid-gap">
         <div className="card" style={{ height: '80px' }}><Skeleton variant="rect" height="100%" /></div>
-        <div className="kanban-grid">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <div className="kanban-grid-4col">
+          {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="card column-card" style={{ height: '400px' }}><Skeleton variant="rect" height="100%" /></div>
           ))}
         </div>
       </div>
     );
   }
+
+
 
   return (
     <div className="task-monitoring-page flex-column grid-gap">
@@ -736,10 +1252,10 @@ const TaskMonitoring = () => {
           </div>
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
             <option value="">All Statuses</option>
+            <option value="Pending Acceptance">Pending Acceptance</option>
             <option value="To Do">To Do</option>
             <option value="In Progress">In Progress</option>
-            <option value="In Review">In Review</option>
-            <option value="Done">Done</option>
+            <option value="Completed">Completed</option>
           </select>
           <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}>
             <option value="">All Priorities</option>
@@ -748,25 +1264,45 @@ const TaskMonitoring = () => {
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
           </select>
-          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
-            <option value="">All Departments</option>
-            <option value="Engineering">Engineering</option>
-            <option value="Sales">Sales</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Operations">Operations</option>
-            <option value="Human Resources">Human Resources</option>
-            <option value="Finance">Finance</option>
-          </select>
+          {!isEmployeeView && (
+            <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
+              <option value="">All Departments</option>
+              <option value="Engineering">Engineering</option>
+              <option value="Sales">Sales</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Operations">Operations</option>
+              <option value="Human Resources">Human Resources</option>
+              <option value="Finance">Finance</option>
+            </select>
+          )}
           <select value={projectFilter} onChange={e => setProjectFilter(e.target.value)}>
             <option value="">All Projects</option>
             {projectSummaries.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
-          <select value={dateFilter} onChange={e => setDateFilter(e.target.value)}>
-            <option value="all">All Dates</option>
-            <option value="today">Created Today</option>
+          <select value={dateFilter} onChange={e => { setDateFilter(e.target.value); if (e.target.value !== 'custom') setCustomDateFilter(''); }}>
+            <option value="custom">Custom Date</option>
+            <option value="all">All Tasks</option>
           </select>
-          {(searchTerm || statusFilter || priorityFilter || deptFilter || projectFilter || dateFilter !== 'all' || activeCardFilter !== 'all') && (
-            <Button variant="ghost" onClick={() => { setSearchTerm(''); setStatusFilter(''); setPriorityFilter(''); setDeptFilter(''); setProjectFilter(''); setDateFilter('all'); setActiveCardFilter('all'); }}>Clear</Button>
+          {dateFilter === 'custom' && (
+            <input
+              type="date"
+              value={customDateFilter}
+              max={todayStr}
+              onChange={e => setCustomDateFilter(e.target.value)}
+              style={{
+                padding: '10px 14px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-primary)',
+                fontSize: '0.875rem',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            />
+          )}
+          {(searchTerm || statusFilter || priorityFilter || deptFilter || projectFilter || dateFilter !== 'custom' || customDateFilter !== todayStr || activeCardFilter !== 'all') && (
+            <Button variant="ghost" onClick={() => { setSearchTerm(''); setStatusFilter(''); setPriorityFilter(''); setDeptFilter(''); setProjectFilter(''); setDateFilter('custom'); setCustomDateFilter(todayStr); setActiveCardFilter('all'); }}>Clear</Button>
           )}
         </div>
       </div>
@@ -801,20 +1337,20 @@ const TaskMonitoring = () => {
 
       {/* ── Section 5: KANBAN VIEW ── */}
       {activeView === 'kanban' && (
-        <div className="kanban-grid">
-          {['To Do', 'In Review', 'Done'].map(col => {
-            const colTasks = filteredTasks.filter(t => getDisplayStatus(t.status) === col);
+        <div className="kanban-grid-4col">
+          {[
+            { label: 'Pending Acceptance', dotClass: 'dot-var-pendingacceptance' },
+            { label: 'To Do', dotClass: 'dot-var-todo' },
+            { label: 'In Progress', dotClass: 'dot-var-inprogress' },
+            { label: 'Completed', dotClass: 'dot-var-completed' }
+          ].map(({ label, dotClass }) => {
+            const colTasks = filteredTasks.filter(t => getDisplayStatus(t.status) === label);
             return (
-              <div
-                key={col}
-                className="kanban-column"
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => handleDrop(e, col)}
-              >
+              <div key={label} className="kanban-column">
                 <div className="column-header">
                   <div className="column-title-group">
-                    <span className={`column-dot dot-var-${col.replace(/\s+/g, '').toLowerCase()}`} />
-                    <h4>{col}</h4>
+                    <span className={`column-dot ${dotClass}`} />
+                    <h4>{label}</h4>
                   </div>
                   <span className="column-card-count">{colTasks.length}</span>
                 </div>
@@ -825,9 +1361,7 @@ const TaskMonitoring = () => {
                       return (
                         <div
                           key={task.id}
-                          className={`kanban-card cursor-grab ${overdue ? 'card-border-overdue' : ''}`}
-                          draggable={true}
-                          onDragStart={e => handleDragStart(e, task.id)}
+                          className={`kanban-card ${overdue ? 'card-border-overdue' : ''}`}
                           onClick={() => { setSelectedTask(task); setIsDetailOpen(true); }}
                         >
                           <h5 className="task-card-title">{task.title}</h5>
@@ -916,29 +1450,10 @@ const TaskMonitoring = () => {
                             min="0"
                             max="100"
                             value={task.progress || 0}
+                            disabled={getDisplayStatus(task.status) !== 'In Progress'}
                             onChange={async (e) => {
                               const val = parseInt(e.target.value);
-                              const currentDisp = getDisplayStatus(task.status);
-                              
-                              if (currentDisp === 'To Do') {
-                                if (val > 30) {
-                                  if (addToast) addToast('warning', 'Task must first be started. Progress capped at 30% for In Progress.');
-                                  await updateTaskProgress(task.id, 'in_progress', 30, task.remarks);
-                                } else if (val > 0) {
-                                  await updateTaskProgress(task.id, 'in_progress', val, task.remarks);
-                                }
-                              } else if (currentDisp === 'In Progress') {
-                                if (val >= 90) {
-                                  if (addToast) addToast('info', 'Task submitted for review.');
-                                  await updateTaskProgress(task.id, 'review', 90, task.remarks);
-                                } else {
-                                  await updateTaskProgress(task.id, 'in_progress', Math.max(10, val), task.remarks);
-                                }
-                              } else if (currentDisp === 'In Review') {
-                                if (addToast) addToast('warning', 'Task is in review. Only reviewers can approve/complete it.');
-                              } else if (currentDisp === 'Done') {
-                                if (addToast) addToast('info', 'Completed tasks cannot be modified.');
-                              }
+                              await updateTaskProgress(task.id, task.status, val, task.remarks || '');
                             }}
                             className="task-progress-slider"
                           />
@@ -950,26 +1465,7 @@ const TaskMonitoring = () => {
 
                       {/* Far Right Column: Quick Action buttons */}
                       <div className="task-actions-col flex-center gap-2 flex-wrap">
-                        {getDisplayStatus(task.status) === 'To Do' && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={async () => await updateTaskProgress(task.id, 'in_progress', 10, '')}
-                            icon={Play}
-                          >
-                            Start
-                          </Button>
-                        )}
-                        {getDisplayStatus(task.status) === 'In Progress' && (
-                          <Button
-                            variant="info"
-                            size="sm"
-                            onClick={async () => await updateTaskProgress(task.id, 'review', 90, '')}
-                            icon={UserCheck}
-                          >
-                            Review
-                          </Button>
-                        )}
+                        {renderLifecycleActions(task, 'sm')}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1440,159 +1936,313 @@ const TaskMonitoring = () => {
       )}
 
       {/* ── Task Details Modal Drawer (Slide-Over Simulation) ── */}
-      {isDetailOpen && selectedTask && (
-        <div className="slide-over-overlay" onClick={() => setIsDetailOpen(false)}>
-          <div className="slide-over-card" onClick={e => e.stopPropagation()}>
-            <div className="slide-over-header flex-row justify-between">
-              <div>
-                <h3>{selectedTask.title}</h3>
-                <span className="slide-over-proj-lbl">{selectedTask.project} ({selectedTask.id})</span>
-              </div>
-              <button className="topbar-icon-btn" onClick={() => setIsDetailOpen(false)}>
-                <PanelRightClose size={20} />
-              </button>
-            </div>
+      {isDetailOpen && selectedTask && (() => {
+        const isReassignedStatus = getDisplayStatus(selectedTask.status) === 'In Progress' && selectedTask.reviewComment;
+        const statusLabel = isReassignedStatus ? 'Reassigned' : getDisplayStatus(selectedTask.status);
+        const statusVariant = isReassignedStatus ? 'danger' : getStatusVariant(selectedTask.status);
 
-            <div className="slide-over-body flex-column gap-4">
-              
-              {/* Task Details Info Grid */}
-              <div className="detail-info-grid">
-                <div className="info-field">
-                  <span className="info-lbl">Assignee</span>
-                  <div className="flex-center gap-2 justify-start" style={{ marginTop: '4px' }}>
-                    <Avatar name={selectedTask.assigneeName} size="sm" />
-                    <strong>{selectedTask.assigneeName}</strong>
+        return createPortal(
+          <div className="slide-over-overlay" onClick={() => setIsDetailOpen(false)}>
+            <div className="slide-over-card" onClick={e => e.stopPropagation()}>
+              <div className="slide-over-header flex-column gap-2">
+                <div className="flex-row justify-between align-center" style={{ width: '100%' }}>
+                  <div>
+                    <span className="slide-over-proj-lbl" style={{ marginBottom: '4px' }}>{selectedTask.project} &bull; #{selectedTask.id}</span>
+                    <h3 className="task-detail-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedTask.title}</h3>
                   </div>
+                  <button className="topbar-icon-btn" onClick={() => setIsDetailOpen(false)}>
+                    <PanelRightClose size={20} />
+                  </button>
                 </div>
-                <div className="info-field">
-                  <span className="info-lbl">Department</span>
-                  <span className="info-val">{selectedTask.department}</span>
-                </div>
-                <div className="info-field">
-                  <span className="info-lbl">Priority</span>
-                  <div style={{ marginTop: '4px' }}><Badge variant={getPriorityVariant(selectedTask.priority)}>{selectedTask.priority}</Badge></div>
-                </div>
-                <div className="info-field">
-                  <span className="info-lbl">Estimated Hours</span>
-                  <span className="info-val">{selectedTask.estimatedHours} hrs</span>
-                </div>
-                <div className="info-field">
-                  <span className="info-lbl">Due Date</span>
-                  <span className={`info-val ${isTaskOverdue(selectedTask) ? 'text-danger-bold' : ''}`}>{selectedTask.dueDate}</span>
-                </div>
-                <div className="info-field">
-                  <span className="info-lbl">Status</span>
-                  <div style={{ marginTop: '4px' }}><Badge variant={getStatusVariant(selectedTask.status)}>{getDisplayStatus(selectedTask.status)}</Badge></div>
+                <div className="flex-row gap-2 mt-2">
+                  <Badge variant={statusVariant}>{statusLabel}</Badge>
+                  <Badge variant={getPriorityVariant(selectedTask.priority)}>{selectedTask.priority}</Badge>
                 </div>
               </div>
 
-              {/* Progress Slider Bar */}
-              <div className="info-field">
-                <span className="info-lbl">Task Progress ({selectedTask.progress}%)</span>
-                <div className="progress-bar-mini" style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginTop: '6px' }}>
-                  <div style={{ width: `${selectedTask.progress}%`, height: '100%', background: 'var(--color-primary)', borderRadius: '4px' }} />
+              <div className="slide-over-body flex-column gap-5">
+                
+                {/* ── Lifecycle Action Panel ── */}
+                <div className="lifecycle-action-panel card glass flex-column gap-2" style={{ padding: '16px' }}>
+                  <span className="info-lbl">Lifecycle Actions</span>
+                  <div style={{ marginTop: '4px' }}>
+                    {renderLifecycleActions(selectedTask, 'md')}
+                  </div>
+                  
+                  {selectedTask.rejectionReason && (
+                    <div className="rejection-reason-panel" style={{ padding: '10px 12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: '6px', marginTop: '6px' }}>
+                      <strong style={{ color: 'var(--color-danger)', fontSize: '0.78rem' }}>Rejection Reason:</strong>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{selectedTask.rejectionReason}</p>
+                    </div>
+                  )}
+
+                  {selectedTask.reviewComment && (
+                    <div className="review-comment-panel" style={{ padding: '10px 12px', background: 'rgba(249, 115, 22, 0.05)', border: '1px solid rgba(249, 115, 22, 0.15)', borderRadius: '6px', marginTop: '6px' }}>
+                      <strong style={{ color: 'var(--color-warning)', fontSize: '0.78rem' }}>Rework Review Comments:</strong>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{selectedTask.reviewComment}</p>
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              {/* Task Description */}
-              <div className="info-field">
-                <span className="info-lbl">Task Description</span>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', lineHeight: 1.4 }}>
-                  {selectedTask.description || 'No description provided.'}
-                </p>
-              </div>
-
-              {/* Approvals Sequence */}
-              <div className="info-field">
-                <span className="info-lbl">Approval Flow timeline</span>
-                <div className="approval-sequence-list flex-column gap-2" style={{ marginTop: '8px' }}>
-                  {(selectedTask.approvals || []).map((app) => (
-                    <div key={app.level} className="approval-sequence-item flex-row justify-between" style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
-                      <div className="flex-column">
-                        <span style={{ fontSize: '0.78rem', fontWeight: 600 }}>L{app.level}: {app.role}</span>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{app.approver} {app.timestamp ? `(${app.timestamp})` : ''}</span>
-                      </div>
-                      <div className="flex-center gap-2">
-                        <Badge variant={app.status === 'Approved' ? 'success' : app.status === 'Rejected' ? 'danger' : 'warning'}>
-                          {app.status}
-                        </Badge>
-                        {app.status === 'Pending' && currentUser?.name?.toLowerCase() === app.approver?.toLowerCase() && (
-                          <div className="flex-center gap-1">
-                            <button className="action-circle-btn approve-btn" onClick={() => handleApproveLevel(app.level)} title="Approve">✓</button>
-                            <button className="action-circle-btn reject-btn" onClick={() => handleRejectLevel(app.level)} title="Reject">✗</button>
-                          </div>
-                        )}
+                {/* ── Assignee Information & Meta Grid ── */}
+                <div className="detail-info-grid">
+                  <div className="info-field">
+                    <span className="info-lbl">Assignee</span>
+                    <div className="flex-center gap-2 justify-start" style={{ marginTop: '4px' }}>
+                      <Avatar name={selectedTask.assigneeName} size="sm" />
+                      <div>
+                        <strong style={{ fontSize: '0.875rem' }}>{selectedTask.assigneeName}</strong>
+                        <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)' }}>{selectedTask.department}</span>
                       </div>
                     </div>
-                  ))}
+                  </div>
+                  <div className="info-field">
+                    <span className="info-lbl">Created By</span>
+                    <span className="info-val" style={{ marginTop: '4px', display: 'block', fontSize: '0.875rem' }}>
+                      {selectedTask.assignedByName && selectedTask.assignedByName !== 'System'
+                        ? selectedTask.assignedByName
+                        : (selectedTask.activityLog?.find(log => log.action === 'assigned')?.userName || 'System')}
+                    </span>
+                  </div>
+                  <div className="info-field">
+                    <span className="info-lbl">Estimated Hours</span>
+                    <span className="info-val" style={{ marginTop: '4px', display: 'block' }}>{selectedTask.estimatedHours || 20} hrs</span>
+                  </div>
+                  <div className="info-field">
+                    <span className="info-lbl">Due Date</span>
+                    <span className={`info-val ${isTaskOverdue(selectedTask) ? 'text-danger-bold' : ''}`} style={{ marginTop: '4px', display: 'block' }}>
+                      {selectedTask.dueDate}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Attachments Section */}
-              <div className="info-field">
-                <span className="info-lbl">Attachments ({selectedTask.attachments?.length || 0})</span>
-                <div className="attachments-list flex-column gap-2" style={{ marginTop: '6px' }}>
-                  {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
-                    selectedTask.attachments.map(att => (
-                      <div key={att.id} className="attachment-file-row flex-row justify-between" style={{ padding: '6px 10px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.78rem' }}>
-                        <span>📎 {att.name} ({att.size})</span>
-                        <Button variant="ghost" size="sm">Download</Button>
-                      </div>
-                    ))
-                  ) : (
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No attachments uploaded.</span>
-                  )}
+                {/* ── Progress Section ── */}
+                <div className="info-field">
+                  <div className="flex-row justify-between align-center">
+                    <span className="info-lbl">Task Progress</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-primary)' }}>{selectedTask.progress || 0}%</span>
+                  </div>
+                  <div className="progress-bar-mini" style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginTop: '8px' }}>
+                    <div style={{ width: `${selectedTask.progress}%`, height: '100%', background: 'var(--color-primary)', borderRadius: '4px' }} />
+                  </div>
+                  <div className="flex-row justify-between" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    <span>0%</span>
+                    <span>25%</span>
+                    <span>50%</span>
+                    <span>75%</span>
+                    <span>100%</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Comment Feed & Discussions Thread */}
-              <div className="info-field flex-column gap-2">
-                <span className="info-lbl">Discussions Thread</span>
-                <div className="comments-chat-wrapper flex-column gap-2" style={{ maxHeight: '200px', overflowY: 'auto', padding: '6px' }}>
-                  {selectedTask.comments && selectedTask.comments.length > 0 ? (
-                    selectedTask.comments.map(c => (
-                      <div key={c.id} className="comment-bubble flex-column" style={{ background: 'rgba(255,255,255,0.02)', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                        <div className="flex-row justify-between" style={{ fontSize: '0.72rem', fontWeight: 600 }}>
-                          <span style={{ color: 'var(--color-primary)' }}>{c.sender} ({c.role})</span>
-                          <span style={{ color: 'var(--text-muted)' }}>{c.time}</span>
+                {/* ── Task Description ── */}
+                <div className="info-field">
+                  <span className="info-lbl">Task Description</span>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '6px', background: 'rgba(255,255,255,0.015)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)', lineHeight: 1.5, whiteSpace: 'pre-line' }}>
+                    {selectedTask.description || 'No description provided.'}
+                  </p>
+                </div>
+
+                {/* ── Attachments Section ── */}
+                <div className="info-field">
+                  <div className="flex-row justify-between align-center">
+                    <span className="info-lbl">Attachments ({selectedTask.attachments?.length || 0})</span>
+                    {getDisplayStatus(selectedTask.status) === 'In Progress' && isTaskAssignee(selectedTask) && (
+                      <label className="attachment-upload-trigger" style={{ cursor: 'pointer', fontSize: '0.78rem', color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Plus size={14} /> Add File
+                        <input type="file" onChange={handleUploadAttachment} style={{ display: 'none' }} />
+                      </label>
+                    )}
+                  </div>
+                  <div className="attachments-list flex-column gap-2" style={{ marginTop: '8px' }}>
+                    {selectedTask.attachments && selectedTask.attachments.length > 0 ? (
+                      selectedTask.attachments.map(att => (
+                        <div key={att.id} className="attachment-file-row flex-row justify-between align-center" style={{ padding: '8px 12px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '0.8rem', background: 'rgba(255,255,255,0.01)' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>📎 {att.name} <small style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>({att.size})</small></span>
+                          <div className="flex-row gap-2">
+                            <button
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = att.url;
+                                link.target = '_blank';
+                                link.rel = 'noopener noreferrer';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="toggle-cols-btn"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(att.url);
+                                  const blob = await res.blob();
+                                  const blobUrl = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = blobUrl;
+                                  link.download = att.name || 'file';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(blobUrl);
+                                } catch (e) {
+                                  const link = document.createElement('a');
+                                  link.href = att.url;
+                                  link.download = att.name || 'file';
+                                  link.target = '_blank';
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }
+                              }}
+                              className="toggle-cols-btn"
+                              style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer' }}
+                            >
+                              Download
+                            </button>
+                            {getDisplayStatus(selectedTask.status) === 'In Progress' && isTaskAssignee(selectedTask) && (
+                              <button
+                                onClick={() => handleRemoveAttachment(att.id, att.name)}
+                                className="toggle-cols-btn"
+                                style={{ padding: '4px 8px', fontSize: '0.75rem', cursor: 'pointer', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.3 }}>{c.text}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', display: 'block', padding: '12px' }}>No discussions yet. Start the thread below!</span>
-                  )}
+                      ))
+                    ) : (
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No attachments uploaded.</span>
+                    )}
+                  </div>
                 </div>
-                
-                {/* Comment Input */}
-                <div className="comment-post-box flex-row gap-2" style={{ marginTop: '8px' }}>
-                  <input
-                    type="text"
-                    placeholder="Type a comment or tag members using @..."
-                    value={newCommentText}
-                    onChange={e => setNewCommentText(e.target.value)}
-                    style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}
-                  />
-                  <Button variant="primary" size="sm" onClick={handleAddCommentSubmit} icon={Send}>Post</Button>
+
+                {/* ── Activity Timeline (Chronological History) ── */}
+                <div className="info-field">
+                  <span className="info-lbl">Activity Timeline</span>
+                  <div className="timeline-wrapper flex-column gap-4" style={{ marginTop: '14px', borderLeft: '2px solid var(--border-color)', paddingLeft: '20px', marginLeft: '8px' }}>
+                    {(selectedTask.activityLog || []).map((log, idx) => {
+                      let iconColor = 'var(--text-muted)';
+                      let timelineIcon = <Activity size={12} />;
+                      
+                      if (log.action === 'assigned') {
+                        timelineIcon = <Flag size={12} />;
+                        iconColor = 'var(--color-neutral)';
+                      } else if (log.action === 'accepted') {
+                        timelineIcon = <Check size={12} />;
+                        iconColor = 'var(--color-primary)';
+                      } else if (log.action === 'rejected') {
+                        timelineIcon = <X size={12} />;
+                        iconColor = 'var(--color-danger)';
+                      } else if (log.action === 'started') {
+                        timelineIcon = <Play size={12} />;
+                        iconColor = 'var(--color-warning)';
+                      } else if (log.action === 'sent_to_review') {
+                        timelineIcon = <Send size={12} />;
+                        iconColor = 'var(--color-purple)';
+                      } else if (log.action === 'approved') {
+                        timelineIcon = <ThumbsUp size={12} />;
+                        iconColor = 'var(--color-success)';
+                      } else if (log.action === 'reassigned_for_rework') {
+                        timelineIcon = <RotateCcw size={12} />;
+                        iconColor = 'var(--color-danger)';
+                      }
+
+                      return (
+                        <div key={log.id || idx} className="timeline-item flex-column" style={{ position: 'relative' }}>
+                          <span className="timeline-dot-icon flex-center" style={{ position: 'absolute', left: '-30px', top: '2px', background: 'var(--bg-card)', border: `2px solid ${iconColor}`, borderRadius: '50%', width: '20px', height: '20px', color: iconColor }}>
+                            {timelineIcon}
+                          </span>
+                          <div className="flex-row justify-between" style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                            <span style={{ color: 'var(--text-primary)' }}>{log.details}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                              {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            By: <strong>{log.userName}</strong>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
+
+                {/* ── Discussions Thread & Comments ── */}
+                <div className="info-field flex-column gap-2">
+                  <span className="info-lbl">Discussions Thread</span>
+                  <div className="comments-chat-wrapper flex-column gap-2" style={{ maxHeight: '240px', overflowY: 'auto', padding: '6px' }}>
+                    {selectedTask.comments && selectedTask.comments.length > 0 ? (
+                      selectedTask.comments.map(c => (
+                        <div key={c.id} className="comment-bubble flex-column" style={{ background: 'rgba(255,255,255,0.015)', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                          <div className="flex-row justify-between align-center" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                            <span style={{ color: 'var(--color-primary)' }}>{c.sender} <small style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({c.role})</small></span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.68rem' }}>{c.time}</span>
+                          </div>
+                          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '6px', margin: '4px 0 0 0', lineHeight: 1.4 }}>{c.text}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', display: 'block', padding: '12px' }}>No discussions yet. Start the thread below!</span>
+                    )}
+                  </div>
+                  
+                  {/* Comment Input */}
+                  <div className="comment-post-box flex-row gap-2" style={{ marginTop: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Type a comment or request feedback..."
+                      value={newCommentText}
+                      onChange={e => setNewCommentText(e.target.value)}
+                      style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                    />
+                     <Button variant="primary" size="sm" onClick={handleAddCommentSubmit} icon={Send} disabled={isPostingComment || !newCommentText.trim()}>Post</Button>
+                  </div>
+                </div>
+
               </div>
 
+              <div className="slide-over-footer flex-row justify-between">
+                <Button variant="secondary" onClick={() => setIsDetailOpen(false)}>Close</Button>
+                <div className="flex-row gap-2">
+                  {currentUserRole !== 'employee' && (
+                    <Button variant="primary" onClick={() => {
+                      setEditForm({
+                        projectId: selectedTask.projectId || '',
+                        title: selectedTask.title,
+                        description: selectedTask.description || '',
+                        dueDate: selectedTask.dueDate,
+                        priority: selectedTask.priority || 'Medium',
+                        assigneeIds: selectedTask.assigneeId ? [selectedTask.assigneeId] : []
+                      });
+                      setIsEditOpen(true);
+                    }} icon={Edit}>Edit</Button>
+                  )}
+                  {currentUserRole !== 'employee' && hasPermission('task_monitoring', 'delete') && (
+                    <Button variant="danger" disabled={isDeletingTask} onClick={() => {
+                      showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, async () => {
+                        setIsDeletingTask(true);
+                        try {
+                          await deleteTask(selectedTask.id);
+                          setIsDetailOpen(false);
+                        } finally {
+                          setIsDeletingTask(false);
+                        }
+                      }, 'danger');
+                    }} icon={Trash2}>Delete</Button>
+                  )}
+                </div>
+              </div>
             </div>
-
-            <div className="slide-over-footer flex-row justify-between">
-              <Button variant="secondary" onClick={() => setIsDetailOpen(false)}>Close</Button>
-              {hasPermission('task_monitoring', 'delete') && (
-                <Button variant="danger" onClick={() => {
-                  showConfirm('Delete Task', `Are you sure you want to delete task "${selectedTask.title}"?`, async () => {
-                    await deleteTask(selectedTask.id);
-                    setIsDetailOpen(false);
-                  }, 'danger');
-                }} icon={Trash2}>Delete</Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* ── Create Task Modal ── */}
       <Modal
@@ -1603,7 +2253,9 @@ const TaskMonitoring = () => {
         footer={
           <div className="modal-actions-wrapper">
             <Button variant="secondary" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleCreateTask} disabled={!createForm.projectId || !createForm.title.trim()}>Create Task</Button>
+            <Button variant="primary" onClick={handleCreateTask} disabled={!createForm.projectId || !createForm.title.trim() || isCreating}>
+               {isCreating ? 'Creating...' : 'Create Task'}
+            </Button>
           </div>
         }
       >
@@ -1612,10 +2264,18 @@ const TaskMonitoring = () => {
             <label>Target Project *</label>
             <select
               value={createForm.projectId}
-              onChange={e => setCreateForm(prev => ({ ...prev, projectId: e.target.value }))}
-              required
+              onChange={e => setCreateForm(prev => ({ ...prev, projectId: e.target.value, assigneeIds: [] }))}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
             >
-              <option value="">Select a project...</option>
               {(projectsList || []).map(p => (
                 <option key={p.id} value={p.id}>{p.id} - {p.name}</option>
               ))}
@@ -1654,15 +2314,91 @@ const TaskMonitoring = () => {
           </div>
           <div className="form-field">
             <label>Assign To</label>
+            <MultiSelectDropdown
+              options={(filteredAssignees || []).map(emp => ({ value: emp.id, label: `${emp.name} (${emp.id})` }))}
+              selectedValues={createForm.assigneeIds || []}
+              onChange={vals => setCreateForm(prev => ({ ...prev, assigneeIds: vals }))}
+              placeholder="Select assignee(s)..."
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Edit Task Modal ── */}
+      <Modal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        title="Edit Project Task"
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleEditTaskSubmit} disabled={!editForm.title.trim() || isEditingTaskDetails}>
+               {isEditingTaskDetails ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="create-task-form-body">
+          <div className="form-field">
+            <label>Task Title *</label>
+            <input
+              type="text"
+              placeholder="Task Title"
+              value={editForm.title}
+              onChange={e => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label>Description</label>
+            <textarea
+              placeholder="No description provided."
+              value={editForm.description}
+              onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+              rows={4}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                background: 'var(--bg-elevated, #1e293b)',
+                border: '1px solid var(--border-color, #334155)',
+                borderRadius: '6px',
+                color: 'var(--text-primary, #f8fafc)',
+                fontSize: '0.875rem',
+                resize: 'vertical',
+                outline: 'none'
+              }}
+            />
+          </div>
+          <div className="form-field">
+            <label>Task Due Date *</label>
+            <input
+              type="date"
+              value={editForm.dueDate}
+              onChange={e => setEditForm(prev => ({ ...prev, dueDate: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label>Priority</label>
             <select
-              value={createForm.assigneeId}
-              onChange={e => setCreateForm(prev => ({ ...prev, assigneeId: e.target.value }))}
+              value={editForm.priority}
+              onChange={e => setEditForm(prev => ({ ...prev, priority: e.target.value }))}
             >
-              <option value="">Unassigned</option>
-              {(scopedEmployees || []).map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
-              ))}
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Critical">Critical</option>
             </select>
+          </div>
+          <div className="form-field">
+            <label>Assign To</label>
+            <MultiSelectDropdown
+              options={(filteredAssigneesForEdit || []).map(emp => ({ value: emp.id, label: `${emp.name} (${emp.id})` }))}
+              selectedValues={editForm.assigneeIds || []}
+              onChange={vals => setEditForm(prev => ({ ...prev, assigneeIds: vals }))}
+              placeholder="Select assignee(s)..."
+            />
           </div>
         </div>
       </Modal>
@@ -1689,6 +2425,17 @@ const TaskMonitoring = () => {
               <option value="Team Report">Team Performance Analysis</option>
             </select>
           </div>
+          {exportOptions.reportType !== 'Team Report' && currentUserRole !== 'employee' && (
+            <div className="form-field">
+              <label>Select Employee</label>
+              <select value={exportOptions.employeeId} onChange={e => setExportOptions(prev => ({ ...prev, employeeId: e.target.value }))}>
+                <option value="">All Employees</option>
+                {scopedEmployees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="form-field">
             <label>Date Scope</label>
             <select value={exportOptions.dateRange} onChange={e => setExportOptions(prev => ({ ...prev, dateRange: e.target.value }))}>
@@ -1776,6 +2523,60 @@ const TaskMonitoring = () => {
               value={newTaskRemarks}
               onChange={e => setNewTaskRemarks(e.target.value)}
               rows={3}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Reject Task Modal ── */}
+      <Modal
+        isOpen={isRejectOpen}
+        onClose={() => setIsRejectOpen(false)}
+        title="Reject Task Assignment"
+        size="sm"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setIsRejectOpen(false)}>Cancel</Button>
+            <Button variant="danger" onClick={handleRejectTaskSubmit} disabled={!rejectReason.trim()}>Confirm Rejection</Button>
+          </div>
+        }
+      >
+        <div className="create-task-form-body">
+          <div className="form-field">
+            <label>Reason for Rejection *</label>
+            <textarea
+              placeholder="Provide a clear reason why you cannot accept this task..."
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              rows={3}
+              required
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Reviewer Reassign Modal ── */}
+      <Modal
+        isOpen={isReviewReassignOpen}
+        onClose={() => setIsReviewReassignOpen(false)}
+        title="Send Task Back for Rework"
+        size="sm"
+        footer={
+          <div className="modal-actions-wrapper">
+            <Button variant="secondary" onClick={() => setIsReviewReassignOpen(false)}>Cancel</Button>
+            <Button variant="warning" onClick={handleReviewReassignSubmit} disabled={!reviewComment.trim()}>Send back for rework</Button>
+          </div>
+        }
+      >
+        <div className="create-task-form-body">
+          <div className="form-field">
+            <label>Rework Instructions / Feedback *</label>
+            <textarea
+              placeholder="Explain what changes are needed before approval..."
+              value={reviewComment}
+              onChange={e => setReviewComment(e.target.value)}
+              rows={4}
+              required
             />
           </div>
         </div>

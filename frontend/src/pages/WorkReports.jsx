@@ -53,6 +53,7 @@ const getStatusBadgeVariant = (status) => {
     case 'Submitted': return 'warning';
     case 'Changes Requested': return 'danger';
     case 'Escalated': return 'info';
+    case 'Under Process': return 'info';
     case 'Rejected': return 'danger';
     default: return 'neutral';
   }
@@ -164,50 +165,136 @@ const WorkReports = () => {
     });
   }, [employees, currentUser, currentUserRole, isEmployee]);
 
-  const getAssignedTasksCountForProject = (projectName) => {
-    if (!projectName) return 0;
+  const getTodayStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getAssignedTasksCountForDate = (dateStr) => {
+    return getAssignedTasksForDate(dateStr).length;
+  };
+
+  const getAssignedTasksForDate = (dateStr) => {
+    if (!dateStr) return [];
     const normalizeName = (name) => {
       if (!name) return '';
       return name.trim().replace(/\s+/g, ' ').toLowerCase();
     };
-    const normCurrentUserName = normalizeName(currentUser?.name);
+    const normCurrentUserName = normalizeName(currentUser?.name || currentUser?.fullName);
+    const currentUserId = currentUser?.id || currentUser?.employeeId;
+    if (!normCurrentUserName && !currentUserId) return [];
     
-    const proj = (projectsList || []).find(p => p.name === projectName);
-    if (!proj || !proj.tasks) return 0;
-    
-    let count = 0;
-    proj.tasks.forEach(t => {
-      const isCurrentUserAssigned = (t.assignedTo && t.assignedTo.map(normalizeName).includes(normCurrentUserName)) ||
-                                     (t.assigneeName && normalizeName(t.assigneeName).includes(normCurrentUserName)) ||
-                                     (t.assigneeId && currentUser && t.assigneeId === currentUser.id);
-      if (isCurrentUserAssigned) {
-        count++;
-      }
+    const allTasks = [];
+    (projectsList || []).forEach(proj => {
+      if (!proj.tasks) return;
+      proj.tasks.forEach(t => {
+        const isNameMatched = normCurrentUserName && (
+          (t.assignedTo && t.assignedTo.map(normalizeName).includes(normCurrentUserName)) ||
+          (t.assigneeName && (normalizeName(t.assigneeName) === normCurrentUserName || normalizeName(t.assigneeName).includes(normCurrentUserName)))
+        );
+        const isIdMatched = currentUserId && (
+          (t.assigneeId && t.assigneeId === currentUserId) ||
+          (t.assignedToIds && t.assignedToIds.includes(currentUserId))
+        );
+        const isCurrentUserAssigned = isNameMatched || isIdMatched;
+        const isDateMatched = t.dueDate === dateStr;
+        const isNotCompleted = t.status !== 'Completed' && t.status !== 'Done' && !t.completed;
+        
+        if (isCurrentUserAssigned && isDateMatched && isNotCompleted) {
+          allTasks.push({
+            ...t,
+            projectName: proj.name
+          });
+        }
+      });
     });
-    return count;
+    return allTasks;
   };
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().slice(0, 10),
-    project: '',
+    date: new Date().toLocaleDateString('en-CA'),
+    project: 'General',
     tasksAssigned: 0,
     tasksCompleted: 0,
     summary: '',
     majorAccomplishments: ''
   });
 
-  const handleProjectChange = (projectName) => {
-    const assignedTasks = getAssignedTasksCountForProject(projectName);
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+
+  React.useEffect(() => {
+    if (currentUser && projectsList && projectsList.length > 0) {
+      const todayStr = getTodayStr();
+      const tasks = getAssignedTasksForDate(todayStr);
+      const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).filter(Boolean);
+      const projectVal = uniqueProjects.length > 0 ? uniqueProjects.join(', ') : 'General';
+      setFormData(prev => ({
+        ...prev,
+        date: todayStr,
+        project: projectVal,
+        tasksAssigned: tasks.length
+      }));
+    }
+  }, [currentUser, projectsList]);
+
+  const handleDateChange = (newDate) => {
+    const tasks = getAssignedTasksForDate(newDate);
+    const assignedCount = tasks.length;
+    const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).filter(Boolean);
+    const projectVal = uniqueProjects.length > 0 ? uniqueProjects.join(', ') : 'General';
+    
     setFormData(prev => ({
       ...prev,
-      project: projectName,
-      tasksAssigned: assignedTasks,
+      date: newDate,
+      project: projectVal,
+      tasksAssigned: assignedCount,
       tasksCompleted: 0
+    }));
+    setSelectedTaskIds([]);
+  };
+
+  const handleTaskCheckboxChange = (taskId, checked) => {
+    let nextIds = [];
+    if (checked) {
+      nextIds = [...selectedTaskIds, taskId];
+    } else {
+      nextIds = selectedTaskIds.filter(id => id !== taskId);
+    }
+    setSelectedTaskIds(nextIds);
+    
+    const allTasks = getAssignedTasksForDate(formData.date);
+    const selectedProjects = nextIds.map(id => {
+      const task = allTasks.find(t => t.id === id);
+      return task ? task.projectName : '';
+    }).filter(Boolean);
+    
+    const uniqueProjects = Array.from(new Set(selectedProjects));
+    const defaultProjects = Array.from(new Set(allTasks.map(t => t.projectName))).filter(Boolean);
+    const defaultProjectVal = defaultProjects.length > 0 ? defaultProjects.join(', ') : 'General';
+    const projectVal = uniqueProjects.length > 0 ? uniqueProjects.join(', ') : defaultProjectVal;
+    
+    setFormData(prev => ({
+      ...prev,
+      tasksCompleted: nextIds.length,
+      project: projectVal
     }));
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAuditing, setIsAuditing] = useState(false);
+  const submittingRef = useRef(false);
+  const auditingRef = useRef(false);
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    const todayStr = getTodayStr();
+    if (formData.date > todayStr) {
+      addToast('warning', 'Report date cannot be in the future.');
+      return;
+    }
     if (!formData.project.trim()) {
       addToast('warning', 'Please specify the project name.');
       return;
@@ -220,9 +307,14 @@ const WorkReports = () => {
       addToast('warning', 'Please list your major accomplishments.');
       return;
     }
+    if (Number(formData.tasksCompleted) > Number(formData.tasksAssigned)) {
+      addToast('warning', 'Completed tasks cannot exceed assigned tasks.');
+      return;
+    }
 
     const payload = {
       ...formData,
+      completedTaskIds: selectedTaskIds,
       employeeId: currentUser?.employeeId || currentUser?.id || 'GATECO-EMP-001',
       employeeName: currentUser?.name || 'Employee',
       department: currentUser?.department || 'IT',
@@ -241,18 +333,29 @@ const WorkReports = () => {
       ]
     };
 
+    if (isSubmitting || submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+
     try {
       const result = await addDailyReport(payload);
       if (result) {
         addToast('success', 'Daily work report submitted successfully!');
-        setFormData(prev => ({
-          ...prev,
+        setFormData({
+          date: getTodayStr(),
+          project: '',
+          tasksAssigned: 0,
+          tasksCompleted: 0,
           summary: '',
           majorAccomplishments: ''
-        }));
+        });
+        setSelectedTaskIds([]);
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -260,6 +363,13 @@ const WorkReports = () => {
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, directory, submit, calendar, analytics, leaderboards, logs
 
   const [timeFilter, setTimeFilter] = useState('AllTime'); // 'AllTime' | 'Today' | 'Weekly' | 'Monthly' | 'Yearly'
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportOptions, setExportOptions] = useState({
+    reportType: 'All Reports',
+    employeeId: '',
+    dateRange: 'AllTime',
+    format: 'CSV'
+  });
 
   const reports = useMemo(() => {
     let filtered = rawReports;
@@ -552,7 +662,7 @@ const WorkReports = () => {
       // Status filters
       if (statusFilter !== 'All') {
         if (statusFilter === 'Flagged') {
-          if (r.status !== 'Changes Requested' && r.status !== 'Escalated') return false;
+          if (r.status !== 'Changes Requested' && r.status !== 'Escalated' && r.status !== 'Under Process') return false;
         } else if (r.status !== statusFilter) {
           return false;
         }
@@ -574,7 +684,7 @@ const WorkReports = () => {
   /* Auto Calculations derived states */
   const stats = useMemo(() => {
     const total = filtered.length;
-    const pending = filtered.filter(r => r.status === 'Submitted' || r.status === 'Escalated').length;
+    const pending = filtered.filter(r => r.status === 'Submitted' || r.status === 'Escalated' || r.status === 'Under Process').length;
     const approved = filtered.filter(r => r.status === 'Approved').length;
     const rejected = filtered.filter(r => r.status === 'Rejected' || r.status === 'Changes Requested').length;
     
@@ -735,28 +845,34 @@ const WorkReports = () => {
 
   /* Audit details action */
   const triggerAuditAction = async (actionType) => {
-    if (!selectedReport) return;
-    
-    let updatedStatus = 'Submitted';
+    if (!selectedReport || isAuditing || auditingRef.current) return;
+    auditingRef.current = true;
+    setIsAuditing(true);
+    try {
+      let updatedStatus = 'Submitted';
 
-    if (actionType === 'Approve') {
-      updatedStatus = 'Approved';
-    } else if (actionType === 'Reject') {
-      updatedStatus = 'Rejected';
-    } else if (actionType === 'Changes') {
-      updatedStatus = 'Changes Requested';
-    } else if (actionType === 'Escalate') {
-      updatedStatus = 'Escalated';
-    }
+      if (actionType === 'Approve') {
+        updatedStatus = 'Approved';
+      } else if (actionType === 'Reject') {
+        updatedStatus = 'Rejected';
+      } else if (actionType === 'Changes') {
+        updatedStatus = 'Changes Requested';
+      } else if (actionType === 'Escalate') {
+        updatedStatus = 'Under Process';
+      }
 
-    const updatedReport = await updateDailyReportStatus(selectedReport.id, updatedStatus, evaluationFeedback);
-    if (updatedReport) {
-      addAuditLog(actionType === 'Approve' ? 'Approval' : 'Rejection', selectedReport.id, `Report status updated to ${updatedStatus} by ${userRole}`);
-      pushNotification(`Report ${selectedReport.id} was ${updatedStatus.toLowerCase()} by manager.`);
+      const updatedReport = await updateDailyReportStatus(selectedReport.id, updatedStatus, evaluationFeedback);
+      if (updatedReport) {
+        addAuditLog(actionType === 'Approve' ? 'Approval' : 'Rejection', selectedReport.id, `Report status updated to ${updatedStatus} by ${userRole}`);
+        pushNotification(`Report ${selectedReport.id} was ${updatedStatus.toLowerCase()} by manager.`);
 
-      // Reset drawer state
-      setSelectedReport(null);
-      setEvaluationFeedback('');
+        // Reset drawer state
+        setSelectedReport(null);
+        setEvaluationFeedback('');
+      }
+    } finally {
+      auditingRef.current = false;
+      setIsAuditing(false);
     }
   };
 
@@ -802,11 +918,53 @@ const WorkReports = () => {
   };
 
   /* Export system trigger */
-  const handleExportSystem = (format) => {
-    if (filtered.length === 0) {
-      addToast('warning', 'No reports available to export.');
+  const handleExportSystem = (options) => {
+    const reportType = options.reportType;
+    const format = options.format;
+    const dateRange = options.dateRange;
+    const employeeId = options.employeeId;
+
+    let targetReports = reports; // already scoped by role
+
+    if (reportType === 'Employee Report' && employeeId) {
+      targetReports = targetReports.filter(r => r.employeeId === employeeId);
+    }
+
+    if (dateRange !== 'AllTime') {
+      const parseDate = (dStr) => {
+        if (!dStr) return new Date();
+        const [y, m, d] = dStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      };
+      const refDate = parseDate(new Date().toISOString().slice(0, 10));
+
+      targetReports = targetReports.filter(r => {
+        if (!r.date) return false;
+        const rDate = parseDate(r.date);
+        const diffTime = refDate.getTime() - rDate.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+        if (dateRange === 'Today') {
+          return r.date === new Date().toISOString().slice(0, 10);
+        }
+        if (dateRange === 'Weekly') {
+          return diffDays >= 0 && diffDays < 7;
+        }
+        if (dateRange === 'Monthly') {
+          return diffDays >= 0 && diffDays < 30;
+        }
+        if (dateRange === 'Yearly') {
+          return diffDays >= 0 && diffDays < 365;
+        }
+        return true;
+      });
+    }
+
+    if (targetReports.length === 0) {
+      addToast('warning', 'No reports available to export for the selected filters.');
       return;
     }
+    
     setExporting(true);
     setTimeout(() => {
       try {
@@ -829,7 +987,7 @@ const WorkReports = () => {
           'Remarks/Feedback'
         ];
 
-        const rows = filtered.map(r => [
+        const rows = targetReports.map(r => [
           r.id || '',
           r.employeeId || '',
           r.employeeName || '',
@@ -848,26 +1006,65 @@ const WorkReports = () => {
           (r.feedback || r.remarks || '').replace(/"/g, '""')
         ]);
 
-        const csvContent = [
-          headers.join(','),
-          ...rows.map(row => row.map(val => `"${val}"`).join(','))
-        ].join('\n');
+        if (format === 'PDF') {
+          const printWindow = window.open('', '_blank');
+          if (printWindow) {
+            const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+            const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+            printWindow.document.write(`
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <title>Work Reports Export</title>
+                  <style>
+                    body { font-family: sans-serif; padding: 20px; color: #334155; }
+                    h1 { color: #0f172a; margin-bottom: 5px; }
+                    p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                    td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                    tr:nth-child(even) td { background-color: #f8fafc; }
+                  </style>
+                </head>
+                <body>
+                  <h1>Work Reports Export</h1>
+                  <p>Generated on: ${new Date().toLocaleString()} | Scope: ${dateRange}</p>
+                  <table>
+                    <thead><tr>${tableHeadersHTML}</tr></thead>
+                    <tbody>${tableRowsHTML}</tbody>
+                  </table>
+                  <script>
+                    window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+                  </script>
+                </body>
+              </html>
+            `);
+            printWindow.document.close();
+            addToast('success', 'PDF Print window opened.');
+          }
+        } else {
+          const csvContent = "\ufeff" + [
+            headers.join(','),
+            ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+          ].join('\n');
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `work_reports_export_${new Date().toISOString().slice(0, 10)}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', `work_reports_export_${new Date().toISOString().slice(0, 10)}.${format === 'Excel' ? 'xls' : 'csv'}`);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
 
+          const msg = isEmployee
+            ? `My Work Reports exported successfully in ${format} format.`
+            : `Daily Work Reports exported successfully in ${format} format.`;
+          addToast('success', msg);
+        }
         setExporting(false);
-        const msg = isEmployee
-          ? `My Work Reports exported successfully in ${format} format.`
-          : `Daily Work Reports exported successfully in ${format} format.`;
-        addToast('success', msg);
       } catch (err) {
         console.error('Failed to export reports:', err);
         setExporting(false);
@@ -1028,7 +1225,7 @@ const WorkReports = () => {
                   </select>
                 </div>
               )}
-              <Button variant="ghost" size="sm" icon={Download} onClick={() => handleExportSystem('CSV')}>
+              <Button variant="ghost" size="sm" icon={Download} onClick={() => setIsExportOpen(true)}>
                 {exporting ? 'Exporting...' : 'Export My Reports'}
               </Button>
             </div>
@@ -1051,24 +1248,80 @@ const WorkReports = () => {
                       type="date"
                       className="reports-form-input"
                       value={formData.date}
-                      onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                      onChange={(e) => handleDateChange(e.target.value)}
+                      max={getTodayStr()}
                       required
                     />
                   </div>
                   <div className="form-group-item">
                     <label className="reports-form-lbl">Project Name / Client *</label>
-                    <select
+                    <input
+                      type="text"
                       className="reports-form-input"
                       value={formData.project}
-                      onChange={(e) => handleProjectChange(e.target.value)}
-                      required
-                    >
-                      <option value="">— Select Project —</option>
-                      {(projectsList || []).map(p => (
-                        <option key={p.id || p.name} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
+                      readOnly
+                      placeholder="No project associated"
+                    />
                   </div>
+                </div>
+ 
+                {/* Active Tasks Checklist */}
+                <div className="form-group-item">
+                  <label className="reports-form-lbl" style={{ marginBottom: '8px', display: 'block' }}>
+                    Select Completed Tasks
+                  </label>
+                  {getAssignedTasksForDate(formData.date).length > 0 ? (
+                    <div className="flex-column gap-2" style={{
+                      maxHeight: '150px',
+                      overflowY: 'auto',
+                      padding: '10px',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--bg-card)'
+                    }}>
+                      {getAssignedTasksForDate(formData.date).map(task => (
+                        <div key={task.id} style={{
+                          display: 'flex',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'flex-start',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          padding: '6px 0',
+                          width: '100%'
+                        }}>
+                          <input
+                            type="checkbox"
+                            id={`task-${task.id}`}
+                            checked={selectedTaskIds.includes(task.id)}
+                            onChange={(e) => handleTaskCheckboxChange(task.id, e.target.checked)}
+                            style={{
+                              cursor: 'pointer',
+                              accentColor: 'var(--color-primary)',
+                              width: 'auto',
+                              margin: 0
+                            }}
+                          />
+                          <label htmlFor={`task-${task.id}`} style={{
+                            cursor: 'pointer',
+                            margin: 0,
+                            fontSize: '0.85rem',
+                            textTransform: 'none',
+                            color: 'var(--text-primary)',
+                            display: 'inline',
+                            fontWeight: 'normal',
+                            letterSpacing: 'normal'
+                          }}>
+                            {task.title} <strong style={{ color: 'var(--text-muted)' }}>({task.id})</strong>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted" style={{ padding: '4px 0' }}>
+                      No active assigned tasks found for this date.
+                    </div>
+                  )}
                 </div>
 
                 {/* Row 2: Timings & Hours */}
@@ -1125,8 +1378,8 @@ const WorkReports = () => {
                 </div>
 
                 <div style={{ marginTop: 12 }}>
-                  <Button type="submit" variant="primary" icon={Send} fullWidth>
-                    Submit Daily Work Report
+                  <Button type="submit" variant="primary" icon={Send} fullWidth disabled={isSubmitting}>
+                    {isSubmitting ? 'Submitting...' : 'Submit Daily Work Report'}
                   </Button>
                 </div>
               </form>
@@ -1161,7 +1414,7 @@ const WorkReports = () => {
                   <option>Submitted</option>
                   <option>Approved</option>
                   <option>Changes Requested</option>
-                  <option>Escalated</option>
+                  <option>Under Process</option>
                   <option>Rejected</option>
                 </select>
               </div>
@@ -1269,7 +1522,6 @@ const WorkReports = () => {
               value={timeFilter}
               onChange={(e) => {
                 setTimeFilter(e.target.value);
-                addToast('info', `Filtered data for time range: ${e.target.value}`);
               }}
               className="role-selector-input"
             >
@@ -1281,7 +1533,7 @@ const WorkReports = () => {
             </select>
           </div>
           
-          <Button variant="ghost" size="sm" icon={Download} onClick={() => handleExportSystem('CSV')}>
+          <Button variant="ghost" size="sm" icon={Download} onClick={() => setIsExportOpen(true)}>
             {exporting ? 'Exporting...' : (isEmployee ? 'Export My Reports' : 'Export Directory')}
           </Button>
         </div>
@@ -1448,7 +1700,7 @@ const WorkReports = () => {
                 <option>Submitted</option>
                 <option>Approved</option>
                 <option>Changes Requested</option>
-                <option>Escalated</option>
+                <option>Under Process</option>
                 <option>Rejected</option>
               </select>
 
@@ -1720,7 +1972,6 @@ const WorkReports = () => {
                       if (cell.day) {
                         setDateFilter(cell.dateStr);
                         setActiveTab('directory');
-                        addToast('info', `Filtered reports for date: ${cell.dateStr}`);
                       }
                     }}
                   >
@@ -2153,24 +2404,28 @@ const WorkReports = () => {
                 <div className="reports-drawer-action-buttons">
                   <button
                     className="review-action-btn changes-btn"
+                    disabled={isAuditing}
                     onClick={() => triggerAuditAction('Changes')}
                   >
                     Request Changes
                   </button>
                   <button
                     className="review-action-btn escalate-btn"
+                    disabled={isAuditing}
                     onClick={() => triggerAuditAction('Escalate')}
                   >
-                    Escalate
+                    Under Process
                   </button>
                   <button
                     className="review-action-btn reject-btn"
+                    disabled={isAuditing}
                     onClick={() => triggerAuditAction('Reject')}
                   >
                     Reject
                   </button>
                   <button
                     className="review-action-btn approve-btn"
+                    disabled={isAuditing}
                     onClick={() => triggerAuditAction('Approve')}
                   >
                     Approve Daily Report
@@ -2182,6 +2437,106 @@ const WorkReports = () => {
           </div>
         )}
       </SlideOver>
+
+      {/* ── Export Work Reports Modal ── */}
+      <Modal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        title="Export Daily Work Reports"
+        size="sm"
+        footer={
+          <div className="modal-actions-wrapper" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <Button variant="secondary" onClick={() => setIsExportOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={() => { handleExportSystem(exportOptions); setIsExportOpen(false); }}>Export Report</Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+          <div className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Report Type</label>
+            <select
+              value={exportOptions.reportType}
+              onChange={e => setExportOptions(prev => ({ ...prev, reportType: e.target.value }))}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem'
+              }}
+            >
+              <option value="All Reports">All Work Reports</option>
+              <option value="Employee Report">Employee Work Reports</option>
+            </select>
+          </div>
+
+          {exportOptions.reportType === 'Employee Report' && !isEmployee && (
+            <div className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Employee</label>
+              <select
+                value={exportOptions.employeeId}
+                onChange={e => setExportOptions(prev => ({ ...prev, employeeId: e.target.value }))}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.85rem'
+                }}
+              >
+                <option value="">-- Choose Employee --</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name} ({emp.id})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Date Scope</label>
+            <select
+              value={exportOptions.dateRange}
+              onChange={e => setExportOptions(prev => ({ ...prev, dateRange: e.target.value }))}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem'
+              }}
+            >
+              <option value="AllTime">All Time</option>
+              <option value="Today">Today</option>
+              <option value="Weekly">Weekly (Last 7 Days)</option>
+              <option value="Monthly">Monthly (Last 30 Days)</option>
+              <option value="Yearly">Yearly (Last 365 Days)</option>
+            </select>
+          </div>
+
+          <div className="form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Download Format</label>
+            <select
+              value={exportOptions.format}
+              onChange={e => setExportOptions(prev => ({ ...prev, format: e.target.value }))}
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-primary)',
+                fontSize: '0.85rem'
+              }}
+            >
+              <option value="CSV">Comma Separated (CSV)</option>
+              <option value="Excel">Microsoft Excel (XLS)</option>
+              <option value="PDF">Document Format (PDF)</option>
+            </select>
+          </div>
+        </div>
+      </Modal>
 
     </div>
   );

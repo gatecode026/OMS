@@ -63,6 +63,41 @@ const formatTime12h = (time24) => {
   return `${String(hour).padStart(2, '0')}:${min} ${ampm}`;
 };
 
+const getCountdownText = (dateStr, timeStr) => {
+  const now = new Date();
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const meetingDate = new Date(dateStr);
+  meetingDate.setHours(hours, minutes, 0, 0);
+  
+  const diffMs = meetingDate - now;
+  if (diffMs < 0) {
+    if (diffMs > -3600000) {
+      return 'Happening now';
+    }
+    return 'Passed';
+  }
+  
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Starting now';
+  if (diffMins < 60) return `${diffMins}m left`;
+  
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `in ${diffHours}h`;
+  
+  const diffDays = Math.floor(diffHours / 24);
+  return `in ${diffDays}d`;
+};
+
+const getMeetingLink = (location) => {
+  if (!location) return null;
+  const trimmed = location.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  if (trimmed.includes('zoom.us') || trimmed.includes('meet.google') || trimmed.includes('teams.live') || trimmed.includes('teams.microsoft')) {
+    return 'https://' + trimmed.replace(/^(https?:\/\/)?/, '');
+  }
+  return null;
+};
+
 const Topbar = ({ onMenuToggle }) => {
   const navigate = useNavigate();
   const {
@@ -156,6 +191,36 @@ const Topbar = ({ onMenuToggle }) => {
 
   const upcomingMeetings = useMemo(() => upcomingEvents.filter(e => e.type === 'meeting'), [upcomingEvents]);
   const upcomingOthers = useMemo(() => upcomingEvents.filter(e => e.type !== 'meeting'), [upcomingEvents]);
+  
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const categorizedMeetings = useMemo(() => {
+    const categorized = {
+      today: [],
+      upcoming: [],
+      pastOrCancelled: []
+    };
+    
+    upcomingMeetings.forEach(evt => {
+      if (evt.status === 'declined') {
+        categorized.pastOrCancelled.push(evt);
+      } else if (evt.date === todayStr) {
+        categorized.today.push(evt);
+      } else if (evt.date > todayStr) {
+        categorized.upcoming.push(evt);
+      } else {
+        categorized.pastOrCancelled.push(evt);
+      }
+    });
+    
+    return categorized;
+  }, [upcomingMeetings, todayStr]);
   
   const notifRef = useRef(null);
   const profileRef = useRef(null);
@@ -446,7 +511,7 @@ const Topbar = ({ onMenuToggle }) => {
           </button>
 
           {meetingsOpen && (
-            <div className="topbar-dropdown-panel meetings-panel animate-slide-up" style={{ right: 0, width: '300px' }}>
+            <div className="topbar-dropdown-panel meetings-panel animate-slide-up" style={{ right: 0, width: '320px' }}>
               <div className="panel-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)' }}>
                 <span className="panel-title flex-row align-center gap-2" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Calendar size={16} style={{ color: 'var(--color-primary, #d946ef)' }} />
@@ -454,7 +519,7 @@ const Topbar = ({ onMenuToggle }) => {
                 </span>
               </div>
               
-              <div className="panel-body" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '380px', overflowY: 'auto' }}>
+              <div className="panel-body" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '420px', overflowY: 'auto' }}>
                 {loadingEvents ? (
                   <div className="text-center text-text-muted py-6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem' }}>
                     Loading events...
@@ -465,9 +530,95 @@ const Topbar = ({ onMenuToggle }) => {
                   </div>
                 ) : (
                   <>
-                    {/* Meetings Section */}
-                    {upcomingMeetings.length > 0 && (
+                    {/* 1. Today's Meetings */}
+                    {categorizedMeetings.today.length > 0 && (
                       <div className="meetings-section">
+                        <span className="meetings-section-title" style={{ 
+                          fontSize: '0.68rem', 
+                          color: '#38bdf8', 
+                          fontWeight: 700, 
+                          textTransform: 'uppercase', 
+                          letterSpacing: '0.08em',
+                          display: 'block',
+                          marginBottom: '8px'
+                        }}>
+                          Today's Meetings
+                        </span>
+                        <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {categorizedMeetings.today.map(evt => {
+                            const link = getMeetingLink(evt.location);
+                            const countdown = getCountdownText(evt.date, evt.startTime);
+                            return (
+                              <div 
+                                key={evt._id || evt.id}
+                                className="meeting-item-card transition-all" 
+                                style={{ 
+                                  display: 'flex', 
+                                  flexDirection: 'column',
+                                  gap: '6px', 
+                                  padding: '10px 12px', 
+                                  background: countdown === 'Happening now' ? 'rgba(56, 189, 248, 0.05)' : 'var(--bg-elevated, rgba(255, 255, 255, 0.02))', 
+                                  border: countdown === 'Happening now' ? '1px solid #38bdf8' : '1px solid var(--border-color, rgba(255, 255, 255, 0.06))',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => {
+                                  setMeetingsOpen(false);
+                                  navigate('/calendar');
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                  <span className="meeting-name" style={{ color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{evt.title}</span>
+                                  <span style={{ 
+                                    fontSize: '0.62rem', 
+                                    fontWeight: 700, 
+                                    color: countdown === 'Happening now' ? '#ef4444' : '#38bdf8',
+                                    background: countdown === 'Happening now' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(56, 189, 248, 0.1)',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    flexShrink: 0
+                                  }}>
+                                    {countdown}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', marginTop: '2px' }}>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Clock size={10} /> {formatTime12h(evt.startTime)}
+                                  </span>
+                                  {link && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.open(link, '_blank');
+                                      }}
+                                      style={{
+                                        padding: '3px 8px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 600,
+                                        borderRadius: '4px',
+                                        background: '#10b981',
+                                        color: '#fff',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      <Video size={10} /> Join
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 2. Upcoming Meetings */}
+                    {categorizedMeetings.upcoming.length > 0 && (
+                      <div className="meetings-section" style={{ marginTop: '12px' }}>
                         <span className="meetings-section-title" style={{ 
                           fontSize: '0.68rem', 
                           color: 'var(--text-muted)', 
@@ -479,65 +630,73 @@ const Topbar = ({ onMenuToggle }) => {
                         }}>
                           Upcoming Meetings
                         </span>
-                        
                         <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          {upcomingMeetings.map(evt => (
-                            <div 
-                              key={evt._id || evt.id}
-                              className="meeting-item-card transition-all" 
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center',
-                                gap: '12px', 
-                                padding: '10px 12px', 
-                                background: 'var(--bg-elevated, rgba(255, 255, 255, 0.02))', 
-                                border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))',
-                                borderRadius: '8px',
-                                cursor: 'pointer'
-                              }}
-                              onClick={() => {
-                                setMeetingsOpen(false);
-                                navigate('/calendar');
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.borderColor = evt.color || '#3b82f6';
-                                e.currentTarget.style.background = (evt.color || '#3b82f6') + '0a';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'none';
-                                e.currentTarget.style.borderColor = 'var(--border-color, rgba(255, 255, 255, 0.06))';
-                                e.currentTarget.style.background = 'var(--bg-elevated, rgba(255, 255, 255, 0.02))';
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                                <div style={{
-                                  padding: '6px',
-                                  borderRadius: '6px',
-                                  background: (evt.color || '#3b82f6') + '14',
-                                  color: evt.color || '#3b82f6',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}>
-                                  <Video size={14} />
+                          {categorizedMeetings.upcoming.map(evt => {
+                            const link = getMeetingLink(evt.location);
+                            const countdown = getCountdownText(evt.date, evt.startTime);
+                            return (
+                              <div 
+                                key={evt._id || evt.id}
+                                className="meeting-item-card transition-all" 
+                                style={{ 
+                                  display: 'flex', 
+                                  flexDirection: 'column',
+                                  gap: '6px', 
+                                  padding: '10px 12px', 
+                                  background: 'var(--bg-elevated, rgba(255, 255, 255, 0.02))', 
+                                  border: '1px solid var(--border-color, rgba(255, 255, 255, 0.06))',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => {
+                                  setMeetingsOpen(false);
+                                  navigate('/calendar');
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                  <span className="meeting-name" style={{ color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 600, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{evt.title}</span>
+                                  <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                                    {countdown}
+                                  </span>
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                  <span className="meeting-name" style={{ color: 'var(--text-primary)', fontSize: '0.8rem', fontWeight: 600 }}>{evt.title}</span>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' }}>
                                   <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <Clock size={10} /> {evt.date} • {formatTime12h(evt.startTime)}
                                   </span>
+                                  {link && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.open(link, '_blank');
+                                      }}
+                                      style={{
+                                        padding: '3px 8px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 600,
+                                        borderRadius: '4px',
+                                        background: '#10b981',
+                                        color: '#fff',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      <Video size={10} /> Join
+                                    </button>
+                                  )}
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
-                    
-                    {/* Events Section */}
-                    {upcomingOthers.length > 0 && (
-                      <div className="meetings-section">
+
+                    {/* 3. Cancelled / Past Meetings */}
+                    {categorizedMeetings.pastOrCancelled.length > 0 && (
+                      <div className="meetings-section" style={{ marginTop: '12px' }}>
                         <span className="meetings-section-title" style={{ 
                           fontSize: '0.68rem', 
                           color: 'var(--text-muted)', 
@@ -547,9 +706,68 @@ const Topbar = ({ onMenuToggle }) => {
                           display: 'block',
                           marginBottom: '8px'
                         }}>
-                          Upcoming Events
+                          Cancelled / Past
                         </span>
-                        
+                        <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          {categorizedMeetings.pastOrCancelled.map(evt => (
+                            <div 
+                              key={evt._id || evt.id}
+                              className="meeting-item-card transition-all" 
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center',
+                                gap: '12px', 
+                                padding: '10px 12px', 
+                                background: 'rgba(0, 0, 0, 0.1)', 
+                                border: '1px solid rgba(255, 255, 255, 0.03)',
+                                borderRadius: '8px',
+                                opacity: 0.6
+                              }}
+                              onClick={() => {
+                                  setMeetingsOpen(false);
+                                  navigate('/calendar');
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                                <span className="meeting-name" style={{ color: 'var(--text-primary)', fontSize: '0.8rem', textDecoration: evt.status === 'declined' ? 'line-through' : 'none' }}>{evt.title}</span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Clock size={10} /> {evt.date} • {formatTime12h(evt.startTime)}
+                                </span>
+                              </div>
+                              {evt.status === 'declined' && (
+                                <span style={{
+                                  fontSize: '0.58rem',
+                                  fontWeight: 700,
+                                  color: '#ef4444',
+                                  border: '1px solid #ef4444',
+                                  padding: '1px 4px',
+                                  borderRadius: '3px',
+                                  textTransform: 'uppercase',
+                                  flexShrink: 0
+                                }}>
+                                  Cancelled
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 4. Other Events */}
+                    {upcomingOthers.length > 0 && (
+                      <div className="meetings-section" style={{ marginTop: '12px' }}>
+                        <span className="meetings-section-title" style={{ 
+                          fontSize: '0.68rem', 
+                          color: 'var(--text-muted)', 
+                          fontWeight: 700, 
+                          textTransform: 'uppercase', 
+                          letterSpacing: '0.08em',
+                          display: 'block',
+                          marginBottom: '8px'
+                        }}>
+                          Other Events
+                        </span>
                         <div className="meeting-items" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           {upcomingOthers.map(evt => (
                             <div 
@@ -570,18 +788,6 @@ const Topbar = ({ onMenuToggle }) => {
                               onClick={() => {
                                 setMeetingsOpen(false);
                                 navigate('/calendar');
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                e.currentTarget.style.background = (evt.color || '#10b981') + '0a';
-                                e.currentTarget.style.borderColor = (evt.color || '#10b981') + '30';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'none';
-                                e.currentTarget.style.background = (evt.color || '#10b981') + '04';
-                                e.currentTarget.style.borderColor = (evt.color || '#10b981') + '14';
-
-                                
                               }}
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', width: '100%' }}>

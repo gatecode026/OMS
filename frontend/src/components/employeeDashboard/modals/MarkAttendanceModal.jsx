@@ -155,49 +155,31 @@ const MarkAttendanceModal = ({
         <div className="flex-column gap-2">
           <label className="attendance-field-label">Select Action</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <label className={`attendance-action-card ${action === 'in' ? 'active' : ''}`}>
+            <label className={`attendance-action-card ${action === 'in' ? 'active' : ''} ${todayRecord.punchIn ? 'disabled' : ''}`}>
               <input
                 type="radio"
                 name="punchAction"
                 value="in"
                 checked={action === 'in'}
                 onChange={() => setAction('in')}
+                disabled={!!todayRecord.punchIn}
                 className="attendance-radio-input"
+                style={todayRecord.punchIn ? { cursor: 'not-allowed' } : { cursor: 'pointer' }}
               />
               <span className="attendance-action-label">Punch In</span>
             </label>
-            <label className={`attendance-action-card ${action === 'out' ? 'active' : ''}`}>
+            <label className={`attendance-action-card ${action === 'out' ? 'active' : ''} ${(!todayRecord.punchIn || todayRecord.punchOut) ? 'disabled' : ''}`}>
               <input
                 type="radio"
                 name="punchAction"
                 value="out"
                 checked={action === 'out'}
                 onChange={() => setAction('out')}
+                disabled={!todayRecord.punchIn || !!todayRecord.punchOut}
                 className="attendance-radio-input"
+                style={(!todayRecord.punchIn || todayRecord.punchOut) ? { cursor: 'not-allowed' } : { cursor: 'pointer' }}
               />
               <span className="attendance-action-label">Punch Out</span>
-            </label>
-            <label className={`attendance-action-card ${action === 'break_start' ? 'active' : ''}`}>
-              <input
-                type="radio"
-                name="punchAction"
-                value="break_start"
-                checked={action === 'break_start'}
-                onChange={() => setAction('break_start')}
-                className="attendance-radio-input"
-              />
-              <span className="attendance-action-label">Break Start</span>
-            </label>
-            <label className={`attendance-action-card ${action === 'break_end' ? 'active' : ''}`}>
-              <input
-                type="radio"
-                name="punchAction"
-                value="break_end"
-                checked={action === 'break_end'}
-                onChange={() => setAction('break_end')}
-                className="attendance-radio-input"
-              />
-              <span className="attendance-action-label">Break End</span>
             </label>
           </div>
         </div>
@@ -240,7 +222,14 @@ const MarkAttendanceModal = ({
           </button>
           <button
             type="submit"
-            className="attendance-btn-submit"
+            disabled={!!todayRecord.punchIn && !!todayRecord.punchOut}
+            className={`attendance-btn-submit ${(todayRecord.punchIn && todayRecord.punchOut) ? 'disabled' : ''}`}
+            style={(todayRecord.punchIn && todayRecord.punchOut) ? {
+              opacity: 0.5,
+              cursor: 'not-allowed',
+              backgroundColor: 'var(--text-muted)',
+              boxShadow: 'none'
+            } : {}}
           >
             Submit
           </button>

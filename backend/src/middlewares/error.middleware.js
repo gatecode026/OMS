@@ -4,6 +4,7 @@
  */
 
 import logger from '../config/logger.js';
+import fs from 'fs';
 
 export const errorMiddleware = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
@@ -15,6 +16,13 @@ export const errorMiddleware = (err, req, res, next) => {
     url: req.originalUrl,
     method: req.method,
   });
+
+  try {
+    const logMsg = `\n[${new Date().toISOString()}] ${req.method} ${req.originalUrl}\nError: ${err.message}\nStack: ${err.stack}\nBody: ${JSON.stringify(req.body)}\n`;
+    fs.appendFileSync('c:/Users/Shubh/Desktop/OMS/backend/error_trace.log', logMsg);
+  } catch (logErr) {
+    logger.error('Failed to write error to trace log: ' + logErr.message);
+  }
 
   // Development VS Production responses
   if (process.env.NODE_ENV === 'development') {

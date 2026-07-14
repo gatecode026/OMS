@@ -8,6 +8,7 @@ import logger from '../../config/logger.js';
 import { createNotification } from '../notifications/notifications.service.js';
 import { getTenantConnection } from '../../utils/multidbConnection.js';
 import { runWithTenant } from '../../utils/tenantContext.js';
+import { emitEntitySync } from '../../services/sync.service.js';
 
 const notifyAdminsAndManagers = async (companyId, title, message, data = {}) => {
   try {
@@ -60,6 +61,14 @@ export const createRecord = async (data, currentUser) => {
     const title = 'Employee Punched In';
     const message = `${record.employeeName} (${record.department}) punched in at ${record.punchIn} on ${record.date} (${record.workMode || 'Office'}).${record.notes ? ' Notes: ' + record.notes : ''}`;
     await notifyAdminsAndManagers(currentUser.companyId, title, message, { attendanceId: record.id });
+    
+    if (currentUser?.companyId) {
+      emitEntitySync(currentUser.companyId, {
+        module: 'attendance',
+        action: 'create',
+        data: record
+      });
+    }
   }
   return record;
 };
@@ -71,13 +80,29 @@ export const updateRecord = async (id, data, currentUser) => {
     const title = 'Employee Punched Out';
     const message = `${record.employeeName} (${record.department}) punched out at ${record.punchOut} on ${record.date}. Total Hours: ${record.totalHours} hrs.${record.notes ? ' Notes: ' + record.notes : ''}`;
     await notifyAdminsAndManagers(currentUser.companyId, title, message, { attendanceId: record.id });
+    
+    if (currentUser?.companyId) {
+      emitEntitySync(currentUser.companyId, {
+        module: 'attendance',
+        action: 'update',
+        data: record
+      });
+    }
   }
   return record;
 };
 
 export const deleteRecord = async (id, currentUser) => {
   logger.info('Executing AttendanceService::deleteRecord for: ' + id + ' by user: ' + currentUser?.id);
-  return repository.remove(id);
+  const record = await repository.remove(id);
+  if (record && currentUser?.companyId) {
+    emitEntitySync(currentUser.companyId, {
+      module: 'attendance',
+      action: 'delete',
+      data: id
+    });
+  }
+  return record;
 };
 
 export const findToday = async (employeeId) => {
@@ -209,6 +234,154 @@ export const qrPunch = async (employeeId, companyId) => {
   });
 };
 
+export const findMonthlyPayrollSummary = async (companyId, monthYear) => {
+  logger.info(`Executing AttendanceService::findMonthlyPayrollSummary for company: ${companyId}, month: ${monthYear}`);
+  const [year, month] = monthYear.split('-');
+  const monthInt = parseInt(month, 10);
+  const yearInt = parseInt(year, 10);
+
+  const conn = await getTenantConnection(companyId);
+  if (conn.asPromise) {
+    await conn.asPromise();
+  }
+  const totalDaysInMonth = new Date(yearInt, monthInt, 0).getDate();
+
+  const holidays = await conn.collection('holidays').find({
+    date: { $regex: new RegExp(`^${year}-${month}`) }
+  }).toArray();
+  const holidayDates = new Set(holidays.map(h => h.date));
+
+  const settings = await conn.collection('system_settings').findOne({ key: 'global' });
+  const weekendPolicy = settings?.payrollRules?.weekendPolicy || 'Saturday & Sunday';
+
+  const employees = await conn.collection('employees').find({ status: 'Active' }).toArray();
+
+  const attendanceRecords = await conn.collection('attendance').find({
+    date: { $regex: new RegExp(`^${year}-${month}`) }
+  }).toArray();
+
+  const leaves = await conn.collection('leaves').find({
+    status: 'Approved',
+    isPolicy: { $ne: true },
+    $or: [
+      { fromDate: { $regex: new RegExp(`^${year}-${month}`) } },
+      { toDate: { $regex: new RegExp(`^${year}-${month}`) } }
+    ]
+  }).toArray();
+
+  const getDatesInRange = (from, to) => {
+    const dates = [];
+    let start = new Date(from);
+    const end = new Date(to || from);
+    while (start <= end) {
+      dates.push(start.toISOString().split('T')[0]);
+      start.setDate(start.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const getIsWeekend = (dateObj, policy) => {
+    const day = dateObj.getDay();
+    if (policy === 'Sunday Only') {
+      return day === 0;
+    }
+    if (policy === 'Saturday & Sunday') {
+      return day === 0 || day === 6;
+    }
+    return false;
+  };
+
+  const payrollSummary = {};
+
+  for (const emp of employees) {
+    const empId = emp.id;
+    const empAttendance = attendanceRecords.filter(r => r.employeeId === empId);
+    const empLeaves = leaves.filter(l => l.employeeId === empId);
+
+    const leaveDayMap = {};
+    for (const leave of empLeaves) {
+      const dates = getDatesInRange(leave.fromDate, leave.toDate);
+      const unpaidCount = leave.unpaidDays || 0;
+      const paidCount = Math.max(0, leave.days - unpaidCount);
+      dates.forEach((d, idx) => {
+        if (d.startsWith(`${year}-${month}`)) {
+          if (idx < paidCount) {
+            leaveDayMap[d] = 'Paid';
+          } else {
+            leaveDayMap[d] = 'Unpaid';
+          }
+        }
+      });
+    }
+
+    let presentDays = 0;
+    let halfDays = 0;
+    let paidLeaveDays = 0;
+    let unpaidLeaveDays = 0;
+    let holidaysCount = 0;
+    let weekendsCount = 0;
+
+    for (let day = 1; day <= totalDaysInMonth; day++) {
+      const dayStr = String(day).padStart(2, '0');
+      const dateStr = `${year}-${month}-${dayStr}`;
+      const dateObj = new Date(yearInt, monthInt - 1, day);
+
+      const isWeekend = getIsWeekend(dateObj, weekendPolicy);
+      const isHoliday = holidayDates.has(dateStr);
+
+      if (isWeekend) {
+        weekendsCount += 1;
+        continue;
+      }
+      if (isHoliday) {
+        holidaysCount += 1;
+        continue;
+      }
+
+      const record = empAttendance.find(r => r.date === dateStr);
+      if (record) {
+        const status = record.status;
+        if (['Present', 'Late', 'Work From Home', 'WFH', 'Overtime'].includes(status)) {
+          presentDays += 1;
+        } else if (['Half Day', 'Half-Day'].includes(status)) {
+          halfDays += 1;
+        } else if (['On Leave', 'Leave'].includes(status)) {
+          if (leaveDayMap[dateStr] === 'Paid') {
+            paidLeaveDays += 1;
+          } else if (leaveDayMap[dateStr] === 'Unpaid') {
+            unpaidLeaveDays += 1;
+          } else {
+            paidLeaveDays += 1;
+          }
+        } else if (status === 'Absent') {
+          unpaidLeaveDays += 1;
+        }
+      } else {
+        if (leaveDayMap[dateStr] === 'Paid') {
+          paidLeaveDays += 1;
+        } else if (leaveDayMap[dateStr] === 'Unpaid') {
+          unpaidLeaveDays += 1;
+        } else {
+          unpaidLeaveDays += 1;
+        }
+      }
+    }
+
+    payrollSummary[empId] = {
+      employeeId: empId,
+      employeeName: emp.name,
+      presentDays,
+      halfDays,
+      paidLeaveDays,
+      unpaidLeaveDays,
+      holidays: holidaysCount,
+      weekends: weekendsCount
+    };
+  }
+
+  return payrollSummary;
+};
+
 export default {
   findAll,
   findById,
@@ -217,5 +390,6 @@ export default {
   deleteRecord,
   findToday,
   findSummary,
-  qrPunch
+  qrPunch,
+  findMonthlyPayrollSummary
 };

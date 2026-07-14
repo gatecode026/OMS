@@ -107,7 +107,14 @@ export const validateDepartmentScope = (context, resource, deptField = 'departme
  */
 export const validateOwnership = (context, resource, ownerIdFields = ['id', 'userId', 'employeeId'], moduleName = 'unknown', operation = 'read') => {
   if (context.isSuperAdmin || context.isCompanyAdmin) return true;
-  if (['Chat', 'Conversation', 'Message', 'Call'].includes(moduleName)) return true;
+  if (['Chat', 'Conversation', 'Message', 'Call', 'Thread', 'Poll'].includes(moduleName)) return true;
+  if (moduleName === 'Projects') return true;
+  if (moduleName === 'Tasks' && resource && (resource.tasks !== undefined || (resource.constructor && resource.constructor.modelName === 'Project'))) return true;
+
+  // Allow Team Leaders to manage tasks assigned to their team members
+  if (context.isTeamLeader && moduleName === 'Tasks' && context.teamEmployeeIds && context.teamEmployeeIds.includes(resource.assigneeId)) {
+    return true;
+  }
 
   // For employee and team_leader roles, enforce strict ownership matching
   if (context.isEmployee || context.isTeamLeader) {
@@ -120,7 +127,7 @@ export const validateOwnership = (context, resource, ownerIdFields = ['id', 'use
     }
     if (!hasMatch) {
       logSecurityEvent(context, moduleName, operation, SecurityEventTypes.OWNERSHIP_DENIED, 'DENIED', 'Access Denied: Ownership verification failed', resource.id);
-      const err = new Error("Access denied: You are not authorized to update or delete another employee's record.");
+      const err = new Error(`Access denied: You are not authorized to update or delete another employee's record. [Debug: moduleName="${moduleName}", operation="${operation}", resourceId="${resource?.id}", role="${context?.role}"]`);
       err.statusCode = 403;
       throw err;
     }
@@ -149,14 +156,25 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
   } = options;
 
   // Delegate project task updates to 'Tasks' module check if appropriate
+  // tasksTotal is included because addTask sends { tasks, tasksTotal, progress } when creating a task
   if (moduleName === 'Projects' && operation === 'update' && updatePayload) {
     const isTaskOnlyUpdate = Object.keys(updatePayload).every(key =>
-      ['tasks', 'tasksDone', 'progress', 'status'].includes(key)
+      ['tasks', 'tasksDone', 'tasksTotal', 'progress', 'status'].includes(key)
     );
     if (isTaskOnlyUpdate) {
-      const hasTaskUpdatePerm = await checkActionPermission('Tasks', context.role, 'update');
-      if (hasTaskUpdatePerm) {
+      // Determine whether this is a task creation or task update:
+      // If the payload contains 'tasks' and 'tasksTotal', it's likely a task being added (create)
+      const isTaskCreate = updatePayload.tasksTotal !== undefined && updatePayload.tasks !== undefined;
+      const taskAction = isTaskCreate ? 'create' : 'update';
+      const hasTaskPerm = await checkActionPermission('Tasks', context.role, taskAction);
+      if (hasTaskPerm) {
         moduleName = 'Tasks';
+      } else {
+        // Fallback: check update permission as well
+        const hasTaskUpdatePerm = await checkActionPermission('Tasks', context.role, 'update');
+        if (hasTaskUpdatePerm) {
+          moduleName = 'Tasks';
+        }
       }
     }
   }
@@ -172,10 +190,22 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
 
   // 2. Validate Field Level Constraints on Updates
   if (operation === 'update' && updatePayload) {
+    try {
+      const fs = await import('fs');
+      const logMsg = `[${new Date().toISOString()}] moduleName: ${moduleName}, role: ${context.role}, updatePayload: ${JSON.stringify(updatePayload)}\n`;
+      fs.appendFileSync('security_debug.log', logMsg);
+      const restrictedFields = getRestrictedFields(moduleName, context.role);
+      fs.appendFileSync('security_debug.log', `[${new Date().toISOString()}] restrictedFields: ${JSON.stringify(restrictedFields)}\n`);
+    } catch (e) {
+      console.error('Failed to write security debug log:', e);
+    }
     const restrictedFields = getRestrictedFields(moduleName, context.role);
     for (const field of restrictedFields) {
       if (updatePayload[field] !== undefined && String(updatePayload[field] ?? '') !== String(resource[field] ?? '')) {
         if (moduleName === 'Attendance' && field === 'status' && updatePayload.punchOut !== undefined) {
+          continue;
+        }
+        if (moduleName === 'Leave' && field === 'status' && updatePayload[field] === 'Cancelled') {
           continue;
         }
         logSecurityEvent(context, moduleName, operation, SecurityEventTypes.FIELD_ACCESS_DENIED, 'DENIED', `Modification of protected field "${field}" blocked`, resource.id);

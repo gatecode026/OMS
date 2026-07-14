@@ -133,6 +133,13 @@ export const createNotification = async (userId, companyId, { type, title, messa
     try {
       const NotificationModel = await getNotificationModel(companyId);
 
+      // Suppress notifications for inactive employees
+      const employee = await Employee.findOne({ id: userId }).select('accountStatus status').lean();
+      if (employee && (employee.accountStatus === 'Inactive' || employee.status === 'Inactive')) {
+        logger.debug(`[Notification] Suppressed notification for inactive user ${userId}`);
+        return null;
+      }
+
       // Check user preferences (Redis-cached)
       const prefs = await getUserPreferences(userId);
       if (!isAllowedByPrefs(prefs, type)) {
@@ -142,6 +149,50 @@ export const createNotification = async (userId, companyId, { type, title, messa
 
       const effectivePriority = priority || (HIGH_PRIORITY_TYPES.has(type) ? 'high' : 'normal');
       const category = deriveCategory(type);
+
+      // ── DUPLICATE PREVENTION ───────────────────────────────────────────────
+      // Uniquely identify by: Recipient User (userId) + Type (type) + Entity ID + Action
+      const entityId = data.taskId || data.meetingId || data.leaveId || data.conversationId || data.entityId || data.correctionId || data.id || '';
+      const action = data.action || type || '';
+
+      if (entityId) {
+        const query = {
+          userId,
+          companyId,
+          type,
+          $or: [
+            { 'data.taskId': entityId },
+            { 'data.meetingId': entityId },
+            { 'data.leaveId': entityId },
+            { 'data.conversationId': entityId },
+            { 'data.entityId': entityId },
+            { 'data.correctionId': entityId }
+          ]
+        };
+        if (action) {
+          query['data.action'] = action;
+        }
+
+        const existing = await NotificationModel.findOne(query).lean();
+        if (existing) {
+          logger.info(`[Notification Engine] Suppressed duplicate notification for user ${userId}, entity ${entityId}, action ${action}`);
+          return existing;
+        }
+      }
+
+      // Short 5-second debounce check on Title + Message + Recipient to prevent fast retries
+      const sameRecent = await NotificationModel.findOne({
+        userId,
+        companyId,
+        type,
+        title,
+        message,
+        createdAt: { $gte: new Date(Date.now() - 5000) }
+      }).lean();
+      if (sameRecent) {
+        logger.info(`[Notification Engine] Suppressed identical notification within 5s window for user ${userId}`);
+        return sameRecent;
+      }
 
       // 1. Persist to MongoDB
       const notifDoc = await NotificationModel.create({
@@ -190,8 +241,12 @@ export const createNotification = async (userId, companyId, { type, title, messa
       try {
         const io = getIO();
         io.to(`user:${userId}`).emit('notification:new', payload);
+
+        // Push updated unread count to sync counts immediately
+        const newCount = await getUnreadCount(userId, companyId);
+        io.to(`user:${userId}`).emit('notification:unread_count', { count: newCount });
       } catch (ioErr) {
-        logger.debug(`[Notification] Socket.IO unavailable: ${ioErr.message}`);
+        logger.debug(`[Notification] Socket.IO unread count emit failed: ${ioErr.message}`);
       }
 
       logger.debug(`[Notification] Created ${type} notification for user ${userId}`);
@@ -323,28 +378,10 @@ export const getUnreadCount = async (userId, companyId) => {
   return runWithTenant(companyId, async () => {
     const NotificationModel = await getNotificationModel(companyId);
     const count = await NotificationModel.countDocuments({
-      $and: [
-        {
-          $or: [
-            { userId },
-            { recipientId: userId },
-            { forUserId: userId },
-            { targetUserId: userId },
-            { 
-              $and: [
-                { userId: { $in: [null, ""] } },
-                { recipientId: { $in: [null, ""] } },
-                { forUserId: { $in: [null, ""] } }
-              ]
-            }
-          ]
-        },
-        {
-          $or: [
-            { isRead: false },
-            { read: false }
-          ]
-        }
+      userId,
+      $or: [
+        { isRead: false },
+        { read: false }
       ]
     });
 
@@ -422,34 +459,14 @@ export const getNotifications = async (userId, companyId, page = 1, limit = 20, 
   return runWithTenant(companyId, async () => {
     const NotificationModel = await getNotificationModel(companyId);
 
-    const query = {
-      $and: [
-        {
-          $or: [
-            { userId },
-            { recipientId: userId },
-            { forUserId: userId },
-            { targetUserId: userId },
-            { 
-              $and: [
-                { userId: { $in: [null, ""] } },
-                { recipientId: { $in: [null, ""] } },
-                { forUserId: { $in: [null, ""] } }
-              ]
-            }
-          ]
-        }
-      ]
-    };
+    const query = { userId };
 
     if (categoryFilter && categoryFilter !== 'all') {
       // Support both category field and type field for backwards compatibility
-      query.$and.push({
-        $or: [
-          { category: categoryFilter },
-          { type: categoryFilter },
-        ]
-      });
+      query.$or = [
+        { category: categoryFilter },
+        { type: categoryFilter },
+      ];
     }
 
     const skip = (page - 1) * limit;
@@ -487,19 +504,14 @@ export const markAsRead = async (id, userId, companyId) => {
 
     const doc = await NotificationModel.findOneAndUpdate(
       { 
-        _id: id,
-        $or: [
-          { userId },
-          { recipientId: userId },
-          { forUserId: userId },
-          { targetUserId: userId },
-          { 
-            $and: [
-              { userId: { $in: [null, ""] } },
-              { recipientId: { $in: [null, ""] } },
-              { forUserId: { $in: [null, ""] } }
-            ]
-          }
+        $and: [
+          {
+            $or: [
+              { _id: mongoose.isValidObjectId(id) ? id : undefined },
+              { id: id }
+            ].filter(Boolean)
+          },
+          { userId }
         ]
       },
       { $set: { isRead: true, read: true } },
@@ -530,28 +542,10 @@ export const markAllAsRead = async (userId, companyId) => {
     const NotificationModel = await getNotificationModel(companyId);
 
     const query = {
-      $and: [
-        {
-          $or: [
-            { userId },
-            { recipientId: userId },
-            { forUserId: userId },
-            { targetUserId: userId },
-            { 
-              $and: [
-                { userId: { $in: [null, ""] } },
-                { recipientId: { $in: [null, ""] } },
-                { forUserId: { $in: [null, ""] } }
-              ]
-            }
-          ]
-        },
-        {
-          $or: [
-            { isRead: false },
-            { read: false }
-          ]
-        }
+      userId,
+      $or: [
+        { isRead: false },
+        { read: false }
       ]
     };
 
@@ -571,7 +565,17 @@ export const markAllAsRead = async (userId, companyId) => {
 export const deleteNotification = async (id, userId, companyId) => {
   return runWithTenant(companyId, async () => {
     const NotificationModel = await getNotificationModel(companyId);
-    const doc = await NotificationModel.findOneAndDelete({ _id: id, userId });
+    const doc = await NotificationModel.findOneAndDelete({
+      $and: [
+        {
+          $or: [
+            { _id: mongoose.isValidObjectId(id) ? id : undefined },
+            { id: id }
+          ].filter(Boolean)
+        },
+        { userId }
+      ]
+    });
     return doc;
   });
 };

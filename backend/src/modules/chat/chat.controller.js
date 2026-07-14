@@ -507,10 +507,11 @@ export const rejectCall = asyncHandler(async (req, res) => {
 // GET /api/v1/chat/imagekit/auth
 export const getImageKitAuth = asyncHandler(async (req, res) => {
   const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
-  if (!privateKey) {
+  const publicKey = process.env.IMAGEKIT_PUBLIC_KEY;
+  if (!privateKey || !publicKey) {
     return res.status(500).json({
       status: 'error',
-      message: 'ImageKit private key is not configured on the server'
+      message: 'ImageKit credentials (public/private keys) are not fully configured on the server'
     });
   }
 
@@ -527,7 +528,7 @@ export const getImageKitAuth = asyncHandler(async (req, res) => {
     token,
     expire,
     signature,
-    publicKey: process.env.IMAGEKIT_PUBLIC_KEY || 'public_CpBAKCTW3cCxoXfv'
+    publicKey
   }, 'ImageKit authentication parameters generated successfully');
 });
 

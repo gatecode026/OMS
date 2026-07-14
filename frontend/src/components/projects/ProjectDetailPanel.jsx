@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import styles from '../../styles/projects.module.css';
 import {
-  X, Briefcase, Calendar, Users, CheckSquare,
+  X, Briefcase, Calendar, Users, CheckSquare, Square,
   FileText, Download, TrendingUp, Clock, AlertTriangle, File
 } from 'lucide-react';
 import Avatar from '../common/Avatar';
@@ -60,7 +61,7 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
 
   const isTransitioningIn = animateState === 'opening' || animateState === 'open';
 
-  return (
+  return createPortal(
     <div className={`${styles.backdrop} ${isTransitioningIn ? styles.isOpen : ''}`} onClick={handleBackdropClick}>
       <div className={`${styles.slideOver} ${isTransitioningIn ? styles.isOpen : ''}`} ref={panelRef}>
         {/* Header */}
@@ -215,12 +216,11 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
                       key={task.id}
                       className={`${styles.taskItem} ${task.overdue && !task.completed ? styles.taskOverdue : ''}`}
                     >
-                      <input
-                        type="checkbox"
-                        className={styles.taskCheckbox}
-                        checked={task.completed}
-                        onChange={() => onToggleTask(project.id, task.id)}
-                      />
+                      {task.completed ? (
+                        <CheckSquare size={16} style={{ color: 'var(--color-success)', marginTop: '2.5px', flexShrink: 0 }} />
+                      ) : (
+                        <Square size={16} style={{ color: 'var(--text-muted)', marginTop: '2.5px', flexShrink: 0 }} />
+                      )}
                       <div className={styles.taskItemText}>
                         <span className={`${styles.taskTitle} ${task.completed ? styles.completed : ''}`}>
                           {task.title}
@@ -348,7 +348,8 @@ const ProjectDetailPanel = ({ project, isOpen, onClose, onToggleTask }) => {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

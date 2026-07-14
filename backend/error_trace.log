@@ -1,0 +1,298 @@
+
+[2026-07-13T11:54:37.699Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:39.260Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:39.454Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:39.615Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:39.789Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:46.781Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:47.713Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:47.885Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:48.063Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:48.298Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:25.904Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:28.118Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:29.364Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:29.593Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:29.970Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:30.193Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:30.334Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:30.550Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:30.777Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:31.485Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:31.655Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T05:54:01.219Z] POST /api/v1/payroll-queries/GATECO-PAYR-002/action
+Error: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+Stack: ValidationError: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"Waiting for Employee","comments":"HR requested more evidence&#x2F;details from employee"}
+
+[2026-07-14T05:56:32.026Z] POST /api/v1/payroll-queries/GATECO-PAYR-002/action
+Error: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+Stack: ValidationError: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"Waiting for Employee","comments":"HR requested more evidence&#x2F;details from employee"}
+
+[2026-07-14T05:56:36.927Z] POST /api/v1/payroll-queries/GATECO-PAYR-002/action
+Error: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+Stack: ValidationError: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"Waiting for Employee","comments":"HR requested more evidence&#x2F;details from employee"}
+
+[2026-07-14T06:12:55.868Z] POST /api/v1/payroll-queries/recalculate/GATECO-EMP-012-June-2026
+Error: PayrollPayment validation failed: department: Path `department` is required., regime: `-` is not a valid enum value for path `regime`.
+Stack: ValidationError: PayrollPayment validation failed: department: Path `department` is required., regime: `-` is not a valid enum value for path `regime`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"adjust_next"}
+
+[2026-07-14T06:16:00.972Z] POST /api/v1/payroll-queries/recalculate/GATECO-EMP-012-June-2026
+Error: PayrollPayment validation failed: department: Path `department` is required., regime: `-` is not a valid enum value for path `regime`.
+Stack: ValidationError: PayrollPayment validation failed: department: Path `department` is required., regime: `-` is not a valid enum value for path `regime`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"apply_current"}
+
+[2026-07-14T06:36:10.294Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:182:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":25000,"hra":10000,"pf":3000,"tds":2500}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:36:28.077Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:182:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":15000,"hra":6000,"pf":1800,"tds":1500}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:38:14.567Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":15000,"hra":6000,"pf":1800,"tds":1500}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:38:58.944Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":15000,"hra":6000,"pf":1800,"tds":1500}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:43:51.232Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-012":{"basic":32000,"hra":12800,"pf":3840,"tds":3200}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:44:54.690Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-012":{"basic":32000,"hra":12800,"pf":3840,"tds":3200}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:50:34.420Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":15000,"hra":6000,"pf":1800,"tds":1500}},"attendanceDaysMap":{}}
+
+[2026-07-14T08:19:41.428Z] POST /api/v1/auth/login
+Error: Invalid email or password
+Stack: Error: Invalid email or password
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:151:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:26:16
+Body: {"email":"aniemsh@gmail.com","password":"password"}

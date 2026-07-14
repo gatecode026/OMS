@@ -106,7 +106,15 @@ const SystemSettingsSchema = new mongoose.Schema({
       esiPct: 0.75,
       tdsFlat: 0,
       overtimeMultiplier: 1.5,
-      holidayMultiplier: 2.0
+      holidayMultiplier: 2.0,
+      payrollWorkingDays: 30,
+      salaryCalculationMethod: 'Fixed 30 Days',
+      dailySalaryFormula: 'Monthly Salary / Payroll Working Days',
+      weekendPolicy: 'Saturday & Sunday',
+      holidayPolicy: 'Paid',
+      halfDayPolicy: 'Deduct Half Day',
+      lopFormula: 'Daily Salary * Unpaid Days',
+      graceRules: 'Late Penalty Flat'
     }
   },
   projectRules: {

@@ -87,6 +87,15 @@ const leaveSchema = new mongoose.Schema({
     status: { type: String },
     comment: { type: String }
   }],
+  leaveClass: {
+    type: String,
+    enum: ['Paid', 'Unpaid', 'Mixed'],
+    default: 'Paid'
+  },
+  unpaidDays: {
+    type: Number,
+    default: 0
+  },
 
   // Policy fields (only required if isPolicy is true)
   leaveCode: {

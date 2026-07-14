@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE, getBaseRole } from '../permissions/permissions';
 import { connectSocket, disconnectSocket, getSocket } from '../lib/socketManager';
 
@@ -6,14 +6,21 @@ const AppContext = createContext(undefined);
 
 const unescapeHtml = (str) => {
   if (!str || typeof str !== 'string') return str;
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/');
+  let curr = str;
+  for (let i = 0; i < 10; i++) {
+    const next = curr
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&#x2F;/g, '/');
+    if (next === curr) break;
+    curr = next;
+  }
+  return curr;
 };
+
 
 export const normalizeDepartment = (dept) => {
   if (!dept) return dept;
@@ -182,7 +189,8 @@ export const normalizeEmployee = (emp) => {
   normalized.mfaEnabled = normalized.mfaEnabled || { email: false, mobile: false, authenticator: false };
 
   // General fields
-  normalized.photoUrl = normalized.photoUrl || normalized.avatar || null;
+  normalized.avatar = unescapeHtml(normalized.avatar || null);
+  normalized.photoUrl = unescapeHtml(normalized.photoUrl || normalized.avatar || null);
   normalized.dob = normalized.dob || '';
   normalized.maritalStatus = normalized.maritalStatus || '';
   normalized.bloodGroup = normalized.bloodGroup || '';
@@ -196,7 +204,73 @@ export const normalizeEmployee = (emp) => {
   return normalized;
 };
 
+export const normalizeProject = (proj) => {
+  if (!proj) return proj;
+  const unescape = unescapeHtml;
+  return {
+    ...proj,
+    name: unescape(proj.name),
+    description: unescape(proj.description),
+    manager: unescape(proj.manager),
+    leader: unescape(proj.leader),
+    department: unescape(proj.department),
+    branch: unescape(proj.branch),
+    members: Array.isArray(proj.members) ? proj.members.map(m => unescape(m)) : proj.members,
+    documents: Array.isArray(proj.documents) ? proj.documents.map(doc => {
+      if (!doc) return doc;
+      return {
+        ...doc,
+        name: unescape(doc.name),
+        downloadUrl: unescape(doc.downloadUrl)
+      };
+    }) : proj.documents,
+    tasks: Array.isArray(proj.tasks) ? proj.tasks.map(t => {
+      if (!t) return t;
+      return {
+        ...t,
+        title: unescape(t.title),
+        description: unescape(t.description),
+        assigneeName: unescape(t.assigneeName),
+        assignedTo: Array.isArray(t.assignedTo) ? t.assignedTo.map(a => unescape(a)) : t.assignedTo,
+        comments: Array.isArray(t.comments) ? t.comments.map(c => {
+          if (!c) return c;
+          return {
+            ...c,
+            userName: unescape(c.userName),
+            comment: unescape(c.comment)
+          };
+        }) : t.comments,
+        attachments: Array.isArray(t.attachments) ? t.attachments.map(att => {
+          if (!att) return att;
+          return {
+            ...att,
+            name: unescape(att.name),
+            url: unescape(att.url)
+          };
+        }) : t.attachments,
+        activityLog: Array.isArray(t.activityLog) ? t.activityLog.map(act => {
+          if (!act) return act;
+          return {
+            ...act,
+            details: unescape(act.details),
+            userName: unescape(act.userName)
+          };
+        }) : t.activityLog,
+        approvals: Array.isArray(t.approvals) ? t.approvals.map(app => {
+          if (!app) return app;
+          return {
+            ...app,
+            approver: unescape(app.approver),
+            remarks: unescape(app.remarks)
+          };
+        }) : t.approvals
+      };
+    }) : proj.tasks
+  };
+};
+
 export const AppProvider = ({ children }) => {
+  const activeActionsRef = useRef({});
   const [employees, setEmployees] = useState([]);
   const [branches, setBranches] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -207,10 +281,22 @@ export const AppProvider = ({ children }) => {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [leavePolicyConfigs, setLeavePolicyConfigs] = useState([]);
   const [holidaysList, setHolidaysList] = useState([]);
-  const [projectsList, setProjectsList] = useState([]);
+  const [projectsList, setProjectsListRaw] = useState([]);
+  const setProjectsList = useCallback((val) => {
+    setProjectsListRaw(prev => {
+      const nextVal = typeof val === 'function' ? val(prev) : val;
+      if (Array.isArray(nextVal)) {
+        return nextVal.map(normalizeProject);
+      }
+      return nextVal;
+    });
+  }, []);
+
 
   const [payroll, setPayroll] = useState([]);
   const [payrollGrades, setPayrollGrades] = useState([]);
+  const [payrollQueries, setPayrollQueries] = useState([]);
+  const [monthlyPayrollSummary, setMonthlyPayrollSummary] = useState({});
   const [payrollReimbursements, setPayrollReimbursements] = useState([]);
   const [payrollLoans, setPayrollLoans] = useState([]);
   const [payrollAdvances, setPayrollAdvances] = useState([]);
@@ -232,6 +318,7 @@ export const AppProvider = ({ children }) => {
   const [permissionModules, setPermissionModules] = useState([]);
   const [userOverrides, setUserOverrides] = useState([]);
   const [dailyReports, setDailyReports] = useState([]);
+  const [correctionRequests, setCorrectionRequests] = useState([]);
   const [appraisalReviews, setAppraisalReviews] = useState([]);
   const [announcementsList, setAnnouncementsList] = useState([]);
   const [emergencyAlert, setEmergencyAlert] = useState({ isActive: false, title: '', description: '', date: '' });
@@ -501,7 +588,7 @@ export const AppProvider = ({ children }) => {
       const savedUserStr = localStorage.getItem('saas_user');
       if (savedUserStr) {
         try {
-          const savedUser = JSON.parse(savedUserStr);
+          const savedUser = normalizeEmployee(JSON.parse(savedUserStr));
           if (savedUser && savedUser.id === currentUserId && (savedUser.roleId === rawUserRole || savedUser.roleId === currentUserRole || getBaseRole(savedUser.roleId) === currentUserRole)) {
             setCurrentUser(savedUser);
             return;
@@ -516,7 +603,7 @@ export const AppProvider = ({ children }) => {
     let savedSuperAdmin = null;
     if (savedUserStr) {
       try {
-        const u = JSON.parse(savedUserStr);
+        const u = normalizeEmployee(JSON.parse(savedUserStr));
         if (u && u.roleId === 'super_admin') {
           savedSuperAdmin = u;
         }
@@ -643,6 +730,73 @@ export const AppProvider = ({ children }) => {
     }
   }, [token, currentUser]);
 
+  // Keep action references fresh for socket events without triggering re-connection effects
+  useEffect(() => {
+    activeActionsRef.current = {
+      fetchProjects,
+      fetchEmployees,
+      fetchLeaves,
+      fetchAttendance,
+      fetchDailyReports,
+      fetchCorrectionRequests
+    };
+  });
+
+  const playNotificationChime = () => {
+    try {
+      const settingsStr = localStorage.getItem('oms_notification_settings');
+      const settings = settingsStr ? JSON.parse(settingsStr) : { desktop: true, sound: true, preview: true };
+      if (settings.sound === false) return;
+
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration, vol = 0.08) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      playTone(1046.5, ctx.currentTime, 0.12);
+      playTone(1318.51, ctx.currentTime + 0.08, 0.16);
+    } catch (err) {}
+  };
+
+  const showDesktopNotification = (notif) => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    try {
+      const omsSettingsStr = localStorage.getItem('oms_notification_settings');
+      const omsSettings = omsSettingsStr ? JSON.parse(omsSettingsStr) : { desktop: true, sound: true, preview: true };
+      if (omsSettings.desktop === false) return;
+
+      const title = notif.title || 'New Notification';
+      const body = omsSettings.preview !== false ? (notif.message || '') : 'New notification';
+      
+      const notification = new Notification(title, {
+        body: body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
+        tag: notif.id || notif._id,
+        renotify: true
+      });
+
+      notification.onclick = (e) => {
+        e.preventDefault();
+        window.focus();
+        notification.close();
+      };
+    } catch (err) {
+      console.warn('[Desktop Notification] Failed to trigger native alert:', err);
+    }
+  };
+
   // Live socket notification listener to update global notifications & announcements in real time
   useEffect(() => {
     if (!currentUser || !token) return;
@@ -650,9 +804,26 @@ export const AppProvider = ({ children }) => {
     if (!socket) return;
 
     const handleNewNotification = (notif) => {
-      console.log('[AppContext] Live socket notification received, refreshing notifications...');
-      fetchNotifications();
-      if (notif && (notif.type === 'announcement' || notif.type === 'Announcement')) {
+      console.log('[AppContext] Live socket notification received:', notif);
+      if (!notif) return;
+
+      // Update local state list instantly (deduplicated by id)
+      setNotifications(prev => {
+        const id = notif.id || notif._id;
+        if (prev.some(n => (n.id || n._id) === id)) return prev;
+        return [notif, ...prev];
+      });
+
+      // Show in-app Toast
+      addToast('info', `${notif.title}: ${notif.message}`);
+
+      // Play soft sound chime
+      playNotificationChime();
+
+      // Show Native Desktop Notification
+      showDesktopNotification(notif);
+
+      if (notif.type === 'announcement' || notif.type === 'Announcement') {
         console.log('[AppContext] Announcement notification received, refreshing announcements...');
         fetchAnnouncements();
       }
@@ -669,14 +840,225 @@ export const AppProvider = ({ children }) => {
       fetchAnnouncements();
     };
 
+    const handleEntitySync = ({ module, action, data }) => {
+      console.log(`[Sync Engine] Live entity:sync event received: ${module}:${action}`, data);
+      if (!data) return;
+
+      switch (module) {
+        case 'projects':
+          if (action === 'create') {
+            setProjectsList(prev => {
+              if (prev.some(p => p.id === data.id || p._id === data._id)) return prev;
+              const next = [data, ...prev];
+              localStorage.setItem('swr_projects', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'update') {
+            setProjectsList(prev => {
+              const next = prev.map(p => (p.id === data.id || p._id === data._id) ? { ...p, ...data } : p);
+              localStorage.setItem('swr_projects', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setProjectsList(prev => {
+              const next = prev.filter(p => p.id !== id && p._id !== id);
+              localStorage.setItem('swr_projects', JSON.stringify(next));
+              return next;
+            });
+          }
+          break;
+
+        case 'leaves':
+          if (action === 'create') {
+            setLeaveRequests(prev => {
+              if (prev.some(l => l.id === data.id || l._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setLeaveRequests(prev => prev.map(l => (l.id === data.id || l._id === data._id) ? { ...l, ...data } : l));
+            if (data.status === 'Approved' || data.status === 'Cancelled' || data.status === 'Rejected') {
+              const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+              const yearStr = String(new Date().getFullYear());
+              fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+              fetchPayrollData();
+            }
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setLeaveRequests(prev => prev.filter(l => l.id !== id && l._id !== id));
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
+          }
+          break;
+
+        case 'attendance':
+          if (action === 'create') {
+            setAttendance(prev => {
+              if (prev.some(a => a.id === data.id || a._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
+          } else if (action === 'update') {
+            setAttendance(prev => prev.map(a => (a.id === data.id || a._id === data._id) ? { ...a, ...data } : a));
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
+          }
+          break;
+
+        case 'payroll-queries':
+          if (action === 'create') {
+            setPayrollQueries(prev => {
+              if (prev.some(q => q.id === data.id || q._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setPayrollQueries(prev => prev.map(q => (q.id === data.id || q._id === data._id) ? data : q));
+          }
+          break;
+
+        case 'employees':
+          if (action === 'create') {
+            setEmployees(prev => {
+              if (prev.some(e => e.id === data.id || e._id === data._id)) return prev;
+              const next = [data, ...prev];
+              localStorage.setItem('swr_employees', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'update') {
+            setEmployees(prev => {
+              const next = prev.map(e => (e.id === data.id || e._id === data._id) ? { ...e, ...data } : e);
+              localStorage.setItem('swr_employees', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'deactivate') {
+            setEmployees(prev => {
+              const next = prev.map(e => (e.id === data || e._id === data) ? { ...e, accountStatus: 'Inactive', status: 'Inactive' } : e);
+              localStorage.setItem('swr_employees', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'restore') {
+            setEmployees(prev => {
+              const next = prev.map(e => (e.id === data.id || e._id === data._id) ? data : e);
+              localStorage.setItem('swr_employees', JSON.stringify(next));
+              return next;
+            });
+          }
+          break;
+
+        case 'departments':
+          if (action === 'create') {
+            setDepartments(prev => {
+              if (prev.some(d => d.id === data.id || d._id === data._id)) return prev;
+              const next = [data, ...prev];
+              localStorage.setItem('swr_departments', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'update') {
+            setDepartments(prev => {
+              const next = prev.map(d => (d.id === data.id || d._id === data._id) ? { ...d, ...data } : d);
+              localStorage.setItem('swr_departments', JSON.stringify(next));
+              return next;
+            });
+          }
+          break;
+
+        case 'teams':
+          if (action === 'create') {
+            setTeams(prev => {
+              if (prev.some(t => t.id === data.id || t._id === data._id)) return prev;
+              const next = [data, ...prev];
+              localStorage.setItem('swr_teams', JSON.stringify(next));
+              return next;
+            });
+          } else if (action === 'update') {
+            setTeams(prev => {
+              const next = prev.map(t => (t.id === data.id || t._id === data._id) ? { ...t, ...data } : t);
+              localStorage.setItem('swr_teams', JSON.stringify(next));
+              return next;
+            });
+          }
+          break;
+
+        case 'activityLogs':
+          if (action === 'create') {
+            setActivityLogs(prev => [data, ...prev].slice(0, 100));
+          }
+          break;
+         case 'announcements':
+          if (action === 'create') {
+            setAnnouncementsList(prev => {
+              if (prev.some(a => a.id === data.id || a._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setAnnouncementsList(prev => prev.map(a => (a.id === data.id || a._id === data._id) ? { ...a, ...data } : a));
+          }
+          break;
+
+        case 'workReports':
+          if (action === 'create') {
+            setDailyReports(prev => {
+              if (prev.some(r => r.id === data.id || r._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setDailyReports(prev => prev.map(r => (r.id === data.id || r._id === data._id) ? { ...r, ...data } : r));
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setDailyReports(prev => prev.filter(r => r.id !== id && r._id !== id));
+          }
+          break;
+
+        case 'attendance-corrections':
+          if (action === 'create') {
+            setCorrectionRequests(prev => {
+              if (prev.some(r => r.id === data.id || r._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setCorrectionRequests(prev => prev.map(r => (r.id === data.id || r._id === data._id) ? { ...r, ...data } : r));
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setCorrectionRequests(prev => prev.filter(r => r.id !== id && r._id !== id));
+          }
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    const handleConnect = () => {
+      console.log('[Sync Engine] Socket connected/reconnected. Running silent state revalidation.');
+      if (token) {
+        if (activeActionsRef.current.fetchProjects) activeActionsRef.current.fetchProjects();
+        if (activeActionsRef.current.fetchEmployees) activeActionsRef.current.fetchEmployees();
+        if (activeActionsRef.current.fetchLeaves) activeActionsRef.current.fetchLeaves();
+        if (activeActionsRef.current.fetchAttendance) activeActionsRef.current.fetchAttendance();
+        if (activeActionsRef.current.fetchDailyReports) activeActionsRef.current.fetchDailyReports();
+        if (activeActionsRef.current.fetchCorrectionRequests) activeActionsRef.current.fetchCorrectionRequests();
+      }
+    };
+
+    socket.on('connect', handleConnect);
     socket.on('notification:new', handleNewNotification);
     socket.on('notification:sync', handleSync);
     socket.on('announcement:sync', handleAnnouncementSync);
+    socket.on('entity:sync', handleEntitySync);
 
     return () => {
+      socket.off('connect', handleConnect);
       socket.off('notification:new', handleNewNotification);
       socket.off('notification:sync', handleSync);
       socket.off('announcement:sync', handleAnnouncementSync);
+      socket.off('entity:sync', handleEntitySync);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, token]);
@@ -710,7 +1092,8 @@ export const AppProvider = ({ children }) => {
         throw new Error(result?.message || 'Authentication failed');
       }
 
-      const { user, token } = result.data;
+      const { user: rawUser, token } = result.data;
+      const user = normalizeEmployee(rawUser);
 
       // Save real credentials and token
       localStorage.setItem('saas_token', token);
@@ -772,6 +1155,12 @@ export const AppProvider = ({ children }) => {
       setEmployees([]);
       return;
     }
+    const cached = localStorage.getItem('swr_employees');
+    if (cached) {
+      try {
+        setEmployees(JSON.parse(cached).map(normalizeEmployee));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/employees', {
         headers: {
@@ -786,11 +1175,13 @@ export const AppProvider = ({ children }) => {
 
       const result = await response.json();
       if (result.status === 'success') {
-        setEmployees((result.data || []).map(normalizeEmployee));
+        const normalized = (result.data || []).map(normalizeEmployee);
+        setEmployees(normalized);
+        localStorage.setItem('swr_employees', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch employees from backend:', err);
-      setEmployees([]);
+      if (!cached) setEmployees([]);
     }
   };
 
@@ -835,14 +1226,150 @@ export const AppProvider = ({ children }) => {
         }
       }
     } catch (err) {
-      console.error('Failed to fetch payroll data from backend:', err);
+      console.error('Failed to fetch payroll data:', err);
     }
+  };
+
+  const fetchMonthlyPayrollSummary = async (monthYear) => {
+    if (!token || !monthYear) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/payroll-summary?month=${monthYear}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setMonthlyPayrollSummary(result.data || {});
+      }
+    } catch (err) {
+      console.error('Failed to fetch monthly payroll summary:', err);
+    }
+  };
+
+  const fetchPayrollQueries = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch payroll queries:', err);
+    }
+  };
+
+  const createPayrollQuery = async (payload) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => [result.data, ...prev]);
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to create payroll query:', err);
+    }
+    return false;
+  };
+
+  const addQueryReply = async (queryId, message, attachments = []) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message, attachments })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to post query comment:', err);
+    }
+    return false;
+  };
+
+  const updateQueryStatus = async (queryId, action, comments) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action, comments })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to update query status:', err);
+    }
+    return false;
+  };
+
+  const addQueryInternalNote = async (queryId, note) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/internal-note`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ note })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to add internal note:', err);
+    }
+    return false;
   };
 
   // fetchEmployees and fetchPayrollData are called in the main data-loading useEffect below
 
   const fetchSystemSettings = async () => {
     if (!token) return;
+    const cached = localStorage.getItem('swr_system_settings');
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        const mergedGeneral = {
+          ...(data.generalSettings || {}),
+          companyName: data.companyProfile?.companyName || data.generalSettings?.companyName || 'Gatecode OMS'
+        };
+        setGeneralSettingsState(mergedGeneral);
+        if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);
+        if (data.securitySettings) setSecuritySettingsState(data.securitySettings);
+        if (data.attendanceRules) setAttendanceRulesState(data.attendanceRules);
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/settings', {
         headers: {
@@ -864,6 +1391,7 @@ export const AppProvider = ({ children }) => {
           setAttendanceRulesState(data.attendanceRules);
           localStorage.setItem('saas_attendance_rules', JSON.stringify(data.attendanceRules));
         }
+        localStorage.setItem('swr_system_settings', JSON.stringify(data));
       }
     } catch (err) {
       console.error('Failed to fetch system settings from database:', err);
@@ -912,6 +1440,12 @@ export const AppProvider = ({ children }) => {
       setBranches([]);
       return;
     }
+    const cached = localStorage.getItem('swr_branches');
+    if (cached) {
+      try {
+        setBranches(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/branches', {
         headers: {
@@ -921,10 +1455,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setBranches(result.data || []);
+        localStorage.setItem('swr_branches', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch branches from backend:', err);
-      setBranches([]);
+      if (!cached) setBranches([]);
     }
   };
 
@@ -935,6 +1470,12 @@ export const AppProvider = ({ children }) => {
       setDepartments([]);
       return;
     }
+    const cached = localStorage.getItem('swr_departments');
+    if (cached) {
+      try {
+        setDepartments(JSON.parse(cached).map(normalizeDepartment));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/departments', {
         headers: {
@@ -943,11 +1484,13 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        setDepartments((result.data || []).map(normalizeDepartment));
+        const normalized = (result.data || []).map(normalizeDepartment);
+        setDepartments(normalized);
+        localStorage.setItem('swr_departments', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch departments from backend:', err);
-      setDepartments([]);
+      if (!cached) setDepartments([]);
     }
   };
 
@@ -958,6 +1501,12 @@ export const AppProvider = ({ children }) => {
       setTeams([]);
       return;
     }
+    const cached = localStorage.getItem('swr_teams');
+    if (cached) {
+      try {
+        setTeams(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/teams', {
         headers: {
@@ -967,10 +1516,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setTeams(result.data || []);
+        localStorage.setItem('swr_teams', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch teams from backend:', err);
-      setTeams([]);
+      if (!cached) setTeams([]);
     }
   };
 
@@ -981,6 +1531,12 @@ export const AppProvider = ({ children }) => {
       setProjectsList([]);
       return;
     }
+    const cached = localStorage.getItem('swr_projects');
+    if (cached) {
+      try {
+        setProjectsList(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/projects', {
         headers: {
@@ -990,10 +1546,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setProjectsList(result.data || []);
+        localStorage.setItem('swr_projects', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch projects from backend:', err);
-      setProjectsList([]);
+      if (!cached) setProjectsList([]);
     }
   };
 
@@ -1046,6 +1603,12 @@ export const AppProvider = ({ children }) => {
       setLeavePolicyConfigs([]);
       return;
     }
+    const cached = localStorage.getItem('swr_leave_policies');
+    if (cached) {
+      try {
+        setLeavePolicyConfigs(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/leaves/policies', {
         headers: {
@@ -1055,10 +1618,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setLeavePolicyConfigs(result.data || []);
+        localStorage.setItem('swr_leave_policies', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch leave policies from backend:', err);
-      setLeavePolicyConfigs([]);
+      if (!cached) setLeavePolicyConfigs([]);
     }
   };
 
@@ -1066,6 +1630,12 @@ export const AppProvider = ({ children }) => {
     if (!token) {
       setHolidaysList([]);
       return;
+    }
+    const cached = localStorage.getItem('swr_holidays');
+    if (cached) {
+      try {
+        setHolidaysList(JSON.parse(cached));
+      } catch (e) {}
     }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/holidays', {
@@ -1076,10 +1646,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setHolidaysList(result.data || []);
+        localStorage.setItem('swr_holidays', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch holidays from backend:', err);
-      setHolidaysList([]);
+      if (!cached) setHolidaysList([]);
     }
   };
 
@@ -1228,7 +1799,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const triggerAutomaticNotification = async (ruleId, { title, message, recipientId, recipientRole, category }) => {
+  const triggerAutomaticNotification = async (ruleId, { title, message, recipientId, recipientRole, category, data }) => {
     try {
       const savedRules = localStorage.getItem('automation_rules');
       let isEnabled = true;
@@ -1274,7 +1845,8 @@ export const AppProvider = ({ children }) => {
             : (employees ? employees.length : 1)
         ),
         read: 0,
-        failed: 0
+        failed: 0,
+        data: data || {}
       };
 
       await addNotification(newNotif);
@@ -1350,6 +1922,12 @@ export const AppProvider = ({ children }) => {
       setRoles([]);
       return;
     }
+    const cached = localStorage.getItem('swr_roles');
+    if (cached) {
+      try {
+        setRoles(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles', {
         headers: {
@@ -1359,10 +1937,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setRoles(result.data || []);
+        localStorage.setItem('swr_roles', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch roles:', err);
-      setRoles([]);
+      if (!cached) setRoles([]);
     }
   };
 
@@ -1370,6 +1949,12 @@ export const AppProvider = ({ children }) => {
     if (!token) {
       setPermissionModules([]);
       return;
+    }
+    const cached = localStorage.getItem('swr_permission_modules');
+    if (cached) {
+      try {
+        setPermissionModules(JSON.parse(cached));
+      } catch (e) {}
     }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/roles/permissions-modules', {
@@ -1380,10 +1965,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setPermissionModules(result.data || []);
+        localStorage.setItem('swr_permission_modules', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch permission modules:', err);
-      setPermissionModules([]);
+      if (!cached) setPermissionModules([]);
     }
   };
 
@@ -1604,6 +2190,27 @@ export const AppProvider = ({ children }) => {
     } catch (err) {
       console.error('Failed to fetch daily reports from backend:', err);
       setDailyReports([]);
+    }
+  };
+
+  const fetchCorrectionRequests = async () => {
+    if (!token) {
+      setCorrectionRequests([]);
+      return;
+    }
+    try {
+      const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/attendance-corrections', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setCorrectionRequests(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch attendance corrections from backend:', err);
+      setCorrectionRequests([]);
     }
   };
 
@@ -2019,7 +2626,8 @@ export const AppProvider = ({ children }) => {
         fetchActivityLogs(),
         fetchPermissionModules(),
         fetchUserOverrides(),
-        fetchProjects()
+        fetchProjects(),
+        fetchCorrectionRequests()
       ]).catch(err => console.error('[AppContext] Phase 2 load error:', err));
     };
 
@@ -2212,6 +2820,18 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Local-only avatar patch — updates state + localStorage without any API call
+  const patchCurrentUserAvatar = (id, avatarUrl) => {
+    setEmployees(prev =>
+      prev.map(e => e.id === id ? { ...e, avatar: avatarUrl, photoUrl: avatarUrl } : e)
+    );
+    if (currentUser && (currentUser.id === id || currentUser.employeeId === id)) {
+      const updated = { ...currentUser, avatar: avatarUrl, photoUrl: avatarUrl };
+      setCurrentUser(updated);
+      localStorage.setItem('saas_user', JSON.stringify(updated));
+    }
+  };
+
   const updateEmployee = async (id, updatedData) => {
     const dataToSend = {
       ...updatedData,
@@ -2261,56 +2881,64 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const deactivateEmployee = async (id) => {
+  const fetchOpenWork = async (id) => {
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}/open-work`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      return result.status === 'success' ? result.data : null;
+    } catch (err) {
+      console.error('Error fetching open work:', err);
+      return null;
+    }
+  };
+
+  const deactivateEmployee = async (id, exitData) => {
     const emp = employees.find(e => e.id === id);
-    if (!emp) return;
+    if (!emp) return false;
 
     try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
-        method: 'PUT',
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}/deactivate`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ status: 'Inactive' })
+        body: JSON.stringify(exitData)
       });
       const result = await response.json();
       if (result.status === 'success') {
-        const updatedEmp = normalizeEmployee(result.data);
         setEmployees(prev =>
-          prev.map(e => (e.id === id ? updatedEmp : e))
+          prev.map(e => (e.id === id ? { ...e, accountStatus: 'Inactive', status: 'Inactive', exitInfo: result.data.exitInfo } : e))
         );
         addActivityLog(`Deactivated employee: ${emp.name}`, 'Employees', 'danger');
         addToast('warning', `Employee ${emp.name} has been deactivated.`);
-
-        // Trigger Automatic Notification
-        await triggerAutomaticNotification('HR-02', {
-          title: 'Employee Account Deactivated',
-          message: `The employee account for ${emp.name} (${emp.id}) has been deactivated.`,
-          recipientRole: 'admin',
-          category: 'HR'
-        });
+        return true;
       } else {
-        addToast('error', result.message || 'Failed to deactivate employee in database');
+        addToast('error', result.message || 'Failed to deactivate employee');
+        return false;
       }
     } catch (err) {
       console.error('Error deactivating employee:', err);
       addToast('error', 'Network error while deactivating employee');
+      return false;
     }
   };
 
-  const activateEmployee = async (id) => {
+  const restoreEmployee = async (id) => {
     const emp = employees.find(e => e.id === id);
-    if (!emp) return;
+    if (!emp) return false;
 
     try {
-      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}`, {
-        method: 'PUT',
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${id}/restore`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'Active' })
+        }
       });
       const result = await response.json();
       if (result.status === 'success') {
@@ -2318,16 +2946,21 @@ export const AppProvider = ({ children }) => {
         setEmployees(prev =>
           prev.map(e => (e.id === id ? updatedEmp : e))
         );
-        addActivityLog(`Activated employee: ${emp.name}`, 'Employees', 'success');
-        addToast('success', `Employee ${emp.name} has been activated.`);
+        addActivityLog(`Restored employee: ${emp.name}`, 'Employees', 'success');
+        addToast('success', `Employee ${emp.name} has been restored.`);
+        return true;
       } else {
-        addToast('error', result.message || 'Failed to activate employee in database');
+        addToast('error', result.message || 'Failed to restore employee');
+        return false;
       }
     } catch (err) {
-      console.error('Error activating employee:', err);
-      addToast('error', 'Network error while activating employee');
+      console.error('Error restoring employee:', err);
+      addToast('error', 'Network error while restoring employee');
+      return false;
     }
   };
+
+  const activateEmployee = restoreEmployee;
 
   const bulkAssignRole = async (ids, roleId) => {
     const roleObj = roles.find(r => r.id === roleId);
@@ -2609,7 +3242,10 @@ export const AppProvider = ({ children }) => {
 
       const result = await response.json();
       if (result.status === 'success') {
-        setLeaveRequests(prev => [result.data, ...prev]);
+        setLeaveRequests(prev => {
+          if (prev.some(l => l.id === result.data.id)) return prev;
+          return [result.data, ...prev];
+        });
 
         // If the leave is pre-approved (assigned directly by Admin), update employee status to 'On Leave'
         if (result.data.status === 'Approved') {
@@ -2738,15 +3374,8 @@ export const AppProvider = ({ children }) => {
       return t;
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progressTotal = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress: progressTotal,
-      status: progressTotal === 100 ? 'Completed' : project.status
-    });
+    // Delegate progress and status recalculation to the backend pre-save hook
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       try {
@@ -3289,15 +3918,7 @@ export const AppProvider = ({ children }) => {
       return t;
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       try {
@@ -3339,7 +3960,7 @@ export const AppProvider = ({ children }) => {
     }
 
     projectId = project.id;
-    const nextTaskId = `t-${projectId}-${project.tasks.length + 1}`;
+    const nextTaskId = `t-${projectId}-${project.tasks.length + 1}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     const assignee = employees.find(e => e.id === taskData.assigneeId);
 
@@ -3349,10 +3970,12 @@ export const AppProvider = ({ children }) => {
       completed: false,
       dueDate: taskData.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       priority: taskData.priority || 'Medium',
-      status: 'To Do',
+      status: 'Pending Acceptance',
       overdue: false,
       assigneeId: taskData.assigneeId || '',
       assigneeName: assignee ? assignee.name : 'Unassigned',
+      assignedById: currentUser?.id || '',
+      assignedByName: currentUser?.name || 'System',
       description: taskData.description || '',
       estimatedHours: Number(taskData.estimatedHours) || 20,
       progress: 0,
@@ -3363,57 +3986,56 @@ export const AppProvider = ({ children }) => {
         { level: 2, role: 'Project Manager Approval', approver: project.manager || 'Project Manager', status: 'Pending', timestamp: '', remarks: '' }
       ],
       activityLog: [
-        { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'created', details: `Task created`, timestamp: 'Just now', userName: currentUser?.name || 'System' }
+        { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'assigned', details: `Task assigned by ${currentUser?.name || 'System'}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
       ]
     };
 
-    const newTasks = [...project.tasks, newTask];
-    const tasksTotal = project.tasksTotal + 1;
-    const progress = Math.round((project.tasksDone / tasksTotal) * 100);
+    const newTasks = [...(project.tasks || []), newTask];
+    
+    // Optimistically update projectsList state immediately to make it feel instant
+    setProjectsList(prev => prev.map(p => p.id === projectId ? { ...p, tasks: newTasks } : p));
 
-    const success = await updateProject(projectId, {
-      tasks: newTasks,
-      tasksTotal,
-      progress
-    });
+    // Asynchronously perform backend updates
+    (async () => {
+      const success = await updateProject(projectId, { tasks: newTasks });
+      if (success) {
+        try {
+          await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              id: nextTaskId,
+              title: newTask.title,
+              description: newTask.description,
+              status: newTask.status,
+              priority: newTask.priority,
+              dueDate: newTask.dueDate,
+              assigneeId: newTask.assigneeId,
+              assigneeName: newTask.assigneeName
+            })
+          });
+        } catch (err) {
+          console.error('Failed to save task in tasks collection:', err);
+        }
 
-    if (success) {
-      try {
-        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            id: nextTaskId,
-            title: newTask.title,
-            description: newTask.description,
-            status: newTask.status,
-            priority: newTask.priority,
-            dueDate: newTask.dueDate,
-            assigneeId: newTask.assigneeId,
-            assigneeName: newTask.assigneeName
-          })
-        });
-      } catch (err) {
-        console.error('Failed to save task in tasks collection:', err);
+        // Trigger Automatic Notification
+        triggerAutomaticNotification('TSK-01', {
+          title: 'New Task Assigned',
+          message: `You have been assigned a new task: "${newTask.title}" in project "${project.name}". Due Date: ${newTask.dueDate || 'No due date'}.`,
+          recipientId: newTask.assigneeId,
+          recipientRole: 'employee',
+          category: 'Project',
+          data: { taskId: newTask.id, action: 'assigned' }
+        }).catch(err => console.error('Failed to trigger automatic notification:', err));
       }
+    })();
 
-      addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
-      addToast('success', 'Task created successfully.');
-
-      // Trigger Automatic Notification
-      await triggerAutomaticNotification('TSK-01', {
-        title: 'New Task Assigned',
-        message: `You have been assigned a new task: "${newTask.title}" in project "${project.name}". Due Date: ${newTask.dueDate || 'No due date'}.`,
-        recipientId: newTask.assigneeId,
-        recipientRole: 'employee',
-        category: 'Project'
-      });
-
-      return newTask;
-    }
+    addActivityLog(`Created task: "${newTask.title}"`, 'Tasks', 'success');
+    addToast('success', 'Task created successfully.');
+    return newTask;
   };
 
   const deleteTask = async (id) => {
@@ -3421,33 +4043,100 @@ export const AppProvider = ({ children }) => {
     if (!project) return;
 
     const newTasks = project.tasks.filter(t => t.id !== id);
-    const tasksTotal = Math.max(0, project.tasksTotal - 1);
-    const tasksDone = newTasks.filter(t => t.completed).length;
-    const progress = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0;
+    
+    // Optimistically update projectsList state immediately to make it feel instant
+    setProjectsList(prev => prev.map(p => p.id === project.id ? { ...p, tasks: newTasks } : p));
 
-    const success = await updateProject(project.id, {
-      tasks: newTasks,
-      tasksTotal,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
+    // Asynchronously perform backend deletes
+    (async () => {
+      const success = await updateProject(project.id, { tasks: newTasks });
+      if (success) {
+        try {
+          await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        } catch (err) {
+          console.error('Failed to delete task from tasks collection:', err);
+        }
+        addActivityLog(`Deleted task "${id}"`, 'Tasks', 'danger');
+      }
+    })();
+
+    addToast('warning', `Task deleted.`);
+  };
+
+  const editTask = async (taskId, updatedFields) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return false;
+
+    let assigneeName = 'Unassigned';
+    let department = 'Unassigned';
+    if (updatedFields.assigneeId) {
+      const assignee = employees.find(e => e.id === updatedFields.assigneeId);
+      if (assignee) {
+        assigneeName = assignee.name;
+        department = assignee.department;
+      }
+    }
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id === taskId) {
+        const prevAssigneeId = t.assigneeId;
+        const newLog = [];
+        if (updatedFields.assigneeId !== undefined && updatedFields.assigneeId !== prevAssigneeId) {
+          newLog.push({
+            id: `act-${Math.random().toString(36).substring(2, 9)}`,
+            action: 'assigned',
+            details: `Task reassigned to ${assigneeName}`,
+            timestamp: new Date().toISOString(),
+            userName: currentUser?.name || 'System'
+          });
+        }
+        return {
+          ...t,
+          title: updatedFields.title ?? t.title,
+          description: updatedFields.description ?? t.description,
+          priority: updatedFields.priority ?? t.priority,
+          dueDate: updatedFields.dueDate ?? t.dueDate,
+          assigneeId: updatedFields.assigneeId !== undefined ? updatedFields.assigneeId : t.assigneeId,
+          assigneeName: updatedFields.assigneeId !== undefined ? assigneeName : t.assigneeName,
+          department: updatedFields.assigneeId !== undefined ? department : t.department,
+          activityLog: [...(t.activityLog || []), ...newLog]
+        };
+      }
+      return t;
     });
 
+    const success = await updateProject(project.id, { tasks: updatedTasks });
     if (success) {
+      const updatedTask = updatedTasks.find(t => t.id === taskId);
       try {
-        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${id}`, {
-          method: 'DELETE',
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
           headers: {
+            'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
-          }
+          },
+          body: JSON.stringify({
+            title: updatedTask.title,
+            description: updatedTask.description,
+            priority: updatedTask.priority,
+            dueDate: updatedTask.dueDate,
+            assigneeId: updatedTask.assigneeId,
+            assigneeName: updatedTask.assigneeName,
+            status: updatedTask.status
+          })
         });
       } catch (err) {
-        console.error('Failed to delete task from tasks collection:', err);
+        console.error('Failed to update task in tasks collection:', err);
       }
-
-      addActivityLog(`Deleted task "${id}"`, 'Tasks', 'danger');
-      addToast('warning', `Task deleted.`);
+      addToast('success', 'Task updated successfully.');
+      return true;
     }
+    return false;
   };
 
   const reassignTask = async (taskId, assigneeId, assigneeName) => {
@@ -3711,15 +4400,7 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       addToast('success', `Level ${level} Approval submitted.`);
@@ -3763,15 +4444,7 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = project.tasksTotal > 0 ? Math.round((tasksDone / project.tasksTotal) * 100) : 0;
-
-    const success = await updateProject(project.id, {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : project.status
-    });
+    const success = await updateProject(project.id, { tasks: updatedTasks });
 
     if (success) {
       addToast('error', `Approval rejected at Level ${level}.`);
@@ -3779,7 +4452,343 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const getTaskStats = () => {
+  // ── TASK LIFECYCLE FUNCTIONS ──────────────────────────────────────────────
+
+  /**
+   * Accept Task: Pending Acceptance → To Do
+   * Only callable by the task assignee.
+   */
+  const acceptTask = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'To Do',
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'accepted', details: `Task accepted by ${currentUser?.name}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'To Do' })
+        });
+      } catch (err) {
+        console.error('Failed to sync task acceptance to tasks collection:', err);
+      }
+
+      addToast('success', 'Task accepted! You can now start working.');
+      addActivityLog(`Accepted task ${taskId}`, 'Tasks', 'success');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Accepted',
+        message: `${currentUser?.name} has accepted the task "${updatedTasks.find(t => t.id === taskId)?.title}".`,
+        recipientId: updatedTasks.find(t => t.id === taskId)?.assignedById,
+        recipientRole: 'manager',
+        category: 'Project',
+        data: { taskId, action: 'accepted' }
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Reject Task: stays at Pending Acceptance with rejection reason
+   * Only callable by the task assignee.
+   */
+  const rejectTask = async (taskId, reason) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'Pending Acceptance',
+        rejectionReason: reason || 'No reason provided',
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'rejected', details: `Task rejected by ${currentUser?.name}. Reason: ${reason || 'No reason provided'}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'Pending Acceptance' })
+        });
+      } catch (err) {
+        console.error('Failed to sync task rejection to tasks collection:', err);
+      }
+
+      addToast('warning', 'Task rejected. The assigner has been notified.');
+      addActivityLog(`Rejected task ${taskId}`, 'Tasks', 'warning');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Rejected',
+        message: `${currentUser?.name} rejected the task "${updatedTasks.find(t => t.id === taskId)?.title}". Reason: ${reason || 'No reason provided'}.`,
+        recipientId: updatedTasks.find(t => t.id === taskId)?.assignedById,
+        recipientRole: 'manager',
+        category: 'Project',
+        data: { taskId, action: 'rejected' }
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Start Work: To Do → In Progress
+   * Only callable by the task assignee.
+   */
+  const startWork = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'In Progress',
+        progress: Math.max(t.progress || 0, 10),
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'started', details: `Work started by ${currentUser?.name}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'In Progress', progress: Math.max(updatedTasks.find(t => t.id === taskId)?.progress || 0, 10) })
+        });
+      } catch (err) {
+        console.error('Failed to sync work start to tasks collection:', err);
+      }
+
+      addToast('success', 'Work started! Good luck.');
+      addActivityLog(`Started work on task ${taskId}`, 'Tasks', 'success');
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Send to Review: In Progress → In Review
+   * Only callable by the task assignee.
+   * Notifies the original assigner.
+   */
+  const sendToReview = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'In Review',
+        progress: Math.max(t.progress || 0, 80),
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'sent_to_review', details: `Sent to review by ${currentUser?.name}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const task = project.tasks.find(t => t.id === taskId);
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'In Review', progress: Math.max(updatedTasks.find(t => t.id === taskId)?.progress || 0, 80) })
+        });
+      } catch (err) {
+        console.error('Failed to sync review submission to tasks collection:', err);
+      }
+
+      addToast('info', 'Task submitted for review. Waiting for approval...');
+      addActivityLog(`Sent task ${taskId} to review`, 'Tasks', 'info');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Ready for Review',
+        message: `${currentUser?.name} has submitted "${task?.title}" for your review.`,
+        recipientId: task?.assignedById,
+        recipientRole: 'manager',
+        category: 'Project',
+        data: { taskId, action: 'sent_to_review' }
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Approve Task: In Review → Completed
+   * Only callable by the original assigner (task.assignedById === currentUser.id).
+   */
+  const approveTask = async (taskId) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const task = project.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Strict identity check — only original assigner can approve
+    let isReviewer = false;
+    if (task.assignedById) {
+      isReviewer = task.assignedById === currentUser?.id;
+    } else {
+      const assignerLog = task.activityLog?.find(log => log.action === 'assigned');
+      isReviewer = assignerLog ? assignerLog.userName === currentUser?.name : false;
+    }
+
+    if (!isReviewer) {
+      addToast('error', 'Only the original task assigner can approve this task.');
+      return;
+    }
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'Completed',
+        completed: true,
+        progress: 100,
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'approved', details: `Task approved and completed by ${currentUser?.name}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+
+    if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'Completed' })
+        });
+      } catch (err) {
+        console.error('Failed to sync task approval to tasks collection:', err);
+      }
+
+      addToast('success', 'Task approved and marked as Completed! 🎉');
+      addActivityLog(`Approved task ${taskId}`, 'Tasks', 'success');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Approved!',
+        message: `Your task "${task?.title}" has been approved and marked as Completed by ${currentUser?.name}.`,
+        recipientId: task?.assigneeId,
+        recipientRole: 'employee',
+        category: 'Project',
+        data: { taskId, action: 'approved' }
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  /**
+   * Reviewer Reassign: In Review → In Progress (with mandatory comment)
+   * Only callable by the original assigner (task.assignedById === currentUser.id).
+   */
+  const reassignToInProgress = async (taskId, comment) => {
+    const project = projectsList.find(p => p.tasks.some(t => t.id === taskId));
+    if (!project) return;
+
+    const task = project.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Strict identity check — only original assigner can reassign from review
+    let isReviewer = false;
+    if (task.assignedById) {
+      isReviewer = task.assignedById === currentUser?.id;
+    } else {
+      const assignerLog = task.activityLog?.find(log => log.action === 'assigned');
+      isReviewer = assignerLog ? assignerLog.userName === currentUser?.name : false;
+    }
+
+    if (!isReviewer) {
+      addToast('error', 'Only the original task assigner can reassign this task.');
+      return;
+    }
+
+    if (!comment || !comment.trim()) {
+      addToast('error', 'A review comment is required when reassigning.');
+      return;
+    }
+
+    const updatedTasks = project.tasks.map(t => {
+      if (t.id !== taskId) return t;
+      return {
+        ...t,
+        status: 'In Progress',
+        reviewComment: comment.trim(),
+        activityLog: [
+          ...(t.activityLog || []),
+          { id: `act-${Math.random().toString(36).substring(2, 9)}`, action: 'reassigned_for_rework', details: `Sent back for rework by ${currentUser?.name}. Comment: ${comment.trim()}`, timestamp: new Date().toISOString(), userName: currentUser?.name || 'System' }
+        ]
+      };
+    });
+
+    const success = await updateProject(project.id, { tasks: updatedTasks });
+    if (success) {
+      try {
+        await fetch((window.API_URL || 'http://localhost:5000') + `/api/v1/tasks/${taskId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'In Progress' })
+        });
+      } catch (err) {
+        console.error('Failed to sync task rework reassignment to tasks collection:', err);
+      }
+
+      addToast('warning', 'Task sent back for rework. Employee has been notified.');
+      addActivityLog(`Reassigned task ${taskId} for rework`, 'Tasks', 'warning');
+      await triggerAutomaticNotification('TSK-01', {
+        title: 'Task Needs Rework',
+        message: `Your task "${task?.title}" has been sent back for rework. Reviewer comment: ${comment.trim()}.`,
+        recipientId: task?.assigneeId,
+        recipientRole: 'employee',
+        category: 'Project',
+        data: { taskId, action: 'reassigned' }
+      });
+      return updatedTasks.find(t => t.id === taskId);
+    }
+  };
+
+  const getTaskStats = React.useCallback(() => {
     const total = tasks.length;
     const active = tasks.filter(t => t.status === 'In Progress' || t.status === 'in_progress').length;
     const completed = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
@@ -3788,9 +4797,9 @@ export const AppProvider = ({ children }) => {
     const overdue = tasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, active, completed, pending, overdue, completionRate };
-  };
+  }, [tasks]);
 
-  const getEmployeeTaskSummary = (employeeId) => {
+  const getEmployeeTaskSummary = React.useCallback((employeeId) => {
     const empTasks = tasks.filter(t => t.assigneeId === employeeId);
     const assigned = empTasks.length;
     const completed = empTasks.filter(t => t.status === 'Done' || t.status === 'done').length;
@@ -3799,9 +4808,9 @@ export const AppProvider = ({ children }) => {
     const overdue = empTasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
     const productivity = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
     return { assigned, completed, pending, overdue, productivity };
-  };
+  }, [tasks]);
 
-  const getTeamTaskRanking = () => {
+  const getTeamTaskRanking = React.useCallback(() => {
     const teamMap = {};
     employees.forEach(emp => {
       if (!emp.team) return;
@@ -3822,9 +4831,9 @@ export const AppProvider = ({ children }) => {
       const productivity = t.totalTasks > 0 ? Math.round((t.completedTasks / t.totalTasks) * 100) : 0;
       return { ...t, productivity };
     }).sort((a, b) => b.productivity - a.productivity);
-  };
+  }, [employees, getEmployeeTaskSummary]);
 
-  const getDepartmentTaskAnalytics = () => {
+  const getDepartmentTaskAnalytics = React.useCallback(() => {
     const deptMap = {};
     const activeDeptNames = new Set((departments || []).filter(d => d.status === 'Active').map(d => d.name));
     employees.forEach(emp => {
@@ -3847,9 +4856,9 @@ export const AppProvider = ({ children }) => {
       const completionRate = d.totalTasks > 0 ? Math.round((d.completed / d.totalTasks) * 100) : 0;
       return { ...d, completionRate };
     });
-  };
+  }, [employees, departments, getEmployeeTaskSummary]);
 
-  const getWorkloadDistribution = () => {
+  const getWorkloadDistribution = React.useCallback(() => {
     return employees.map(emp => {
       const stats = getEmployeeTaskSummary(emp.id);
       let workloadStatus = 'Normal';
@@ -3866,7 +4875,7 @@ export const AppProvider = ({ children }) => {
         workloadStatus
       };
     });
-  };
+  }, [employees, getEmployeeTaskSummary]);
 
   // Payroll Handlers
   const runPayroll = (month, year) => {
@@ -4362,14 +5371,15 @@ export const AppProvider = ({ children }) => {
         addActivityLog(`Updated report ${id} status to ${status}`, 'Work Reports', 'success');
         addToast('success', `Report ${id} successfully updated to ${status}.`);
 
-        // Trigger Automatic Notification for work report review status update
-        await triggerAutomaticNotification('TSK-03', {
+        // Trigger Automatic Notification for work report review status update (fire-and-forget, non-blocking)
+        triggerAutomaticNotification('TSK-03', {
           title: 'Daily Work Report Status Updated',
           message: `Your daily work report for ${updatedReport.date} has been reviewed and marked as "${status}". Feedback: ${feedback || 'None'}`,
           recipientId: updatedReport.employeeId,
           recipientRole: 'employee',
-          category: 'Project'
-        });
+          category: 'Project',
+          data: { entityId: id, action: 'report_updated' }
+        }).catch(() => {});
 
         return updatedReport;
       } else {
@@ -4411,20 +5421,15 @@ export const AppProvider = ({ children }) => {
 
   // Notifications Handlers
   const markAllNotificationsRead = async () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setNotifications(prev => prev.map(n => ({ ...n, read: true, isRead: true })));
     addToast('info', 'All notifications marked as read.');
     try {
-      const unread = notifications.filter(n => !n.read);
-      await Promise.all(unread.map(n => {
-        return fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${n.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ read: true, readStatus: 'Read', readTime: 'Just now' })
-        });
-      }));
+      await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/read-all`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       await fetchNotifications();
     } catch (err) {
       console.error(err);
@@ -4432,15 +5437,13 @@ export const AppProvider = ({ children }) => {
   };
 
   const markNotificationRead = async (id) => {
-    setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
+    setNotifications(prev => prev.map(n => ((n.id === id || n._id === id) ? { ...n, read: true, isRead: true } : n)));
     try {
-      await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${id}`, {
-        method: 'PUT',
+      await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/notifications/${id}/read`, {
+        method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ read: true, readStatus: 'Read', readTime: 'Just now' })
+        }
       });
       await fetchNotifications();
     } catch (err) {
@@ -4523,6 +5526,8 @@ export const AppProvider = ({ children }) => {
 
     // Map frontend module keys to backend DB permission keys
     const MODULE_MAPPING = {
+      'dashboard': 'dashboard',
+      'company_overview': 'company_overview',
       'employee_management': 'employees',
       'attendance_management': 'attendance',
       'leave_management': 'leaves',
@@ -4537,7 +5542,11 @@ export const AppProvider = ({ children }) => {
       'notifications': 'notifications',
       'announcements': 'announcements',
       'meetings_calendar': 'meetings_calendar',
-      'work_reports': 'work_reports'
+      'work_reports': 'work_reports',
+      'performance_analytics': 'performance_analytics',
+      'role_permission': 'role_permission',
+      'security_audit_logs': 'security_audit_logs',
+      'profile_settings': 'profile_settings'
     };
 
     const HIERARCHICAL_MODULES = [
@@ -4578,30 +5587,14 @@ export const AppProvider = ({ children }) => {
       }
 
       if (dbPermission !== undefined) {
-        const res = !!dbPermission?.[action];
-        console.log('hasPermission DB-backed details:', {
-          module,
-          action,
-          currentUserRole,
-          result: res
-        });
-        return res;
+        return !!dbPermission?.[action];
       }
     }
 
     // Fallback: Resolve required role and use hierarchy check if module is not DB-backed or is not found in roles Obj
     const route = Object.keys(PATH_TO_MODULE).find(key => PATH_TO_MODULE[key] === module);
     if (route) {
-      const requiredRole = getRequiredRoleForPath(route);
-      const res = hasRoleAccess(currentUserRole, requiredRole);
-      console.log('hasPermission fallback hierarchy details:', {
-        module,
-        action,
-        currentUserRole,
-        requiredRole,
-        result: res
-      });
-      return res;
+      return hasRoleAccess(currentUserRole, getRequiredRoleForPath(route));
     }
 
     return true;
@@ -4655,6 +5648,10 @@ export const AppProvider = ({ children }) => {
     });
   }, [employees, branches, departments, attendance]);
 
+  const activeEmployees = useMemo(() => {
+    return memoizedEmployees.filter(e => e.accountStatus === 'Active' || e.status === 'Active' || (e.status !== 'Inactive' && e.accountStatus !== 'Inactive'));
+  }, [memoizedEmployees]);
+
   const memoizedCurrentUser = useMemo(() => {
     if (!currentUser) return null;
     const todayStr = (() => {
@@ -4696,10 +5693,23 @@ export const AppProvider = ({ children }) => {
   }, [currentUser, branches, departments, attendance]);
 
 
+  const uniqueNotifications = useMemo(() => {
+    const seen = new Set();
+    return (notifications || []).filter(n => {
+      const id = n.id || n._id;
+      if (!id) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [notifications]);
+
   return (
     <AppContext.Provider
       value={{
-        employees: memoizedEmployees,
+        employees: activeEmployees,
+        allEmployees: memoizedEmployees,
+        activeEmployees,
         branches,
         addBranch,
         updateBranch,
@@ -4728,6 +5738,14 @@ export const AppProvider = ({ children }) => {
         payrollPayments,
         payrollConfigs,
         fetchPayrollData,
+        payrollQueries,
+        fetchPayrollQueries,
+        createPayrollQuery,
+        addQueryReply,
+        updateQueryStatus,
+        addQueryInternalNote,
+        monthlyPayrollSummary,
+        fetchMonthlyPayrollSummary,
         addOrUpdateSalaryGrade,
         deleteSalaryGrade,
         createLoanOrAdvance,
@@ -4743,7 +5761,7 @@ export const AppProvider = ({ children }) => {
         updatePayrollConfig,
         token,
         setToken,
-        notifications,
+        notifications: uniqueNotifications,
         setNotifications,
         fetchNotifications,
         addNotification,
@@ -4771,6 +5789,8 @@ export const AppProvider = ({ children }) => {
         setDailyReports,
         addDailyReport,
         updateDailyReportStatus,
+        correctionRequests,
+        fetchCorrectionRequests,
         appraisalReviews,
         addAppraisalReview,
         toasts,
@@ -4789,8 +5809,11 @@ export const AppProvider = ({ children }) => {
         closeConfirm,
         addEmployee,
         updateEmployee,
+        patchCurrentUserAvatar,
         deactivateEmployee,
         activateEmployee,
+        restoreEmployee,
+        fetchOpenWork,
         bulkAssignRole,
         bulkTransferDept,
         bulkUpdateStatus,
@@ -4814,6 +5837,7 @@ export const AppProvider = ({ children }) => {
         updateTaskProgress,
         addTask,
         deleteTask,
+        editTask,
         reassignTask,
         extendTaskDeadline,
         escalateTask,
@@ -4821,6 +5845,12 @@ export const AppProvider = ({ children }) => {
         addTaskComment,
         approveTaskLevel,
         rejectTaskLevel,
+        acceptTask,
+        rejectTask,
+        startWork,
+        sendToReview,
+        approveTask,
+        reassignToInProgress,
         getTaskStats,
         getEmployeeTaskSummary,
         getTeamTaskRanking,

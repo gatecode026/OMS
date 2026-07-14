@@ -150,6 +150,14 @@ const projectSchema = new mongoose.Schema({
       type: String,
       default: 'Unassigned'
     },
+    assignedById: {
+      type: String,
+      default: ''
+    },
+    assignedByName: {
+      type: String,
+      default: 'System'
+    },
     description: {
       type: String,
       default: ''
@@ -204,6 +212,28 @@ projectSchema.plugin(tenantPlugin);
 projectSchema.index({ companyId: 1, id: 1 }, { unique: true, sparse: true });
 projectSchema.index({ companyId: 1, projectCode: 1 }, { unique: true, sparse: true });
 
+const getTimelineProgress = (startDateStr, deadlineStr) => {
+  if (!startDateStr || !deadlineStr) return 0;
+  try {
+    const start = new Date(startDateStr);
+    const end = new Date(deadlineStr);
+    const today = new Date();
+    
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    
+    const totalDuration = end - start;
+    if (totalDuration <= 0) return 0;
+    
+    const elapsed = today - start;
+    const timePct = Math.round((elapsed / totalDuration) * 100);
+    return Math.max(0, Math.min(100, timePct));
+  } catch (err) {
+    return 0;
+  }
+};
+
 projectSchema.pre('save', async function(next) {
   if (this.isNew) {
     try {
@@ -215,6 +245,39 @@ projectSchema.pre('save', async function(next) {
       return next(err);
     }
   }
+
+  // Recalculate tasksTotal, tasksDone, and progress
+  if (this.tasks) {
+    this.tasksTotal = this.tasks.length;
+    this.tasksDone = this.tasks.filter(t => t.completed).length;
+
+    const taskPct = this.tasksTotal > 0 ? (this.tasksDone / this.tasksTotal) * 100 : 0;
+    const timePct = getTimelineProgress(this.startDate, this.deadline);
+
+    const statusExplicitlySetToCompleted = this.isModified('status') && this.status === 'Completed';
+
+    if (statusExplicitlySetToCompleted) {
+      // Manager manually marked the project as Completed via the edit form.
+      // Respect that decision and set progress to 100.
+      this.progress = 100;
+    } else {
+      // Normal recalculation — progress is capped at 99 so tasks alone
+      // can never auto-complete the project.
+      if (this.tasksTotal > 0) {
+        const raw = Math.round(0.4 * timePct + 0.6 * taskPct);
+        this.progress = Math.min(99, Math.max(0, raw));
+      } else {
+        this.progress = 0;
+      }
+
+      // PROTECTION: if the project was previously Completed but tasks have
+      // been re-opened or new tasks added, revert status back to Active.
+      if (this.status === 'Completed' && this.tasksDone < this.tasksTotal) {
+        this.status = 'Active';
+      }
+    }
+  }
+
   next();
 });
 

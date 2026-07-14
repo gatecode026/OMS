@@ -124,7 +124,7 @@ const Projects = () => {
   const [addTaskForm, setAddTaskForm] = useState({ projectId: '', title: '', dueDate: '', priority: 'Medium' });
   const [selectedTaskEmployees, setSelectedTaskEmployees] = useState([]);
   const [uploadDocForm, setUploadDocForm] = useState({ projectId: '', docName: '', docType: 'pdf', docSize: '0.8 MB' });
-  const [reportForm, setReportForm] = useState({ projectId: '', reportType: 'progress', format: 'pdf' });
+  const [reportForm, setReportForm] = useState({ projectId: 'all', reportType: 'progress', format: 'pdf', dateRange: 'All' });
   const [dateErrors, setDateErrors] = useState({ startDate: '', deadline: '' });
 
   // Filtering Calculation
@@ -303,17 +303,9 @@ const Projects = () => {
       }
       return t;
     });
-    const tasksDone = updatedTasks.filter(t => t.completed).length;
-    const progress = targetProj.tasksTotal > 0 ? Math.round((tasksDone / targetProj.tasksTotal) * 100) : 0;
-    
-    const updatedFields = {
-      tasks: updatedTasks,
-      tasksDone,
-      progress,
-      status: progress === 100 ? 'Completed' : (targetProj.status === 'Completed' ? 'In Progress' : targetProj.status)
-    };
 
-    const success = await updateProject(projectId, updatedFields);
+    // Delegate progress and status calculation to the backend pre-save hook
+    const success = await updateProject(projectId, { tasks: updatedTasks });
     if (success) {
       const toggledTask = updatedTasks.find(t => t.id === taskId);
       try {
@@ -330,7 +322,9 @@ const Projects = () => {
       }
 
       if (selectedProject && selectedProject.id === projectId) {
-        setSelectedProject({ ...targetProj, ...updatedFields });
+        // Refresh selectedProject from the updated projects list — backend response carries correct progress/status
+        const freshProj = projects.find(p => p.id === projectId);
+        if (freshProj) setSelectedProject({ ...freshProj, tasks: updatedTasks });
       }
       addToast('success', 'Task progress updated!');
     }
@@ -381,7 +375,14 @@ const Projects = () => {
       return;
     }
     if (selectedProject) {
-      // Edit mode
+      // Edit mode — guard against manually marking Completed when tasks are unfinished
+      if (newProjectForm.status === 'Completed') {
+        const unfinishedTasks = (selectedProject.tasks || []).filter(t => !t.completed);
+        if (unfinishedTasks.length > 0) {
+          addToast('error', `Cannot mark project as Completed — ${unfinishedTasks.length} task(s) are still unfinished. Complete all tasks first.`);
+          return;
+        }
+      }
       const success = await updateProject(selectedProject.id, {
         ...newProjectForm,
         members: createSelectedMembers.length > 0 ? createSelectedMembers : (selectedProject.members || [])
@@ -482,7 +483,7 @@ const Projects = () => {
     const targetProj = projects.find(p => p.id === projectId);
     if (!targetProj) return;
 
-    const nextTaskId = `t-${projectId}-${targetProj.tasks.length + 1}`;
+    const nextTaskId = `t-${projectId}-${targetProj.tasks.length + 1}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const firstEmpName = selectedTaskEmployees[0];
     const firstEmp = (employees || []).find(e => (e.name || '').toLowerCase() === (firstEmpName || '').toLowerCase());
     const assigneeId = firstEmp ? firstEmp.id : '';
@@ -502,41 +503,38 @@ const Projects = () => {
         assigneeId
       }
     ];
-    const tasksTotal = targetProj.tasksTotal + 1;
-    const progress = Math.round((targetProj.tasksDone / tasksTotal) * 100);
-
-    const success = await updateProject(projectId, {
-      tasks: newTasks,
-      tasksTotal,
-      progress
-    });
-    if (success) {
-      try {
-        await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            id: nextTaskId,
-            title: title.trim(),
-            description: addTaskForm.description || '',
-            status: 'To Do',
-            priority,
-            dueDate,
-            assigneeId,
-            assigneeName: selectedTaskEmployees.length > 0 ? selectedTaskEmployees.join(', ') : 'Unassigned'
-          })
-        });
-      } catch (err) {
-        console.error('Failed to sync task creation to tasks collection:', err);
-      }
-
-      if (selectedProject && selectedProject.id === projectId) {
-        setSelectedProject({ ...selectedProject, tasks: newTasks, tasksTotal, progress });
-      }
+    // Optimistically update the selected project's task list in local state immediately
+    if (selectedProject && selectedProject.id === projectId) {
+      setSelectedProject({ ...selectedProject, tasks: newTasks });
     }
+
+    // Run database calls in the background asynchronously
+    (async () => {
+      const success = await updateProject(projectId, { tasks: newTasks });
+      if (success) {
+        try {
+          await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/tasks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              id: nextTaskId,
+              title: title.trim(),
+              description: addTaskForm.description || '',
+              status: 'To Do',
+              priority,
+              dueDate,
+              assigneeId,
+              assigneeName: selectedTaskEmployees.length > 0 ? selectedTaskEmployees.join(', ') : 'Unassigned'
+            })
+          });
+        } catch (err) {
+          console.error('Failed to sync task creation to tasks collection:', err);
+        }
+      }
+    })();
     setActiveModal(null);
   };
 
@@ -596,105 +594,253 @@ const Projects = () => {
   // Generate Reports Submit
   const handleGenerateReportSubmit = (e) => {
     e.preventDefault();
-    const { projectId, reportType, format } = reportForm;
+    const { projectId, reportType, format, dateRange } = reportForm;
     if (!projectId) return;
 
-    const targetProj = projects.find(p => p.id === projectId);
-    if (!targetProj) return;
+    // Date range filter helper
+    const filterByDateRange = (dateStr) => {
+      if (!dateStr || dateRange === 'All') return true;
+      const parseDate = (dStr) => {
+        const [y, m, d] = dStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      };
+      const rDate = parseDate(dateStr);
+      const refDate = new Date();
+      refDate.setHours(0, 0, 0, 0);
+      rDate.setHours(0, 0, 0, 0);
+      const diffTime = refDate.getTime() - rDate.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-    addToast('info', `Compiling report for "${targetProj.name}"...`);
+      if (dateRange === 'Today') {
+        return dateStr === refDate.toISOString().slice(0, 10);
+      }
+      if (dateRange === 'Weekly') {
+        return diffDays >= 0 && diffDays < 7;
+      }
+      if (dateRange === 'Monthly') {
+        return diffDays >= 0 && diffDays < 30;
+      }
+      if (dateRange === 'Yearly') {
+        return diffDays >= 0 && diffDays < 365;
+      }
+      return true;
+    };
 
+    let filename = '';
     let fileContent = '';
-    let mimeType = 'text/plain';
-    let fileExtension = 'txt';
+    let headers = [];
+    let rows = [];
 
-    if (format === 'csv' || format === 'excel') {
-      mimeType = 'text/csv;charset=utf-8;';
-      fileExtension = 'csv';
+    if (projectId === 'all') {
+      // General All Projects Report
+      filename = `all_projects_report_${reportType}_${dateRange.toLowerCase()}`;
+      addToast('info', 'Compiling report for all projects...');
 
-      // Build detailed CSV
-      const rows = [
-        ['PROJECT REPORT', targetProj.name],
-        ['Report Type', reportType.toUpperCase()],
-        ['Generated At', new Date().toLocaleString()],
-        [],
-        ['PROJECT METRICS', 'VALUE'],
-        ['Project ID', targetProj.id],
-        ['Project Name', targetProj.name],
-        ['Client', targetProj.client || 'Internal'],
-        ['Department', targetProj.department],
-        ['Project Manager', targetProj.manager],
-        ['Team Leader', targetProj.leader],
-        ['Priority', targetProj.priority],
-        ['Start Date', targetProj.startDate],
-        ['Deadline', targetProj.deadline],
-        ['Progress', `${targetProj.progress}%`],
-        ['Status', targetProj.status],
-        ['Workflow Stage', targetProj.workflowStage || 'Planning'],
-        ['Tasks Total', targetProj.tasksTotal],
-        ['Tasks Done', targetProj.tasksDone],
-        ['Working Hours logged', targetProj.workingHours || 0],
-        ['Productivity Score', `${targetProj.productivityScore || 80}%`],
-        [],
-        ['TEAM ASSIGNED'],
-        ['Name', 'Role'],
-        ...(targetProj.members || []).map(m => [m, m === targetProj.manager ? 'Project Manager' : m === targetProj.leader ? 'Team Leader' : 'Team Member']),
-        [],
-        ['PROJECT WORK TASKS'],
-        ['Task ID', 'Task Title', 'Due Date', 'Priority', 'Completed'],
-        ...(targetProj.tasks || []).map(t => [t.id, t.title, t.dueDate, t.priority, t.completed ? 'YES' : 'NO'])
-      ];
+      const targetProjects = projects.filter(p => filterByDateRange(p.startDate) || filterByDateRange(p.deadline));
 
-      fileContent = rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
+      headers = ['Project ID', 'Project Name', 'Client', 'Department', 'Manager', 'Leader', 'Priority', 'Start Date', 'Deadline', 'Progress (%)', 'Status', 'Total Tasks'];
+      rows = targetProjects.map(p => [
+        p.id || '',
+        p.name || '',
+        p.client || 'Internal',
+        p.department || '',
+        p.manager || '',
+        p.leader || '',
+        p.priority || '',
+        p.startDate || '',
+        p.deadline || '',
+        p.progress || 0,
+        p.status || '',
+        p.tasksTotal || 0
+      ]);
+
+      if (format === 'pdf') {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          const tableHeadersHTML = headers.map(h => `<th>${h}</th>`).join('');
+          const tableRowsHTML = rows.map(r => `<tr>${r.map(val => `<td>${val}</td>`).join('')}</tr>`).join('');
+          printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>All Projects Report</title>
+                <style>
+                  body { font-family: sans-serif; padding: 20px; color: #334155; }
+                  h1 { color: #0f172a; margin-bottom: 5px; }
+                  p { color: #64748b; font-size: 14px; margin-top: 0; margin-bottom: 20px; }
+                  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                  th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                  td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                  tr:nth-child(even) td { background-color: #f8fafc; }
+                </style>
+              </head>
+              <body>
+                <h1>All Projects Report</h1>
+                <p>Generated on: ${new Date().toLocaleString()} | Date Scope: ${dateRange} | Focus Area: ${reportType}</p>
+                <table>
+                  <thead><tr>${tableHeadersHTML}</tr></thead>
+                  <tbody>${tableRowsHTML}</tbody>
+                </table>
+                <script>
+                  window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+                </script>
+              </body>
+            </html>
+          `);
+          printWindow.document.close();
+          addToast('success', 'PDF Print window opened.');
+          setActiveModal(null);
+          setReportForm({ projectId: 'all', reportType: 'progress', format: 'pdf', dateRange: 'All' });
+          return;
+        }
+      } else {
+        fileContent = "\ufeff" + [
+          headers.join(','),
+          ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+      }
     } else {
-      // PDF/Text format: Build a beautiful plain-text ASCII report
-      mimeType = 'text/plain;charset=utf-8;';
-      fileExtension = 'txt';
+      // Specific Project Report
+      const targetProj = projects.find(p => p.id === projectId);
+      if (!targetProj) return;
 
-      const divider = '='.repeat(60);
-      const subDivider = '-'.repeat(60);
+      filename = `${targetProj.id}_report_${reportType}_${dateRange.toLowerCase()}`;
+      addToast('info', `Compiling report for "${targetProj.name}"...`);
 
-      fileContent = [
-        divider,
-        `               PROJECT PERFORMANCE REPORT`,
-        `               Project: ${targetProj.name} (${targetProj.id})`,
-        divider,
-        `Report Type  : ${reportType.toUpperCase()}`,
-        `Generated At : ${new Date().toLocaleString()}`,
-        subDivider,
-        `Project Name : ${targetProj.name}`,
-        `Client       : ${targetProj.client || 'Internal'}`,
-        `Department   : ${targetProj.department}`,
-        `Manager      : ${targetProj.manager}`,
-        `Leader       : ${targetProj.leader}`,
-        `Priority     : ${targetProj.priority}`,
-        `Start Date   : ${targetProj.startDate}`,
-        `Deadline     : ${targetProj.deadline}`,
-        `Progress     : ${targetProj.progress}%`,
-        `Status       : ${targetProj.status}`,
-        `Workflow Stage: ${targetProj.workflowStage || 'Planning'}`,
-        `Total Tasks  : ${targetProj.tasksTotal}`,
-        `Tasks Done   : ${targetProj.tasksDone}`,
-        subDivider,
-        `TEAM MEMBERS ASSIGNED:`,
-        ...(targetProj.members || []).map(m => ` - ${m} (${m === targetProj.manager ? 'Project Manager' : m === targetProj.leader ? 'Team Leader' : 'Team Member'})`),
-        subDivider,
-        `PROJECT CHECKLIST TASKS:`,
-        ...(targetProj.tasks || []).map(t => ` [${t.completed ? 'X' : ' '}] ${t.id} - ${t.title} (Due: ${t.dueDate}, Priority: ${t.priority})`),
-        divider
-      ].join('\n');
+      const filteredTasks = (targetProj.tasks || []).filter(t => filterByDateRange(t.dueDate));
+
+      if (format === 'pdf') {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          const membersHTML = (targetProj.members || []).map(m => `<li>${m}</li>`).join('');
+          const tasksHTML = filteredTasks.map(t => `
+            <tr>
+              <td>${t.id || ''}</td>
+              <td>${t.title || ''}</td>
+              <td>${t.dueDate || ''}</td>
+              <td>${t.priority || ''}</td>
+              <td>${t.completed ? 'YES' : 'NO'}</td>
+            </tr>
+          `).join('');
+
+          printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>Project Report - ${targetProj.name}</title>
+                <style>
+                  body { font-family: sans-serif; padding: 20px; color: #334155; }
+                  h1 { color: #0f172a; margin-bottom: 5px; }
+                  h2 { color: #1e293b; margin-top: 20px; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+                  p { color: #64748b; font-size: 14px; margin-top: 0; }
+                  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+                  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                  th { background-color: #f1f5f9; padding: 10px; border: 1px solid #e2e8f0; text-align: left; font-size: 12px; }
+                  td { padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+                  tr:nth-child(even) td { background-color: #f8fafc; }
+                </style>
+              </head>
+              <body>
+                <h1>Project Performance Report</h1>
+                <p>Project: <strong>${targetProj.name} (${targetProj.id})</strong></p>
+                <p>Generated: ${new Date().toLocaleString()} | Date Scope: ${dateRange}</p>
+                
+                <div class="grid">
+                  <div>
+                    <h2>Project Details</h2>
+                    <p><strong>Client:</strong> ${targetProj.client || 'Internal'}</p>
+                    <p><strong>Department:</strong> ${targetProj.department || ''}</p>
+                    <p><strong>Project Manager:</strong> ${targetProj.manager || ''}</p>
+                    <p><strong>Team Leader:</strong> ${targetProj.leader || ''}</p>
+                  </div>
+                  <div>
+                    <h2>Metrics</h2>
+                    <p><strong>Progress:</strong> ${targetProj.progress || 0}%</p>
+                    <p><strong>Status:</strong> ${targetProj.status || ''}</p>
+                    <p><strong>Total Tasks:</strong> ${targetProj.tasksTotal || 0}</p>
+                    <p><strong>Completed Tasks:</strong> ${targetProj.tasksDone || 0}</p>
+                  </div>
+                </div>
+
+                <h2>Team Members</h2>
+                <ul>${membersHTML || '<li>No members assigned</li>'}</ul>
+
+                <h2>Work Tasks (Filtered)</h2>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Task ID</th>
+                      <th>Title</th>
+                      <th>Due Date</th>
+                      <th>Priority</th>
+                      <th>Completed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${tasksHTML || '<tr><td colspan="5" style="text-align:center">No tasks in this date range</td></tr>'}
+                  </tbody>
+                </table>
+
+                <script>
+                  window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+                </script>
+              </body>
+            </html>
+          `);
+          printWindow.document.close();
+          addToast('success', 'PDF Print window opened.');
+          setActiveModal(null);
+          setReportForm({ projectId: 'all', reportType: 'progress', format: 'pdf', dateRange: 'All' });
+          return;
+        }
+      } else {
+        // Build detailed CSV
+        headers = [
+          ['PROJECT REPORT', targetProj.name],
+          ['Report Type', reportType.toUpperCase()],
+          ['Generated At', new Date().toLocaleString()],
+          [],
+          ['PROJECT METRICS', 'VALUE'],
+          ['Project ID', targetProj.id],
+          ['Project Name', targetProj.name],
+          ['Client', targetProj.client || 'Internal'],
+          ['Department', targetProj.department],
+          ['Project Manager', targetProj.manager],
+          ['Team Leader', targetProj.leader],
+          ['Priority', targetProj.priority],
+          ['Start Date', targetProj.startDate],
+          ['Deadline', targetProj.deadline],
+          ['Progress', `${targetProj.progress}%`],
+          ['Status', targetProj.status],
+          ['Workflow Stage', targetProj.workflowStage || 'Planning'],
+          ['Tasks Total', targetProj.tasksTotal],
+          ['Tasks Done', targetProj.tasksDone],
+          ['Working Hours logged', targetProj.workingHours || 0],
+          ['Productivity Score', `${targetProj.productivityScore || 80}%`],
+          [],
+          ['TEAM ASSIGNED'],
+          ['Name', 'Role'],
+          ...(targetProj.members || []).map(m => [m, m === targetProj.manager ? 'Project Manager' : m === targetProj.leader ? 'Team Leader' : 'Team Member']),
+          [],
+          ['PROJECT WORK TASKS (FILTERED)'],
+          ['Task ID', 'Task Title', 'Due Date', 'Priority', 'Completed'],
+          ...filteredTasks.map(t => [t.id, t.title, t.dueDate, t.priority, t.completed ? 'YES' : 'NO'])
+        ];
+
+        fileContent = "\ufeff" + headers.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
+      }
     }
 
     // Trigger standard Blob download
     setTimeout(() => {
+      const mimeType = format === 'excel' ? 'application/vnd.ms-excel;charset=utf-8;' : 'text/csv;charset=utf-8;';
+      const fileExtension = format === 'excel' ? 'xls' : 'csv';
+
       const blob = new Blob([fileContent], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-
-      // Clean target project name for filename
-      const cleanProjName = targetProj.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      link.setAttribute('download', `${targetProj.id}_${cleanProjName}_report_${reportType}.${fileExtension}`);
+      link.setAttribute('download', `${filename}.${fileExtension}`);
 
       document.body.appendChild(link);
       link.click();
@@ -704,7 +850,7 @@ const Projects = () => {
     }, 800);
 
     setActiveModal(null);
-    setReportForm({ projectId: '', reportType: 'progress', format: 'pdf' });
+    setReportForm({ projectId: 'all', reportType: 'progress', format: 'pdf', dateRange: 'All' });
   };
 
   // CSV Data Exporter
@@ -809,30 +955,6 @@ const Projects = () => {
         </div>
       </div>
 
-      {/* Top Banner Alert Bar */}
-      {isCompanyView && (
-        <div className={styles.alertsBanner}>
-          <div className={styles.alertsHeader}>
-            <span className={styles.alertsTitle}>
-              <Bell size={16} /> Important Dashboard System Alerts
-            </span>
-          </div>
-          <div className={styles.alertList}>
-            <div className={styles.alertItem}>
-              <span className={styles.alertDot} />
-              <span>Upcoming Deadlines: <strong>{stats.upcoming}</strong> projects need delivery this month.</span>
-            </div>
-            <div className={styles.alertItem}>
-              <span className={styles.alertDot} />
-              <span>Delayed Projects: <strong>{stats.delayed}</strong> databases and systems core lagging.</span>
-            </div>
-            <div className={styles.alertItem}>
-              <span className={styles.alertDot} />
-              <span>Approvals: <strong>8</strong> approvals pending from managers.</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Section G - Quick Action Buttons Bar */}
       {isCompanyView && (
@@ -860,8 +982,8 @@ const Projects = () => {
               </button>
             </>
           )}
-          <button className={styles.pageBtn} onClick={handleExportCSV}>
-            <Download size={14} /> Export Data (CSV)
+          <button className={styles.pageBtn} onClick={() => setActiveModal('report')}>
+            <Download size={14} /> Export Data
           </button>
           <button className={styles.pageBtn} onClick={handleViewAnalytics}>
             <TrendingUp size={14} /> View Analytics
@@ -1786,7 +1908,7 @@ const Projects = () => {
                     onChange={(e) => setReportForm({ ...reportForm, projectId: e.target.value })}
                     required
                   >
-                    <option value="">Select a project...</option>
+                    <option value="all">All Projects</option>
                     {projects.map(p => <option key={p.id} value={p.id}>{p.id} - {p.name}</option>)}
                   </select>
                 </div>
@@ -1803,6 +1925,21 @@ const Projects = () => {
                     <option value="deadlines">Deadline Tracking Report</option>
                     <option value="resources">Resource Allocation Report</option>
                     <option value="performance">Department Project Performance</option>
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Date Scope</label>
+                  <select
+                    className={styles.filterSelect}
+                    style={{ width: '100%' }}
+                    value={reportForm.dateRange}
+                    onChange={(e) => setReportForm({ ...reportForm, dateRange: e.target.value })}
+                  >
+                    <option value="All">All Time</option>
+                    <option value="Today">Today</option>
+                    <option value="Weekly">Weekly (Last 7 Days)</option>
+                    <option value="Monthly">Monthly (Last 30 Days)</option>
+                    <option value="Yearly">Yearly (Last 365 Days)</option>
                   </select>
                 </div>
                 <div className={styles.formGroup}>

@@ -512,7 +512,7 @@ const WebPortalAttendance = () => {
   const stats = useMemo(() => {
     const todayRecords = attendance.filter(a => a.date === dateFilter);
     const webPortalToday = todayRecords.filter(a => a.source === 'Web Portal').length;
-    const presentToday = todayRecords.filter(a => a.status === 'Present' || a.status === 'Overtime').length;
+    const presentToday = todayRecords.filter(a => a.status === 'Present' || a.status === 'Overtime' || a.status === 'Late').length;
 
     // Use TOTAL employees (not filtered view) as the denominator for consistent percentages
     const totalEmployees = employees.length;
@@ -530,7 +530,7 @@ const WebPortalAttendance = () => {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
     const yesterdayRecords = attendance.filter(a => a.date === yesterdayStr);
-    const yesterdayPresent = yesterdayRecords.filter(a => a.status === 'Present' || a.status === 'Overtime').length;
+    const yesterdayPresent = yesterdayRecords.filter(a => a.status === 'Present' || a.status === 'Overtime' || a.status === 'Late').length;
     const yesterdayMarked = yesterdayRecords.filter(a => a.source === 'Web Portal').length;
     const yesterdayOnTime = yesterdayRecords.filter(a => {
       if (!a.punchIn) return false;

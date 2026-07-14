@@ -1177,7 +1177,7 @@ const LeaveManagement = () => {
       ? [...myLeaves].sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate))
       : myLeaves.filter(l => l.status === empStatusTab).sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate));
 
-    const handleEmpApply = (formData) => {
+    const handleEmpApply = async (formData) => {
       const typeLabel = formData.type === 'CL' ? 'Casual Leave' : 
                         formData.type === 'SL' ? 'Sick Leave' : 
                         formData.type === 'PL' ? 'Earned Leave' : 
@@ -1196,9 +1196,10 @@ const LeaveManagement = () => {
             { date: new Date().toISOString().split('T')[0], status: 'Pending', comment: 'Edited by employee' }
           ]
         };
-        updateLeaveRequest(editingLeave.id, updatedRequest);
-        addToast('success', 'Leave request updated successfully.');
-        setEditingLeave(null);
+        const result = await updateLeaveRequest(editingLeave.id, updatedRequest);
+        if (result) {
+          setEditingLeave(null);
+        }
       } else {
         const newRequest = {
           id: `LR-${Math.floor(100 + Math.random() * 900)}`,
@@ -1217,7 +1218,6 @@ const LeaveManagement = () => {
         addLeaveRequest(newRequest);
         addToast('success', 'Leave request submitted successfully.');
       }
-      if (fetchLeaves) fetchLeaves(); // Refresh the list from the server
     };
 
     const handleEmpCancel = (leaveId) => {
@@ -1229,7 +1229,6 @@ const LeaveManagement = () => {
           if (leave) {
             updateLeaveRequest(leaveId, { ...leave, status: 'Cancelled' });
             addToast('success', 'Leave request cancelled.');
-            if (fetchLeaves) fetchLeaves(); // Refresh the list from the server
           }
         },
         'danger'

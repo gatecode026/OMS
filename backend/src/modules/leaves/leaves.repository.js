@@ -23,6 +23,14 @@ const validatePolicyAdminAccess = async (context) => {
   if (!context) return;
   if (context.isSuperAdmin || context.isCompanyAdmin) return;
 
+  // Employees and Team Leaders are never allowed to modify global leave policies
+  if (context.role === 'employee' || context.role === 'team_leader') {
+    const err = new Error('Access denied: Only Administrators are authorized to modify Leave Policies.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Check dynamic DB action-level permissions for other roles
   const isAllowed = await checkActionPermission('Leave', context.role, 'update');
   if (!isAllowed) {
     const err = new Error('Access denied: Only Administrators are authorized to modify Leave Policies.');
@@ -154,6 +162,14 @@ export const update = async (id, data) => {
     const restrictedFields = ['approver', 'status', 'approvedBy', 'approvalDate'];
     for (const field of restrictedFields) {
       if (data[field] !== undefined) {
+        // Allow cancellation
+        if (field === 'status' && data[field] === 'Cancelled') {
+          continue;
+        }
+        // Allow passing the same value as what's already saved (no actual change)
+        if (String(data[field]) === String(record[field])) {
+          continue;
+        }
         const err = new Error(`Access denied: You are not authorized to modify the "${field}" field.`);
         err.statusCode = 403;
         throw err;

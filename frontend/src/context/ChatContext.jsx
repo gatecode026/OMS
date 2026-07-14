@@ -1386,6 +1386,9 @@ export const ChatProvider = ({ children }) => {
         status: 'failed',
         error: err.message || 'Upload failed'
       });
+      if (addToastRef.current) {
+        addToastRef.current('error', `Upload failed: ${err.message || 'Server connection error'}`);
+      }
     }
   }, [token, updateUploadItem]);
 
@@ -2311,6 +2314,9 @@ export const ChatProvider = ({ children }) => {
 
     socket.on('message_error', handleSendError);
     socket.on('message_upload_error', handleSendError);
+    socket.on('error', (err) => {
+      console.error('[Chat Socket] Global error event received:', err);
+    });
 
     // ── Conversation Cleared ──────────────────────────────────────────────
     socket.on('conversation:cleared', ({ conversationId }) => {

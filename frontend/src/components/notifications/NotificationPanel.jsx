@@ -1,14 +1,3 @@
-/**
- * @file NotificationPanel.jsx
- * @description Quick-view notification dropdown panel.
- *
- *   Shows the 5 most recent notifications with:
- *   • Type-specific color-coded icons (all 14 types)
- *   • Click-to-navigate with mark-as-read
- *   • Mark all read action
- *   • View all → opens full NotificationDrawer
- */
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
@@ -18,6 +7,7 @@ import {
   Smile, Radio, UserPlus, UserMinus, Zap, ClipboardList, CreditCard, Clock
 } from 'lucide-react';
 import './NotificationComponents.css';
+import { decodeHTMLEntities } from '../../utils/stringUtils';
 
 // ── TYPE ICON MAP ─────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
@@ -77,23 +67,39 @@ const formatTime = (dateStr) => {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-const API_BASE = window.API_URL || 'http://localhost:5000';
+const getNotificationGroup = (dateStr) => {
+  if (!dateStr) return 'Earlier';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return 'Earlier';
+  
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  
+  const isSameDay = (d1, d2) => 
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+    
+  if (isSameDay(date, today)) return 'Today';
+  if (isSameDay(date, yesterday)) return 'Yesterday';
+  return 'Earlier';
+};
 
 // ── COMPONENT ─────────────────────────────────────────────────────────────────
 const NotificationPanel = ({ notifications, onMarkAllRead, onClose, onOpenDrawer }) => {
   const navigate = useNavigate();
-  const { token } = useApp();
+  const { markNotificationRead } = useApp();
 
   const handleNotificationClick = async (notif) => {
     onClose();
 
-    // Mark as read in background (fire-and-forget)
+    // Mark as read in context (updates local and calls backend PATCH)
     const notifId = notif.id || notif._id;
     if (notifId && !notif.isRead) {
-      fetch(`${API_BASE}/api/v1/notifications/${notifId}/read`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {});
+      if (markNotificationRead) {
+        await markNotificationRead(notifId);
+      }
     }
 
     const type = (notif.type || '').toLowerCase();
@@ -120,12 +126,29 @@ const NotificationPanel = ({ notifications, onMarkAllRead, onClose, onOpenDrawer
     ) {
       navigate('/chat', { state: { conversationId: data.conversationId } });
     } else {
-      // Fallback: Always redirect to the main notification page
       navigate('/notifications', { state: { selectedNotifId: notifId } });
     }
   };
 
   const hasUnread = notifications.some((n) => !n.isRead);
+
+  const grouped = React.useMemo(() => {
+    const sections = {
+      Unread: [],
+      Today: [],
+      Yesterday: [],
+      Earlier: []
+    };
+    notifications.forEach(n => {
+      if (!n.isRead) {
+        sections.Unread.push(n);
+      } else {
+        const grp = getNotificationGroup(n.createdAt);
+        sections[grp].push(n);
+      }
+    });
+    return sections;
+  }, [notifications]);
 
   return (
     <div className="notif-panel" role="dialog" aria-label="Recent Notifications">
@@ -144,28 +167,53 @@ const NotificationPanel = ({ notifications, onMarkAllRead, onClose, onOpenDrawer
       </div>
 
       {/* Notification list */}
-      <div className="notif-list">
+      <div className="notif-list" style={{ maxHeight: '360px', overflowY: 'auto' }}>
         {notifications.length > 0 ? (
-          notifications.map((n) => {
-            const notifId = n.id || n._id;
+          Object.entries(grouped).map(([sectionName, items]) => {
+            if (items.length === 0) return null;
             return (
-              <div
-                key={notifId}
-                className={`notif-item-wrapper${!n.isRead ? ' unread' : ''}${n.priority === 'high' ? ' priority-high' : ''}`}
-                onClick={() => handleNotificationClick(n)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && handleNotificationClick(n)}
-              >
-                <NotifIcon type={n.type} />
-                <div className="notif-item-content">
-                  <h5 className="notif-item-title">{n.title}</h5>
-                  <p className="notif-item-msg">{n.message}</p>
-                  <div className="notif-item-footer">
-                    <span className="notif-item-time">{formatTime(n.createdAt)}</span>
-                    {!n.isRead && <span className="notif-item-dot" />}
-                  </div>
+              <div key={sectionName} className="notif-section" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div className="notif-section-header" style={{
+                  padding: '6px 16px',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted, #94a3b8)',
+                  backgroundColor: 'rgba(148, 163, 184, 0.06)',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                  letterSpacing: '0.05em'
+                }}>
+                  {sectionName}
                 </div>
+                {items.map((n) => {
+                  const notifId = n.id || n._id;
+                  return (
+                    <div
+                      key={notifId}
+                      className={`notif-item-wrapper${!n.isRead ? ' unread' : ''}${n.priority === 'high' ? ' priority-high' : ''}`}
+                      onClick={() => handleNotificationClick(n)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && handleNotificationClick(n)}
+                    >
+                      <NotifIcon type={n.type} />
+                      <div className="notif-item-content">
+                        <h5 className="notif-item-title" style={{ fontWeight: !n.isRead ? 700 : 500 }}>{n.title}</h5>
+                        <p className="notif-item-msg">{decodeHTMLEntities(n.message)}</p>
+                        <div className="notif-item-footer">
+                          <span className="notif-item-time">{formatTime(n.createdAt)}</span>
+                          {!n.isRead && <span className="notif-item-dot" style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: '50%',
+                            backgroundColor: '#3b82f6',
+                            display: 'inline-block'
+                          }} />}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })

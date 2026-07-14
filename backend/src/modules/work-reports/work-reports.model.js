@@ -109,9 +109,13 @@ const workReportSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  completedTaskIds: {
+    type: [String],
+    default: []
+  },
   status: {
     type: String,
-    enum: ['Submitted', 'Approved', 'Changes Requested', 'Escalated', 'Rejected'],
+    enum: ['Submitted', 'Approved', 'Changes Requested', 'Escalated', 'Rejected', 'Under Process'],
     default: 'Submitted'
   },
   submittedTime: {

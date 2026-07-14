@@ -91,7 +91,8 @@ const fieldPolicies = {
     allowedFields: {},
     restrictedFields: {
       employee: ['name', 'description', 'department', 'branch', 'client', 'manager', 'leader', 'members', 'priority', 'startDate', 'deadline', 'budget', 'workflowStage', 'approvalStatus'],
-      team_leader: ['name', 'description', 'department', 'branch', 'client', 'manager', 'leader', 'members', 'priority', 'startDate', 'deadline', 'budget', 'workflowStage', 'approvalStatus']
+      team_leader: ['name', 'description', 'department', 'branch', 'client', 'manager', 'leader', 'priority', 'startDate', 'deadline', 'budget', 'workflowStage', 'approvalStatus'],
+      manager: []
     }
   },
   Tasks: {
@@ -209,9 +210,9 @@ export const checkActionPermission = async (moduleName, role, action) => {
     return true;
   }
 
-  // Self-service bypass: Employees and Team Leaders can always create/read/update their own attendance and leave records.
+  // Self-service bypass: Employees and Team Leaders can always create/read/update their own attendance, leave, and document records.
   // The repository layer will enforce strict ownership mapping to ensure they only touch their own records.
-  if (['Attendance', 'Leave'].includes(moduleName) && ['create', 'read', 'update'].includes(action)) {
+  if (['Attendance', 'Leave', 'Tasks', 'Documents'].includes(moduleName) && ['create', 'read', 'update'].includes(action)) {
     if (role === 'employee' || role === 'team_leader') return true;
   }
 
@@ -287,13 +288,23 @@ export const getRestrictedFields = (moduleName, role) => {
   const policy = getCanonicalPolicy(moduleName);
   if (!policy) return [];
 
-  // If the role is an admin role, do not fallback to 'employee'
-  if (role === 'super_admin' || role === 'company_admin' || role === 'branch_admin') {
-    return policy.restrictedFields[role] || [];
+  // If the role is explicitly defined in policy.restrictedFields, use it
+  if (policy.restrictedFields && policy.restrictedFields[role] !== undefined) {
+    return policy.restrictedFields[role];
   }
 
-  // Get restricted fields for the role (or fallback to employee defaults)
-  return policy.restrictedFields[role] || policy.restrictedFields['employee'] || [];
+  // Admin roles have no field restrictions by default
+  if (role === 'super_admin' || role === 'company_admin' || role === 'branch_admin') {
+    return [];
+  }
+
+  // If the role is specifically 'employee' or 'team_leader', we fallback to employee
+  if (role === 'employee' || role === 'team_leader') {
+    return (policy.restrictedFields && policy.restrictedFields['employee']) || [];
+  }
+
+  // Any other custom role gets no restrictions by default
+  return [];
 };
 
 // ─── MODULE CONFIG (FOR SCOPE/OWNERSHIP REQUIREMENTS) ───────────────────────

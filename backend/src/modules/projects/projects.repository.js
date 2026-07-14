@@ -215,6 +215,14 @@ export const update = async (id, data) => {
     }
   }
 
+  // Auto-transition project status to 'Active' if tasks are assigned and current status is Pending/Planning
+  if (data.tasks && Array.isArray(data.tasks) && data.tasks.length > 0) {
+    if (project.status === 'Pending' || project.status === 'Planning') {
+      project.status = 'Active';
+      data.status = 'Active';
+    }
+  }
+
   Object.assign(project, data);
 
   // Auto-resolve branch from department on update

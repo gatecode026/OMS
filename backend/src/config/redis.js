@@ -83,6 +83,24 @@ client.mget = function (keys) {
   return client.mGet(keys);
 };
 
+// ── Multi Wrapper ───────────────────────────────────────────────────────────
+const originalMulti = client.multi.bind(client);
+client.multi = function (...args) {
+  const multi = originalMulti(...args);
+  const originalExec = multi.exec.bind(multi);
+  multi.exec = function (...execArgs) {
+    return originalExec(...execArgs).catch((err) => {
+      const errMsg = err.message || "";
+      if (errMsg.includes("max requests limit exceeded") || errMsg.includes("limit exceeded") || errMsg.includes("Quota Exceeded")) {
+        client.isAvailable = false;
+        logger.error(`[Redis Multi] Request limit exceeded. Disabling Redis client dynamically. Error: ${errMsg}`);
+      }
+      throw err;
+    });
+  };
+  return multi;
+};
+
 // ── Duplicate Factory ─────────────────────────────────────────────────────────
 const originalDuplicate = client.duplicate.bind(client);
 client.duplicate = function (...args) {
@@ -108,6 +126,24 @@ client.duplicate = function (...args) {
     return dup.mGet(keys);
   };
 
+  const originalDupMulti = dup.multi.bind(dup);
+  dup.multi = function (...args) {
+    const multi = originalDupMulti(...args);
+    const originalExec = multi.exec.bind(multi);
+    multi.exec = function (...execArgs) {
+      return originalExec(...execArgs).catch((err) => {
+        const errMsg = err.message || "";
+        if (errMsg.includes("max requests limit exceeded") || errMsg.includes("limit exceeded") || errMsg.includes("Quota Exceeded")) {
+          dup.isAvailable = false;
+          client.isAvailable = false;
+          logger.error(`[Redis Duplicate Multi] Request limit exceeded. Disabling Redis client dynamically. Error: ${errMsg}`);
+        }
+        throw err;
+      });
+    };
+    return multi;
+  };
+
   dup.on("connect", () => { dup.isAvailable = true; });
   dup.on("ready", () => { dup.isAvailable = true; });
   dup.on("error", (err) => {
@@ -121,7 +157,59 @@ client.duplicate = function (...args) {
     logger.error(`[Redis] Failed to connect duplicate client: ${err.message}`);
   });
 
-  return dup;
+  return wrapClient(dup);
 };
 
-export default client;
+// ── Proxy Wrapper to dynamically disable Redis on billing/limit errors ──────────
+const wrapClient = (clientInstance) => {
+  return new Proxy(clientInstance, {
+    get(target, prop, receiver) {
+      if (prop === "isAvailable") {
+        return target.isAvailable;
+      }
+      
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value === "function") {
+        return function (...args) {
+          // If the client is disabled, bypass commands gracefully
+          if (!target.isAvailable && prop !== "connect" && prop !== "on" && prop !== "duplicate" && prop !== "quit" && prop !== "disconnect") {
+            if (prop === "mget" || prop === "mGet") return Promise.resolve([]);
+            return Promise.resolve(null);
+          }
+          
+          try {
+            const result = value.apply(target, args);
+            if (result instanceof Promise) {
+              return result.catch((err) => {
+                const errMsg = err.message || "";
+                if (errMsg.includes("max requests limit exceeded") || errMsg.includes("limit exceeded") || errMsg.includes("Quota Exceeded")) {
+                  target.isAvailable = false;
+                  client.isAvailable = false; // Disable main client too
+                  logger.error(`[Redis] Request limit exceeded. Disabling Redis client dynamically. Error: ${errMsg}`);
+                  if (prop === "mget" || prop === "mGet") return [];
+                  return null;
+                }
+                throw err;
+              });
+            }
+            return result;
+          } catch (err) {
+            const errMsg = err.message || "";
+            if (errMsg.includes("max requests limit exceeded") || errMsg.includes("limit exceeded") || errMsg.includes("Quota Exceeded")) {
+              target.isAvailable = false;
+              client.isAvailable = false;
+              logger.error(`[Redis] Request limit exceeded. Disabling Redis client dynamically. Error: ${errMsg}`);
+              if (prop === "mget" || prop === "mGet") return [];
+              return null;
+            }
+            throw err;
+          }
+        };
+      }
+      return value;
+    }
+  });
+};
+
+const wrappedClient = wrapClient(client);
+export default wrappedClient;

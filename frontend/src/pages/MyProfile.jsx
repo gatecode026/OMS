@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import './MyProfile.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -7,10 +7,11 @@ import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
 import Modal from '../components/common/Modal';
+import { ImageKitUploadService } from '../services/imagekitUploadService';
 import {
   User, Mail, Phone, MapPin, Briefcase, Shield, Clock,
   Lock, Check, Download, Share2, Globe, Building, Cpu, Activity,
-  FileText, FileCode, File
+  FileText, FileCode, File, Camera
 } from 'lucide-react';
 
 // ─── REDESIGNED SUB-COMPONENTS ─────────────────────────────────────────────
@@ -28,6 +29,75 @@ const StatusBadge = ({ status }) => {
 };
 
 const ProfileHeroCard = ({ user }) => {
+  const { patchCurrentUserAvatar, token, addToast } = useApp();
+  const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleTriggerUpload = () => {
+    if (isUploading) return;
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      addToast('error', 'Please select a valid image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      addToast('error', 'Image size must be less than 5MB');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const authParams = await ImageKitUploadService.fetchAuthParams(token);
+      const result = await ImageKitUploadService.upload(
+        file,
+        authParams,
+        (progress) => {
+          console.log(`Avatar upload progress: ${progress.percentage}%`);
+        }
+      );
+
+      if (!result || !result.url) {
+        throw new Error('Upload to ImageKit failed');
+      }
+
+      const imageUrl = result.url;
+
+      // Use the dedicated self-service avatar endpoint — bypasses permission matrix
+      const res = await fetch(`/api/v1/employees/${user.id}/avatar`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ avatar: imageUrl, photoUrl: imageUrl })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to save profile image');
+      }
+
+      const data = await res.json();
+      // Update global context so sidebar/header reflect the new photo immediately (no extra API call)
+      patchCurrentUserAvatar(user.id, imageUrl);
+      addToast('success', 'Profile image updated successfully!');
+    } catch (err) {
+      console.error('Failed to update avatar:', err);
+      addToast('error', err.message || 'Error occurred while updating profile image');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleDownloadQR = (employeeId, companyId) => {
     try {
       const data = JSON.stringify({ employeeId, companyId });
@@ -70,13 +140,35 @@ const ProfileHeroCard = ({ user }) => {
       <div className="hero-card-banner" />
       <div className="hero-card-content">
         <div className="hero-left-col">
-          <div className="hero-avatar-glow">
+          <div 
+            className="hero-avatar-glow" 
+            style={{ cursor: 'pointer' }} 
+            onClick={handleTriggerUpload}
+            title="Click to change profile picture"
+          >
             {user.photoUrl ? (
               <img src={user.photoUrl} alt={user.name} />
             ) : (
               <Avatar name={user.name} size="xl" src={user.avatar} />
             )}
+            <div className="avatar-edit-overlay">
+              <Camera size={18} style={{ color: '#fff' }} />
+              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#fff', marginTop: '2px' }}>Change</span>
+            </div>
+            {isUploading && (
+              <div className="avatar-edit-overlay" style={{ opacity: 1, background: 'rgba(9, 13, 22, 0.8)' }}>
+                <div className="avatar-upload-spinner" />
+                <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#fff', marginTop: '6px' }}>Uploading...</span>
+              </div>
+            )}
           </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept="image/*"
+            onChange={handleFileChange}
+          />
           <div className="hero-primary-info">
             <h3>{user.name}</h3>
             <p className="hero-designation">{user.designation || '—'}</p>

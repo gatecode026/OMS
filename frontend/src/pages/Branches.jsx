@@ -6,6 +6,7 @@ import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import Avatar from '../components/common/Avatar';
 import Skeleton from '../components/common/Skeleton';
+import Modal from '../components/common/Modal';
 import { useNavigate } from 'react-router-dom';
 import { encodeEmployeeId } from '../utils/hashId';
 import {
@@ -21,7 +22,7 @@ import {
 const Branches = () => {
   const isLoading = usePageLoading(500);
   const navigate = useNavigate();
-  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole, currentUser } = useApp();
+  const { addToast, showConfirm, employees, branches: originalBranches, departments, attendance, addBranch, updateBranch, deleteBranch, updateEmployee, addEmployee, projectsList, hasPermission, currentUserRole, currentUser, leaveRequests } = useApp();
 
   // Real employee counts by branch (from actual employees data)
   const branchEmployeeCountMap = useMemo(() => {
@@ -37,6 +38,49 @@ const Branches = () => {
 
   const getRealEmpCount = (branchName) => {
     return branchEmployeeCountMap[(branchName || '').trim().toLowerCase()] || 0;
+  };
+
+  const getBranchOnLeaveCount = (branchName) => {
+    if (!branchName) return 0;
+    const branchEmployees = (employees || []).filter(e => 
+      e?.status !== 'Inactive' && 
+      (e?.branch || '').trim().toLowerCase() === branchName.trim().toLowerCase()
+    );
+    
+    // Get today's local date string YYYY-MM-DD
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    
+    return branchEmployees.filter(emp => {
+      if (emp.status === 'On Leave') return true;
+      return (leaveRequests || []).some(l => 
+        l.employeeId === emp.id && 
+        l.status === 'Approved' && 
+        todayStr >= l.fromDate && 
+        todayStr <= (l.toDate || l.fromDate)
+      );
+    }).length;
+  };
+
+  const getBranchTeamLeadersCount = (branchName) => {
+    if (!branchName) return 0;
+    return (employees || []).filter(e => 
+      e?.status !== 'Inactive' && 
+      (e?.branch || '').trim().toLowerCase() === branchName.trim().toLowerCase() &&
+      ((e?.designation || '').toLowerCase().includes('team leader') || (e?.roleId || '').toLowerCase() === 'team_leader')
+    ).length;
+  };
+
+  const getBranchProjectManagersCount = (branchName) => {
+    if (!branchName) return 0;
+    return (employees || []).filter(e => 
+      e?.status !== 'Inactive' && 
+      (e?.branch || '').trim().toLowerCase() === branchName.trim().toLowerCase() &&
+      ((e?.designation || '').toLowerCase().includes('project manager') || (e?.designation || '').toLowerCase().includes('manager') || (e?.roleId || '').toLowerCase() === 'manager')
+    ).length;
   };
 
   const generatedEmployeeId = useMemo(() => {
@@ -223,6 +267,13 @@ const Branches = () => {
     return generatedAlerts;
   }, [branches]);
 
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportOptions, setExportOptions] = useState({
+    reportType: 'All Branches',
+    branchId: '',
+    dateRange: 'AllTime',
+    format: 'CSV'
+  });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -1021,19 +1072,171 @@ const Branches = () => {
   };
 
   const handleExportCSV = () => {
-    addToast('info', 'Compiling report...');
-    setTimeout(() => {
-      const headers = ['ID','Code','Name','Manager','City','Status','Employees','Attendance','Productivity'];
-      const rows = branches.map(b => [
-        b.id, b.code, b.name, b.manager, b.city, b.status, b.employeeCount, b.attendance, b.productivity
+    setIsExportOpen(true);
+  };
+
+  const handleExportSubmit = (e) => {
+    e.preventDefault();
+    const { reportType, branchId, dateRange, format } = exportOptions;
+
+    let targets = [...branches];
+    if (reportType === 'Specific Branch' && branchId) {
+      targets = targets.filter(b => b.id === branchId);
+    }
+
+    // Filter by Date Scope using b.established
+    const now = new Date();
+    targets = targets.filter(b => {
+      if (dateRange === 'AllTime' || dateRange === 'All') return true;
+      if (!b.established) return false;
+      const establishedDate = new Date(b.established);
+      const diffTime = Math.abs(now - establishedDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (dateRange === 'Today') return diffDays <= 1;
+      if (dateRange === 'Weekly') return diffDays <= 7;
+      if (dateRange === 'Monthly') return diffDays <= 30;
+      if (dateRange === 'Yearly') return diffDays <= 365;
+      return true;
+    });
+
+    const filename = `Agency_Branch_Report_${new Date().toISOString().split('T')[0]}`;
+
+    if (format === 'PDF') {
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${filename}</title>
+            <style>
+              body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                color: #1e293b;
+                margin: 40px;
+                background-color: #ffffff;
+              }
+              h2 {
+                color: #0f172a;
+                border-bottom: 2px solid #e2e8f0;
+                padding-bottom: 12px;
+                margin-bottom: 20px;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              th, td {
+                border: 1px solid #cbd5e1;
+                padding: 10px 12px;
+                text-align: left;
+                font-size: 0.85rem;
+              }
+              th {
+                background-color: #f1f5f9;
+                font-weight: 600;
+              }
+              .meta-info {
+                font-size: 0.85rem;
+                color: #64748b;
+                margin-bottom: 30px;
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Agency & Branch Management Summary Report</h2>
+            <div class="meta-info">
+              <strong>Generated At:</strong> ${new Date().toLocaleString()}<br/>
+              <strong>Date Scope (Established):</strong> ${dateRange}<br/>
+              <strong>Scope:</strong> ${reportType === 'Specific Branch' ? 'Single Branch Performance Audit' : 'Organization-wide Branch Audit'}
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Branch ID</th>
+                  <th>Code</th>
+                  <th>Branch Name</th>
+                  <th>Manager</th>
+                  <th>City</th>
+                  <th>Status</th>
+                  <th>Employees</th>
+                  <th>Attendance Rate</th>
+                  <th>Productivity Score</th>
+                  <th>Established</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${targets.map(b => `
+                  <tr>
+                    <td>${b.id}</td>
+                    <td><strong>${b.code || 'N/A'}</strong></td>
+                    <td>${b.name}</td>
+                    <td>${b.manager || 'Unassigned'}</td>
+                    <td>${b.city || 'N/A'}</td>
+                    <td>${b.status}</td>
+                    <td>${b.employeeCount || 0}</td>
+                    <td>${b.attendance || 0}%</td>
+                    <td>${b.productivity || 0}%</td>
+                    <td>${b.established || 'N/A'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(() => window.close(), 500);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setIsExportOpen(false);
+      return;
+    }
+
+    // CSV / Excel formats
+    const headers = [
+      ['AGENCY BRANCH EXPORT SUMMARY REPORT'],
+      ['Report Type', reportType.toUpperCase()],
+      ['Date Scope', dateRange],
+      ['Generated At', new Date().toLocaleString()],
+      [],
+      ['Branch ID', 'Code', 'Branch Name', 'Manager', 'City', 'Status', 'Employees', 'Attendance (%)', 'Productivity (%)', 'Established Date']
+    ];
+
+    targets.forEach(b => {
+      headers.push([
+        b.id,
+        b.code || 'N/A',
+        b.name,
+        b.manager || 'Unassigned',
+        b.city || 'N/A',
+        b.status,
+        b.employeeCount || 0,
+        `${b.attendance || 0}%`,
+        `${b.productivity || 0}%`,
+        b.established || 'N/A'
       ]);
-      const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'branches_summary_report.csv'; a.click();
-      URL.revokeObjectURL(url);
-      addToast('success', 'Branches CSV Download Ready!');
-    }, 800);
+    });
+
+    const fileContent = "\ufeff" + headers.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const mimeType = format === 'Excel' ? 'application/vnd.ms-excel;charset=utf-8;' : 'text/csv;charset=utf-8;';
+    const fileExtension = format === 'Excel' ? 'xls' : 'csv';
+
+    const blob = new Blob([fileContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${filename}.${fileExtension}`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    addToast('success', `${format} report exported successfully!`);
+    setIsExportOpen(false);
   };
 
   if (isLoading) {
@@ -1888,7 +2091,7 @@ const Branches = () => {
             <div>
               <h3>Total Headcount</h3>
               <p className="val">{getRealEmpCount(selectedBranch.name)} Employees</p>
-              <p className="sub">{selectedBranch.employeesOnLeave || 0} Currently on Leave</p>
+              <p className="sub">{getBranchOnLeaveCount(selectedBranch.name)} Currently on Leave</p>
             </div>
           </div>
           <div className="stat-card card">
@@ -2451,9 +2654,9 @@ const Branches = () => {
                     <h4><Users size={14} /> Staff Allocation Overview</h4>
                     <div className="stats-mini-grid">
                       <div className="stat-mini"><span>Employees</span><strong>{getRealEmpCount(selectedBranch.name)}</strong></div>
-                      <div className="stat-mini"><span>On Leave</span><strong>{selectedBranch.employeesOnLeave}</strong></div>
-                      <div className="stat-mini"><span>Team Leaders</span><strong>{selectedBranch.teamLeaders}</strong></div>
-                      <div className="stat-mini"><span>Project Mgrs</span><strong>{selectedBranch.projectManagers}</strong></div>
+                      <div className="stat-mini"><span>On Leave</span><strong>{getBranchOnLeaveCount(selectedBranch.name)}</strong></div>
+                      <div className="stat-mini"><span>Team Leaders</span><strong>{getBranchTeamLeadersCount(selectedBranch.name) || selectedBranch.teamLeaders || 0}</strong></div>
+                      <div className="stat-mini"><span>Project Mgrs</span><strong>{getBranchProjectManagersCount(selectedBranch.name) || selectedBranch.projectManagers || 0}</strong></div>
                     </div>
 
                     <h4 style={{ marginTop: '16px' }}>Departments Distribution</h4>
@@ -2514,9 +2717,17 @@ const Branches = () => {
                           <div className="progress-label"><span>Present Rate</span><strong>{selectedBranch.attendance}%</strong></div>
                           <div className="progress-bar" style={{ height: '6px' }}><div className="progress-fill" style={{ width: `${selectedBranch.attendance}%`, background: selectedBranch.attendance >= 94 ? '#10b981' : '#f59e0b' }}></div></div>
                           <div className="attendance-mini-stats" style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.78rem', marginTop: '10px' }}>
-                            <span>✅ Present: <strong>{Math.round(getRealEmpCount(selectedBranch.name) * selectedBranch.attendance / 100)}</strong> staff</span>
-                            <span>❌ Absent: <strong>{Math.round(getRealEmpCount(selectedBranch.name) * (100 - selectedBranch.attendance) / 100)}</strong> staff</span>
-                            <span>🌴 On Leave: <strong>{selectedBranch.employeesOnLeave}</strong> staff</span>
+                            <span>✅ Present: <strong>{(() => {
+                              const total = getRealEmpCount(selectedBranch.name);
+                              return Math.round(total * selectedBranch.attendance / 100);
+                            })()}</strong> staff</span>
+                            <span>❌ Absent: <strong>{(() => {
+                              const total = getRealEmpCount(selectedBranch.name);
+                              const present = Math.round(total * selectedBranch.attendance / 100);
+                              const leave = getBranchOnLeaveCount(selectedBranch.name);
+                              return Math.max(0, total - present - leave);
+                            })()}</strong> staff</span>
+                            <span>🌴 On Leave: <strong>{getBranchOnLeaveCount(selectedBranch.name)}</strong> staff</span>
                           </div>
                         </div>
                       </div>
@@ -2644,6 +2855,122 @@ const Branches = () => {
 
       {/* Modals & Overlays */}
       {renderModals()}
+
+      {/* ── Export Results Modal Form ── */}
+      {isExportOpen && (
+        <Modal
+          isOpen={isExportOpen}
+          onClose={() => setIsExportOpen(false)}
+          title="Export Agency & Branch Report"
+        >
+          <form onSubmit={handleExportSubmit}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Report Type</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.reportType}
+                  onChange={(e) => setExportOptions({
+                    ...exportOptions,
+                    reportType: e.target.value,
+                    branchId: e.target.value === 'All Branches' ? '' : exportOptions.branchId || (branches[0]?.id || '')
+                  })}
+                >
+                  <option value="All Branches">All Branches Performance Audit</option>
+                  <option value="Specific Branch">Specific Branch Performance Audit</option>
+                </select>
+              </div>
+
+              {exportOptions.reportType === 'Specific Branch' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Select Branch</label>
+                  <select
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                    value={exportOptions.branchId}
+                    onChange={(e) => setExportOptions({ ...exportOptions, branchId: e.target.value })}
+                    required
+                  >
+                    <option value="">— Select Branch —</option>
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name} ({b.city})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Date Scope (Established Date)</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.dateRange}
+                  onChange={(e) => setExportOptions({ ...exportOptions, dateRange: e.target.value })}
+                >
+                  <option value="AllTime">All Time</option>
+                  <option value="Today">Today</option>
+                  <option value="Weekly">Weekly (Last 7 Days)</option>
+                  <option value="Monthly">Monthly (Last 30 Days)</option>
+                  <option value="Yearly">Yearly (Last 365 Days)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>Export Format</label>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.9rem',
+                    outline: 'none'
+                  }}
+                  value={exportOptions.format}
+                  onChange={(e) => setExportOptions({ ...exportOptions, format: e.target.value })}
+                >
+                  <option value="CSV">Standard CSV File (.csv)</option>
+                  <option value="Excel">Microsoft Excel Sheet (.xls)</option>
+                  <option value="PDF">Adobe PDF Document (.pdf)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <Button type="button" variant="ghost" onClick={() => setIsExportOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary">
+                  Compile & Export
+                </Button>
+              </div>
+            </div>
+          </form>
+        </Modal>
+      )}
+
     </div>
   );
 };
