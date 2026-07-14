@@ -97,6 +97,10 @@ export const sanitizeNoSql = (input) => {
  */
 export const sanitizeXss = (input) => {
   if (typeof input === 'string') {
+    // Skip escaping for base64 data URLs and HTTP/HTTPS URLs to prevent corrupting binary data and links
+    if (input.startsWith('data:') || input.startsWith('http://') || input.startsWith('https://')) {
+      return input;
+    }
     return input
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
