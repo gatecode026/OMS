@@ -36,6 +36,19 @@ export class EmployeeQueryBuilder {
       }
     }
 
+    // Exclude manager/admin profiles based on authority level
+    if (!this.context.isSuperAdmin && !this.context.isCompanyAdmin) {
+      if (this.context.isEmployee || this.context.isTeamLeader) {
+        // Lower authority cannot see any managers, HR, finance, branch admins, or company admins
+        const excludedRoles = ['manager', 'branch_manager', 'hr_manager', 'finance_manager', 'super_admin', 'company_admin', 'branch_admin'];
+        filters.roleId = { $nin: excludedRoles };
+      } else {
+        // Other authority dashboards/lists (like HR, Finance, Branch Managers) cannot see manager roles
+        const managerRoles = ['manager', 'branch_manager', 'branch_admin'];
+        filters.roleId = { $nin: managerRoles };
+      }
+    }
+
     return filters;
   }
 
