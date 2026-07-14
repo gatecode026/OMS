@@ -107,7 +107,7 @@ export const validateDepartmentScope = (context, resource, deptField = 'departme
  */
 export const validateOwnership = (context, resource, ownerIdFields = ['id', 'userId', 'employeeId'], moduleName = 'unknown', operation = 'read') => {
   if (context.isSuperAdmin || context.isCompanyAdmin) return true;
-  if (['Chat', 'Conversation', 'Message', 'Call'].includes(moduleName) && operation === 'read') return true;
+  if (['Chat', 'Conversation', 'Message', 'Call', 'Thread', 'Poll'].includes(moduleName)) return true;
   if (moduleName === 'Projects') return true;
   if (moduleName === 'Tasks' && resource && (resource.tasks !== undefined || (resource.constructor && resource.constructor.modelName === 'Project'))) return true;
 
