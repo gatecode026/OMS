@@ -175,6 +175,14 @@ const Payroll = () => {
     fetchAttendance();
     fetchPayrollQueries();
     fetchPayrollData();
+    // One-time migration: wipe legacy dummy-calculated TDS/PF/PT from all saved payment records
+    if (token) {
+      fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/payments/fix-deductions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ fields: ['tds', 'pf', 'pt', 'esi'] })
+      }).then(() => fetchPayrollData()).catch(() => {});
+    }
   }, []);
 
   React.useEffect(() => {
@@ -629,41 +637,27 @@ const Payroll = () => {
   // --- Dynamic Calculator Engine logic ---
   const calculatedPayrollData = useMemo(() => {
     return scopedPayrollState.map(p => {
-      // If this is a saved, processed database record, do not recalculate/overwrite it!
+      // If this is a saved, processed database record — return database values directly, no recalculation
       if (p._id || p.createdAt) {
-        const basic = p.basicSalary || 0;
-        
-        // If these exist on the database document (saved real-time values), use them!
-        // Otherwise, fall back to standard calculations for backward compatibility.
-        const hra = p.hra !== undefined && p.hra !== null ? p.hra : Math.round(basic * 0.4);
-        const travel = p.travel !== undefined && p.travel !== null ? p.travel : 0;
-        const medical = p.medical !== undefined && p.medical !== null ? p.medical : 0;
-        const pf = p.pf !== undefined && p.pf !== null ? p.pf : Math.round(basic * 0.12);
-        const tds = p.tds !== undefined && p.tds !== null ? p.tds : Math.round(basic * 0.1);
-        const pt = p.pt !== undefined && p.pt !== null ? p.pt : 200;
-        const esi = p.esi !== undefined && p.esi !== null ? p.esi : 0;
-        
-        const special = p.special !== undefined && p.special !== null ? p.special : Math.max(0, (p.grossSalary || 0) - basic - hra - (p.overtimeAmount || 0) - (p.bonusAmount || 0));
-
         return {
           ...p,
           branch: p.branch || '-',
           department: p.department || '-',
           designation: p.designation || '-',
-          basicSalary: basic,
-          grossSalary: p.grossSalary,
-          totalDeductions: p.totalDeductions,
-          netSalary: p.netSalary,
-          hra,
-          special,
-          travel,
-          medical,
-          pf,
-          esi,
-          pt,
-          tds,
+          basicSalary: p.basicSalary || 0,
+          grossSalary: p.grossSalary || 0,
+          totalDeductions: p.totalDeductions || 0,
+          netSalary: p.netSalary || 0,
+          hra: p.hra || 0,
+          special: p.special || 0,
+          travel: p.travel || 0,
+          medical: p.medical || 0,
+          pf: p.pf || 0,
+          esi: p.esi || 0,
+          pt: p.pt || 0,
+          tds: p.tds || 0,
           pan: p.pan || '-',
-          regime: p.regime || 'New',
+          regime: p.regime || '-',
           bankName: p.bankName || '-',
           bankAccount: p.bankAccount || '-',
           bankIfsc: p.bankIfsc || '-',
@@ -676,16 +670,18 @@ const Payroll = () => {
       const emp = resolveEmployee(p.employeeId, p.employeeName);
 
       const empBasicSalary = Number(emp?.salaryAmount) || 0;
-      const struct = salaryStructures[empId] || {
-        basic: empBasicSalary,
-        hra: Number(emp?.hra) || 0,
-        travel: Number(emp?.travel) || 0,
-        medical: Number(emp?.medical) || 0,
-        special: Number(emp?.special) || 0,
-        pf: Math.round(empBasicSalary * 0.12),
-        esi: 0,
-        pt: 200,
-        tds: Math.round(empBasicSalary * 0.1)
+      const rawStruct = salaryStructures[empId] || {};
+      const struct = {
+        basic: rawStruct.basic || empBasicSalary,
+        hra: Number(rawStruct.hra ?? emp?.hra) || 0,
+        travel: Number(rawStruct.travel ?? emp?.travel) || 0,
+        medical: Number(rawStruct.medical ?? emp?.medical) || 0,
+        special: Number(rawStruct.special ?? emp?.special) || 0,
+        pf: Number(rawStruct.pf) || 0,
+        esi: Number(rawStruct.esi) || 0,
+        pt: Number(rawStruct.pt) || 0,
+        // TDS is NEVER read from salary structures — it's a tax calculation, not a fixed deduction
+        tds: 0
       };
 
       const monthStr = monthMap[month] || '06';
@@ -694,18 +690,18 @@ const Payroll = () => {
         a => a.employeeId === empId && a.date && a.date.startsWith(prefix)
       );
 
-      // Expose attendance aggregates
+      // Attendance summary from backend
       const summary = (monthlyPayrollSummary && monthlyPayrollSummary[empId]) || {
         presentDays: 0, halfDays: 0, paidLeaveDays: 0, unpaidLeaveDays: 0, holidays: 0, weekends: 0
       };
 
-      // Resolve payroll rules configuration
+      // Payroll config rules
       const configWorkingDays = Number(payrollConfigs?.payrollWorkingDays) || 30;
       const configMethod = payrollConfigs?.salaryCalculationMethod || 'Fixed 30 Days';
       const configHalfDayPolicy = payrollConfigs?.halfDayPolicy || 'Deduct Half Day';
-      const configGraceRules = payrollConfigs?.graceRules || 'Late Penalty Flat';
+      const configGraceRules = payrollConfigs?.graceRules || 'No Late Penalty';
 
-      // 1. Calculate Payroll Working Days
+      // 1. Working Days
       let workingDays = configWorkingDays;
       const monthNum = parseInt(monthStr);
       const yrNum = parseInt(year || '2026');
@@ -718,39 +714,43 @@ const Payroll = () => {
       }
 
       // 2. Daily Salary Rate
-      const dailySalary = Math.round(empBasicSalary / Math.max(1, workingDays));
+      const dailySalary = workingDays > 0 ? Math.round(empBasicSalary / workingDays) : 0;
 
-      // 3. Unpaid/excess leave days (including half-day deduction if applicable)
+      // 3. Unpaid days
       let unpaidDays = summary.unpaidLeaveDays || 0;
       if (configHalfDayPolicy === 'Deduct Half Day') {
         unpaidDays += (summary.halfDays || 0) * 0.5;
       }
 
-      // 4. LOP Leave Deduction
+      // 4. LOP Leave Deduction (only if there are actual unpaid days)
       const leaveDeduction = Math.round(dailySalary * unpaidDays);
 
-      // 5. Late Arrival penalty
+      // 5. Late Arrival penalty (only if configured in payrollConfigs)
+      const lateArrivalPenalty = Number(payrollConfigs?.lateArrivalPenalty) || 0;
       const lateArrivalsCount = empRecords.filter(a => a.status === 'Late').length;
-      const lateDeduction = configGraceRules === 'Late Penalty Flat' ? lateArrivalsCount * (payrollConfigs.lateArrivalPenalty || 300) : 0;
+      const lateDeduction = (configGraceRules === 'Late Penalty Flat' && lateArrivalPenalty > 0)
+        ? lateArrivalsCount * lateArrivalPenalty
+        : 0;
 
-      // 6. Overtime pay
+      // 6. Overtime pay (only if configured in payrollConfigs)
+      const overtimeHourlyRate = Number(payrollConfigs?.overtimeHourlyRate) || 0;
       const overtimeHoursCount = empRecords.reduce((sum, a) => sum + (parseFloat(a.overtime) || 0), 0);
-      const overtimePay = overtimeHoursCount * (payrollConfigs.overtimeHourlyRate || 500);
+      const overtimePay = overtimeHoursCount * overtimeHourlyRate;
 
-      // 7. Allowances Sum
+      // 7. Allowances
       const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
 
-      // Bonuses
+      // 8. Bonuses
       const approvedBonuses = bonuses
         .filter(b => b.employeeId === empId && (b.status === 'Super Admin Approved' || b.status === 'Released'))
         .reduce((sum, curr) => sum + curr.amount, 0);
 
-      // Reimbursements
+      // 9. Reimbursements
       const approvedReimbursements = reimbursements
         .filter(r => r.employeeId === empId && (r.status === 'Approved' || r.status === 'Released'))
         .reduce((sum, curr) => sum + curr.amount, 0);
 
-      // Deductions (loans / advances)
+      // 10. Loan / Advance deductions
       const loanEMI = loans
         .filter(l => l.employeeId === empId && l.status === 'Approved')
         .reduce((sum, curr) => sum + curr.emi, 0);
@@ -759,17 +759,14 @@ const Payroll = () => {
         .filter(a => a.employeeId === empId && a.status === 'Approved')
         .reduce((sum, curr) => sum + curr.amount, 0);
 
-      // Statutory Deductions
+      // 11. Statutory Deductions (only PF, ESI, PT from salary structures — TDS is always 0 in draft mode)
       const pfDeduction = emp?.pfContribution !== false ? (struct.pf || 0) : 0;
-      const statutoryDeductions = pfDeduction + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
+      const statutoryDeductions = pfDeduction + (struct.esi || 0) + (struct.pt || 0);
+      // Note: TDS = 0 for draft/unconfigured records. TDS only comes from saved payment DB records.
 
-      // Total Deductions
+      // 12. Totals
       const totalDeductions = statutoryDeductions + leaveDeduction + lateDeduction + loanEMI + advanceDeduct;
-
-      // Gross Salary
       const grossSalary = (struct.basic || empBasicSalary) + totalAllowances + overtimePay + approvedBonuses;
-
-      // Net Salary
       const netSalary = Math.max(0, grossSalary - totalDeductions);
 
       return {
@@ -792,11 +789,11 @@ const Payroll = () => {
         reimbursementAmount: approvedReimbursements,
         totalDeductions,
         netSalary,
-        bankName: emp?.bank?.bankName || struct.bankName || '-',
-        bankAccount: emp?.bank?.accountNumber || struct.bankAccountNumber || '-',
-        bankIfsc: emp?.bank?.ifsc || struct.bankIfscCode || '-',
-        pan: emp?.panNumber || taxProfiles[empId]?.pan || '-',
-        regime: taxProfiles[empId]?.regime || '-',
+        bankName: emp?.bank?.bankName || '-',
+        bankAccount: emp?.bank?.accountNumber || '-',
+        bankIfsc: emp?.bank?.ifsc || '-',
+        pan: emp?.panNumber || '-',
+        regime: emp?.taxRegime || '-',
         hra: struct.hra || 0,
         travel: struct.travel || 0,
         medical: struct.medical || 0,
@@ -804,7 +801,7 @@ const Payroll = () => {
         pf: pfDeduction,
         esi: struct.esi || 0,
         pt: struct.pt || 0,
-        tds: struct.tds || 0
+        tds: 0  // TDS never applied in draft mode — only from saved DB records
       };
     });
   }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees, resolveEmployee, monthlyPayrollSummary, payrollConfigs]);
@@ -812,7 +809,7 @@ const Payroll = () => {
   const employeeMonthlyPayslips = useMemo(() => {
     if (!currentUser?.id) return {};
 
-    const months = ['June', 'May', 'April', 'March', 'February', 'January'];
+    const months = ['December', 'November', 'October', 'September', 'August', 'July', 'June', 'May', 'April', 'March', 'February', 'January'];
     const result = {};
 
     months.forEach(m => {
@@ -996,7 +993,7 @@ const Payroll = () => {
   // Apply new loan or advance
   const handleCreateLoanAdvance = async (e) => {
     e.preventDefault();
-    const empId = perspective === 'employee' ? (currentUser?.id || 'EMP-2026-001') : (applyForm.employeeId || employees[0]?.id);
+    const empId = perspective === 'employee' ? currentUser?.id : (applyForm.employeeId || employees[0]?.id);
     const targetEmp = resolveEmployee(empId) || { name: 'Employee' };
     const payload = {
       employeeId: empId,
@@ -1092,7 +1089,7 @@ const Payroll = () => {
       }
 
       // If perspective is Self, restrict view to current employee only
-      const matchesPerspective = perspective === 'self' ? row.employeeId === (currentUser?.id || 'EMP-2026-001') : true;
+      const matchesPerspective = perspective === 'self' ? row.employeeId === currentUser?.id : true;
 
       return matchesSearch && matchesDept && matchesBranch && matchesStatus && matchesPerspective;
     });
@@ -1120,13 +1117,14 @@ const Payroll = () => {
 
   // Selected Employee Data for Details Tab
   const selectedEmployeeObj = useMemo(() => {
-    const targetId = selectedEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : 'EMP-2026-002');
+    const targetId = selectedEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : null);
+    if (!targetId) return calculatedPayrollData[0] || null;
     return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
   }, [calculatedPayrollData, selectedEmpId, currentUser, currentUserRole, perspective]);
 
   // Selected Employee Payslip Modal Data
   const payslipEmployeeObj = useMemo(() => {
-    const targetId = payslipEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : 'EMP-2026-001');
+    const targetId = payslipEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : null);
     return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
   }, [calculatedPayrollData, payslipEmpId, currentUser, currentUserRole, perspective]);
 
@@ -1423,6 +1421,12 @@ BANK PAYMENT & COMPLIANCE DETAIL:
             <option value="April">April</option>
             <option value="May">May</option>
             <option value="June">June</option>
+            <option value="July">July</option>
+            <option value="August">August</option>
+            <option value="September">September</option>
+            <option value="October">October</option>
+            <option value="November">November</option>
+            <option value="December">December</option>
           </select>
           
           <select value={year} onChange={(e) => setYear(e.target.value)} className="payroll-selector">
@@ -1594,7 +1598,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   className="payroll-selector"
                   style={{ width: '100%', cursor: 'pointer' }}
                 >
-                  {['June', 'May', 'April', 'March', 'February', 'January'].map(m => {
+                  {['December', 'November', 'October', 'September', 'August', 'July', 'June', 'May', 'April', 'March', 'February', 'January'].map(m => {
                     const periodObj = employeeMonthlyPayslips[m];
                     const isPaid = periodObj?.status === 'Released';
                     const netSalary = periodObj ? formatCurrency(periodObj.netSalary) : '-';
@@ -1770,6 +1774,26 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <option value="Released">Distributed</option>
                     <option value="Hold">On Hold</option>
                   </select>
+
+                  <select value={month} onChange={(e) => setMonth(e.target.value)} className="table-filter-select">
+                    <option value="January">January</option>
+                    <option value="February">February</option>
+                    <option value="March">March</option>
+                    <option value="April">April</option>
+                    <option value="May">May</option>
+                    <option value="June">June</option>
+                    <option value="July">July</option>
+                    <option value="August">August</option>
+                    <option value="September">September</option>
+                    <option value="October">October</option>
+                    <option value="November">November</option>
+                    <option value="December">December</option>
+                  </select>
+
+                  <select value={year} onChange={(e) => setYear(e.target.value)} className="table-filter-select">
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                  </select>
                 </div>
 
                 {/* Bulk Actions Panel */}
@@ -1811,11 +1835,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <th>Dept & Designation</th>
                       <th>Branch</th>
                       <th>Basic Salary</th>
-                      <th>Present Days</th>
-                      <th>OT Pay</th>
                       <th>Bonus</th>
                       <th>Deductions</th>
-                      <th>Net Salary</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
@@ -1839,18 +1860,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                           </td>
                           <td><span className="badge badge-secondary">{row.branch === '—' ? '-' : row.branch}</span></td>
                           <td className="font-semibold">{row.basicSalary > 0 ? formatCurrency(row.basicSalary) : '₹0'}</td>
-                          <td className="text-center">
-                            <div className="flex-column" style={{ gap: '2px', alignItems: 'center' }}>
-                              <span className="font-semibold">{row.attendanceDays >= 0 ? row.attendanceDays : 0} Days</span>
-                              <span className="font-xsmall text-muted" style={{ fontSize: '0.75rem' }}>
-                                {row.paidLeaveDays || 0}P / {row.unpaidLeaveDays || 0}U Leaves
-                              </span>
-                            </div>
-                          </td>
-                          <td className="text-success font-semibold">{row.overtimeAmount > 0 ? `+${formatCurrency(row.overtimeAmount)}` : '₹0'}</td>
                           <td className="text-success font-semibold">{row.bonusAmount > 0 ? `+${formatCurrency(row.bonusAmount)}` : '₹0'}</td>
                           <td className="text-danger font-semibold">{row.totalDeductions > 0 ? `-${formatCurrency(row.totalDeductions)}` : '₹0'}</td>
-                          <td className="text-info font-bold">{row.netSalary > 0 ? formatCurrency(row.netSalary) : '₹0'}</td>
                           <td>
                             <Badge variant={
                               row.status === 'Released' ? 'success' :
@@ -1906,7 +1917,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="12" className="text-center p-8 text-muted">
+                        <td colSpan="9" className="text-center p-8 text-muted">
                           No employee records found matching selected filters.
                         </td>
                       </tr>
@@ -3047,20 +3058,22 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 </thead>
                 <tbody>
                   {calculatedPayrollData.map(emp => {
-                    const profile = taxProfiles[emp.employeeId] || { pan: 'AAAPS1234F', regime: 'New', taxableIncome: 900000 };
+                    const profile = taxProfiles[emp.employeeId] || {};
                     return (
                       <tr key={emp.employeeId}>
                         <td className="font-semibold">{emp.employeeId}</td>
                         <td>{emp.employeeName}</td>
-                        <td className="font-mono">{profile.pan}</td>
+                        <td className="font-mono">{profile.pan || '-'}</td>
                         <td>
-                          <Badge variant={profile.regime === 'New' ? 'success' : 'primary'}>
-                            {profile.regime} Regime
-                          </Badge>
+                          {profile.regime ? (
+                            <Badge variant={profile.regime === 'New' ? 'success' : 'primary'}>
+                              {profile.regime} Regime
+                            </Badge>
+                          ) : <span className="text-muted">—</span>}
                         </td>
-                        <td className="font-semibold">{formatCurrency(emp.basicSalary * 12 * 2.2)}</td>
-                        <td className="font-semibold text-info">{formatCurrency(profile.taxableIncome)}</td>
-                        <td className="text-danger font-semibold">{formatCurrency(emp.statutoryDeductions - 10000)}</td>
+                        <td className="font-semibold">{formatCurrency(emp.grossSalary * 12)}</td>
+                        <td className="font-semibold text-info">{profile.taxableIncome ? formatCurrency(profile.taxableIncome) : '—'}</td>
+                        <td className="text-danger font-semibold">{formatCurrency(emp.tds || 0)}</td>
                         <td>
                           <button
                             className="flex-center gap-1 font-xsmall badge badge-secondary py-1 cursor-pointer"

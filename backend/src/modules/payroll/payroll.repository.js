@@ -30,7 +30,7 @@ import { PayrollResourceQueryBuilder } from './payroll.queryBuilder.js';
  */
 const overrideDepartmentForAdminRoles = (record, context) => {
   if (record && context) {
-    const bypassRoles = ['hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'manager'];
+    const bypassRoles = ['manager'];
     if (bypassRoles.includes(context.role)) {
       record.department = context.department;
     }
@@ -291,18 +291,23 @@ export const saveMonthlyPayment = async (paymentData) => {
   }
 
   logger.debug('Executing PayrollRepository::saveMonthlyPayment', paymentData);
-  if (!paymentData.id) {
-    paymentData.id = `${paymentData.employeeId}-${paymentData.month}-${paymentData.year}`;
+  const updatePayload = { ...paymentData };
+  delete updatePayload._id;
+  delete updatePayload.createdAt;
+  delete updatePayload.updatedAt;
+
+  if (!updatePayload.id) {
+    updatePayload.id = `${updatePayload.employeeId}-${updatePayload.month}-${updatePayload.year}`;
   }
   
-  const existing = await PayrollPayment.findOne({ id: paymentData.id });
-  if (!existing && !paymentData.payrollCode) {
-    const companyId = getTenantId() || paymentData.companyId || 'COMP-001';
+  const existing = await PayrollPayment.findOne({ id: updatePayload.id });
+  if (!existing && !updatePayload.payrollCode) {
+    const companyId = getTenantId() || updatePayload.companyId || 'COMP-001';
     const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-    paymentData.payrollCode = await generateCompanyUniqueId(companyId, 'payroll');
+    updatePayload.payrollCode = await generateCompanyUniqueId(companyId, 'payroll');
   }
 
-  return PayrollPayment.findOneAndUpdate({ id: paymentData.id }, paymentData, { upsert: true, new: true }).lean();
+  return PayrollPayment.findOneAndUpdate({ id: updatePayload.id }, updatePayload, { upsert: true, new: true }).lean();
 };
 
 export const updatePaymentStatus = async (empId, month, year, status) => {
@@ -362,6 +367,45 @@ export const saveGlobalConfigs = async (configs) => {
   ).lean();
 };
 
+export const resetPaymentDeductions = async ({ employeeId, month, year, fields }) => {
+  logger.debug(`PayrollRepository::resetPaymentDeductions - employee: ${employeeId}, month: ${month}, year: ${year}`);
+  const query = {};
+  if (employeeId) query.employeeId = employeeId;
+  if (month) query.month = month;
+  if (year) query.year = year;
+
+  // Default fields to zero out if not specified
+  const fieldsToReset = fields || ['tds', 'pf', 'pt', 'esi'];
+  const updateSet = {};
+  for (const field of fieldsToReset) {
+    updateSet[field] = 0;
+  }
+
+  // Recalculate totalDeductions and netSalary for all matching records
+  const records = await PayrollPayment.find(query).lean();
+  for (const record of records) {
+    const newPf = fieldsToReset.includes('pf') ? 0 : (record.pf || 0);
+    const newTds = fieldsToReset.includes('tds') ? 0 : (record.tds || 0);
+    const newPt = fieldsToReset.includes('pt') ? 0 : (record.pt || 0);
+    const newEsi = fieldsToReset.includes('esi') ? 0 : (record.esi || 0);
+    const statutory = newPf + newTds + newPt + newEsi;
+    const leaveDeductions = record.leaveDeductions || 0;
+    const lateDeductions = record.lateDeductions || 0;
+    const loanEMI = record.loanEMI || 0;
+    const advanceDeduct = record.advanceDeduct || 0;
+    const newTotalDeductions = statutory + leaveDeductions + lateDeductions + loanEMI + advanceDeduct;
+    const grossSalary = record.grossSalary || 0;
+    const newNetSalary = Math.max(0, grossSalary - newTotalDeductions);
+
+    await PayrollPayment.updateOne(
+      { _id: record._id },
+      { $set: { ...updateSet, totalDeductions: newTotalDeductions, netSalary: newNetSalary } }
+    );
+  }
+
+  return { updated: records.length };
+};
+
 export default {
   getMasterPayrollData,
   saveGrade,
@@ -374,5 +418,6 @@ export default {
   saveMonthlyPayment,
   updatePaymentStatus,
   bulkUpdatePaymentStatus,
-  saveGlobalConfigs
+  saveGlobalConfigs,
+  resetPaymentDeductions
 };
