@@ -299,16 +299,40 @@ const ConversationItem = ({
     >
       {/* Avatar */}
       <div className="conv-item-avatar-wrap" style={{ position: 'relative' }}>
-        {avatarSrc ? (
-          <img src={avatarSrc} alt={displayName} className="conv-item-avatar-img" />
-        ) : (
-          <div
-            className="conv-item-avatar-letter"
-            style={{ background: avatarBg }}
-          >
-            {avatarLetter}
-          </div>
-        )}
+        {(() => {
+          const hasValidAvatar = avatarSrc && 
+                                 typeof avatarSrc === 'string' &&
+                                 avatarSrc.trim() !== '' &&
+                                 avatarSrc !== 'null' &&
+                                 avatarSrc !== 'undefined';
+          return hasValidAvatar ? (
+            <>
+              <img 
+                src={avatarSrc} 
+                alt={displayName} 
+                className="conv-item-avatar-img" 
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  const sib = e.target.nextSibling;
+                  if (sib) sib.style.display = 'flex';
+                }}
+              />
+              <div
+                className="conv-item-avatar-letter"
+                style={{ display: 'none', background: avatarBg }}
+              >
+                {avatarLetter}
+              </div>
+            </>
+          ) : (
+            <div
+              className="conv-item-avatar-letter"
+              style={{ background: avatarBg }}
+            >
+              {avatarLetter}
+            </div>
+          );
+        })()}
         {/* Status dot — only for direct chats */}
         {isDirect && (
           <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', border: '2px solid var(--bg-card, #fff)', borderRadius: '50%' }}>

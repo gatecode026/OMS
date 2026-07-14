@@ -190,20 +190,41 @@ const MessageStatus = ({ message: msg, conversation, onRetry }) => {
           <BiCheckDouble className="msg-status-icon" />
           <span>Seen by {seenCount}</span>
           <div className="msg-status-avatar-stack">
-            {displayedAvatars.map((reader, index) => (
-              <div
-                key={reader.employeeId}
-                className="msg-status-stack-avatar"
-                title={reader.name}
-                style={{ zIndex: 10 - index }}
-              >
-                {reader.avatar ? (
-                  <img src={reader.avatar} alt={reader.name} className="msg-status-avatar-img" />
-                ) : (
-                  <span>{reader.name.charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-            ))}
+            {displayedAvatars.map((reader, index) => {
+              const hasValidAvatar = reader.avatar && 
+                                     typeof reader.avatar === 'string' &&
+                                     reader.avatar.trim() !== '' &&
+                                     reader.avatar !== 'null' &&
+                                     reader.avatar !== 'undefined';
+              return (
+                <div
+                  key={reader.employeeId}
+                  className="msg-status-stack-avatar"
+                  title={reader.name}
+                  style={{ zIndex: 10 - index }}
+                >
+                  {hasValidAvatar ? (
+                    <>
+                      <img 
+                        src={reader.avatar} 
+                        alt={reader.name} 
+                        className="msg-status-avatar-img" 
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          const sib = e.target.nextSibling;
+                          if (sib) sib.style.display = 'flex';
+                        }}
+                      />
+                      <span style={{ display: 'none' }}>
+                        {reader.name.charAt(0).toUpperCase()}
+                      </span>
+                    </>
+                  ) : (
+                    <span>{reader.name.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+              );
+            })}
             {remainingCount > 0 && (
               <div className="msg-status-stack-avatar msg-status-stack-more" title={`${remainingCount} more`}>
                 <span>+{remainingCount}</span>
@@ -515,16 +536,35 @@ const MessageBubble = ({
           />
         </div>
       )}
-      {/* Sender avatar (others only) */}
-      {!isOwn && msg.senderName && (
-        <div className="msg-sender-avatar">
-          {msg.senderAvatar ? (
-            <img src={msg.senderAvatar} alt={msg.senderName} />
-          ) : (
-            <span>{msg.senderName.charAt(0).toUpperCase()}</span>
-          )}
-        </div>
-      )}
+      {!isOwn && msg.senderName && (() => {
+        const hasValidAvatar = msg.senderAvatar && 
+                               typeof msg.senderAvatar === 'string' &&
+                               msg.senderAvatar.trim() !== '' &&
+                               msg.senderAvatar !== 'null' &&
+                               msg.senderAvatar !== 'undefined';
+        return (
+          <div className="msg-sender-avatar">
+            {hasValidAvatar ? (
+              <>
+                <img 
+                  src={msg.senderAvatar} 
+                  alt={msg.senderName} 
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    const sib = e.target.nextSibling;
+                    if (sib) sib.style.display = 'flex';
+                  }}
+                />
+                <span style={{ display: 'none' }}>
+                  {msg.senderName.charAt(0).toUpperCase()}
+                </span>
+              </>
+            ) : (
+              <span>{msg.senderName.charAt(0).toUpperCase()}</span>
+            )}
+          </div>
+        );
+      })()}
 
       <div
         className={`msg-bubble-wrapper ${isOwn ? 'msg-bubble-wrapper-own' : ''}`}
