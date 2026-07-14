@@ -235,7 +235,16 @@ const ConversationItem = ({
   // Last message preview
   const lastMsg = conv.lastMessage;
   const hasLastMsg = lastMsg && lastMsg.messageId;
-  const rawPreview = hasLastMsg ? (lastMsg.content ? stripMarkdown(lastMsg.content) : null) : null;
+  const isAudioOrVoice = lastMsg && (
+    lastMsg.type === 'audio' || 
+    lastMsg.type === 'voice' || 
+    (lastMsg.content && typeof lastMsg.content === 'string' && lastMsg.content.startsWith('data:audio/'))
+  );
+  const rawPreview = hasLastMsg 
+    ? (isAudioOrVoice 
+        ? '🎤 Voice Message' 
+        : (lastMsg.content ? stripMarkdown(lastMsg.content) : null)) 
+    : null;
   const preview = hasLastMsg
     ? rawPreview
       ? rawPreview.length > 48

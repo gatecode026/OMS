@@ -1386,6 +1386,9 @@ export const ChatProvider = ({ children }) => {
         status: 'failed',
         error: err.message || 'Upload failed'
       });
+      if (addToastRef.current) {
+        addToastRef.current('error', `Upload failed: ${err.message || 'Server connection error'}`);
+      }
     }
   }, [token, updateUploadItem]);
 
