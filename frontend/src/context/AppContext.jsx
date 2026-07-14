@@ -5211,7 +5211,7 @@ export const AppProvider = ({ children }) => {
 
   const toggleEmployeeTaxRegime = async (empId) => {
     if (!token) return false;
-    const current = payrollConfigs.taxProfiles[empId] || { pan: 'AAAPS1234F', regime: 'New', taxableIncome: 900000 };
+    const current = payrollConfigs.taxProfiles[empId] || {};
     const nextRegime = current.regime === 'New' ? 'Old' : 'New';
     const updatedTaxProfiles = {
       ...payrollConfigs.taxProfiles,

@@ -34,6 +34,7 @@ router.post('/reimbursements/status/:id', controller.updateReimbursementStatus);
 router.post('/payments', controller.saveMonthlyPayment);
 router.post('/payments/bulk-status', controller.bulkUpdatePaymentStatus);
 router.put('/payments/:empId', controller.updatePaymentStatus);
+router.patch('/payments/fix-deductions', controller.resetPaymentDeductions);
 
 // 7. Global penalities and maps
 router.post('/configs', controller.saveGlobalConfigs);

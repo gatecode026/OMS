@@ -88,8 +88,8 @@ export const validateBranchScope = (context, resource, branchField = 'branch', m
  * Validates that the resource belongs to the allowed department boundary.
  */
 export const validateDepartmentScope = (context, resource, deptField = 'department', moduleName = 'unknown', operation = 'read') => {
-  const isHrRole = context.role?.toLowerCase().includes('hr');
-  if (context.isSuperAdmin || context.isCompanyAdmin || isHrRole) return true;
+  const isBranchWideRole = ['hr_manager', 'finance_manager', 'branch_manager', 'branch_admin'].includes(context.role) || context.role?.toLowerCase().includes('hr');
+  if (context.isSuperAdmin || context.isCompanyAdmin || isBranchWideRole) return true;
   
   const userDept = context.department;
   const resourceDept = resource[deptField];
