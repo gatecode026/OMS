@@ -49,25 +49,17 @@ const UpdateTaskStatusModal = ({
       setProgress(100);
     } else if (newStatus === 'To Do') {
       setProgress(0);
-    } else if (newStatus === 'In Progress' && (progress === 0 || progress >= 90)) {
+    } else if (newStatus === 'In Progress' && (progress === 0 || progress >= 100)) {
       setProgress(10);
-    } else if (newStatus === 'In Review' && progress < 90) {
-      setProgress(90);
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    if (status === 'Done' && currentUserRole === 'employee') {
-      if (addToast) addToast('warning', 'Only management can approve and set task to "Done".');
-      return;
-    }
-    
     // Map display status back to DB status key
     let dbStatus = 'todo';
     if (status === 'In Progress') dbStatus = 'in_progress';
-    else if (status === 'In Review') dbStatus = 'review';
     else if (status === 'Done') dbStatus = 'done';
 
     updateTaskProgress(task.id, dbStatus, progress, remarks);
@@ -98,8 +90,7 @@ const UpdateTaskStatusModal = ({
           >
             <option value="To Do" disabled={currentDisp !== 'To Do'}>To Do</option>
             <option value="In Progress" disabled={currentDisp !== 'To Do' && currentDisp !== 'In Progress'}>In Progress</option>
-            <option value="In Review" disabled={currentDisp !== 'In Progress' && currentDisp !== 'In Review'}>In Review</option>
-            <option value="Done" disabled={currentUserRole === 'employee' || (currentDisp !== 'In Review' && currentDisp !== 'Done')}>Done</option>
+            <option value="Done" disabled={currentDisp !== 'In Progress' && currentDisp !== 'Done'}>Done</option>
           </select>
         </div>
 
@@ -115,7 +106,7 @@ const UpdateTaskStatusModal = ({
               min="0"
               max="100"
               value={progress}
-              disabled={currentDisp === 'In Review' || currentDisp === 'Done'}
+              disabled={currentDisp === 'Done'}
               onChange={(e) => {
                 const val = parseInt(e.target.value);
                 
@@ -132,15 +123,13 @@ const UpdateTaskStatusModal = ({
                     setStatus('To Do');
                   }
                 } else if (currentDisp === 'In Progress') {
-                  if (val >= 90) {
-                    setProgress(90);
-                    setStatus('In Review');
-                    if (addToast) addToast('info', 'Task submitted for review.');
+                  if (val === 100) {
+                    setProgress(100);
+                    setStatus('Done');
+                    if (addToast) addToast('success', 'Task marked as completed!');
                   } else {
-                    setProgress(Math.max(10, val));
+                    setProgress(Math.max(10, Math.min(val, 99)));
                   }
-                } else if (currentDisp === 'In Review') {
-                  if (addToast) addToast('warning', 'Task is in review. Only reviewers can approve/complete it.');
                 } else if (currentDisp === 'Done') {
                   if (addToast) addToast('info', 'Completed tasks cannot be modified.');
                 }

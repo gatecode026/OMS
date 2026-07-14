@@ -65,6 +65,16 @@ export const qrPunch = asyncHandler(async (req, res) => {
   return successResponse(res, result, result.message);
 });
 
+export const getPayrollSummary = asyncHandler(async (req, res) => {
+  const companyId = req.user.companyId;
+  const month = req.query.month;
+  if (!month) {
+    return res.status(400).json({ success: false, message: 'month parameter (YYYY-MM) is required' });
+  }
+  const data = await service.findMonthlyPayrollSummary(companyId, month);
+  return successResponse(res, data, 'Monthly payroll summary fetched successfully');
+});
+
 export default {
   getAll,
   getById,
@@ -74,5 +84,6 @@ export default {
   getPublicData,
   getToday,
   getSummary,
-  qrPunch
+  qrPunch,
+  getPayrollSummary
 };

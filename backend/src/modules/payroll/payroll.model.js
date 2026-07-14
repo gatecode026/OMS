@@ -99,11 +99,22 @@ const payrollPaymentSchema = new mongoose.Schema({
   leaveDeductions: { type: Number, default: 0 },
   lateDeductions: { type: Number, default: 0 },
   statutoryDeductions: { type: Number, required: true },
+  hra: { type: Number, default: 0 },
+  travel: { type: Number, default: 0 },
+  medical: { type: Number, default: 0 },
+  special: { type: Number, default: 0 },
+  pf: { type: Number, default: 0 },
+  esi: { type: Number, default: 0 },
+  pt: { type: Number, default: 0 },
+  tds: { type: Number, default: 0 },
   bankName: { type: String, default: 'HDFC Bank' },
   bankAccount: { type: String, default: '' },
   bankIfsc: { type: String, default: '' },
   pan: { type: String, default: '' },
-  regime: { type: String, enum: ['Old', 'New'], default: 'New' }
+  regime: { type: String, enum: ['Old', 'New'], default: 'New' },
+  paidLeaveDays: { type: Number, default: 0 },
+  unpaidLeaveDays: { type: Number, default: 0 },
+  requiresRecalculation: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // 6. Global Configuration Schema (Stores penality settings, custom salary structures, tax regimes, and attendance configurations)

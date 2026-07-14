@@ -315,7 +315,7 @@ const TaskMonitoring = () => {
 
   // Create Task Form State
   const [createForm, setCreateForm] = useState({
-    projectIds: [],
+    projectId: '',
     title: '',
     dueDate: new Date().toISOString().split('T')[0],
     priority: 'Medium',
@@ -336,22 +336,20 @@ const TaskMonitoring = () => {
 
   // Filter assignees to only show members of the selected project
   const filteredAssignees = useMemo(() => {
-    if (!createForm.projectIds || createForm.projectIds.length === 0) return [];
+    if (!createForm.projectId) return [];
     const allEmailsOrNames = new Set();
-    createForm.projectIds.forEach(projId => {
-      const selectedProj = (projectsList || []).find(p => p.id === projId);
-      if (selectedProj) {
-        (selectedProj.members || []).forEach(m => allEmailsOrNames.add((m || '').trim().toLowerCase()));
-        if (selectedProj.leader) allEmailsOrNames.add(selectedProj.leader.trim().toLowerCase());
-        if (selectedProj.manager) allEmailsOrNames.add(selectedProj.manager.trim().toLowerCase());
-      }
-    });
+    const selectedProj = (projectsList || []).find(p => p.id === createForm.projectId);
+    if (selectedProj) {
+      (selectedProj.members || []).forEach(m => allEmailsOrNames.add((m || '').trim().toLowerCase()));
+      if (selectedProj.leader) allEmailsOrNames.add(selectedProj.leader.trim().toLowerCase());
+      if (selectedProj.manager) allEmailsOrNames.add(selectedProj.manager.trim().toLowerCase());
+    }
 
     return scopedEmployees.filter(emp => {
       const empNameLower = (emp.name || '').trim().toLowerCase();
       return allEmailsOrNames.has(empNameLower);
     });
-  }, [createForm.projectIds, projectsList, scopedEmployees]);
+  }, [createForm.projectId, projectsList, scopedEmployees]);
 
   // Filter assignees to only show members of the selected project for editing
   const filteredAssigneesForEdit = useMemo(() => {
@@ -384,10 +382,10 @@ const TaskMonitoring = () => {
 
   // When projectsList loads, default the select option
   useEffect(() => {
-    if (projectsList && projectsList.length > 0 && (!createForm.projectIds || createForm.projectIds.length === 0)) {
-      setCreateForm(prev => ({ ...prev, projectIds: [projectsList[0].id] }));
+    if (projectsList && projectsList.length > 0 && !createForm.projectId) {
+      setCreateForm(prev => ({ ...prev, projectId: projectsList[0].id }));
     }
-  }, [projectsList, createForm.projectIds]);
+  }, [projectsList, createForm.projectId]);
 
   // Export Options State
   const [exportOptions, setExportOptions] = useState({
@@ -413,11 +411,10 @@ const TaskMonitoring = () => {
         return 'To Do';
       case 'in progress':
       case 'in_progress':
-        return 'In Progress';
       case 'in review':
       case 'under_review':
       case 'review':
-        return 'In Review';
+        return 'In Progress';
       case 'done':
       case 'completed':
         return 'Completed';
@@ -649,33 +646,32 @@ const TaskMonitoring = () => {
 
   // Form submits handlers
   const handleCreateTask = async () => {
-    if (!createForm.projectIds || createForm.projectIds.length === 0 || !createForm.title.trim() || isCreating) return;
+    if (!createForm.projectId || !createForm.title.trim() || isCreating) return;
     setIsCreating(true);
     try {
-      for (const projectId of createForm.projectIds) {
-        if (createForm.assigneeIds && createForm.assigneeIds.length > 0) {
-          for (const assigneeId of createForm.assigneeIds) {
-            await addTask({
-              projectId,
-              title: createForm.title.trim(),
-              dueDate: createForm.dueDate,
-              priority: createForm.priority,
-              assigneeId
-            });
-          }
-        } else {
+      const projectId = createForm.projectId;
+      if (createForm.assigneeIds && createForm.assigneeIds.length > 0) {
+        for (const assigneeId of createForm.assigneeIds) {
           await addTask({
             projectId,
             title: createForm.title.trim(),
             dueDate: createForm.dueDate,
             priority: createForm.priority,
-            assigneeId: ''
+            assigneeId
           });
         }
+      } else {
+        await addTask({
+          projectId,
+          title: createForm.title.trim(),
+          dueDate: createForm.dueDate,
+          priority: createForm.priority,
+          assigneeId: ''
+        });
       }
       setIsCreateOpen(false);
       setCreateForm({
-        projectIds: [projectsList[0]?.id || ''],
+        projectId: projectsList[0]?.id || '',
         title: '',
         dueDate: new Date().toISOString().split('T')[0],
         priority: 'Medium',
@@ -1259,7 +1255,6 @@ const TaskMonitoring = () => {
             <option value="Pending Acceptance">Pending Acceptance</option>
             <option value="To Do">To Do</option>
             <option value="In Progress">In Progress</option>
-            <option value="In Review">In Review</option>
             <option value="Completed">Completed</option>
           </select>
           <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}>
@@ -1269,15 +1264,17 @@ const TaskMonitoring = () => {
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
           </select>
-          <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
-            <option value="">All Departments</option>
-            <option value="Engineering">Engineering</option>
-            <option value="Sales">Sales</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Operations">Operations</option>
-            <option value="Human Resources">Human Resources</option>
-            <option value="Finance">Finance</option>
-          </select>
+          {!isEmployeeView && (
+            <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}>
+              <option value="">All Departments</option>
+              <option value="Engineering">Engineering</option>
+              <option value="Sales">Sales</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Operations">Operations</option>
+              <option value="Human Resources">Human Resources</option>
+              <option value="Finance">Finance</option>
+            </select>
+          )}
           <select value={projectFilter} onChange={e => setProjectFilter(e.target.value)}>
             <option value="">All Projects</option>
             {projectSummaries.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
@@ -2256,7 +2253,7 @@ const TaskMonitoring = () => {
         footer={
           <div className="modal-actions-wrapper">
             <Button variant="secondary" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={handleCreateTask} disabled={!createForm.projectIds || createForm.projectIds.length === 0 || !createForm.title.trim() || isCreating}>
+            <Button variant="primary" onClick={handleCreateTask} disabled={!createForm.projectId || !createForm.title.trim() || isCreating}>
                {isCreating ? 'Creating...' : 'Create Task'}
             </Button>
           </div>
@@ -2265,12 +2262,24 @@ const TaskMonitoring = () => {
         <div className="create-task-form-body">
           <div className="form-field">
             <label>Target Project *</label>
-            <MultiSelectDropdown
-              options={(projectsList || []).map(p => ({ value: p.id, label: `${p.id} - ${p.name}` }))}
-              selectedValues={createForm.projectIds || []}
-              onChange={vals => setCreateForm(prev => ({ ...prev, projectIds: vals, assigneeIds: [] }))}
-              placeholder="Select project(s)..."
-            />
+            <select
+              value={createForm.projectId}
+              onChange={e => setCreateForm(prev => ({ ...prev, projectId: e.target.value, assigneeIds: [] }))}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-primary)',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {(projectsList || []).map(p => (
+                <option key={p.id} value={p.id}>{p.id} - {p.name}</option>
+              ))}
+            </select>
           </div>
           <div className="form-field">
             <label>Task Title *</label>

@@ -17,6 +17,7 @@ import { CacheKeys, TTL, cacheGetOrSet, cacheDel } from '../../services/cache.se
 
 // Security and Query Builder Imports
 import { resolveSecurityContext } from '../../security/scopeEngine.js';
+import { checkActionPermission } from '../../security/permissionMatrix.js';
 import { 
   validateRepositoryAccess, 
   sanitizeQueryOperators 
@@ -46,9 +47,9 @@ export const getMasterPayrollData = async () => {
 
   const queryFilters = await builder.buildQuery({}, 'payroll');
 
-  // If employee, they cannot view Grades or Configs at all
-  const showGrades = context ? (context.isSuperAdmin || context.isCompanyAdmin || context.role === 'hr_manager' || context.role === 'finance_manager') : true;
-  const showConfig = context ? (context.isSuperAdmin || context.isCompanyAdmin || context.role === 'hr_manager' || context.role === 'finance_manager') : true;
+  // Dynamically resolve permission from matrix instead of using hardcoded roles
+  const showGrades = context ? await checkActionPermission('PayrollGrade', context.role, 'read') : true;
+  const showConfig = context ? await checkActionPermission('PayrollConfig', context.role, 'read') : true;
 
   // Use a role-scoped cache key so employee vs admin see correct filtered data
   const roleScope = context?.role || 'unknown';
@@ -346,6 +347,14 @@ export const saveGlobalConfigs = async (configs) => {
   }
 
   logger.debug('Executing PayrollRepository::saveGlobalConfigs', configs);
+  const companyId = getTenantId();
+  if (companyId) {
+    const roles = ['hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'company_admin', 'employee'];
+    for (const r of roles) {
+      await cacheDel(`payroll_master:${companyId}:${r}`);
+    }
+  }
+
   return PayrollConfig.findOneAndUpdate(
     { id: 'GLOBAL_CONFIG' },
     configs,
