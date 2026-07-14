@@ -173,6 +173,12 @@ export const save = async (data) => {
   }
 
   const processedData = await processEmployeeAssets(data);
+  const isHrRole = processedData.roleId?.toLowerCase().includes('hr') || processedData.role?.toLowerCase().includes('hr');
+  if (isHrRole) {
+    processedData.department = '—';
+    processedData.teamLeader = '—';
+    processedData.team = '—';
+  }
   const employee = await Employee.create(processedData);
   try {
     const { registerTenantUser } = await import('../../utils/tenantRegistry.js');
@@ -231,6 +237,12 @@ export const update = async (id, data) => {
   }
 
   const updateData = await processEmployeeAssets(data);
+  const isHrRole = updateData.roleId?.toLowerCase().includes('hr') || updateData.role?.toLowerCase().includes('hr') || (oldEmployee && (oldEmployee.roleId?.toLowerCase().includes('hr') || oldEmployee.role?.toLowerCase().includes('hr')));
+  if (isHrRole) {
+    updateData.department = '—';
+    updateData.teamLeader = '—';
+    updateData.team = '—';
+  }
   if (updateData.password === '••••••••' || !updateData.password) {
     delete updateData.password;
   } else {

@@ -296,3 +296,43 @@ Stack: Error: Invalid email or password
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:26:16
 Body: {"email":"aniemsh@gmail.com","password":"password"}
+
+[2026-07-14T09:03:25.571Z] PUT /api/v1/leaves/LR-144
+Error: Access denied: Resource is in department "IT", which is outside your scoped department "—".
+Stack: Error: Access denied: Resource is in department "IT", which is outside your scoped department "—".
+    at validateDepartmentScope (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:98:17)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:228:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.update (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.repository.js:147:7)
+    at async Object.updateRecord (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.service.js:318:18)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.controller.js:26:16
+Body: {"status":"Rejected","approverNotes":"Rejected by Manager","history":[{"date":"2026-07-14","status":"Rejected","comment":"Rejected by Akshita: "}]}
+
+[2026-07-14T09:03:34.654Z] PUT /api/v1/leaves/LR-144
+Error: Access denied: Resource is in department "IT", which is outside your scoped department "—".
+Stack: Error: Access denied: Resource is in department "IT", which is outside your scoped department "—".
+    at validateDepartmentScope (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:98:17)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:228:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.update (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.repository.js:147:7)
+    at async Object.updateRecord (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.service.js:318:18)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.controller.js:26:16
+Body: {"status":"Rejected","approverNotes":"Rejected by Manager","history":[{"date":"2026-07-14","status":"Rejected","comment":"Rejected by Akshita: "}]}
+
+[2026-07-14T09:18:41.902Z] GET /api/v1/chat/messages/6a55fef14951810082f982ed
+Error: Message.findOne(...).lean is not a function
+Stack: TypeError: Message.findOne(...).lean is not a function
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:497:8
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at runWithTenant (file:///C:/Users/Shubh/Desktop/OMS/backend/src/utils/tenantContext.js:41:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Body: {}
+
+[2026-07-14T09:38:19.237Z] GET /api/v1/chat/messages/6a56038a4951810082f995dd
+Error: Message.findOne(...).lean is not a function
+Stack: TypeError: Message.findOne(...).lean is not a function
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:497:8
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at runWithTenant (file:///C:/Users/Shubh/Desktop/OMS/backend/src/utils/tenantContext.js:41:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Body: {}
