@@ -47,8 +47,21 @@ const EmployeeDashboard = () => {
     documentsList,
     addToast,
     leavePolicyConfigs = [],
-    hasPermission
+    hasPermission,
+    payroll,
+    payrollLoans,
+    payrollAdvances,
+    monthlyPayrollSummary,
+    fetchMonthlyPayrollSummary,
+    fetchPayrollData
   } = useApp();
+
+  useEffect(() => {
+    fetchPayrollData();
+    const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+    const yearStr = String(new Date().getFullYear());
+    fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+  }, []);
 
   useEffect(() => {
     const hasSelf = hasPermission('dashboard', 'read', 'self');
@@ -225,6 +238,74 @@ const EmployeeDashboard = () => {
     setUpdateTaskOpen(true);
   };
 
+  const myPayrollCalculated = useMemo(() => {
+    const currentMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
+    const currentYearStr = String(new Date().getFullYear());
+
+    // 1. Get processed payment if it exists
+    const processed = (payroll || []).find(
+      p => p.employeeId === currentUser.id && p.month === currentMonthName && p.year === currentYearStr
+    );
+    if (processed) return { ...processed, basicSalary: processed.basicSalary || Number(currentUser.salaryAmount) || 0 };
+
+    // 2. Otherwise compute on-the-fly
+    const empId = currentUser.id;
+    const empBasicSalary = Number(currentUser.salaryAmount) || 0;
+    
+    const struct = {
+      basic: empBasicSalary, hra: Math.round(empBasicSalary * 0.4), travel: 0, medical: 0, special: 0, pf: Math.round(empBasicSalary * 0.12), esi: 0, pt: 200, tds: Math.round(empBasicSalary * 0.1)
+    };
+
+    const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+    const summary = (monthlyPayrollSummary && monthlyPayrollSummary[empId]) || {
+      presentDays: 0, halfDays: 0, paidLeaveDays: 0, unpaidLeaveDays: 0, holidays: 0, weekends: 0
+    };
+
+    const workingDays = 30; // standard fallback
+    const dailySalary = Math.round(empBasicSalary / Math.max(1, workingDays));
+
+    let unpaidDays = summary.unpaidLeaveDays || 0;
+    unpaidDays += (summary.halfDays || 0) * 0.5;
+
+    const leaveDeduction = Math.round(dailySalary * unpaidDays);
+
+    const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
+    const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
+
+    const loanEMI = (payrollLoans || [])
+      .filter(l => l.employeeId === empId && l.status === 'Approved')
+      .reduce((sum, curr) => sum + curr.emi, 0);
+
+    const advanceDeduct = (payrollAdvances || [])
+      .filter(a => a.employeeId === empId && a.status === 'Approved')
+      .reduce((sum, curr) => sum + curr.amount, 0);
+
+    const totalDeductions = statutoryDeductions + leaveDeduction + loanEMI + advanceDeduct;
+    const grossSalary = struct.basic + totalAllowances;
+    const netSalary = Math.max(0, grossSalary - totalDeductions);
+
+    return {
+      basicSalary: struct.basic,
+      hra: struct.hra,
+      travel: struct.travel,
+      medical: struct.medical,
+      special: struct.special,
+      pf: struct.pf,
+      esi: struct.esi,
+      pt: struct.pt,
+      tds: struct.tds,
+      paidLeaveDays: summary.paidLeaveDays,
+      unpaidLeaveDays: unpaidDays,
+      leaveDeductions: leaveDeduction,
+      loanEMI,
+      advanceDeduct,
+      totalDeductions,
+      grossSalary,
+      netSalary,
+      status: 'Draft (Pending Processing)'
+    };
+  }, [payroll, currentUser, monthlyPayrollSummary, payrollLoans, payrollAdvances]);
+
   // Loading skeleton layout
   if (isLoading) {
     return (
@@ -302,6 +383,63 @@ const EmployeeDashboard = () => {
           <DailyWorkReportWidget
             myReports={myReports}
           />
+
+          {/* My Payroll Summary Widget */}
+          <div className="dashboard-widget animate-fade-in" style={{ marginTop: '1.25rem', padding: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+            <div className="flex-row justify-between align-center mb-4" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 className="widget-title" style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>My Payroll & Salary Details</h3>
+              <span style={{ fontSize: '0.78rem', padding: '4px 8px', borderRadius: '20px', background: 'var(--bg-tag)', color: 'var(--text-muted)' }}>
+                {myPayrollCalculated.status}
+              </span>
+            </div>
+            
+            <div className="grid-2-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Monthly Basic Salary</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-main)' }}>₹{myPayrollCalculated.basicSalary?.toLocaleString()}</div>
+                
+                <div style={{ marginTop: '1rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Allowances (HRA, Travel, Medical)</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 550, color: 'var(--color-success)' }}>
+                    + ₹{((myPayrollCalculated.hra || 0) + (myPayrollCalculated.travel || 0) + (myPayrollCalculated.medical || 0) + (myPayrollCalculated.special || 0)).toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '1rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Paid Leaves Used</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 550, color: 'var(--text-main)' }}>{myPayrollCalculated.paidLeaveDays || 0} Days</div>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Deductions (LOP, Loans, PF, Tax)</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--color-danger)' }}>
+                  - ₹{(myPayrollCalculated.totalDeductions || 0).toLocaleString()}
+                </div>
+
+                {myPayrollCalculated.leaveDeductions > 0 && (
+                  <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(239, 68, 68, 0.08)', padding: '6px 10px', borderRadius: '6px', borderLeft: '3px solid var(--color-danger)' }}>
+                    <strong>LOP Deduction:</strong> ₹{myPayrollCalculated.leaveDeductions?.toLocaleString()} ({myPayrollCalculated.unpaidLeaveDays || 0} LOP days)
+                  </div>
+                )}
+
+                <div style={{ marginTop: '1rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Unpaid / LOP Leaves</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 550, color: 'var(--color-danger)' }}>{myPayrollCalculated.unpaidLeaveDays || 0} Days</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Estimated Net Take-Home Salary</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)' }}>₹{myPayrollCalculated.netSalary?.toLocaleString()}</div>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right' }}>
+                * Leaves exceeding the paid leave quota are automatically classified as LOP and deducted.
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Column (40% width on Desktop) */}

@@ -85,6 +85,7 @@ export const ensureAllModelsRegistered = async () => {
     import('../modules/performance/pip.model.js'),
     import('../modules/security/security.model.js'),
     import('../modules/work-reports/work-reports.model.js'),
+    import('../modules/payroll-queries/payroll-query.model.js'),
   ];
 
   await Promise.all(modelImports.map(p => p.catch(err => logger.error('Error registering model:', err))));
@@ -337,7 +338,7 @@ export const provisionTenantDatabase = async (company, clusterKey, dbName, admin
       'WorkReport', 'ActivityLog', 'Event', 'Announcement', 'EmergencyAlert', 
       'AnnouncementTrackingLog', 'AnnouncementAuditLog', 'Notification', 
       'Document', 'UserOverride', 'Goal', 'Pip', 'IpWhitelist', 'IpBlocklist', 
-      'UserDevice', 'UserSession', 'SecurityAlert', 'Task', 'Workflow'
+      'UserDevice', 'UserSession', 'SecurityAlert', 'Task', 'Workflow', 'PayrollQuery'
     ];
 
     for (const modelName of tenantScopedModelNames) {

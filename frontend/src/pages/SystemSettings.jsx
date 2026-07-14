@@ -24,7 +24,8 @@ const sidebarGroups = [
   {
     title: 'Workforce & Policies',
     items: [
-      { id: 'attendance', label: 'Attendance Rules', icon: Clock }
+      { id: 'attendance', label: 'Attendance Rules', icon: Clock },
+      { id: 'payroll', label: 'Payroll Configuration', icon: DollarSignIcon }
     ]
   },
   {
@@ -1396,6 +1397,96 @@ const SystemSettings = () => {
                   value={payrollRules.holidayMultiplier}
                   onChange={v => setPayrollRules(p => ({ ...p, holidayMultiplier: parseFloat(v) || 1.0 }))}
                 />
+              </div>
+            </div>
+
+            <div className="settings-group">
+              <h4 className="settings-group-title">Leave & Payroll Integration Rules</h4>
+              <div className="settings-fields-grid">
+                <SettingsInput
+                  label="Payroll Working Days"
+                  type="number"
+                  value={payrollRules.payrollWorkingDays || 30}
+                  onChange={v => setPayrollRules(p => ({ ...p, payrollWorkingDays: parseInt(v) || 30 }))}
+                />
+                <div className="settings-field">
+                  <label className="settings-field-label">Salary Calculation Method</label>
+                  <select
+                    className="settings-input"
+                    value={payrollRules.salaryCalculationMethod || 'Fixed 30 Days'}
+                    onChange={e => setPayrollRules(p => ({ ...p, salaryCalculationMethod: e.target.value }))}
+                  >
+                    <option value="Fixed 30 Days">Fixed 30 Days</option>
+                    <option value="Calendar Days">Calendar Days</option>
+                    <option value="Actual Working Days">Actual Working Days</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Daily Salary Formula</label>
+                  <select
+                    className="settings-input"
+                    value={payrollRules.dailySalaryFormula || 'Monthly Salary / Payroll Working Days'}
+                    onChange={e => setPayrollRules(p => ({ ...p, dailySalaryFormula: e.target.value }))}
+                  >
+                    <option value="Monthly Salary / Payroll Working Days">Monthly Salary / Payroll Working Days</option>
+                    <option value="Monthly Salary / Calendar Days">Monthly Salary / Calendar Days</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Weekend Policy</label>
+                  <select
+                    className="settings-input"
+                    value={payrollRules.weekendPolicy || 'Saturday & Sunday'}
+                    onChange={e => setPayrollRules(p => ({ ...p, weekendPolicy: e.target.value }))}
+                  >
+                    <option value="Saturday & Sunday">Saturday & Sunday</option>
+                    <option value="Sunday Only">Sunday Only</option>
+                    <option value="None">None</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Holiday Policy</label>
+                  <select
+                    className="settings-input"
+                    value={payrollRules.holidayPolicy || 'Paid'}
+                    onChange={e => setPayrollRules(p => ({ ...p, holidayPolicy: e.target.value }))}
+                  >
+                    <option value="Paid">Paid (No salary deduction)</option>
+                    <option value="Unpaid">Unpaid (Excludes holidays from pay)</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Half Day Policy</label>
+                  <select
+                    className="settings-input"
+                    value={payrollRules.halfDayPolicy || 'Deduct Half Day'}
+                    onChange={e => setPayrollRules(p => ({ ...p, halfDayPolicy: e.target.value }))}
+                  >
+                    <option value="Deduct Half Day">Deduct Half Day Salary (50%)</option>
+                    <option value="No Deduction">No Salary Deduction</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">LOP Formula</label>
+                  <select
+                    className="settings-input"
+                    value={payrollRules.lopFormula || 'Daily Salary * Unpaid Days'}
+                    onChange={e => setPayrollRules(p => ({ ...p, lopFormula: e.target.value }))}
+                  >
+                    <option value="Daily Salary * Unpaid Days">Daily Salary * Unpaid Days</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Grace & Penalty Rules</label>
+                  <select
+                    className="settings-input"
+                    value={payrollRules.graceRules || 'Late Penalty Flat'}
+                    onChange={e => setPayrollRules(p => ({ ...p, graceRules: e.target.value }))}
+                  >
+                    <option value="Late Penalty Flat">Late Penalty Flat Rate</option>
+                    <option value="No Penalty">No Penalty</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>

@@ -3318,6 +3318,80 @@ const Employees = () => {
                   <div className="form-field"><label>Monthly Salary (₹)</label><input type="text" placeholder="55000" value={formData.monthlySalary || ''} onChange={e => { const val = e.target.value.replace(/\D/g, ''); const capped = Number(val) > 500000 ? '500000' : val; setFormData(p => ({ ...p, monthlySalary: capped })); }} /></div>
                   <div className="form-field"><label>Basic Salary (₹)</label><input type="text" placeholder="35000" value={formData.salaryAmount || ''} onChange={e => { const val = e.target.value.replace(/\D/g, ''); const capped = Number(val) > 500000 ? '500000' : val; setFormData(p => ({ ...p, salaryAmount: capped })); }} /></div>
                   <div className="form-field"><label>Deductions (₹)</label><input type="text" placeholder="5000" value={formData.salaryDeductions || ''} onChange={e => { const val = e.target.value.replace(/\D/g, ''); setFormData(p => ({ ...p, salaryDeductions: val })); }} /></div>
+                  
+                  {/* Additional options */}
+                  <div className="form-field">
+                    <label>Tax Regime</label>
+                    <select value={formData.taxRegime || 'New'} onChange={e => setFormData(p => ({ ...p, taxRegime: e.target.value }))}>
+                      <option value="New">New Tax Regime</option>
+                      <option value="Old">Old Tax Regime</option>
+                      <option value="—">Exempt / Not Applicable</option>
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label>PF UAN Number</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 100987654321" 
+                      value={formData.pfUan || ''} 
+                      onChange={e => { const val = e.target.value.replace(/\D/g, '').slice(0, 12); setFormData(p => ({ ...p, pfUan: val })); }} 
+                      maxLength={12} 
+                    />
+                  </div>
+                  <div className="form-field" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <label style={{ marginBottom: '8px' }}>PF Contribution</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                      <div 
+                        className={`toggle-switch${(formData.pfContribution !== false) ? ' ts-on' : ''}`}
+                        onClick={() => setFormData(p => ({ ...p, pfContribution: p.pfContribution === false ? true : false }))}
+                      >
+                        <div className="ts-thumb" />
+                      </div>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {formData.pfContribution !== false ? 'Deduct PF (12% of Basic)' : 'Do not deduct PF'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <h4 className="form-subsection-title" style={{ marginTop: 'var(--spacing-5)' }}>Allowance Details</h4>
+                <div className="form-section-grid">
+                  <div className="form-field">
+                    <label>House Rent Allowance (HRA) (₹)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 6000" 
+                      value={formData.hra || ''} 
+                      onChange={e => { const val = e.target.value.replace(/\D/g, ''); setFormData(p => ({ ...p, hra: val })); }} 
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Conveyance Allowance (₹)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 1600" 
+                      value={formData.travel || ''} 
+                      onChange={e => { const val = e.target.value.replace(/\D/g, ''); setFormData(p => ({ ...p, travel: val })); }} 
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Medical Allowance (₹)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 1250" 
+                      value={formData.medical || ''} 
+                      onChange={e => { const val = e.target.value.replace(/\D/g, ''); setFormData(p => ({ ...p, medical: val })); }} 
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Special Allowance (₹)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. 2500" 
+                      value={formData.special || ''} 
+                      onChange={e => { const val = e.target.value.replace(/\D/g, ''); setFormData(p => ({ ...p, special: val })); }} 
+                    />
+                  </div>
                 </div>
               </div>
             )}

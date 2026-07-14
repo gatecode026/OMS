@@ -25,6 +25,7 @@ router.route('/')
 
 router.get('/today', controller.getToday);
 router.get('/summary', controller.getSummary);
+router.get('/payroll-summary', controller.getPayrollSummary);
 
 router.route('/:id')
   .get(controller.getById)

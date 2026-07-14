@@ -295,6 +295,8 @@ export const AppProvider = ({ children }) => {
 
   const [payroll, setPayroll] = useState([]);
   const [payrollGrades, setPayrollGrades] = useState([]);
+  const [payrollQueries, setPayrollQueries] = useState([]);
+  const [monthlyPayrollSummary, setMonthlyPayrollSummary] = useState({});
   const [payrollReimbursements, setPayrollReimbursements] = useState([]);
   const [payrollLoans, setPayrollLoans] = useState([]);
   const [payrollAdvances, setPayrollAdvances] = useState([]);
@@ -875,9 +877,19 @@ export const AppProvider = ({ children }) => {
             });
           } else if (action === 'update') {
             setLeaveRequests(prev => prev.map(l => (l.id === data.id || l._id === data._id) ? { ...l, ...data } : l));
+            if (data.status === 'Approved' || data.status === 'Cancelled' || data.status === 'Rejected') {
+              const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+              const yearStr = String(new Date().getFullYear());
+              fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+              fetchPayrollData();
+            }
           } else if (action === 'delete') {
             const id = typeof data === 'string' ? data : (data.id || data._id);
             setLeaveRequests(prev => prev.filter(l => l.id !== id && l._id !== id));
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
           }
           break;
 
@@ -887,8 +899,27 @@ export const AppProvider = ({ children }) => {
               if (prev.some(a => a.id === data.id || a._id === data._id)) return prev;
               return [data, ...prev];
             });
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
           } else if (action === 'update') {
             setAttendance(prev => prev.map(a => (a.id === data.id || a._id === data._id) ? { ...a, ...data } : a));
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
+          }
+          break;
+
+        case 'payroll-queries':
+          if (action === 'create') {
+            setPayrollQueries(prev => {
+              if (prev.some(q => q.id === data.id || q._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setPayrollQueries(prev => prev.map(q => (q.id === data.id || q._id === data._id) ? data : q));
           }
           break;
 
@@ -1195,8 +1226,130 @@ export const AppProvider = ({ children }) => {
         }
       }
     } catch (err) {
-      console.error('Failed to fetch payroll data from backend:', err);
+      console.error('Failed to fetch payroll data:', err);
     }
+  };
+
+  const fetchMonthlyPayrollSummary = async (monthYear) => {
+    if (!token || !monthYear) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/payroll-summary?month=${monthYear}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setMonthlyPayrollSummary(result.data || {});
+      }
+    } catch (err) {
+      console.error('Failed to fetch monthly payroll summary:', err);
+    }
+  };
+
+  const fetchPayrollQueries = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch payroll queries:', err);
+    }
+  };
+
+  const createPayrollQuery = async (payload) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => [result.data, ...prev]);
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to create payroll query:', err);
+    }
+    return false;
+  };
+
+  const addQueryReply = async (queryId, message, attachments = []) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message, attachments })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to post query comment:', err);
+    }
+    return false;
+  };
+
+  const updateQueryStatus = async (queryId, action, comments) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action, comments })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to update query status:', err);
+    }
+    return false;
+  };
+
+  const addQueryInternalNote = async (queryId, note) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/internal-note`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ note })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to add internal note:', err);
+    }
+    return false;
   };
 
   // fetchEmployees and fetchPayrollData are called in the main data-loading useEffect below
@@ -5585,6 +5738,14 @@ export const AppProvider = ({ children }) => {
         payrollPayments,
         payrollConfigs,
         fetchPayrollData,
+        payrollQueries,
+        fetchPayrollQueries,
+        createPayrollQuery,
+        addQueryReply,
+        updateQueryStatus,
+        addQueryInternalNote,
+        monthlyPayrollSummary,
+        fetchMonthlyPayrollSummary,
         addOrUpdateSalaryGrade,
         deleteSalaryGrade,
         createLoanOrAdvance,

@@ -150,6 +150,35 @@ const employeeSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  taxRegime: {
+    type: String,
+    enum: ['Old', 'New', '—'],
+    default: 'New'
+  },
+  pfUan: {
+    type: String,
+    default: ''
+  },
+  pfContribution: {
+    type: Boolean,
+    default: true
+  },
+  hra: {
+    type: Number,
+    default: 0
+  },
+  travel: {
+    type: Number,
+    default: 0
+  },
+  medical: {
+    type: Number,
+    default: 0
+  },
+  special: {
+    type: Number,
+    default: 0
+  },
 
   // Identity documents
   panNumber: String,
