@@ -516,14 +516,15 @@ export const getImageKitAuth = asyncHandler(async (req, res) => {
   }
 
   const token = req.query.token || crypto.randomBytes(16).toString('hex');
-  // Expire in 1 hour (3600 seconds)
-  const expire = req.query.expire || Math.floor(Date.now() / 1000) + 3600;
+  // Expire in 30 minutes (1800 seconds) to absorb clock skew and stay safely under ImageKit's 1-hour limit
+  const expire = req.query.expire || Math.floor(Date.now() / 1000) + 1800;
 
   const signature = crypto
     .createHmac('sha1', privateKey)
     .update(token + expire)
     .digest('hex');
 
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   return successResponse(res, {
     token,
     expire,
