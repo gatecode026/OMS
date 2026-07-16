@@ -61,20 +61,35 @@ export const MonthlyDonutChart = ({ records = [] }) => {
       const s = (r.status || '').toLowerCase();
       if (s === 'present' || s === 'overtime') present++;
       else if (s === 'absent') absent++;
-      else if (s === 'late') late++;
+      else if (s === 'late') {
+        late++;
+        present++;
+      }
       else if (s.includes('leave')) leave++;
       else if (s === 'wfh' || s === 'work from home') wfh++;
     });
-    return [
-      { name: 'Present', value: present, color: colors.success },
-      { name: 'Absent', value: absent, color: colors.danger },
-      { name: 'Late', value: late, color: colors.warning },
-      { name: 'On Leave', value: leave, color: colors.purple },
-      { name: 'WFH', value: wfh, color: colors.info }
-    ].filter(d => d.value > 0);
+
+    const onTime = Math.max(0, present - late);
+
+    return {
+      slices: [
+        { name: 'Present (On Time)', value: onTime, color: colors.success },
+        { name: 'Late', value: late, color: colors.warning },
+        { name: 'Absent', value: absent, color: colors.danger },
+        { name: 'On Leave', value: leave, color: colors.purple },
+        { name: 'WFH', value: wfh, color: colors.info }
+      ].filter(d => d.value > 0),
+      legend: [
+        { name: 'Present', value: present, color: colors.success },
+        { name: 'Late', value: late, color: colors.warning, isSubItem: true },
+        { name: 'Absent', value: absent, color: colors.danger },
+        { name: 'On Leave', value: leave, color: colors.purple },
+        { name: 'WFH', value: wfh, color: colors.info }
+      ].filter(d => d.value > 0 || (d.isSubItem && d.value > 0))
+    };
   }, [records, colors]);
 
-  const totalDays = data.reduce((s, d) => s + d.value, 0);
+  const totalDays = data.slices.reduce((s, d) => s + d.value, 0);
 
   return (
     <div style={{
@@ -94,7 +109,7 @@ export const MonthlyDonutChart = ({ records = [] }) => {
         <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: 'var(--text-muted)' }}>Attendance breakdown this month</p>
       </div>
 
-      {data.length === 0 ? (
+      {data.slices.length === 0 ? (
         <div style={{ height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
           No data for this period
         </div>
@@ -103,7 +118,7 @@ export const MonthlyDonutChart = ({ records = [] }) => {
           <ResponsiveContainer width={130} height={130}>
             <PieChart>
               <Pie
-                data={data}
+                data={data.slices}
                 cx="50%"
                 cy="50%"
                 innerRadius={38}
@@ -113,7 +128,7 @@ export const MonthlyDonutChart = ({ records = [] }) => {
                 labelLine={false}
                 label={renderCustomLabel}
               >
-                {data.map((entry, index) => (
+                {data.slices.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -123,11 +138,24 @@ export const MonthlyDonutChart = ({ records = [] }) => {
 
           {/* Legend */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-            {data.map((d, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            {data.legend.map((d, i) => (
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  paddingLeft: d.isSubItem ? '12px' : '0',
+                  borderLeft: d.isSubItem ? '1.5px dashed var(--border-color)' : 'none',
+                  marginLeft: d.isSubItem ? '4px' : '0'
+                }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{d.name}</span>
+                  <span style={{ fontSize: '0.72rem', color: d.isSubItem ? 'var(--text-muted)' : 'var(--text-secondary)', fontWeight: d.isSubItem ? 600 : 'normal' }}>
+                    {d.name}
+                  </span>
                 </div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)' }}>{d.value}d</span>
               </div>
