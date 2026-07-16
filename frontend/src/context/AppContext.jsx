@@ -2226,15 +2226,62 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify(reportData)
       });
       const result = await response.json();
+      if (response.status === 409) {
+        return { success: false, conflict: true, message: result.message, existingReport: result.existingReport };
+      }
       if (result.status === 'success') {
         await fetchDailyReports();
-        return result.data;
+        return { success: true, data: result.data };
       } else {
         throw new Error(result.message || 'Failed to submit work report');
       }
     } catch (err) {
       console.error('Error submitting daily report:', err);
       addToast('danger', err.message || 'Network error while submitting report.');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const updateDailyReport = async (id, reportData) => {
+    if (!token) return null;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/work-reports/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(reportData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDailyReports();
+        return { success: true, data: result.data };
+      } else {
+        throw new Error(result.message || 'Failed to update work report');
+      }
+    } catch (err) {
+      console.error('Error updating daily report:', err);
+      addToast('danger', err.message || 'Network error while updating report.');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const checkExistingReport = async (employeeId, date) => {
+    if (!token) return null;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/work-reports/check?employeeId=${employeeId}&date=${date}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        return result.data;
+      }
+      return null;
+    } catch (err) {
+      console.error('Error checking existing report:', err);
       return null;
     }
   };
@@ -5788,6 +5835,8 @@ export const AppProvider = ({ children }) => {
         dailyReports,
         setDailyReports,
         addDailyReport,
+        updateDailyReport,
+        checkExistingReport,
         updateDailyReportStatus,
         correctionRequests,
         fetchCorrectionRequests,

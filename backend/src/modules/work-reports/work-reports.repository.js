@@ -26,12 +26,21 @@ export const find = async (query = {}) => {
     filter.date = query.date;
   }
   
-  return WorkReport.find(filter).sort({ submittedTime: -1 });
+  return WorkReport.find(filter).sort({ date: -1, submittedTime: -1 });
 };
 
 export const findOne = async (id) => {
   logger.debug('Executing WorkReportsRepository::findOne for: ' + id);
   return WorkReport.findOne({ id });
+};
+
+/**
+ * Find an existing report for an employee on a given date.
+ * Used for duplicate detection.
+ */
+export const findByEmployeeAndDate = async (employeeId, date) => {
+  logger.debug(`Executing WorkReportsRepository::findByEmployeeAndDate: emp=${employeeId}, date=${date}`);
+  return WorkReport.findOne({ employeeId, date });
 };
 
 export const save = async (data) => {
@@ -56,6 +65,7 @@ export const remove = async (id) => {
 export default {
   find,
   findOne,
+  findByEmployeeAndDate,
   save,
   update,
   remove

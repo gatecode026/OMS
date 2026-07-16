@@ -16,7 +16,8 @@ import {
   FileText, Search, Filter, CheckCircle, AlertTriangle, Clock, ThumbsUp,
   Eye, MessageSquare, Sparkles, Plus, Download, Calendar, Users, BarChart3,
   TrendingUp, Send, Trash2, ArrowLeft, ArrowRight, ShieldAlert, Award,
-  Volume2, ShieldCheck, RefreshCw, Layers, Check, X, FileSpreadsheet, Paperclip
+  Volume2, ShieldCheck, RefreshCw, Layers, Check, X, FileSpreadsheet, Paperclip,
+  Edit, Pencil, Lock
 } from 'lucide-react';
 
 /* ── Shared Chart Tooltip Style ─────────────────────────────────── */
@@ -76,6 +77,8 @@ const WorkReports = () => {
     dailyReports: rawReports,
     setDailyReports: setReports,
     addDailyReport,
+    updateDailyReport,
+    checkExistingReport,
     projectsList,
     updateDailyReportStatus,
     activityLogs,
@@ -173,6 +176,19 @@ const WorkReports = () => {
     return `${year}-${month}-${day}`;
   };
 
+  const submittedTaskIds = useMemo(() => {
+    const ids = new Set();
+    const currentUserId = currentUser?.id || currentUser?.employeeId;
+    if (!currentUserId || !rawReports) return ids;
+
+    rawReports.forEach(r => {
+      if (r.employeeId === currentUserId && r.status !== 'Draft' && r.completedTaskIds) {
+        r.completedTaskIds.forEach(id => ids.add(id));
+      }
+    });
+    return ids;
+  }, [rawReports, currentUser]);
+
   const getAssignedTasksCountForDate = (dateStr) => {
     return getAssignedTasksForDate(dateStr).length;
   };
@@ -203,7 +219,7 @@ const WorkReports = () => {
         const isDateMatched = t.dueDate === dateStr;
         const isNotCompleted = t.status !== 'Completed' && t.status !== 'Done' && !t.completed;
         
-        if (isCurrentUserAssigned && isDateMatched && isNotCompleted) {
+        if (isCurrentUserAssigned && isDateMatched && isNotCompleted && !submittedTaskIds.has(t.id)) {
           allTasks.push({
             ...t,
             projectName: proj.name
@@ -240,7 +256,120 @@ const WorkReports = () => {
     }
   }, [currentUser, projectsList]);
 
-  const handleDateChange = (newDate) => {
+  const [editingReportId, setEditingReportId] = useState(null);
+  const [isFormLocked, setIsFormLocked] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState(null);
+  const [lastAutoSaved, setLastAutoSaved] = useState(null);
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    id: '',
+    date: '',
+    project: '',
+    tasksAssigned: 0,
+    tasksCompleted: 0,
+    summary: '',
+    majorAccomplishments: '',
+    challengesFaced: '',
+    workingHours: 8,
+    plannedTasksTomorrow: '',
+    expectedDeliverablesTomorrow: '',
+    priorityTasksTomorrow: 'Medium',
+    completedTaskIds: []
+  });
+  const [isEditSubmitting, setIsEditSubmitting] = useState(false);
+
+  // Auto-Save Draft every 30 seconds
+  React.useEffect(() => {
+    if (currentUserRole !== 'employee' || !formData.summary.trim() && !formData.majorAccomplishments.trim()) {
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      if (isFormLocked) return;
+
+      setAutoSaveStatus('Saving Draft...');
+      const payload = {
+        ...formData,
+        completedTaskIds: selectedTaskIds,
+        employeeId: currentUser?.employeeId || currentUser?.id || 'GATECO-EMP-001',
+        employeeName: currentUser?.name || 'Employee',
+        department: currentUser?.department || 'IT',
+        team: currentUser?.teamName || 'Operations',
+        status: 'Draft',
+        productivityScore: Math.min(100, Math.round((formData.tasksCompleted / Math.max(1, formData.tasksAssigned)) * 100))
+      };
+
+      try {
+        if (editingReportId) {
+          const res = await updateDailyReport(editingReportId, payload);
+          if (res && res.success) {
+            setAutoSaveStatus('Draft Saved.');
+            setLastAutoSaved(new Date().toLocaleTimeString());
+          } else {
+            setAutoSaveStatus('Auto-save failed.');
+          }
+        } else {
+          const existing = await checkExistingReport(currentUser?.id, formData.date);
+          if (existing) {
+            if (existing.status !== 'Approved') {
+              setEditingReportId(existing.id);
+              const res = await updateDailyReport(existing.id, payload);
+              if (res && res.success) {
+                setAutoSaveStatus('Draft Saved.');
+                setLastAutoSaved(new Date().toLocaleTimeString());
+              }
+            } else {
+              setIsFormLocked(true);
+              setAutoSaveStatus('Locked (Approved).');
+            }
+          } else {
+            const res = await addDailyReport(payload);
+            if (res && res.success) {
+              setEditingReportId(res.data.id);
+              setAutoSaveStatus('Draft Saved.');
+              setLastAutoSaved(new Date().toLocaleTimeString());
+            } else {
+              setAutoSaveStatus('Auto-save failed.');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Auto-save error:', err);
+        setAutoSaveStatus('Auto-save failed.');
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [formData, selectedTaskIds, editingReportId, isFormLocked, currentUser, currentUserRole]);
+
+  const weekBounds = useMemo(() => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
+
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - diffToMonday);
+
+    const saturday = new Date(monday);
+    saturday.setDate(monday.getDate() + 5);
+
+    const fmt = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+
+    return {
+      monday: fmt(monday),
+      saturday: fmt(saturday),
+      today: fmt(today)
+    };
+  }, []);
+
+  const handleDateChange = async (newDate) => {
     const tasks = getAssignedTasksForDate(newDate);
     const assignedCount = tasks.length;
     const uniqueProjects = Array.from(new Set(tasks.map(t => t.projectName))).filter(Boolean);
@@ -251,12 +380,53 @@ const WorkReports = () => {
       date: newDate,
       project: projectVal,
       tasksAssigned: assignedCount,
-      tasksCompleted: 0
+      tasksCompleted: 0,
+      summary: '',
+      majorAccomplishments: ''
     }));
     setSelectedTaskIds([]);
+    setEditingReportId(null);
+    setIsFormLocked(false);
+    setAutoSaveStatus(null);
+    setLastAutoSaved(null);
+
+    // Call duplicate prevention check
+    if (currentUser?.id) {
+      const existing = await checkExistingReport(currentUser?.id, newDate);
+      if (existing) {
+        if (existing.status !== 'Approved') {
+          addToast('info', `Found existing ${existing.status} report for this date. Switched to Edit Mode.`);
+          setEditingReportId(existing.id);
+          setIsFormLocked(false);
+          setFormData(prev => ({
+            ...prev,
+            project: existing.project || projectVal,
+            tasksAssigned: existing.tasksAssigned || assignedCount,
+            tasksCompleted: existing.tasksCompleted || 0,
+            summary: existing.summary || '',
+            majorAccomplishments: existing.majorAccomplishments || ''
+          }));
+          setSelectedTaskIds(existing.completedTaskIds || []);
+        } else {
+          addToast('warning', `A report for this date is already ${existing.status}. Editing is locked.`);
+          setEditingReportId(existing.id);
+          setIsFormLocked(true);
+          setFormData(prev => ({
+            ...prev,
+            project: existing.project || projectVal,
+            tasksAssigned: existing.tasksAssigned || assignedCount,
+            tasksCompleted: existing.tasksCompleted || 0,
+            summary: existing.summary || '',
+            majorAccomplishments: existing.majorAccomplishments || ''
+          }));
+          setSelectedTaskIds(existing.completedTaskIds || []);
+        }
+      }
+    }
   };
 
   const handleTaskCheckboxChange = (taskId, checked) => {
+    if (isFormLocked) return;
     let nextIds = [];
     if (checked) {
       nextIds = [...selectedTaskIds, taskId];
@@ -288,11 +458,161 @@ const WorkReports = () => {
   const submittingRef = useRef(false);
   const auditingRef = useRef(false);
 
+  const resetForm = () => {
+    setFormData({
+      date: getTodayStr(),
+      project: 'General',
+      tasksAssigned: 0,
+      tasksCompleted: 0,
+      summary: '',
+      majorAccomplishments: ''
+    });
+    setSelectedTaskIds([]);
+    setEditingReportId(null);
+    setIsFormLocked(false);
+    setAutoSaveStatus(null);
+    setLastAutoSaved(null);
+  };
+
+  const handleStartEdit = (report) => {
+    setEditFormData({
+      id: report.id,
+      date: report.date,
+      project: report.project || 'General',
+      tasksAssigned: report.tasksAssigned || 0,
+      tasksCompleted: report.tasksCompleted || 0,
+      summary: report.summary || '',
+      majorAccomplishments: report.majorAccomplishments || '',
+      challengesFaced: report.challengesFaced || '',
+      workingHours: report.workingHours || 8,
+      plannedTasksTomorrow: report.plannedTasksTomorrow || '',
+      expectedDeliverablesTomorrow: report.expectedDeliverablesTomorrow || '',
+      priorityTasksTomorrow: report.priorityTasksTomorrow || 'Medium',
+      completedTaskIds: report.completedTaskIds || []
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditFormSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setIsEditSubmitting(true);
+    try {
+      const payload = {
+        ...editFormData,
+        employeeId: currentUser?.employeeId || currentUser?.id || 'GATECO-EMP-001',
+        employeeName: currentUser?.name || 'Employee',
+        department: currentUser?.department || 'IT',
+        team: currentUser?.teamName || 'Operations',
+        status: 'Submitted',
+        productivityScore: Math.min(100, Math.round((editFormData.tasksCompleted / Math.max(1, editFormData.tasksAssigned)) * 100))
+      };
+
+      const res = await updateDailyReport(editFormData.id, payload);
+      if (res && res.success) {
+        addToast('success', 'Daily work report updated successfully!');
+        setIsEditModalOpen(false);
+      } else {
+        addToast('danger', res.message || 'Failed to update work report.');
+      }
+    } catch (err) {
+      console.error('Error updating work report:', err);
+      addToast('danger', 'An error occurred while updating the report.');
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  };
+
+  const handleEditFormSaveDraft = async () => {
+    setIsEditSubmitting(true);
+    try {
+      const payload = {
+        ...editFormData,
+        employeeId: currentUser?.employeeId || currentUser?.id || 'GATECO-EMP-001',
+        employeeName: currentUser?.name || 'Employee',
+        department: currentUser?.department || 'IT',
+        team: currentUser?.teamName || 'Operations',
+        status: 'Draft',
+        productivityScore: Math.min(100, Math.round((editFormData.tasksCompleted / Math.max(1, editFormData.tasksAssigned)) * 100))
+      };
+
+      const res = await updateDailyReport(editFormData.id, payload);
+      if (res && res.success) {
+        addToast('success', 'Daily work report draft saved!');
+        setIsEditModalOpen(false);
+      } else {
+        addToast('danger', res.message || 'Failed to save draft.');
+      }
+    } catch (err) {
+      console.error('Error saving draft:', err);
+      addToast('danger', 'An error occurred while saving draft.');
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (isFormLocked) {
+      addToast('warning', 'Report submission is locked.');
+      return;
+    }
+    if (!formData.summary.trim() && !formData.majorAccomplishments.trim()) {
+      addToast('warning', 'Please write a summary or accomplishments to save a draft.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    const payload = {
+      ...formData,
+      completedTaskIds: selectedTaskIds,
+      employeeId: currentUser?.employeeId || currentUser?.id || 'GATECO-EMP-001',
+      employeeName: currentUser?.name || 'Employee',
+      department: currentUser?.department || 'IT',
+      team: currentUser?.teamName || 'Operations',
+      status: 'Draft',
+      productivityScore: Math.min(100, Math.round((formData.tasksCompleted / Math.max(1, formData.tasksAssigned)) * 100))
+    };
+
+    try {
+      if (editingReportId) {
+        const res = await updateDailyReport(editingReportId, payload);
+        if (res && res.success) {
+          addToast('success', 'Draft updated successfully!');
+          setAutoSaveStatus('Draft Saved.');
+          setLastAutoSaved(new Date().toLocaleTimeString());
+        }
+      } else {
+        const res = await addDailyReport(payload);
+        if (res) {
+          if (res.conflict) {
+            addToast('danger', 'Report already exists for this date.');
+          } else if (res.success) {
+            addToast('success', 'Draft saved successfully!');
+            setEditingReportId(res.data.id);
+            setAutoSaveStatus('Draft Saved.');
+            setLastAutoSaved(new Date().toLocaleTimeString());
+          }
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    if (isFormLocked) {
+      addToast('warning', 'Report submission is locked for this date.');
+      return;
+    }
     const todayStr = getTodayStr();
     if (formData.date > todayStr) {
       addToast('warning', 'Report date cannot be in the future.');
+      return;
+    }
+    if (formData.date < weekBounds.monday) {
+      addToast('warning', 'Report date cannot be before the current week.');
       return;
     }
     if (!formData.project.trim()) {
@@ -338,18 +658,38 @@ const WorkReports = () => {
     setIsSubmitting(true);
 
     try {
-      const result = await addDailyReport(payload);
-      if (result) {
-        addToast('success', 'Daily work report submitted successfully!');
-        setFormData({
-          date: getTodayStr(),
-          project: '',
-          tasksAssigned: 0,
-          tasksCompleted: 0,
-          summary: '',
-          majorAccomplishments: ''
-        });
-        setSelectedTaskIds([]);
+      if (editingReportId) {
+        const result = await updateDailyReport(editingReportId, payload);
+        if (result && result.success) {
+          addToast('success', 'Daily work report updated successfully!');
+          resetForm();
+        }
+      } else {
+        const result = await addDailyReport(payload);
+        if (result) {
+          if (result.conflict) {
+            addToast('danger', result.message || 'A report already exists for this date.');
+            if (result.existingReport) {
+              if (result.existingReport.status !== 'Approved') {
+                setEditingReportId(result.existingReport.id);
+                setFormData({
+                  date: result.existingReport.date,
+                  project: result.existingReport.project || 'General',
+                  tasksAssigned: result.existingReport.tasksAssigned || 0,
+                  tasksCompleted: result.existingReport.tasksCompleted || 0,
+                  summary: result.existingReport.summary || '',
+                  majorAccomplishments: result.existingReport.majorAccomplishments || ''
+                });
+                setSelectedTaskIds(result.existingReport.completedTaskIds || []);
+              } else {
+                setIsFormLocked(true);
+              }
+            }
+          } else if (result.success) {
+            addToast('success', 'Daily work report submitted successfully!');
+            resetForm();
+          }
+        }
       }
     } catch (err) {
       console.error(err);
@@ -859,12 +1199,17 @@ const WorkReports = () => {
         updatedStatus = 'Changes Requested';
       } else if (actionType === 'Escalate') {
         updatedStatus = 'Under Process';
+      } else if (actionType === 'Reopen') {
+        updatedStatus = 'Needs Revision';
       }
 
       const updatedReport = await updateDailyReportStatus(selectedReport.id, updatedStatus, evaluationFeedback);
       if (updatedReport) {
-        addAuditLog(actionType === 'Approve' ? 'Approval' : 'Rejection', selectedReport.id, `Report status updated to ${updatedStatus} by ${userRole}`);
-        pushNotification(`Report ${selectedReport.id} was ${updatedStatus.toLowerCase()} by manager.`);
+        const logAction = actionType === 'Approve' ? 'Approval' : 
+                          actionType === 'Reject' ? 'Rejection' : 
+                          actionType === 'Reopen' ? 'Reopened' : 'Status Update';
+        addAuditLog(logAction, selectedReport.id, `Report status updated to ${updatedStatus} by ${userRole}`);
+        pushNotification(`Report ${selectedReport.id} status was changed to ${updatedStatus} by manager.`);
 
         // Reset drawer state
         setSelectedReport(null);
@@ -1178,6 +1523,92 @@ const WorkReports = () => {
     }
   };
 
+  const resolveCompletedTasks = (report) => {
+    if (!report || !report.completedTaskIds || report.completedTaskIds.length === 0) return [];
+    const resolved = [];
+    report.completedTaskIds.forEach(id => {
+      let found = null;
+      (projectsList || []).forEach(proj => {
+        if (!proj.tasks) return;
+        const task = proj.tasks.find(t => t.id === id);
+        if (task) {
+          found = {
+            id,
+            title: task.title,
+            status: task.status,
+            progress: task.progress || 100,
+            projectName: proj.name
+          };
+        }
+      });
+      if (!found) {
+        found = {
+          id,
+          title: `Task (${id})`,
+          status: 'Completed',
+          progress: 100,
+          projectName: report.project || 'General'
+        };
+      }
+      resolved.push(found);
+    });
+    return resolved;
+  };
+
+  const getActivityTimeline = (report) => {
+    if (!report) return [];
+    const timeline = [];
+    
+    if (report.createdAt) {
+      timeline.push({
+        type: 'Created',
+        user: report.employeeName,
+        role: 'Employee',
+        action: 'Created',
+        timestamp: report.createdAt,
+        comments: 'Initial report draft/creation.'
+      });
+    }
+    
+    if (report.submittedTime) {
+      timeline.push({
+        type: 'Submitted',
+        user: report.employeeName,
+        role: 'Employee',
+        action: 'Submitted',
+        timestamp: report.submittedTime,
+        comments: 'Daily report submitted for review.'
+      });
+    }
+
+    if (report.editHistory) {
+      report.editHistory.forEach(edit => {
+        timeline.push({
+          type: 'Edited',
+          user: edit.editedBy,
+          role: 'Employee',
+          action: 'Edited',
+          timestamp: edit.editedAt,
+          comments: `Changed fields: ${edit.changedFields?.join(', ')}`
+        });
+      });
+    }
+
+    if (report.approvalHistory) {
+      report.approvalHistory.forEach(app => {
+        timeline.push({
+          type: app.action,
+          user: app.user,
+          role: app.role,
+          action: app.action,
+          timestamp: app.timestamp,
+          comments: app.comments
+        });
+      });
+    }
+
+    return timeline.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  };
   /* Loading state wrapper */
   if (loading) {
     return (
@@ -1226,7 +1657,7 @@ const WorkReports = () => {
                 </div>
               )}
               <Button variant="ghost" size="sm" icon={Download} onClick={() => setIsExportOpen(true)}>
-                {exporting ? 'Exporting...' : 'Export My Reports'}
+                Export My Reports
               </Button>
             </div>
           </div>
@@ -1236,10 +1667,17 @@ const WorkReports = () => {
             <div className="card padding-5 employee-submit-card animate-slide-up">
               <div className="flex-row align-center gap-2" style={{ marginBottom: 16 }}>
                 <Plus size={18} style={{ color: 'var(--color-primary)' }} />
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Submit Daily Report</h2>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>{editingReportId ? 'Edit Work Report' : 'Submit Daily Report'}</h2>
               </div>
 
               <form onSubmit={handleFormSubmit} className="flex-column gap-4">
+                {autoSaveStatus && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'flex-end', gap: '4px', alignItems: 'center' }}>
+                    <span className="dot" style={{ width: 6, height: 6, borderRadius: '50%', background: autoSaveStatus.includes('Saved') ? 'var(--color-success)' : 'var(--color-warning)' }} />
+                    {autoSaveStatus} {lastAutoSaved && `at ${lastAutoSaved}`}
+                  </div>
+                )}
+
                 {/* Row 1: Date & Project */}
                 <div className="form-row-2">
                   <div className="form-group-item">
@@ -1249,7 +1687,9 @@ const WorkReports = () => {
                       className="reports-form-input"
                       value={formData.date}
                       onChange={(e) => handleDateChange(e.target.value)}
-                      max={getTodayStr()}
+                      min={weekBounds.monday}
+                      max={weekBounds.today}
+                      disabled={isFormLocked && editingReportId === null}
                       required
                     />
                   </div>
@@ -1286,7 +1726,7 @@ const WorkReports = () => {
                           alignItems: 'center',
                           justifyContent: 'flex-start',
                           gap: '8px',
-                          cursor: 'pointer',
+                          cursor: isFormLocked ? 'not-allowed' : 'pointer',
                           padding: '6px 0',
                           width: '100%'
                         }}>
@@ -1295,15 +1735,16 @@ const WorkReports = () => {
                             id={`task-${task.id}`}
                             checked={selectedTaskIds.includes(task.id)}
                             onChange={(e) => handleTaskCheckboxChange(task.id, e.target.checked)}
+                            disabled={isFormLocked}
                             style={{
-                              cursor: 'pointer',
+                              cursor: isFormLocked ? 'not-allowed' : 'pointer',
                               accentColor: 'var(--color-primary)',
                               width: 'auto',
                               margin: 0
                             }}
                           />
                           <label htmlFor={`task-${task.id}`} style={{
-                            cursor: 'pointer',
+                            cursor: isFormLocked ? 'not-allowed' : 'pointer',
                             margin: 0,
                             fontSize: '0.85rem',
                             textTransform: 'none',
@@ -1323,8 +1764,6 @@ const WorkReports = () => {
                     </div>
                   )}
                 </div>
-
-                {/* Row 2: Timings & Hours */}
 
                 {/* Row 3: Tasks Counts */}
                 <div className="form-row-2">
@@ -1347,6 +1786,7 @@ const WorkReports = () => {
                       className="reports-form-input"
                       value={formData.tasksCompleted}
                       onChange={(e) => setFormData(prev => ({ ...prev, tasksCompleted: parseInt(e.target.value, 10) || 0 }))}
+                      disabled={isFormLocked}
                       required
                     />
                   </div>
@@ -1358,9 +1798,10 @@ const WorkReports = () => {
                   <textarea
                     className="reports-form-textarea"
                     rows={3}
-                    placeholder="Describe the specific tasks you worked on today..."
+                    placeholder={isFormLocked ? "Report locked for editing." : "Describe the specific tasks you worked on today..."}
                     value={formData.summary}
                     onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
+                    disabled={isFormLocked}
                     required
                   />
                 </div>
@@ -1370,18 +1811,36 @@ const WorkReports = () => {
                   <textarea
                     className="reports-form-textarea"
                     rows={2}
-                    placeholder="Key accomplishments or milestones reached..."
+                    placeholder={isFormLocked ? "Report locked for editing." : "Key accomplishments or milestones reached..."}
                     value={formData.majorAccomplishments}
                     onChange={(e) => setFormData(prev => ({ ...prev, majorAccomplishments: e.target.value }))}
+                    disabled={isFormLocked}
                     required
                   />
                 </div>
 
-                <div style={{ marginTop: 12 }}>
-                  <Button type="submit" variant="primary" icon={Send} fullWidth disabled={isSubmitting}>
-                    {isSubmitting ? 'Submitting...' : 'Submit Daily Work Report'}
-                  </Button>
-                </div>
+                {isFormLocked ? (
+                  <div className="flex-row align-center gap-2 text-danger" style={{ fontSize: '0.85rem', background: 'rgba(239,68,68,0.08)', padding: '8px 12px', borderRadius: '6px', borderLeft: '3px solid var(--color-danger)' }}>
+                    <Lock size={14} />
+                    <span>This report is locked and cannot be edited.</span>
+                  </div>
+                ) : (
+                  <div className="flex-column gap-2" style={{ marginTop: 12 }}>
+                    <div className="flex-row gap-2">
+                      <Button type="button" variant="secondary" onClick={handleSaveDraft} disabled={isSubmitting} style={{ flex: 1 }}>
+                        Save as Draft
+                      </Button>
+                      <Button type="submit" variant="primary" icon={Send} disabled={isSubmitting} style={{ flex: 2 }}>
+                        {isSubmitting ? 'Processing...' : editingReportId ? 'Update Report' : 'Submit Daily Work Report'}
+                      </Button>
+                    </div>
+                    {editingReportId && (
+                      <Button type="button" variant="ghost" onClick={resetForm} style={{ marginTop: 4 }}>
+                        Cancel Edit / New Report
+                      </Button>
+                    )}
+                  </div>
+                )}
               </form>
             </div>
 
@@ -1411,10 +1870,12 @@ const WorkReports = () => {
                   style={{ height: '32px', fontSize: '0.8rem', padding: '0 8px' }}
                 >
                   <option value="All">All Statuses</option>
+                  <option>Draft</option>
                   <option>Submitted</option>
+                  <option>Under Process</option>
                   <option>Approved</option>
                   <option>Changes Requested</option>
-                  <option>Under Process</option>
+                  <option>Needs Revision</option>
                   <option>Rejected</option>
                 </select>
               </div>
@@ -1428,6 +1889,8 @@ const WorkReports = () => {
                       <th>Tasks</th>
                       <th>Hours</th>
                       <th>Status</th>
+                      <th>Reviewed By</th>
+                      <th>Last Updated</th>
                       <th className="text-right">Actions</th>
                     </tr>
                   </thead>
@@ -1435,27 +1898,41 @@ const WorkReports = () => {
                     {pagedList.length > 0 ? pagedList.map(report => (
                       <tr key={report.id}>
                         <td>{report.date}</td>
-                        <td><Badge variant="neutral">{report.project}</Badge></td>
+                        <td><Badge variant="neutral">{report.project || 'General'}</Badge></td>
                         <td>{report.tasksCompleted}/{report.tasksAssigned}</td>
                         <td>{report.workingHours} hrs</td>
                         <td><Badge variant={getStatusBadgeVariant(report.status)}>{report.status}</Badge></td>
+                        <td>{report.reviewedBy || '—'}</td>
+                        <td>{report.updatedAt ? new Date(report.updatedAt).toLocaleDateString() : '—'}</td>
                         <td className="text-right">
-                          <Button
-                            variant="secondary"
-                            size="xs"
-                            icon={Eye}
-                            onClick={() => {
-                              setSelectedReport(report);
-                              setEvaluationFeedback(report.feedback || '');
-                            }}
-                          >
-                            View
-                          </Button>
+                          <div className="flex-row gap-1 justify-end">
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              icon={Eye}
+                              onClick={() => {
+                                setSelectedReport(report);
+                                setEvaluationFeedback(report.feedback || '');
+                              }}
+                            >
+                              View
+                            </Button>
+                            {isEmployeeView && report.status !== 'Approved' && (
+                              <Button
+                                variant="outline"
+                                size="xs"
+                                icon={Pencil}
+                                onClick={() => handleStartEdit(report)}
+                              >
+                                Edit
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={6} className="reports-table-empty">
+                        <td colSpan={8} className="reports-table-empty">
                           <FileText size={24} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 8 }} />
                           <p style={{ fontSize: '0.8rem' }}>No reports found.</p>
                         </td>
@@ -1697,10 +2174,12 @@ const WorkReports = () => {
                 className="reports-select-filter"
               >
                 <option value="All">All Statuses</option>
+                <option>Draft</option>
                 <option>Submitted</option>
+                <option>Under Process</option>
                 <option>Approved</option>
                 <option>Changes Requested</option>
-                <option>Under Process</option>
+                <option>Needs Revision</option>
                 <option>Rejected</option>
               </select>
 
@@ -2312,6 +2791,38 @@ const WorkReports = () => {
               </div>
             </div>
 
+            {/* Additional report metadata */}
+            <div className="reports-meta-block" style={{ marginTop: '1rem' }}>
+              <span className="block-title">Report Details & Reviews</span>
+              <div className="block-row flex-column gap-1" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column' }}>
+                <div>Project / Client: <strong>{selectedReport.project || 'General'}</strong></div>
+                <div>Submitted Time: <strong>{selectedReport.submittedTime ? new Date(selectedReport.submittedTime).toLocaleString() : '—'}</strong></div>
+                {selectedReport.reviewedBy && <div>Reviewed By: <strong>{selectedReport.reviewedBy}</strong></div>}
+                {selectedReport.approvalDate && <div>Approval Date: <strong>{new Date(selectedReport.approvalDate).toLocaleString()}</strong></div>}
+                {selectedReport.rejectionReason && <div style={{ color: 'var(--color-danger)' }}>Rejection Reason: <strong>{selectedReport.rejectionReason}</strong></div>}
+              </div>
+            </div>
+
+            {/* Completed Tasks details card box */}
+            <div className="drawer-content-box border-left-primary">
+              <span className="box-title text-primary">Completed Tasks Details</span>
+              {resolveCompletedTasks(selectedReport).length > 0 ? (
+                <div className="flex-column gap-2" style={{ marginTop: 8, display: 'flex', flexDirection: 'column' }}>
+                  {resolveCompletedTasks(selectedReport).map(t => (
+                    <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-tag)', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem' }}>
+                      <div className="flex-column" style={{ display: 'flex', flexDirection: 'column' }}>
+                        <strong style={{ color: 'var(--text-primary)' }}>{t.title}</strong>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Project: {t.projectName} | ID: {t.id}</span>
+                      </div>
+                      <Badge variant={t.status === 'Completed' ? 'success' : 'info'}>{t.status} ({t.progress}%)</Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 4 }}>No completed tasks linked to this report.</div>
+              )}
+            </div>
+
             {/* Accomplishments & Summary boxes */}
             <div className="drawer-content-box">
               <span className="box-title">Daily Work Summary</span>
@@ -2360,25 +2871,29 @@ const WorkReports = () => {
               </div>
             )}
 
-            {/* Approval History Timeline */}
+            {/* Integrated Activity Timeline */}
             <div className="drawer-content-box">
-              <span className="box-title">Workflow Approvals Audit History</span>
+              <span className="box-title">Workflow Activity Timeline</span>
               <div className="approvals-timeline-wrapper">
-                {selectedReport.approvalHistory.map((history, idx) => (
+                {getActivityTimeline(selectedReport).map((history, idx) => (
                   <div key={idx} className="timeline-node-item">
                     <div className="node-marker-wrapper">
-                      <span className="node-marker-dot" />
-                      {idx < selectedReport.approvalHistory.length - 1 && <span className="node-marker-line" />}
+                      <span className="node-marker-dot" style={{
+                        background: history.type === 'Approved' ? 'var(--color-success)' :
+                                    history.type === 'Rejected' ? 'var(--color-danger)' :
+                                    history.type === 'Edited' ? 'var(--color-warning)' : 'var(--color-primary)'
+                      }} />
+                      {idx < getActivityTimeline(selectedReport).length - 1 && <span className="node-marker-line" />}
                     </div>
                     <div className="node-content-block">
                       <div className="node-header flex-row justify-between">
                         <strong>{history.user} ({history.role})</strong>
-                        <span className="node-time-lbl">{history.timestamp.replace('T', ' ').slice(0, 16)}</span>
+                        <span className="node-time-lbl">{history.timestamp ? history.timestamp.replace('T', ' ').slice(0, 16) : '—'}</span>
                       </div>
-                      <div className="node-action-text">
-                        Action performed: <Badge variant={getStatusBadgeVariant(history.action === 'Submitted' ? 'Submitted' : history.action === 'Approved' ? 'Approved' : 'Changes Requested')}>{history.action}</Badge>
+                      <div className="node-action-text" style={{ fontSize: '0.8rem', marginTop: 4 }}>
+                        Action: <Badge variant={getStatusBadgeVariant(history.action)}>{history.action}</Badge>
                       </div>
-                      {history.comments && <p className="node-comments-text">Remarks: <em>"{history.comments}"</em></p>}
+                      {history.comments && <p className="node-comments-text" style={{ fontSize: '0.78rem', marginTop: 4, fontStyle: 'italic' }}>Remarks: "{history.comments}"</p>}
                     </div>
                   </div>
                 ))}
@@ -2401,35 +2916,48 @@ const WorkReports = () => {
                   />
                 </div>
 
-                <div className="reports-drawer-action-buttons">
-                  <button
-                    className="review-action-btn changes-btn"
-                    disabled={isAuditing}
-                    onClick={() => triggerAuditAction('Changes')}
-                  >
-                    Request Changes
-                  </button>
-                  <button
-                    className="review-action-btn escalate-btn"
-                    disabled={isAuditing}
-                    onClick={() => triggerAuditAction('Escalate')}
-                  >
-                    Under Process
-                  </button>
-                  <button
-                    className="review-action-btn reject-btn"
-                    disabled={isAuditing}
-                    onClick={() => triggerAuditAction('Reject')}
-                  >
-                    Reject
-                  </button>
-                  <button
-                    className="review-action-btn approve-btn"
-                    disabled={isAuditing}
-                    onClick={() => triggerAuditAction('Approve')}
-                  >
-                    Approve Daily Report
-                  </button>
+                <div className="reports-drawer-action-buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {selectedReport.status === 'Approved' ? (
+                    <button
+                      className="review-action-btn changes-btn"
+                      disabled={isAuditing}
+                      onClick={() => triggerAuditAction('Reopen')}
+                      style={{ background: 'var(--color-warning)', color: 'black', width: '100%' }}
+                    >
+                      Reopen Report / Request Revision
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="review-action-btn changes-btn"
+                        disabled={isAuditing}
+                        onClick={() => triggerAuditAction('Changes')}
+                      >
+                        Request Changes
+                      </button>
+                      <button
+                        className="review-action-btn escalate-btn"
+                        disabled={isAuditing}
+                        onClick={() => triggerAuditAction('Escalate')}
+                      >
+                        Under Process
+                      </button>
+                      <button
+                        className="review-action-btn reject-btn"
+                        disabled={isAuditing}
+                        onClick={() => triggerAuditAction('Reject')}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        className="review-action-btn approve-btn"
+                        disabled={isAuditing}
+                        onClick={() => triggerAuditAction('Approve')}
+                      >
+                        Approve Daily Report
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -2536,6 +3064,235 @@ const WorkReports = () => {
             </select>
           </div>
         </div>
+      </Modal>
+
+      {/* ── Edit Daily Work Report Modal ── */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title={`Edit Work Report: ${editFormData.id}`}
+        size="md"
+        footer={
+          <div className="modal-actions-wrapper" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+            <Button variant="secondary" onClick={() => setIsEditModalOpen(false)} disabled={isEditSubmitting}>
+              Cancel
+            </Button>
+            <Button variant="secondary" onClick={handleEditFormSaveDraft} disabled={isEditSubmitting}>
+              Save as Draft
+            </Button>
+            <Button variant="primary" icon={Send} onClick={handleEditFormSubmit} disabled={isEditSubmitting}>
+              {isEditSubmitting ? 'Updating...' : 'Update Report'}
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleEditFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+          {/* Row 1: Date & Project (Read-only) */}
+          <div className="form-row-2">
+            <div className="form-group-item">
+              <label className="reports-form-lbl">Report Date (Locked)</label>
+              <input
+                type="text"
+                className="reports-form-input"
+                value={editFormData.date}
+                disabled
+                style={{ background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 }}
+              />
+            </div>
+            <div className="form-group-item">
+              <label className="reports-form-lbl">Project Name (Locked)</label>
+              <input
+                type="text"
+                className="reports-form-input"
+                value={editFormData.project}
+                disabled
+                style={{ background: 'var(--bg-card)', cursor: 'not-allowed', opacity: 0.7 }}
+              />
+            </div>
+          </div>
+
+          {/* Active Tasks Checklist (Locked/Read-only) */}
+          <div className="form-group-item">
+            <label className="reports-form-lbl" style={{ marginBottom: '8px', display: 'block' }}>
+              Submitted Tasks (Locked)
+            </label>
+            <div className="flex-column gap-2" style={{
+              maxHeight: '120px',
+              overflowY: 'auto',
+              padding: '10px',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--bg-card)'
+            }}>
+              {(() => {
+                const reportTasks = [];
+                (projectsList || []).forEach(proj => {
+                  if (!proj.tasks) return;
+                  proj.tasks.forEach(t => {
+                    if (editFormData.completedTaskIds.includes(t.id)) {
+                      reportTasks.push({ ...t, projectName: proj.name });
+                    }
+                  });
+                });
+                
+                if (reportTasks.length > 0) {
+                  return reportTasks.map(task => (
+                    <div key={task.id} style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'flex-start',
+                      gap: '8px',
+                      padding: '4px 0',
+                      width: '100%'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={true}
+                        disabled={true}
+                        style={{
+                          cursor: 'not-allowed',
+                          accentColor: 'var(--color-primary)',
+                          width: 'auto',
+                          margin: 0
+                        }}
+                      />
+                      <label style={{
+                        cursor: 'not-allowed',
+                        margin: 0,
+                        fontSize: '0.85rem',
+                        textTransform: 'none',
+                        color: 'var(--text-primary)',
+                        display: 'inline',
+                        fontWeight: 'normal',
+                        letterSpacing: 'normal'
+                      }}>
+                        {task.title} <strong style={{ color: 'var(--text-muted)' }}>({task.id})</strong>
+                      </label>
+                    </div>
+                  ));
+                } else {
+                  return (
+                    <div className="text-xs text-muted" style={{ padding: '4px 0' }}>
+                      No specific tasks were associated with this report.
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+          </div>
+
+          {/* Row 3: Tasks Completed & Hours Worked */}
+          <div className="form-row-2">
+            <div className="form-group-item">
+              <label className="reports-form-lbl">Tasks Completed *</label>
+              <input
+                type="number"
+                min="0"
+                max={editFormData.tasksAssigned}
+                className="reports-form-input"
+                value={editFormData.tasksCompleted}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, tasksCompleted: parseInt(e.target.value, 10) || 0 }))}
+                required
+              />
+            </div>
+            <div className="form-group-item">
+              <label className="reports-form-lbl">Hours Worked *</label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                step="0.5"
+                className="reports-form-input"
+                value={editFormData.workingHours}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, workingHours: parseFloat(e.target.value) || 0 }))}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Row 4: Summary & Accomplishments */}
+          <div className="form-group-item">
+            <label className="reports-form-lbl">Daily Work Summary *</label>
+            <textarea
+              className="reports-form-textarea"
+              rows={3}
+              placeholder="Describe the specific tasks you worked on..."
+              value={editFormData.summary}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, summary: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div className="form-group-item">
+            <label className="reports-form-lbl">Major Accomplishments *</label>
+            <textarea
+              className="reports-form-textarea"
+              rows={2}
+              placeholder="Key accomplishments or milestones reached..."
+              value={editFormData.majorAccomplishments}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, majorAccomplishments: e.target.value }))}
+              required
+            />
+          </div>
+
+          {/* Row 5: Challenges Faced */}
+          <div className="form-group-item">
+            <label className="reports-form-lbl">Challenges Faced</label>
+            <textarea
+              className="reports-form-textarea"
+              rows={2}
+              placeholder="Any roadblocks or support needed..."
+              value={editFormData.challengesFaced}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, challengesFaced: e.target.value }))}
+            />
+          </div>
+
+          {/* Row 6: Tomorrow's Plan Strategy */}
+          <div style={{ padding: '8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.02)' }}>
+            <span className="reports-form-lbl" style={{ display: 'block', fontWeight: 700, marginBottom: '12px', fontSize: '0.85rem', color: 'var(--color-primary)' }}>
+              Tomorrow Strategy Objectives Planning
+            </span>
+            <div className="flex-column gap-3">
+              <div className="form-group-item">
+                <label className="reports-form-lbl" style={{ fontSize: '0.78rem' }}>Objective Planned</label>
+                <textarea
+                  className="reports-form-textarea"
+                  rows={2}
+                  placeholder="What is your primary objective for tomorrow..."
+                  value={editFormData.plannedTasksTomorrow}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, plannedTasksTomorrow: e.target.value }))}
+                />
+              </div>
+              <div className="form-row-2">
+                <div className="form-group-item" style={{ flex: 2 }}>
+                  <label className="reports-form-lbl" style={{ fontSize: '0.78rem' }}>Expected Deliverables</label>
+                  <input
+                    type="text"
+                    className="reports-form-input"
+                    placeholder="Specific expected deliverables..."
+                    value={editFormData.expectedDeliverablesTomorrow}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, expectedDeliverablesTomorrow: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group-item" style={{ flex: 1 }}>
+                  <label className="reports-form-lbl" style={{ fontSize: '0.78rem' }}>Priority</label>
+                  <select
+                    className="reports-form-input"
+                    value={editFormData.priorityTasksTomorrow}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, priorityTasksTomorrow: e.target.value }))}
+                    style={{ padding: '0 12px', height: '38px', cursor: 'pointer' }}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </form>
       </Modal>
 
     </div>
