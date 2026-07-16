@@ -191,6 +191,11 @@ const SecurityAudit = () => {
   const [sessionRoleFilter, setSessionRoleFilter] = useState('All');
   const [selectedSession, setSelectedSession] = useState(null);
   const [showSessionModal, setShowSessionModal] = useState(false);
+  const [showLockoutModal, setShowLockoutModal] = useState(false);
+  const [lockoutSessionId, setLockoutSessionId] = useState('');
+  const [lockoutUserName, setLockoutUserName] = useState('');
+  const [lockoutDuration, setLockoutDuration] = useState('0');
+  const [lockoutReason, setLockoutReason] = useState('Force logout by administrator');
 
   // 8. Security Alerts State (Tab 5)
   const [securityAlerts, setSecurityAlerts] = useState([]);
@@ -253,8 +258,32 @@ const SecurityAudit = () => {
     }
   };
 
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+
+  // Lightweight session-only refresh (runs every 30s)
+  const fetchSessionsOnly = async () => {
+    if (!token) return;
+    try {
+      const sesRes = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/security/sessions', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const sesData = await sesRes.json();
+      if (sesData.status === 'success') {
+        setActiveSessions(sesData.data || []);
+        setLastRefreshed(new Date());
+      }
+    } catch (err) {
+      // silently ignore poll errors
+    }
+  };
+
   useEffect(() => {
-    fetchSecurityData();
+    fetchSecurityData().then(() => setLastRefreshed(new Date()));
+    // Auto-refresh all security data every 30 seconds
+    const interval = setInterval(() => {
+      fetchSecurityData().then(() => setLastRefreshed(new Date()));
+    }, 30000);
+    return () => clearInterval(interval);
   }, [token]);
 
   // Sync audit trail from activity logs in context
@@ -303,6 +332,38 @@ const SecurityAudit = () => {
   };
 
   const securityDashboardStats = useMemo(() => {
+    // Helper to parse dates safely
+    const parseLogDate = (dateStr) => {
+      if (!dateStr) return null;
+      const ms = Date.parse(dateStr);
+      if (!isNaN(ms)) return new Date(ms);
+      try {
+        const parts = dateStr.split(',')[0].split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const year = parseInt(parts[2], 10);
+          return new Date(year, month, day);
+        }
+      } catch (e) {}
+      return null;
+    };
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+
+    const isToday = (date) => date && date.getTime() >= todayStart;
+    const isYesterday = (date) => date && date.getTime() >= yesterdayStart && date.getTime() < todayStart;
+
+    const getTrend = (todayVal, yesterdayVal) => {
+      if (yesterdayVal === 0) {
+        return todayVal > 0 ? '+100.0%' : '0.0%';
+      }
+      const pct = ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+      return (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+    };
+
     // 1. Total Security Events
     const totalEvents = auditLogsData.length;
     const authEvents = auditLogsData.filter(log => 
@@ -311,6 +372,10 @@ const SecurityAudit = () => {
       log.module?.toLowerCase().includes('auth')
     ).length;
     const alertsCount = securityAlerts.length;
+
+    const todayEvents = (auditLogsData || []).filter(log => isToday(parseLogDate(log.timestamp))).length;
+    const yesterdayEvents = (auditLogsData || []).filter(log => isYesterday(parseLogDate(log.timestamp))).length;
+    const totalEventsTrend = getTrend(todayEvents, yesterdayEvents);
 
     // 2. Failed Login Attempts
     const employeesFailedAttempts = (employees || []).reduce((sum, e) => sum + (e.securityInfo?.failedAttempts || 0), 0);
@@ -325,6 +390,15 @@ const SecurityAudit = () => {
       a.message?.toLowerCase().includes('lockout')
     ).length;
 
+    const failedLogs = (auditLogsData || []).filter(log => 
+      log.action === 'Failed Login' || 
+      log.status?.toLowerCase() === 'failed' || 
+      log.action?.toLowerCase().includes('failed login')
+    );
+    const todayFailed = failedLogs.filter(log => isToday(parseLogDate(log.timestamp))).length;
+    const yesterdayFailed = failedLogs.filter(log => isYesterday(parseLogDate(log.timestamp))).length;
+    const failedLoginsTrend = getTrend(todayFailed, yesterdayFailed);
+
     // 3. Active User Sessions
     const totalSessions = activeSessions.length;
     const adminSessionsCount = activeSessions.filter(s => 
@@ -334,6 +408,18 @@ const SecurityAudit = () => {
       s.status?.toLowerCase() === 'idle'
     ).length;
 
+    const todayLogins = (auditLogsData || []).filter(log => 
+      isToday(parseLogDate(log.timestamp)) && 
+      ((log.action && log.action.toLowerCase().includes('login')) || 
+       (log.eventType && log.eventType.toLowerCase().includes('login')))
+    ).length;
+    const yesterdayLogins = (auditLogsData || []).filter(log => 
+      isYesterday(parseLogDate(log.timestamp)) && 
+      ((log.action && log.action.toLowerCase().includes('login')) || 
+       (log.eventType && log.eventType.toLowerCase().includes('login')))
+    ).length;
+    const sessionsTrend = getTrend(todayLogins, yesterdayLogins);
+
     // 4. Security Alerts
     const criticalAlertsCount = securityAlerts.filter(a => 
       a.severity?.toLowerCase() === 'critical'
@@ -341,6 +427,10 @@ const SecurityAudit = () => {
     const highAlertsCount = securityAlerts.filter(a => 
       a.severity?.toLowerCase() === 'high'
     ).length;
+
+    const todayAlerts = (securityAlerts || []).filter(a => isToday(new Date(a.createdAt || a.timestamp))).length;
+    const yesterdayAlerts = (securityAlerts || []).filter(a => isYesterday(new Date(a.createdAt || a.timestamp))).length;
+    const alertsTrend = getTrend(todayAlerts, yesterdayAlerts);
 
     // 5. Permission Changes
     const permissionChangesCount = auditLogsData.filter(log => 
@@ -359,6 +449,17 @@ const SecurityAudit = () => {
       log.action === 'Policy Update' || 
       log.action?.toLowerCase().includes('policy')
     ).length;
+
+    const permLogs = (auditLogsData || []).filter(log => 
+      log.eventType === 'Roles & Permissions' || 
+      log.action === 'Permission Change' || 
+      log.action === 'Role Update' || 
+      log.module === 'RolesPermissions' || 
+      log.action?.toLowerCase().includes('permission')
+    );
+    const todayPerm = permLogs.filter(log => isToday(parseLogDate(log.timestamp))).length;
+    const yesterdayPerm = permLogs.filter(log => isYesterday(parseLogDate(log.timestamp))).length;
+    const permissionChangesTrend = getTrend(todayPerm, yesterdayPerm);
 
     // 6. Audit Logs Generated (represented by auditLogsData.length)
     const auditLogsCount = auditLogsData.length;
@@ -414,7 +515,12 @@ const SecurityAudit = () => {
       mfaUsersCount,
       mfaCoverage,
       mfaAdminCoverage,
-      systemHealthScore
+      systemHealthScore,
+      totalEventsTrend,
+      failedLoginsTrend,
+      sessionsTrend,
+      alertsTrend,
+      permissionChangesTrend
     };
   }, [auditLogsData, securityAlerts, employees, activeSessions, restrictedIps]);
 
@@ -703,26 +809,31 @@ const SecurityAudit = () => {
 
   // Session Revocation
   const handleForceLogoutSession = (sessionId, userName) => {
-    showConfirm(
-      'Force Logout Session',
-      `Are you sure you want to immediately terminate the session for user "${userName}"? The user will be redirected to the login screen.`,
-      async () => {
-        try {
-          const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/security/sessions/${sessionId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const result = await response.json();
-          if (result.status === 'success') {
-            addPageToast('success', `User "${userName}" session terminated successfully.`);
-            fetchSecurityData();
-          }
-        } catch (err) {
-          console.error('Failed to terminate session:', err);
-        }
-      },
-      'danger'
-    );
+    setLockoutSessionId(sessionId);
+    setLockoutUserName(userName);
+    setLockoutDuration('0');
+    setLockoutReason('Force logout by administrator');
+    setShowLockoutModal(true);
+  };
+
+  const submitForceLogout = async () => {
+    try {
+      const url = `${window.API_URL || "http://localhost:5000"}/api/v1/security/sessions/${lockoutSessionId}?duration=${lockoutDuration}&reason=${encodeURIComponent(lockoutReason)}`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const lockoutLabel = lockoutDuration !== '0' ? ` and locked out for ${lockoutDuration === '15' ? '15 minutes' : lockoutDuration === '60' ? '1 hour' : lockoutDuration === '1440' ? '24 hours' : '10 minutes'}` : '';
+        addPageToast('success', `User "${lockoutUserName}" session terminated successfully${lockoutLabel}.`);
+        fetchSecurityData();
+      }
+    } catch (err) {
+      console.error('Failed to terminate session:', err);
+    } finally {
+      setShowLockoutModal(false);
+    }
   };
 
   const handleForceLogoutAll = () => {
@@ -1168,8 +1279,8 @@ const SecurityAudit = () => {
       <div className="card tab-bar-card overflow-x-auto">
         <div className="security-tabs-list">
           <button onClick={() => setActiveTab('dashboard')} className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}><Shield size={16} />Security Dashboard</button>
-          <button onClick={() => setActiveTab('login_security')} className={`tab-btn ${activeTab === 'login_security' ? 'active' : ''}`}><Lock size={16} />Login Security</button>
-          <button onClick={() => setActiveTab('access_controls')} className={`tab-btn ${activeTab === 'access_controls' ? 'active' : ''}`}><Key size={16} />Access Controls</button>
+          <button disabled title="Coming Soon" className="tab-btn" style={{ opacity: 0.4, cursor: 'not-allowed', pointerEvents: 'none' }}><Lock size={16} />Login Security</button>
+          <button disabled title="Coming Soon" className="tab-btn" style={{ opacity: 0.4, cursor: 'not-allowed', pointerEvents: 'none' }}><Key size={16} />Access Controls</button>
           <button onClick={() => setActiveTab('sessions')} className={`tab-btn ${activeTab === 'sessions' ? 'active' : ''}`}><Users size={16} />Session Management</button>
           <button onClick={() => setActiveTab('alerts')} className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`}><AlertTriangle size={16} />Security Alerts</button>
           <button onClick={() => setActiveTab('audit')} className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`}><Activity size={16} />Audit Logs</button>
@@ -1182,7 +1293,9 @@ const SecurityAudit = () => {
         <div className="card security-stat-card border-bottom-primary">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Total Security Events</span>
-            <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +8.4%</span>
+            <span className={`stat-trend ${(securityDashboardStats.totalEventsTrend || '').startsWith('-') ? 'trend-red' : 'trend-green'}`}>
+              {(securityDashboardStats.totalEventsTrend || '').startsWith('-') ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />} {securityDashboardStats.totalEventsTrend}
+            </span>
           </div>
           <h3 className="stat-num">{formatNumber(securityDashboardStats.totalEvents)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
@@ -1194,7 +1307,9 @@ const SecurityAudit = () => {
         <div className="card security-stat-card border-bottom-danger">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Failed Login Attempts</span>
-            <span className="stat-trend trend-red"><ArrowUpRight size={14} /> +1.2%</span>
+            <span className={`stat-trend ${(securityDashboardStats.failedLoginsTrend || '').startsWith('-') ? 'trend-red' : 'trend-green'}`}>
+              {(securityDashboardStats.failedLoginsTrend || '').startsWith('-') ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />} {securityDashboardStats.failedLoginsTrend}
+            </span>
           </div>
           <h3 className="stat-num text-danger">{formatNumber(securityDashboardStats.failedLogins)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
@@ -1218,7 +1333,9 @@ const SecurityAudit = () => {
         <div className="card security-stat-card border-bottom-warning">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Security Alerts</span>
-            <span className="badge-warning-custom font-xsmall">{formatNumber(securityDashboardStats.alertsCount)} Alerts</span>
+            <span className={`stat-trend ${(securityDashboardStats.alertsTrend || '').startsWith('-') ? 'trend-red' : 'trend-green'}`}>
+              {(securityDashboardStats.alertsTrend || '').startsWith('-') ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />} {securityDashboardStats.alertsTrend}
+            </span>
           </div>
           <h3 className="stat-num text-warning">{formatNumber(securityDashboardStats.alertsCount)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
@@ -1234,7 +1351,9 @@ const SecurityAudit = () => {
         <div className="card security-stat-card border-bottom-orange">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Permission Changes</span>
-            <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +{formatNumber(securityDashboardStats.permissionChangesCount)} today</span>
+            <span className={`stat-trend ${(securityDashboardStats.permissionChangesTrend || '').startsWith('-') ? 'trend-red' : 'trend-green'}`}>
+              {(securityDashboardStats.permissionChangesTrend || '').startsWith('-') ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />} {securityDashboardStats.permissionChangesTrend}
+            </span>
           </div>
           <h3 className="stat-num text-warning">{formatNumber(securityDashboardStats.permissionChangesCount)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
@@ -1246,7 +1365,9 @@ const SecurityAudit = () => {
         <div className="card security-stat-card border-bottom-primary">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Audit Logs Generated</span>
-            <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +5.4%</span>
+            <span className={`stat-trend ${(securityDashboardStats.totalEventsTrend || '').startsWith('-') ? 'trend-red' : 'trend-green'}`}>
+              {(securityDashboardStats.totalEventsTrend || '').startsWith('-') ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />} {securityDashboardStats.totalEventsTrend}
+            </span>
           </div>
           <h3 className="stat-num">{formatNumber(securityDashboardStats.auditLogsCount)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
@@ -1258,7 +1379,7 @@ const SecurityAudit = () => {
         <div className="card security-stat-card border-bottom-success">
           <div className="stat-card-header flex-center justify-between width-full">
             <span className="stat-label">Active MFA Users</span>
-            <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +12.4%</span>
+            <span className="stat-trend trend-green"><ArrowUpRight size={14} /> +0.0%</span>
           </div>
           <h3 className="stat-num text-success">{formatNumber(securityDashboardStats.mfaUsersCount)}</h3>
           <div className="flex-center justify-between font-small text-muted width-full">
@@ -1980,6 +2101,13 @@ const SecurityAudit = () => {
             </div>
 
             <div className="flex-center gap-3">
+              {lastRefreshed && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  <RefreshCw size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                  Refreshed {lastRefreshed.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              )}
+              <Button variant="ghost" onClick={() => { fetchSessionsOnly(); }} icon={RefreshCw}>Refresh</Button>
               <Button variant="ghost" onClick={() => handleExportData('Active Admin Sessions', 'CSV')} icon={Download}>Export CSV</Button>
               <Button variant="danger" onClick={handleForceLogoutAll} icon={X}>Force Logout All</Button>
             </div>
@@ -2002,11 +2130,21 @@ const SecurityAudit = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSessions.map(session => (
+                  {filteredSessions.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                          <Shield size={32} style={{ opacity: 0.3 }} />
+                          <span style={{ fontSize: '0.875rem' }}>No active sessions found</span>
+                          <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Sessions appear here when users log in. Auto-refreshes every 30s.</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredSessions.map(session => (
                     <tr key={session.id}>
                       <td>
                         <div className="flex-center gap-2">
-                          <Avatar name={session.employeeName} size={32} />
+                          <Avatar name={session.employeeName} size="sm" />
                           <strong>{session.employeeName}</strong>
                         </div>
                       </td>
@@ -2037,11 +2175,9 @@ const SecurityAudit = () => {
                             setSelectedSession(session);
                             setShowSessionModal(true);
                           }}>View</Button>
-                          {session.id !== 'SES-001' && (
-                            <Button variant="danger" size="sm" onClick={() => handleForceLogoutSession(session.id, session.employeeName)}>
-                              Force Logout
-                            </Button>
-                          )}
+                          <Button variant="danger" size="sm" onClick={() => handleForceLogoutSession(session.id, session.employeeName)}>
+                            Force Logout
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -2571,6 +2707,63 @@ const SecurityAudit = () => {
                 <Button variant="primary" onClick={() => setShowLogModal(false)}>Close</Button>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+      {/* 4. Force Logout & Lockout Configuration Modal */}
+      {showLockoutModal && (
+        <div className="modal-backdrop flex-center">
+          <div className="modal-content card p-6 animate-zoom-in" style={{ width: 480 }}>
+            <div className="flex-between align-center mb-4">
+              <h3 className="title-bold" style={{ color: 'var(--text-primary)' }}>Force Logout & Lockout</h3>
+              <button className="icon-btn text-muted" onClick={() => setShowLockoutModal(false)}><X size={18} /></button>
+            </div>
+
+            <div className="flex-column gap-4">
+              <div className="p-3" style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 6 }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                  You are about to terminate the active session for <strong>{lockoutUserName}</strong>.
+                </span>
+              </div>
+
+              <div className="form-group flex-column gap-2">
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Prevent employee from logging back in for:
+                </label>
+                <select
+                  value={lockoutDuration}
+                  onChange={(e) => setLockoutDuration(e.target.value)}
+                  className="sec-selector"
+                  style={{ height: 38, width: '100%', padding: '0 10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 6, color: 'var(--text-primary)' }}
+                >
+                  <option value="0">No Lockout (Can log in again immediately)</option>
+                  <option value="10">10 Minutes</option>
+                  <option value="15">15 Minutes</option>
+                  <option value="60">1 Hour</option>
+                  <option value="1440">24 Hours</option>
+                </select>
+              </div>
+
+              <div className="form-group flex-column gap-2">
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  Reason for termination & lockout:
+                </label>
+                <input
+                  type="text"
+                  value={lockoutReason}
+                  onChange={(e) => setLockoutReason(e.target.value)}
+                  placeholder="e.g. System maintenance / Security investigation"
+                  style={{ height: 38, padding: '0 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 6, color: 'var(--text-primary)', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div className="flex-center justify-end gap-2 mt-4 pt-3" style={{ borderTop: '1px solid var(--border-color)' }}>
+                <Button variant="ghost" onClick={() => setShowLockoutModal(false)}>Cancel</Button>
+                <Button variant="danger" onClick={submitForceLogout}>
+                  {lockoutDuration === '0' ? 'Terminate Session' : `Terminate & Lock ${lockoutDuration === '60' ? '1h' : lockoutDuration === '1440' ? '24h' : lockoutDuration + 'm'}`}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

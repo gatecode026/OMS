@@ -760,3 +760,64 @@ Stack: Error: Invalid email or password
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:26:16
 Body: {"email":"gatecode@gmail.com","password":"password"}
+
+[2026-07-16T08:27:49.877Z] GET /api/v1/chat/messages/6a589605f9eced29c2ec8502
+Error: Message.findOne(...).lean is not a function
+Stack: TypeError: Message.findOne(...).lean is not a function
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:497:8
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at runWithTenant (file:///C:/Users/Shubh/Desktop/OMS/backend/src/utils/tenantContext.js:41:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Body: {}
+
+[2026-07-16T08:32:57.839Z] PATCH /api/v1/chat/conversations/GATECO-CONV-031/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T08:32:58.689Z] PATCH /api/v1/chat/conversations/GATECO-CONV-031/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T08:35:09.118Z] PATCH /api/v1/chat/conversations/GATECO-CONV-031/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T08:35:09.391Z] PATCH /api/v1/chat/conversations/GATECO-CONV-031/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T11:48:43.152Z] POST /api/v1/auth/login
+Error: Your account has been temporarily locked by an administrator. Please try again in 10 minute(s).
+Stack: Error: Your account has been temporarily locked by an administrator. Please try again in 10 minute(s).
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:190:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
+Body: {"email":"geeta@gmail.com","password":"password"}

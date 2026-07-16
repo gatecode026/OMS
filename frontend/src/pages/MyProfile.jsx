@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import './MyProfile.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -487,8 +487,30 @@ const MyProfile = () => {
     projectsList,
     tasks,
     leaveRequests,
-    activityLogs
+    activityLogs,
+    fetchEmployees,
+    fetchBranches,
+    fetchDepartments,
+    fetchProjects,
+    fetchLeaves,
+    fetchActivityLogs
   } = useApp();
+
+  // Load and refresh stats periodically in real-time
+  useEffect(() => {
+    const refreshData = () => {
+      if (fetchEmployees) fetchEmployees();
+      if (fetchBranches) fetchBranches();
+      if (fetchDepartments) fetchDepartments();
+      if (fetchProjects) fetchProjects();
+      if (fetchLeaves) fetchLeaves();
+      if (fetchActivityLogs) fetchActivityLogs();
+    };
+
+    refreshData();
+    const interval = setInterval(refreshData, 30000); // 30 seconds auto-refresh
+    return () => clearInterval(interval);
+  }, []);
 
   // Active Tab state for form panels
   const [activeTab, setActiveTab] = useState('personal'); // personal, contact
@@ -879,7 +901,7 @@ const MyProfile = () => {
     const branchCount = branches?.length || 0;
     const deptCount = departments?.length || 0;
     const projectCount = projectsList?.length || 0;
-    const taskCount = tasks?.length || 0;
+    const taskCount = (tasks || []).filter(t => !(t.completed || t.status === 'Done' || t.status === 'Completed')).length;
     const pendingLeaveCount = leaveRequests?.filter(r => r.status === 'Pending').length || 0;
 
     return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './Login.css';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -16,6 +16,18 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [signInError, setSignInError] = useState('');
+  const [forceLogoutReason, setForceLogoutReason] = useState('');
+
+  // Check if redirected here due to force logout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get('reason');
+    if (reason) {
+      setForceLogoutReason(decodeURIComponent(reason));
+      // Clean the URL so it doesn't show on refresh
+      window.history.replaceState({}, '', '/login');
+    }
+  }, []);
 
   // Authentication mode: 'signin' | 'forgot'
   const [authMode, setAuthMode] = useState('signin');
@@ -182,6 +194,20 @@ const Login = () => {
         {/* ── SIGN IN FORM ── */}
         {authMode === 'signin' && (
           <form onSubmit={handleSubmit} className="login-form">
+            {/* Force Logout Warning Banner */}
+            {forceLogoutReason && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.4)',
+                borderRadius: 8, padding: '10px 14px', marginBottom: 12
+              }}>
+                <AlertCircle size={16} style={{ color: '#fb923c', flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#fb923c' }}>Session Terminated</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 }}>{forceLogoutReason}</div>
+                </div>
+              </div>
+            )}
             {signInError && (
               <div className="login-error-alert animate-shake">
                 <AlertCircle size={16} className="text-danger flex-shrink-0" />
