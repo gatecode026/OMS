@@ -737,6 +737,34 @@ export const AppProvider = ({ children }) => {
     }
   }, [token, currentUser]);
 
+  // Listen for force_logout events emitted by the backend (admin terminates session)
+  useEffect(() => {
+    if (!token) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleForceLogout = (data) => {
+      console.warn('[AppContext] force_logout received:', data);
+      // Show a brief alert before redirecting
+      const reason = data?.reason || 'Your session was terminated by an administrator.';
+      // Clear all local state
+      localStorage.removeItem('saas_token');
+      localStorage.removeItem('saas_role');
+      localStorage.removeItem('saas_user_id');
+      localStorage.removeItem('saas_user');
+      sessionStorage.removeItem('saas_token');
+      sessionStorage.removeItem('just_logged_in');
+      disconnectSocket();
+      // Redirect to login with reason encoded in URL
+      window.location.href = `/login?reason=${encodeURIComponent(reason)}`;
+    };
+
+    socket.on('force_logout', handleForceLogout);
+    return () => {
+      socket.off('force_logout', handleForceLogout);
+    };
+  }, [token]);
+
   // Keep action references fresh for socket events without triggering re-connection effects
   useEffect(() => {
     activeActionsRef.current = {
@@ -1138,7 +1166,18 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Notify backend to remove the session record (fire-and-forget)
+    try {
+      const t = localStorage.getItem('saas_token') || token;
+      if (t) {
+        fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/auth/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${t}` }
+        }).catch(() => {});
+      }
+    } catch (_) {}
+
     localStorage.removeItem('saas_token');
     localStorage.removeItem('saas_role');
     localStorage.removeItem('saas_user_id');
@@ -3210,15 +3249,6 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Approved leave request for ${leave.employeeName}`, 'Leaves', 'success');
         addToast('success', `Leave request for ${leave.employeeName} approved.`);
-
-        // Add Notification — targeted to the employee who requested leave
-        await triggerAutomaticNotification('LV-02', {
-          title: 'Leave Request Approved',
-          message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Approved. Note: ${notes || 'Approved by Manager'}`,
-          recipientId: leave.employeeId,
-          recipientRole: 'employee',
-          category: 'Leave'
-        });
       } else {
         addToast('error', result.message || 'Failed to approve leave request');
       }
@@ -3261,15 +3291,6 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Rejected leave request for ${leave.employeeName}`, 'Leaves', 'danger');
         addToast('error', `Leave request for ${leave.employeeName} rejected.`);
-
-        // Add Notification — targeted to the employee who requested leave
-        await triggerAutomaticNotification('LV-03', {
-          title: 'Leave Request Rejected',
-          message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Rejected. Note: ${notes || 'Rejected by Manager'}`,
-          recipientId: leave.employeeId,
-          recipientRole: 'employee',
-          category: 'Leave'
-        });
       } else {
         addToast('error', result.message || 'Failed to reject leave request');
       }
@@ -3320,16 +3341,6 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Submitted leave request for ${result.data.employeeName}`, 'Leaves', 'success');
         addToast('success', result.data.status === 'Approved' ? `Leave assigned successfully for ${result.data.employeeName}.` : 'Leave request submitted successfully for approval.');
-
-        // Notify admin/manager about the new leave application (only if status is Pending)
-        if (result.data.status === 'Pending') {
-          await triggerAutomaticNotification('LV-01', {
-            title: 'New Leave Application Submitted',
-            message: `${result.data.employeeName} has applied for ${result.data.type || 'Leave'} from ${result.data.fromDate} to ${result.data.toDate || result.data.fromDate} (${result.data.days || 1} day(s)). Action required.`,
-            recipientRole: 'admin',
-            category: 'Leave'
-          });
-        }
 
         return result.data;
       } else {
@@ -5622,9 +5633,10 @@ export const AppProvider = ({ children }) => {
     const isDbBacked = Object.values(MODULE_MAPPING).includes(baseKey) || Object.keys(MODULE_MAPPING).includes(module);
 
     if (isDbBacked) {
+      const rawUserRole = currentUser?.roleId || currentUser?.role || currentUserRole;
       const roleObj = roles.find(r => r.id === rawUserRole) || 
                       roles.find(r => r.id === currentUserRole) || 
-                      roles.find(r => getBaseRole(r.id) === currentUserRole);
+                      roles.find(r => r.id.toLowerCase() === currentUserRole.toLowerCase());
       const permissions = roleObj?.permissions;
       
       let dbPermission;
@@ -5777,6 +5789,7 @@ export const AppProvider = ({ children }) => {
         updateTeam,
         deleteTeam,
         projectsList,
+        fetchProjects,
         addProject,
         updateProject,
         deleteProject,

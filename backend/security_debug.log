@@ -692,3 +692,139 @@
 [2026-07-15T07:12:31.359Z] restrictedFields: ["assigneeId","assigneeName","priority","dueDate","creatorId","projectId","branch","department","approvalStatus","createdBy","updatedBy"]
 [2026-07-15T07:12:32.141Z] moduleName: Tasks, role: employee, updatePayload: {"status":"In Progress","progress":10}
 [2026-07-15T07:12:32.144Z] restrictedFields: ["assigneeId","assigneeName","priority","dueDate","creatorId","projectId","branch","department","approvalStatus","createdBy","updatedBy"]
+[2026-07-16T08:27:39.072Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:38.826Z"}}
+[2026-07-16T08:27:39.113Z] restrictedFields: []
+[2026-07-16T08:27:39.151Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:38.840Z"}}
+[2026-07-16T08:27:39.155Z] restrictedFields: []
+[2026-07-16T08:27:39.305Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:39.177Z"}}
+[2026-07-16T08:27:39.307Z] restrictedFields: []
+[2026-07-16T08:27:39.362Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:39.210Z"}}
+[2026-07-16T08:27:39.365Z] restrictedFields: []
+[2026-07-16T08:27:39.497Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:39.382Z"}}
+[2026-07-16T08:27:39.498Z] restrictedFields: []
+[2026-07-16T08:27:39.506Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:39.388Z"}}
+[2026-07-16T08:27:39.509Z] restrictedFields: []
+[2026-07-16T08:27:39.613Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:39.503Z"}}
+[2026-07-16T08:27:39.615Z] restrictedFields: []
+[2026-07-16T08:27:40.072Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:39.951Z"}}
+[2026-07-16T08:27:40.074Z] restrictedFields: []
+[2026-07-16T08:27:40.597Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:40.489Z"}}
+[2026-07-16T08:27:40.598Z] restrictedFields: []
+[2026-07-16T08:27:41.106Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:40.992Z"}}
+[2026-07-16T08:27:41.108Z] restrictedFields: []
+[2026-07-16T08:27:41.649Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:41.543Z"}}
+[2026-07-16T08:27:41.650Z] restrictedFields: []
+[2026-07-16T08:27:42.196Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:42.071Z"}}
+[2026-07-16T08:27:42.198Z] restrictedFields: []
+[2026-07-16T08:27:42.728Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:42.617Z"}}
+[2026-07-16T08:27:42.731Z] restrictedFields: []
+[2026-07-16T08:27:43.261Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:43.140Z"}}
+[2026-07-16T08:27:43.282Z] restrictedFields: []
+[2026-07-16T08:27:43.812Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:43.703Z"}}
+[2026-07-16T08:27:43.814Z] restrictedFields: []
+[2026-07-16T08:27:44.355Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:44.234Z"}}
+[2026-07-16T08:27:44.359Z] restrictedFields: []
+[2026-07-16T08:27:44.925Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:44.797Z"}}
+[2026-07-16T08:27:44.927Z] restrictedFields: []
+[2026-07-16T08:27:45.484Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:45.365Z"}}
+[2026-07-16T08:27:45.486Z] restrictedFields: []
+[2026-07-16T08:27:46.042Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:45.900Z"}}
+[2026-07-16T08:27:46.046Z] restrictedFields: []
+[2026-07-16T08:27:46.604Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:46.463Z"}}
+[2026-07-16T08:27:46.606Z] restrictedFields: []
+[2026-07-16T08:27:47.159Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:47.026Z"}}
+[2026-07-16T08:27:47.160Z] restrictedFields: []
+[2026-07-16T08:27:47.817Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:47.694Z"}}
+[2026-07-16T08:27:47.819Z] restrictedFields: []
+[2026-07-16T08:27:47.932Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:47.823Z"}}
+[2026-07-16T08:27:47.933Z] restrictedFields: []
+[2026-07-16T08:27:48.326Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:48.215Z"}}
+[2026-07-16T08:27:48.327Z] restrictedFields: []
+[2026-07-16T08:27:48.853Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:48.740Z"}}
+[2026-07-16T08:27:48.854Z] restrictedFields: []
+[2026-07-16T08:27:49.371Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:49.251Z"}}
+[2026-07-16T08:27:49.373Z] restrictedFields: []
+[2026-07-16T08:27:49.652Z] moduleName: Chat, role: manager, updatePayload: {"lastMessage":{"messageId":"6a589605f9eced29c2ec8502","content":"hii","type":"text","senderId":"GATECO-EMP-001","senderName":"Harsh Chaudhary","sentAt":"2026-07-16T08:27:49.616Z"},"lastActivityAt":"2026-07-16T08:27:49.616Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-16T08:27:49.653Z] restrictedFields: []
+[2026-07-16T08:27:49.904Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-012","deliveredAt":"2026-07-16T08:27:49.828Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-16T08:27:49.828Z"}}
+[2026-07-16T08:27:49.906Z] restrictedFields: []
+[2026-07-16T08:27:50.382Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:50.274Z"}}
+[2026-07-16T08:27:50.383Z] restrictedFields: []
+[2026-07-16T08:27:50.923Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:50.815Z"}}
+[2026-07-16T08:27:50.924Z] restrictedFields: []
+[2026-07-16T08:27:51.425Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:51.319Z"}}
+[2026-07-16T08:27:51.427Z] restrictedFields: []
+[2026-07-16T08:27:51.946Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:51.833Z"}}
+[2026-07-16T08:27:51.947Z] restrictedFields: []
+[2026-07-16T08:27:52.472Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:52.356Z"}}
+[2026-07-16T08:27:52.473Z] restrictedFields: []
+[2026-07-16T08:27:52.988Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:52.881Z"}}
+[2026-07-16T08:27:52.990Z] restrictedFields: []
+[2026-07-16T08:27:53.532Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:53.413Z"}}
+[2026-07-16T08:27:53.533Z] restrictedFields: []
+[2026-07-16T08:27:54.104Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:53.960Z"}}
+[2026-07-16T08:27:54.106Z] restrictedFields: []
+[2026-07-16T08:27:54.632Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:54.516Z"}}
+[2026-07-16T08:27:54.633Z] restrictedFields: []
+[2026-07-16T08:27:55.157Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:55.045Z"}}
+[2026-07-16T08:27:55.158Z] restrictedFields: []
+[2026-07-16T08:27:55.658Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:55.551Z"}}
+[2026-07-16T08:27:55.660Z] restrictedFields: []
+[2026-07-16T08:27:56.170Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:56.062Z"}}
+[2026-07-16T08:27:56.171Z] restrictedFields: []
+[2026-07-16T08:27:56.687Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:56.579Z"}}
+[2026-07-16T08:27:56.689Z] restrictedFields: []
+[2026-07-16T08:27:57.203Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:57.095Z"}}
+[2026-07-16T08:27:57.204Z] restrictedFields: []
+[2026-07-16T08:27:57.737Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:57.623Z"}}
+[2026-07-16T08:27:57.738Z] restrictedFields: []
+[2026-07-16T08:27:58.237Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:58.133Z"}}
+[2026-07-16T08:27:58.238Z] restrictedFields: []
+[2026-07-16T08:27:58.760Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:27:58.652Z"}}
+[2026-07-16T08:27:58.764Z] restrictedFields: []
+[2026-07-16T08:28:37.541Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:37.391Z"}}
+[2026-07-16T08:28:37.542Z] restrictedFields: []
+[2026-07-16T08:28:37.555Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:37.407Z"}}
+[2026-07-16T08:28:37.557Z] restrictedFields: []
+[2026-07-16T08:28:37.637Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:37.411Z"}}
+[2026-07-16T08:28:37.643Z] restrictedFields: []
+[2026-07-16T08:28:37.750Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:37.587Z"}}
+[2026-07-16T08:28:37.751Z] restrictedFields: []
+[2026-07-16T08:28:38.244Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:38.121Z"}}
+[2026-07-16T08:28:38.246Z] restrictedFields: []
+[2026-07-16T08:28:38.792Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:38.662Z"}}
+[2026-07-16T08:28:38.793Z] restrictedFields: []
+[2026-07-16T08:28:39.336Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:39.219Z"}}
+[2026-07-16T08:28:39.337Z] restrictedFields: []
+[2026-07-16T08:28:39.864Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:39.747Z"}}
+[2026-07-16T08:28:39.866Z] restrictedFields: []
+[2026-07-16T08:28:40.384Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:40.276Z"}}
+[2026-07-16T08:28:40.386Z] restrictedFields: []
+[2026-07-16T08:28:41.010Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:40.821Z"}}
+[2026-07-16T08:28:41.014Z] restrictedFields: []
+[2026-07-16T08:28:41.546Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:41.431Z"}}
+[2026-07-16T08:28:41.548Z] restrictedFields: []
+[2026-07-16T08:28:42.154Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:41.984Z"}}
+[2026-07-16T08:28:42.156Z] restrictedFields: []
+[2026-07-16T08:28:42.730Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T08:28:42.617Z"}}
+[2026-07-16T08:28:42.732Z] restrictedFields: []
+[2026-07-16T08:29:54.146Z] moduleName: Leave, role: manager, updatePayload: {"status":"Rejected","approverNotes":"Rejected by Manager","history":[{"date":"2026-07-16","status":"Pending","comment":"Applied by employee","_id":"6a58962df9eced29c2ec8570"},{"date":"2026-07-16","status":"Rejected","comment":"Rejected by Harsh Chaudhary: "}]}
+[2026-07-16T08:29:54.148Z] restrictedFields: []
+[2026-07-16T09:35:17.405Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:17.252Z"}}
+[2026-07-16T09:35:17.424Z] restrictedFields: []
+[2026-07-16T09:35:17.460Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:17.257Z"}}
+[2026-07-16T09:35:17.462Z] restrictedFields: []
+[2026-07-16T09:35:17.606Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:17.389Z"}}
+[2026-07-16T09:35:17.607Z] restrictedFields: []
+[2026-07-16T09:35:17.765Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:17.634Z"}}
+[2026-07-16T09:35:17.768Z] restrictedFields: []
+[2026-07-16T09:35:17.836Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:17.721Z"}}
+[2026-07-16T09:35:17.838Z] restrictedFields: []
+[2026-07-16T09:35:17.858Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:17.724Z"}}
+[2026-07-16T09:35:17.861Z] restrictedFields: []
+[2026-07-16T09:35:17.968Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:17.848Z"}}
+[2026-07-16T09:35:17.970Z] restrictedFields: []
+[2026-07-16T09:35:18.474Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:18.357Z"}}
+[2026-07-16T09:35:18.476Z] restrictedFields: []
+[2026-07-16T09:35:19.004Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T09:35:18.889Z"}}
+[2026-07-16T09:35:19.006Z] restrictedFields: []

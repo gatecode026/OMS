@@ -55,7 +55,7 @@ const menuStructure = [
         path: '/employees',
         subItems: [
           { name: 'Active Employees', path: '/employees' },
-          { name: 'Inactive Employees', path: '/employees/inactive' }
+          { name: 'Past Employees', path: '/employees/inactive' }
         ]
       },
       { name: 'Agency Branch Management', icon: Network, path: '/branches' },
@@ -63,6 +63,7 @@ const menuStructure = [
       {
         name: 'Team Management',
         icon: Award,
+
         path: '/teams',
         subItems: [
           { name: 'Managers', path: '/managers' },
@@ -297,7 +298,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
               {triggerContent}
             </button>
           )}
-          
+
           {/* Submenu entries */}
           <div className={`submenu-wrapper ${isExpanded && !effectiveCollapsed ? 'expanded' : 'collapsed'}`}>
             {item.subItems.map(sub => {
@@ -370,9 +371,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
 
       {/* Main Sidebar */}
       <aside
-        className={`app-sidebar ${effectiveCollapsed ? 'collapsed' : ''} ${
-          mobileOpen ? 'mobile-show' : ''
-        }`}
+        className={`app-sidebar ${effectiveCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-show' : ''
+          }`}
         onMouseEnter={() => {
           if (isCollapsedConfig) {
             setIsHovered(true);
@@ -405,13 +405,15 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                   { name: 'My Tasks', icon: KanbanSquare, path: '/tasks' },
                   { name: 'My Projects', icon: Briefcase, path: '/projects' },
                   { name: 'Daily Work Reports', icon: FileText, path: '/work-reports' },
+                  { name: 'Announcements', icon: Megaphone, path: '/announcements' },
+                  { name: 'Notifications', icon: Bell, path: '/notifications', badgeKey: 'notifications' },
                   { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat' },
                   { name: 'Payroll', icon: DollarSign, path: '/payroll' },
                   { name: 'Documents', icon: FolderClosed, path: '/documents' },
                   { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }
                 ]
-                .filter(item => isMenuItemAccessible(item, currentUserRole, hasPermission))
-                .map(item => renderItem(item))}
+                  .filter(item => isMenuItemAccessible(item, currentUserRole, hasPermission))
+                  .map(item => renderItem(item))}
               </div>
             </div>
           ) : (
@@ -428,8 +430,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                       }
                       return item;
                     })
-                })), 
-                currentUserRole, 
+                })),
+                currentUserRole,
                 hasPermission
               ).map((section) => (
                 <div key={section.title} className="sidebar-section">
@@ -447,7 +449,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
             <div className="sidebar-quick-actions">
               <span className="quick-actions-title">Quick Actions</span>
               <div className="quick-actions-grid-layout">
-                {isMenuItemAccessible({ path: '/employee-dashboard' }, currentUserRole, hasPermission) && (
+                {isMenuItemAccessible({ path: '/attendance' }, currentUserRole, hasPermission) && (
                   <Link to="/employee-dashboard" onClick={() => setMobileOpen(false)} className="quick-action-tile">
                     <Clock size={14} className="tile-icon text-primary-c" />
                     <span className="tile-label">Punch In/Out</span>

@@ -111,6 +111,7 @@ export const PATH_TO_MODULE = {
   '/calendar': 'meetings_calendar',
   '/announcements': 'announcements',
   '/notifications': 'notifications',
+  '/chat': 'notifications',
   '/documents': 'document_management',
   '/permissions': 'role_permission',
   '/settings': 'system_settings',

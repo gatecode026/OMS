@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import Admin from '../admin/admin.model.js';
 import Employee from '../employees/employees.model.js';
 import Company from '../companies/company.model.js';
+import { UserSession, EmployeeLockout } from '../security/security.model.js';
 import env from '../../config/env.js';
 import logger from '../../config/logger.js';
 import mongoose from 'mongoose';
@@ -175,6 +176,24 @@ export const login = async (email, password, options = {}) => {
     throw err;
   }
 
+  // Check for active admin force-logout lockout
+  if (isEmployee) {
+    const activeLockout = await EmployeeLockout.findOne({
+      employeeId: user.id,
+      lockedUntil: { $gt: new Date() }
+    });
+
+    if (activeLockout) {
+      const remainingMs = new Date(activeLockout.lockedUntil).getTime() - Date.now();
+      const remainingMin = Math.ceil(remainingMs / (60 * 1000));
+      logger.warn(`AuthService::login block attempt for locked out user ${resolvedEmail} until ${activeLockout.lockedUntil}`);
+      const err = new Error(`Your account has been temporarily locked by an administrator. Please try again in ${remainingMin} minute(s).`);
+      err.statusCode = 403;
+      err.status = 'fail';
+      throw err;
+    }
+  }
+
   const isMatch = await user.comparePassword(password);
   if (!isMatch) {
     logger.warn(`AuthService::login credentials failed for: ${resolvedEmail}`);
@@ -211,6 +230,60 @@ export const login = async (email, password, options = {}) => {
   }
 
   logger.info(`AuthService::login success for: ${user.name} (${isCompanyAdmin ? 'company_admin' : user.roleId})`);
+
+  // --- Record active session in security.UserSession ---
+  try {
+    const sessionId = `SES-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const ip = options.ip || '—';
+    const ua = options.userAgent || '';
+
+    // Resolve the companyId for tenant scoping
+    const sessionCompanyId = isCompanyAdmin
+      ? (user.companyId || user.id)
+      : (user.companyId || resolvedCompany?.id || null);
+
+    if (!sessionCompanyId) {
+      logger.warn(`AuthService::login session skipped — no companyId resolved for ${user.name}`);
+    } else {
+      // Simple UA parsing
+      let browser = 'Unknown';
+      let os = 'Unknown';
+      if (ua.includes('Chrome')) browser = 'Chrome';
+      else if (ua.includes('Firefox')) browser = 'Firefox';
+      else if (ua.includes('Safari')) browser = 'Safari';
+      else if (ua.includes('Edge')) browser = 'Edge';
+      if (ua.includes('Windows')) os = 'Windows';
+      else if (ua.includes('Mac')) os = 'macOS';
+      else if (ua.includes('Linux')) os = 'Linux';
+      else if (ua.includes('Android')) os = 'Android';
+      else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+      const deviceType = ua.includes('Mobile') ? 'Mobile' : 'Desktop';
+      const now = new Date();
+      const loginTimeStr = now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+      await UserSession.create({
+        id: sessionId,
+        companyId: sessionCompanyId,   // ← explicit so tenantPlugin doesn't need context
+        employeeName: user.name || user.email,
+        employeeId: isCompanyAdmin ? (user.companyId || user.id) : user.id,
+        role: isCompanyAdmin ? 'Company Admin' : (user.roleId || 'Employee'),
+        loginTime: loginTimeStr,
+        lastActivity: loginTimeStr,
+        duration: '0m',
+        deviceType,
+        browser,
+        os,
+        ipAddress: ip,
+        location: '—',
+        status: 'Active',
+        tokenRef: token.slice(-12)
+      });
+      logger.info(`AuthService::login session recorded [${sessionId}] for ${user.name} (company: ${sessionCompanyId})`);
+    }
+  } catch (sessionErr) {
+    // Non-critical — do not fail login if session record fails
+    logger.warn(`AuthService::login session record failed: ${sessionErr.message}`);
+  }
 
   return {
     user: userResponse,
