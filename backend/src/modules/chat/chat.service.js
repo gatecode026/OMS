@@ -542,6 +542,17 @@ export const getMessageDetail = async (messageId, employeeId, companyId) => {
  */
 export const saveMessage = async (messageData, companyId, existingConv = null) => {
   return runWithTenant(companyId, async () => {
+    if (messageData.tempId) {
+      const existingMsg = await Message.findOne({
+        conversationId: messageData.conversationId,
+        tempId: messageData.tempId,
+      });
+      if (existingMsg) {
+        logger.info(`[ChatService] Duplicate message detected for tempId: ${messageData.tempId}. Returning existing message.`);
+        return existingMsg;
+      }
+    }
+
     // Enforce onlyAdminsCanMessage settings
     const conv = existingConv || await Conversation.findOne({ id: messageData.conversationId });
     if (!conv) throw new Error("Conversation not found");

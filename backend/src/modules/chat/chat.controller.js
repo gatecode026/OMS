@@ -194,6 +194,36 @@ export const markRead = asyncHandler(async (req, res) => {
   const result = await chatService.markAsRead(
     conversationId, employeeId, name, companyId
   );
+
+  try {
+    const io = getIO();
+    if (io) {
+      const { getTenantConnection } = await import('../../utils/multidbConnection.js');
+      const conn = await getTenantConnection(companyId);
+      const lastMsg = await conn.collection('messages')
+        .findOne({ conversationId, isDeleted: false }, { sort: { createdAt: -1 } });
+
+      const lastReadMessageId = lastMsg?.id || null;
+      const readAt = result.readAt || new Date();
+
+      const readUpdatePayload = {
+        conversationId,
+        userId: employeeId,
+        lastReadMessageId,
+        readAt
+      };
+
+      io.to(`conv:${conversationId}`).emit('conversation:read_update', readUpdatePayload);
+      io.to(`user:${employeeId}`).emit('conversation:read_update', readUpdatePayload);
+      io.to(`conv:${conversationId}`).emit('messages_read', {
+        conversationId,
+        readBy: [{ employeeId, name, readAt }]
+      });
+    }
+  } catch (err) {
+    logger.error('[Chat] markRead socket broadcast failed:', err);
+  }
+
   return successResponse(res, result, 'Messages marked as read');
 });
 

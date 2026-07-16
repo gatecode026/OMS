@@ -1,0 +1,278 @@
+/**
+ * @file chatApi.ts
+ * @description API service calls for Enterprise Chat and Conversation management.
+ */
+
+import apiClient from '../../../shared/services/apiClient';
+import { ChatConversation, ChatMessage, CallLog } from '../types';
+
+export const chatApi = {
+  /**
+   * Fetch all active conversations for the authenticated employee.
+   */
+  async fetchConversations(): Promise<ChatConversation[]> {
+    const response = await apiClient.get('/api/v1/chat/conversations');
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Fetch messages in a specific conversation (paginated or last N).
+   */
+  async fetchMessages(conversationId: string): Promise<ChatMessage[]> {
+    const response = await apiClient.get(`/api/v1/chat/conversations/${conversationId}/messages`);
+    const data = response.data?.data || response.data;
+    return data?.messages || (Array.isArray(data) ? data : []);
+  },
+
+  /**
+   * Mark all messages in a conversation as read.
+   */
+  async markAsRead(conversationId: string): Promise<void> {
+    await apiClient.patch(`/api/v1/chat/conversations/${conversationId}/read`);
+  },
+
+  /**
+   * Start a direct chat with another employee.
+   */
+  async startDirectChat(targetEmployeeId: string): Promise<ChatConversation> {
+    const response = await apiClient.post('/api/v1/chat/conversations/direct', {
+      targetEmployeeId,
+    });
+    return response.data?.data || response.data;
+  },
+
+  async createGroupChat(name: string, participantIds: string[], description?: string, avatar?: string): Promise<ChatConversation> {
+    const response = await apiClient.post('/api/v1/chat/conversations/group', {
+      name,
+      participantIds,
+      description,
+      avatar,
+    });
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Search for employees to start a new chat.
+   */
+  async searchEmployees(query: string = ''): Promise<any[]> {
+    const response = await apiClient.get(`/api/v1/chat/employees?q=${encodeURIComponent(query)}`);
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Fetch call history.
+   */
+  async fetchCallHistory(): Promise<CallLog[]> {
+    const response = await apiClient.get('/api/v1/chat/calls/history');
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Fetch archived conversations.
+   */
+  async fetchArchivedConversations(): Promise<ChatConversation[]> {
+    const response = await apiClient.get('/api/v1/chat/conversations/archived');
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Archive a conversation.
+   */
+  async archiveConversation(conversationId: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/conversations/${conversationId}/archive`);
+  },
+
+  /**
+   * Unarchive a conversation.
+   */
+  async unarchiveConversation(conversationId: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/conversations/${conversationId}/unarchive`);
+  },
+
+  /**
+   * Clear chat history.
+   */
+  async clearChat(conversationId: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/conversations/${conversationId}/clear`);
+  },
+
+  /**
+   * Delete conversation for the current user.
+   */
+  async deleteConversationForMe(conversationId: string): Promise<void> {
+    await apiClient.delete(`/api/v1/chat/conversations/${conversationId}/me`);
+  },
+
+  /**
+   * Block a user.
+   */
+  async blockUser(employeeId: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/users/${employeeId}/block`);
+  },
+
+  /**
+   * Unblock a user.
+   */
+  async unblockUser(employeeId: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/users/${employeeId}/unblock`);
+  },
+
+  /**
+   * React to a message.
+   */
+  async reactToMessage(messageId: string, reaction: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/messages/${messageId}/react`, { reaction });
+  },
+
+  /**
+   * Edit a message.
+   */
+  async editMessage(messageId: string, content: string): Promise<void> {
+    await apiClient.patch(`/api/v1/chat/messages/${messageId}/edit`, { content });
+  },
+
+  /**
+   * Delete a message (for everyone or for me depending on backend).
+   */
+  async deleteMessage(messageId: string): Promise<void> {
+    await apiClient.delete(`/api/v1/chat/messages/${messageId}`);
+  },
+
+  /**
+   * Hide a conversation.
+   */
+  async hideConversation(conversationId: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/conversations/${conversationId}/hide`);
+  },
+
+  /**
+   * Unhide a conversation.
+   */
+  async unhideConversation(conversationId: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/conversations/${conversationId}/unhide`);
+  },
+
+  /**
+   * Fetch hidden conversations.
+   */
+  async fetchHiddenConversations(): Promise<ChatConversation[]> {
+    const response = await apiClient.get('/api/v1/chat/conversations/hidden');
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Global search across conversations, messages, files, and contacts.
+   */
+  async globalSearch(query: string, category: string = 'all'): Promise<any> {
+    const response = await apiClient.get(`/api/v1/chat/search?q=${encodeURIComponent(query)}&category=${category}`);
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Update group conversation details (e.g. settings, name, description).
+   */
+  async updateGroupDetails(conversationId: string, data: any): Promise<ChatConversation> {
+    const response = await apiClient.patch(`/api/v1/chat/conversations/${conversationId}`, data);
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Fetch thread activity list for the user.
+   */
+  async fetchThreadActivity(): Promise<any[]> {
+    const response = await apiClient.get('/api/v1/chat/threads/activity');
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Fetch details of a specific thread.
+   */
+  async fetchThreadDetails(threadId: string): Promise<any> {
+    const response = await apiClient.get(`/api/v1/chat/threads/${threadId}`);
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Fetch replies in a thread.
+   */
+  async fetchThreadReplies(threadId: string, cursor?: string, limit?: number): Promise<any> {
+    const response = await apiClient.get(`/api/v1/chat/threads/${threadId}/messages`, {
+      params: { cursor, limit }
+    });
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Send a reply in a thread.
+   */
+  async sendThreadReply(threadId: string, data: { content: string; type: string; media?: any; tempId?: string }): Promise<any> {
+    const response = await apiClient.post(`/api/v1/chat/threads/${threadId}/reply`, data);
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Follow a thread.
+   */
+  async followThread(threadId: string): Promise<any> {
+    const response = await apiClient.post(`/api/v1/chat/threads/${threadId}/follow`);
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Unfollow a thread.
+   */
+  async unfollowThread(threadId: string): Promise<any> {
+    const response = await apiClient.post(`/api/v1/chat/threads/${threadId}/unfollow`);
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Mark a thread as read.
+   */
+  async markThreadRead(threadId: string): Promise<any> {
+    const response = await apiClient.post(`/api/v1/chat/threads/${threadId}/read`);
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Create a thread from a root message.
+   */
+  async createThread(rootMessageId: string): Promise<any> {
+    const response = await apiClient.post('/api/v1/chat/threads', { rootMessageId });
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Fetch pinned messages in a conversation.
+   */
+  async fetchPinnedMessages(conversationId: string, params?: any): Promise<any> {
+    const response = await apiClient.get(`/api/v1/chat/conversations/${conversationId}/pinned`, { params });
+    return response.data?.data || response.data || [];
+  },
+
+  /**
+   * Add members to a group conversation.
+   */
+  async addGroupMembers(conversationId: string, memberIds: string[]): Promise<any> {
+    const response = await apiClient.post(`/api/v1/chat/conversations/${conversationId}/members`, { memberIds });
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Remove a member from a group.
+   */
+  async removeGroupMember(conversationId: string, memberId: string): Promise<any> {
+    const response = await apiClient.delete(`/api/v1/chat/conversations/${conversationId}/members/${memberId}`);
+    return response.data?.data || response.data;
+  },
+
+  /**
+   * Fetch list of blocked users.
+   */
+  async fetchBlockedUsers(): Promise<any[]> {
+    const response = await apiClient.get('/api/v1/chat/users/blocked');
+    return response.data?.data || response.data || [];
+  },
+};
+
+export default chatApi;

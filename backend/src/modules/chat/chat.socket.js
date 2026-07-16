@@ -1013,7 +1013,7 @@ export const registerChatSocketHandlers = (io) => {
     });
 
     // ── EVENT: SEND MESSAGE ─────────────────────────────────────────────────
-    socket.on("send_message", async (data) => {
+    socket.on("send_message", async (data, callback) => {
       const { tempId } = data;
       await runTrackedWrite(async () => {
         try {
@@ -1030,6 +1030,9 @@ export const registerChatSocketHandlers = (io) => {
               event: "send_message",
               message: "conversationId is required",
             });
+            if (typeof callback === "function") {
+              callback({ success: false, reason: "conversationId is required", tempId });
+            }
             return;
           }
 
@@ -1051,6 +1054,9 @@ export const registerChatSocketHandlers = (io) => {
               message:
                 "Access denied: You are not a participant in this conversation",
             });
+            if (typeof callback === "function") {
+              callback({ success: false, reason: "Access denied: You are not a participant in this conversation", tempId });
+            }
             return;
           }
 
@@ -1059,6 +1065,9 @@ export const registerChatSocketHandlers = (io) => {
               event: "send_message",
               message: "Content cannot be empty",
             });
+            if (typeof callback === "function") {
+              callback({ success: false, reason: "Content cannot be empty", tempId });
+            }
             return;
           }
           let uploadedMedia = media
@@ -1096,6 +1105,9 @@ export const registerChatSocketHandlers = (io) => {
                 tempId,
                 reason: "Image upload failed. Try again.",
               });
+              if (typeof callback === "function") {
+                callback({ success: false, reason: "Image upload failed. Try again.", tempId });
+              }
               return;
             }
           }
@@ -1296,6 +1308,9 @@ export const registerChatSocketHandlers = (io) => {
             conversationId,
             tempId,
           });
+          if (typeof callback === "function") {
+            callback({ success: true, messageId: savedMessage.id, tempId });
+          }
         } catch (err) {
           logger.error("[Chat] send_message error:", err);
           socket.emit("error", {
@@ -1306,6 +1321,9 @@ export const registerChatSocketHandlers = (io) => {
             tempId,
             reason: "Server error. Try again.",
           });
+          if (typeof callback === "function") {
+            callback({ success: false, reason: err.message || "Server error. Try again.", tempId });
+          }
         }
       });
     });

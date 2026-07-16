@@ -144,3 +144,405 @@
 [2026-07-14T07:19:42.219Z] restrictedFields: []
 [2026-07-14T07:24:23.727Z] moduleName: Employee, role: manager, updatePayload: {"_id":"6a438743e8b1e8b0c469b9ae","name":"Balram Suman","dob":"2000-06-25","gender":"Male","phone":"9898898989","alternatePhone":"","email":"balram@gmail.com","personalEmail":"balram@gmail.com","workEmail":"balram@gmail.com","avatar":"","bloodGroup":"","maritalStatus":"Single","experience":"4","nationality":"Not specified","currentAddress":"Jaipur\nJaipur, Jaipur, Rajasthan - 302020","permanentAddress":"","city":"Jaipur","state":"Rajasthan","zipCode":"302020","country":"India","emergencyContactName":"","emergencyContactPhone":"","emergencyContactPhoneAlt":"","emergencyContactRelation":"","username":"balram","lastLoginAt":"2026-07-14T05:34:20.751Z","role":"Employee","roleId":"employee","designation":"Senior Developer","department":"IT","branch":"Jaipur","branchAddress":"","team":"","teamLeader":"Geeta Bisht","projectManager":"Unassigned","joinDate":"2026-01-01","shiftTiming":"09:30 AM - 06:00 PM","shiftType":"Morning Shift","workLocation":"Mansarovar Jaipur","workMode":"WFO","employeeType":"Full Time","employmentStatus":"Active","status":"Active","accountStatus":"Active","probationEndDate":"","contractEndDate":"","bankName":"","bankAccountNumber":"","bankIfscCode":"","bankUpiId":"","salaryType":"Monthly Fixed","monthlySalary":"50000","salaryAmount":"50000","salaryDeductions":"0","overtimeEligibility":false,"panNumber":"AESRT9584N","aadhaarNumber":"475878571920","attendanceStatus":"Present","workStatus":"Offline","chatStatus":"available","statusEmoji":null,"statusExpiry":null,"todayPunchIn":"10:05 AM","todayPunchOut":null,"todayWorkingHours":0,"todayPunchStatus":"Punched In","lastSeen":"2026-07-14T07:13:06.262Z","productivityScore":0,"efficiency":80,"quality":92,"performanceRating":"Good","leaveBalance":0,"currentProjectsCount":0,"skills":[],"certifications":[],"performanceScore":{"overall":0,"attendance":0,"taskCompletion":0,"reportSubmission":0,"leaveDiscipline":0,"monthly":[0,0,0,0,0,0]},"securityInfo":{"lastLogin":"—","loginDevice":"—","loginLocation":"—","failedAttempts":0,"mfaStatus":"Disabled"},"payrollSummary":{"salaryStatus":"Pending","lastSalaryDate":"—","upcomingPayrollDate":"—","bonusHistory":[]},"companyId":"COMP-001","id":"GATECO-EMP-005","employeeCode":"GATECO-EMP-005","createdAt":"2026-06-30T09:07:15.171Z","updatedAt":"2026-07-14T07:17:54.272Z","__v":0,"pfContribution":false,"fullName":"Balram Suman","branchAgency":"Jaipur","employeeId":"GATECO-EMP-005","contactNumber":"9898898989","officialEmail":"balram@gmail.com","shift":"09:30 AM - 06:00 PM","punchInTime":null,"punchIn":"10:05 AM","punchOutTime":null,"punchOut":null,"workingHours":0,"totalHours":0,"emergencyName":"","emergencyRelation":"","emergencyMobile":"","bank":{"accountName":"Balram Suman","bankName":"","branch":"","accountNumber":"","ifsc":"","upiId":"","verified":false},"documents":[],"activities":[],"mfaEnabled":{"email":false,"mobile":false,"authenticator":false},"photoUrl":null,"officialMobile":"9898898989","teamName":"","password":"••••••••","confirmPassword":"••••••••","hra":"0","travel":"0","medical":"0","special":"0"}
 [2026-07-14T07:24:23.739Z] restrictedFields: []
+[2026-07-14T09:09:26.933Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:09:26.800Z"}}
+[2026-07-14T09:09:26.934Z] restrictedFields: []
+[2026-07-14T09:09:26.981Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:09:26.850Z"}}
+[2026-07-14T09:09:26.981Z] restrictedFields: []
+[2026-07-14T09:09:31.974Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a55fccb8efbb0a37e82463e","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T09:09:31.938Z"},"lastActivityAt":"2026-07-14T09:09:31.938Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T09:09:31.975Z] restrictedFields: []
+[2026-07-14T09:09:32.262Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:09:32.113Z"}}
+[2026-07-14T09:09:32.262Z] restrictedFields: []
+[2026-07-14T09:09:32.308Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:09:32.166Z"}}
+[2026-07-14T09:09:32.309Z] restrictedFields: []
+[2026-07-14T09:09:32.328Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:09:32.207Z"}}
+[2026-07-14T09:09:32.329Z] restrictedFields: []
+[2026-07-14T09:09:32.350Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:09:32.221Z"}}
+[2026-07-14T09:09:32.351Z] restrictedFields: []
+[2026-07-14T09:14:33.308Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:14:33.134Z"}}
+[2026-07-14T09:14:33.309Z] restrictedFields: []
+[2026-07-14T09:14:33.316Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:14:33.166Z"}}
+[2026-07-14T09:14:33.316Z] restrictedFields: []
+[2026-07-14T09:16:21.138Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:16:20.968Z"}}
+[2026-07-14T09:16:21.139Z] restrictedFields: []
+[2026-07-14T09:16:21.182Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:16:21.016Z"}}
+[2026-07-14T09:16:21.182Z] restrictedFields: []
+[2026-07-14T09:16:36.050Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a55fe738efbb0a37e824a83","content":"Ok","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T09:16:36.017Z"},"lastActivityAt":"2026-07-14T09:16:36.017Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T09:16:36.051Z] restrictedFields: []
+[2026-07-14T09:16:36.272Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:16:36.137Z"}}
+[2026-07-14T09:16:36.273Z] restrictedFields: []
+[2026-07-14T09:16:36.339Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:16:36.189Z"}}
+[2026-07-14T09:16:36.339Z] restrictedFields: []
+[2026-07-14T09:16:36.355Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:16:36.213Z"}}
+[2026-07-14T09:16:36.355Z] restrictedFields: []
+[2026-07-14T09:16:36.388Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:16:36.232Z"}}
+[2026-07-14T09:16:36.388Z] restrictedFields: []
+[2026-07-14T09:17:41.661Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:17:41.459Z"}}
+[2026-07-14T09:17:41.662Z] restrictedFields: []
+[2026-07-14T09:17:41.721Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:17:41.524Z"}}
+[2026-07-14T09:17:41.722Z] restrictedFields: []
+[2026-07-14T09:17:56.468Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:17:56.336Z"}}
+[2026-07-14T09:17:56.469Z] restrictedFields: []
+[2026-07-14T09:17:56.515Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:17:56.390Z"}}
+[2026-07-14T09:17:56.515Z] restrictedFields: []
+[2026-07-14T09:18:00.836Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a55fec88efbb0a37e824c0b","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T09:18:00.802Z"},"lastActivityAt":"2026-07-14T09:18:00.802Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T09:18:00.836Z] restrictedFields: []
+[2026-07-14T09:18:01.061Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:18:00.931Z"}}
+[2026-07-14T09:18:01.061Z] restrictedFields: []
+[2026-07-14T09:18:01.112Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:18:00.986Z"}}
+[2026-07-14T09:18:01.112Z] restrictedFields: []
+[2026-07-14T09:18:01.127Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:18:01.009Z"}}
+[2026-07-14T09:18:01.127Z] restrictedFields: []
+[2026-07-14T09:18:01.137Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:18:01.016Z"}}
+[2026-07-14T09:18:01.138Z] restrictedFields: []
+[2026-07-14T09:18:11.728Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:18:11.515Z"}}
+[2026-07-14T09:18:11.728Z] restrictedFields: []
+[2026-07-14T09:18:11.810Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:18:11.615Z"}}
+[2026-07-14T09:18:11.812Z] restrictedFields: []
+[2026-07-14T09:18:22.523Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:18:22.396Z"}}
+[2026-07-14T09:18:22.523Z] restrictedFields: []
+[2026-07-14T09:18:22.529Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:18:22.399Z"}}
+[2026-07-14T09:18:22.530Z] restrictedFields: []
+[2026-07-14T09:19:36.719Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:19:36.585Z"}}
+[2026-07-14T09:19:36.719Z] restrictedFields: []
+[2026-07-14T09:19:36.773Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T09:19:36.627Z"}}
+[2026-07-14T09:19:36.773Z] restrictedFields: []
+[2026-07-14T10:05:21.271Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:05:21.147Z"}}
+[2026-07-14T10:05:21.274Z] restrictedFields: []
+[2026-07-14T10:05:21.334Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:05:21.213Z"}}
+[2026-07-14T10:05:21.335Z] restrictedFields: []
+[2026-07-14T10:05:40.217Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:05:40.086Z"}}
+[2026-07-14T10:05:40.218Z] restrictedFields: []
+[2026-07-14T10:05:40.221Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:05:40.099Z"}}
+[2026-07-14T10:05:40.222Z] restrictedFields: []
+[2026-07-14T10:07:01.176Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:07:01.055Z"}}
+[2026-07-14T10:07:01.177Z] restrictedFields: []
+[2026-07-14T10:07:01.268Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:07:01.150Z"}}
+[2026-07-14T10:07:01.269Z] restrictedFields: []
+[2026-07-14T10:07:13.132Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a560a518efbb0a37e8262f3","content":"Lund","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T10:07:13.097Z"},"lastActivityAt":"2026-07-14T10:07:13.097Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T10:07:13.133Z] restrictedFields: []
+[2026-07-14T10:07:13.364Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:07:13.237Z"}}
+[2026-07-14T10:07:13.364Z] restrictedFields: []
+[2026-07-14T10:07:13.405Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:07:13.284Z"}}
+[2026-07-14T10:07:13.406Z] restrictedFields: []
+[2026-07-14T10:07:13.442Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:07:13.315Z"}}
+[2026-07-14T10:07:13.442Z] restrictedFields: []
+[2026-07-14T10:07:13.542Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:07:13.421Z"}}
+[2026-07-14T10:07:13.542Z] restrictedFields: []
+[2026-07-14T10:07:18.273Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deletedFor":{"employeeId":"GATECO-EMP-008","deletedAt":"2026-07-14T10:07:18.206Z"}}}
+[2026-07-14T10:07:18.274Z] restrictedFields: []
+[2026-07-14T10:09:04.671Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:09:04.546Z"}}
+[2026-07-14T10:09:04.672Z] restrictedFields: []
+[2026-07-14T10:09:04.738Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:09:04.605Z"}}
+[2026-07-14T10:09:04.738Z] restrictedFields: []
+[2026-07-14T10:09:11.991Z] moduleName: Chat, role: employee, updatePayload: {"isPinned":true,"pinnedBy":"GATECO-EMP-008","pinnedAt":"2026-07-14T10:09:11.923Z"}
+[2026-07-14T10:09:11.991Z] restrictedFields: []
+[2026-07-14T10:09:17.405Z] moduleName: Chat, role: employee, updatePayload: {"$addToSet":{"starredBy":"GATECO-EMP-008"}}
+[2026-07-14T10:09:17.408Z] restrictedFields: []
+[2026-07-14T10:09:21.267Z] moduleName: Chat, role: employee, updatePayload: {"$pull":{"starredBy":"GATECO-EMP-008"}}
+[2026-07-14T10:09:21.268Z] restrictedFields: []
+[2026-07-14T10:09:24.294Z] moduleName: Chat, role: employee, updatePayload: {"isPinned":false,"pinnedBy":null,"pinnedAt":null}
+[2026-07-14T10:09:24.294Z] restrictedFields: []
+[2026-07-14T10:18:57.609Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a560d118efbb0a37e826918","content":"📎 call","type":"call","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T10:18:57.571Z"},"lastActivityAt":"2026-07-14T10:18:57.571Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T10:18:57.609Z] restrictedFields: []
+[2026-07-14T10:57:30.836Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:57:30.708Z"}}
+[2026-07-14T10:57:30.838Z] restrictedFields: []
+[2026-07-14T10:57:30.886Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:57:30.760Z"}}
+[2026-07-14T10:57:30.887Z] restrictedFields: []
+[2026-07-14T10:58:43.637Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a5616638efbb0a37e826d22","content":"Hu","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T10:58:43.601Z"},"lastActivityAt":"2026-07-14T10:58:43.601Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T10:58:43.638Z] restrictedFields: []
+[2026-07-14T10:58:44.006Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:58:43.800Z"}}
+[2026-07-14T10:58:44.006Z] restrictedFields: []
+[2026-07-14T10:58:44.078Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:58:43.911Z"}}
+[2026-07-14T10:58:44.079Z] restrictedFields: []
+[2026-07-14T10:58:44.114Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:58:43.962Z"}}
+[2026-07-14T10:58:44.114Z] restrictedFields: []
+[2026-07-14T10:58:44.129Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T10:58:43.973Z"}}
+[2026-07-14T10:58:44.129Z] restrictedFields: []
+[2026-07-14T11:00:10.754Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:00:10.612Z"}}
+[2026-07-14T11:00:10.754Z] restrictedFields: []
+[2026-07-14T11:00:10.834Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:00:10.708Z"}}
+[2026-07-14T11:00:10.835Z] restrictedFields: []
+[2026-07-14T11:00:26.596Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:00:26.475Z"}}
+[2026-07-14T11:00:26.597Z] restrictedFields: []
+[2026-07-14T11:00:26.701Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:00:26.581Z"}}
+[2026-07-14T11:00:26.702Z] restrictedFields: []
+[2026-07-14T11:05:57.482Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:05:57.345Z"}}
+[2026-07-14T11:05:57.483Z] restrictedFields: []
+[2026-07-14T11:05:57.541Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:05:57.400Z"}}
+[2026-07-14T11:05:57.542Z] restrictedFields: []
+[2026-07-14T11:06:10.966Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:06:10.813Z"}}
+[2026-07-14T11:06:10.967Z] restrictedFields: []
+[2026-07-14T11:06:11.044Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:06:10.897Z"}}
+[2026-07-14T11:06:11.045Z] restrictedFields: []
+[2026-07-14T11:06:25.237Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:06:25.094Z"}}
+[2026-07-14T11:06:25.237Z] restrictedFields: []
+[2026-07-14T11:06:25.408Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:06:25.193Z"}}
+[2026-07-14T11:06:25.412Z] restrictedFields: []
+[2026-07-14T11:06:36.434Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:06:36.191Z"}}
+[2026-07-14T11:06:36.435Z] restrictedFields: []
+[2026-07-14T11:06:36.519Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:06:36.349Z"}}
+[2026-07-14T11:06:36.520Z] restrictedFields: []
+[2026-07-14T11:06:46.616Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:06:46.327Z"}}
+[2026-07-14T11:06:46.617Z] restrictedFields: []
+[2026-07-14T11:06:46.808Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:06:46.448Z"}}
+[2026-07-14T11:06:46.809Z] restrictedFields: []
+[2026-07-14T11:07:02.844Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:07:02.709Z"}}
+[2026-07-14T11:07:02.844Z] restrictedFields: []
+[2026-07-14T11:07:02.927Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:07:02.792Z"}}
+[2026-07-14T11:07:02.927Z] restrictedFields: []
+[2026-07-14T11:07:15.331Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:07:15.116Z"}}
+[2026-07-14T11:07:15.332Z] restrictedFields: []
+[2026-07-14T11:07:15.439Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:07:15.269Z"}}
+[2026-07-14T11:07:15.439Z] restrictedFields: []
+[2026-07-14T11:07:35.178Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:07:34.890Z"}}
+[2026-07-14T11:07:35.178Z] restrictedFields: []
+[2026-07-14T11:07:35.259Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:07:35.108Z"}}
+[2026-07-14T11:07:35.259Z] restrictedFields: []
+[2026-07-14T11:14:41.436Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a561a218efbb0a37e8276ad","content":"📎 call","type":"call","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T11:14:41.386Z"},"lastActivityAt":"2026-07-14T11:14:41.386Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T11:14:41.438Z] restrictedFields: []
+[2026-07-14T11:14:57.325Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:14:57.201Z"}}
+[2026-07-14T11:14:57.326Z] restrictedFields: []
+[2026-07-14T11:15:05.219Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a561a398efbb0a37e827755","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T11:15:05.187Z"},"lastActivityAt":"2026-07-14T11:15:05.187Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T11:15:05.220Z] restrictedFields: []
+[2026-07-14T11:15:27.075Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:15:26.389Z"}}
+[2026-07-14T11:15:27.075Z] restrictedFields: []
+[2026-07-14T11:15:27.309Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:15:26.719Z"}}
+[2026-07-14T11:15:27.309Z] restrictedFields: []
+[2026-07-14T11:15:31.191Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a561a538efbb0a37e827845","content":"Ok","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T11:15:31.138Z"},"lastActivityAt":"2026-07-14T11:15:31.138Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T11:15:31.191Z] restrictedFields: []
+[2026-07-14T11:15:31.525Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:15:31.345Z"}}
+[2026-07-14T11:15:31.525Z] restrictedFields: []
+[2026-07-14T11:15:31.668Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:15:31.444Z"}}
+[2026-07-14T11:15:31.669Z] restrictedFields: []
+[2026-07-14T11:15:31.676Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:15:31.482Z"}}
+[2026-07-14T11:15:31.676Z] restrictedFields: []
+[2026-07-14T11:15:31.822Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:15:31.562Z"}}
+[2026-07-14T11:15:31.823Z] restrictedFields: []
+[2026-07-14T11:15:53.372Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:15:53.205Z"}}
+[2026-07-14T11:15:53.372Z] restrictedFields: []
+[2026-07-14T11:15:53.454Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:15:53.309Z"}}
+[2026-07-14T11:15:53.455Z] restrictedFields: []
+[2026-07-14T11:37:32.896Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:37:32.778Z"}}
+[2026-07-14T11:37:32.897Z] restrictedFields: []
+[2026-07-14T11:37:32.943Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:37:32.822Z"}}
+[2026-07-14T11:37:32.943Z] restrictedFields: []
+[2026-07-14T11:37:59.248Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a561f978efbb0a37e827f26","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T11:37:59.205Z"},"lastActivityAt":"2026-07-14T11:37:59.205Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T11:37:59.248Z] restrictedFields: []
+[2026-07-14T11:37:59.461Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:37:59.341Z"}}
+[2026-07-14T11:37:59.462Z] restrictedFields: []
+[2026-07-14T11:37:59.525Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:37:59.389Z"}}
+[2026-07-14T11:37:59.525Z] restrictedFields: []
+[2026-07-14T11:37:59.539Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:37:59.410Z"}}
+[2026-07-14T11:37:59.539Z] restrictedFields: []
+[2026-07-14T11:37:59.579Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:37:59.446Z"}}
+[2026-07-14T11:37:59.579Z] restrictedFields: []
+[2026-07-14T11:38:14.593Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:38:14.463Z"}}
+[2026-07-14T11:38:14.594Z] restrictedFields: []
+[2026-07-14T11:38:14.661Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:38:14.544Z"}}
+[2026-07-14T11:38:14.662Z] restrictedFields: []
+[2026-07-14T11:41:09.681Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:41:09.548Z"}}
+[2026-07-14T11:41:09.681Z] restrictedFields: []
+[2026-07-14T11:41:09.701Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:41:09.586Z"}}
+[2026-07-14T11:41:09.701Z] restrictedFields: []
+[2026-07-14T11:41:18.068Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a56205d8efbb0a37e828280","content":"Ok","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T11:41:18.036Z"},"lastActivityAt":"2026-07-14T11:41:18.036Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T11:41:18.068Z] restrictedFields: []
+[2026-07-14T11:41:18.271Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:41:18.146Z"}}
+[2026-07-14T11:41:18.272Z] restrictedFields: []
+[2026-07-14T11:41:18.318Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:41:18.204Z"}}
+[2026-07-14T11:41:18.318Z] restrictedFields: []
+[2026-07-14T11:41:18.336Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:41:18.220Z"}}
+[2026-07-14T11:41:18.336Z] restrictedFields: []
+[2026-07-14T11:41:18.367Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:41:18.241Z"}}
+[2026-07-14T11:41:18.370Z] restrictedFields: []
+[2026-07-14T11:49:40.660Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:49:40.541Z"}}
+[2026-07-14T11:49:40.661Z] restrictedFields: []
+[2026-07-14T11:49:40.683Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T11:49:40.566Z"}}
+[2026-07-14T11:49:40.684Z] restrictedFields: []
+[2026-07-14T11:53:33.384Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a56233d8efbb0a37e828879","content":"📎 call","type":"call","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T11:53:33.352Z"},"lastActivityAt":"2026-07-14T11:53:33.352Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T11:53:33.385Z] restrictedFields: []
+[2026-07-14T12:10:39.025Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T12:10:38.757Z"}}
+[2026-07-14T12:10:39.026Z] restrictedFields: []
+[2026-07-14T12:10:39.076Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-14T12:10:38.835Z"}}
+[2026-07-14T12:10:39.076Z] restrictedFields: []
+[2026-07-14T12:11:12.245Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a5627608efbb0a37e82937c","content":"📎 call","type":"call","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-14T12:11:12.213Z"},"lastActivityAt":"2026-07-14T12:11:12.213Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-14T12:11:12.246Z] restrictedFields: []
+[2026-07-15T05:19:24.791Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:19:24.600Z"}}
+[2026-07-15T05:19:24.793Z] restrictedFields: []
+[2026-07-15T05:19:24.862Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:19:24.719Z"}}
+[2026-07-15T05:19:24.863Z] restrictedFields: []
+[2026-07-15T05:19:30.685Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a5718626ba6f43324b659e6","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-15T05:19:30.620Z"},"lastActivityAt":"2026-07-15T05:19:30.620Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-15T05:19:30.686Z] restrictedFields: []
+[2026-07-15T05:25:06.031Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:25:05.892Z"}}
+[2026-07-15T05:25:06.031Z] restrictedFields: []
+[2026-07-15T05:25:06.118Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:25:05.984Z"}}
+[2026-07-15T05:25:06.119Z] restrictedFields: []
+[2026-07-15T05:25:24.339Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:25:24.215Z"}}
+[2026-07-15T05:25:24.339Z] restrictedFields: []
+[2026-07-15T05:25:24.409Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:25:24.293Z"}}
+[2026-07-15T05:25:24.410Z] restrictedFields: []
+[2026-07-15T05:30:13.709Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:30:13.364Z"}}
+[2026-07-15T05:30:13.710Z] restrictedFields: []
+[2026-07-15T05:30:13.721Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:30:13.380Z"}}
+[2026-07-15T05:30:13.722Z] restrictedFields: []
+[2026-07-15T05:30:13.736Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:30:13.390Z"}}
+[2026-07-15T05:30:13.737Z] restrictedFields: []
+[2026-07-15T05:30:13.762Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-008","deliveredAt":"2026-07-15T05:30:13.614Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T05:30:13.614Z"}}
+[2026-07-15T05:30:13.762Z] restrictedFields: []
+[2026-07-15T05:30:13.768Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-008","deliveredAt":"2026-07-15T05:30:13.584Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T05:30:13.584Z"}}
+[2026-07-15T05:30:13.769Z] restrictedFields: []
+[2026-07-15T05:30:13.774Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:30:13.426Z"}}
+[2026-07-15T05:30:13.775Z] restrictedFields: []
+[2026-07-15T05:30:13.788Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:30:13.455Z"}}
+[2026-07-15T05:30:13.789Z] restrictedFields: []
+[2026-07-15T05:30:13.793Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:30:13.457Z"}}
+[2026-07-15T05:30:13.794Z] restrictedFields: []
+[2026-07-15T05:30:13.830Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-008","deliveredAt":"2026-07-15T05:30:13.654Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T05:30:13.654Z"}}
+[2026-07-15T05:30:13.831Z] restrictedFields: []
+[2026-07-15T05:30:13.835Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-008","deliveredAt":"2026-07-15T05:30:13.650Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T05:30:13.650Z"}}
+[2026-07-15T05:30:13.836Z] restrictedFields: []
+[2026-07-15T05:30:13.841Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-008","deliveredAt":"2026-07-15T05:30:13.679Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T05:30:13.679Z"}}
+[2026-07-15T05:30:13.841Z] restrictedFields: []
+[2026-07-15T05:30:13.888Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:30:13.634Z"}}
+[2026-07-15T05:30:13.888Z] restrictedFields: []
+[2026-07-15T05:30:13.922Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-008","deliveredAt":"2026-07-15T05:30:13.807Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T05:30:13.807Z"}}
+[2026-07-15T05:30:13.922Z] restrictedFields: []
+[2026-07-15T05:30:14.072Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:30:13.422Z"}}
+[2026-07-15T05:30:14.072Z] restrictedFields: []
+[2026-07-15T05:30:14.112Z] moduleName: Chat, role: employee, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-008","deliveredAt":"2026-07-15T05:30:13.892Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T05:30:13.892Z"}}
+[2026-07-15T05:30:14.112Z] restrictedFields: []
+[2026-07-15T05:34:00.989Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:34:00.858Z"}}
+[2026-07-15T05:34:00.991Z] restrictedFields: []
+[2026-07-15T05:34:01.077Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:34:00.954Z"}}
+[2026-07-15T05:34:01.078Z] restrictedFields: []
+[2026-07-15T05:35:12.074Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:35:11.927Z"}}
+[2026-07-15T05:35:12.075Z] restrictedFields: []
+[2026-07-15T05:35:12.168Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:35:12.016Z"}}
+[2026-07-15T05:35:12.169Z] restrictedFields: []
+[2026-07-15T05:37:46.264Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a571caa07ed21ab05178887","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-15T05:37:46.224Z"},"lastActivityAt":"2026-07-15T05:37:46.224Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-15T05:37:46.265Z] restrictedFields: []
+[2026-07-15T05:38:25.293Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:38:25.159Z"}}
+[2026-07-15T05:38:25.293Z] restrictedFields: []
+[2026-07-15T05:38:25.375Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:38:25.254Z"}}
+[2026-07-15T05:38:25.375Z] restrictedFields: []
+[2026-07-15T05:39:42.217Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:39:42.081Z"}}
+[2026-07-15T05:39:42.217Z] restrictedFields: []
+[2026-07-15T05:39:42.295Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T05:39:42.173Z"}}
+[2026-07-15T05:39:42.295Z] restrictedFields: []
+[2026-07-15T05:39:48.808Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a571d2407ed21ab05178a53","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-15T05:39:48.774Z"},"lastActivityAt":"2026-07-15T05:39:48.774Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-15T05:39:48.808Z] restrictedFields: []
+[2026-07-15T06:12:33.555Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T06:12:33.422Z"}}
+[2026-07-15T06:12:33.556Z] restrictedFields: []
+[2026-07-15T06:12:33.633Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T06:12:33.503Z"}}
+[2026-07-15T06:12:33.633Z] restrictedFields: []
+[2026-07-15T07:04:22.919Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:04:22.776Z"}}
+[2026-07-15T07:04:22.923Z] restrictedFields: []
+[2026-07-15T07:04:23.029Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:04:22.903Z"}}
+[2026-07-15T07:04:23.029Z] restrictedFields: []
+[2026-07-15T07:04:27.784Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a5730fb07ed21ab05179818","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-15T07:04:27.755Z"},"lastActivityAt":"2026-07-15T07:04:27.755Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-15T07:04:27.785Z] restrictedFields: []
+[2026-07-15T07:11:33.871Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:11:33.745Z"}}
+[2026-07-15T07:11:33.872Z] restrictedFields: []
+[2026-07-15T07:11:33.886Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:11:33.774Z"}}
+[2026-07-15T07:11:33.887Z] restrictedFields: []
+[2026-07-15T07:13:14.476Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:13:14.340Z"}}
+[2026-07-15T07:13:14.477Z] restrictedFields: []
+[2026-07-15T07:14:30.934Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:14:30.766Z"}}
+[2026-07-15T07:14:30.935Z] restrictedFields: []
+[2026-07-15T07:14:31.287Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:14:31.161Z"}}
+[2026-07-15T07:14:31.287Z] restrictedFields: []
+[2026-07-15T07:17:18.971Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:17:18.827Z"}}
+[2026-07-15T07:17:18.971Z] restrictedFields: []
+[2026-07-15T07:17:19.028Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:17:18.906Z"}}
+[2026-07-15T07:17:19.029Z] restrictedFields: []
+[2026-07-15T07:17:42.242Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:17:42.120Z"}}
+[2026-07-15T07:17:42.243Z] restrictedFields: []
+[2026-07-15T07:17:42.318Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:17:42.195Z"}}
+[2026-07-15T07:17:42.318Z] restrictedFields: []
+[2026-07-15T07:17:49.190Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:17:49.061Z"}}
+[2026-07-15T07:17:49.190Z] restrictedFields: []
+[2026-07-15T07:17:49.286Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:17:49.153Z"}}
+[2026-07-15T07:17:49.287Z] restrictedFields: []
+[2026-07-15T07:19:04.722Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:19:04.585Z"}}
+[2026-07-15T07:19:04.724Z] restrictedFields: []
+[2026-07-15T07:19:04.822Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:19:04.692Z"}}
+[2026-07-15T07:19:04.823Z] restrictedFields: []
+[2026-07-15T07:19:35.825Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a57348707ed21ab0517a281","content":"📎 02d914e0-5bf2-4bfc-9232-152246044a1c_ztmiijvvf.jpeg","type":"image","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-15T07:19:35.794Z"},"lastActivityAt":"2026-07-15T07:19:35.794Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-15T07:19:35.826Z] restrictedFields: []
+[2026-07-15T07:19:39.036Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:19:38.924Z"}}
+[2026-07-15T07:19:39.037Z] restrictedFields: []
+[2026-07-15T07:19:39.123Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:19:38.991Z"}}
+[2026-07-15T07:19:39.124Z] restrictedFields: []
+[2026-07-15T07:20:28.590Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:20:28.458Z"}}
+[2026-07-15T07:20:28.591Z] restrictedFields: []
+[2026-07-15T07:20:28.604Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:20:28.481Z"}}
+[2026-07-15T07:20:28.605Z] restrictedFields: []
+[2026-07-15T07:20:35.779Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:20:35.637Z"}}
+[2026-07-15T07:20:35.779Z] restrictedFields: []
+[2026-07-15T07:20:35.783Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:20:35.653Z"}}
+[2026-07-15T07:20:35.784Z] restrictedFields: []
+[2026-07-15T07:27:03.810Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:27:03.698Z"}}
+[2026-07-15T07:27:03.810Z] restrictedFields: []
+[2026-07-15T07:27:03.919Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:27:03.786Z"}}
+[2026-07-15T07:27:03.920Z] restrictedFields: []
+[2026-07-15T07:27:11.774Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a57364f07ed21ab0517a54d","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-15T07:27:11.743Z"},"lastActivityAt":"2026-07-15T07:27:11.743Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-15T07:27:11.774Z] restrictedFields: []
+[2026-07-15T07:27:11.967Z] moduleName: Chat, role: role_hr, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-014","deliveredAt":"2026-07-15T07:27:11.902Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T07:27:11.902Z"}}
+[2026-07-15T07:27:11.968Z] restrictedFields: []
+[2026-07-15T07:27:11.975Z] moduleName: Chat, role: role_hr, updatePayload: {"$push":{"deliveredTo":{"employeeId":"GATECO-EMP-014","deliveredAt":"2026-07-15T07:27:11.904Z"}},"$set":{"deliveryStatus.deliveredAt":"2026-07-15T07:27:11.904Z"}}
+[2026-07-15T07:27:11.975Z] restrictedFields: []
+[2026-07-15T07:27:13.469Z] moduleName: Chat, role: role_hr, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:27:13.350Z"}}
+[2026-07-15T07:27:13.469Z] restrictedFields: []
+[2026-07-15T07:27:13.474Z] moduleName: Chat, role: role_hr, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:27:13.365Z"}}
+[2026-07-15T07:27:13.474Z] restrictedFields: []
+[2026-07-15T07:27:21.491Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:27:21.355Z"}}
+[2026-07-15T07:27:21.492Z] restrictedFields: []
+[2026-07-15T07:27:21.562Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:27:21.435Z"}}
+[2026-07-15T07:27:21.562Z] restrictedFields: []
+[2026-07-15T07:28:55.592Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:28:55.468Z"}}
+[2026-07-15T07:28:55.593Z] restrictedFields: []
+[2026-07-15T07:28:55.647Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T07:28:55.530Z"}}
+[2026-07-15T07:28:55.648Z] restrictedFields: []
+[2026-07-15T07:29:01.223Z] moduleName: Chat, role: employee, updatePayload: {"$addToSet":{"pinnedBy":{"employeeId":"GATECO-EMP-008","pinnedAt":"2026-07-15T07:29:01.194Z"}}}
+[2026-07-15T07:29:01.224Z] restrictedFields: []
+[2026-07-15T07:29:04.836Z] moduleName: Chat, role: employee, updatePayload: {"$pull":{"pinnedBy":{"employeeId":"GATECO-EMP-008"}}}
+[2026-07-15T07:29:04.836Z] restrictedFields: []
+[2026-07-15T08:28:25.730Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:28:25.573Z"}}
+[2026-07-15T08:28:25.734Z] restrictedFields: []
+[2026-07-15T08:28:25.826Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:28:25.669Z"}}
+[2026-07-15T08:28:25.826Z] restrictedFields: []
+[2026-07-15T08:28:36.415Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:28:36.296Z"}}
+[2026-07-15T08:28:36.416Z] restrictedFields: []
+[2026-07-15T08:28:36.492Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:28:36.368Z"}}
+[2026-07-15T08:28:36.493Z] restrictedFields: []
+[2026-07-15T08:29:01.908Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:29:01.769Z"}}
+[2026-07-15T08:29:01.908Z] restrictedFields: []
+[2026-07-15T08:29:02.031Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:29:01.905Z"}}
+[2026-07-15T08:29:02.032Z] restrictedFields: []
+[2026-07-15T08:29:11.227Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a5744d707ed21ab0517aa31","content":"📎 call","type":"call","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-15T08:29:11.187Z"},"lastActivityAt":"2026-07-15T08:29:11.187Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-15T08:29:11.228Z] restrictedFields: []
+[2026-07-15T08:47:52.204Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:47:52.057Z"}}
+[2026-07-15T08:47:52.204Z] restrictedFields: []
+[2026-07-15T08:47:52.272Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:47:52.148Z"}}
+[2026-07-15T08:47:52.272Z] restrictedFields: []
+[2026-07-15T08:47:55.142Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:47:55.020Z"}}
+[2026-07-15T08:47:55.142Z] restrictedFields: []
+[2026-07-15T08:47:55.230Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-15T08:47:55.116Z"}}
+[2026-07-15T08:47:55.231Z] restrictedFields: []
+[2026-07-16T06:06:39.539Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T06:06:39.410Z"}}
+[2026-07-16T06:06:39.541Z] restrictedFields: []
+[2026-07-16T06:06:39.620Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T06:06:39.497Z"}}
+[2026-07-16T06:06:39.621Z] restrictedFields: []
+[2026-07-16T06:06:43.504Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a5874f370a8a57b91dbc12d","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-16T06:06:43.470Z"},"lastActivityAt":"2026-07-16T06:06:43.470Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-16T06:06:43.505Z] restrictedFields: []
+[2026-07-16T06:15:24.296Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T06:15:24.180Z"}}
+[2026-07-16T06:15:24.297Z] restrictedFields: []
+[2026-07-16T06:15:24.368Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T06:15:24.259Z"}}
+[2026-07-16T06:15:24.369Z] restrictedFields: []
+[2026-07-16T06:16:28.293Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T06:16:28.150Z"}}
+[2026-07-16T06:16:28.294Z] restrictedFields: []
+[2026-07-16T06:16:28.307Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T06:16:28.156Z"}}
+[2026-07-16T06:16:28.308Z] restrictedFields: []
+[2026-07-16T07:20:10.540Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T07:20:10.388Z"}}
+[2026-07-16T07:20:10.541Z] restrictedFields: []
+[2026-07-16T07:20:10.662Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-16T07:20:10.490Z"}}
+[2026-07-16T07:20:10.662Z] restrictedFields: []
