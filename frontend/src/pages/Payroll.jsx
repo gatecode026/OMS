@@ -548,6 +548,32 @@ const Payroll = () => {
     December: '12'
   }), []);
 
+  const isFutureMonth = React.useCallback((mName, selectedYear) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonthIdx = currentDate.getMonth();
+    const monthNumStr = monthMap[mName];
+    if (!monthNumStr) return false;
+    const monthIdx = parseInt(monthNumStr) - 1;
+    
+    const selYear = Number(selectedYear);
+    if (selYear > currentYear) return true;
+    if (selYear === currentYear && monthIdx > currentMonthIdx) return true;
+    return false;
+  }, [monthMap]);
+
+  React.useEffect(() => {
+    if (isFutureMonth(month, year)) {
+      const currentDate = new Date();
+      const currentMonthIdx = currentDate.getMonth();
+      const MONTH_NAMES = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      setMonth(MONTH_NAMES[currentMonthIdx]);
+    }
+  }, [month, year, isFutureMonth]);
+
   // --- Dynamic Calendar & Timeline Helpers ---
   const getTimelineDate = (day) => {
     const monthNum = parseInt(monthMap[month] || '06') - 1;
@@ -1415,18 +1441,10 @@ BANK PAYMENT & COMPLIANCE DETAIL:
           )}
 
           <select value={month} onChange={(e) => setMonth(e.target.value)} className="payroll-selector">
-            <option value="January">January</option>
-            <option value="February">February</option>
-            <option value="March">March</option>
-            <option value="April">April</option>
-            <option value="May">May</option>
-            <option value="June">June</option>
-            <option value="July">July</option>
-            <option value="August">August</option>
-            <option value="September">September</option>
-            <option value="October">October</option>
-            <option value="November">November</option>
-            <option value="December">December</option>
+            {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => {
+              if (isFutureMonth(m, year)) return null;
+              return <option key={m} value={m}>{m}</option>;
+            })}
           </select>
           
           <select value={year} onChange={(e) => setYear(e.target.value)} className="payroll-selector">
@@ -1599,6 +1617,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   style={{ width: '100%', cursor: 'pointer' }}
                 >
                   {['December', 'November', 'October', 'September', 'August', 'July', 'June', 'May', 'April', 'March', 'February', 'January'].map(m => {
+                    if (isFutureMonth(m, year)) return null;
                     const periodObj = employeeMonthlyPayslips[m];
                     const isPaid = periodObj?.status === 'Released';
                     const netSalary = periodObj ? formatCurrency(periodObj.netSalary) : '-';
@@ -1776,18 +1795,10 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   </select>
 
                   <select value={month} onChange={(e) => setMonth(e.target.value)} className="table-filter-select">
-                    <option value="January">January</option>
-                    <option value="February">February</option>
-                    <option value="March">March</option>
-                    <option value="April">April</option>
-                    <option value="May">May</option>
-                    <option value="June">June</option>
-                    <option value="July">July</option>
-                    <option value="August">August</option>
-                    <option value="September">September</option>
-                    <option value="October">October</option>
-                    <option value="November">November</option>
-                    <option value="December">December</option>
+                    {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => {
+                      if (isFutureMonth(m, year)) return null;
+                      return <option key={m} value={m}>{m}</option>;
+                    })}
                   </select>
 
                   <select value={year} onChange={(e) => setYear(e.target.value)} className="table-filter-select">

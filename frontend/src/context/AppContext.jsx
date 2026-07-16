@@ -510,7 +510,14 @@ export const AppProvider = ({ children }) => {
       leaveAlerts: true,
       payrollAlerts: true,
       securityAlerts: true,
-      weeklyDigest: false
+      weeklyDigest: false,
+      smsNotifs: true,
+      projectMilestoneAlerts: true,
+      announcementAlerts: true,
+      announcementCompanyWide: true,
+      announcementDeptSpecific: true,
+      announcementBranchSpecific: true,
+      announcementEmergencyPushes: true
     };
   });
 
