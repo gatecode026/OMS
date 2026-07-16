@@ -158,8 +158,14 @@ export default function InboxScreen() {
   // Launch direct conversation
   const handleSelectEmployee = async (employeeId: string) => {
     try {
-      const conversation = await startDirectChat(employeeId);
-      router.push(`/chat/${conversation.id}`);
+      const result = await startDirectChat(employeeId);
+      // startDirectChat returns the conversation object directly (chatApi normalizes it)
+      const convId = result?.id || (result as any)?._id;
+      if (!convId) {
+        toast.error('Failed to start chat conversation');
+        return;
+      }
+      router.push(`/chat/${convId}`);
     } catch {
       toast.error('Failed to start chat conversation');
     }
@@ -1038,16 +1044,17 @@ export default function InboxScreen() {
             const otherPersonName = isCallerMe ? item.calleeName : item.callerName;
             const otherPersonAvatar = isCallerMe ? item.calleeAvatar : item.callerAvatar;
             
-            let statusIcon = 'arrow-down-left-outline';
+            // 'call-received' style: incoming = arrow coming in, outgoing = arrow going out
+            let statusIcon = 'arrow-down-outline';   // incoming call (received)
             let statusColor = colors.success;
             if (item.status === 'missed') {
-              statusIcon = 'arrow-down-left-outline';
+              statusIcon = 'arrow-down-outline';      // missed incoming
               statusColor = colors.danger;
             } else if (item.status === 'rejected') {
               statusIcon = 'close-circle-outline';
               statusColor = colors.textLight;
             } else if (isCallerMe) {
-              statusIcon = 'arrow-up-right-outline';
+              statusIcon = 'arrow-up-outline';        // outgoing call
               statusColor = colors.info;
             }
 

@@ -30,6 +30,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import useTheme from '../../../shared/hooks/useTheme';
 import { formatBytes, getFileIcon, getFileExtension } from '../utils/fileUtils';
 
+/**
+ * Isolated video player component.
+ * useVideoPlayer MUST live here so it only fires when a real URI is mounted.
+ * Rendering this component conditionally prevents the native "Received 3 arguments"
+ * crash that happens when useVideoPlayer is called with null/empty source.
+ */
+const VideoPlayerView: React.FC<{ uri: string; style: any }> = ({ uri, style }) => {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+    p.play();
+  });
+  return <VideoView player={player} style={style} nativeControls />;
+};
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export interface PreviewItem {
@@ -73,14 +87,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const activeItem = items[activeIndex] || null;
-  const videoUri = activeItem && (activeItem.mimeType?.startsWith('video/') || activeItem.type === 'video') ? activeItem.uri : null;
-
-  const player = useVideoPlayer(videoUri, (p) => {
-    if (videoUri) {
-      p.loop = true;
-      p.play();
-    }
-  });
+  const isCurrentVideo = !!(activeItem && (activeItem.mimeType?.startsWith('video/') || activeItem.type === 'video'));
 
   // Customization states for each picked item
   const [rotations, setRotations] = useState<Record<number, number>>({});
@@ -224,11 +231,9 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
               )}
             </View>
           ) : isVideo ? (
-            <VideoView
-              player={player}
-              style={styles.previewVideo}
-              nativeControls
-            />
+            isCurrentVideo ? (
+              <VideoPlayerView uri={currentItem.uri} style={styles.previewVideo} />
+            ) : null
           ) : (
             <View style={styles.docPlaceholder}>
               <View style={[styles.docIconCircle, { backgroundColor: fileInfo?.bgColor ?? 'rgba(100,116,139,0.15)' }]}>

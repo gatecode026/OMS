@@ -27,7 +27,8 @@ export const useChatMessages = (conversationId: string) => {
   return useQuery({
     queryKey: ['chat', 'messages', conversationId],
     queryFn: () => chatApi.fetchMessages(conversationId),
-    enabled: isConnected && !!conversationId,
+    // Guard against literal string 'undefined' from bad navigation params
+    enabled: isConnected && !!conversationId && conversationId !== 'undefined',
     staleTime: 5000,
   });
 };

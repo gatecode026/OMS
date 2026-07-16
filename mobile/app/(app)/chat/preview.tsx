@@ -31,6 +31,18 @@ import { toast } from '../../../src/shared/components/Toast';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+/**
+ * Isolated video player — useVideoPlayer only fires when this component mounts.
+ * Must NOT be inlined in the parent to preserve hook call order.
+ */
+const VideoPlayerItem: React.FC<{ url: string; style: any }> = ({ url, style }) => {
+  const player = useVideoPlayer(url, (p) => {
+    p.loop = false;
+    p.play();
+  });
+  return <VideoView player={player} nativeControls style={style} />;
+};
+
 interface MediaItem {
   id: string;
   url: string;
@@ -93,15 +105,6 @@ export default function MediaPreviewScreen() {
   }, [initialIndex]);
 
   const activeItem = mediaItems[activeIndex] || { id: 'single', url: '', type: 'image', name: '' };
-
-  const videoUrl = activeItem && activeItem.type === 'video' ? activeItem.url : null;
-
-  const player = useVideoPlayer(videoUrl, (p) => {
-    if (videoUrl) {
-      p.loop = true;
-      p.play();
-    }
-  });
 
   const formatBytes = (bytes: number | string | undefined, decimals = 2) => {
     if (!bytes) return '0 Bytes';
@@ -289,11 +292,7 @@ export default function MediaPreviewScreen() {
                   />
                 </View>
               ) : isVid && item.url ? (
-                <VideoView
-                  player={player}
-                  nativeControls
-                  style={styles.videoPreview}
-                />
+                <VideoPlayerItem url={item.url} style={styles.videoPreview} />
               ) : (
                 <View style={styles.docWrapper}>
                   <Ionicons name="document-attach" size={80} color="#3B82F6" />

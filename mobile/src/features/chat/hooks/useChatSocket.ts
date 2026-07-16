@@ -250,61 +250,43 @@ export const useChatSocket = (socket: Socket | null) => {
       let fullMsg = msg;
 
       if (msg._isOptimized) {
-        if (isCurrentActive) {
-          try {
-            console.log('[ChatSocket] Fetching full message details for active chat message:', msg.id);
-            const response = await apiClient.get(`/api/v1/chat/messages/${msg.id}`);
-            if (response.data?.data) {
-              fullMsg = response.data.data;
-            } else if (response.data) {
-              fullMsg = response.data;
-            }
-          } catch (e) {
-            console.error('[ChatSocket] Failed to fetch full message:', e);
-            fullMsg = {
-              ...msg,
-              content: msg.preview || msg.content || '',
-            };
-          }
-        } else {
-          // Non-active conversation: DO NOT write incomplete optimized message to messages query cache.
-          // Just update the conversation list preview.
-          const formattedMsg: ChatMessage = {
-            ...msg,
-            content: msg.preview || msg.content || '',
-            status: msg.senderId === currentUserIdRef.current ? 'sent' : 'delivered',
-          };
-          
-          if (formattedMsg.senderId !== currentUserIdRef.current) {
-            markAsDelivered(formattedMsg.id, formattedMsg.conversationId);
-          }
-          
-          // Increment unread count in sidebar if not actively viewing
-          const shouldIncrementUnread = formattedMsg.senderId !== currentUserIdRef.current;
-          updateConversationPreview(formattedMsg, shouldIncrementUnread);
+        // Use the socket payload directly — the HTTP fetch caused a race condition:
+        // the backend emits the socket BEFORE the DB write commits, so
+        // GET /messages/:id returns 500 ("Message not found").
+        // The optimized payload already contains all fields needed for display.
+        const formattedOptMsg: ChatMessage = {
+          ...msg,
+          content: msg.content || msg.preview || '',
+          status: msg.senderId === currentUserIdRef.current ? 'sent' : 'delivered',
+        };
 
-          // Local notifications for background/non-active chat
-          if (formattedMsg.senderId !== currentUserIdRef.current) {
-            const isBackgrounded = AppState.currentState !== 'active';
-            if (isBackgrounded) {
-              try {
-                await Notifications.scheduleNotificationAsync({
-                  content: {
-                    title: formattedMsg.senderName || 'New Message',
-                    body: formattedMsg.content || (formattedMsg.media ? '📎 Attachment' : ''),
-                    data: { conversationId: formattedMsg.conversationId },
-                  },
-                  trigger: null,
-                });
-              } catch (error) {
-                console.error('[ChatSocket] Failed to schedule local notification:', error);
-              }
+        if (!isCurrentActive) {
+          // Non-active conversation: just update the preview/unread badge
+          if (formattedOptMsg.senderId !== currentUserIdRef.current) {
+            markAsDelivered(formattedOptMsg.id, formattedOptMsg.conversationId);
+          }
+          updateConversationPreview(formattedOptMsg, formattedOptMsg.senderId !== currentUserIdRef.current);
+
+          if (formattedOptMsg.senderId !== currentUserIdRef.current && AppState.currentState !== 'active') {
+            try {
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: formattedOptMsg.senderName || 'New Message',
+                  body: formattedOptMsg.content || (formattedOptMsg.media ? '📎 Attachment' : ''),
+                  data: { conversationId: formattedOptMsg.conversationId },
+                },
+                trigger: null,
+              });
+            } catch (error) {
+              console.error('[ChatSocket] Failed to schedule local notification:', error);
             }
           }
-          
           await updateSyncTimestamp();
           return;
         }
+
+        // Active chat: add to cache and let React Query refetch for full data
+        fullMsg = formattedOptMsg;
       }
 
       const formattedMsg: ChatMessage = {

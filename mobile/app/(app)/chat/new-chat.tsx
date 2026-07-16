@@ -289,26 +289,31 @@ export default function NewChatScreen() {
 
   // Actions
   const handleSelectEmployee = async (employee: any) => {
-    if (selectedEmployees.size > 0) {
-      toggleEmployeeSelection(employee.id);
-      return;
-    }
-
     try {
+      // Check if a direct conversation with this employee already exists
       const existingConv = conversations.find(
         (c) =>
           c.type === 'direct' &&
-          c.participants.some((p) => p.employeeId === employee.id)
+          c.participants.some((p: any) => p.employeeId === employee.id)
       );
 
       if (existingConv) {
-        router.push(`/chat/${existingConv.id}`);
+        // Conversation exists — open it immediately
+        router.replace(`/chat/${existingConv.id}` as any);
       } else {
+        // Create a new direct conversation then open it
         const newConv = await startDirectChat(employee.id);
-        router.push(`/chat/${newConv.id}`);
+        const convId = newConv?.id || (newConv as any)?._id;
+        if (!convId) {
+          console.error('[NewChat] startDirectChat returned no id:', newConv);
+          toast.error('Failed to open chat. Please try again.');
+          return;
+        }
+        router.replace(`/chat/${convId}` as any);
       }
-    } catch {
-      toast.error('Failed to initiate conversation');
+    } catch (err: any) {
+      console.error('[NewChat] Failed to start direct chat:', err);
+      toast.error('Failed to open chat. Please try again.');
     }
   };
 

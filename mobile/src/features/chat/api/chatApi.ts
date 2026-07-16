@@ -6,13 +6,26 @@
 import apiClient from '../../../shared/services/apiClient';
 import { ChatConversation, ChatMessage, CallLog } from '../types';
 
+/**
+ * Normalize MongoDB documents: map _id → id so all consumers use conv.id consistently.
+ * The backend may return either `id` (virtual) or `_id` (raw Mongo) depending on toJSON config.
+ */
+const normalizeId = <T extends Record<string, any>>(obj: T): T => {
+  if (!obj) return obj;
+  if (obj._id && !obj.id) {
+    return { ...obj, id: String(obj._id) };
+  }
+  return obj;
+};
+
 export const chatApi = {
   /**
    * Fetch all active conversations for the authenticated employee.
    */
   async fetchConversations(): Promise<ChatConversation[]> {
     const response = await apiClient.get('/api/v1/chat/conversations');
-    return response.data?.data || response.data || [];
+    const raw: any[] = response.data?.data || response.data || [];
+    return raw.map(normalizeId) as ChatConversation[];
   },
 
   /**
@@ -21,7 +34,8 @@ export const chatApi = {
   async fetchMessages(conversationId: string): Promise<ChatMessage[]> {
     const response = await apiClient.get(`/api/v1/chat/conversations/${conversationId}/messages`);
     const data = response.data?.data || response.data;
-    return data?.messages || (Array.isArray(data) ? data : []);
+    const msgs: any[] = data?.messages || (Array.isArray(data) ? data : []);
+    return msgs.map(normalizeId) as ChatMessage[];
   },
 
   /**
@@ -38,7 +52,10 @@ export const chatApi = {
     const response = await apiClient.post('/api/v1/chat/conversations/direct', {
       targetEmployeeId,
     });
-    return response.data?.data || response.data;
+    // Backend returns: { status, message, data: { isNew, conversation } }
+    // We need the conversation object, not the outer wrapper
+    const payload = response.data?.data || response.data;
+    return payload?.conversation || payload;
   },
 
   async createGroupChat(name: string, participantIds: string[], description?: string, avatar?: string): Promise<ChatConversation> {
