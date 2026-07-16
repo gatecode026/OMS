@@ -724,7 +724,14 @@ const SystemSettings = () => {
         leaveAlerts: true,
         payrollAlerts: true,
         securityAlerts: true,
-        weeklyDigest: false
+        weeklyDigest: false,
+        smsNotifs: true,
+        projectMilestoneAlerts: true,
+        announcementAlerts: true,
+        announcementCompanyWide: true,
+        announcementDeptSpecific: true,
+        announcementBranchSpecific: true,
+        announcementEmergencyPushes: true
       };
       const defaultSecurity = {
         twoFactor: false,
@@ -1950,8 +1957,8 @@ const SystemSettings = () => {
                 desc="Desktop dynamic alerts inside the system frame"
               />
               <ToggleSwitch
-                checked={true}
-                onChange={() => {}}
+                checked={localNotif.smsNotifs ?? true}
+                onChange={v => updateLocalNotif('smsNotifs', v)}
                 label="SMS Gateway Alerts"
                 desc="Deliver important status changes directly to employee mobile devices"
               />
@@ -1984,10 +1991,16 @@ const SystemSettings = () => {
                 desc="Alert superadmin immediately on system security triggers"
               />
               <ToggleSwitch
-                checked={true}
-                onChange={() => {}}
+                checked={localNotif.projectMilestoneAlerts ?? true}
+                onChange={v => updateLocalNotif('projectMilestoneAlerts', v)}
                 label="Project Milestones Alerts"
                 desc="Notify managers when milestone deadlines are near"
+              />
+              <ToggleSwitch
+                checked={localNotif.announcementAlerts ?? true}
+                onChange={v => updateLocalNotif('announcementAlerts', v)}
+                label="Announcement Alerts"
+                desc="Notify employees when a new company-wide announcement is published"
               />
             </div>
 
@@ -2009,10 +2022,38 @@ const SystemSettings = () => {
 
             <div className="settings-group">
               <h4 className="settings-group-title">Announcement Scope Channels</h4>
-              <ToggleSwitch checked={true} onChange={() => {}} label="Company-Wide Broadcasts" />
-              <ToggleSwitch checked={true} onChange={() => {}} label="Department-Specific Scope Announcements" />
-              <ToggleSwitch checked={true} onChange={() => {}} label="Branch-Specific Scope Announcements" />
-              <ToggleSwitch checked={true} onChange={() => {}} label="Emergency Alerts Enforced Pushes" />
+              <ToggleSwitch
+                checked={localNotif.announcementCompanyWide ?? true}
+                onChange={v => updateLocalNotif('announcementCompanyWide', v)}
+                label="Company-Wide Broadcasts"
+                desc="Enable company-wide general broadcasts and updates"
+              />
+              <ToggleSwitch
+                checked={localNotif.announcementDeptSpecific ?? true}
+                onChange={v => updateLocalNotif('announcementDeptSpecific', v)}
+                label="Department-Specific Scope Announcements"
+                desc="Enable announcements scoped to specific departments"
+              />
+              <ToggleSwitch
+                checked={localNotif.announcementBranchSpecific ?? true}
+                onChange={v => updateLocalNotif('announcementBranchSpecific', v)}
+                label="Branch-Specific Scope Announcements"
+                desc="Enable announcements scoped to specific branch locations"
+              />
+              <ToggleSwitch
+                checked={localNotif.announcementEmergencyPushes ?? true}
+                onChange={v => updateLocalNotif('announcementEmergencyPushes', v)}
+                label="Emergency Alerts Enforced Pushes"
+                desc="Enforce push notifications for critical emergency alerts"
+              />
+            </div>
+
+            <div className="settings-group">
+              <h4 className="settings-group-title">Browser & Chat Notifications</h4>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '-4px 0 12px' }}>
+                Manage desktop push alerts, message sound chimes, and content preview for announcements.
+              </p>
+              <NotificationSettings />
             </div>
           </div>
         );

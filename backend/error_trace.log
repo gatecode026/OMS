@@ -631,3 +631,132 @@ Stack: Error: Access denied: You are not authorized to update or delete another 
     at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
     at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
 Body: {}
+
+[2026-07-16T06:02:52.299Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:02:52.591Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:07:27.536Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:08:03.207Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:08:30.533Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:11:03.042Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:56:28.101Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:08:43.365Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:10:22.145Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:10:31.608Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:10:31.994Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:12:42.027Z] POST /api/v1/auth/login
+Error: Invalid email or password
+Stack: Error: Invalid email or password
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:151:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:26:16
+Body: {"email":"gatecode@gmail.com","password":"password"}
