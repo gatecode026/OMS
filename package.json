@@ -13,10 +13,13 @@
     "dev": "concurrently -n BACKEND,FRONTEND -c green,blue \"npm run backend\" \"npm run frontend\""
   },
   "devDependencies": {
-    "concurrently": "^10.0.3"
+    "@types/react": "~19.2.4",
+    "concurrently": "^10.0.3",
+    "typescript": "~6.0.3"
   },
   "dependencies": {
     "date-fns": "^4.4.0",
+    "expo": "^57.0.4",
     "lucide-react": "^1.17.0",
     "nodemon": "^3.1.14",
     "puppeteer-core": "^25.1.0",

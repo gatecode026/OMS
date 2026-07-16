@@ -10,26 +10,26 @@
  *   - conv:<conversationId>   → conversation-level room (messages)
  */
 
-import { runWithTenant } from '../../utils/tenantContext.js';
-import { getTenantConnection } from '../../utils/multidbConnection.js';
-import * as chatService from './chat.service.js';
-import logger from '../../config/logger.js';
-import { verifySocketToken } from '../../middlewares/socketAuth.middleware.js';
-import redis from '../../config/redis.js';
-import Conversation from './conversation.repository.js';
-import Message from './message.repository.js';
-import { UserDevice } from '../security/security.model.js';
-import { uploadToImageKit } from '../../utils/imagekit.js';
-import Call from './call.model.js';
-import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
-import * as pushNotificationService from '../notifications/pushNotificationService.js';
-import presenceService from './services/presence.service.js';
-import typingService from './services/typing.service.js';
-import * as readReceiptService from './services/readReceipt.service.js';
-import { registerNotificationSocketHandlers } from './services/notification.socket.js';
-import { checkRateLimit } from '../../services/rateLimiter.service.js';
-import { CacheKeys, TTL, cacheGetOrSet } from '../../services/cache.service.js';
-import { incrementMetric } from '../../services/monitoring.service.js';
+import { runWithTenant } from "../../utils/tenantContext.js";
+import { getTenantConnection } from "../../utils/multidbConnection.js";
+import * as chatService from "./chat.service.js";
+import logger from "../../config/logger.js";
+import { verifySocketToken } from "../../middlewares/socketAuth.middleware.js";
+import redis from "../../config/redis.js";
+import Conversation from "./conversation.repository.js";
+import Message from "./message.repository.js";
+import { UserDevice } from "../security/security.model.js";
+import { uploadToImageKit } from "../../utils/imagekit.js";
+import Call from "./call.model.js";
+import { generateCompanyUniqueId } from "../../utils/idGenerator.js";
+import * as pushNotificationService from "../notifications/pushNotificationService.js";
+import presenceService from "./services/presence.service.js";
+import typingService from "./services/typing.service.js";
+import * as readReceiptService from "./services/readReceipt.service.js";
+import { registerNotificationSocketHandlers } from "./services/notification.socket.js";
+import { checkRateLimit } from "../../services/rateLimiter.service.js";
+import { CacheKeys, TTL, cacheGetOrSet } from "../../services/cache.service.js";
+import { incrementMetric } from "../../services/monitoring.service.js";
 
 // ─── IN-MEMORY ONLINE USERS STORE ────────────────────────────────────────────
 // Structure: Map<companyId, Map<employeeId, { socketId, name, avatar, onlineAt }>>
@@ -96,7 +96,7 @@ export const triggerPushNotificationJob = async (userId, companyId) => {
             isDeleted: false,
             createdAt: { $gt: new Date(lastReadAt) },
           },
-          { sort: { createdAt: 1 }, lean: true }
+          { sort: { createdAt: 1 }, lean: true },
         );
 
         if (unreadMessages.length === 0) continue;
@@ -322,7 +322,7 @@ const verifyParticipantCached = async (companyId, conversationId, userId) => {
       return runWithTenant(companyId, async () => {
         const conv = await Conversation.findOne(
           { id: conversationId },
-          { select: "participants.employeeId", lean: true }
+          { select: "participants.employeeId", lean: true },
         );
         return conv ? conv.participants.map((p) => p.employeeId) : [];
       });
@@ -347,15 +347,22 @@ export const registerChatSocketHandlers = (io) => {
     } = socket.user;
     socket.typingConvs = new Set();
 
-    const isSuperAdmin = ["super_admin", "superadmin"].includes(role?.toLowerCase());
+    const isSuperAdmin = ["super_admin", "superadmin"].includes(
+      role?.toLowerCase(),
+    );
 
     // Intercept socket.on to bind AsyncLocalStorage tenant and user context automatically to all handlers
     const originalOn = socket.on.bind(socket);
     socket.on = (event, listener) => {
       return originalOn(event, async (...args) => {
-        await runWithTenant(companyId, async () => {
-          return listener(...args);
-        }, isSuperAdmin, socket.user);
+        await runWithTenant(
+          companyId,
+          async () => {
+            return listener(...args);
+          },
+          isSuperAdmin,
+          socket.user,
+        );
       });
     };
 
@@ -863,10 +870,12 @@ export const registerChatSocketHandlers = (io) => {
           socket.join(`conv:${conversationId}`);
           socket.emit("joined_conversation", { conversationId });
           logger.info(`[Chat] ${name} joined conv: ${conversationId}`);
-          
+
           socket.activeConversationId = conversationId;
           if (redis.isAvailable) {
-            await redis.set(`active_conv:${userId}`, conversationId, { EX: 86400 }).catch(() => {});
+            await redis
+              .set(`active_conv:${userId}`, conversationId, { EX: 86400 })
+              .catch(() => {});
           }
         });
       } catch (err) {
@@ -1170,10 +1179,14 @@ export const registerChatSocketHandlers = (io) => {
                     // Cluster-safe fast active room check
                     let isLookingAtThisConv = false;
                     if (redis.isAvailable) {
-                      const activeConv = await redis.get(`active_conv:${participant.employeeId}`).catch(() => null);
-                      isLookingAtThisConv = (activeConv === conversationId);
+                      const activeConv = await redis
+                        .get(`active_conv:${participant.employeeId}`)
+                        .catch(() => null);
+                      isLookingAtThisConv = activeConv === conversationId;
                     } else {
-                      const roomSockets = io.sockets.adapter.rooms.get(`conv:${conversationId}`);
+                      const roomSockets = io.sockets.adapter.rooms.get(
+                        `conv:${conversationId}`,
+                      );
                       if (roomSockets) {
                         for (const socketId of roomSockets) {
                           const s = io.sockets.sockets.get(socketId);
@@ -1199,7 +1212,9 @@ export const registerChatSocketHandlers = (io) => {
                             .toLowerCase()
                             .includes(
                               "@" +
-                                participant.name.toLowerCase().replace(/\s+/g, ""),
+                                participant.name
+                                  .toLowerCase()
+                                  .replace(/\s+/g, ""),
                             ) ||
                             content.toLowerCase().includes("@all") ||
                             content.toLowerCase().includes("@everyone"));
@@ -1238,11 +1253,15 @@ export const registerChatSocketHandlers = (io) => {
                       // Check online status cluster-safely via Redis or local adapter
                       let isOnline = false;
                       if (redis.isAvailable) {
-                        const presence = await presenceService.getUserPresence(participant.employeeId);
-                        isOnline = (presence && presence.status === "online");
+                        const presence = await presenceService.getUserPresence(
+                          participant.employeeId,
+                        );
+                        isOnline = presence && presence.status === "online";
                       } else {
-                        const userRoom = io.sockets.adapter.rooms.get(`user:${participant.employeeId}`);
-                        isOnline = (userRoom && userRoom.size > 0);
+                        const userRoom = io.sockets.adapter.rooms.get(
+                          `user:${participant.employeeId}`,
+                        );
+                        isOnline = userRoom && userRoom.size > 0;
                       }
 
                       if (!isOnline) {
@@ -1262,7 +1281,7 @@ export const registerChatSocketHandlers = (io) => {
                         }
                       }
                     }
-                  })
+                  }),
                 );
               } catch (bgErr) {
                 logger.error(
