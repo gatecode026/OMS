@@ -263,12 +263,10 @@ export const CallProvider = ({ children }) => {
     const handleSWMessage = (event) => {
       if (event.data && event.data.type === 'STOP_SOUND') {
         console.log('[CallContext] STOP_SOUND event received from Service Worker:', event.data);
-        const currentCallInfo = callInfoRef.current;
-        if (!event.data.callId || currentCallInfo?.callId === event.data.callId) {
-          cleanupRef.current();
-          setCallState('idle');
-          setCallInfo(null);
-        }
+        callSounds.stopAll();
+        cleanupRef.current();
+        setCallState('idle');
+        setCallInfo(null);
       }
     };
 
@@ -335,6 +333,7 @@ export const CallProvider = ({ children }) => {
 
     // Call rejected
     const onCallRejected = ({ callId, reason, calleeName, calleeId, callerId }) => {
+      callSounds.stopAll();
       cleanupRef.current();
       setCallState('idle');
       setCallInfo(null);
@@ -354,6 +353,7 @@ export const CallProvider = ({ children }) => {
 
     // Call ended by other party
     const onCallEnded = ({ callId, duration, endedBy }) => {
+      callSounds.stopAll();
       cleanupRef.current();
       setCallState('idle');
       setCallInfo(null);
@@ -364,6 +364,7 @@ export const CallProvider = ({ children }) => {
 
     // Call missed
     const onCallMissed = ({ callId, callerName, reason }) => {
+      callSounds.stopAll();
       cleanupRef.current();
       setCallState('idle');
       setCallInfo(null);
@@ -372,6 +373,7 @@ export const CallProvider = ({ children }) => {
 
     // Call error
     const onCallError = ({ code, message }) => {
+      callSounds.stopAll();
       setCallError(message);
       cleanupRef.current();
       setCallState('idle');
