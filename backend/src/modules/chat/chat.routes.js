@@ -81,6 +81,7 @@ router.post('/calls/:callId/reject',          controller.rejectCall);
 
 // ─── IMAGEKIT CLIENT AUTH ────────────────────────────────────────────────────
 router.get('/imagekit/auth',                 controller.getImageKitAuth);
+router.post('/imagekit/upload',               controller.uploadToImageKitRoute);
 
 // ─── ADMIN CLEANUP ENDPOINTS ─────────────────────────────────────────────────
 router.get('/admin/cleanup/stats',           restrictTo('admin', 'super_admin'), controller.getCleanupStats);

@@ -83,6 +83,24 @@ client.mget = function (keys) {
   return client.mGet(keys);
 };
 
+// ── Multi Wrapper ───────────────────────────────────────────────────────────
+const originalMulti = client.multi.bind(client);
+client.multi = function (...args) {
+  const multi = originalMulti(...args);
+  const originalExec = multi.exec.bind(multi);
+  multi.exec = function (...execArgs) {
+    return originalExec(...execArgs).catch((err) => {
+      const errMsg = err.message || "";
+      if (errMsg.includes("max requests limit exceeded") || errMsg.includes("limit exceeded") || errMsg.includes("Quota Exceeded")) {
+        client.isAvailable = false;
+        logger.error(`[Redis Multi] Request limit exceeded. Disabling Redis client dynamically. Error: ${errMsg}`);
+      }
+      throw err;
+    });
+  };
+  return multi;
+};
+
 // ── Duplicate Factory ─────────────────────────────────────────────────────────
 const originalDuplicate = client.duplicate.bind(client);
 client.duplicate = function (...args) {
@@ -106,6 +124,24 @@ client.duplicate = function (...args) {
 
   dup.mget = function (keys) {
     return dup.mGet(keys);
+  };
+
+  const originalDupMulti = dup.multi.bind(dup);
+  dup.multi = function (...args) {
+    const multi = originalDupMulti(...args);
+    const originalExec = multi.exec.bind(multi);
+    multi.exec = function (...execArgs) {
+      return originalExec(...execArgs).catch((err) => {
+        const errMsg = err.message || "";
+        if (errMsg.includes("max requests limit exceeded") || errMsg.includes("limit exceeded") || errMsg.includes("Quota Exceeded")) {
+          dup.isAvailable = false;
+          client.isAvailable = false;
+          logger.error(`[Redis Duplicate Multi] Request limit exceeded. Disabling Redis client dynamically. Error: ${errMsg}`);
+        }
+        throw err;
+      });
+    };
+    return multi;
   };
 
   dup.on("connect", () => { dup.isAvailable = true; });

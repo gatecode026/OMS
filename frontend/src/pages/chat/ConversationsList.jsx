@@ -336,30 +336,61 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
               style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}
               onClick={() => setShowStatusPicker(!showStatusPicker)}
             >
-              {currentUser?.avatar ? (
-                <img 
-                  src={currentUser.avatar} 
-                  alt={currentUser.name} 
-                  style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} 
-                />
-              ) : (
-                <div 
-                  style={{ 
-                    width: '32px', 
-                    height: '32px', 
-                    borderRadius: '50%', 
-                    backgroundColor: 'var(--color-primary, #6366f1)', 
-                    color: 'white', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    fontWeight: 'bold',
-                    fontSize: '14px'
-                  }}
-                >
-                  {currentUser?.name?.charAt(0).toUpperCase()}
-                </div>
-              )}
+              {(() => {
+                const hasValidAvatar = currentUser?.avatar && 
+                                       typeof currentUser.avatar === 'string' &&
+                                       currentUser.avatar.trim() !== '' &&
+                                       currentUser.avatar !== 'null' &&
+                                       currentUser.avatar !== 'undefined';
+                const letter = currentUser?.name?.charAt(0).toUpperCase() || '?';
+                return hasValidAvatar ? (
+                  <>
+                    <img 
+                      src={currentUser.avatar} 
+                      alt={currentUser.name} 
+                      style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} 
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        const sib = e.target.nextSibling;
+                        if (sib) sib.style.display = 'flex';
+                      }}
+                    />
+                    <div 
+                      style={{ 
+                        display: 'none',
+                        width: '32px', 
+                        height: '32px', 
+                        borderRadius: '50%', 
+                        backgroundColor: 'var(--color-primary, #6366f1)', 
+                        color: 'white', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '14px'
+                      }}
+                    >
+                      {letter}
+                    </div>
+                  </>
+                ) : (
+                  <div 
+                    style={{ 
+                      width: '32px', 
+                      height: '32px', 
+                      borderRadius: '50%', 
+                      backgroundColor: 'var(--color-primary, #6366f1)', 
+                      color: 'white', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      fontWeight: 'bold',
+                      fontSize: '14px'
+                    }}
+                  >
+                    {letter}
+                  </div>
+                );
+              })()}
               <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', border: '2px solid var(--bg-card, #fff)', borderRadius: '50%' }}>
                 <StatusDot status={currentUserStatus?.status || 'available'} size={10} />
               </div>
@@ -742,11 +773,33 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
                             }}
                           >
                             <div style={avatarStyle}>
-                              {contact.avatar ? (
-                                <img src={contact.avatar} alt={contact.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                <span>{contact.name?.charAt(0).toUpperCase()}</span>
-                              )}
+                              {(() => {
+                                const hasValidAvatar = contact.avatar && 
+                                                       typeof contact.avatar === 'string' &&
+                                                       contact.avatar.trim() !== '' &&
+                                                       contact.avatar !== 'null' &&
+                                                       contact.avatar !== 'undefined';
+                                const letter = contact.name?.charAt(0).toUpperCase() || '?';
+                                return hasValidAvatar ? (
+                                  <>
+                                    <img 
+                                      src={contact.avatar} 
+                                      alt={contact.name} 
+                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        const sib = e.target.nextSibling;
+                                        if (sib) sib.style.display = 'flex';
+                                      }}
+                                    />
+                                    <span style={{ display: 'none', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                                      {letter}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span>{letter}</span>
+                                );
+                              })()}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -781,11 +834,33 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
                             }}
                           >
                             <div style={avatarStyle}>
-                              {msg.senderAvatar ? (
-                                <img src={msg.senderAvatar} alt={msg.senderName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                <span>{msg.senderName?.charAt(0).toUpperCase()}</span>
-                              )}
+                              {(() => {
+                                const hasValidAvatar = msg.senderAvatar && 
+                                                       typeof msg.senderAvatar === 'string' &&
+                                                       msg.senderAvatar.trim() !== '' &&
+                                                       msg.senderAvatar !== 'null' &&
+                                                       msg.senderAvatar !== 'undefined';
+                                const letter = msg.senderName?.charAt(0).toUpperCase() || '?';
+                                return hasValidAvatar ? (
+                                  <>
+                                    <img 
+                                      src={msg.senderAvatar} 
+                                      alt={msg.senderName} 
+                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                      onError={(e) => {
+                                        e.target.style.display = 'none';
+                                        const sib = e.target.nextSibling;
+                                        if (sib) sib.style.display = 'flex';
+                                      }}
+                                    />
+                                    <span style={{ display: 'none', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+                                      {letter}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span>{letter}</span>
+                                );
+                              })()}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px' }}>

@@ -1344,32 +1344,49 @@ export const ChatProvider = ({ children }) => {
     updateUploadItem(id, { controller, status: 'uploading', error: null, progress: 0 });
 
     try {
-      // 1. Fetch ImageKit upload authentication details from the backend
-      const authParams = await ImageKitUploadService.fetchAuthParams(token);
+      // Convert file to base64
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (error) => reject(error);
+      });
 
-      // 2. Perform direct upload to ImageKit
-      const result = await ImageKitUploadService.upload(
-        file,
-        authParams,
-        (progressData) => {
-          updateUploadItem(id, {
-            progress: progressData.percentage,
-            speed: progressData.speed,
-            eta: progressData.eta
-          });
+      // Call our backend proxy route which uploads via basic auth (private key only)
+      const response = await fetch(`${window.API_URL || window.location.origin}/api/v1/chat/imagekit/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        controller.signal
-      );
+        body: JSON.stringify({
+          fileData: base64Data,
+          fileName: file.name
+        }),
+        signal: controller.signal
+      });
 
-      // 3. Record successful response
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Upload failed (Status ${response.status})`);
+      }
+
+      const resultData = await response.json();
+      if (resultData.status !== 'success' || !resultData.data) {
+        throw new Error(resultData.message || 'Upload failed');
+      }
+
+      const result = resultData.data;
+
+      // Record successful response
       updateUploadItem(id, {
         status: 'success',
         progress: 100,
         result: {
           url: result.url,
-          thumbnailUrl: result.thumbnailUrl || result.url,
-          fileName: result.name,
-          fileSize: result.size,
+          thumbnailUrl: result.url,
+          fileName: file.name,
+          fileSize: file.size,
           mimeType: file.type,
           fileType: file.type,
           imageKitFileId: result.fileId,
@@ -1386,6 +1403,9 @@ export const ChatProvider = ({ children }) => {
         status: 'failed',
         error: err.message || 'Upload failed'
       });
+      if (addToastRef.current) {
+        addToastRef.current('error', `Upload failed: ${err.message || 'Server connection error'}`);
+      }
     }
   }, [token, updateUploadItem]);
 
@@ -2311,6 +2331,9 @@ export const ChatProvider = ({ children }) => {
 
     socket.on('message_error', handleSendError);
     socket.on('message_upload_error', handleSendError);
+    socket.on('error', (err) => {
+      console.error('[Chat Socket] Global error event received:', err);
+    });
 
     // ── Conversation Cleared ──────────────────────────────────────────────
     socket.on('conversation:cleared', ({ conversationId }) => {

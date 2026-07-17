@@ -108,7 +108,7 @@ export const validateDepartmentScope = (context, resource, deptField = 'departme
  */
 export const validateOwnership = (context, resource, ownerIdFields = ['id', 'userId', 'employeeId'], moduleName = 'unknown', operation = 'read') => {
   if (context.isSuperAdmin || context.isCompanyAdmin) return true;
-  if (['Chat', 'Conversation', 'Message', 'Call'].includes(moduleName) && operation === 'read') return true;
+  if (['Chat', 'Conversation', 'Message', 'Call', 'Thread', 'Poll'].includes(moduleName)) return true;
   if (moduleName === 'Projects') return true;
   if (moduleName === 'Tasks' && resource && (resource.tasks !== undefined || (resource.constructor && resource.constructor.modelName === 'Project'))) return true;
 
@@ -128,7 +128,7 @@ export const validateOwnership = (context, resource, ownerIdFields = ['id', 'use
     }
     if (!hasMatch) {
       logSecurityEvent(context, moduleName, operation, SecurityEventTypes.OWNERSHIP_DENIED, 'DENIED', 'Access Denied: Ownership verification failed', resource.id);
-      const err = new Error("Access denied: You are not authorized to update or delete another employee's record.");
+      const err = new Error(`Access denied: You are not authorized to update or delete another employee's record. [Debug: moduleName="${moduleName}", operation="${operation}", resourceId="${resource?.id}", role="${context?.role}"]`);
       err.statusCode = 403;
       throw err;
     }

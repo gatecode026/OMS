@@ -93,11 +93,30 @@ const ChatSidebar = ({ conversation: conv, currentUser, onClose }) => {
         {/* Profile area */}
         <div className="chat-sidebar-profile">
           <div className="chat-sidebar-avatar">
-            {(isDirect ? other?.avatar : conv?.avatar) ? (
-              <img src={isDirect ? other?.avatar : conv?.avatar} alt={displayName} />
-            ) : (
-              <span>{avatarLetter}</span>
-            )}
+            {(() => {
+              const avatarSrc = isDirect ? other?.avatar : conv?.avatar;
+              const hasValidAvatar = avatarSrc && 
+                                     typeof avatarSrc === 'string' &&
+                                     avatarSrc.trim() !== '' &&
+                                     avatarSrc !== 'null' &&
+                                     avatarSrc !== 'undefined';
+              return hasValidAvatar ? (
+                <>
+                  <img 
+                    src={avatarSrc} 
+                    alt={displayName} 
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      const sib = e.target.nextSibling;
+                      if (sib) sib.style.display = 'flex';
+                    }}
+                  />
+                  <span style={{ display: 'none' }}>{avatarLetter}</span>
+                </>
+              ) : (
+                <span>{avatarLetter}</span>
+              );
+            })()}
           </div>
           <h4 className="chat-sidebar-name">{displayName}</h4>
           {!isDirect && (
@@ -177,11 +196,30 @@ const ChatSidebar = ({ conversation: conv, currentUser, onClose }) => {
               {conv.participants.map(p => (
                 <div key={p.employeeId} className="chat-sidebar-member">
                   <div className="chat-sidebar-member-avatar">
-                    {p.avatar ? (
-                      <img src={p.avatar} alt={p.name} />
-                    ) : (
-                      <span>{p.name?.charAt(0).toUpperCase()}</span>
-                    )}
+                    {(() => {
+                      const hasValidAvatar = p.avatar && 
+                                             typeof p.avatar === 'string' &&
+                                             p.avatar.trim() !== '' &&
+                                             p.avatar !== 'null' &&
+                                             p.avatar !== 'undefined';
+                      const letter = p.name?.charAt(0).toUpperCase() || '?';
+                      return hasValidAvatar ? (
+                        <>
+                          <img 
+                            src={p.avatar} 
+                            alt={p.name} 
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              const sib = e.target.nextSibling;
+                              if (sib) sib.style.display = 'flex';
+                            }}
+                          />
+                          <span style={{ display: 'none' }}>{letter}</span>
+                        </>
+                      ) : (
+                        <span>{letter}</span>
+                      );
+                    })()}
                   </div>
                   <div className="chat-sidebar-member-info">
                     <span className="chat-sidebar-member-name">
