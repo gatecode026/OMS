@@ -98,7 +98,7 @@ const NotificationPanel = ({ notifications, onMarkAllRead, onClose, onOpenDrawer
     const notifId = notif.id || notif._id;
     if (notifId && !notif.isRead) {
       if (markNotificationRead) {
-        await markNotificationRead(notifId);
+        markNotificationRead(notifId);
       }
     }
 

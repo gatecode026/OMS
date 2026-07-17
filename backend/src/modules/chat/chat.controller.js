@@ -18,6 +18,7 @@ import Conversation from './conversation.repository.js';
 import ImageKitCleanupLog from './cleanupLog.model.js';
 import ActivityLog from '../activity-logs/activity-log.model.js';
 import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
+import { uploadToImageKitDetailed } from '../../utils/imagekit.js';
 
 // ─── HELPER ──────────────────────────────────────────────────────────────────
 
@@ -546,20 +547,43 @@ export const getImageKitAuth = asyncHandler(async (req, res) => {
   }
 
   const token = req.query.token || crypto.randomBytes(16).toString('hex');
-  // Expire in 1 hour (3600 seconds)
-  const expire = req.query.expire || Math.floor(Date.now() / 1000) + 3600;
+  // Expire in 30 minutes (1800 seconds) to absorb clock skew and stay safely under ImageKit's 1-hour limit
+  const expire = req.query.expire || Math.floor(Date.now() / 1000) + 1800;
 
   const signature = crypto
     .createHmac('sha1', privateKey)
     .update(token + expire)
     .digest('hex');
 
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   return successResponse(res, {
     token,
     expire,
     signature,
     publicKey
   }, 'ImageKit authentication parameters generated successfully');
+});
+
+// POST /api/v1/chat/imagekit/upload
+export const uploadToImageKitRoute = asyncHandler(async (req, res) => {
+  const { fileData, fileName } = req.body;
+  if (!fileData) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'No file data provided'
+    });
+  }
+
+  // Upload to ImageKit using basic auth helper
+  const result = await uploadToImageKitDetailed(fileData, fileName);
+  if (!result || !result.url || result.url.startsWith('data:')) {
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to upload file to ImageKit'
+    });
+  }
+
+  return successResponse(res, result, 'File uploaded to ImageKit successfully');
 });
 
 // DELETE /api/v1/chat/messages/:id/permanent

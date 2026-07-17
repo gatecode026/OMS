@@ -1919,6 +1919,14 @@ input:checked + .notif-slider {
   background-color: var(--chat-primary, #6366f1);
 }
 
+.notif-switch.toggle-on .notif-slider {
+  background-color: var(--chat-primary, #6366f1);
+}
+
+.notif-switch.toggle-on .notif-slider:before {
+  transform: translateX(16px);
+}
+
 input:checked + .notif-slider:before {
   transform: translateX(16px);
 }

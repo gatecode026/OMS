@@ -404,8 +404,6 @@ export const findMonthlyPayrollSummary = async (companyId, monthYear) => {
           paidLeaveDays += 1;
         } else if (leaveDayMap[dateStr] === 'Unpaid') {
           unpaidLeaveDays += 1;
-        } else {
-          unpaidLeaveDays += 1;
         }
       }
     }

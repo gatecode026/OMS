@@ -15,6 +15,7 @@ import {
   Clock,
   Eye,
   Trash2,
+  Edit,
   CheckCircle,
   FileText,
   AlertTriangle,
@@ -151,10 +152,20 @@ const Announcements = () => {
 
   // Creation/Edit modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingAnnId, setEditingAnnId] = useState(null);
   const [createForm, setCreateForm] = useState({
     title: '', category: 'Company', priority: 'Medium', description: '', publishDate: new Date().toISOString().split('T')[0], expiryDate: '',
     audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
   });
+
+  const handleCloseModal = () => {
+    setShowCreateModal(false);
+    setEditingAnnId(null);
+    setCreateForm({
+      title: '', category: 'Company', priority: 'Medium', description: '', publishDate: new Date().toISOString().split('T')[0], expiryDate: '',
+      audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
+    });
+  };
 
   const branchesList = useMemo(() => {
     return (branches || []).map(b => b.name);
@@ -255,19 +266,41 @@ const Announcements = () => {
     );
   };
 
+  const handleEditClick = (ann) => {
+    setEditingAnnId(ann.id || ann._id);
+    setCreateForm({
+      title: ann.title || '',
+      category: ann.category || 'Company',
+      priority: ann.priority || 'Medium',
+      description: ann.description || '',
+      publishDate: ann.publishDate || new Date().toISOString().split('T')[0],
+      expiryDate: ann.expiryDate || '',
+      audienceType: ann.audienceType || 'All',
+      targetAudience: ann.targetAudience || 'All Employees',
+      deliveryChannels: ann.deliveryChannels || ['Dashboard']
+    });
+    setShowCreateModal(true);
+  };
+
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const created = await createAnnouncement(createForm);
-      if (created) {
-        setSelectedAnn(created);
+      if (editingAnnId) {
+        await updateAnnouncement(editingAnnId, createForm);
+        addPageToast('success', 'Announcement updated successfully.');
+      } else {
+        const created = await createAnnouncement(createForm);
+        if (created) {
+          setSelectedAnn(created);
+        }
       }
     } catch (err) {
-      console.error('Failed to create announcement:', err);
+      console.error('Failed to save announcement:', err);
     } finally {
       setSubmitting(false);
       setShowCreateModal(false);
+      setEditingAnnId(null);
       setCreateForm({
         title: '', category: 'Company', priority: 'Medium', description: '', publishDate: new Date().toISOString().split('T')[0], expiryDate: '',
         audienceType: 'All', targetAudience: 'All Employees', deliveryChannels: ['Dashboard']
@@ -525,6 +558,35 @@ const Announcements = () => {
                         <span className="badge badge-secondary font-xsmall">{ann.category}</span>
                       </div>
                       <div className="flex-center gap-1">
+                        {(currentUserRole === 'super_admin' || 
+                          currentUserRole === 'company_admin' || 
+                          ann.publishedBy === currentUser?.name || 
+                          (typeof hasPermission === 'function' && hasPermission('announcements', 'update'))) && (
+                          <div className="flex-center gap-1 mr-2" style={{ borderRight: '1px solid var(--border-color)', paddingRight: 8 }}>
+                            <button
+                              className="action-circle-btn"
+                              style={{ width: 22, height: 22, minWidth: 22, padding: 0 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(ann);
+                              }}
+                              title="Edit Announcement"
+                            >
+                              <Edit size={11} />
+                            </button>
+                            <button
+                              className="action-circle-btn text-danger"
+                              style={{ width: 22, height: 22, minWidth: 22, padding: 0 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(ann.id);
+                              }}
+                              title="Delete Announcement"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        )}
                         {ann.pinned && <Pin size={14} className="text-primary spin-rotate" />}
                         <span className="font-xsmall text-muted"><Clock size={11} /> {ann.publishDate}</span>
                       </div>
@@ -1000,8 +1062,8 @@ const Announcements = () => {
         <div className="payroll-modal-overlay">
           <form className="payroll-modal-container animate-slide-up" onSubmit={handleCreateSubmit} style={{ maxWidth: '580px' }}>
             <div className="flex-center justify-between border-bottom pb-3 mb-4">
-              <h3 className="modal-title-bold">Publish / Schedule New Announcement</h3>
-              <button className="action-circle-btn" type="button" onClick={() => setShowCreateModal(false)}><X size={18} /></button>
+              <h3 className="modal-title-bold">{editingAnnId ? 'Edit Announcement' : 'Publish / Schedule New Announcement'}</h3>
+              <button className="action-circle-btn" type="button" onClick={handleCloseModal}><X size={18} /></button>
             </div>
 
             <div className="flex-column gap-3 font-small">
@@ -1128,9 +1190,9 @@ const Announcements = () => {
             </div>
 
             <div className="flex justify-end gap-3 border-top pt-4 mt-4">
-              <Button variant="secondary" type="button" onClick={() => setShowCreateModal(false)}>Cancel</Button>
+              <Button variant="secondary" type="button" onClick={handleCloseModal}>Cancel</Button>
               <Button variant="primary" type="submit" disabled={submitting}>
-                {submitting ? 'Publishing...' : 'Submit & Publish'}
+                {submitting ? 'Saving...' : (editingAnnId ? 'Save Changes' : 'Submit & Publish')}
               </Button>
             </div>
           </form>
@@ -1146,7 +1208,36 @@ const Announcements = () => {
                 <Megaphone className="text-primary" size={22} />
                 <h3 className="modal-title-bold">{selectedAnnDetail.title}</h3>
               </div>
-              <button className="action-circle-btn" onClick={() => setSelectedAnn(null)}><X size={18} /></button>
+              <div className="flex-center gap-2">
+                {(currentUserRole === 'super_admin' || 
+                  currentUserRole === 'company_admin' || 
+                  selectedAnnDetail.publishedBy === currentUser?.name || 
+                  (typeof hasPermission === 'function' && hasPermission('announcements', 'update'))) && (
+                  <div className="flex-center gap-2 mr-2" style={{ borderRight: '1px solid var(--border-color)', paddingRight: 10 }}>
+                    <button
+                      className="action-circle-btn"
+                      onClick={() => {
+                        handleEditClick(selectedAnnDetail);
+                        setSelectedAnn(null);
+                      }}
+                      title="Edit Announcement"
+                    >
+                      <Edit size={14} />
+                    </button>
+                    <button
+                      className="action-circle-btn text-danger"
+                      onClick={() => {
+                        handleDelete(selectedAnnDetail.id);
+                        setSelectedAnn(null);
+                      }}
+                      title="Delete Announcement"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )}
+                <button className="action-circle-btn" onClick={() => setSelectedAnn(null)}><X size={18} /></button>
+              </div>
             </div>
 
             <div className="modal-body-section flex-column gap-4 font-small">

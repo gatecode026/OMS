@@ -6,6 +6,11 @@
 import service from './security.service.js';
 import { successResponse } from '../../utils/response.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+import { getIO } from '../../config/socket.js';
+import { UserSession, EmployeeLockout } from './security.model.js';
+import { blacklistToken } from '../../services/security.service.js';
+import jwt from 'jsonwebtoken';
+import env from '../../config/env.js';
 
 // --- IP Whitelist ---
 export const getWhitelist = asyncHandler(async (req, res) => {
@@ -67,12 +72,83 @@ export const postSession = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Session logged successfully', 201);
 });
 export const deleteSession = asyncHandler(async (req, res) => {
+  // 1. Look up the session to get the employeeId before deleting it
+  const session = await UserSession.findOne({ id: req.params.id });
+
+  // 2. Read optional lock duration from query parameter (in minutes)
+  const durationMin = parseInt(req.query.duration, 10);
+  let lockedUntil = null;
+  let durationLabel = '';
+
+  if (session && !isNaN(durationMin) && durationMin > 0) {
+    lockedUntil = new Date(Date.now() + durationMin * 60 * 1000);
+    if (durationMin < 60) {
+      durationLabel = `${durationMin} Minutes`;
+    } else if (durationMin === 60) {
+      durationLabel = '1 Hour';
+    } else if (durationMin === 1440) {
+      durationLabel = '24 Hours';
+    } else {
+      durationLabel = `${Math.round(durationMin / 60)} Hours`;
+    }
+
+    // Create a lockout entry
+    await EmployeeLockout.create({
+      employeeId: session.employeeId,
+      employeeName: session.employeeName,
+      companyId: session.companyId,
+      lockedUntil,
+      durationLabel,
+      reason: req.query.reason || 'Force logout by administrator',
+      lockedBy: req.user?.name || 'Admin'
+    });
+  }
+
+  // 3. Delete the session record from DB
   const data = await service.deleteSession(req.params.id);
+
+  if (session) {
+    // 4. Emit force_logout to the target user's socket room
+    try {
+      const io = getIO();
+      const logoutReason = lockedUntil 
+        ? `Your session was terminated by an administrator. You have been locked out from logging in for ${durationLabel}.`
+        : 'Your session was terminated by an administrator.';
+      
+      io.to(`user:${session.employeeId}`).emit('force_logout', {
+        reason: logoutReason,
+        by: req.user?.name || 'Admin',
+        lockedUntil
+      });
+    } catch (socketErr) {
+      // Non-critical if socket is not available
+    }
+  }
+
   return successResponse(res, data, 'Session terminated successfully');
 });
 export const deleteSessionsExcept = asyncHandler(async (req, res) => {
   const { keepId } = req.body;
+
+  // Get all sessions that will be terminated (everyone except current user)
+  const toTerminate = await UserSession.find({ employeeId: { $ne: keepId } });
+
+  // Delete them from DB
   const data = await service.terminateAllSessionsExcept(keepId);
+
+  // Emit force_logout to each terminated user's socket room
+  try {
+    const io = getIO();
+    toTerminate.forEach(sess => {
+      io.to(`user:${sess.employeeId}`).emit('force_logout', {
+        reason: 'All sessions were terminated by an administrator.',
+        by: req.user?.name || 'Admin'
+      });
+    });
+  } catch (socketErr) {
+    // Non-critical
+  }
+
   return successResponse(res, data, 'All other sessions terminated successfully');
 });
 

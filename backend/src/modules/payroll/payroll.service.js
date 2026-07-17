@@ -227,6 +227,12 @@ export const saveGlobalConfigs = async (configs, currentUser) => {
   return repository.saveGlobalConfigs(configs);
 };
 
+export const resetPaymentDeductions = async (body, currentUser) => {
+  logger.info('PayrollService::resetPaymentDeductions - Resetting legacy dummy deductions on payment records');
+  const { employeeId, month, year, fields } = body;
+  return repository.resetPaymentDeductions({ employeeId, month, year, fields });
+};
+
 export default {
   getMasterPayrollData,
   saveGrade,
@@ -239,5 +245,6 @@ export default {
   saveMonthlyPayment,
   updatePaymentStatus,
   bulkUpdatePaymentStatus,
-  saveGlobalConfigs
+  saveGlobalConfigs,
+  resetPaymentDeductions
 };

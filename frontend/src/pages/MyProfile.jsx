@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import './MyProfile.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -56,20 +56,36 @@ const ProfileHeroCard = ({ user }) => {
 
     try {
       setIsUploading(true);
-      const authParams = await ImageKitUploadService.fetchAuthParams(token);
-      const result = await ImageKitUploadService.upload(
-        file,
-        authParams,
-        (progress) => {
-          console.log(`Avatar upload progress: ${progress.percentage}%`);
-        }
-      );
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (error) => reject(error);
+      });
 
-      if (!result || !result.url) {
-        throw new Error('Upload to ImageKit failed');
+      const uploadRes = await fetch(`/api/v1/chat/imagekit/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fileData: base64Data,
+          fileName: file.name
+        })
+      });
+
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.message || `Upload failed (Status ${uploadRes.status})`);
       }
 
-      const imageUrl = result.url;
+      const uploadResult = await uploadRes.json();
+      if (uploadResult.status !== 'success' || !uploadResult.data) {
+        throw new Error(uploadResult.message || 'Upload failed');
+      }
+
+      const imageUrl = uploadResult.data.url;
 
       // Use the dedicated self-service avatar endpoint — bypasses permission matrix
       const res = await fetch(`/api/v1/employees/${user.id}/avatar`, {
@@ -471,8 +487,30 @@ const MyProfile = () => {
     projectsList,
     tasks,
     leaveRequests,
-    activityLogs
+    activityLogs,
+    fetchEmployees,
+    fetchBranches,
+    fetchDepartments,
+    fetchProjects,
+    fetchLeaves,
+    fetchActivityLogs
   } = useApp();
+
+  // Load and refresh stats periodically in real-time
+  useEffect(() => {
+    const refreshData = () => {
+      if (fetchEmployees) fetchEmployees();
+      if (fetchBranches) fetchBranches();
+      if (fetchDepartments) fetchDepartments();
+      if (fetchProjects) fetchProjects();
+      if (fetchLeaves) fetchLeaves();
+      if (fetchActivityLogs) fetchActivityLogs();
+    };
+
+    refreshData();
+    const interval = setInterval(refreshData, 30000); // 30 seconds auto-refresh
+    return () => clearInterval(interval);
+  }, []);
 
   // Active Tab state for form panels
   const [activeTab, setActiveTab] = useState('personal'); // personal, contact
@@ -863,7 +901,7 @@ const MyProfile = () => {
     const branchCount = branches?.length || 0;
     const deptCount = departments?.length || 0;
     const projectCount = projectsList?.length || 0;
-    const taskCount = tasks?.length || 0;
+    const taskCount = (tasks || []).filter(t => !(t.completed || t.status === 'Done' || t.status === 'Completed')).length;
     const pendingLeaveCount = leaveRequests?.filter(r => r.status === 'Pending').length || 0;
 
     return (

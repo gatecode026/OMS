@@ -1127,10 +1127,11 @@ const Employees = () => {
       const validBankAccount = !formData.bankAccountNumber || isValidBankAccount(formData.bankAccountNumber);
       const validIfsc = !formData.bankIfscCode || isValidIfsc(formData.bankIfscCode);
       const validUpi = !formData.bankUpiId || isValidUpi(formData.bankUpiId);
+      const isHrRole = formData.roleId?.toLowerCase().includes('hr') || formData.role?.toLowerCase().includes('hr');
 
       return !!(
         (formData.roleId === 'manager' || (formData.designation && formData.designation.trim().length >= 2)) &&
-        (formData.roleId === 'manager' || formData.department) &&
+        (formData.roleId === 'manager' || isHrRole || formData.department) &&
         (formData.roleId === 'manager' || formData.branch) &&
         formData.joinDate &&
         !isIdDuplicate &&
@@ -1285,6 +1286,7 @@ const Employees = () => {
       }
 
       const isManager = matchingRole.id === 'manager';
+      const isHrRole = matchingRole.id?.toLowerCase().includes('hr') || matchingRole.name?.toLowerCase().includes('hr');
       const finalData = {
         ...formData,
         name: formData.name,
@@ -1292,7 +1294,9 @@ const Employees = () => {
         roleId: matchingRole.id,
         role: matchingRole.name,
         branch: formData.branch,
-        department: formData.department,
+        department: isHrRole ? '—' : formData.department,
+        teamLeader: isHrRole ? '—' : formData.teamLeader,
+        team: isHrRole ? '—' : formData.team,
         avatar: avatarBase64,
         documents: docsToSave,
         currentAddress: addressToString(formData.currentAddress),
@@ -2959,6 +2963,7 @@ const Employees = () => {
             {wizardStep === 2 && (() => {
               const isWfh = formData.workMode === 'WFH';
               const isFullTime = formData.employeeType === 'Full Time';
+              const isHrRole = formData.roleId?.toLowerCase().includes('hr') || formData.role?.toLowerCase().includes('hr');
               return (
                 <div className="wizard-step-form">
                   <div className="form-section-grid">
@@ -3027,19 +3032,20 @@ const Employees = () => {
                         })()}
                       </select>
                     </div>
-                    <div className="form-field">
-                      <label>{FIELD_LABELS.department}</label>
-                      <select
-                        value={formData.department}
-                        onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}
-                      >
-                        {(() => {
-                          const filteredDbDepts = dbDepartments && dbDepartments.length > 0
-                            ? (formData.branch
-                                ? dbDepartments.filter(d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase())
-                                : dbDepartments)
-                            : [];
-                          const hasDbDepts = filteredDbDepts.length > 0;
+                    {!isHrRole && (
+                      <div className="form-field">
+                        <label>{FIELD_LABELS.department}</label>
+                        <select
+                          value={formData.department}
+                          onChange={e => setFormData(p => ({ ...p, department: e.target.value }))}
+                        >
+                          {(() => {
+                            const filteredDbDepts = dbDepartments && dbDepartments.length > 0
+                              ? (formData.branch
+                                  ? dbDepartments.filter(d => d.branch?.trim().toLowerCase() === formData.branch?.trim().toLowerCase())
+                                  : dbDepartments)
+                              : [];
+                            const hasDbDepts = filteredDbDepts.length > 0;
                             if (!hasDbDepts) {
                               return <option value="">Select Department</option>;
                             }
@@ -3054,8 +3060,15 @@ const Employees = () => {
                           })()}
                         </select>
                       </div>
-                    {formData.roleId !== 'manager' && formData.roleId !== 'team_leader' && (
-                      <div className="form-field"><label>{FIELD_LABELS.teamLeader}</label><select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}><option value="">Select Team Leader</option>{leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}</select></div>
+                    )}
+                    {!isHrRole && formData.roleId !== 'manager' && formData.roleId !== 'team_leader' && (
+                      <div className="form-field">
+                        <label>{FIELD_LABELS.teamLeader}</label>
+                        <select value={formData.teamLeader} onChange={e => setFormData(p => ({ ...p, teamLeader: e.target.value }))}>
+                          <option value="">Select Team Leader</option>
+                          {leaders.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                        </select>
+                      </div>
                     )}
                     <div className="form-field"><label>{FIELD_LABELS.joinDate} *</label><input type="date" value={formData.joinDate} onChange={e => setFormData(p => ({ ...p, joinDate: e.target.value }))} required /></div>
                     <div className="form-field"><label>{FIELD_LABELS.workLocation}</label><input type="text" placeholder="e.g. Tower B, 3rd Floor" value={formData.workLocation || ''} onChange={e => setFormData(p => ({ ...p, workLocation: e.target.value }))} /></div>

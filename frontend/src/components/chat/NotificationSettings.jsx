@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { useChat } from '../../context/ChatContext';
 import { useApp } from '../../context/AppContext';
+import './NotificationSettings.css';
 
 const NotificationSettings = () => {
   const { permission, requestPermission } = useChat();
@@ -73,15 +74,14 @@ const NotificationSettings = () => {
       {/* Desktop Notifications Toggle */}
       <div className="notif-settings-row">
         <span className="notif-settings-label">Desktop notifications</span>
-        <label className="notif-switch">
-          <input 
-            type="checkbox" 
-            checked={settings.desktop && !isDenied && !isUnsupported}
-            disabled={isUnsupported}
-            onChange={handleDesktopToggle}
-          />
+        <button
+          type="button"
+          className={`notif-switch ${settings.desktop && !isDenied && !isUnsupported ? 'toggle-on' : ''}`}
+          disabled={isUnsupported}
+          onClick={handleDesktopToggle}
+        >
           <span className="notif-slider" />
-        </label>
+        </button>
       </div>
       
       {showDeniedWarning && isDenied && (
@@ -99,27 +99,25 @@ const NotificationSettings = () => {
       {/* Message Sounds Toggle */}
       <div className="notif-settings-row">
         <span className="notif-settings-label">Message sounds</span>
-        <label className="notif-switch">
-          <input 
-            type="checkbox" 
-            checked={settings.sound}
-            onChange={() => handleToggle('sound')}
-          />
+        <button
+          type="button"
+          className={`notif-switch ${settings.sound ? 'toggle-on' : ''}`}
+          onClick={() => handleToggle('sound')}
+        >
           <span className="notif-slider" />
-        </label>
+        </button>
       </div>
 
       {/* Show Preview Toggle */}
       <div className="notif-settings-row">
         <span className="notif-settings-label">Show message preview</span>
-        <label className="notif-switch">
-          <input 
-            type="checkbox" 
-            checked={settings.preview}
-            onChange={() => handleToggle('preview')}
-          />
+        <button
+          type="button"
+          className={`notif-switch ${settings.preview ? 'toggle-on' : ''}`}
+          onClick={() => handleToggle('preview')}
+        >
           <span className="notif-slider" />
-        </label>
+        </button>
       </div>
     </div>
   );

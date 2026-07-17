@@ -248,7 +248,7 @@ export default function InactiveEmployees() {
         <div className="inactive-emp-title-wrap">
           <TrendingDown size={28} className="title-icon-inactive" />
           <div>
-            <h1>Inactive Employees Directory</h1>
+            <h1>Past Employees Directory</h1>
             <p>Monitor exited employee registries, historical assignments, and account deactivation logs.</p>
           </div>
         </div>
@@ -267,7 +267,7 @@ export default function InactiveEmployees() {
             <Users size={20} className="text-danger" />
           </div>
           <div className="stat-content">
-            <span className="stat-label">Total Inactive Employees</span>
+            <span className="stat-label">Total Past Employees</span>
             <h2 className="stat-val">{stats.total}</h2>
             <span className="stat-subdesc">All-time exited database records</span>
           </div>
@@ -309,60 +309,62 @@ export default function InactiveEmployees() {
 
       {/* Filter and Toolbar Area */}
       <div className="card table-wrapper-card mt-3">
-        <div className="table-toolbar flex-wrap justify-between align-center p-3">
-          <div className="toolbar-left flex-row align-center flex-wrap gap-2">
-            {/* Search Input */}
-            <div className="search-input-wrapper">
-              <Search size={14} className="search-icon" />
-              <input
-                type="text"
-                placeholder="Search ID, name, or role..."
-                value={searchTerm}
-                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="toolbar-search-input"
-              />
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap' }}>
+          {/* Search Input */}
+          <div className="search-input-wrapper" style={{ flex: '1 1 200px', minWidth: '180px', maxWidth: '320px' }}>
+            <Search size={14} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search ID, name, or role..."
+              value={searchTerm}
+              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="toolbar-search-input"
+              style={{ width: '100%' }}
+            />
+          </div>
 
-            {/* Department Filter */}
-            <select
-              value={selectedDept}
-              onChange={e => { setSelectedDept(e.target.value); setCurrentPage(1); }}
-              className="filter-select"
-            >
-              <option value="All">All Departments</option>
-              {departments.map(d => (
-                <option key={d.id || d._id} value={d.name}>{d.name}</option>
-              ))}
-            </select>
+          {/* Department Filter */}
+          <select
+            value={selectedDept}
+            onChange={e => { setSelectedDept(e.target.value); setCurrentPage(1); }}
+            className="filter-select"
+            style={{ flex: '0 0 auto', width: '170px' }}
+          >
+            <option value="All">All Departments</option>
+            {departments.map(d => (
+              <option key={d.id || d._id} value={d.name}>{d.name}</option>
+            ))}
+          </select>
 
-            {/* Exit Reason Filter */}
-            <select
-              value={selectedReason}
-              onChange={e => { setSelectedReason(e.target.value); setCurrentPage(1); }}
-              className="filter-select"
-            >
-              <option value="All">All Exit Reasons</option>
-              {EXIT_REASONS.map(r => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
+          {/* Exit Reason Filter */}
+          <select
+            value={selectedReason}
+            onChange={e => { setSelectedReason(e.target.value); setCurrentPage(1); }}
+            className="filter-select"
+            style={{ flex: '0 0 auto', width: '170px' }}
+          >
+            <option value="All">All Exit Reasons</option>
+            {EXIT_REASONS.map(r => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
 
-            {/* Exit Date Filter */}
-            <div className="date-filter-wrapper">
-              <Calendar size={14} className="date-icon" />
-              <input
-                type="date"
-                value={exitDateFilter}
-                onChange={e => { setExitDateFilter(e.target.value); setCurrentPage(1); }}
-                className="filter-date-input"
-                title="Filter by exit date"
-              />
-              {exitDateFilter && (
-                <button className="clear-date-btn" onClick={() => setExitDateFilter('')} title="Clear exit date">
-                  <X size={12} />
-                </button>
-              )}
-            </div>
+          {/* Exit Date Filter */}
+          <div className="date-filter-wrapper" style={{ flex: '0 0 auto' }}>
+            <Calendar size={14} className="date-icon" />
+            <input
+              type="date"
+              value={exitDateFilter}
+              onChange={e => { setExitDateFilter(e.target.value); setCurrentPage(1); }}
+              className="filter-date-input"
+              title="Filter by exit date"
+              style={{ width: '155px' }}
+            />
+            {exitDateFilter && (
+              <button className="clear-date-btn" onClick={() => setExitDateFilter('')} title="Clear exit date">
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -399,7 +401,7 @@ export default function InactiveEmployees() {
                   <td colSpan={10} className="empty-table-cell">
                     <div className="empty-table-msg">
                       <Info size={32} className="text-muted mb-2" />
-                      <p>No inactive employee records match your active search filter settings.</p>
+                      <p>No past employee records match your active search filter settings.</p>
                     </div>
                   </td>
                 </tr>

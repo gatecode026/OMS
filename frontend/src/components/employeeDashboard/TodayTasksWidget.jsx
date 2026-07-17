@@ -164,7 +164,6 @@ const TodayTasksWidget = ({
                   <th style={{ padding: '8px 12px' }}>Priority</th>
                   <th style={{ padding: '8px 12px' }}>Due Date</th>
                   <th style={{ padding: '8px 12px' }}>Status</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -190,19 +189,11 @@ const TodayTasksWidget = ({
                          {getDisplayStatus(task.status)}
                        </span>
                      </td>
-                    <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => onOpenUpdateModal(task)}
-                        className="text-xs text-primary-500 hover:text-primary-400 font-semibold"
-                      >
-                        Update
-                      </button>
-                    </td>
                   </tr>
                 ))}
                 {tasks.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center text-text-muted py-4">No tasks assigned for today.</td>
+                    <td colSpan={4} className="text-center text-text-muted py-4">No tasks assigned for today.</td>
                   </tr>
                 )}
               </tbody>
