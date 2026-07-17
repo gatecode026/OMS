@@ -244,6 +244,9 @@ export const ChatProvider = ({ children }) => {
         } else {
           playNotificationChime();
         }
+      } else if (event.data && event.data.type === 'STOP_SOUND') {
+        console.log('[ChatContext] STOP_SOUND event received from Service Worker:', event.data);
+        callSounds.stopAll();
       }
     };
 

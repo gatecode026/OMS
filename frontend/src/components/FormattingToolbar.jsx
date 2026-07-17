@@ -34,8 +34,8 @@ const FormattingToolbar = ({
     {
       label: 'Strikethrough',
       icon: <Strikethrough size={15} />,
-      prefix: '~',
-      suffix: '~',
+      prefix: '~~',
+      suffix: '~~',
       title: 'Strikethrough (Ctrl+Shift+X)'
     },
     {
