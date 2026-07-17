@@ -118,6 +118,13 @@ self.addEventListener('push', function (event) {
 
   event.waitUntil(
     self.registration.showNotification(title, options)
+      .catch(err => {
+        console.error('[Service Worker] Failed to show notification with actions/interaction:', err);
+        const fallbackOptions = { ...options };
+        delete fallbackOptions.actions;
+        delete fallbackOptions.requireInteraction;
+        return self.registration.showNotification(title, fallbackOptions);
+      })
   );
 });
 
