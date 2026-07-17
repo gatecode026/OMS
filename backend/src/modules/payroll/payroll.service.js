@@ -178,12 +178,59 @@ export const bulkUpdatePaymentStatus = async (month, year, status, currentUser) 
 export const saveGlobalConfigs = async (configs, currentUser) => {
   logger.info(`Executing PayrollService::saveGlobalConfigs by user: ${currentUser?.id}`);
   const branchName = await getBranchManagerBranch(currentUser);
+  
   if (branchName) {
-    const err = new Error('Access denied: Branch Managers cannot modify global payroll configurations.');
-    err.statusCode = 403;
-    throw err;
+    // Branch manager is saving. Let's load the current global config to compare.
+    const Config = mongoose.model('PayrollConfig');
+    const existing = await Config.findOne({ id: 'GLOBAL_CONFIG' }).lean() || {};
+    
+    // Helper to safely compare values
+    const isEqual = (a, b) => {
+      if (a === b) return true;
+      if (!a && !b) return true; // e.g. undefined/null/empty map
+      return JSON.stringify(a) === JSON.stringify(b);
+    };
+
+    // Check if fields other than 'salaryStructures' are being modified
+    const fields = ['leaveDeductionRate', 'lateArrivalPenalty', 'overtimeHourlyRate', 'timelineDeadlines', 'taxProfiles', 'attendanceDaysMap'];
+    for (const field of fields) {
+      if (!isEqual(configs[field], existing[field])) {
+        const err = new Error('Access denied: Branch Managers cannot modify global payroll configurations.');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    // Check if any employee's salary structure modified does not belong to the manager's branch
+    const incomingStructures = configs.salaryStructures || {};
+    const existingStructures = existing.salaryStructures || {};
+    
+    const allEmpIds = new Set([
+      ...Object.keys(incomingStructures),
+      ...Object.keys(existingStructures)
+    ]);
+    
+    const Employee = mongoose.model('Employee');
+    for (const empId of allEmpIds) {
+      if (!isEqual(incomingStructures[empId], existingStructures[empId])) {
+        // Verify this employee exists and belongs to the manager's branch
+        const emp = await Employee.findOne({ id: empId }).lean();
+        if (!emp || emp.branch !== branchName) {
+          const err = new Error(`Access denied: Branch Managers cannot modify salary structure of employees outside their branch.`);
+          err.statusCode = 403;
+          throw err;
+        }
+      }
+    }
   }
+
   return repository.saveGlobalConfigs(configs);
+};
+
+export const resetPaymentDeductions = async (body, currentUser) => {
+  logger.info('PayrollService::resetPaymentDeductions - Resetting legacy dummy deductions on payment records');
+  const { employeeId, month, year, fields } = body;
+  return repository.resetPaymentDeductions({ employeeId, month, year, fields });
 };
 
 export default {
@@ -198,5 +245,6 @@ export default {
   saveMonthlyPayment,
   updatePaymentStatus,
   bulkUpdatePaymentStatus,
-  saveGlobalConfigs
+  saveGlobalConfigs,
+  resetPaymentDeductions
 };

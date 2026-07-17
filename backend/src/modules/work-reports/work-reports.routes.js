@@ -17,6 +17,9 @@ router.get('/public', controller.getPublicData);
 // Secured routes boundary
 router.use(authenticate);
 
+// Check for existing report (must be before /:id to avoid route conflicts)
+router.get('/check', controller.checkExisting);
+
 router.route('/')
   .get(controller.getAll)
   .post(validateRequest(validation.create), controller.create);

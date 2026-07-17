@@ -7,6 +7,9 @@ const router = express.Router();
 // Public authentication endpoint
 router.post('/login', controller.login);
 
+// Authenticated logout endpoint (clears session record)
+router.post('/logout', authenticate, controller.logout);
+
 // Silent refresh endpoint
 router.post('/refresh', authenticate, controller.refreshToken);
 

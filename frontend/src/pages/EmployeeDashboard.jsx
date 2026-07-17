@@ -47,8 +47,24 @@ const EmployeeDashboard = () => {
     documentsList,
     addToast,
     leavePolicyConfigs = [],
-    hasPermission
+    hasPermission,
+    payroll,
+    payrollLoans,
+    payrollAdvances,
+    payrollReimbursements,
+    payrollBonuses,
+    payrollConfigs,
+    monthlyPayrollSummary,
+    fetchMonthlyPayrollSummary,
+    fetchPayrollData
   } = useApp();
+
+  useEffect(() => {
+    fetchPayrollData();
+    const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+    const yearStr = String(new Date().getFullYear());
+    fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+  }, []);
 
   useEffect(() => {
     const hasSelf = hasPermission('dashboard', 'read', 'self');
@@ -225,6 +241,168 @@ const EmployeeDashboard = () => {
     setUpdateTaskOpen(true);
   };
 
+  const myPayrollCalculated = useMemo(() => {
+    const currentMonthName = new Date().toLocaleDateString('en-US', { month: 'long' });
+    const currentYearStr = String(new Date().getFullYear());
+
+    // 1. Get processed payment if it exists
+    const processed = (payroll || []).find(
+      p => p.employeeId === currentUser.id && p.month === currentMonthName && p.year === currentYearStr
+    );
+    if (processed) {
+      return {
+        ...processed,
+        basicSalary: processed.basicSalary || 0,
+        hra: processed.hra || 0,
+        travel: processed.travel || 0,
+        medical: processed.medical || 0,
+        special: processed.special || 0,
+        pf: processed.pf || 0,
+        esi: processed.esi || 0,
+        pt: processed.pt || 0,
+        tds: processed.tds || 0,
+        paidLeaveDays: processed.paidLeaveDays || 0,
+        unpaidLeaveDays: processed.unpaidLeaveDays || 0,
+        leaveDeductions: processed.leaveDeductions || 0,
+        loanEMI: processed.loanEMI || 0,
+        advanceDeduct: processed.advanceDeduct || 0,
+        totalDeductions: processed.totalDeductions || 0,
+        grossSalary: processed.grossSalary || 0,
+        netSalary: processed.netSalary || 0,
+        status: processed.status || 'Draft (Pending Processing)'
+      };
+    }
+
+    // 2. Otherwise compute on-the-fly (Draft)
+    const empId = currentUser.id;
+    const empBasicSalary = Number(currentUser.salaryAmount) || 0;
+    
+    // Resolve employee salary structure & tax profiles from payrollConfigs
+    const salaryStructures = payrollConfigs?.salaryStructures || {};
+    const rawStruct = salaryStructures[empId] || {};
+    const struct = {
+      basic: rawStruct.basic || empBasicSalary,
+      hra: Number(rawStruct.hra ?? currentUser?.hra) || 0,
+      travel: Number(rawStruct.travel ?? currentUser?.travel) || 0,
+      medical: Number(rawStruct.medical ?? currentUser?.medical) || 0,
+      special: Number(rawStruct.special ?? currentUser?.special) || 0,
+      pf: Number(rawStruct.pf) || 0,
+      esi: Number(rawStruct.esi) || 0,
+      pt: Number(rawStruct.pt) || 0,
+      tds: 0 // TDS is 0 in draft mode unless configured or saved
+    };
+
+    const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+    const summary = (monthlyPayrollSummary && monthlyPayrollSummary[empId]) || {
+      presentDays: 0, halfDays: 0, paidLeaveDays: 0, unpaidLeaveDays: 0, holidays: 0, weekends: 0
+    };
+
+    // Resolving config values from payrollConfigs
+    const configWorkingDays = Number(payrollConfigs?.payrollWorkingDays) || 30;
+    const configMethod = payrollConfigs?.salaryCalculationMethod || 'Fixed 30 Days';
+    const configHalfDayPolicy = payrollConfigs?.halfDayPolicy || 'Deduct Half Day';
+    const configGraceRules = payrollConfigs?.graceRules || 'No Late Penalty';
+
+    // Calculate working days
+    let workingDays = configWorkingDays;
+    const monthNum = parseInt(monthStr);
+    const yrNum = parseInt(currentYearStr);
+    const calendarDays = new Date(yrNum, monthNum, 0).getDate();
+
+    if (configMethod === 'Calendar Days') {
+      workingDays = calendarDays;
+    } else if (configMethod === 'Actual Working Days') {
+      workingDays = calendarDays - (summary.weekends || 0) - (summary.holidays || 0);
+    }
+
+    const dailySalary = workingDays > 0 ? Math.round(empBasicSalary / workingDays) : 0;
+
+    let unpaidDays = summary.unpaidLeaveDays || 0;
+    if (configHalfDayPolicy === 'Deduct Half Day') {
+      unpaidDays += (summary.halfDays || 0) * 0.5;
+    }
+
+    const leaveDeduction = Math.round(dailySalary * unpaidDays);
+
+    // Late penalty & Overtime (using the same logic as admin side)
+    const currentMonthPrefix = `${currentYearStr}-${monthStr}`;
+    const empRecords = (attendance || []).filter(
+      a => a.employeeId === empId && a.date && a.date.startsWith(currentMonthPrefix)
+    );
+
+    const lateArrivalPenalty = Number(payrollConfigs?.lateArrivalPenalty) || 0;
+    const lateArrivalsCount = empRecords.filter(a => a.status === 'Late').length;
+    const lateDeduction = (configGraceRules === 'Late Penalty Flat' && lateArrivalPenalty > 0)
+      ? lateArrivalsCount * lateArrivalPenalty
+      : 0;
+
+    const overtimeHourlyRate = Number(payrollConfigs?.overtimeHourlyRate) || 0;
+    const overtimeHoursCount = empRecords.reduce((sum, a) => sum + (parseFloat(a.overtime) || 0), 0);
+    const overtimePay = overtimeHoursCount * overtimeHourlyRate;
+
+    const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
+
+    // Fetch approved bonuses for the current employee
+    const approvedBonuses = (payrollBonuses || [])
+      .filter(b => b.employeeId === empId && (b.status === 'Super Admin Approved' || b.status === 'Released'))
+      .reduce((sum, curr) => sum + curr.amount, 0);
+
+    // Fetch approved reimbursements
+    const approvedReimbursements = (payrollReimbursements || [])
+      .filter(r => r.employeeId === empId && (r.status === 'Approved' || r.status === 'Released'))
+      .reduce((sum, curr) => sum + curr.amount, 0);
+
+    const loanEMI = (payrollLoans || [])
+      .filter(l => l.employeeId === empId && l.status === 'Approved')
+      .reduce((sum, curr) => sum + curr.emi, 0);
+
+    const advanceDeduct = (payrollAdvances || [])
+      .filter(a => a.employeeId === empId && a.status === 'Approved')
+      .reduce((sum, curr) => sum + curr.amount, 0);
+
+    const pfDeduction = currentUser?.pfContribution !== false ? (struct.pf || 0) : 0;
+    const statutoryDeductions = pfDeduction + (struct.esi || 0) + (struct.pt || 0);
+
+    const totalDeductions = statutoryDeductions + leaveDeduction + lateDeduction + loanEMI + advanceDeduct;
+    const grossSalary = (struct.basic || empBasicSalary) + totalAllowances + overtimePay + approvedBonuses;
+    const netSalary = Math.max(0, grossSalary - totalDeductions);
+
+    return {
+      basicSalary: struct.basic || empBasicSalary,
+      hra: struct.hra,
+      travel: struct.travel,
+      medical: struct.medical,
+      special: struct.special,
+      pf: pfDeduction,
+      esi: struct.esi,
+      pt: struct.pt,
+      tds: struct.tds,
+      paidLeaveDays: summary.paidLeaveDays,
+      unpaidLeaveDays: unpaidDays,
+      leaveDeductions: leaveDeduction,
+      lateDeductions: lateDeduction,
+      overtimeAmount: overtimePay,
+      bonusAmount: approvedBonuses,
+      reimbursementAmount: approvedReimbursements,
+      loanEMI,
+      advanceDeduct,
+      totalDeductions,
+      grossSalary,
+      netSalary,
+      status: 'Draft (Pending Processing)'
+    };
+  }, [
+    payroll,
+    currentUser,
+    monthlyPayrollSummary,
+    payrollLoans,
+    payrollAdvances,
+    payrollReimbursements,
+    payrollBonuses,
+    payrollConfigs,
+    attendance
+  ]);
+
   // Loading skeleton layout
   if (isLoading) {
     return (
@@ -298,10 +476,7 @@ const EmployeeDashboard = () => {
             onOpenUploadModal={() => setUploadFileOpen(true)}
           />
 
-          {/* Work Report Status Widget */}
-          <DailyWorkReportWidget
-            myReports={myReports}
-          />
+          {/* DailyWorkReportWidget is moved to Right Column to balance column heights */}
         </div>
 
         {/* Right Column (40% width on Desktop) */}
@@ -320,6 +495,11 @@ const EmployeeDashboard = () => {
             myAttendance={myAttendance}
           />
 
+          {/* Work Report Status Widget (Moved here to balance column heights) */}
+          <DailyWorkReportWidget
+            myReports={myReports}
+          />
+
           {/* Notifications Center */}
           <NotificationsCenter
             notifications={notifications}
@@ -331,6 +511,81 @@ const EmployeeDashboard = () => {
           />
         </div>
       </div>
+
+      {/* SECTION 3.5: Full Width Payroll Summary Widget */}
+      <div className="dashboard-widget animate-fade-in" style={{ marginTop: '1.25rem', padding: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+        <div className="flex-row justify-between align-center mb-4" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 className="widget-title" style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>My Payroll & Salary Details</h3>
+          <span style={{ fontSize: '0.78rem', padding: '4px 8px', borderRadius: '20px', background: 'var(--bg-tag)', color: 'var(--text-muted)' }}>
+            {myPayrollCalculated.status}
+          </span>
+        </div>
+        
+        <div className="grid-2-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Monthly Basic Salary</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-main)' }}>₹{myPayrollCalculated.basicSalary?.toLocaleString()}</div>
+            
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Allowances & Earnings</div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 550, color: 'var(--color-success)' }}>
+                + ₹{((myPayrollCalculated.hra || 0) + (myPayrollCalculated.travel || 0) + (myPayrollCalculated.medical || 0) + (myPayrollCalculated.special || 0) + (myPayrollCalculated.overtimeAmount || 0) + (myPayrollCalculated.bonusAmount || 0)).toLocaleString()}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {myPayrollCalculated.hra > 0 && <span>HRA: ₹{myPayrollCalculated.hra.toLocaleString()}</span>}
+                {myPayrollCalculated.travel > 0 && <span>Travel: ₹{myPayrollCalculated.travel.toLocaleString()}</span>}
+                {myPayrollCalculated.medical > 0 && <span>Medical: ₹{myPayrollCalculated.medical.toLocaleString()}</span>}
+                {myPayrollCalculated.special > 0 && <span>Special: ₹{myPayrollCalculated.special.toLocaleString()}</span>}
+                {myPayrollCalculated.overtimeAmount > 0 && <span>Overtime: ₹{myPayrollCalculated.overtimeAmount.toLocaleString()}</span>}
+                {myPayrollCalculated.bonusAmount > 0 && <span>Bonus: ₹{myPayrollCalculated.bonusAmount.toLocaleString()}</span>}
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Paid Leaves Used</div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 550, color: 'var(--text-main)' }}>{myPayrollCalculated.paidLeaveDays || 0} Days</div>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Deductions</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--color-danger)' }}>
+              - ₹{(myPayrollCalculated.totalDeductions || 0).toLocaleString()}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {myPayrollCalculated.pf > 0 && <span>PF: ₹{myPayrollCalculated.pf.toLocaleString()}</span>}
+              {myPayrollCalculated.esi > 0 && <span>ESI: ₹{myPayrollCalculated.esi.toLocaleString()}</span>}
+              {myPayrollCalculated.pt > 0 && <span>PT: ₹{myPayrollCalculated.pt.toLocaleString()}</span>}
+              {myPayrollCalculated.tds > 0 && <span>TDS: ₹{myPayrollCalculated.tds.toLocaleString()}</span>}
+              {myPayrollCalculated.loanEMI > 0 && <span>Loan EMI: ₹{myPayrollCalculated.loanEMI.toLocaleString()}</span>}
+              {myPayrollCalculated.advanceDeduct > 0 && <span>Advance Salary: ₹{myPayrollCalculated.advanceDeduct.toLocaleString()}</span>}
+              {myPayrollCalculated.lateDeductions > 0 && <span>Late Penalty: ₹{myPayrollCalculated.lateDeductions.toLocaleString()}</span>}
+            </div>
+
+            {myPayrollCalculated.leaveDeductions > 0 && (
+              <div style={{ marginTop: '1rem', fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(239, 68, 68, 0.08)', padding: '6px 10px', borderRadius: '6px', borderLeft: '3px solid var(--color-danger)' }}>
+                <strong>LOP Deduction:</strong> ₹{myPayrollCalculated.leaveDeductions?.toLocaleString()} ({myPayrollCalculated.unpaidLeaveDays || 0} LOP days)
+              </div>
+            )}
+
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Unpaid / LOP Leaves</div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 550, color: 'var(--color-danger)' }}>{myPayrollCalculated.unpaidLeaveDays || 0} Days</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Estimated Net Take-Home Salary</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)' }}>₹{myPayrollCalculated.netSalary?.toLocaleString()}</div>
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right' }}>
+            * Leaves exceeding the paid leave quota are automatically classified as LOP and deducted.
+          </div>
+        </div>
+      </div>
+
 
       {/* SECTION 4: Full Width Analytics & Schedule Row */}
       <div className="flex-column gap-5 mt-2">

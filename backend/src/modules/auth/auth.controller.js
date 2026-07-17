@@ -23,8 +23,29 @@ export const login = asyncHandler(async (req, res) => {
     }
   }
 
-  const data = await service.login(email, password, { companyCode, subdomain });
+  // Capture real IP and User-Agent for session tracking
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || req.ip || '—';
+  const userAgent = req.headers['user-agent'] || '';
+
+  const data = await service.login(email, password, { companyCode, subdomain, ip, userAgent });
   return successResponse(res, data, 'Authenticated successfully');
+});
+
+/**
+ * Logout endpoint — removes the session record for the current user.
+ */
+export const logout = asyncHandler(async (req, res) => {
+  try {
+    const { UserSession } = await import('../security/security.model.js');
+    // Delete all sessions belonging to this user (matched by employeeId)
+    const userId = req.user?.id;
+    if (userId) {
+      await UserSession.deleteMany({ employeeId: userId });
+    }
+  } catch (e) {
+    // Non-critical
+  }
+  return successResponse(res, {}, 'Logged out successfully');
 });
 
 /**
@@ -50,5 +71,6 @@ export const refreshToken = asyncHandler(async (req, res) => {
 
 export default {
   login,
+  logout,
   refreshToken
 };

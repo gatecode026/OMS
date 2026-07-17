@@ -13,6 +13,7 @@ import { startEventScheduler } from './src/modules/events/event.scheduler.js';
 import { startConnectionCleanupJob } from './src/jobs/connectionCleanup.job.js';
 import { startImageKitCleanupJob } from './src/jobs/imagekitCleanup.job.js';
 import { startPollExpiryJob } from './src/jobs/pollExpiry.job.js';
+import { startAttendanceAutomationJob } from './src/jobs/attendanceAutomation.job.js';
 import { closeAllConnections } from './src/utils/multidbConnection.js';
 import { initSocket, getIO } from './src/config/socket.js';
 import { getActiveWrites } from './src/modules/chat/chat.socket.js';
@@ -157,6 +158,9 @@ const bootstrap = async () => {
 
     // Start background poll expiry checks
     startPollExpiryJob();
+
+    // Start background attendance automation (Auto Punch-Out, Reminders, Missing Alerts)
+    startAttendanceAutomationJob();
 
     // Background ImageKit cleanup sweep disabled as per user instruction
     // startImageKitCleanupJob();

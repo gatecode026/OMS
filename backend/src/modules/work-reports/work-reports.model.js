@@ -6,6 +6,21 @@
 import mongoose from 'mongoose';
 import { tenantPlugin } from '../../utils/tenantPlugin.js';
 
+const editHistoryEntrySchema = new mongoose.Schema({
+  editedBy: { type: String, required: true },
+  editedAt: { type: String, required: true },
+  changedFields: { type: [String], default: [] },
+  previousValues: { type: mongoose.Schema.Types.Mixed, default: {} }
+}, { _id: false });
+
+const approvalHistoryEntrySchema = new mongoose.Schema({
+  role: String,
+  user: String,
+  action: String,
+  timestamp: String,
+  comments: String
+}, { _id: false });
+
 const workReportSchema = new mongoose.Schema({
   id: {
     type: String,
@@ -115,12 +130,12 @@ const workReportSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Submitted', 'Approved', 'Changes Requested', 'Escalated', 'Rejected', 'Under Process'],
+    enum: ['Draft', 'Submitted', 'Under Review', 'Approved', 'Changes Requested', 'Rejected', 'Needs Revision', 'Escalated', 'Under Process'],
     default: 'Submitted'
   },
   submittedTime: {
     type: String,
-    required: true
+    default: ''
   },
   productivityScore: {
     type: Number,
@@ -130,17 +145,48 @@ const workReportSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  approvalHistory: [{
-    role: String,
-    user: String,
-    action: String,
-    timestamp: String,
-    comments: String
-  }]
+  // Review & Approval fields
+  reviewedBy: {
+    type: String,
+    default: ''
+  },
+  approvalDate: {
+    type: String,
+    default: ''
+  },
+  rejectionReason: {
+    type: String,
+    default: ''
+  },
+  // Version tracking
+  version: {
+    type: Number,
+    default: 1
+  },
+  lastEditedAt: {
+    type: String,
+    default: ''
+  },
+  draftAutoSavedAt: {
+    type: String,
+    default: ''
+  },
+  // History arrays
+  editHistory: {
+    type: [editHistoryEntrySchema],
+    default: []
+  },
+  approvalHistory: {
+    type: [approvalHistoryEntrySchema],
+    default: []
+  }
 }, {
   timestamps: true,
   collection: 'work_reports'
 });
+
+// Compound index: one report per employee per day per company
+workReportSchema.index({ companyId: 1, employeeId: 1, date: 1 }, { unique: true });
 
 workReportSchema.plugin(tenantPlugin);
 

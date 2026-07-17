@@ -295,6 +295,8 @@ export const AppProvider = ({ children }) => {
 
   const [payroll, setPayroll] = useState([]);
   const [payrollGrades, setPayrollGrades] = useState([]);
+  const [payrollQueries, setPayrollQueries] = useState([]);
+  const [monthlyPayrollSummary, setMonthlyPayrollSummary] = useState({});
   const [payrollReimbursements, setPayrollReimbursements] = useState([]);
   const [payrollLoans, setPayrollLoans] = useState([]);
   const [payrollAdvances, setPayrollAdvances] = useState([]);
@@ -508,7 +510,14 @@ export const AppProvider = ({ children }) => {
       leaveAlerts: true,
       payrollAlerts: true,
       securityAlerts: true,
-      weeklyDigest: false
+      weeklyDigest: false,
+      smsNotifs: true,
+      projectMilestoneAlerts: true,
+      announcementAlerts: true,
+      announcementCompanyWide: true,
+      announcementDeptSpecific: true,
+      announcementBranchSpecific: true,
+      announcementEmergencyPushes: true
     };
   });
 
@@ -728,6 +737,34 @@ export const AppProvider = ({ children }) => {
     }
   }, [token, currentUser]);
 
+  // Listen for force_logout events emitted by the backend (admin terminates session)
+  useEffect(() => {
+    if (!token) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleForceLogout = (data) => {
+      console.warn('[AppContext] force_logout received:', data);
+      // Show a brief alert before redirecting
+      const reason = data?.reason || 'Your session was terminated by an administrator.';
+      // Clear all local state
+      localStorage.removeItem('saas_token');
+      localStorage.removeItem('saas_role');
+      localStorage.removeItem('saas_user_id');
+      localStorage.removeItem('saas_user');
+      sessionStorage.removeItem('saas_token');
+      sessionStorage.removeItem('just_logged_in');
+      disconnectSocket();
+      // Redirect to login with reason encoded in URL
+      window.location.href = `/login?reason=${encodeURIComponent(reason)}`;
+    };
+
+    socket.on('force_logout', handleForceLogout);
+    return () => {
+      socket.off('force_logout', handleForceLogout);
+    };
+  }, [token]);
+
   // Keep action references fresh for socket events without triggering re-connection effects
   useEffect(() => {
     activeActionsRef.current = {
@@ -875,9 +912,19 @@ export const AppProvider = ({ children }) => {
             });
           } else if (action === 'update') {
             setLeaveRequests(prev => prev.map(l => (l.id === data.id || l._id === data._id) ? { ...l, ...data } : l));
+            if (data.status === 'Approved' || data.status === 'Cancelled' || data.status === 'Rejected') {
+              const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+              const yearStr = String(new Date().getFullYear());
+              fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+              fetchPayrollData();
+            }
           } else if (action === 'delete') {
             const id = typeof data === 'string' ? data : (data.id || data._id);
             setLeaveRequests(prev => prev.filter(l => l.id !== id && l._id !== id));
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
           }
           break;
 
@@ -887,8 +934,27 @@ export const AppProvider = ({ children }) => {
               if (prev.some(a => a.id === data.id || a._id === data._id)) return prev;
               return [data, ...prev];
             });
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
           } else if (action === 'update') {
             setAttendance(prev => prev.map(a => (a.id === data.id || a._id === data._id) ? { ...a, ...data } : a));
+            const monthStr = String(new Date().getMonth() + 1).padStart(2, '0');
+            const yearStr = String(new Date().getFullYear());
+            fetchMonthlyPayrollSummary(`${yearStr}-${monthStr}`);
+            fetchPayrollData();
+          }
+          break;
+
+        case 'payroll-queries':
+          if (action === 'create') {
+            setPayrollQueries(prev => {
+              if (prev.some(q => q.id === data.id || q._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setPayrollQueries(prev => prev.map(q => (q.id === data.id || q._id === data._id) ? data : q));
           }
           break;
 
@@ -1100,7 +1166,18 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Notify backend to remove the session record (fire-and-forget)
+    try {
+      const t = localStorage.getItem('saas_token') || token;
+      if (t) {
+        fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/auth/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${t}` }
+        }).catch(() => {});
+      }
+    } catch (_) {}
+
     localStorage.removeItem('saas_token');
     localStorage.removeItem('saas_role');
     localStorage.removeItem('saas_user_id');
@@ -1195,8 +1272,130 @@ export const AppProvider = ({ children }) => {
         }
       }
     } catch (err) {
-      console.error('Failed to fetch payroll data from backend:', err);
+      console.error('Failed to fetch payroll data:', err);
     }
+  };
+
+  const fetchMonthlyPayrollSummary = async (monthYear) => {
+    if (!token || !monthYear) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/payroll-summary?month=${monthYear}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setMonthlyPayrollSummary(result.data || {});
+      }
+    } catch (err) {
+      console.error('Failed to fetch monthly payroll summary:', err);
+    }
+  };
+
+  const fetchPayrollQueries = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(result.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch payroll queries:', err);
+    }
+  };
+
+  const createPayrollQuery = async (payload) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => [result.data, ...prev]);
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to create payroll query:', err);
+    }
+    return false;
+  };
+
+  const addQueryReply = async (queryId, message, attachments = []) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message, attachments })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to post query comment:', err);
+    }
+    return false;
+  };
+
+  const updateQueryStatus = async (queryId, action, comments) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/action`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action, comments })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to update query status:', err);
+    }
+    return false;
+  };
+
+  const addQueryInternalNote = async (queryId, note) => {
+    if (!token) return false;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/${queryId}/internal-note`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ note })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPayrollQueries(prev => prev.map(q => q.id === queryId ? result.data : q));
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to add internal note:', err);
+    }
+    return false;
   };
 
   // fetchEmployees and fetchPayrollData are called in the main data-loading useEffect below
@@ -2073,15 +2272,62 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify(reportData)
       });
       const result = await response.json();
+      if (response.status === 409) {
+        return { success: false, conflict: true, message: result.message, existingReport: result.existingReport };
+      }
       if (result.status === 'success') {
         await fetchDailyReports();
-        return result.data;
+        return { success: true, data: result.data };
       } else {
         throw new Error(result.message || 'Failed to submit work report');
       }
     } catch (err) {
       console.error('Error submitting daily report:', err);
       addToast('danger', err.message || 'Network error while submitting report.');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const updateDailyReport = async (id, reportData) => {
+    if (!token) return null;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/work-reports/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(reportData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDailyReports();
+        return { success: true, data: result.data };
+      } else {
+        throw new Error(result.message || 'Failed to update work report');
+      }
+    } catch (err) {
+      console.error('Error updating daily report:', err);
+      addToast('danger', err.message || 'Network error while updating report.');
+      return { success: false, message: err.message };
+    }
+  };
+
+  const checkExistingReport = async (employeeId, date) => {
+    if (!token) return null;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/work-reports/check?employeeId=${employeeId}&date=${date}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        return result.data;
+      }
+      return null;
+    } catch (err) {
+      console.error('Error checking existing report:', err);
       return null;
     }
   };
@@ -3003,15 +3249,6 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Approved leave request for ${leave.employeeName}`, 'Leaves', 'success');
         addToast('success', `Leave request for ${leave.employeeName} approved.`);
-
-        // Add Notification — targeted to the employee who requested leave
-        await triggerAutomaticNotification('LV-02', {
-          title: 'Leave Request Approved',
-          message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Approved. Note: ${notes || 'Approved by Manager'}`,
-          recipientId: leave.employeeId,
-          recipientRole: 'employee',
-          category: 'Leave'
-        });
       } else {
         addToast('error', result.message || 'Failed to approve leave request');
       }
@@ -3054,15 +3291,6 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Rejected leave request for ${leave.employeeName}`, 'Leaves', 'danger');
         addToast('error', `Leave request for ${leave.employeeName} rejected.`);
-
-        // Add Notification — targeted to the employee who requested leave
-        await triggerAutomaticNotification('LV-03', {
-          title: 'Leave Request Rejected',
-          message: `Your ${leave.type || 'leave'} request (${leave.fromDate} to ${leave.toDate || leave.fromDate}) has been Rejected. Note: ${notes || 'Rejected by Manager'}`,
-          recipientId: leave.employeeId,
-          recipientRole: 'employee',
-          category: 'Leave'
-        });
       } else {
         addToast('error', result.message || 'Failed to reject leave request');
       }
@@ -3113,16 +3341,6 @@ export const AppProvider = ({ children }) => {
 
         addActivityLog(`Submitted leave request for ${result.data.employeeName}`, 'Leaves', 'success');
         addToast('success', result.data.status === 'Approved' ? `Leave assigned successfully for ${result.data.employeeName}.` : 'Leave request submitted successfully for approval.');
-
-        // Notify admin/manager about the new leave application (only if status is Pending)
-        if (result.data.status === 'Pending') {
-          await triggerAutomaticNotification('LV-01', {
-            title: 'New Leave Application Submitted',
-            message: `${result.data.employeeName} has applied for ${result.data.type || 'Leave'} from ${result.data.fromDate} to ${result.data.toDate || result.data.fromDate} (${result.data.days || 1} day(s)). Action required.`,
-            recipientRole: 'admin',
-            category: 'Leave'
-          });
-        }
 
         return result.data;
       } else {
@@ -5058,7 +5276,7 @@ export const AppProvider = ({ children }) => {
 
   const toggleEmployeeTaxRegime = async (empId) => {
     if (!token) return false;
-    const current = payrollConfigs.taxProfiles[empId] || { pan: 'AAAPS1234F', regime: 'New', taxableIncome: 900000 };
+    const current = payrollConfigs.taxProfiles[empId] || {};
     const nextRegime = current.regime === 'New' ? 'Old' : 'New';
     const updatedTaxProfiles = {
       ...payrollConfigs.taxProfiles,
@@ -5415,9 +5633,10 @@ export const AppProvider = ({ children }) => {
     const isDbBacked = Object.values(MODULE_MAPPING).includes(baseKey) || Object.keys(MODULE_MAPPING).includes(module);
 
     if (isDbBacked) {
+      const rawUserRole = currentUser?.roleId || currentUser?.role || currentUserRole;
       const roleObj = roles.find(r => r.id === rawUserRole) || 
                       roles.find(r => r.id === currentUserRole) || 
-                      roles.find(r => getBaseRole(r.id) === currentUserRole);
+                      roles.find(r => r.id.toLowerCase() === currentUserRole.toLowerCase());
       const permissions = roleObj?.permissions;
       
       let dbPermission;
@@ -5570,6 +5789,7 @@ export const AppProvider = ({ children }) => {
         updateTeam,
         deleteTeam,
         projectsList,
+        fetchProjects,
         addProject,
         updateProject,
         deleteProject,
@@ -5585,6 +5805,14 @@ export const AppProvider = ({ children }) => {
         payrollPayments,
         payrollConfigs,
         fetchPayrollData,
+        payrollQueries,
+        fetchPayrollQueries,
+        createPayrollQuery,
+        addQueryReply,
+        updateQueryStatus,
+        addQueryInternalNote,
+        monthlyPayrollSummary,
+        fetchMonthlyPayrollSummary,
         addOrUpdateSalaryGrade,
         deleteSalaryGrade,
         createLoanOrAdvance,
@@ -5627,6 +5855,8 @@ export const AppProvider = ({ children }) => {
         dailyReports,
         setDailyReports,
         addDailyReport,
+        updateDailyReport,
+        checkExistingReport,
         updateDailyReportStatus,
         correctionRequests,
         fetchCorrectionRequests,

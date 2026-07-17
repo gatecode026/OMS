@@ -216,6 +216,40 @@ const Attendance = () => {
   const [personalTab, setPersonalTab] = useState('today'); // today, 7days, month, custom
   const [customRange, setCustomRange] = useState({ from: '', to: '' });
 
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const handleCustomFromChange = (val) => {
+    if (val > todayStr) {
+      addToast('error', 'Cannot select a future date.');
+      return;
+    }
+    if (customRange.to && val > customRange.to) {
+      addToast('error', 'Start date cannot be after end date.');
+      setCustomRange(prev => ({ ...prev, from: val, to: val }));
+    } else {
+      setCustomRange(prev => ({ ...prev, from: val }));
+    }
+  };
+
+  const handleCustomToChange = (val) => {
+    if (val > todayStr) {
+      addToast('error', 'Cannot select a future date.');
+      return;
+    }
+    if (customRange.from && val < customRange.from) {
+      addToast('error', 'End date cannot be before start date.');
+      setCustomRange(prev => ({ ...prev, to: val, from: val }));
+    } else {
+      setCustomRange(prev => ({ ...prev, to: val }));
+    }
+  };
+
   const [queueFilterTab, setQueueFilterTab] = useState('active'); // 'active' or 'history'
 
   const filteredQueueRequests = useMemo(() => {
@@ -2429,14 +2463,17 @@ const Attendance = () => {
               <input
                 type="date"
                 value={customRange.from}
-                onChange={e => setCustomRange(prev => ({ ...prev, from: e.target.value }))}
+                max={customRange.to || todayStr}
+                onChange={e => handleCustomFromChange(e.target.value)}
                 style={{ padding: '6px 10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.78rem' }}
               />
               <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>to</span>
               <input
                 type="date"
                 value={customRange.to}
-                onChange={e => setCustomRange(prev => ({ ...prev, to: e.target.value }))}
+                min={customRange.from}
+                max={todayStr}
+                onChange={e => handleCustomToChange(e.target.value)}
                 style={{ padding: '6px 10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.78rem' }}
               />
             </div>

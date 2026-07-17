@@ -1,0 +1,823 @@
+
+[2026-07-13T11:54:37.699Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:39.260Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:39.454Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:39.615Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:39.789Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong Attendance Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:46.781Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:47.713Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:47.885Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:48.063Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-13T11:54:48.298Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Wrong LOP Calculation","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:25.904Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:28.118Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:29.364Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:29.593Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:29.970Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:30.193Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:30.334Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:30.550Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:30.777Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:31.485Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T04:45:31.655Z] POST /api/v1/payroll-queries
+Error: PayrollQuery validation failed: id: Path `id` is required.
+Stack: ValidationError: PayrollQuery validation failed: id: Path `id` is required.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"category":"Incorrect Salary Amount","subject":"Dispute regarding June 2026 salary slip","description":"I am writing to raise a query regarding my salary slip of June 2026. ","priority":"Medium","attachments":[],"payrollId":"GATECO-EMP-012-June-2026"}
+
+[2026-07-14T05:54:01.219Z] POST /api/v1/payroll-queries/GATECO-PAYR-002/action
+Error: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+Stack: ValidationError: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"Waiting for Employee","comments":"HR requested more evidence&#x2F;details from employee"}
+
+[2026-07-14T05:56:32.026Z] POST /api/v1/payroll-queries/GATECO-PAYR-002/action
+Error: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+Stack: ValidationError: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"Waiting for Employee","comments":"HR requested more evidence&#x2F;details from employee"}
+
+[2026-07-14T05:56:36.927Z] POST /api/v1/payroll-queries/GATECO-PAYR-002/action
+Error: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+Stack: ValidationError: Notification validation failed: type: `payroll` is not a valid enum value for path `type`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"Waiting for Employee","comments":"HR requested more evidence&#x2F;details from employee"}
+
+[2026-07-14T06:12:55.868Z] POST /api/v1/payroll-queries/recalculate/GATECO-EMP-012-June-2026
+Error: PayrollPayment validation failed: department: Path `department` is required., regime: `-` is not a valid enum value for path `regime`.
+Stack: ValidationError: PayrollPayment validation failed: department: Path `department` is required., regime: `-` is not a valid enum value for path `regime`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"adjust_next"}
+
+[2026-07-14T06:16:00.972Z] POST /api/v1/payroll-queries/recalculate/GATECO-EMP-012-June-2026
+Error: PayrollPayment validation failed: department: Path `department` is required., regime: `-` is not a valid enum value for path `regime`.
+Stack: ValidationError: PayrollPayment validation failed: department: Path `department` is required., regime: `-` is not a valid enum value for path `regime`.
+    at Document.invalidate (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3381:32)
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\document.js:3142:17
+    at C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\schemaType.js:1443:9
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11)
+Body: {"action":"apply_current"}
+
+[2026-07-14T06:36:10.294Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:182:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":25000,"hra":10000,"pf":3000,"tds":2500}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:36:28.077Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:182:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":15000,"hra":6000,"pf":1800,"tds":1500}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:38:14.567Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":15000,"hra":6000,"pf":1800,"tds":1500}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:38:58.944Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":15000,"hra":6000,"pf":1800,"tds":1500}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:43:51.232Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-012":{"basic":32000,"hra":12800,"pf":3840,"tds":3200}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:44:54.690Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-012":{"basic":32000,"hra":12800,"pf":3840,"tds":3200}},"attendanceDaysMap":{}}
+
+[2026-07-14T06:50:34.420Z] POST /api/v1/payroll/configs
+Error: Access denied: Branch Managers cannot modify global payroll configurations.
+Stack: Error: Access denied: Branch Managers cannot modify global payroll configurations.
+    at Object.saveGlobalConfigs (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.service.js:198:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/payroll/payroll.controller.js:75:16
+Body: {"id":"GLOBAL_CONFIG","leaveDeductionRate":0,"lateArrivalPenalty":0,"overtimeHourlyRate":0,"taxProfiles":{},"salaryStructures":{"GATECO-EMP-011":{"basic":15000,"hra":6000,"pf":1800,"tds":1500}},"attendanceDaysMap":{}}
+
+[2026-07-14T08:19:41.428Z] POST /api/v1/auth/login
+Error: Invalid email or password
+Stack: Error: Invalid email or password
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:151:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:26:16
+Body: {"email":"aniemsh@gmail.com","password":"password"}
+
+[2026-07-14T09:03:25.571Z] PUT /api/v1/leaves/LR-144
+Error: Access denied: Resource is in department "IT", which is outside your scoped department "—".
+Stack: Error: Access denied: Resource is in department "IT", which is outside your scoped department "—".
+    at validateDepartmentScope (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:98:17)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:228:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.update (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.repository.js:147:7)
+    at async Object.updateRecord (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.service.js:318:18)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.controller.js:26:16
+Body: {"status":"Rejected","approverNotes":"Rejected by Manager","history":[{"date":"2026-07-14","status":"Rejected","comment":"Rejected by Akshita: "}]}
+
+[2026-07-14T09:03:34.654Z] PUT /api/v1/leaves/LR-144
+Error: Access denied: Resource is in department "IT", which is outside your scoped department "—".
+Stack: Error: Access denied: Resource is in department "IT", which is outside your scoped department "—".
+    at validateDepartmentScope (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:98:17)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:228:3)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.update (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.repository.js:147:7)
+    at async Object.updateRecord (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.service.js:318:18)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/leaves/leaves.controller.js:26:16
+Body: {"status":"Rejected","approverNotes":"Rejected by Manager","history":[{"date":"2026-07-14","status":"Rejected","comment":"Rejected by Akshita: "}]}
+
+[2026-07-14T09:18:41.902Z] GET /api/v1/chat/messages/6a55fef14951810082f982ed
+Error: Message.findOne(...).lean is not a function
+Stack: TypeError: Message.findOne(...).lean is not a function
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:497:8
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at runWithTenant (file:///C:/Users/Shubh/Desktop/OMS/backend/src/utils/tenantContext.js:41:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Body: {}
+
+[2026-07-14T09:38:19.237Z] GET /api/v1/chat/messages/6a56038a4951810082f995dd
+Error: Message.findOne(...).lean is not a function
+Stack: TypeError: Message.findOne(...).lean is not a function
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:497:8
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at runWithTenant (file:///C:/Users/Shubh/Desktop/OMS/backend/src/utils/tenantContext.js:41:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Body: {}
+
+[2026-07-15T06:35:42.875Z] PUT /api/v1/work-reports/REP-025
+Error: connection <monitor> to 159.41.183.253:27017 timed out
+Stack: MongoServerSelectionError: connection <monitor> to 159.41.183.253:27017 timed out
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {"date":"2026-07-13","project":"OMS","tasksAssigned":1,"tasksCompleted":1,"summary":"Test the payroll section , add new features and fixes bugs.","majorAccomplishments":"All the Task Done","completedTaskIds":["t-PRJ-001-12-3LOI"],"employeeId":"GATECO-EMP-012","employeeName":"Animesh Jain","department":"IT","team":"Operations","submittedTime":"2026-07-15T06:35:27.564Z","status":"Approved","productivityScore":100,"approvalHistory":[{"role":"Employee","user":"Animesh Jain","action":"Submitted","timestamp":"2026-07-14T11:51:41.300Z","comments":"Daily report submitted.","_id":"6a5622d013d7ea9711a0239b"},{"role":"Team Leader","user":"Geeta Bisht","action":"Approved","timestamp":"2026-07-15T06:03:48.458Z","comments":"","_id":"6a5722c8791acf8d1b4f313a"},{"role":"Employee","user":"Animesh Jain","action":"Updated","timestamp":"2026-07-15T06:35:27.564Z","comments":"Daily report updated."}]}
+
+[2026-07-15T08:10:48.946Z] GET /api/events/upcoming?limit=10
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:10:48.968Z] GET /api/v1/chat/users/blocked
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:10:48.985Z] GET /api/v1/chat/conversations
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:567:9)
+    at process.processTimers (node:internal/timers:541:7)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+Body: {}
+
+[2026-07-15T08:10:48.989Z] GET /api/v1/chat/threads/activity
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:10:49.029Z] GET /api/v1/employees
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:567:9)
+    at process.processTimers (node:internal/timers:541:7)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+Body: {}
+
+[2026-07-15T08:10:49.034Z] GET /api/v1/roles
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:32:15.781Z] PUT /api/v1/work-reports/REP-029
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {"date":"2026-07-15","project":"OMS","tasksAssigned":1,"tasksCompleted":1,"summary":"Done","majorAccomplishments":"Done","completedTaskIds":["t-PRJ-001-18-20NB"],"employeeId":"GATECO-EMP-012","employeeName":"Animesh Jain","department":"IT","team":"Operations","submittedTime":"2026-07-15T08:31:59.161Z","status":"Submitted","productivityScore":100,"approvalHistory":[{"role":"Employee","user":"Animesh Jain","action":"Submitted","timestamp":"2026-07-15T08:31:59.161Z","comments":"Daily report submitted."}]}
+
+[2026-07-15T08:34:58.411Z] GET /api/v1/work-reports/check?employeeId=GATECO-EMP-012&date=2026-07-14
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:36:23.639Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-15T08:36:23.970Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-15T08:37:42.349Z] GET /api/v1/payroll/all
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:567:9)
+    at process.processTimers (node:internal/timers:541:7)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+Body: {}
+
+[2026-07-15T08:37:42.355Z] GET /api/v1/attendance/payroll-summary?month=2026-07
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:37:42.486Z] GET /api/events?from=2026-07-15&to=2026-07-15
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:43:07.891Z] GET /api/events?from=2026-06-28&to=2026-08-08
+Error: read ECONNRESET
+Stack: MongoServerSelectionError: read ECONNRESET
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:43:22.930Z] GET /api/events?from=2026-06-28&to=2026-08-08
+Error: connect ETIMEDOUT 159.41.183.218:27017
+Stack: MongoServerSelectionError: connect ETIMEDOUT 159.41.183.218:27017
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:43:23.183Z] GET /api/v1/chat/conversations/GATECO-CONV-019/messages?limit=20
+Error: connect ETIMEDOUT 159.41.183.218:27017
+Stack: MongoServerSelectionError: connect ETIMEDOUT 159.41.183.218:27017
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:43:23.219Z] GET /api/v1/chat/conversations/GATECO-CONV-019/pinned?page=1&limit=10
+Error: connect ETIMEDOUT 159.41.183.218:27017
+Stack: MongoServerSelectionError: connect ETIMEDOUT 159.41.183.218:27017
+    at Topology.selectServer (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\sdam\topology.js:327:38)
+    at async tryOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:148:18)
+    at async executeOperation (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\operations\execute_operation.js:78:16)
+    at async FindCursor._initialize (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\find_cursor.js:62:26)
+    at async FindCursor.cursorInit (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:632:27)
+    at async FindCursor.fetchBatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:666:13)
+    at async FindCursor.next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\cursor\abstract_cursor.js:342:17)
+    at async Collection.findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongodb\lib\collection.js:313:24)
+    at async model.Query._findOne (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:2710:15)
+    at async model.Query.exec (C:\Users\Shubh\Desktop\OMS\backend\node_modules\mongoose\lib\query.js:4627:63)
+Body: {}
+
+[2026-07-15T08:43:30.082Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-15T09:10:54.995Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-15T09:10:55.324Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:02:52.299Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:02:52.591Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:07:27.536Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:08:03.207Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:08:30.533Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:11:03.042Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T06:56:28.101Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:08:43.365Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:10:22.145Z] PATCH /api/v1/chat/conversations/GATECO-CONV-019/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:10:31.608Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:10:31.994Z] PATCH /api/v1/chat/conversations/GATECO-CONV-024/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T07:12:42.027Z] POST /api/v1/auth/login
+Error: Invalid email or password
+Stack: Error: Invalid email or password
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:151:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:26:16
+Body: {"email":"gatecode@gmail.com","password":"password"}
+
+[2026-07-16T08:27:49.877Z] GET /api/v1/chat/messages/6a589605f9eced29c2ec8502
+Error: Message.findOne(...).lean is not a function
+Stack: TypeError: Message.findOne(...).lean is not a function
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:497:8
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at runWithTenant (file:///C:/Users/Shubh/Desktop/OMS/backend/src/utils/tenantContext.js:41:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Body: {}
+
+[2026-07-16T08:32:57.839Z] PATCH /api/v1/chat/conversations/GATECO-CONV-031/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T08:32:58.689Z] PATCH /api/v1/chat/conversations/GATECO-CONV-031/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T08:35:09.118Z] PATCH /api/v1/chat/conversations/GATECO-CONV-031/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T08:35:09.391Z] PATCH /api/v1/chat/conversations/GATECO-CONV-031/read
+Error: Access denied: You are not authorized to update or delete another employee's record.
+Stack: Error: Access denied: You are not authorized to update or delete another employee's record.
+    at validateOwnership (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:131:19)
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:222:5)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.updateMany (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/message.repository.js:135:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:659:5
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.controller.js:194:18
+Body: {}
+
+[2026-07-16T11:48:43.152Z] POST /api/v1/auth/login
+Error: Your account has been temporarily locked by an administrator. Please try again in 10 minute(s).
+Stack: Error: Your account has been temporarily locked by an administrator. Please try again in 10 minute(s).
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:190:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
+Body: {"email":"geeta@gmail.com","password":"password"}

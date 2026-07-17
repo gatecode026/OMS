@@ -98,6 +98,13 @@
 }
 
 /* Sizes */
+.btn-xs {
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  border-radius: var(--radius-sm);
+  gap: var(--spacing-1);
+}
+
 .btn-sm {
   padding: 6px 12px;
   font-size: 0.75rem;

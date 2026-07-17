@@ -39,7 +39,12 @@ import {
   Check,
   X,
   FileDown,
-  MinusCircle
+  MinusCircle,
+  MessageSquare,
+  Send,
+  Paperclip,
+  Shield,
+  RefreshCw
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -90,7 +95,17 @@ const Payroll = () => {
     savePayrollSalaryRevision,
     hasPermission,
     attendance,
-    fetchAttendance
+    fetchAttendance,
+    monthlyPayrollSummary,
+    fetchMonthlyPayrollSummary,
+    payrollQueries,
+    fetchPayrollQueries,
+    createPayrollQuery,
+    addQueryReply,
+    updateQueryStatus,
+    addQueryInternalNote,
+    fetchPayrollData,
+    token
   } = useApp();
 
   const resolveEmployee = React.useCallback((empId, empName) => {
@@ -150,12 +165,34 @@ const Payroll = () => {
   const isEmployeeView = perspective === 'self';
   const isCompanyView = perspective === 'company';
 
-  // Active navigation tab
   const [activeTab, setActiveTab] = useState('processing');
+  const [recalcPreviewData, setRecalcPreviewData] = useState(null);
+  const [showRecalcModal, setShowRecalcModal] = useState(false);
+  const [isSubmittingRecalc, setIsSubmittingRecalc] = useState(false);
+  const [selectedAdjustmentType, setSelectedAdjustmentType] = useState('apply_current');
 
   React.useEffect(() => {
     fetchAttendance();
+    fetchPayrollQueries();
+    fetchPayrollData();
+    // One-time migration: wipe legacy dummy-calculated TDS/PF/PT from all saved payment records
+    if (token) {
+      fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/payroll/payments/fix-deductions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ fields: ['tds', 'pf', 'pt', 'esi'] })
+      }).then(() => fetchPayrollData()).catch(() => {});
+    }
   }, []);
+
+  React.useEffect(() => {
+    const monthStr = {
+      'January': '01', 'February': '02', 'March': '03', 'April': '04',
+      'May': '05', 'June': '06', 'July': '07', 'August': '08',
+      'September': '09', 'October': '10', 'November': '11', 'December': '12'
+    }[month] || '06';
+    fetchMonthlyPayrollSummary(`${year}-${monthStr}`);
+  }, [month, year]);
 
   React.useEffect(() => {
     if (perspective === 'self') {
@@ -204,6 +241,21 @@ const Payroll = () => {
   const bonuses = payrollBonuses || [];
   const payrollState = payrollPayments || [];
 
+  // Payroll Queries states
+  const [activeQueryTicket, setActiveQueryTicket] = useState(null);
+  const [showRaiseQueryForm, setShowRaiseQueryForm] = useState(false);
+  const [queryFormState, setQueryFormState] = useState({
+    category: 'Incorrect Salary Amount',
+    subject: '',
+    description: '',
+    priority: 'Medium',
+    attachments: []
+  });
+  const [newCommentText, setNewCommentText] = useState('');
+  const [internalNoteText, setInternalNoteText] = useState('');
+  const [queryStatusFilter, setQueryStatusFilter] = useState('All');
+  const [querySearchTerm, setQuerySearchTerm] = useState('');
+
   // Form states for creating/editing salary grade
   const [showGradeModal, setShowGradeModal] = useState(false);
   const [editingGrade, setEditingGrade] = useState(null);
@@ -217,6 +269,11 @@ const Payroll = () => {
   const [applyForm, setApplyForm] = useState({
     employeeId: '', type: 'Personal Loan', amount: 10000, emi: 1000, recoverySchedule: '10 Months'
   });
+
+  // Salary Revision Modal States
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [revisionEmpId, setRevisionEmpId] = useState('');
+  const [revisionBasic, setRevisionBasic] = useState('');
 
   // Form states for Bonus Recommendation
   const [showBonusModal, setShowBonusModal] = useState(false);
@@ -491,6 +548,32 @@ const Payroll = () => {
     December: '12'
   }), []);
 
+  const isFutureMonth = React.useCallback((mName, selectedYear) => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonthIdx = currentDate.getMonth();
+    const monthNumStr = monthMap[mName];
+    if (!monthNumStr) return false;
+    const monthIdx = parseInt(monthNumStr) - 1;
+    
+    const selYear = Number(selectedYear);
+    if (selYear > currentYear) return true;
+    if (selYear === currentYear && monthIdx > currentMonthIdx) return true;
+    return false;
+  }, [monthMap]);
+
+  React.useEffect(() => {
+    if (isFutureMonth(month, year)) {
+      const currentDate = new Date();
+      const currentMonthIdx = currentDate.getMonth();
+      const MONTH_NAMES = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      setMonth(MONTH_NAMES[currentMonthIdx]);
+    }
+  }, [month, year, isFutureMonth]);
+
   // --- Dynamic Calendar & Timeline Helpers ---
   const getTimelineDate = (day) => {
     const monthNum = parseInt(monthMap[month] || '06') - 1;
@@ -580,19 +663,50 @@ const Payroll = () => {
   // --- Dynamic Calculator Engine logic ---
   const calculatedPayrollData = useMemo(() => {
     return scopedPayrollState.map(p => {
+      // If this is a saved, processed database record — return database values directly, no recalculation
+      if (p._id || p.createdAt) {
+        return {
+          ...p,
+          branch: p.branch || '-',
+          department: p.department || '-',
+          designation: p.designation || '-',
+          basicSalary: p.basicSalary || 0,
+          grossSalary: p.grossSalary || 0,
+          totalDeductions: p.totalDeductions || 0,
+          netSalary: p.netSalary || 0,
+          hra: p.hra || 0,
+          special: p.special || 0,
+          travel: p.travel || 0,
+          medical: p.medical || 0,
+          pf: p.pf || 0,
+          esi: p.esi || 0,
+          pt: p.pt || 0,
+          tds: p.tds || 0,
+          pan: p.pan || '-',
+          regime: p.regime || '-',
+          bankName: p.bankName || '-',
+          bankAccount: p.bankAccount || '-',
+          bankIfsc: p.bankIfsc || '-',
+          paidLeaveDays: p.paidLeaveDays || 0,
+          unpaidLeaveDays: p.unpaidLeaveDays || 0
+        };
+      }
+
       const empId = p.employeeId;
       const emp = resolveEmployee(p.employeeId, p.employeeName);
 
       const empBasicSalary = Number(emp?.salaryAmount) || 0;
-      const struct = salaryStructures[empId] || {
-        basic: empBasicSalary,
-        hra: 0,
-        travel: 0,
-        medical: 0,
-        special: 0,
-        pf: 0,
-        esi: 0,
-        pt: 0,
+      const rawStruct = salaryStructures[empId] || {};
+      const struct = {
+        basic: rawStruct.basic || empBasicSalary,
+        hra: Number(rawStruct.hra ?? emp?.hra) || 0,
+        travel: Number(rawStruct.travel ?? emp?.travel) || 0,
+        medical: Number(rawStruct.medical ?? emp?.medical) || 0,
+        special: Number(rawStruct.special ?? emp?.special) || 0,
+        pf: Number(rawStruct.pf) || 0,
+        esi: Number(rawStruct.esi) || 0,
+        pt: Number(rawStruct.pt) || 0,
+        // TDS is NEVER read from salary structures — it's a tax calculation, not a fixed deduction
         tds: 0
       };
 
@@ -602,55 +716,67 @@ const Payroll = () => {
         a => a.employeeId === empId && a.date && a.date.startsWith(prefix)
       );
 
-      let presentCount = 0;
-      let absentCount = 0;
-      let halfDaysCount = 0;
-      let paidLeavesCount = 0;
-      let lateArrivalsCount = 0;
-      let overtimeHoursCount = 0;
+      // Attendance summary from backend
+      const summary = (monthlyPayrollSummary && monthlyPayrollSummary[empId]) || {
+        presentDays: 0, halfDays: 0, paidLeaveDays: 0, unpaidLeaveDays: 0, holidays: 0, weekends: 0
+      };
 
-      if (empRecords.length > 0) {
-        presentCount = empRecords.filter(a => ['Present', 'Work From Home', 'WFH', 'Overtime'].includes(a.status)).length;
-        absentCount = empRecords.filter(a => a.status === 'Absent').length;
-        halfDaysCount = empRecords.filter(a => ['Half Day', 'Half-Day'].includes(a.status)).length;
-        paidLeavesCount = empRecords.filter(a => ['On Leave', 'Leave'].includes(a.status) || (a.status && a.status.includes('Leave'))).length;
-        lateArrivalsCount = empRecords.filter(a => a.status === 'Late').length;
-        overtimeHoursCount = empRecords.reduce((sum, a) => {
-          const hrs = parseFloat(a.overtime) || 0;
-          return sum + hrs;
-        }, 0);
-      } else {
-        presentCount = 0;
-        absentCount = 0;
-        halfDaysCount = 0;
-        paidLeavesCount = 0;
-        lateArrivalsCount = 0;
-        overtimeHoursCount = 0;
+      // Payroll config rules
+      const configWorkingDays = Number(payrollConfigs?.payrollWorkingDays) || 30;
+      const configMethod = payrollConfigs?.salaryCalculationMethod || 'Fixed 30 Days';
+      const configHalfDayPolicy = payrollConfigs?.halfDayPolicy || 'Deduct Half Day';
+      const configGraceRules = payrollConfigs?.graceRules || 'No Late Penalty';
+
+      // 1. Working Days
+      let workingDays = configWorkingDays;
+      const monthNum = parseInt(monthStr);
+      const yrNum = parseInt(year || '2026');
+      const calendarDays = new Date(yrNum, monthNum, 0).getDate();
+
+      if (configMethod === 'Calendar Days') {
+        workingDays = calendarDays;
+      } else if (configMethod === 'Actual Working Days') {
+        workingDays = calendarDays - (summary.weekends || 0) - (summary.holidays || 0);
       }
 
-      // Allowances Sum
+      // 2. Daily Salary Rate
+      const dailySalary = workingDays > 0 ? Math.round(empBasicSalary / workingDays) : 0;
+
+      // 3. Unpaid days
+      let unpaidDays = summary.unpaidLeaveDays || 0;
+      if (configHalfDayPolicy === 'Deduct Half Day') {
+        unpaidDays += (summary.halfDays || 0) * 0.5;
+      }
+
+      // 4. LOP Leave Deduction (only if there are actual unpaid days)
+      const leaveDeduction = Math.round(dailySalary * unpaidDays);
+
+      // 5. Late Arrival penalty (only if configured in payrollConfigs)
+      const lateArrivalPenalty = Number(payrollConfigs?.lateArrivalPenalty) || 0;
+      const lateArrivalsCount = empRecords.filter(a => a.status === 'Late').length;
+      const lateDeduction = (configGraceRules === 'Late Penalty Flat' && lateArrivalPenalty > 0)
+        ? lateArrivalsCount * lateArrivalPenalty
+        : 0;
+
+      // 6. Overtime pay (only if configured in payrollConfigs)
+      const overtimeHourlyRate = Number(payrollConfigs?.overtimeHourlyRate) || 0;
+      const overtimeHoursCount = empRecords.reduce((sum, a) => sum + (parseFloat(a.overtime) || 0), 0);
+      const overtimePay = overtimeHoursCount * overtimeHourlyRate;
+
+      // 7. Allowances
       const totalAllowances = (struct.hra || 0) + (struct.travel || 0) + (struct.medical || 0) + (struct.special || 0);
 
-      // Unpaid Leave Deduction
-      const leaveDeduction = absentCount * Math.round((struct.basic || empBasicSalary) / 24);
-
-      // Late penalty
-      const lateDeduction = lateArrivalsCount * attendanceConfigs.lateArrivalPenalty;
-
-      // Overtime Pay
-      const overtimePay = overtimeHoursCount * attendanceConfigs.overtimeHourlyRate;
-
-      // Bonuses
+      // 8. Bonuses
       const approvedBonuses = bonuses
         .filter(b => b.employeeId === empId && (b.status === 'Super Admin Approved' || b.status === 'Released'))
         .reduce((sum, curr) => sum + curr.amount, 0);
 
-      // Reimbursements (only Approved/Released)
+      // 9. Reimbursements
       const approvedReimbursements = reimbursements
         .filter(r => r.employeeId === empId && (r.status === 'Approved' || r.status === 'Released'))
         .reduce((sum, curr) => sum + curr.amount, 0);
 
-      // Deductions from loans / advances (only Approved ones)
+      // 10. Loan / Advance deductions
       const loanEMI = loans
         .filter(l => l.employeeId === empId && l.status === 'Approved')
         .reduce((sum, curr) => sum + curr.emi, 0);
@@ -659,16 +785,14 @@ const Payroll = () => {
         .filter(a => a.employeeId === empId && a.status === 'Approved')
         .reduce((sum, curr) => sum + curr.amount, 0);
 
-      // Total Statutory Deductions
-      const statutoryDeductions = (struct.pf || 0) + (struct.esi || 0) + (struct.pt || 0) + (struct.tds || 0);
+      // 11. Statutory Deductions (only PF, ESI, PT from salary structures — TDS is always 0 in draft mode)
+      const pfDeduction = emp?.pfContribution !== false ? (struct.pf || 0) : 0;
+      const statutoryDeductions = pfDeduction + (struct.esi || 0) + (struct.pt || 0);
+      // Note: TDS = 0 for draft/unconfigured records. TDS only comes from saved payment DB records.
 
-      // Total Deductions
+      // 12. Totals
       const totalDeductions = statutoryDeductions + leaveDeduction + lateDeduction + loanEMI + advanceDeduct;
-
-      // Gross Salary
       const grossSalary = (struct.basic || empBasicSalary) + totalAllowances + overtimePay + approvedBonuses;
-
-      // Net Salary
       const netSalary = Math.max(0, grossSalary - totalDeductions);
 
       return {
@@ -678,7 +802,9 @@ const Payroll = () => {
         designation: (emp?.designation || p.designation || '-').trim(),
         basicSalary: struct.basic || empBasicSalary,
         grossSalary,
-        attendanceDays: presentCount + paidLeavesCount + (halfDaysCount * 0.5),
+        attendanceDays: summary.presentDays + summary.paidLeaveDays + (summary.halfDays * (configHalfDayPolicy === 'Deduct Half Day' ? 0.5 : 1)),
+        paidLeaveDays: summary.paidLeaveDays,
+        unpaidLeaveDays: unpaidDays,
         leaveDeductions: leaveDeduction,
         lateDeductions: lateDeduction,
         statutoryDeductions,
@@ -689,27 +815,27 @@ const Payroll = () => {
         reimbursementAmount: approvedReimbursements,
         totalDeductions,
         netSalary,
-        bankName: emp?.bank?.bankName || struct.bankName || '-',
-        bankAccount: emp?.bank?.accountNumber || struct.bankAccountNumber || '-',
-        bankIfsc: emp?.bank?.ifsc || struct.bankIfscCode || '-',
-        pan: emp?.panNumber || taxProfiles[empId]?.pan || '-',
-        regime: taxProfiles[empId]?.regime || '-',
+        bankName: emp?.bank?.bankName || '-',
+        bankAccount: emp?.bank?.accountNumber || '-',
+        bankIfsc: emp?.bank?.ifsc || '-',
+        pan: emp?.panNumber || '-',
+        regime: emp?.taxRegime || '-',
         hra: struct.hra || 0,
         travel: struct.travel || 0,
         medical: struct.medical || 0,
         special: struct.special || 0,
-        pf: struct.pf || 0,
+        pf: pfDeduction,
         esi: struct.esi || 0,
         pt: struct.pt || 0,
-        tds: struct.tds || 0
+        tds: 0  // TDS never applied in draft mode — only from saved DB records
       };
     });
-  }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees, resolveEmployee]);
+  }, [payrollState, salaryStructures, attendance, month, year, monthMap, bonuses, reimbursements, loans, advances, attendanceConfigs, taxProfiles, employees, resolveEmployee, monthlyPayrollSummary, payrollConfigs]);
 
   const employeeMonthlyPayslips = useMemo(() => {
     if (!currentUser?.id) return {};
 
-    const months = ['June', 'May', 'April', 'March', 'February', 'January'];
+    const months = ['December', 'November', 'October', 'September', 'August', 'July', 'June', 'May', 'April', 'March', 'February', 'January'];
     const result = {};
 
     months.forEach(m => {
@@ -817,6 +943,12 @@ const Payroll = () => {
     const success = await savePayrollSalaryRevision(empId, newBasic);
     if (success) {
       addPageToast('success', `Revised salary for ${empId} to ${formatCurrency(newBasic)} successfully.`);
+      const monthStr = {
+        'January': '01', 'February': '02', 'March': '03', 'April': '04',
+        'May': '05', 'June': '06', 'July': '07', 'August': '08',
+        'September': '09', 'October': '10', 'November': '11', 'December': '12'
+      }[month] || '06';
+      await fetchMonthlyPayrollSummary(`${year}-${monthStr}`);
     }
   };
 
@@ -887,7 +1019,7 @@ const Payroll = () => {
   // Apply new loan or advance
   const handleCreateLoanAdvance = async (e) => {
     e.preventDefault();
-    const empId = perspective === 'employee' ? (currentUser?.id || 'EMP-2026-001') : (applyForm.employeeId || employees[0]?.id);
+    const empId = perspective === 'employee' ? currentUser?.id : (applyForm.employeeId || employees[0]?.id);
     const targetEmp = resolveEmployee(empId) || { name: 'Employee' };
     const payload = {
       employeeId: empId,
@@ -983,21 +1115,42 @@ const Payroll = () => {
       }
 
       // If perspective is Self, restrict view to current employee only
-      const matchesPerspective = perspective === 'self' ? row.employeeId === (currentUser?.id || 'EMP-2026-001') : true;
+      const matchesPerspective = perspective === 'self' ? row.employeeId === currentUser?.id : true;
 
       return matchesSearch && matchesDept && matchesBranch && matchesStatus && matchesPerspective;
     });
   }, [calculatedPayrollData, searchQuery, filterDept, filterBranch, filterStatus, perspective, currentUser]);
 
+  const filteredPayrollQueries = useMemo(() => {
+    let list = payrollQueries || [];
+    if (perspective === 'self') {
+      list = list.filter(q => q.employeeId === currentUser?.id);
+    }
+    if (queryStatusFilter !== 'All') {
+      list = list.filter(q => q.status === queryStatusFilter);
+    }
+    if (querySearchTerm.trim()) {
+      const term = querySearchTerm.toLowerCase();
+      list = list.filter(q => 
+        (q.subject && q.subject.toLowerCase().includes(term)) ||
+        (q.employeeName && q.employeeName.toLowerCase().includes(term)) ||
+        (q.id && q.id.toLowerCase().includes(term)) ||
+        (q.category && q.category.toLowerCase().includes(term))
+      );
+    }
+    return list;
+  }, [payrollQueries, perspective, currentUser, queryStatusFilter, querySearchTerm]);
+
   // Selected Employee Data for Details Tab
   const selectedEmployeeObj = useMemo(() => {
-    const targetId = selectedEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : 'EMP-2026-002');
+    const targetId = selectedEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : null);
+    if (!targetId) return calculatedPayrollData[0] || null;
     return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
   }, [calculatedPayrollData, selectedEmpId, currentUser, currentUserRole, perspective]);
 
   // Selected Employee Payslip Modal Data
   const payslipEmployeeObj = useMemo(() => {
-    const targetId = payslipEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : 'EMP-2026-001');
+    const targetId = payslipEmpId || (currentUserRole === 'employee' || perspective === 'self' ? currentUser?.id : null);
     return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
   }, [calculatedPayrollData, payslipEmpId, currentUser, currentUserRole, perspective]);
 
@@ -1054,6 +1207,128 @@ BANK PAYMENT & COMPLIANCE DETAIL:
     link.click();
     document.body.removeChild(link);
     addPageToast('success', `Downloaded PDF payslip for ${empObj.employeeName}.`);
+  };
+
+  const handleQuerySubmit = async (e) => {
+    e.preventDefault();
+    const matchedPayment = payrollState.find(p => p.month === month && p.year === year && (perspective === 'self' ? p.employeeId === currentUser?.id : true));
+    if (!matchedPayment) {
+      addPageToast('warning', `No calculated payroll record found for period ${month} ${year}.`);
+      return;
+    }
+    const newQuery = await createPayrollQuery({
+      ...queryFormState,
+      payrollId: matchedPayment.id
+    });
+    if (newQuery) {
+      addPageToast('success', 'Payroll query ticket submitted successfully.');
+      setShowRaiseQueryForm(false);
+      setActiveQueryTicket(newQuery);
+      fetchPayrollQueries();
+    } else {
+      addPageToast('danger', 'Failed to submit payroll query.');
+    }
+  };
+
+  const handleSendComment = async (e) => {
+    e.preventDefault();
+    if (!newCommentText.trim()) return;
+    const updated = await addQueryReply(activeQueryTicket.id, newCommentText);
+    if (updated) {
+      addPageToast('success', 'Comment sent successfully.');
+      setActiveQueryTicket(updated);
+      setNewCommentText('');
+      fetchPayrollQueries();
+    } else {
+      addPageToast('danger', 'Failed to send comment.');
+    }
+  };
+
+  const handleAddInternalNote = async (e) => {
+    e.preventDefault();
+    if (!internalNoteText.trim()) return;
+    const updated = await addQueryInternalNote(activeQueryTicket.id, internalNoteText);
+    if (updated) {
+      addPageToast('success', 'Internal note logged.');
+      setActiveQueryTicket(updated);
+      setInternalNoteText('');
+      fetchPayrollQueries();
+    } else {
+      addPageToast('danger', 'Failed to save internal note.');
+    }
+  };
+
+  const handleQueryStatusAction = async (status, comments) => {
+    const updated = await updateQueryStatus(activeQueryTicket.id, status, comments);
+    if (updated) {
+      addPageToast('success', `Ticket status updated to: ${status}`);
+      setActiveQueryTicket(updated);
+      fetchPayrollQueries();
+    } else {
+      addPageToast('danger', 'Failed to update ticket status.');
+    }
+  };
+
+  const handleManualRecalculateQuery = async (payrollId) => {
+    try {
+      setIsSubmittingRecalc(true);
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/recalculate/${payrollId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: 'preview' })
+      });
+      const result = await response.json();
+      if (result.status === 'success' && result.data.preview) {
+        setRecalcPreviewData({
+          payrollId,
+          ...result.data
+        });
+        setSelectedAdjustmentType('apply_current');
+        setShowRecalcModal(true);
+      } else {
+        addPageToast('danger', result.message || 'Failed to fetch recalculation preview.');
+      }
+    } catch (err) {
+      console.error(err);
+      addPageToast('danger', 'Error fetching recalculation preview.');
+    } finally {
+      setIsSubmittingRecalc(false);
+    }
+  };
+
+  const handleConfirmRecalcAdjustment = async () => {
+    if (!recalcPreviewData) return;
+    try {
+      setIsSubmittingRecalc(true);
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/payroll-queries/recalculate/${recalcPreviewData.payrollId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: selectedAdjustmentType })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addPageToast('success', selectedAdjustmentType === 'apply_current' 
+          ? 'Payroll updated and ticket resolved successfully.' 
+          : 'Adjustment carry-forward registered and ticket resolved successfully.');
+        setShowRecalcModal(false);
+        setRecalcPreviewData(null);
+        fetchPayrollQueries();
+        fetchPayrollData();
+      } else {
+        addPageToast('danger', result.message || 'Adjustment failed.');
+      }
+    } catch (err) {
+      console.error(err);
+      addPageToast('danger', 'Error completing recalculation adjustment.');
+    } finally {
+      setIsSubmittingRecalc(false);
+    }
   };
 
   // Recharts Chart Series derived from DB
@@ -1166,12 +1441,10 @@ BANK PAYMENT & COMPLIANCE DETAIL:
           )}
 
           <select value={month} onChange={(e) => setMonth(e.target.value)} className="payroll-selector">
-            <option value="January">January</option>
-            <option value="February">February</option>
-            <option value="March">March</option>
-            <option value="April">April</option>
-            <option value="May">May</option>
-            <option value="June">June</option>
+            {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => {
+              if (isFutureMonth(m, year)) return null;
+              return <option key={m} value={m}>{m}</option>;
+            })}
           </select>
           
           <select value={year} onChange={(e) => setYear(e.target.value)} className="payroll-selector">
@@ -1194,6 +1467,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
           <button onClick={() => setActiveTab('processing')} className={`tab-btn ${activeTab === 'processing' ? 'active' : ''}`}><Sliders size={16} />{perspective === 'self' ? 'My Payslips' : 'Processing Center'}</button>
           <button onClick={() => setActiveTab('bonuses')} className={`tab-btn ${activeTab === 'bonuses' ? 'active' : ''}`}><Award size={16} />{perspective === 'self' ? 'My Bonuses & Incentives' : 'Bonuses & Incentives'}</button>
           <button onClick={() => setActiveTab('loans')} className={`tab-btn ${activeTab === 'loans' ? 'active' : ''}`}><Scale size={16} />{perspective === 'self' ? 'My Loans & Advances' : 'Loans & Advances'}</button>
+          <button onClick={() => setActiveTab('queries')} className={`tab-btn ${activeTab === 'queries' ? 'active' : ''}`}><MessageSquare size={16} />{perspective === 'self' ? 'My Payroll Queries' : 'Payroll Dispute Tickets'}</button>
         </div>
       </div>
 
@@ -1342,7 +1616,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   className="payroll-selector"
                   style={{ width: '100%', cursor: 'pointer' }}
                 >
-                  {['June', 'May', 'April', 'March', 'February', 'January'].map(m => {
+                  {['December', 'November', 'October', 'September', 'August', 'July', 'June', 'May', 'April', 'March', 'February', 'January'].map(m => {
+                    if (isFutureMonth(m, year)) return null;
                     const periodObj = employeeMonthlyPayslips[m];
                     const isPaid = periodObj?.status === 'Released';
                     const netSalary = periodObj ? formatCurrency(periodObj.netSalary) : '-';
@@ -1371,13 +1646,48 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <Receipt className="text-primary" size={24} />
                       <h3 className="payslip-title">Salary Statement for {month} {year}</h3>
                     </div>
-                    <Button
-                      variant="primary"
-                      icon={Download}
-                      onClick={() => handleDownloadPayslip(selectedEmployeeObj)}
-                    >
-                      Download PDF
-                    </Button>
+                    <div className="flex-center gap-2 wrap-content">
+                      <Button
+                        variant="primary"
+                        icon={Download}
+                        onClick={() => handleDownloadPayslip(selectedEmployeeObj)}
+                      >
+                        Download PDF
+                      </Button>
+                      {perspective === 'self' && (
+                        <>
+                          <Button
+                            variant="danger"
+                            icon={AlertTriangle}
+                            onClick={() => {
+                              setQueryFormState({
+                                category: 'Incorrect Salary Amount',
+                                subject: `Dispute regarding ${month} ${year} salary slip`,
+                                description: `I am writing to raise a query regarding my salary slip of ${month} ${year}. `,
+                                priority: 'Medium',
+                                attachments: []
+                              });
+                              setShowRaiseQueryForm(true);
+                              setActiveQueryTicket(null);
+                              setActiveTab('queries');
+                            }}
+                          >
+                            Raise Query
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            icon={MessageSquare}
+                            onClick={() => {
+                              setActiveTab('queries');
+                              setActiveQueryTicket(null);
+                              setShowRaiseQueryForm(false);
+                            }}
+                          >
+                            View Queries
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Info Grid */}
@@ -1483,6 +1793,18 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                     <option value="Released">Distributed</option>
                     <option value="Hold">On Hold</option>
                   </select>
+
+                  <select value={month} onChange={(e) => setMonth(e.target.value)} className="table-filter-select">
+                    {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => {
+                      if (isFutureMonth(m, year)) return null;
+                      return <option key={m} value={m}>{m}</option>;
+                    })}
+                  </select>
+
+                  <select value={year} onChange={(e) => setYear(e.target.value)} className="table-filter-select">
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                  </select>
                 </div>
 
                 {/* Bulk Actions Panel */}
@@ -1524,11 +1846,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       <th>Dept & Designation</th>
                       <th>Branch</th>
                       <th>Basic Salary</th>
-                      <th>Present Days</th>
-                      <th>OT Pay</th>
                       <th>Bonus</th>
                       <th>Deductions</th>
-                      <th>Net Salary</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
@@ -1552,11 +1871,8 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                           </td>
                           <td><span className="badge badge-secondary">{row.branch === '—' ? '-' : row.branch}</span></td>
                           <td className="font-semibold">{row.basicSalary > 0 ? formatCurrency(row.basicSalary) : '₹0'}</td>
-                          <td className="text-center font-semibold">{row.attendanceDays >= 0 ? row.attendanceDays : 0}</td>
-                          <td className="text-success font-semibold">{row.overtimeAmount > 0 ? `+${formatCurrency(row.overtimeAmount)}` : '₹0'}</td>
                           <td className="text-success font-semibold">{row.bonusAmount > 0 ? `+${formatCurrency(row.bonusAmount)}` : '₹0'}</td>
                           <td className="text-danger font-semibold">{row.totalDeductions > 0 ? `-${formatCurrency(row.totalDeductions)}` : '₹0'}</td>
-                          <td className="text-info font-bold">{row.netSalary > 0 ? formatCurrency(row.netSalary) : '₹0'}</td>
                           <td>
                             <Badge variant={
                               row.status === 'Released' ? 'success' :
@@ -1589,9 +1905,11 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                                   icon={Edit}
                                   onClick={() => {
                                     setSelectedEmpId(row.employeeId);
-                                    setActiveTab('attendance');
+                                    setRevisionEmpId(row.employeeId);
+                                    setRevisionBasic(row.basicSalary);
+                                    setShowRevisionModal(true);
                                   }}
-                                  title="Adjust Adjustments"
+                                  title="Adjust Salary / Revision"
                                 />
                               )}
 
@@ -1610,7 +1928,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="12" className="text-center p-8 text-muted">
+                        <td colSpan="9" className="text-center p-8 text-muted">
                           No employee records found matching selected filters.
                         </td>
                       </tr>
@@ -2312,6 +2630,421 @@ BANK PAYMENT & COMPLIANCE DETAIL:
         </div>
       )}
 
+      {/* ==================== TAB CONTENT: PAYROLL QUERIES & DISPUTES ==================== */}
+      {activeTab === 'queries' && (
+        <div className="flex-column grid-gap animate-fade-in queries-tab-container">
+          
+          {/* Header Row */}
+          <div className="flex-row justify-between align-center border-bottom pb-3 mb-2">
+            <div>
+              <h3 className="card-sec-title" style={{ margin: 0 }}>Payroll Query & Salary Dispute Desk</h3>
+              <p className="subtitle text-muted font-xsmall">Track, investigate, and resolve compensation calculation issues</p>
+            </div>
+            {!showRaiseQueryForm && !activeQueryTicket && perspective === 'self' && (
+              <Button
+                variant="primary"
+                icon={Plus}
+                onClick={() => {
+                  setQueryFormState({
+                    category: 'Incorrect Salary Amount',
+                    subject: `Dispute regarding ${month} ${year} salary slip`,
+                    description: `I am writing to raise a query regarding my salary slip of ${month} ${year}. `,
+                    priority: 'Medium',
+                    attachments: []
+                  });
+                  setShowRaiseQueryForm(true);
+                }}
+              >
+                Raise Dispute Ticket
+              </Button>
+            )}
+            {(showRaiseQueryForm || activeQueryTicket) && (
+              <Button
+                variant="secondary"
+                icon={Sliders}
+                onClick={() => {
+                  setShowRaiseQueryForm(false);
+                  setActiveQueryTicket(null);
+                }}
+              >
+                Back to Ticket List
+              </Button>
+            )}
+          </div>
+
+          {/* MODE 1: Raise Query Form */}
+          {showRaiseQueryForm && (
+            <div className="card p-5 animate-slide-up">
+              <form onSubmit={handleQuerySubmit} className="flex-column gap-4">
+                <h4 className="font-bold border-bottom pb-2 text-primary">New Dispute Ticket Registration</h4>
+                
+                <div className="grid-2-col gap-4">
+                  <div>
+                    <label className="input-label">Dispute Category</label>
+                    <select
+                      value={queryFormState.category}
+                      onChange={(e) => setQueryFormState(prev => ({ ...prev, category: e.target.value }))}
+                      className="table-filter-select width-full p-2"
+                      required
+                    >
+                      <option value="Incorrect Salary Amount">Incorrect Salary Amount</option>
+                      <option value="Missing Salary Credit">Missing Salary Credit</option>
+                      <option value="Incorrect Leave Deduction">Incorrect Leave Deduction</option>
+                      <option value="Wrong LOP Calculation">Wrong LOP Calculation</option>
+                      <option value="Overtime Missing">Overtime Missing</option>
+                      <option value="Bonus Missing">Bonus Missing</option>
+                      <option value="Incentive Missing">Incentive Missing</option>
+                      <option value="Incorrect Tax Deduction">Incorrect Tax Deduction</option>
+                      <option value="Incorrect PF/ESI">Incorrect PF/ESI</option>
+                      <option value="Wrong Attendance Calculation">Wrong Attendance Calculation</option>
+                      <option value="Salary Paid Late">Salary Paid Late</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="input-label">Priority</label>
+                    <select
+                      value={queryFormState.priority}
+                      onChange={(e) => setQueryFormState(prev => ({ ...prev, priority: e.target.value }))}
+                      className="table-filter-select width-full p-2"
+                      required
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="input-label">Subject</label>
+                  <input
+                    type="text"
+                    value={queryFormState.subject}
+                    onChange={(e) => setQueryFormState(prev => ({ ...prev, subject: e.target.value }))}
+                    className="table-search-input width-full p-2"
+                    placeholder="Brief summary of the issue"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="input-label">Description & Evidence</label>
+                  <textarea
+                    value={queryFormState.description}
+                    onChange={(e) => setQueryFormState(prev => ({ ...prev, description: e.target.value }))}
+                    className="table-search-input width-full p-2"
+                    rows="6"
+                    placeholder="Provide full details of the calculation discrepancy. Mention the dates of leaves/overtime disputed."
+                    required
+                  />
+                </div>
+
+                <div className="bg-secondary p-3 rounded flex-column gap-2 font-xsmall text-muted border-left-info">
+                  <div className="font-semibold text-primary">Linked Pay Slip Snapshot:</div>
+                  <div className="grid-3-col gap-2">
+                    <div>Pay Period: <strong>{month} {year}</strong></div>
+                    <div>Employee: <strong>{currentUser?.name} ({currentUser?.id})</strong></div>
+                    <div>Department: <strong>{currentUser?.department || 'Staff'}</strong></div>
+                  </div>
+                  <div className="font-xsmall text-danger">⚠️ Submitting this ticket will freeze the payroll recalculation lock until HR investigates and resolves the dispute.</div>
+                </div>
+
+                <div className="flex-end gap-3 border-top pt-4">
+                  <Button variant="secondary" type="button" onClick={() => setShowRaiseQueryForm(false)}>Cancel</Button>
+                  <Button variant="danger" type="submit">Submit Dispute to HR</Button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* MODE 2: Ticket Conversation detail view */}
+          {activeQueryTicket && (
+            <div className="grid-3-col gap-6 align-start animate-slide-up queries-detail-layout">
+              
+              {/* Left Pane: Ticket Details & Snapshot */}
+              <div className="card p-4 flex-column gap-3 queries-detail-meta-pane">
+                <h4 className="font-bold border-bottom pb-2">Ticket Info</h4>
+                <div className="flex-column gap-2 font-xsmall text-muted">
+                  <div className="flex-center justify-between"><span>Ticket ID:</span> <strong className="font-mono text-primary">{activeQueryTicket.id}</strong></div>
+                  <div className="flex-center justify-between"><span>Status:</span> <Badge variant={activeQueryTicket.status === 'Pending' ? 'warning' : activeQueryTicket.status === 'Approved' || activeQueryTicket.status === 'Resolved' ? 'success' : activeQueryTicket.status === 'Rejected' ? 'danger' : 'primary'}>{activeQueryTicket.status}</Badge></div>
+                  <div className="flex-center justify-between"><span>Priority:</span> <Badge variant={activeQueryTicket.priority === 'High' ? 'danger' : activeQueryTicket.priority === 'Medium' ? 'warning' : 'secondary'}>{activeQueryTicket.priority}</Badge></div>
+                  <div className="flex-center justify-between"><span>Category:</span> <strong>{activeQueryTicket.category}</strong></div>
+                  <div className="flex-center justify-between"><span>Raised On:</span> <strong>{new Date(activeQueryTicket.submittedDate).toLocaleDateString()}</strong></div>
+                </div>
+
+                <h4 className="font-bold border-bottom pb-2 mt-2">Payroll Snapshot</h4>
+                <div className="flex-column gap-2 font-xsmall text-muted bg-secondary p-2 rounded">
+                  <div className="flex-center justify-between"><span>Gross Salary:</span> <strong>{formatCurrency(activeQueryTicket.grossSalary)}</strong></div>
+                  <div className="flex-center justify-between"><span>Net Salary:</span> <strong className="text-success">{formatCurrency(activeQueryTicket.netSalary)}</strong></div>
+                  <div className="flex-center justify-between"><span>Deductions:</span> <strong className="text-danger">{formatCurrency(activeQueryTicket.deductions)}</strong></div>
+                  <div className="flex-center justify-between"><span>Allowances:</span> <strong>{formatCurrency(activeQueryTicket.allowances)}</strong></div>
+                  <div className="flex-center justify-between"><span>LOP Deductions:</span> <strong className="text-danger">{formatCurrency(activeQueryTicket.lop)}</strong></div>
+                  <div className="flex-center justify-between"><span>Unpaid Leaves:</span> <strong>{activeQueryTicket.unpaidLeave} Days</strong></div>
+                </div>
+              </div>
+
+              {/* Middle Pane: Conversation Thread */}
+              <div className="card p-4 flex-column gap-4 queries-detail-chat-pane" style={{ gridColumn: 'span 2' }}>
+
+
+                {/* Messages Timeline */}
+                <div className="queries-chat-messages-container flex-column gap-3 overflow-y-auto" style={{ maxHeight: '400px', paddingRight: '8px' }}>
+                  {activeQueryTicket.messages && activeQueryTicket.messages.map((msg, index) => {
+                    const isSelf = msg.senderId === currentUser?.id;
+                    return (
+                      <div key={index} className={`queries-message-bubble flex-column p-3 rounded ${isSelf ? 'msg-self' : 'msg-other'}`}>
+                        <div className="flex-center justify-between font-xsmall border-bottom pb-1 mb-1">
+                          <span className="font-semibold text-primary">{msg.senderName} ({msg.senderRole.replace('_', ' ').toUpperCase()})</span>
+                          <span>{new Date(msg.timestamp).toLocaleString()}</span>
+                        </div>
+                        <p className="font-small" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{msg.message}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* HR Investigation & Internal Notes Desk (HR View only) */}
+                {perspective !== 'self' && (
+                  <div className="flex-column gap-4 border-top pt-4 mt-2">
+                    <h4 className="font-bold text-danger border-bottom pb-2 flex-row gap-2 align-center justify-start">
+                      <Shield size={16} /> HR Investigation & Audit Control Board
+                    </h4>
+
+                    {/* Recalculation Checklists */}
+                    {activeQueryTicket.status === 'Approved' || activeQueryTicket.status === 'Resolved' || activeQueryTicket.status === 'Rejected' ? (
+                      <div 
+                        className="card p-3 rounded flex-row justify-between align-center font-xsmall"
+                        style={{ 
+                          borderLeft: activeQueryTicket.status === 'Rejected' ? '4px solid var(--danger-color)' : '4px solid var(--success-color)',
+                          backgroundColor: activeQueryTicket.status === 'Rejected' ? 'var(--danger-light)' : 'var(--success-light)'
+                        }}
+                      >
+                        <div className="flex-column gap-1 align-start text-left">
+                          <strong className={activeQueryTicket.status === 'Rejected' ? 'text-danger font-medium' : 'text-success font-medium'} style={{ fontSize: '1.1em' }}>Dispute Query Resolution Card</strong>
+                          <p className="text-muted mt-1 font-xsmall" style={{ margin: 0 }}>
+                            {activeQueryTicket.status === 'Rejected' 
+                              ? 'This dispute query has been reviewed and formally rejected.' 
+                              : 'This dispute checklist audit has been closed, and final calculations have been registered.'}
+                          </p>
+                        </div>
+                        <div className="bg-secondary py-2 px-3 rounded flex-column align-center justify-center font-xsmall">
+                          <span className="text-muted font-xsmall">Audit Status</span>
+                          <strong 
+                            className={activeQueryTicket.status === 'Rejected' ? 'text-danger font-semibold mt-1 text-uppercase' : 'text-success font-semibold mt-1 text-uppercase'} 
+                            style={{ letterSpacing: '0.05em' }}
+                          >
+                            {activeQueryTicket.status}
+                          </strong>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid-2-col gap-4">
+                        {/* Left: Quick checklist */}
+                        <div className="bg-secondary p-3 rounded flex-column gap-2 font-xsmall">
+                          <span className="font-semibold text-primary">Audit Investigation Checklist:</span>
+                          <label className="flex-row gap-2 justify-start align-center cursor-pointer" style={{ display: 'flex', textTransform: 'none', fontWeight: 'normal', color: 'var(--text-secondary)', marginBottom: 0 }}>
+                            <input type="checkbox" defaultChecked style={{ width: 'auto', margin: 0 }} />
+                            <span>Verify attendance logs for missing punches</span>
+                          </label>
+                          <label className="flex-row gap-2 justify-start align-center cursor-pointer" style={{ display: 'flex', textTransform: 'none', fontWeight: 'normal', color: 'var(--text-secondary)', marginBottom: 0 }}>
+                            <input type="checkbox" defaultChecked style={{ width: 'auto', margin: 0 }} />
+                            <span>Check approved leave applications count</span>
+                          </label>
+                          <label className="flex-row gap-2 justify-start align-center cursor-pointer" style={{ display: 'flex', textTransform: 'none', fontWeight: 'normal', color: 'var(--text-secondary)', marginBottom: 0 }}>
+                            <input type="checkbox" style={{ width: 'auto', margin: 0 }} />
+                            <span>Confirm dynamic Loss-of-Pay calculations</span>
+                          </label>
+                          <label className="flex-row gap-2 justify-start align-center cursor-pointer" style={{ display: 'flex', textTransform: 'none', fontWeight: 'normal', color: 'var(--text-secondary)', marginBottom: 0 }}>
+                            <input type="checkbox" style={{ width: 'auto', margin: 0 }} />
+                            <span>Match bank account credit details</span>
+                          </label>
+                        </div>
+                        
+                        {/* Right: Recalculate Trigger Panel */}
+                        <div className="bg-secondary p-3 rounded flex-column justify-between font-xsmall">
+                          <div>
+                            <span className="font-semibold text-primary">Calculation Override Control:</span>
+                            <p className="text-muted font-xsmall mt-1">Recalculate will pull active attendance logs, update unpaid leave balances, and rebuild this employee's payroll statement row for the month.</p>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={RefreshCw}
+                            onClick={() => handleManualRecalculateQuery(activeQueryTicket.payrollId)}
+                          >
+                            Trigger Recalculate Now
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Internal Notes Timeline */}
+                    <div className="flex-column gap-2">
+                      <span className="font-semibold text-primary font-xsmall">Internal HR Notes (Only visible to managers):</span>
+                      <div className="bg-secondary p-3 rounded flex-column gap-2" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                        {activeQueryTicket.internalNotes && activeQueryTicket.internalNotes.length > 0 ? (
+                          activeQueryTicket.internalNotes.map((note, index) => (
+                            <div key={index} className="border-bottom pb-2 mb-2 font-xsmall flex-column">
+                              <div className="flex-center justify-between text-muted font-bold">
+                                <span>{note.authorName}</span>
+                                <span>{new Date(note.timestamp).toLocaleString()}</span>
+                              </div>
+                              <p className="mt-1" style={{ margin: 0 }}>{note.note}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center text-muted font-xsmall">No internal notes logged on this ticket yet.</div>
+                        )}
+                      </div>
+                      <form onSubmit={handleAddInternalNote} className="flex-row gap-2 mt-1">
+                        <input
+                          type="text"
+                          value={internalNoteText}
+                          onChange={(e) => setInternalNoteText(e.target.value)}
+                          className="table-search-input flex-1 p-2"
+                          placeholder="Log an internal review note..."
+                        />
+                        <Button variant="secondary" type="submit">Log Note</Button>
+                      </form>
+                    </div>
+
+                    {/* Decision Actions */}
+                    {activeQueryTicket.status !== 'Approved' && activeQueryTicket.status !== 'Resolved' && activeQueryTicket.status !== 'Rejected' && (
+                      <div className="flex-row gap-3 justify-end border-top pt-3">
+                        <Button
+                          variant="danger"
+                          onClick={() => handleQueryStatusAction('Rejected', 'Dispute ticket rejected after review of logs')}
+                        >
+                          Reject Dispute
+                        </Button>
+                        <Button
+                          variant="success"
+                          onClick={() => handleQueryStatusAction('Approved', 'Approved correction and recalculated payment')}
+                        >
+                          Approve & Recalculate
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* MODE 3: Ticket List view */}
+          {!showRaiseQueryForm && !activeQueryTicket && (
+            <div className="flex-column grid-gap animate-slide-up">
+              
+              {/* Filter controls row */}
+              <div className="card p-3 flex-row justify-between align-center wrap-content gap-3 table-filters-card">
+                
+                {/* Search */}
+                <div className="flex-row gap-2 table-search-container" style={{ flex: 1, minWidth: '220px' }}>
+                  <input
+                    type="text"
+                    value={querySearchTerm}
+                    onChange={(e) => setQuerySearchTerm(e.target.value)}
+                    className="table-search-input width-full"
+                    placeholder="Search by Employee, Subject, Ticket ID..."
+                  />
+                </div>
+
+                {/* Status Tabs */}
+                <div className="flex-row gap-1 queries-filter-tabs overflow-x-auto">
+                  {['All', 'Pending', 'Under Review', 'Waiting for Employee', 'Approved', 'Rejected'].map(statusTab => (
+                    <button
+                      key={statusTab}
+                      onClick={() => setQueryStatusFilter(statusTab)}
+                      className={`filter-tab-btn font-xsmall py-1 px-3 rounded ${queryStatusFilter === statusTab ? 'active bg-primary text-white font-semibold' : 'bg-secondary text-muted'}`}
+                    >
+                      {statusTab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Data Table */}
+              <div className="card table-wrapper-card">
+                {filteredPayrollQueries.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="payroll-data-table">
+                      <thead>
+                        <tr>
+                          <th>Ticket ID</th>
+                          {perspective !== 'self' && <th>Employee</th>}
+                          <th>Category</th>
+                          <th>Subject</th>
+                          <th>Pay Period</th>
+                          <th>Priority</th>
+                          <th>Status</th>
+                          <th>Last Updated</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredPayrollQueries.map(ticket => (
+                          <tr key={ticket.id} className="cursor-pointer hover-bg" onClick={() => setActiveQueryTicket(ticket)}>
+                            <td className="font-semibold font-mono text-primary">{ticket.id}</td>
+                            {perspective !== 'self' && (
+                              <td>
+                                <div className="flex-center gap-2 justify-start">
+                                  <Avatar name={ticket.employeeName} size="xs" />
+                                  <span className="emp-name-bold">{ticket.employeeName}</span>
+                                </div>
+                              </td>
+                            )}
+                            <td className="font-xsmall">{ticket.category}</td>
+                            <td>
+                              <div className="flex-column max-w-xs overflow-hidden">
+                                <span className="font-semibold text-truncate">{ticket.subject}</span>
+                                <span className="font-xsmall text-muted text-truncate">{ticket.description}</span>
+                              </div>
+                            </td>
+                            <td>{ticket.payrollPeriod}</td>
+                            <td>
+                              <Badge variant={ticket.priority === 'High' ? 'danger' : ticket.priority === 'Medium' ? 'warning' : 'secondary'}>
+                                {ticket.priority}
+                              </Badge>
+                            </td>
+                            <td>
+                              <Badge variant={ticket.status === 'Pending' ? 'warning' : ticket.status === 'Approved' || ticket.status === 'Resolved' ? 'success' : ticket.status === 'Rejected' ? 'danger' : 'primary'}>
+                                {ticket.status}
+                              </Badge>
+                            </td>
+                            <td className="font-xsmall text-muted">{new Date(ticket.updatedAt).toLocaleDateString()}</td>
+                            <td>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveQueryTicket(ticket);
+                                }}
+                              >
+                                View Ticket
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center p-8 text-muted flex-column align-center gap-3">
+                    <div className="loan-empty-icon badge-glow-primary">
+                      <MessageSquare size={32} />
+                    </div>
+                    <h4 className="font-semibold">No Dispute Tickets Found</h4>
+                    <p className="font-small max-w-sm">No payroll queries matching this filter have been raised on your account.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ==================== TAB CONTENT: TAX VAULT ==================== */}
       {activeTab === 'taxes' && (
         <div className="flex-column grid-gap animate-fade-in">
@@ -2336,20 +3069,22 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 </thead>
                 <tbody>
                   {calculatedPayrollData.map(emp => {
-                    const profile = taxProfiles[emp.employeeId] || { pan: 'AAAPS1234F', regime: 'New', taxableIncome: 900000 };
+                    const profile = taxProfiles[emp.employeeId] || {};
                     return (
                       <tr key={emp.employeeId}>
                         <td className="font-semibold">{emp.employeeId}</td>
                         <td>{emp.employeeName}</td>
-                        <td className="font-mono">{profile.pan}</td>
+                        <td className="font-mono">{profile.pan || '-'}</td>
                         <td>
-                          <Badge variant={profile.regime === 'New' ? 'success' : 'primary'}>
-                            {profile.regime} Regime
-                          </Badge>
+                          {profile.regime ? (
+                            <Badge variant={profile.regime === 'New' ? 'success' : 'primary'}>
+                              {profile.regime} Regime
+                            </Badge>
+                          ) : <span className="text-muted">—</span>}
                         </td>
-                        <td className="font-semibold">{formatCurrency(emp.basicSalary * 12 * 2.2)}</td>
-                        <td className="font-semibold text-info">{formatCurrency(profile.taxableIncome)}</td>
-                        <td className="text-danger font-semibold">{formatCurrency(emp.statutoryDeductions - 10000)}</td>
+                        <td className="font-semibold">{formatCurrency(emp.grossSalary * 12)}</td>
+                        <td className="font-semibold text-info">{profile.taxableIncome ? formatCurrency(profile.taxableIncome) : '—'}</td>
+                        <td className="text-danger font-semibold">{formatCurrency(emp.tds || 0)}</td>
                         <td>
                           <button
                             className="flex-center gap-1 font-xsmall badge badge-secondary py-1 cursor-pointer"
@@ -2443,6 +3178,50 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                   <div className="flex-center justify-between py-1"><span>Late Punch Deductions:</span> <strong>{formatCurrency(payslipEmployeeObj.lateDeductions)}</strong></div>
                   <div className="flex-center justify-between py-1"><span>Loan EMI Recovery:</span> <strong>{formatCurrency(payslipEmployeeObj.loanEMI + payslipEmployeeObj.advanceDeduct)}</strong></div>
                   <div className="flex-center justify-between border-top pt-2 font-semibold"><span>Total Deductions:</span> <strong>{formatCurrency(payslipEmployeeObj.totalDeductions)}</strong></div>
+                </div>
+              </div>
+
+              {/* Leave Summary section */}
+              <div className="flex-column gap-2 border-top pt-3">
+                <span className="font-bold text-primary border-bottom pb-1">Leave & LOP Summary</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.25rem' }}>
+                  <div className="flex-column gap-1">
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">Paid Leave Used:</span>
+                      <strong>{payslipEmployeeObj.paidLeaveDays || 0} Days</strong>
+                    </div>
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">Remaining Paid Leave:</span>
+                      <strong>{(() => {
+                        const emp = resolveEmployee(payslipEmployeeObj.employeeId);
+                        if (!emp) return '0 Days';
+                        const cl = typeof emp.clBalance === 'number' ? emp.clBalance : 0;
+                        const sl = typeof emp.slBalance === 'number' ? emp.slBalance : 0;
+                        const pl = typeof emp.plBalance === 'number' ? emp.plBalance : 0;
+                        return `${cl + sl + pl} Days`;
+                      })()}</strong>
+                    </div>
+                  </div>
+                  <div className="flex-column gap-1">
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">Unpaid / LOP Leave:</span>
+                      <strong>{payslipEmployeeObj.unpaidLeaveDays || 0} Days</strong>
+                    </div>
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">Daily Salary Rate:</span>
+                      <strong>₹{(() => {
+                        const basic = payslipEmployeeObj.basicSalary || 0;
+                        const workingDays = Number(payrollConfigs?.payrollWorkingDays) || 30;
+                        return Math.round(basic / Math.max(1, workingDays));
+                      })()}</strong>
+                    </div>
+                    {payslipEmployeeObj.leaveDeductions > 0 && (
+                      <div className="flex-center justify-between" style={{ color: 'var(--color-danger)' }}>
+                        <span>Loss Of Pay (LOP):</span>
+                        <strong>- ₹{payslipEmployeeObj.leaveDeductions?.toLocaleString()}</strong>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2857,6 +3636,187 @@ BANK PAYMENT & COMPLIANCE DETAIL:
               <Button variant="primary" type="submit">Confirm & Disburse</Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ==================== SALARY REVISION / ADJUST BASIC MODAL ==================== */}
+      {showRevisionModal && (
+        <div className="payroll-modal-overlay">
+          <form 
+            className="payroll-modal-container animate-slide-up" 
+            onSubmit={async (e) => {
+              e.preventDefault();
+              await handleSalaryRevision(revisionEmpId, Number(revisionBasic));
+              setShowRevisionModal(false);
+            }} 
+            style={{ maxWidth: '400px', width: '90%' }}
+          >
+            <div className="flex-center justify-between border-bottom pb-3 mb-4">
+              <h3 className="modal-title-bold flex-center gap-2">
+                <Edit className="text-primary" size={20} />
+                Adjust Basic Salary (Revision)
+              </h3>
+              <button className="action-circle-btn" type="button" onClick={() => setShowRevisionModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-column gap-3 font-small" style={{ color: 'var(--text-primary)' }}>
+              <div>
+                <span className="text-muted block">Employee ID:</span>
+                <strong className="text-primary mt-1 block">{revisionEmpId}</strong>
+              </div>
+
+              <div>
+                <label className="input-label">New Basic Salary Rate (Monthly)</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={revisionBasic}
+                  onChange={(e) => setRevisionBasic(e.target.value)}
+                  className="table-search-input width-full p-2"
+                  placeholder="e.g. 35000"
+                  style={{ width: '100%' }}
+                />
+                <span className="text-muted font-xsmall block mt-1">This will automatically recalculate allowances, PF, and TDS for future periods and recalculate this month's payroll.</span>
+              </div>
+            </div>
+
+            <div className="flex-end gap-3 border-top pt-4 mt-4">
+              <Button variant="secondary" type="button" onClick={() => setShowRevisionModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit">
+                Apply Revision
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ==================== RECALCULATION PREVIEW MODAL ==================== */}
+      {showRecalcModal && recalcPreviewData && (
+        <div className="payroll-modal-overlay">
+          <div className="payroll-modal-container animate-slide-up" style={{ maxWidth: '580px', width: '90%' }}>
+            <div className="flex-center justify-between border-bottom pb-3 mb-4">
+              <h3 className="modal-title-bold flex-center gap-2">
+                <RefreshCw className="text-primary animate-spin-slow" size={20} />
+                Salary Recalculation Preview
+              </h3>
+              <button className="action-circle-btn" type="button" onClick={() => setShowRecalcModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-column gap-3 font-small" style={{ color: 'var(--text-primary)' }}>
+              {/* Highlight summary cards */}
+              <div className="grid-3-col gap-3 text-center">
+                <div className="bg-secondary p-3 rounded flex-column justify-center align-center">
+                  <span className="text-muted font-xsmall block">Original Net Salary</span>
+                  <strong className="font-semibold block mt-1 text-primary">{formatCurrency(recalcPreviewData.oldNetSalary)}</strong>
+                </div>
+                <div className="bg-secondary p-3 rounded flex-column justify-center align-center">
+                  <span className="text-muted font-xsmall block">Recalculated Net</span>
+                  <strong className="font-semibold block mt-1 text-primary">{formatCurrency(recalcPreviewData.newNetSalary)}</strong>
+                </div>
+                <div className={`p-3 rounded flex-column justify-center align-center ${recalcPreviewData.difference >= 0 ? 'bg-success-light text-success' : 'bg-danger-light text-danger'}`}>
+                  <span className="font-xsmall block">Difference Amount</span>
+                  <strong className="font-bold block mt-1">
+                    {recalcPreviewData.difference >= 0 ? '+' : ''}{formatCurrency(recalcPreviewData.difference)}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Detailed Breakdown Comparison */}
+              <div className="bg-secondary p-3 rounded flex-column gap-2" style={{ border: '1px solid var(--border-color)' }}>
+                <span className="font-bold text-primary block border-bottom pb-1 font-xsmall text-uppercase tracking-wider">Recalculated Components Breakdown</span>
+                <div className="overflow-y-auto pr-1 flex-column gap-1" style={{ maxHeight: '180px' }}>
+                  <div className="flex-center justify-between border-bottom py-1 text-muted">
+                    <span>Basic Salary Rate</span>
+                    <span className="font-semibold text-primary">{formatCurrency(recalcPreviewData.breakdown.basicSalary)}</span>
+                  </div>
+                  <div className="flex-center justify-between border-bottom py-1 text-muted">
+                    <span>Allowances</span>
+                    <span className="font-semibold text-primary">{formatCurrency(recalcPreviewData.breakdown.allowances)}</span>
+                  </div>
+                  <div className="flex-center justify-between border-bottom py-1 text-muted">
+                    <span>Overtime & Incentives</span>
+                    <span className="font-semibold text-success">{formatCurrency(recalcPreviewData.breakdown.overtimePay + recalcPreviewData.breakdown.bonus)}</span>
+                  </div>
+                  <div className="flex-center justify-between border-bottom py-1 text-muted">
+                    <span>Loss of Pay (LOP) Deductions</span>
+                    <span className="font-semibold text-danger">{formatCurrency(recalcPreviewData.breakdown.leaveDeductions)}</span>
+                  </div>
+                  <div className="flex-center justify-between border-bottom py-1 text-muted">
+                    <span>Statutory Tax & Loan EMI</span>
+                    <span className="font-semibold text-danger">
+                      {formatCurrency(recalcPreviewData.breakdown.statutoryDeductions + recalcPreviewData.breakdown.loanEMI + recalcPreviewData.breakdown.advanceDeduct + recalcPreviewData.breakdown.lateDeductions)}
+                    </span>
+                  </div>
+                  <div className="flex-center justify-between py-1 font-semibold border-top mt-1" style={{ fontSize: '1.1em' }}>
+                    <span className="text-primary">Recalculated Net take-home</span>
+                    <span className="text-success">{formatCurrency(recalcPreviewData.breakdown.netSalary)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Adjustment Mode Selection */}
+              <div className="flex-column gap-2 border-top pt-3 mt-1">
+                <span className="font-bold text-primary font-xsmall text-uppercase tracking-wider">Adjustment & Disbursement Options:</span>
+                <div className="flex-column gap-2 mt-2">
+                  <label 
+                    className={`flex-center gap-3 p-3 rounded border cursor-pointer justify-start transition-all ${
+                      selectedAdjustmentType === 'apply_current' 
+                        ? 'border-primary bg-primary-light font-semibold' 
+                        : 'border-secondary bg-secondary'
+                    }`}
+                    style={{ border: selectedAdjustmentType === 'apply_current' ? '1px solid var(--primary-color)' : '1px solid var(--border-color)' }}
+                  >
+                    <input 
+                      type="radio" 
+                      name="adjustment_type" 
+                      checked={selectedAdjustmentType === 'apply_current'} 
+                      onChange={() => setSelectedAdjustmentType('apply_current')} 
+                    />
+                    <div className="flex-column align-start text-left gap-1">
+                      <span className="font-medium text-primary">Disburse with this month's payroll</span>
+                      <span className="text-muted font-xsmall" style={{ fontWeight: 'normal' }}>Immediately update this month's payslip and payout net salary.</span>
+                    </div>
+                  </label>
+
+                  <label 
+                    className={`flex-center gap-3 p-3 rounded border cursor-pointer justify-start transition-all ${
+                      selectedAdjustmentType === 'adjust_next' 
+                        ? 'border-primary bg-primary-light font-semibold' 
+                        : 'border-secondary bg-secondary'
+                    }`}
+                    style={{ border: selectedAdjustmentType === 'adjust_next' ? '1px solid var(--primary-color)' : '1px solid var(--border-color)' }}
+                  >
+                    <input 
+                      type="radio" 
+                      name="adjustment_type" 
+                      checked={selectedAdjustmentType === 'adjust_next'} 
+                      onChange={() => setSelectedAdjustmentType('adjust_next')} 
+                    />
+                    <div className="flex-column align-start text-left gap-1">
+                      <span className="font-medium text-primary">Adjust in next month's payroll</span>
+                      <span className="text-muted font-xsmall" style={{ fontWeight: 'normal' }}>Keep current month payslip unchanged. Carry forward difference to next month's payroll adjustment.</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-end gap-3 border-top pt-4 mt-4">
+              <Button variant="secondary" type="button" onClick={() => setShowRecalcModal(false)} disabled={isSubmittingRecalc}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="button" onClick={handleConfirmRecalcAdjustment} disabled={isSubmittingRecalc}>
+                {isSubmittingRecalc ? 'Processing...' : 'Confirm Adjustment'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

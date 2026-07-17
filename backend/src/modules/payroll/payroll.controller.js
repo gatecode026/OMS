@@ -76,6 +76,11 @@ export const saveGlobalConfigs = asyncHandler(async (req, res) => {
   return successResponse(res, data, 'Global payroll configuration updated successfully');
 });
 
+export const resetPaymentDeductions = asyncHandler(async (req, res) => {
+  const data = await service.resetPaymentDeductions(req.body, req.user);
+  return successResponse(res, data, 'Payment deductions reset successfully');
+});
+
 export default {
   getMasterData,
   saveSalaryGrade,
@@ -88,5 +93,6 @@ export default {
   saveMonthlyPayment,
   updatePaymentStatus,
   bulkUpdatePaymentStatus,
-  saveGlobalConfigs
+  saveGlobalConfigs,
+  resetPaymentDeductions
 };

@@ -18,8 +18,8 @@ const payrollGradeSchema = new mongoose.Schema({
   special: { type: Number, default: 0 },
   pf: { type: Number, default: 0 },
   esi: { type: Number, default: 0 },
-  pt: { type: Number, default: 200 },
-  tdsRate: { type: Number, default: 10 },
+  pt: { type: Number, default: 0 },
+  tdsRate: { type: Number, default: 0 },
   effectiveDate: { type: String, required: true }
 }, { timestamps: true });
 
@@ -99,19 +99,30 @@ const payrollPaymentSchema = new mongoose.Schema({
   leaveDeductions: { type: Number, default: 0 },
   lateDeductions: { type: Number, default: 0 },
   statutoryDeductions: { type: Number, required: true },
-  bankName: { type: String, default: 'HDFC Bank' },
+  hra: { type: Number, default: 0 },
+  travel: { type: Number, default: 0 },
+  medical: { type: Number, default: 0 },
+  special: { type: Number, default: 0 },
+  pf: { type: Number, default: 0 },
+  esi: { type: Number, default: 0 },
+  pt: { type: Number, default: 0 },
+  tds: { type: Number, default: 0 },
+  bankName: { type: String, default: '' },
   bankAccount: { type: String, default: '' },
   bankIfsc: { type: String, default: '' },
   pan: { type: String, default: '' },
-  regime: { type: String, enum: ['Old', 'New'], default: 'New' }
+  regime: { type: String, enum: ['Old', 'New', ''], default: '' },
+  paidLeaveDays: { type: Number, default: 0 },
+  unpaidLeaveDays: { type: Number, default: 0 },
+  requiresRecalculation: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // 6. Global Configuration Schema (Stores penality settings, custom salary structures, tax regimes, and attendance configurations)
 const payrollConfigSchema = new mongoose.Schema({
   id: { type: String, required: true, default: 'GLOBAL_CONFIG', index: true },
-  leaveDeductionRate: { type: Number, default: 2000 },
-  lateArrivalPenalty: { type: Number, default: 300 },
-  overtimeHourlyRate: { type: Number, default: 500 },
+  leaveDeductionRate: { type: Number, default: 0 },
+  lateArrivalPenalty: { type: Number, default: 0 },
+  overtimeHourlyRate: { type: Number, default: 0 },
   // Map fields use Mixed to allow easy serialization of dynamic configurations keyed by employeeId
   taxProfiles: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
   salaryStructures: { type: Map, of: mongoose.Schema.Types.Mixed, default: {} },
@@ -119,27 +130,15 @@ const payrollConfigSchema = new mongoose.Schema({
   timelineDeadlines: {
     type: Map,
     of: mongoose.Schema.Types.Mixed,
-    default: {
-      reimbursementCutoff: 20,
-      attendanceVerification: 25,
-      payrollProcessing: 28,
-      salaryDisbursement: 30
-    }
+    default: {}
   },
   complianceSchedules: {
     type: [mongoose.Schema.Types.Mixed],
-    default: [
-      { id: 'tds_deposit', title: 'Monthly TDS Deposit Due', day: 7, monthOffset: 1, info: 'Challan ITNS 281' },
-      { id: 'pf_esi_filing', title: 'PF & ESI Filing Deadline', day: 15, monthOffset: 1, info: 'Form 5 & Form 10' },
-      { id: 'tds_return_q1', title: 'TDS Return Filing (Q1)', day: 31, monthOffset: 1, info: 'Form 24Q Submission • FY 2026-27' }
-    ]
+    default: []
   },
   complianceNotices: {
     type: [String],
-    default: [
-      'Submission window for Q1 Investment Proofs is currently open.',
-      'Penalty for late TDS return filing is ₹200 per day under Section 234E.'
-    ]
+    default: []
   }
 }, { timestamps: true, collection: 'payroll_configs' });
 

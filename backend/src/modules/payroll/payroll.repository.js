@@ -17,6 +17,7 @@ import { CacheKeys, TTL, cacheGetOrSet, cacheDel } from '../../services/cache.se
 
 // Security and Query Builder Imports
 import { resolveSecurityContext } from '../../security/scopeEngine.js';
+import { checkActionPermission } from '../../security/permissionMatrix.js';
 import { 
   validateRepositoryAccess, 
   sanitizeQueryOperators 
@@ -29,7 +30,7 @@ import { PayrollResourceQueryBuilder } from './payroll.queryBuilder.js';
  */
 const overrideDepartmentForAdminRoles = (record, context) => {
   if (record && context) {
-    const bypassRoles = ['hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'manager'];
+    const bypassRoles = ['manager'];
     if (bypassRoles.includes(context.role)) {
       record.department = context.department;
     }
@@ -46,9 +47,9 @@ export const getMasterPayrollData = async () => {
 
   const queryFilters = await builder.buildQuery({}, 'payroll');
 
-  // If employee, they cannot view Grades or Configs at all
-  const showGrades = context ? (context.isSuperAdmin || context.isCompanyAdmin || context.role === 'hr_manager' || context.role === 'finance_manager') : true;
-  const showConfig = context ? (context.isSuperAdmin || context.isCompanyAdmin || context.role === 'hr_manager' || context.role === 'finance_manager') : true;
+  // Dynamically resolve permission from matrix instead of using hardcoded roles
+  const showGrades = context ? await checkActionPermission('PayrollGrade', context.role, 'read') : true;
+  const showConfig = context ? await checkActionPermission('PayrollConfig', context.role, 'read') : true;
 
   // Use a role-scoped cache key so employee vs admin see correct filtered data
   const roleScope = context?.role || 'unknown';
@@ -290,18 +291,23 @@ export const saveMonthlyPayment = async (paymentData) => {
   }
 
   logger.debug('Executing PayrollRepository::saveMonthlyPayment', paymentData);
-  if (!paymentData.id) {
-    paymentData.id = `${paymentData.employeeId}-${paymentData.month}-${paymentData.year}`;
+  const updatePayload = { ...paymentData };
+  delete updatePayload._id;
+  delete updatePayload.createdAt;
+  delete updatePayload.updatedAt;
+
+  if (!updatePayload.id) {
+    updatePayload.id = `${updatePayload.employeeId}-${updatePayload.month}-${updatePayload.year}`;
   }
   
-  const existing = await PayrollPayment.findOne({ id: paymentData.id });
-  if (!existing && !paymentData.payrollCode) {
-    const companyId = getTenantId() || paymentData.companyId || 'COMP-001';
+  const existing = await PayrollPayment.findOne({ id: updatePayload.id });
+  if (!existing && !updatePayload.payrollCode) {
+    const companyId = getTenantId() || updatePayload.companyId || 'COMP-001';
     const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-    paymentData.payrollCode = await generateCompanyUniqueId(companyId, 'payroll');
+    updatePayload.payrollCode = await generateCompanyUniqueId(companyId, 'payroll');
   }
 
-  return PayrollPayment.findOneAndUpdate({ id: paymentData.id }, paymentData, { upsert: true, new: true }).lean();
+  return PayrollPayment.findOneAndUpdate({ id: updatePayload.id }, updatePayload, { upsert: true, new: true }).lean();
 };
 
 export const updatePaymentStatus = async (empId, month, year, status) => {
@@ -346,11 +352,58 @@ export const saveGlobalConfigs = async (configs) => {
   }
 
   logger.debug('Executing PayrollRepository::saveGlobalConfigs', configs);
+  const companyId = getTenantId();
+  if (companyId) {
+    const roles = ['hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'company_admin', 'employee'];
+    for (const r of roles) {
+      await cacheDel(`payroll_master:${companyId}:${r}`);
+    }
+  }
+
   return PayrollConfig.findOneAndUpdate(
     { id: 'GLOBAL_CONFIG' },
     configs,
     { upsert: true, new: true }
   ).lean();
+};
+
+export const resetPaymentDeductions = async ({ employeeId, month, year, fields }) => {
+  logger.debug(`PayrollRepository::resetPaymentDeductions - employee: ${employeeId}, month: ${month}, year: ${year}`);
+  const query = {};
+  if (employeeId) query.employeeId = employeeId;
+  if (month) query.month = month;
+  if (year) query.year = year;
+
+  // Default fields to zero out if not specified
+  const fieldsToReset = fields || ['tds', 'pf', 'pt', 'esi'];
+  const updateSet = {};
+  for (const field of fieldsToReset) {
+    updateSet[field] = 0;
+  }
+
+  // Recalculate totalDeductions and netSalary for all matching records
+  const records = await PayrollPayment.find(query).lean();
+  for (const record of records) {
+    const newPf = fieldsToReset.includes('pf') ? 0 : (record.pf || 0);
+    const newTds = fieldsToReset.includes('tds') ? 0 : (record.tds || 0);
+    const newPt = fieldsToReset.includes('pt') ? 0 : (record.pt || 0);
+    const newEsi = fieldsToReset.includes('esi') ? 0 : (record.esi || 0);
+    const statutory = newPf + newTds + newPt + newEsi;
+    const leaveDeductions = record.leaveDeductions || 0;
+    const lateDeductions = record.lateDeductions || 0;
+    const loanEMI = record.loanEMI || 0;
+    const advanceDeduct = record.advanceDeduct || 0;
+    const newTotalDeductions = statutory + leaveDeductions + lateDeductions + loanEMI + advanceDeduct;
+    const grossSalary = record.grossSalary || 0;
+    const newNetSalary = Math.max(0, grossSalary - newTotalDeductions);
+
+    await PayrollPayment.updateOne(
+      { _id: record._id },
+      { $set: { ...updateSet, totalDeductions: newTotalDeductions, netSalary: newNetSalary } }
+    );
+  }
+
+  return { updated: records.length };
 };
 
 export default {
@@ -365,5 +418,6 @@ export default {
   saveMonthlyPayment,
   updatePaymentStatus,
   bulkUpdatePaymentStatus,
-  saveGlobalConfigs
+  saveGlobalConfigs,
+  resetPaymentDeductions
 };

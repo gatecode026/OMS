@@ -63,8 +63,10 @@ const userSessionSchema = new mongoose.Schema({
   os: { type: String, required: true },
   ipAddress: { type: String, required: true },
   location: { type: String, required: true },
-  status: { type: String, enum: ['Active', 'Idle'], default: 'Active' }
+  status: { type: String, enum: ['Active', 'Idle'], default: 'Active' },
+  tokenRef: { type: String, default: null }
 }, { timestamps: true });
+
 
 userSessionSchema.plugin(tenantPlugin);
 export const UserSession = mongoose.model('UserSession', userSessionSchema);
@@ -85,10 +87,27 @@ const securityAlertSchema = new mongoose.Schema({
 securityAlertSchema.plugin(tenantPlugin);
 export const SecurityAlert = mongoose.model('SecurityAlert', securityAlertSchema);
 
+// ─── Employee Lockout Schema ───
+// Stores temporary login bans applied when an admin force-logs-out an employee.
+const employeeLockoutSchema = new mongoose.Schema({
+  employeeId:   { type: String, required: true, index: true },
+  employeeName: { type: String, required: true },
+  companyId:    { type: String, required: true, index: true },
+  lockedUntil:  { type: Date,   required: true },          // absolute expiry time
+  durationLabel:{ type: String, default: '' },             // human label, e.g. "1 Hour"
+  reason:       { type: String, default: 'Force logout by administrator' },
+  lockedBy:     { type: String, default: 'Admin' }
+}, { timestamps: true });
+
+employeeLockoutSchema.index({ employeeId: 1, companyId: 1 });
+employeeLockoutSchema.plugin(tenantPlugin);
+export const EmployeeLockout = mongoose.model('EmployeeLockout', employeeLockoutSchema);
+
 export default {
   IpWhitelist,
   IpBlocklist,
   UserDevice,
   UserSession,
-  SecurityAlert
+  SecurityAlert,
+  EmployeeLockout
 };
