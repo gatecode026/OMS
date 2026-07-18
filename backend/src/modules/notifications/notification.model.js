@@ -34,6 +34,8 @@ const VALID_TYPES = [
   "leave",
   "attendance",
   "poll",
+  "payroll",
+  "performance",
 ];
 
 const notificationSchema = new mongoose.Schema(

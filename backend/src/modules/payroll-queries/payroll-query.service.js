@@ -426,8 +426,36 @@ export const recalculatePayrollRecord = async (payrollId, companyId, options = {
   const basic = payment.basicSalary || emp.salaryAmount || 0;
   const dailySalary = Math.round(basic / Math.max(1, workingDays));
 
-  // 3. Unpaid leave calculation
-  let unpaidDays = summary.unpaidLeaveDays || 0;
+  // 3. Auto-prioritize paid leaves before unpaid:
+  //    Use policy defaultDays as the cap — employee balance fields (clBalance etc.) are
+  //    deducted at leave-approval time and not guaranteed to reflect this month's payroll cycle.
+  const Leave = mongoose.model('Leave');
+  let policies = [];
+  try {
+    const { getTenantConnection } = await import('../../utils/multidbConnection.js');
+    const conn = await getTenantConnection(companyId);
+    if (conn.asPromise) await conn.asPromise();
+    policies = await conn.collection('leaves').find({ isPolicy: true }).toArray();
+  } catch (e) {
+    // Fall back to mongoose model if tenant connection fails
+    policies = await Leave.find({ isPolicy: true, companyId }).lean();
+  }
+
+  let availablePaidLeaves = 0;
+  if (policies && policies.length > 0) {
+    policies.forEach(policy => {
+      if (policy.leaveCode !== 'UL' && policy.leaveCode !== 'LOP' && policy.isActive !== false) {
+        availablePaidLeaves += (policy.defaultDays || 0);
+      }
+    });
+  }
+
+  const totalLeavesTaken = (summary.paidLeaveDays || 0) + (summary.unpaidLeaveDays || 0);
+  // Priority: paid leaves consumed first, remainder → unpaid/LOP
+  const finalPaidLeaveDays = Math.min(totalLeavesTaken, availablePaidLeaves);
+  const finalUnpaidLeaveDays = totalLeavesTaken - finalPaidLeaveDays;
+
+  let unpaidDays = finalUnpaidLeaveDays;
   if (config.halfDayPolicy === 'Deduct Half Day') {
     unpaidDays += (summary.halfDays || 0) * 0.5;
   }
@@ -473,7 +501,7 @@ export const recalculatePayrollRecord = async (payrollId, companyId, options = {
         lateDeductions: lateDeduction,
         totalDeductions,
         netSalary,
-        paidLeaveDays: summary.paidLeaveDays || 0,
+        paidLeaveDays: finalPaidLeaveDays,
         unpaidLeaveDays: unpaidDays
       }
     };
@@ -549,7 +577,7 @@ export const recalculatePayrollRecord = async (payrollId, companyId, options = {
   }
 
   // Update payment document
-  payment.paidLeaveDays = summary.paidLeaveDays || 0;
+  payment.paidLeaveDays = finalPaidLeaveDays;
   payment.unpaidLeaveDays = unpaidDays;
   payment.leaveDeductions = leaveDeduction;
   payment.totalDeductions = totalDeductions;

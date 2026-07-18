@@ -34,7 +34,8 @@ import {
   UserSquare2,
   LogOut,
   Sparkles,
-  UserCog
+  UserCog,
+  TrendingUp
 } from 'lucide-react';
 
 const menuStructure = [
@@ -88,6 +89,7 @@ const menuStructure = [
       { name: 'Task Monitoring', icon: KanbanSquare, path: '/tasks' },
       { name: 'Work Reports', icon: FileText, path: '/work-reports' },
       { name: 'Performance Analytics', icon: BarChart3, path: '/performance' },
+      { name: 'KPI Management', icon: TrendingUp, path: '/kpi' },
       { name: 'Payroll Management', icon: DollarSign, path: '/payroll' },
       { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }
     ]
@@ -408,6 +410,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                   { name: 'Announcements', icon: Megaphone, path: '/announcements' },
                   { name: 'Notifications', icon: Bell, path: '/notifications', badgeKey: 'notifications' },
                   { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat' },
+                  { name: 'KPI Management', icon: TrendingUp, path: '/kpi' },
                   { name: 'Payroll', icon: DollarSign, path: '/payroll' },
                   { name: 'Documents', icon: FolderClosed, path: '/documents' },
                   { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }

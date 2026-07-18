@@ -81,6 +81,7 @@ const Payroll = () => {
     payrollBonuses,
     payrollPayments,
     payrollConfigs,
+    payrollLeavePolicies,
     activityLogs,
     addOrUpdateSalaryGrade,
     deleteSalaryGrade,
@@ -166,6 +167,7 @@ const Payroll = () => {
   const isCompanyView = perspective === 'company';
 
   const [activeTab, setActiveTab] = useState('processing');
+  const [updatingEmpId, setUpdatingEmpId] = useState(null);
   const [recalcPreviewData, setRecalcPreviewData] = useState(null);
   const [showRecalcModal, setShowRecalcModal] = useState(false);
   const [isSubmittingRecalc, setIsSubmittingRecalc] = useState(false);
@@ -742,8 +744,26 @@ const Payroll = () => {
       // 2. Daily Salary Rate
       const dailySalary = workingDays > 0 ? Math.round(empBasicSalary / workingDays) : 0;
 
-      // 3. Unpaid days
-      let unpaidDays = summary.unpaidLeaveDays || 0;
+      // 3. Auto-prioritize paid leaves before unpaid:
+      //    Available paid leave = annual entitlement from DB policy defaultDays (source of truth).
+      //    Employee balance fields (clBalance etc.) are deducted at leave-approval time and may
+      //    not match the current payroll month's usage, so we use defaultDays for the cap.
+      let availablePaidLeaves = 0;
+      if (payrollLeavePolicies && payrollLeavePolicies.length > 0) {
+        payrollLeavePolicies.forEach(policy => {
+          if (policy.leaveCode !== 'UL' && policy.leaveCode !== 'LOP' && policy.isActive !== false) {
+            availablePaidLeaves += (policy.defaultDays || 0);
+          }
+        });
+      }
+
+      // Total leaves/absences taken this month (paid + unpaid as classified by attendance)
+      const totalLeavesTaken = (summary.paidLeaveDays || 0) + (summary.unpaidLeaveDays || 0);
+      // Priority rule: consume paid leave first, overflow → unpaid/LOP
+      const finalPaidLeaveDays = Math.min(totalLeavesTaken, availablePaidLeaves);
+      const finalUnpaidLeaveDays = totalLeavesTaken - finalPaidLeaveDays;
+
+      let unpaidDays = finalUnpaidLeaveDays;
       if (configHalfDayPolicy === 'Deduct Half Day') {
         unpaidDays += (summary.halfDays || 0) * 0.5;
       }
@@ -802,8 +822,9 @@ const Payroll = () => {
         designation: (emp?.designation || p.designation || '-').trim(),
         basicSalary: struct.basic || empBasicSalary,
         grossSalary,
-        attendanceDays: summary.presentDays + summary.paidLeaveDays + (summary.halfDays * (configHalfDayPolicy === 'Deduct Half Day' ? 0.5 : 1)),
-        paidLeaveDays: summary.paidLeaveDays,
+        attendanceDays: summary.presentDays + finalPaidLeaveDays + (summary.halfDays * (configHalfDayPolicy === 'Deduct Half Day' ? 0.5 : 1)),
+        paidLeaveDays: finalPaidLeaveDays,
+        totalPaidLeavesFromDB: availablePaidLeaves,
         unpaidLeaveDays: unpaidDays,
         leaveDeductions: leaveDeduction,
         lateDeductions: lateDeduction,
@@ -982,10 +1003,12 @@ const Payroll = () => {
 
   // Handle single status change
   const handleStatusChange = async (empId, nextStatus) => {
-    const paymentObj = calculatedPayrollData.find(p => p.employeeId === empId);
-    const success = await updateSinglePayrollStatus(paymentObj, nextStatus);
-    if (success) {
-      addPageToast('info', `Status of employee ${empId} set to: ${nextStatus}`);
+    setUpdatingEmpId(empId);
+    try {
+      const paymentObj = calculatedPayrollData.find(p => p.employeeId === empId);
+      await updateSinglePayrollStatus(paymentObj, nextStatus);
+    } finally {
+      setUpdatingEmpId(null);
     }
   };
 
@@ -1913,13 +1936,23 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                                 />
                               )}
 
-                              {perspective !== 'self' && perspective !== 'employee' && row.status !== 'Released' && (
+                              {perspective !== 'self' && perspective !== 'employee' && (
                                 <button
                                   className="action-circle-btn success-btn"
                                   onClick={() => handleStatusChange(row.employeeId, 'Released')}
-                                  title="Distribute Salary"
+                                  title={row.status === 'Released' ? "Salary Distributed" : "Distribute Salary"}
+                                  disabled={updatingEmpId === row.employeeId || row.status === 'Released'}
+                                  style={
+                                    updatingEmpId === row.employeeId || row.status === 'Released'
+                                      ? { opacity: 0.6, cursor: 'not-allowed' }
+                                      : {}
+                                  }
                                 >
-                                  <Check size={14} />
+                                  {updatingEmpId === row.employeeId ? (
+                                    <RefreshCw size={14} className="animate-spin" />
+                                  ) : (
+                                    <Check size={14} />
+                                  )}
                                 </button>
                               )}
                             </div>
@@ -3187,22 +3220,56 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.25rem' }}>
                   <div className="flex-column gap-1">
                     <div className="flex-center justify-between">
-                      <span className="text-muted">Paid Leave Used:</span>
+                      <span className="text-muted">Present Days:</span>
+                      <strong>{(() => {
+                        const summary = monthlyPayrollSummary?.[payslipEmployeeObj.employeeId];
+                        return summary ? (summary.presentDays || 0) : 0;
+                      })()} Days</strong>
+                    </div>
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">Total Paid Leaves:</span>
+                      <strong>{(() => {
+                        // Total Paid Leaves = company-allocated annual entitlement from DB policies (defaultDays)
+                        if (payrollLeavePolicies && payrollLeavePolicies.length > 0) {
+                          const total = payrollLeavePolicies
+                            .filter(p => p.leaveCode !== 'UL' && p.leaveCode !== 'LOP' && p.isActive !== false)
+                            .reduce((sum, p) => sum + (p.defaultDays || 0), 0);
+                          return `${total} Days`;
+                        }
+                        return '0 Days';
+                      })()}</strong>
+                    </div>
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">Used Paid Leaves:</span>
                       <strong>{payslipEmployeeObj.paidLeaveDays || 0} Days</strong>
                     </div>
                     <div className="flex-center justify-between">
                       <span className="text-muted">Remaining Paid Leave:</span>
                       <strong>{(() => {
-                        const emp = resolveEmployee(payslipEmployeeObj.employeeId);
-                        if (!emp) return '0 Days';
-                        const cl = typeof emp.clBalance === 'number' ? emp.clBalance : 0;
-                        const sl = typeof emp.slBalance === 'number' ? emp.slBalance : 0;
-                        const pl = typeof emp.plBalance === 'number' ? emp.plBalance : 0;
-                        return `${cl + sl + pl} Days`;
+                        // Remaining = Total allocated by company (DB defaultDays) - Used this month
+                        const total = payslipEmployeeObj.totalPaidLeavesFromDB != null
+                          ? payslipEmployeeObj.totalPaidLeavesFromDB
+                          : (payrollLeavePolicies || [])
+                              .filter(p => p.leaveCode !== 'UL' && p.leaveCode !== 'LOP' && p.isActive !== false)
+                              .reduce((s, p) => s + (p.defaultDays || 0), 0);
+                        const used = payslipEmployeeObj.paidLeaveDays || 0;
+                        return `${Math.max(0, total - used)} Days`;
                       })()}</strong>
                     </div>
                   </div>
                   <div className="flex-column gap-1">
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">No. of Working Days:</span>
+                      <strong>{(() => {
+                        const months = {
+                          'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
+                          'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12
+                        };
+                        const monthNum = months[month] || 6;
+                        const yrNum = parseInt(year || '2026');
+                        return new Date(yrNum, monthNum, 0).getDate();
+                      })()} Days</strong>
+                    </div>
                     <div className="flex-center justify-between">
                       <span className="text-muted">Unpaid / LOP Leave:</span>
                       <strong>{payslipEmployeeObj.unpaidLeaveDays || 0} Days</strong>

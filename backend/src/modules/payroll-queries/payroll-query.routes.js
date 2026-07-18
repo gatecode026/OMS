@@ -27,12 +27,12 @@ router.route('/:id/comment')
 
 // HR Actions: internal notes and ticket status resolutions
 router.route('/:id/internal-note')
-  .post(restrictTo('hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'manager'), controller.postInternalNote);
+  .post(restrictTo('hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'manager', 'role_hr'), controller.postInternalNote);
 
 router.route('/:id/action')
-  .post(restrictTo('hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'manager'), controller.processHRAction);
+  .post(restrictTo('hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'manager', 'role_hr'), controller.processHRAction);
 
 router.route('/recalculate/:payrollId')
-  .post(restrictTo('hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'manager'), controller.triggerRecalculate);
+  .post(restrictTo('hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'manager', 'role_hr'), controller.triggerRecalculate);
 
 export default router;

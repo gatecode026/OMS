@@ -185,6 +185,7 @@ const RolesPermissions = () => {
     'task_monitoring',
     'payroll_management',
     'work_reports',
+    'performance_analytics',
     'meetings_calendar',
     'announcements'
   ];

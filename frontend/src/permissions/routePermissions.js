@@ -32,6 +32,9 @@ export const ROUTE_PERMISSIONS = {
   '/tasks': ROLES.EMPLOYEE,
   '/work-reports': ROLES.EMPLOYEE,
   '/performance': ROLES.EMPLOYEE,
+  '/kpi': ROLES.EMPLOYEE,
+  '/kpi/:tab': ROLES.EMPLOYEE,
+  '/kpi/:tab/:id': ROLES.EMPLOYEE,
   '/calendar': ROLES.EMPLOYEE,
 
   // Employee and above (General Access)
@@ -107,6 +110,9 @@ export const PATH_TO_MODULE = {
   '/tasks': 'task_monitoring',
   '/work-reports': 'work_reports',
   '/performance': 'performance_analytics',
+  '/kpi': 'performance_analytics',
+  '/kpi/:tab': 'performance_analytics',
+  '/kpi/:tab/:id': 'performance_analytics',
   '/payroll': 'payroll_management',
   '/calendar': 'meetings_calendar',
   '/announcements': 'announcements',

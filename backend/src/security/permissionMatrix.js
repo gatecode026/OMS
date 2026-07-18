@@ -30,7 +30,8 @@ const FRONTEND_TO_BACKEND_KEYS = {
   announcements: ['Announcement', 'Announcements', 'AnnouncementTrackingLog', 'AnnouncementAuditLog'],
   system_settings: ['SystemSettings', 'Settings'],
   role_permission: ['Role', 'PermissionModule', 'UserOverride', 'Workflow', 'Workflows'],
-  security_audit_logs: ['SecurityAlert', 'Security', 'ActivityLog']
+  security_audit_logs: ['SecurityAlert', 'Security', 'ActivityLog'],
+  performance_analytics: ['Goal', 'Pip', 'KpiTemplate', 'KpiEvaluationCycle', 'KpiEmployeeEvaluation']
 };
 
 // Reverse mapping: backend key → frontend key (for DB lookups)
