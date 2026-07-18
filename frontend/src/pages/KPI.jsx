@@ -73,6 +73,18 @@ export default function KPI() {
   const [myEvaluations, setMyEvaluations] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Global Export Modal States
+  const [showGlobalExportModal, setShowGlobalExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState('csv');
+  const [exportDateFrom, setExportDateFrom] = useState('');
+  const [exportDateTo, setExportDateTo] = useState('');
+  const [exportStatusFilter, setExportStatusFilter] = useState('all');
+  const [exportDeptFilter, setExportDeptFilter] = useState('all');
+  const [exportCycleFilter, setExportCycleFilter] = useState('all');
+  const [exportIncludeComments, setExportIncludeComments] = useState(true);
+  const [exportIncludeScoreBreakdown, setExportIncludeScoreBreakdown] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+
   // API Call helper
   const apiCall = async (url, method = 'GET', body = null) => {
     const headers = {
@@ -127,6 +139,162 @@ export default function KPI() {
   // Handle active navigation item click
   const handleNav = (targetTab) => {
     navigate(`/kpi/${targetTab}`);
+  };
+
+  const handleGlobalExport = () => {
+    setIsExporting(true);
+    try {
+      // Determine base list based on perspective
+      const baseList = perspective === 'self' ? myEvaluations : evaluations;
+      
+      // Filter list
+      let filtered = [...baseList];
+      
+      if (exportStatusFilter !== 'all') {
+        filtered = filtered.filter(ev => ev.status === exportStatusFilter);
+      }
+      
+      if (exportDeptFilter !== 'all') {
+        filtered = filtered.filter(ev => ev.departmentId === exportDeptFilter);
+      }
+      
+      if (exportCycleFilter !== 'all') {
+        filtered = filtered.filter(ev => ev.cycleId === exportCycleFilter);
+      }
+      
+      if (exportDateFrom) {
+        filtered = filtered.filter(ev => new Date(ev.periodStart || ev.createdAt) >= new Date(exportDateFrom));
+      }
+      
+      if (exportDateTo) {
+        filtered = filtered.filter(ev => new Date(ev.periodEnd || ev.createdAt) <= new Date(exportDateTo));
+      }
+
+      if (filtered.length === 0) {
+        addToast('error', 'No evaluations match your export filters.');
+        setIsExporting(false);
+        return;
+      }
+
+      const exportDate = new Date().toLocaleDateString();
+      const exportTitle = perspective === 'self' ? 'My_KPI_Performance' : 'KPI_Evaluation_Report';
+
+      if (exportFormat === 'csv' || exportFormat === 'excel') {
+        const sep = exportFormat === 'csv' ? ',' : '\t';
+        
+        // Find all unique attribute names across filtered evals to build dynamic column headers
+        const uniqueAttrNames = [];
+        const uniqueAttrIds = [];
+        filtered.forEach(ev => {
+          ev.attributeScores?.forEach(a => {
+            if (!uniqueAttrIds.includes(a.attributeId)) {
+              uniqueAttrIds.push(a.attributeId);
+              uniqueAttrNames.push(a.attributeName);
+            }
+          });
+        });
+
+        const headerRow = ['Employee', 'Designation', 'Department', 'Period', 'Status', 'Total Score', 'Rating'];
+        if (exportIncludeScoreBreakdown) {
+          headerRow.push(...uniqueAttrNames);
+        }
+        if (exportIncludeComments) {
+          headerRow.push('Manager Comment');
+        }
+        
+        const rows = [headerRow.join(sep)];
+        rows.unshift(`# Export: ${perspective === 'self' ? 'Self View' : 'Company View'}${sep}Date: ${exportDate}`);
+        rows.push('');
+
+        filtered.forEach(ev => {
+          const row = [
+            `"${ev.employeeName || currentUser.name || ''}"`,
+            `"${ev.designation || ''}"`,
+            `"${ev.departmentName || ''}"`,
+            `"${ev.periodLabel || ''}"`,
+            `"${ev.status}"`,
+            ev.totalScore ?? '',
+            `"${ev.rating || 'Pending'}"`
+          ];
+          
+          if (exportIncludeScoreBreakdown) {
+            uniqueAttrIds.forEach(id => {
+              const scoreObj = ev.attributeScores?.find(a => a.attributeId === id);
+              row.push(scoreObj ? (scoreObj.finalScore ?? '--') : '');
+            });
+          }
+          
+          if (exportIncludeComments) {
+            row.push(`"${ev.managerComment || ''}"`);
+          }
+          
+          rows.push(row.join(sep));
+        });
+
+        const content = rows.join('\n');
+        const ext = exportFormat === 'csv' ? 'csv' : 'xls';
+        const mimeType = exportFormat === 'csv' ? 'text/csv' : 'application/vnd.ms-excel';
+        const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${exportTitle}_${exportDate.replace(/\//g, '-')}.${ext}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        addToast('success', `Export downloaded as .${ext} successfully!`);
+      } else if (exportFormat === 'pdf') {
+        const printWindow = window.open('', '_blank');
+        
+        const bodyRows = filtered.map(ev => {
+          return `<tr>
+            <td style="padding:6px 10px;border:1px solid #334155;font-weight:600;font-size:12px;">${ev.employeeName || currentUser.name}</td>
+            <td style="padding:6px 10px;border:1px solid #334155;font-size:12px;">${ev.designation || ''}</td>
+            <td style="padding:6px 10px;border:1px solid #334155;font-size:12px;">${ev.departmentName || ''}</td>
+            <td style="padding:6px 10px;border:1px solid #334155;font-size:12px;text-align:center;">${ev.periodLabel || ''}</td>
+            <td style="padding:6px 10px;border:1px solid #334155;text-align:center;font-weight:700;font-size:12px;">${ev.totalScore ?? ''}%</td>
+            <td style="padding:6px 10px;border:1px solid #334155;text-align:center;font-size:12px;">${ev.rating || 'Pending'}</td>
+            <td style="padding:6px 10px;border:1px solid #334155;text-align:center;font-size:12px;">${ev.status}</td>
+            ${exportIncludeComments ? `<td style="padding:6px 10px;border:1px solid #334155;font-size:11px;max-width:200px;">${ev.managerComment || ''}</td>` : ''}
+          </tr>`;
+        }).join('');
+
+        printWindow.document.write(`
+          <html><head><title>KPI Performance Report</title></head>
+          <body style="font-family:'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:32px;">
+            <div style="max-width:1200px;margin:0 auto;">
+              <h1 style="color:#db2777;margin-bottom:4px;">KPI Performance Report</h1>
+              <p style="color:#94a3b8;margin-bottom:4px;">Perspective: ${perspective === 'self' ? 'Self View (My Evaluations)' : 'Company View (All Evaluations)'}</p>
+              <p style="color:#64748b;font-size:13px;">Generated: ${exportDate}${exportDateFrom ? ' | Range: ' + exportDateFrom + ' to ' + (exportDateTo || 'Present') : ''}</p>
+              <hr style="border-color:#334155;margin:16px 0;">
+              <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+                <thead><tr>
+                  <th style="padding:8px 12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;text-align:left;">Employee</th>
+                  <th style="padding:8px 12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;text-align:left;">Designation</th>
+                  <th style="padding:8px 12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;text-align:left;">Department</th>
+                  <th style="padding:8px 12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;">Period</th>
+                  <th style="padding:8px 12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;">Total</th>
+                  <th style="padding:8px 12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;">Rating</th>
+                  <th style="padding:8px 12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;">Status</th>
+                  ${exportIncludeComments ? '<th style="padding:8px 12px;border:1px solid #334155;background:#1e293b;color:#f1f5f9;font-size:12px;text-align:left;">Comment</th>' : ''}
+                </tr></thead>
+                <tbody>${bodyRows}</tbody>
+              </table>
+              <p style="margin-top:24px;color:#475569;font-size:11px;">Generated from OMS KPI Management System</p>
+            </div>
+            <script>setTimeout(()=>{window.print();},500);<\/script>
+          </body></html>
+        `);
+        printWindow.document.close();
+        addToast('success', 'PDF report opened in new tab. Use Print → Save as PDF.');
+      }
+      setShowGlobalExportModal(false);
+    } catch (err) {
+      addToast('error', 'Export failed: ' + err.message);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -187,28 +355,34 @@ export default function KPI() {
             )}
           </div>
 
-          {hasBoth && (
-            <div className="perspective-dropdown-container">
-              <label htmlFor="perspective-select">Perspective:</label>
-              <select
-                id="perspective-select"
-                className="perspective-select"
-                value={perspective}
-                onChange={e => {
-                  const newPers = e.target.value;
-                  setPerspective(newPers);
-                  if (newPers === 'company') {
-                    navigate('/kpi/dashboard');
-                  } else {
-                    navigate('/kpi/my-kpi');
-                  }
-                }}
-              >
-                <option value="company">Company View</option>
-                <option value="self">Self View</option>
-              </select>
-            </div>
-          )}
+          <div className="flex-center gap-3" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: 'var(--space-2)' }}>
+            <button className="btn btn-outline-export" onClick={() => setShowGlobalExportModal(true)}>
+              <Download size={14} />
+              <span>Export Details</span>
+            </button>
+            {hasBoth && (
+              <div className="perspective-dropdown-container" style={{ margin: 0 }}>
+                <label htmlFor="perspective-select">Perspective:</label>
+                <select
+                  id="perspective-select"
+                  className="perspective-select"
+                  value={perspective}
+                  onChange={e => {
+                    const newPers = e.target.value;
+                    setPerspective(newPers);
+                    if (newPers === 'company') {
+                      navigate('/kpi/dashboard');
+                    } else {
+                      navigate('/kpi/my-kpi');
+                    }
+                  }}
+                >
+                  <option value="company">Company View</option>
+                  <option value="self">Self View</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -244,6 +418,191 @@ export default function KPI() {
           </>
         )}
       </div>
+
+      {/* Global Export Modal */}
+      {showGlobalExportModal && (
+        <div className="export-modal-overlay" onClick={() => setShowGlobalExportModal(false)}>
+          <div className="export-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="export-modal-header">
+              <div className="export-modal-title">
+                <div className="export-icon-glow">
+                  <Download size={20} />
+                </div>
+                <div>
+                  <h3>Export KPI Details</h3>
+                  <p className="text-muted">{perspective === 'company' ? 'Company View Evaluations' : 'Self View Evaluations'}</p>
+                </div>
+              </div>
+              <button className="btn-close" onClick={() => setShowGlobalExportModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="export-modal-body">
+              {/* Format Selection */}
+              <div className="export-section">
+                <label className="export-label">Export Format</label>
+                <div className="export-format-cards">
+                  <button
+                    className={`format-card ${exportFormat === 'csv' ? 'active' : ''}`}
+                    onClick={() => setExportFormat('csv')}
+                  >
+                    <FileText size={24} />
+                    <span className="format-name">CSV</span>
+                    <span className="format-desc">Comma-separated values</span>
+                  </button>
+                  <button
+                    className={`format-card ${exportFormat === 'excel' ? 'active' : ''}`}
+                    onClick={() => setExportFormat('excel')}
+                  >
+                    <FileText size={24} />
+                    <span className="format-name">Excel</span>
+                    <span className="format-desc">Spreadsheet (.xls)</span>
+                  </button>
+                  <button
+                    className={`format-card ${exportFormat === 'pdf' ? 'active' : ''}`}
+                    onClick={() => setExportFormat('pdf')}
+                  >
+                    <Download size={24} />
+                    <span className="format-name">PDF</span>
+                    <span className="format-desc">Print-ready report</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Department & Cycle Filters (Company View Only) */}
+              {perspective === 'company' && (
+                <div className="export-date-row">
+                  <div className="export-field">
+                    <label className="export-label">Department</label>
+                    <select
+                      className="export-input"
+                      value={exportDeptFilter}
+                      onChange={e => setExportDeptFilter(e.target.value)}
+                    >
+                      <option value="all">All Departments</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="export-field">
+                    <label className="export-label">Cycle / Period</label>
+                    <select
+                      className="export-input"
+                      value={exportCycleFilter}
+                      onChange={e => setExportCycleFilter(e.target.value)}
+                    >
+                      <option value="all">All Cycles</option>
+                      {cycles.map(c => (
+                        <option key={c.id} value={c.id}>{c.departmentName} - {c.periodLabel}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Date Range */}
+              <div className="export-section">
+                <label className="export-label">
+                  <Calendar size={14} />
+                  Date Range <span className="text-muted">(optional)</span>
+                </label>
+                <div className="export-date-row">
+                  <div className="export-field">
+                    <label className="export-sublabel">From</label>
+                    <input
+                      type="date"
+                      className="export-input"
+                      value={exportDateFrom}
+                      onChange={e => setExportDateFrom(e.target.value)}
+                    />
+                  </div>
+                  <div className="export-field">
+                    <label className="export-sublabel">To</label>
+                    <input
+                      type="date"
+                      className="export-input"
+                      value={exportDateTo}
+                      onChange={e => setExportDateTo(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div className="export-section">
+                <label className="export-label">
+                  <Filter size={14} />
+                  Status Filter
+                </label>
+                <select
+                  className="export-input"
+                  value={exportStatusFilter}
+                  onChange={e => setExportStatusFilter(e.target.value)}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="Draft">Draft</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Submitted">Submitted</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Locked">Locked</option>
+                </select>
+              </div>
+
+              {/* Include Options */}
+              <div className="export-section">
+                <label className="export-label">Include in Export</label>
+                <div className="export-toggles">
+                  <label className="export-toggle-item">
+                    <input
+                      type="checkbox"
+                      checked={exportIncludeScoreBreakdown}
+                      onChange={e => setExportIncludeScoreBreakdown(e.target.checked)}
+                    />
+                    <span>Individual attribute scores</span>
+                  </label>
+                  <label className="export-toggle-item">
+                    <input
+                      type="checkbox"
+                      checked={exportIncludeComments}
+                      onChange={e => setExportIncludeComments(e.target.checked)}
+                    />
+                    <span>Manager comments</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="export-summary-strip">
+                <span>
+                  {(() => {
+                    const baseList = perspective === 'self' ? myEvaluations : evaluations;
+                    let count = baseList.length;
+                    if (exportStatusFilter !== 'all') count = baseList.filter(ev => ev.status === exportStatusFilter).length;
+                    return count;
+                  })()} evaluation(s) selected for export
+                </span>
+              </div>
+            </div>
+
+            <div className="export-modal-footer">
+              <button className="btn btn-outline" onClick={() => setShowGlobalExportModal(false)}>Cancel</button>
+              <button
+                className="btn btn-primary export-btn-glow"
+                onClick={handleGlobalExport}
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <><RefreshCw size={16} className="animate-spin" /> Exporting...</>
+                ) : (
+                  <><Download size={16} /> Export Now</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
