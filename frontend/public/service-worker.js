@@ -88,7 +88,15 @@ self.addEventListener('push', function (event) {
         clients[0].postMessage({
           type: 'PLAY_SOUND',
           notificationType: type || 'message',
-          callId: data.callId
+          callId: data.callId,
+          callData: type === 'incoming_call' ? {
+            callId: data.callId,
+            callerId: data.callerId,
+            callerName: data.callerName,
+            callerAvatar: data.callerAvatar,
+            callType: data.callType,
+            conversationId: data.conversationId
+          } : null
         });
       }
     })

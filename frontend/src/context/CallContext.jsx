@@ -261,7 +261,16 @@ export const CallProvider = ({ children }) => {
     if (!('serviceWorker' in navigator)) return;
 
     const handleSWMessage = (event) => {
-      if (event.data && event.data.type === 'STOP_SOUND') {
+      if (event.data && event.data.type === 'PLAY_SOUND') {
+        console.log('[CallContext] PLAY_SOUND event received from Service Worker:', event.data);
+        if (event.data.notificationType === 'incoming_call' && event.data.callData) {
+          if (callStateRef.current === 'idle') {
+            console.log('[CallContext] WebSocket call:incoming did not arrive yet. Triggering push notification failover incoming call UI.');
+            setCallInfo(event.data.callData);
+            setCallState('incoming');
+          }
+        }
+      } else if (event.data && event.data.type === 'STOP_SOUND') {
         console.log('[CallContext] STOP_SOUND event received from Service Worker:', event.data);
         callSounds.stopAll();
         cleanupRef.current();
