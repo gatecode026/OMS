@@ -34,11 +34,16 @@ class NotificationService {
     }
 
     try {
-      // Register SW from root scope
       const registration = await navigator.serviceWorker.register('/service-worker.js', {
         scope: '/'
       });
       console.log('[Notification Service] Service Worker registered with scope:', registration.scope);
+      try {
+        await registration.update();
+        console.log('[Notification Service] Forced service worker update check on load.');
+      } catch (updateErr) {
+        console.warn('[Notification Service] Failed to check for SW update:', updateErr);
+      }
       this.swRegistration = registration;
       
       // Sync active token to cache in case SW was just reloaded

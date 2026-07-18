@@ -239,9 +239,7 @@ export const ChatProvider = ({ children }) => {
     const handleSWMessage = (event) => {
       if (event.data && event.data.type === 'PLAY_SOUND') {
         console.log('[ChatContext] Sound trigger from Service Worker:', event.data);
-        if (event.data.notificationType === 'incoming_call') {
-          callSounds.startIncomingRing();
-        } else {
+        if (event.data.notificationType !== 'incoming_call') {
           playNotificationChime();
         }
       }

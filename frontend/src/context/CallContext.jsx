@@ -261,14 +261,21 @@ export const CallProvider = ({ children }) => {
     if (!('serviceWorker' in navigator)) return;
 
     const handleSWMessage = (event) => {
-      if (event.data && event.data.type === 'STOP_SOUND') {
-        console.log('[CallContext] STOP_SOUND event received from Service Worker:', event.data);
-        const currentCallInfo = callInfoRef.current;
-        if (!event.data.callId || currentCallInfo?.callId === event.data.callId) {
-          cleanupRef.current();
-          setCallState('idle');
-          setCallInfo(null);
+      if (event.data && event.data.type === 'PLAY_SOUND') {
+        console.log('[CallContext] PLAY_SOUND event received from Service Worker:', event.data);
+        if (event.data.notificationType === 'incoming_call' && event.data.callData) {
+          if (callStateRef.current === 'idle') {
+            console.log('[CallContext] WebSocket call:incoming did not arrive yet. Triggering push notification failover incoming call UI.');
+            setCallInfo(event.data.callData);
+            setCallState('incoming');
+          }
         }
+      } else if (event.data && event.data.type === 'STOP_SOUND') {
+        console.log('[CallContext] STOP_SOUND event received from Service Worker:', event.data);
+        callSounds.stopAll();
+        cleanupRef.current();
+        setCallState('idle');
+        setCallInfo(null);
       }
     };
 
@@ -335,6 +342,7 @@ export const CallProvider = ({ children }) => {
 
     // Call rejected
     const onCallRejected = ({ callId, reason, calleeName, calleeId, callerId }) => {
+      callSounds.stopAll();
       cleanupRef.current();
       setCallState('idle');
       setCallInfo(null);
@@ -354,6 +362,7 @@ export const CallProvider = ({ children }) => {
 
     // Call ended by other party
     const onCallEnded = ({ callId, duration, endedBy }) => {
+      callSounds.stopAll();
       cleanupRef.current();
       setCallState('idle');
       setCallInfo(null);
@@ -364,6 +373,7 @@ export const CallProvider = ({ children }) => {
 
     // Call missed
     const onCallMissed = ({ callId, callerName, reason }) => {
+      callSounds.stopAll();
       cleanupRef.current();
       setCallState('idle');
       setCallInfo(null);
@@ -372,6 +382,7 @@ export const CallProvider = ({ children }) => {
 
     // Call error
     const onCallError = ({ code, message }) => {
+      callSounds.stopAll();
       setCallError(message);
       cleanupRef.current();
       setCallState('idle');

@@ -324,7 +324,7 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
       }
       if (e.shiftKey && key === 'x') {
         e.preventDefault();
-        handleFormat('~', '~');
+        handleFormat('~~', '~~');
         return;
       }
       if (e.shiftKey && key === 'c') {
@@ -334,7 +334,75 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
       }
     }
 
-    // 2. Original enter key handler
+    // 2. Shift+Enter handler for lists auto-continuation
+    if (e.key === 'Enter' && e.shiftKey) {
+      const ta = textareaRef.current;
+      if (ta) {
+        const start = ta.selectionStart;
+        const val = ta.value;
+        const lastNewline = val.lastIndexOf('\n', start - 1);
+        const lineStart = lastNewline === -1 ? 0 : lastNewline + 1;
+        const currentLine = val.substring(lineStart, start);
+
+        // Check if the current line starts with bullet list (* or - or +)
+        const bulletMatch = currentLine.match(/^(\s*)([\*\-+])\s+/);
+        if (bulletMatch) {
+          e.preventDefault();
+          const indent = bulletMatch[1];
+          const marker = bulletMatch[2];
+          
+          if (currentLine.trim() === marker) {
+            // Erase the empty bullet
+            const newVal = val.substring(0, lineStart) + '\n' + val.substring(start);
+            setMessage(newVal);
+            setTimeout(() => {
+              ta.setSelectionRange(lineStart + 1, lineStart + 1);
+              resizeTextarea();
+            }, 0);
+          } else {
+            const insertText = `\n${indent}${marker} `;
+            const newVal = val.substring(0, start) + insertText + val.substring(start);
+            setMessage(newVal);
+            setTimeout(() => {
+              const newPos = start + insertText.length;
+              ta.setSelectionRange(newPos, newPos);
+              resizeTextarea();
+            }, 0);
+          }
+          return;
+        }
+
+        // Check if current line starts with numbered list (e.g. 1.)
+        const numberMatch = currentLine.match(/^(\s*)(\d+)\.\s+/);
+        if (numberMatch) {
+          e.preventDefault();
+          const indent = numberMatch[1];
+          const num = parseInt(numberMatch[2], 10);
+          
+          if (currentLine.trim() === `${num}.`) {
+            // Erase the empty numbered list item
+            const newVal = val.substring(0, lineStart) + '\n' + val.substring(start);
+            setMessage(newVal);
+            setTimeout(() => {
+              ta.setSelectionRange(lineStart + 1, lineStart + 1);
+              resizeTextarea();
+            }, 0);
+          } else {
+            const insertText = `\n${indent}${num + 1}. `;
+            const newVal = val.substring(0, start) + insertText + val.substring(start);
+            setMessage(newVal);
+            setTimeout(() => {
+              const newPos = start + insertText.length;
+              ta.setSelectionRange(newPos, newPos);
+              resizeTextarea();
+            }, 0);
+          }
+          return;
+        }
+      }
+    }
+
+    // 3. Original enter key handler
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       // Ensure we don't send if button is disabled
