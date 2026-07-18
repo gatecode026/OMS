@@ -110,7 +110,11 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
         <Pressable
           style={styles.headerTitleContainer}
-          onPress={() => router.push(`/chat/contact-info?id=${conversationId}` as any)}
+          onPress={() => router.push(
+            conversation?.type === 'direct'
+              ? `/chat/chat-profile?id=${conversationId}` as any
+              : `/chat/contact-info?id=${conversationId}` as any
+          )}
         >
           <View style={styles.avatarWrapper}>
             <Avatar name={chatMeta.title} size={36} source={chatMeta.avatar || undefined} />
@@ -138,7 +142,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         </Pressable>
 
         <View style={styles.headerRightRow}>
-          {conversation?.type === 'direct' && (
+          {conversation?.type === 'direct' && !(chatMeta as any).isBlocked && (
             <>
               <Pressable style={styles.headerBtn} onPress={onVoiceCallInit} accessibilityLabel="Start Voice Call" accessibilityRole="button" accessible>
                 <Ionicons name="call-outline" size={22} color={colors.text} />
@@ -148,7 +152,11 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               </Pressable>
             </>
           )}
-          <Pressable style={styles.headerBtn} onPress={() => router.push(`/chat/contact-info?id=${conversationId}` as any)} accessibilityLabel="Chat Information Options" accessibilityRole="button" accessible>
+          <Pressable style={styles.headerBtn} onPress={() => router.push(
+            conversation?.type === 'direct'
+              ? `/chat/chat-profile?id=${conversationId}` as any
+              : `/chat/contact-info?id=${conversationId}` as any
+          )} accessibilityLabel="Chat Information Options" accessibilityRole="button" accessible>
             <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
           </Pressable>
         </View>

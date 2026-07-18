@@ -18,7 +18,11 @@ import {
 } from '@expo-google-fonts/inter';
 import RootProvider from '../src/shared/providers/RootProvider';
 import useAuthStore from '../src/shared/store/authStore';
-import { SplashScreen, ToastView, ToastRef, setToastRef } from '../src/shared/components';
+import useGlobalSockets from '../src/shared/hooks/useGlobalSockets';
+import { SplashScreen, ToastView, ToastRef, setToastRef, toast } from '../src/shared/components';
+import { usePresenceStore } from '../src/shared/store/presenceStore';
+import { connectSocket } from '../src/shared/services/socketManager';
+import secureStore from '../src/shared/services/secureStore';
 import * as KeepAwake from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { registerDeviceForPushNotifications } from '../src/shared/services/pushNotification';
@@ -53,13 +57,31 @@ ExpoSplashScreen.preventAutoHideAsync().catch(() => {
 
 // Configure global notification handler
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async (notification) => {
+    const { data } = notification.request.content;
+    const conversationId = data?.conversationId;
+    const activeConversationId = usePresenceStore.getState().activeConversationId;
+
+    // Suppress notifications entirely if already looking at the conversation
+    if (activeConversationId === conversationId) {
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: false,
+        shouldShowList: false,
+      };
+    }
+
+    // Suppress native system banner in foreground to avoid duplicates, but play a soft sound
+    return {
+      shouldShowAlert: false,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: false,
+      shouldShowList: false,
+    };
+  },
 });
 
 // ─── Navigation Gate (runs inside RootProvider — has full theme/branding context) ──
@@ -68,6 +90,9 @@ function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
   const { isAuthenticated, loadingSession, loadSession } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
+
+  // Initialize global socket listeners for real-time syncing
+  useGlobalSockets();
 
   const [minTimePassed, setMinTimePassed] = useState(false);
 
@@ -88,10 +113,85 @@ function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
 
     requestPermissions();
 
+    // Register Chat Reply notification category
+    Notifications.setNotificationCategoryAsync('chatReply', [
+      {
+        identifier: 'reply',
+        buttonTitle: 'Reply',
+        options: {
+          opensAppToForeground: false,
+        },
+        textInput: {
+          submitButtonTitle: 'Send',
+          placeholder: 'Type your reply...',
+        },
+      },
+    ]);
+
+    // Handle incoming notifications while in foreground
+    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      try {
+        const { data } = notification.request.content;
+        const conversationId = data?.conversationId;
+        const activeConversationId = usePresenceStore.getState().activeConversationId;
+
+        // Skip banner if user is actively looking at this conversation
+        if (activeConversationId === conversationId) return;
+
+        const title = notification.request.content.title || 'New Message';
+        const body = notification.request.content.body || '';
+        
+        // Show premium in-app Toast banner instead of native system banner
+        toast.show(`${title}: ${body}`, 'info');
+      } catch (err) {
+        console.error('[Notifications] Error handling received notification:', err);
+      }
+    });
+
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       try {
         const conversationId = response.notification.request.content.data?.conversationId;
-        console.log('[Notifications] Notification tap received, conversationId:', conversationId);
+        console.log('[Notifications] Notification response received, conversationId:', conversationId);
+
+        // Handle Quick Reply Action
+        if (response.actionIdentifier === 'reply') {
+          const userText = (response as any).userText;
+          if (userText && conversationId) {
+            console.log('[Notifications] Quick reply typed:', userText);
+            
+            // Read credentials asynchronously from secure storage to support cold start
+            secureStore.getItem('auth_token').then((token) => {
+              secureStore.getJson<any>('user_profile').then((user) => {
+                if (token) {
+                  // Connect socket with loaded credentials
+                  const socket = connectSocket(token, user?.companyId);
+                  
+                  const tempId = `temp_reply_${Date.now()}`;
+                  const payload = {
+                    conversationId,
+                    content: userText.trim(),
+                    type: 'text',
+                    tempId,
+                    replyTo: null,
+                  };
+                  
+                  // Emit the send_message event to the backend
+                  socket.emit('send_message', payload, (ack: any) => {
+                    console.log('[Notifications] Quick reply acknowledgment:', ack);
+                  });
+                  
+                  // Dismiss the notification to close the native quick reply UI and stop the spinner
+                  Notifications.dismissNotificationAsync(response.notification.request.identifier);
+                  toast.success('Reply sent!');
+                } else {
+                  console.warn('[Notifications] No auth token found for quick reply.');
+                }
+              });
+            });
+          }
+          return;
+        }
+
         if (conversationId) {
           setTimeout(() => {
             router.push(`/chat/${conversationId}` as any);
@@ -103,6 +203,7 @@ function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
     });
 
     return () => {
+      receivedSubscription.remove();
       responseSubscription.remove();
     };
   }, [router]);

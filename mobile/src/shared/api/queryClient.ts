@@ -5,6 +5,7 @@
 
 import { QueryClient } from '@tanstack/react-query';
 import { AppError } from '../services/apiClient';
+import fileCacheService from '../services/fileCacheService';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +33,23 @@ export const queryClient = new QueryClient({
       },
     },
   },
+});
+
+// Subscribe to automatically persist query cache updates to local disk
+queryClient.getQueryCache().subscribe((event) => {
+  if (event.type === 'updated' && event.action.type === 'success') {
+    const key = event.query.queryKey;
+    const data = event.action.data;
+
+    const cacheableKeys = ['profile', 'chat', 'conversations', 'messages', 'starred', 'pinned', 'shared-content', 'settings', 'wallpaper'];
+    const isCacheable = key.some(
+      (part: any) => typeof part === 'string' && cacheableKeys.some((k) => part.includes(k))
+    );
+
+    if (isCacheable && data) {
+      fileCacheService.save(key, data);
+    }
+  }
 });
 
 export default queryClient;

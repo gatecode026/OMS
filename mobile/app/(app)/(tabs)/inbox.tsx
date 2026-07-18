@@ -643,31 +643,47 @@ export default function InboxScreen() {
         </View>
       </View>
 
-      {/* More Options Dropdown menu overlay */}
-      {menuDropdownVisible && (
-        <View style={[styles.dropdownMenu, { backgroundColor: colors.surface, borderColor: colors.border }, shadows.medium]}>
-          <Pressable
-            style={styles.dropdownOption}
-            onPress={() => {
-              setMenuDropdownVisible(false);
-              handleSelectFilter('Pinned');
-            }}
+      {/* More Options Dropdown menu — wrapped in Modal so it auto-dismisses on outside tap */}
+      <Modal
+        visible={menuDropdownVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuDropdownVisible(false)}
+      >
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => setMenuDropdownVisible(false)}
+        >
+          <View
+            style={[
+              styles.dropdownMenu,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              shadows.medium,
+            ]}
           >
-            <Ionicons name="pin-outline" size={16} color={colors.text} style={{ marginRight: 8 }} />
-            <Text style={[styles.dropdownOptionText, { color: colors.text, fontFamily: typography.fonts.medium }]}>Pinned Chats</Text>
-          </Pressable>
-          <Pressable
-            style={styles.dropdownOption}
-            onPress={() => {
-              setMenuDropdownVisible(false);
-              toast.info('Settings and Block lists are managed inside profile tabs.');
-            }}
-          >
-            <Ionicons name="settings-outline" size={16} color={colors.text} style={{ marginRight: 8 }} />
-            <Text style={[styles.dropdownOptionText, { color: colors.text, fontFamily: typography.fonts.medium }]}>Chat Settings</Text>
-          </Pressable>
-        </View>
-      )}
+            <Pressable
+              style={styles.dropdownOption}
+              onPress={() => {
+                setMenuDropdownVisible(false);
+                handleSelectFilter('Pinned');
+              }}
+            >
+              <Ionicons name="pin-outline" size={16} color={colors.text} style={{ marginRight: 8 }} />
+              <Text style={[styles.dropdownOptionText, { color: colors.text, fontFamily: typography.fonts.medium }]}>Pinned Chats</Text>
+            </Pressable>
+            <Pressable
+              style={styles.dropdownOption}
+              onPress={() => {
+                setMenuDropdownVisible(false);
+                toast.info('Settings and Block lists are managed inside profile tabs.');
+              }}
+            >
+              <Ionicons name="settings-outline" size={16} color={colors.text} style={{ marginRight: 8 }} />
+              <Text style={[styles.dropdownOptionText, { color: colors.text, fontFamily: typography.fonts.medium }]}>Chat Settings</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* ─── SEGMENTED TABS (Chats vs Calls) ─── */}
       <View style={[styles.tabsWrapper, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -987,10 +1003,6 @@ export default function InboxScreen() {
                   return (
                     <ConversationCard
                       conv={conv}
-                      colors={colors}
-                      spacing={spacing}
-                      radius={radius}
-                      typography={typography}
                       currentUserId={authUser?.id || ''}
                       isOnline={isOnline}
                       userStatus={userStatus}

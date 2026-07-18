@@ -74,6 +74,8 @@ export const useAttendance = () => {
   };
 };
 
+import apiClient from '../../../shared/services/apiClient';
+
 export const useAttendanceHistory = (month: string) => {
   const isConnected = useOfflineStore((state) => state.isConnected);
   // Widen from/to range to include adjacent month padding days in the calendar grid
@@ -92,8 +94,17 @@ export const useAttendanceHistory = (month: string) => {
     enabled: isConnected && !!month,
   });
 
+  const holidaysQuery = useQuery({
+    queryKey: ['holidays'],
+    queryFn: async () => {
+      const response = await apiClient.get('/api/v1/holidays');
+      return response.data?.data || [];
+    },
+    enabled: isConnected,
+  });
+
   const refetch = async () => {
-    await Promise.all([historyQuery.refetch(), summaryQuery.refetch()]);
+    await Promise.all([historyQuery.refetch(), summaryQuery.refetch(), holidaysQuery.refetch()]);
   };
 
   return {
@@ -105,9 +116,12 @@ export const useAttendanceHistory = (month: string) => {
     isLoadingSummary: summaryQuery.isLoading,
     refetchSummary: summaryQuery.refetch,
 
-    isError: historyQuery.isError || summaryQuery.isError,
-    error: (historyQuery.error || summaryQuery.error) as Error | null,
-    isLoading: historyQuery.isLoading || summaryQuery.isLoading,
+    holidays: holidaysQuery.data || [],
+    isLoadingHolidays: holidaysQuery.isLoading,
+
+    isError: historyQuery.isError || summaryQuery.isError || holidaysQuery.isError,
+    error: (historyQuery.error || summaryQuery.error || holidaysQuery.error) as Error | null,
+    isLoading: historyQuery.isLoading || summaryQuery.isLoading || holidaysQuery.isLoading,
     refetch,
   };
 };

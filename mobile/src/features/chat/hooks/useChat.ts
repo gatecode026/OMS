@@ -153,7 +153,8 @@ export const useEditMessage = () => {
 export const useDeleteMessage = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (messageId: string) => chatApi.deleteMessage(messageId),
+    mutationFn: ({ messageId, deleteForEveryone }: { messageId: string; deleteForEveryone?: boolean }) =>
+      chatApi.deleteMessage(messageId, deleteForEveryone),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chat', 'messages'] });
     },
@@ -353,5 +354,117 @@ export const useBlockedUsers = () => {
     queryKey: ['chat', 'users', 'blocked'],
     queryFn: () => chatApi.fetchBlockedUsers(),
     enabled: isConnected,
+  });
+};
+
+export const useReportUser = () => {
+  return useMutation({
+    mutationFn: ({ targetUserId, category, description, screenshotUrl }: { targetUserId: string; category: string; description?: string; screenshotUrl?: string }) =>
+      chatApi.reportUser(targetUserId, category, description, screenshotUrl),
+  });
+};
+
+export const useExportChat = () => {
+  return useMutation({
+    mutationFn: (conversationId: string) => chatApi.exportChat(conversationId),
+  });
+};
+
+export const usePinMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conversationId, messageId }: { conversationId: string; messageId: string }) =>
+      chatApi.pinMessage(conversationId, messageId),
+    onSuccess: (_, { conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['chat', 'pinned', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['chat', 'messages', conversationId] });
+    },
+  });
+};
+
+export const useUnpinMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conversationId, messageId }: { conversationId: string; messageId: string }) =>
+      chatApi.unpinMessage(conversationId, messageId),
+    onSuccess: (_, { conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['chat', 'pinned', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['chat', 'messages', conversationId] });
+    },
+  });
+};
+
+export const useStarMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => chatApi.starMessage(messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat', 'messages'] });
+      queryClient.invalidateQueries({ queryKey: ['chat', 'messages', 'starred'] });
+    },
+  });
+};
+
+export const useUnstarMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => chatApi.unstarMessage(messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat', 'messages'] });
+      queryClient.invalidateQueries({ queryKey: ['chat', 'messages', 'starred'] });
+    },
+  });
+};
+
+export const useStarredMessages = () => {
+  const isConnected = useOfflineStore((s) => s.isConnected);
+  return useQuery({
+    queryKey: ['chat', 'messages', 'starred'],
+    queryFn: () => chatApi.fetchStarredMessages(),
+    enabled: isConnected,
+  });
+};
+
+export const useSharedContentSummary = (conversationId: string) => {
+  const isConnected = useOfflineStore((s) => s.isConnected);
+  return useQuery({
+    queryKey: ['chat', 'shared-content', conversationId],
+    queryFn: () => chatApi.fetchSharedContentSummary(conversationId),
+    enabled: isConnected && !!conversationId,
+  });
+};
+
+export const useUpdateStatus = () => {
+  return useMutation({
+    mutationFn: ({ status, emoji, expiresInMinutes }: { status: string; emoji: string | null; expiresInMinutes: number | null }) =>
+      chatApi.updateStatus(status, emoji, expiresInMinutes),
+  });
+};
+
+export const useUserPresence = (userId: string) => {
+  const isConnected = useOfflineStore((s) => s.isConnected);
+  return useQuery({
+    queryKey: ['chat', 'presence', userId],
+    queryFn: () => chatApi.fetchUserPresence(userId),
+    enabled: isConnected && !!userId,
+    refetchInterval: 30000, // Sync status every 30s
+  });
+};
+
+export const useLastSeen = (userId: string) => {
+  const isConnected = useOfflineStore((s) => s.isConnected);
+  return useQuery({
+    queryKey: ['chat', 'last-seen', userId],
+    queryFn: () => chatApi.fetchLastSeen(userId),
+    enabled: isConnected && !!userId,
+  });
+};
+
+export const useConversationSearch = (conversationId: string, query: string) => {
+  const isConnected = useOfflineStore((s) => s.isConnected);
+  return useQuery({
+    queryKey: ['chat', 'search', conversationId, query],
+    queryFn: () => chatApi.searchMessagesInConversation(conversationId, query),
+    enabled: isConnected && !!conversationId && !!query.trim(),
   });
 };

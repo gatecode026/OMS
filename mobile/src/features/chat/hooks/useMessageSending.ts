@@ -14,7 +14,7 @@ interface MessageSendingOptions {
 export const useMessageSending = ({ conversationId, authUser, setLocalMessages }: MessageSendingOptions) => {
   const queryClient = useQueryClient();
   const { mutate: editMsg } = useEditMessage();
-  const { mutate: deleteMsg } = useDeleteMessage();
+  const deleteMutation = useDeleteMessage();
   const sendingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const handleSend = (
@@ -196,9 +196,9 @@ export const useMessageSending = ({ conversationId, authUser, setLocalMessages }
     });
   };
 
-  const handleDeleteMessage = (msg: ChatMessage) => {
-    deleteMsg(msg.id);
-    toast.success('Message deleted');
+  const handleDeleteMessage = (msg: ChatMessage, deleteForEveryone: boolean = false) => {
+    deleteMutation.mutate({ messageId: msg.id, deleteForEveryone });
+    toast.success(deleteForEveryone ? 'Message deleted for everyone' : 'Message deleted for me');
   };
 
   const handlePinMessage = (msg: ChatMessage) => {

@@ -10,6 +10,8 @@ import FileMessage from './FileMessage';
 import SystemMessage from './SystemMessage';
 import { ChatMessage } from '../../types';
 import { toast } from '../../../../shared/components/Toast';
+import useTheme from '../../../../shared/hooks/useTheme';
+import { useChatTheme } from '../ChatThemeProvider';
 
 export type MessageRenderer = (props: { item: ChatMessage; isMe: boolean; currentUserId: string }) => React.ReactElement | null;
 
@@ -86,6 +88,23 @@ registerMessageRenderer('file', ({ item, isMe }) => {
 
 registerMessageRenderer('call', ({ item, isMe }) => <SystemMessage content={item.content} type={item.type} isMe={isMe} />);
 registerMessageRenderer('system', ({ item, isMe }) => <SystemMessage content={item.content} type={item.type} isMe={isMe} />);
+
+registerMessageRenderer('text', ({ item, isMe }) => {
+  const { typography } = useTheme();
+  const chatTheme = useChatTheme();
+  return (
+    <Text
+      style={{
+        color: isMe ? chatTheme.textMe : chatTheme.textOther,
+        fontSize: 15,
+        lineHeight: 21,
+        fontFamily: typography.fonts.regular,
+      }}
+    >
+      {item.content}
+    </Text>
+  );
+});
 
 // ─── REGISTER OMS SMART CARD ATTACHMENT RENDERERS ───
 
@@ -271,10 +290,14 @@ registerMessageRenderer('location', ({ item }) => {
   );
 });
 
-export const renderMessageContent = (item: ChatMessage, isMe: boolean, currentUserId: string): React.ReactElement | null => {
-  const renderer = registry[item.type];
-  if (renderer) {
-    return renderer({ item, isMe, currentUserId });
+export const MessageContentRenderer: React.FC<{ item: ChatMessage; isMe: boolean; currentUserId: string }> = ({
+  item,
+  isMe,
+  currentUserId,
+}) => {
+  const Renderer = registry[item.type];
+  if (Renderer) {
+    return <Renderer item={item} isMe={isMe} currentUserId={currentUserId} />;
   }
   return null;
 };

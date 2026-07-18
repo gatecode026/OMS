@@ -7,6 +7,7 @@ import {
   Platform,
   AppState,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import useTheme from '../../../shared/hooks/useTheme';
 import useAuthStore from '../../../shared/store/authStore';
+import { useChatSettingsStore } from '../../../shared/store/chatSettingsStore';
 import { toast } from '../../../shared/components/Toast';
 import { connectSocket, getSocket } from '../../../shared/services/socketManager';
 import { usePresenceStore } from '../../../shared/store/presenceStore';
@@ -29,6 +31,8 @@ import {
   useChatMessages,
   useMarkChatRead,
   usePinnedMessages,
+  useBlockedUsers,
+  useUnblockUser,
 } from '../hooks/useChat';
 
 import ChatHeader from '../components/ChatHeader';
@@ -59,7 +63,7 @@ import { useChatAnalytics } from '../hooks/useChatAnalytics';
 
 const ChatRoomScreenInner: React.FC = () => {
   const queryClient = useQueryClient();
-  const { id: conversationId } = useLocalSearchParams<{ id: string }>();
+  const { id: conversationId, msgId } = useLocalSearchParams<{ id: string; msgId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -68,6 +72,17 @@ const ChatRoomScreenInner: React.FC = () => {
   const { activeCall, initiateCall } = useCall();
   const { activeSheet, sheetData, openSheet, closeSheet } = useBottomSheetManager();
 
+  const wallpaperConfig = useChatSettingsStore(
+    useCallback((s) => s.getWallpaper(conversationId || ''), [conversationId])
+  );
+
+  const resolvedWallpaper = useMemo(() => {
+    if (wallpaperConfig && wallpaperConfig.type !== 'default') {
+      return wallpaperConfig;
+    }
+    return { type: 'solid', value: colors.background };
+  }, [wallpaperConfig, colors.background]);
+
   const flags = useChatFeatureFlags();
   const analytics = useChatAnalytics();
 
@@ -75,15 +90,42 @@ const ChatRoomScreenInner: React.FC = () => {
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | undefined>(undefined);
   
   const flatListRef = useRef<any>(null);
   const sendingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
+
+  // Scroll to targeted search result message
+  useEffect(() => {
+    if (msgId && localMessages.length > 0) {
+      setHighlightedMessageId(msgId);
+      const index = localMessages.findIndex((m) => m.id === msgId);
+      if (index !== -1) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index,
+            animated: true,
+            viewPosition: 0.5,
+          });
+        }, 400);
+      }
+      const timer = setTimeout(() => {
+        setHighlightedMessageId(undefined);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [msgId, localMessages.length]);
 
   // API query bindings
   const { data: conversations = [] } = useConversations();
   const { data: dbMessages, isLoading } = useChatMessages(conversationId || '');
   const { mutate: markRead } = useMarkChatRead();
   const { data: pinnedMessages = [] } = usePinnedMessages(conversationId || '');
+  const { data: blockedData, refetch: refetchBlocked } = useBlockedUsers();
+  const { mutate: unblockUserMutate } = useUnblockUser();
+
+  const blockedList = useMemo(() => blockedData?.blockedUsers || [], [blockedData]);
+  const blockedByList = useMemo(() => blockedData?.blockedByUsers || [], [blockedData]);
 
   // Find conversation metadata
   const conversation = useMemo(() => {
@@ -104,13 +146,20 @@ const ChatRoomScreenInner: React.FC = () => {
         userStatus: 'offline',
         statusEmoji: null,
         otherUserIsOnChatScreen: false,
+        isBlocked: false,
+        isBlockedByMe: false,
+        isBlockedByThem: false,
       };
     }
     if (conversation.type === 'direct') {
       const otherUser = conversation.participants.find((p) => p.employeeId !== authUser?.id);
       const otherId = otherUser?.employeeId || '';
-      const isOnline = otherId ? onlineUserIds.has(otherId) : false;
-      const presence = otherId ? statuses[otherId] : null;
+      const isBlockedByMe = blockedList.some((b) => b.id === otherId);
+      const isBlockedByThem = blockedByList.includes(otherId);
+      const isBlocked = isBlockedByMe || isBlockedByThem;
+
+      const isOnline = isBlocked ? false : (otherId ? onlineUserIds.has(otherId) : false);
+      const presence = isBlocked ? null : (otherId ? statuses[otherId] : null);
       const inCall = !!(activeCall && activeCall.targetUser?.id === otherId && (activeCall.status === 'active' || activeCall.status === 'ringing'));
       return {
         title: otherUser?.name || 'User',
@@ -120,8 +169,11 @@ const ChatRoomScreenInner: React.FC = () => {
         userStatus: isOnline ? (presence?.status || 'available') : 'offline',
         statusEmoji: isOnline ? (presence?.emoji || null) : null,
         otherUserIsOnChatScreen: otherId ? !!chatscreenUsers[otherId] : false,
-        lastSeen: presence?.lastSeen || (otherUser as any)?.lastSeen || null,
+        lastSeen: isBlocked ? null : (presence?.lastSeen || (otherUser as any)?.lastSeen || null),
         inCall,
+        isBlocked,
+        isBlockedByMe,
+        isBlockedByThem,
       };
     }
     return {
@@ -132,10 +184,12 @@ const ChatRoomScreenInner: React.FC = () => {
       userStatus: 'offline',
       statusEmoji: null,
       otherUserIsOnChatScreen: false,
-      lastSeen: null,
       inCall: false,
+      isBlocked: false,
+      isBlockedByMe: false,
+      isBlockedByThem: false,
     };
-  }, [conversation, authUser, onlineUserIds, statuses, chatscreenUsers, activeCall]);
+  }, [conversation, authUser, onlineUserIds, statuses, chatscreenUsers, activeCall, blockedList, blockedByList]);
 
   // Sync DB messages with real-time updates (including empty cleared states)
   useEffect(() => {
@@ -374,12 +428,14 @@ const ChatRoomScreenInner: React.FC = () => {
         if (socket.connected) {
           socket.emit('mark_read', { conversationId });
           socket.emit('user_chatscreen_status', { isOnChatScreen: true });
+          socket.emit('viewing_chat', { conversationId, isViewing: true });
           markRead(conversationId);
         }
       } else {
         usePresenceStore.getState().setActiveConversationId(null);
         if (socket.connected) {
           socket.emit('user_chatscreen_status', { isOnChatScreen: false });
+          socket.emit('viewing_chat', { conversationId, isViewing: false });
         }
       }
     };
@@ -395,6 +451,7 @@ const ChatRoomScreenInner: React.FC = () => {
         socket.emit('join_conversation', conversationId);
         socket.emit('mark_read', { conversationId });
         socket.emit('user_chatscreen_status', { isOnChatScreen: true });
+        socket.emit('viewing_chat', { conversationId, isViewing: true });
         socket.emit('get_online_users');
       };
 
@@ -419,6 +476,7 @@ const ChatRoomScreenInner: React.FC = () => {
         socket.off('connect', handleConnect);
         socket.off('message_delivered', handleMsgDelivered);
         socket.emit('user_chatscreen_status', { isOnChatScreen: false });
+        socket.emit('viewing_chat', { conversationId, isViewing: false });
         usePresenceStore.getState().setActiveConversationId(null);
       };
     } else {
@@ -627,6 +685,20 @@ const ChatRoomScreenInner: React.FC = () => {
     </Pressable>
   );
 
+  const handleUnblockUser = () => {
+    if (chatMeta.otherUser?.employeeId) {
+      unblockUserMutate(chatMeta.otherUser.employeeId, {
+        onSuccess: () => {
+          refetchBlocked();
+          toast.success('User unblocked successfully');
+        },
+        onError: (err: any) => {
+          toast.error('Failed to unblock: ' + err.message);
+        }
+      });
+    }
+  };
+
   const emojiPluginButton = (
     <Pressable
       onPress={() => {
@@ -697,7 +769,8 @@ const ChatRoomScreenInner: React.FC = () => {
           uploadsProgress={uploadsProgress}
           uploadErrors={uploadErrors}
           uploadStates={uploadStates}
-          wallpaper={useMemo(() => ({ type: 'solid', value: colors.background }), [colors.background])}
+          wallpaper={resolvedWallpaper}
+          highlightedMessageId={highlightedMessageId}
         />
       </ChatErrorBoundary>
 
@@ -732,6 +805,9 @@ const ChatRoomScreenInner: React.FC = () => {
           insets={insets}
           leftPlugins={[attachmentPluginButton]}
           rightPlugins={[emojiPluginButton]}
+          isBlockedByMe={chatMeta.isBlockedByMe}
+          isBlockedByThem={chatMeta.isBlockedByThem}
+          onUnblock={handleUnblockUser}
         />
       </ChatErrorBoundary>
 
@@ -769,7 +845,45 @@ const ChatRoomScreenInner: React.FC = () => {
         }}
         onDelete={() => {
           if (sheetData) {
-            handleDeleteMessage(sheetData);
+            if (sheetData.senderId === authUser?.id) {
+              Alert.alert(
+                'Delete message?',
+                undefined,
+                [
+                  {
+                    text: 'Delete for everyone',
+                    onPress: () => handleDeleteMessage(sheetData, true),
+                    style: 'destructive',
+                  },
+                  {
+                    text: 'Delete for me',
+                    onPress: () => handleDeleteMessage(sheetData, false),
+                  },
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                  },
+                ],
+                { cancelable: true }
+              );
+            } else {
+              Alert.alert(
+                'Delete message?',
+                undefined,
+                [
+                  {
+                    text: 'Delete for me',
+                    onPress: () => handleDeleteMessage(sheetData, false),
+                    style: 'destructive',
+                  },
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                  },
+                ],
+                { cancelable: true }
+              );
+            }
           }
         }}
         isMe={sheetData?.senderId === authUser?.id}
@@ -792,13 +906,19 @@ const ChatRoomScreenInner: React.FC = () => {
 };
 
 export const ChatRoomScreen: React.FC = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ChatThemeProvider>
         <BottomSheetManagerProvider>
-          <ChatRoomScreenInner />
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
+          >
+            <ChatRoomScreenInner />
+          </KeyboardAvoidingView>
         </BottomSheetManagerProvider>
       </ChatThemeProvider>
     </View>

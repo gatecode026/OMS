@@ -151,8 +151,10 @@ export const chatApi = {
   /**
    * Delete a message (for everyone or for me depending on backend).
    */
-  async deleteMessage(messageId: string): Promise<void> {
-    await apiClient.delete(`/api/v1/chat/messages/${messageId}`);
+  async deleteMessage(messageId: string, deleteForEveryone: boolean = false): Promise<void> {
+    await apiClient.delete(`/api/v1/chat/messages/${messageId}`, {
+      data: { deleteForEveryone }
+    });
   },
 
   /**
@@ -283,11 +285,89 @@ export const chatApi = {
     return response.data?.data || response.data;
   },
 
-  /**
-   * Fetch list of blocked users.
-   */
-  async fetchBlockedUsers(): Promise<any[]> {
+  async fetchBlockedUsers(): Promise<{ blockedUsers: Array<{ id: string }>; blockedByUsers: string[] }> {
     const response = await apiClient.get('/api/v1/chat/users/blocked');
+    const data = response.data?.data || response.data;
+    const blockedUsers = data?.blockedUsers || [];
+    const blockedByUsers = data?.blockedByUsers || [];
+    return {
+      blockedUsers: blockedUsers.map((id: string) => ({ id })),
+      blockedByUsers
+    };
+  },
+
+  /**
+   * Report a user.
+   */
+  async reportUser(targetUserId: string, category: string, description?: string, screenshotUrl?: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/users/${targetUserId}/report`, {
+      category,
+      description,
+      screenshotUrl,
+    });
+  },
+
+  /**
+   * Audit log an export action on the server.
+   */
+  async exportChat(conversationId: string): Promise<void> {
+    await apiClient.post(`/api/v1/chat/conversations/${conversationId}/export`);
+  },
+
+  async pinMessage(conversationId: string, messageId: string): Promise<any> {
+    const response = await apiClient.post(`/api/v1/chat/conversations/${conversationId}/messages/${messageId}/pin`);
+    return response.data?.data || response.data;
+  },
+
+  async unpinMessage(conversationId: string, messageId: string): Promise<any> {
+    const response = await apiClient.delete(`/api/v1/chat/conversations/${conversationId}/messages/${messageId}/pin`);
+    return response.data?.data || response.data;
+  },
+
+  async starMessage(messageId: string): Promise<any> {
+    const response = await apiClient.post(`/api/v1/chat/messages/${messageId}/star`);
+    return response.data?.data || response.data;
+  },
+
+  async unstarMessage(messageId: string): Promise<any> {
+    const response = await apiClient.delete(`/api/v1/chat/messages/${messageId}/star`);
+    return response.data?.data || response.data;
+  },
+
+  async fetchStarredMessages(): Promise<any[]> {
+    const response = await apiClient.get('/api/v1/chat/messages/starred');
+    return response.data?.data || response.data || [];
+  },
+
+  async fetchSharedContentSummary(conversationId: string): Promise<any> {
+    const response = await apiClient.get(`/api/v1/chat/conversations/${conversationId}/shared-content`);
+    return response.data?.data || response.data;
+  },
+
+  async updateStatus(status: string, emoji: string | null, expiresInMinutes: number | null): Promise<any> {
+    const response = await apiClient.patch('/api/v1/chat/status', { status, emoji, expiresInMinutes });
+    return response.data?.data || response.data;
+  },
+
+  async fetchUserPresence(userId: string): Promise<any> {
+    const response = await apiClient.get(`/api/v1/chat/presence/${userId}`);
+    return response.data?.data || response.data;
+  },
+
+  async fetchLastSeen(userId: string): Promise<any> {
+    const response = await apiClient.get(`/api/v1/chat/users/${userId}/last-seen`);
+    return response.data?.data || response.data;
+  },
+
+  async pingServer(): Promise<{ timestamp: number }> {
+    const response = await apiClient.get('/api/v1/chat/ping');
+    return response.data?.data || response.data;
+  },
+
+  async searchMessagesInConversation(conversationId: string, query: string): Promise<any[]> {
+    const response = await apiClient.get(`/api/v1/chat/conversations/${conversationId}/search`, {
+      params: { q: query }
+    });
     return response.data?.data || response.data || [];
   },
 };

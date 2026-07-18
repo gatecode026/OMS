@@ -11,6 +11,10 @@ interface PresenceState {
   chatscreenUsers: Record<string, boolean>;
   activeConversationId: string | null;
   statuses: Record<string, { status: string; emoji: string | null; lastSeen?: string | Date | null }>;
+  connectionState: 'connected' | 'connecting' | 'disconnected' | 'reconnecting' | 'poor' | 'excellent';
+  ping: number;
+  networkType: string;
+  customStatus: { emoji: string | null; text: string; expiresAt: string | null } | null;
   setOnlineUsers: (ids: Set<string>) => void;
   addUserOnline: (userId: string) => void;
   addUserOffline: (userId: string) => void;
@@ -19,6 +23,8 @@ interface PresenceState {
   setChatscreenStatus: (employeeId: string, isOnChatScreen: boolean) => void;
   setActiveConversationId: (id: string | null) => void;
   setUserStatus: (employeeId: string, status: string, emoji: string | null, lastSeen?: string | Date | null) => void;
+  setConnectionInfo: (info: Partial<{ connectionState: 'connected' | 'connecting' | 'disconnected' | 'reconnecting' | 'poor' | 'excellent'; ping: number; networkType: string }>) => void;
+  setCustomStatus: (status: { emoji: string | null; text: string; expiresAt: string | null } | null) => void;
 }
 
 export const usePresenceStore = create<PresenceState>((set) => ({
@@ -27,6 +33,10 @@ export const usePresenceStore = create<PresenceState>((set) => ({
   chatscreenUsers: {},
   activeConversationId: null,
   statuses: {},
+  connectionState: 'connected',
+  ping: 0,
+  networkType: 'wifi',
+  customStatus: null,
 
   setOnlineUsers: (ids) => set({ onlineUserIds: ids }),
 
@@ -84,6 +94,8 @@ export const usePresenceStore = create<PresenceState>((set) => ({
       },
     },
   })),
+  setConnectionInfo: (info) => set((state) => ({ ...state, ...info })),
+  setCustomStatus: (status) => set({ customStatus: status }),
 }));
 
 export default usePresenceStore;

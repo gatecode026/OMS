@@ -32,6 +32,7 @@ import { useDashboard } from '../../../src/features/dashboard/hooks/useDashboard
 import { UpcomingEvent } from '../../../src/features/dashboard/api/dashboardApi';
 import { useNotificationsUnreadCount } from '../../../src/features/notifications';
 import useAuthStore from '../../../src/shared/store/authStore';
+import useDrawerStore from '../../../src/shared/store/drawerStore';
 import { connectSocket } from '../../../src/shared/services/socketManager';
 import {
   Card,
@@ -447,7 +448,10 @@ export default function DashboardScreen() {
       {/* ─── 1. Header (Menu, Hello Wave, Notifications, Avatar) ─── */}
       <View style={[styles.headerRow, { paddingTop: insets.top + 16, backgroundColor: colors.surface }]}>
         <View style={styles.headerLeft}>
-          <Pressable style={styles.menuButton}>
+          <Pressable
+            onPress={() => useDrawerStore.getState().openDrawer()}
+            style={styles.menuButton}
+          >
             <Ionicons name="menu-outline" size={26} color={colors.text} />
           </Pressable>
           <View style={styles.greetingContainer}>

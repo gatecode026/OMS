@@ -84,7 +84,8 @@ export default function ContactInfoScreen() {
   // Hook queries
   const { data: conversations = [], refetch: refetchConversations } = useConversations();
   const { data: dbMessages = [], isLoading: isMessagesLoading } = useChatMessages(conversationId || '');
-  const { data: blockedList = [], refetch: refetchBlocked } = useBlockedUsers();
+  const { data: blockedData, refetch: refetchBlocked } = useBlockedUsers();
+  const blockedList = blockedData?.blockedUsers || [];
   
   // Member Search Query
   const { data: searchEmployeeResults = [] } = useSearchEmployees(memberSearchQuery);
@@ -103,13 +104,16 @@ export default function ContactInfoScreen() {
   }, [conversations, conversationId]);
 
   // Determine other participant
-  const targetEmployeeId = useMemo(() => {
+  const targetEmployee = useMemo(() => {
     if (!conversation) return null;
     if (conversation.type === 'direct') {
-      return conversation.participants.find((p) => p.employeeId !== authUser?.id)?.employeeId || null;
+      return conversation.participants.find((p) => p.employeeId !== authUser?.id) || null;
     }
     return null;
   }, [conversation, authUser]);
+
+  const targetEmployeeId = targetEmployee?.employeeId || null;
+  const targetEmpAny = targetEmployee as any;
 
   // Fetch full employee details from backend endpoint `/api/v1/employees/:id`
   const { data: employee, isLoading: isEmployeeLoading } = useQuery({
@@ -143,7 +147,7 @@ export default function ContactInfoScreen() {
       if (m.isDeleted) return false;
       const isImg = m.type === 'image';
       const isAud = m.type === 'audio';
-      const isVid = (m.type as string) === 'video' || (m.type === 'file' && m.media?.mimeType?.startsWith('video/'));
+      const isVid = m.type === 'video' || (m.type === 'file' && m.media?.mimeType?.startsWith('video/'));
 
       if (!isImg && !isAud && !isVid) return false;
 
@@ -307,6 +311,10 @@ export default function ContactInfoScreen() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
+  const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
+  const statuses = usePresenceStore((s) => s.statuses);
+  const chatscreenUsers = usePresenceStore((s) => s.chatscreenUsers);
+
   if (isEmployeeLoading && conversation?.type === 'direct') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -314,10 +322,6 @@ export default function ContactInfoScreen() {
       </View>
     );
   }
-
-  const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
-  const statuses = usePresenceStore((s) => s.statuses);
-  const chatscreenUsers = usePresenceStore((s) => s.chatscreenUsers);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -334,8 +338,8 @@ export default function ContactInfoScreen() {
   const currentPresenceEmoji = isOnline ? (statuses[targetEmployeeId || '']?.emoji || null) : null;
   const otherIsOnChatScreen = targetEmployeeId ? !!chatscreenUsers[targetEmployeeId] : false;
 
-  const name = conversation?.type === 'group' ? conversation.name || 'Group Chat' : employee?.name || 'Contact Name';
-  const avatar = conversation?.type === 'group' ? conversation.avatar : employee?.avatarUrl || null;
+  const name = conversation?.type === 'group' ? conversation.name || 'Group Chat' : employee?.name || targetEmployee?.name || 'Contact Name';
+  const avatar = conversation?.type === 'group' ? conversation.avatar : employee?.avatarUrl || targetEmployee?.avatar || null;
   const isAdmin = conversation?.type === 'group' && conversation.participants.find(p => p.employeeId === authUser?.id)?.isAdmin;
 
   return (
@@ -528,43 +532,43 @@ export default function ContactInfoScreen() {
             </View>
 
             {/* ─── DETAILS CARD (FOR DIRECT CHATS) ─── */}
-            {conversation?.type === 'direct' && employee && (
+            {conversation?.type === 'direct' && (employee || targetEmployee) && (
               <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: typography.fonts.bold, marginBottom: spacing.md }]}>
                   Contact Details
                 </Text>
-                <Pressable style={styles.detailItem} onPress={() => handleSendEmail(employee.email)}>
+                <Pressable style={styles.detailItem} onPress={() => handleSendEmail(employee?.email || targetEmpAny?.email)}>
                   <Ionicons name="mail-outline" size={18} color={colors.textMuted} style={{ marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee.email || '—'}</Text>
+                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee?.email || targetEmpAny?.email || '—'}</Text>
                     <Text style={{ fontSize: 9, color: colors.textMuted }}>Work Email</Text>
                   </View>
                 </Pressable>
-                <Pressable style={styles.detailItem} onPress={() => handleCallPhone(employee.phone)}>
+                <Pressable style={styles.detailItem} onPress={() => handleCallPhone(employee?.phone || targetEmpAny?.phone)}>
                   <Ionicons name="call-outline" size={18} color={colors.textMuted} style={{ marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee.phone || '—'}</Text>
+                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee?.phone || targetEmpAny?.phone || '—'}</Text>
                     <Text style={{ fontSize: 9, color: colors.textMuted }}>Mobile Number</Text>
                   </View>
                 </Pressable>
                 <View style={styles.detailItem}>
                   <Ionicons name="business-outline" size={18} color={colors.textMuted} style={{ marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee.department || '—'}</Text>
+                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee?.department || targetEmpAny?.department || '—'}</Text>
                     <Text style={{ fontSize: 9, color: colors.textMuted }}>Department</Text>
                   </View>
                 </View>
                 <View style={styles.detailItem}>
                   <Ionicons name="person-outline" size={18} color={colors.textMuted} style={{ marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee.designation || '—'}</Text>
+                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee?.designation || targetEmpAny?.role || '—'}</Text>
                     <Text style={{ fontSize: 9, color: colors.textMuted }}>Role</Text>
                   </View>
                 </View>
                 <View style={styles.detailItem}>
                   <Ionicons name="location-outline" size={18} color={colors.textMuted} style={{ marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee.branch || 'Jaipur, India'}</Text>
+                    <Text style={[styles.detailVal, { color: colors.text, fontFamily: typography.fonts.semibold }]}>{employee?.branch || targetEmpAny?.branch || 'Jaipur, India'}</Text>
                     <Text style={{ fontSize: 9, color: colors.textMuted }}>Location</Text>
                   </View>
                 </View>

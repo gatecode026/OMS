@@ -194,3 +194,33 @@ export interface ProfileCompletenessResult {
   percentage: number;
   sections: ProfileCompletenessSection[];
 }
+
+// ─── Active Session & Device Registry ──────────────────────────────────────────
+
+export interface UserSession {
+  id: string;
+  employeeName: string;
+  employeeId: string;
+  role: string;
+  loginTime: string;
+  lastActivity: string;
+  duration?: string;
+  deviceType: string;
+  browser: string;
+  os: string;
+  ipAddress: string;
+  location: string;
+  status: 'Active' | 'Idle';
+}
+
+export interface UserDevice {
+  id: string;
+  name: string;
+  type: string;
+  browser: string;
+  os: string;
+  registeredBy: string;
+  regDate: string;
+  lastLogin: string;
+  status: 'Active' | 'Blocked' | 'Pending';
+}

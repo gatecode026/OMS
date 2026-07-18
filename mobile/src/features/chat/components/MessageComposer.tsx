@@ -1,10 +1,10 @@
 /**
  * @file MessageComposer.tsx
- * @description Premium chat message input bar.
+ * @description Premium chat message input bar matching WhatsApp aesthetics.
  * - PanResponder on the mic button area: slide left → cancel, slide up → lock
  * - Passes lockProgress (0–1) to VoiceRecorder for visual lock fill
  * - Left/Right plugin slots for attachment button and emoji button
- * - Reply/Edit preview bars above the input
+ * - Reply/Edit preview bars nested inside the unified card
  */
 
 import React, { useRef, useState } from 'react';
@@ -50,6 +50,11 @@ interface MessageComposerProps {
   // Extensible Plugins
   leftPlugins?: React.ReactNode[];
   rightPlugins?: React.ReactNode[];
+
+  // Block states
+  isBlockedByMe?: boolean;
+  isBlockedByThem?: boolean;
+  onUnblock?: () => void;
 }
 
 export const MessageComposer: React.FC<MessageComposerProps> = ({
@@ -70,8 +75,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   insets,
   leftPlugins = [],
   rightPlugins = [],
+  isBlockedByMe = false,
+  isBlockedByThem = false,
+  onUnblock,
 }) => {
-  const { colors, radius, typography } = useTheme();
+  const { colors, radius, typography, isDark } = useTheme();
+
 
   // Tracks lock progress fill (0–1) based on how far the user slides up
   const [lockProgress, setLockProgress] = useState(0);
@@ -126,57 +135,92 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   });
 
   return (
-    <View style={{ width: '100%' }}>
-      {/* Reply Preview Bar */}
-      {replyTo && (
-        <View style={[styles.contextBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          <View style={[styles.contextBarAccent, { backgroundColor: colors.primary }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 11, fontFamily: typography.fonts.bold, color: colors.primary }}>
-              Replying to {replyTo.senderName}
+    <View style={{ width: '100%', paddingBottom: insets.bottom || 6, backgroundColor: 'transparent' }}>
+      {isBlockedByMe ? (
+        <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.blockedText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
+            You blocked this contact.
+          </Text>
+          <Pressable onPress={onUnblock} style={styles.unblockBtn}>
+            <Text style={[styles.unblockText, { color: colors.primary, fontFamily: typography.fonts.bold }]}>
+              Unblock
             </Text>
-            <Text style={{ fontSize: 12, color: colors.textMuted }} numberOfLines={1}>
-              {replyTo.content || '[Attachment]'}
-            </Text>
-          </View>
-          <Pressable onPress={onClearReply} hitSlop={10}>
-            <Ionicons name="close-circle" size={20} color={colors.textLight} />
           </Pressable>
         </View>
-      )}
-
-      {/* Edit Mode Preview Bar */}
-      {isEditingMode && (
-        <View style={[styles.contextBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          <View style={[styles.contextBarAccent, { backgroundColor: colors.warning }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 11, fontFamily: typography.fonts.bold, color: colors.warning }}>
-              Editing Message
-            </Text>
-          </View>
-          <Pressable onPress={onClearEdit} hitSlop={10}>
-            <Ionicons name="close-circle" size={20} color={colors.textLight} />
-          </Pressable>
+      ) : isBlockedByThem ? (
+        <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.blockedText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
+            This contact is unavailable.
+          </Text>
         </View>
-      )}
+      ) : (
+        <View style={styles.footerInputRow}>
+        
+        {/* Unified Input Card (Pill shape) */}
+        {!isRecording && (
+          <View style={[styles.composerMainCard, { backgroundColor: colors.surface }]}>
+            {/* Reply Preview Bar */}
+            {replyTo && (
+              <View style={[styles.contextBar, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderLeftColor: colors.primary }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontFamily: typography.fonts.bold, color: colors.primary }}>
+                    {replyTo.senderName}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted }} numberOfLines={1}>
+                    {replyTo.content || '[Attachment]'}
+                  </Text>
+                </View>
+                <Pressable onPress={onClearReply} hitSlop={10}>
+                  <Ionicons name="close" size={16} color={colors.textLight} />
+                </Pressable>
+              </View>
+            )}
 
-      {/* ─── MESSAGE INPUT FOOTER ─── */}
-      <View
-        style={[
-          styles.footerInputRow,
-          {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-            paddingBottom: insets.bottom + 8,
-          },
-        ]}
-      >
-        {/* Left Plugin Slot (attachment button) */}
-        {leftPlugins.map((plugin, idx) => (
-          <View key={`left-${idx}`}>{plugin}</View>
-        ))}
+            {/* Edit Mode Preview Bar */}
+            {isEditingMode && (
+              <View style={[styles.contextBar, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderLeftColor: colors.warning }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontFamily: typography.fonts.bold, color: colors.warning }}>
+                    Editing Message
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted }} numberOfLines={1}>
+                    {messageText}
+                  </Text>
+                </View>
+                <Pressable onPress={onClearEdit} hitSlop={10}>
+                  <Ionicons name="close" size={16} color={colors.textLight} />
+                </Pressable>
+              </View>
+            )}
 
-        {isRecording ? (
+            {/* Text Input Row containing plugins and input field */}
+            <View style={styles.inputRow}>
+              {/* Emoji button on the left */}
+              {rightPlugins.map((plugin, idx) => (
+                <View key={`right-${idx}`}>{plugin}</View>
+              ))}
+
+              <TextInput
+                placeholder="Type a message…"
+                placeholderTextColor={colors.textLight}
+                value={messageText}
+                onChangeText={onTextChange}
+                multiline
+                accessibilityLabel="Message input field"
+                accessibilityRole="text"
+                accessible
+                style={[styles.textInput, { color: colors.text, fontFamily: typography.fonts.regular }]}
+              />
+
+              {/* Attachment button on the right */}
+              {leftPlugins.map((plugin, idx) => (
+                <View key={`left-${idx}`}>{plugin}</View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {isRecording && (
           <VoiceRecorder
             isRecording={isRecording}
             recordingDuration={recordingDuration}
@@ -184,120 +228,140 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             onCancel={onCancelRecording}
             lockProgress={lockProgress}
           />
-        ) : (
-          <View style={[styles.textInputWrapper, { backgroundColor: colors.background, borderRadius: radius.lg }]}>
-            <TextInput
-              placeholder="Type a message…"
-              placeholderTextColor={colors.textLight}
-              value={messageText}
-              onChangeText={onTextChange}
-              multiline
-              accessibilityLabel="Message input field"
-              accessibilityRole="text"
-              accessible
-              style={[styles.textInput, { color: colors.text, fontFamily: typography.fonts.regular }]}
-            />
-          </View>
         )}
 
-        {/* Right Plugin Slot (emoji button) */}
-        {rightPlugins.map((plugin, idx) => (
-          <View key={`right-${idx}`}>{plugin}</View>
-        ))}
-
-        {/* Send / Mic Button */}
+        {/* Send / Mic Circular Button */}
         {isRecording ? (
           recordingLocked ? (
-            // Locked state: trash (discard) + send button
             <View style={styles.lockedControls}>
               <Pressable onPress={onCancelRecording} style={styles.lockControlBtn} hitSlop={8}>
                 <Ionicons name="trash-outline" size={20} color={colors.danger} />
               </Pressable>
               <Pressable
                 onPress={onStopAndSendRecording}
-                style={[styles.sendBtn, { backgroundColor: colors.primary, borderRadius: radius.circular }]}
+                style={[styles.sendBtn, { backgroundColor: '#075E54' }]}
               >
                 <Ionicons name="send" size={18} color="#FFFFFF" />
               </Pressable>
             </View>
           ) : (
-            // Active recording — mic button with PanResponder gesture area
             <View
               {...micPanResponder.panHandlers}
-              style={[styles.sendBtn, { backgroundColor: colors.danger, borderRadius: radius.circular }]}
+              style={[styles.sendBtn, { backgroundColor: colors.danger }]}
             >
               <Ionicons name="mic" size={18} color="#FFFFFF" />
             </View>
           )
         ) : messageText.trim() ? (
-          // Send text button
           <Pressable
             onPress={onSend}
-            style={[styles.sendBtn, { backgroundColor: colors.primary, borderRadius: radius.circular }]}
+            style={[styles.sendBtn, { backgroundColor: colors.primary }]}
           >
             <Ionicons name="send" size={18} color="#FFFFFF" />
           </Pressable>
         ) : (
-          // Idle — mic button (hold to record with PanResponder)
           <Pressable
             onLongPress={onStartRecording}
-            style={[styles.sendBtn, { backgroundColor: colors.primary, borderRadius: radius.circular }]}
+            style={[styles.sendBtn, { backgroundColor: colors.primary }]}
             delayLongPress={200}
           >
             <Ionicons name="mic" size={18} color="#FFFFFF" />
           </Pressable>
         )}
       </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  footerInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  composerMainCard: {
+    flex: 1,
+    borderRadius: 24,
+    marginRight: 6,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'transparent',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+  },
   contextBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderTopWidth: 1,
+    borderLeftWidth: 4,
+    margin: 6,
+    borderRadius: 8,
   },
-  contextBarAccent: {
-    width: 3,
-    alignSelf: 'stretch',
-    borderRadius: 2,
-    marginRight: 10,
-  },
-  footerInputRow: {
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-  },
-  textInputWrapper: {
-    flex: 1,
-    marginHorizontal: 6,
-    paddingHorizontal: 12,
-    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
   textInput: {
-    fontSize: 14,
-    maxHeight: 80,
-    paddingVertical: 7,
+    flex: 1,
+    fontSize: 15,
+    maxHeight: 120,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     lineHeight: 20,
   },
   sendBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
   },
   lockedControls: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   lockControlBtn: {
-    padding: 8,
-    marginRight: 4,
+    padding: 10,
+    marginRight: 6,
+  },
+  blockedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    marginHorizontal: 12,
+    marginVertical: 6,
+    borderWidth: 0.5,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  blockedText: {
+    fontSize: 13,
+  },
+  unblockBtn: {
+    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  unblockText: {
+    fontSize: 13,
   },
 });
 

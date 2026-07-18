@@ -1012,6 +1012,55 @@ export const registerChatSocketHandlers = (io) => {
       }
     });
 
+    socket.on("heartbeat", (data, callback) => {
+      try {
+        if (typeof callback === "function") {
+          callback({ success: true, timestamp: Date.now() });
+        } else {
+          socket.emit("heartbeat_ack", { timestamp: Date.now() });
+        }
+      } catch (err) {
+        logger.error("[Chat] heartbeat error:", err);
+      }
+    });
+
+    socket.on("viewing_chat", async ({ conversationId, isViewing }) => {
+      try {
+        socket.isOnChatScreen = !!isViewing;
+        if (isViewing) {
+          socket.activeConversationId = conversationId;
+          if (redis.isAvailable) {
+            await redis.set(`active_conv:${userId}`, conversationId, { EX: 86400 }).catch(() => {});
+          }
+        } else {
+          socket.activeConversationId = null;
+          if (redis.isAvailable) {
+            await redis.del(`active_conv:${userId}`).catch(() => {});
+          }
+        }
+        await updateUserChatScreenPresence(userId, companyId, io);
+        io.to(`conv:${conversationId}`).emit("user_viewing_chat", {
+          userId,
+          conversationId,
+          isViewing: !!isViewing
+        });
+      } catch (err) {
+        logger.error("[Chat] viewing_chat error:", err);
+      }
+    });
+
+    socket.on("viewing_profile", async ({ targetUserId, isViewing }) => {
+      try {
+        io.to(`user:${targetUserId}`).emit("user_viewing_profile", {
+          viewerId: userId,
+          viewerName: name,
+          isViewing: !!isViewing
+        });
+      } catch (err) {
+        logger.error("[Chat] viewing_profile error:", err);
+      }
+    });
+
     // ── EVENT: SEND MESSAGE ─────────────────────────────────────────────────
     socket.on("send_message", async (data, callback) => {
       const { tempId } = data;

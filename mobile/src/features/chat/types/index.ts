@@ -17,7 +17,7 @@ export interface ChatParticipant {
 export interface LastMessagePreview {
   messageId: string | null;
   content: string | null;
-  type: 'text' | 'image' | 'file' | 'audio' | 'system' | 'emoji' | 'call' | 'poll' | 'task' | 'leave' | 'attendance' | 'payslip' | 'project' | 'meeting' | 'contact' | 'location';
+  type: 'text' | 'image' | 'video' | 'file' | 'audio' | 'system' | 'emoji' | 'call' | 'poll' | 'task' | 'leave' | 'attendance' | 'payslip' | 'project' | 'meeting' | 'contact' | 'location';
   senderId: string | null;
   senderName: string | null;
   sentAt: string | null;
@@ -63,7 +63,7 @@ export interface ChatMessage {
   senderAvatar: string | null;
   senderRole: string;
   content: string;
-  type: 'text' | 'image' | 'file' | 'audio' | 'system' | 'emoji' | 'call' | 'poll' | 'task' | 'leave' | 'attendance' | 'payslip' | 'project' | 'meeting' | 'contact' | 'location';
+  type: 'text' | 'image' | 'video' | 'file' | 'audio' | 'system' | 'emoji' | 'call' | 'poll' | 'task' | 'leave' | 'attendance' | 'payslip' | 'project' | 'meeting' | 'contact' | 'location';
   contentType: 'plain' | 'markdown';
   createdAt: string;
   isDeleted: boolean;

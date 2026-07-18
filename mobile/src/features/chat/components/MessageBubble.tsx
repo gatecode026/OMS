@@ -23,7 +23,7 @@ import useTheme from '../../../shared/hooks/useTheme';
 import { ChatMessage, ChatMessageReaction } from '../types';
 import MessageStatus from './MessageStatus';
 import { useChatTheme } from './ChatThemeProvider';
-import { renderMessageContent } from './messageTypes/MessageRendererRegistry';
+import { MessageContentRenderer } from './messageTypes/MessageRendererRegistry';
 import type { UploadState } from '../hooks/useUploadQueue';
 
 // ─── CIRCULAR PROGRESS ARC ────────────────────────────────────────────────────
@@ -182,6 +182,7 @@ interface MessageBubbleProps {
   isFirstOfGroup?: boolean;
   isLastOfGroup?: boolean;
   isGroup?: boolean;
+  isHighlighted?: boolean;
 }
 
 const areEqual = (prevProps: MessageBubbleProps, nextProps: MessageBubbleProps) => {
@@ -200,7 +201,8 @@ const areEqual = (prevProps: MessageBubbleProps, nextProps: MessageBubbleProps) 
     prevProps.currentUserId === nextProps.currentUserId &&
     prevProps.isFirstOfGroup === nextProps.isFirstOfGroup &&
     prevProps.isLastOfGroup === nextProps.isLastOfGroup &&
-    prevProps.isGroup === nextProps.isGroup
+    prevProps.isGroup === nextProps.isGroup &&
+    prevProps.isHighlighted === nextProps.isHighlighted
   );
 };
 
@@ -218,12 +220,41 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
   isFirstOfGroup = true,
   isLastOfGroup = true,
   isGroup = false,
+  isHighlighted = false,
 }) => {
-  const { radius, typography } = useTheme();
+  const { colors, radius, typography, isDark } = useTheme();
   const chatTheme = useChatTheme();
   const isMe = item.senderId === currentUserId;
 
   let swipeableRef: any = null;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isHighlighted) {
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.06,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.98,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1.02,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isHighlighted]);
 
   const renderLeftActions = () => (
     <View style={styles.swipeLeftAction}>
@@ -231,13 +262,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
     </View>
   );
 
-  const messageContent = renderMessageContent(item, isMe, currentUserId);
+  const messageContent = <MessageContentRenderer item={item} isMe={isMe} currentUserId={currentUserId} />;
 
   if (item.type === 'system' || item.type === 'call') {
     return messageContent;
   }
 
-  // Determine whether to show the progress arc
   const isUploading = uploadProgress !== undefined && uploadState !== 'delivered' && uploadState !== 'read' && uploadState !== 'cancelled';
 
   return (
@@ -250,6 +280,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
       }}
       friction={1.5}
       leftThreshold={30}
+      enabled={!item.isDeleted}
     >
       <View 
         style={[
@@ -261,41 +292,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
           }
         ]}
       >
-        {/* Reply reference preview */}
-        {item.replyTo && (
-          <View
-            style={[
-              styles.replyReference,
+        <Animated.View style={{ transform: [{ scale: pulseAnim }], flexDirection: 'row', alignItems: 'flex-end' }}>
+          <Pressable
+            onLongPress={() => !item.isDeleted && onLongPress(item)}
+            style={({ pressed }) => [
+              styles.messageBubble,
               {
-                alignSelf: isMe ? 'flex-end' : 'flex-start',
-                backgroundColor: chatTheme.bubbleOtherBg,
-                borderColor: chatTheme.reactionBorder,
+                backgroundColor: isMe ? chatTheme.bubbleMeBg : chatTheme.bubbleOtherBg,
+                borderTopRightRadius: isMe ? (isFirstOfGroup ? 0 : 16) : 16,
+                borderTopLeftRadius: isMe ? 16 : (isFirstOfGroup ? 0 : 16),
+                borderBottomLeftRadius: 16,
+                borderBottomRightRadius: 16,
+                marginLeft: isMe ? 0 : 8,
+                marginRight: isMe ? 8 : 0,
+                opacity: pressed ? 0.92 : 1,
+                borderWidth: isHighlighted ? 1.5 : 0,
+                borderColor: colors.primary,
               },
             ]}
           >
-            <Text style={{ fontSize: 10, fontFamily: typography.fonts.bold, color: chatTheme.bubbleMeBg }}>
-              {item.replyTo.senderName}
-            </Text>
-            <Text style={{ fontSize: 11, color: chatTheme.textOther }} numberOfLines={1}>
-              {item.replyTo.content}
-            </Text>
-          </View>
-        )}
-
-        <Pressable
-          onLongPress={() => onLongPress(item)}
-          style={({ pressed }) => [
-            styles.messageBubble,
-            {
-              backgroundColor: isMe ? chatTheme.bubbleMeBg : chatTheme.bubbleOtherBg,
-              borderTopRightRadius: isMe ? (isFirstOfGroup ? 0 : 12) : 12,
-              borderTopLeftRadius: isMe ? 12 : (isFirstOfGroup ? 0 : 12),
-              borderBottomLeftRadius: 12,
-              borderBottomRightRadius: 12,
-              opacity: pressed ? 0.92 : 1,
-            },
-          ]}
-        >
           {isFirstOfGroup && (
             <View 
               style={[
@@ -316,20 +331,65 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
             </Text>
           )}
 
-          {/* Message content (text / image / video / file / smart card) */}
-          {messageContent || (
-            <Text
+          {/* WhatsApp-style nested Reply reference preview */}
+          {item.replyTo && (
+            <View
               style={[
-                styles.messageText,
-                { color: isMe ? chatTheme.textMe : chatTheme.textOther, fontFamily: typography.fonts.regular },
+                styles.replyReference,
+                {
+                  backgroundColor: isMe 
+                    ? (isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.22)') 
+                    : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)'),
+                  borderLeftColor: isMe ? '#FFFFFF' : chatTheme.bubbleMeBg,
+                },
               ]}
             >
-              {item.content}
-            </Text>
+              <Text style={{ fontSize: 11, fontFamily: typography.fonts.bold, color: isMe ? '#FFFFFF' : chatTheme.bubbleMeBg }}>
+                {item.replyTo.senderName}
+              </Text>
+              <Text style={{ fontSize: 12, color: isMe ? 'rgba(255, 255, 255, 0.85)' : chatTheme.textOther }} numberOfLines={1}>
+                {item.replyTo.content}
+              </Text>
+            </View>
+          )}
+
+          {/* Message content (text / image / video / file / smart card / deleted placeholder) */}
+          {item.isDeleted ? (
+            <View style={styles.deletedMessageContainer}>
+              <Ionicons
+                name="ban-outline"
+                size={14}
+                color={isMe ? (isDark ? 'rgba(255,255,255,0.5)' : '#64748B') : colors.textMuted}
+                style={{ marginRight: 6 }}
+              />
+              <Text
+                style={[
+                  styles.deletedMessageText,
+                  {
+                    color: isMe ? (isDark ? 'rgba(255,255,255,0.5)' : '#64748B') : colors.textMuted,
+                    fontFamily: typography.fonts.regular,
+                    fontStyle: 'italic',
+                  },
+                ]}
+              >
+                {isMe ? 'You deleted this message' : 'This message was deleted'}
+              </Text>
+            </View>
+          ) : (
+            messageContent || (
+              <Text
+                style={[
+                  styles.messageText,
+                  { color: isMe ? chatTheme.textMe : chatTheme.textOther, fontFamily: typography.fonts.regular },
+                ]}
+              >
+                {item.content}
+              </Text>
+            )
           )}
 
           {/* ── Upload Progress Arc ── */}
-          {isUploading && !uploadError && (
+          {!item.isDeleted && isUploading && !uploadError && (
             <CircularProgress
               progress={uploadProgress ?? 0}
               onCancel={() => onCancelUpload(item.id)}
@@ -338,12 +398,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
           )}
 
           {/* ── Upload Error Overlay ── */}
-          {uploadError && (
+          {!item.isDeleted && uploadError && (
             <UploadErrorOverlay onRetry={() => onRetryUpload(item)} />
           )}
 
           {/* Reaction labels */}
-          {item.reactions && item.reactions.length > 0 && (
+          {!item.isDeleted && item.reactions && item.reactions.length > 0 && (
             <View
               style={[
                 styles.reactionsContainer,
@@ -358,13 +418,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
           {/* Footer: time, pin, star, delivery tick */}
           <View style={styles.messageFooter}>
-            {item.isPinned && (
+            {!item.isDeleted && item.isPinned && (
               <Ionicons name="pin" size={10} color={isMe ? 'rgba(255,255,255,0.8)' : chatTheme.bubbleMeBg} style={{ marginRight: 4 }} />
             )}
-            {item.starredBy?.includes(currentUserId) && (
+            {!item.isDeleted && item.starredBy?.includes(currentUserId) && (
               <Ionicons name="star" size={10} color={isMe ? '#FFF700' : '#E2E8F0'} style={{ marginRight: 4 }} />
             )}
-            {item.isEdited && (
+            {!item.isDeleted && item.isEdited && (
               <Text style={[styles.editedLabel, { color: isMe ? 'rgba(255,255,255,0.5)' : chatTheme.textOther }]}>
                 edited
               </Text>
@@ -372,9 +432,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
             <Text style={[styles.messageTime, { color: isMe ? 'rgba(255,255,255,0.7)' : chatTheme.textOther }]}>
               {dayjs(item.createdAt).format('hh:mm A')}
             </Text>
-            {isMe && <MessageStatus msg={item} currentUserId={currentUserId} onRetry={onRetrySend} />}
+            {isMe && !item.isDeleted && <MessageStatus msg={item} currentUserId={currentUserId} onRetry={onRetrySend} />}
           </View>
         </Pressable>
+        </Animated.View>
       </View>
     </Swipeable>
   );
@@ -382,7 +443,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({
 
 const styles = StyleSheet.create({
   messageRow: {
-    maxWidth: '80%',
+    maxWidth: '82%',
   },
   swipeLeftAction: {
     justifyContent: 'center',
@@ -391,10 +452,10 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
   },
   replyReference: {
-    padding: 6,
+    padding: 8,
     borderLeftWidth: 3,
-    borderRadius: 4,
-    marginBottom: 2,
+    borderRadius: 6,
+    marginBottom: 6,
   },
   messageBubble: {
     paddingVertical: 8,
@@ -506,6 +567,15 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 12,
     marginBottom: 3,
+  },
+  deletedMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  deletedMessageText: {
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });
 

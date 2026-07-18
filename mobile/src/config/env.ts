@@ -1,10 +1,3 @@
-/**
- * @file env.ts
- * @description Environment configuration for development, staging, and production.
- */
-
-import { Platform } from 'react-native';
-
 export type Environment = 'development' | 'staging' | 'production';
 
 export interface Config {
@@ -37,7 +30,7 @@ const environments: Record<Environment, Config> = {
   },
   production: {
     ENV: 'production',
-    API_URL: 'https://api.gatecodeoms.com',
+    API_URL: 'https://oms-xdcz.onrender.com',
     TIMEOUT: 30000,
     APP_NAME: 'OMS',
     ENABLE_LOGGER: false,
@@ -46,7 +39,7 @@ const environments: Record<Environment, Config> = {
 };
 
 // Select current environment. Change this to switch environments.
-const CURRENT_ENV: Environment = (process.env.EXPO_PUBLIC_APP_ENV as Environment) || 'development';
+const CURRENT_ENV: Environment = (process.env.EXPO_PUBLIC_APP_ENV as Environment) || 'production';
 
 export const ENV = environments[CURRENT_ENV];
 export default ENV;

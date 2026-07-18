@@ -106,41 +106,173 @@ export const usePayroll = () => {
   });
 };
 
+// ─── Update Profile Mutation ──────────────────────────────────────────────────
+
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient();
+  const updateUser = useAuthStore((s) => s.updateUser);
+  return useMutation({
+    mutationFn: async ({ employeeId, data }: { employeeId: string; data: any }) => {
+      return profileApi.updateProfile(employeeId, data);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      // Sync global auth store
+      const currentUserId = useAuthStore.getState().user?.id;
+      if (data && data.id === currentUserId) {
+        updateUser({
+          name: data.name,
+          avatarUrl: data.avatar || data.photoUrl,
+          phone: data.phone,
+          department: data.department,
+          designation: data.designation,
+        });
+      }
+    },
+  });
+};
+
+// ─── Active Sessions & Devices Queries ───────────────────────────────────────
+
+export const useActiveSessions = () => {
+  const isConnected = useOfflineStore((s) => s.isConnected);
+  return useQuery({
+    queryKey: ['profile', 'sessions'],
+    queryFn: () => profileApi.fetchSessions(),
+    enabled: isConnected,
+    staleTime: STALE_STATIC,
+  });
+};
+
+export const useActiveDevices = () => {
+  const isConnected = useOfflineStore((s) => s.isConnected);
+  return useQuery({
+    queryKey: ['profile', 'devices'],
+    queryFn: () => profileApi.fetchDevices(),
+    enabled: isConnected,
+    staleTime: STALE_STATIC,
+  });
+};
+
+// ─── Terminate Sessions Mutations ────────────────────────────────────────────
+
+export const useTerminateSession = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => profileApi.terminateSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', 'sessions'] });
+    },
+  });
+};
+
+export const useTerminateOtherSessions = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (keepId: string) => profileApi.terminateOtherSessions(keepId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', 'sessions'] });
+    },
+  });
+};
+
 // ─── Profile Completeness (derived, no API call) ─────────────────────────────
 
 export const useProfileCompleteness = (
   profile: EmployeeProfile | null | undefined
-): ProfileCompletenessResult => {
-  const hasPersonal = !!(
+): {
+  percentage: number;
+  missingFields: string[];
+  suggestions: string[];
+} => {
+  const hasBasicInfo = !!(
     profile?.name &&
     profile?.gender &&
-    profile?.dateOfBirth &&
-    profile?.bloodGroup
+    (profile?.dateOfBirth || profile?.dob) &&
+    profile?.maritalStatus &&
+    profile?.bloodGroup &&
+    profile?.nationality
   );
 
-  const hasProfessional = !!(
-    profile?.designation &&
-    profile?.department &&
-    profile?.joiningDate &&
-    profile?.employmentType
+  const hasPhoto = !!(
+    profile?.avatar ||
+    profile?.photoUrl ||
+    profile?.avatarUrl ||
+    profile?.profilePhoto
   );
 
-  const hasContact = !!(
-    profile?.email &&
-    profile?.phone
+  const hasAddress = !!(
+    profile?.currentAddress &&
+    profile?.permanentAddress
   );
 
-  const sections = [
-    { label: 'Personal Information', complete: hasPersonal, weight: 40 },
-    { label: 'Professional Information', complete: hasProfessional, weight: 30 },
-    { label: 'Contact & Address Details', complete: hasContact, weight: 30 },
-  ];
+  const hasEmergency = !!(
+    profile?.emergencyContactName &&
+    profile?.emergencyContactPhone &&
+    profile?.emergencyContactRelation
+  );
 
-  const percentage = sections.reduce((acc, s) => {
-    return acc + (s.complete ? s.weight : 0);
-  }, 0);
+  const hasBank = !!(
+    profile?.bankName &&
+    profile?.bankAccountNumber &&
+    profile?.bankIfscCode
+  );
 
-  return { percentage, sections };
+  const hasIdentity = !!(
+    profile?.aadhaarNumber &&
+    profile?.panNumber
+  );
+
+  const weights = {
+    basicInfo: 20,
+    photo: 15,
+    address: 15,
+    emergency: 15,
+    bank: 15,
+    identity: 20,
+  };
+
+  let percentage = 0;
+  const missingFields: string[] = [];
+  const suggestions: string[] = [];
+
+  if (hasBasicInfo) percentage += weights.basicInfo;
+  else {
+    missingFields.push('Basic Information');
+    suggestions.push('Complete basic info (gender, DOB, marital status, blood group, nationality)');
+  }
+
+  if (hasPhoto) percentage += weights.photo;
+  else {
+    missingFields.push('Profile Photo');
+    suggestions.push('Upload a high-quality profile picture');
+  }
+
+  if (hasAddress) percentage += weights.address;
+  else {
+    missingFields.push('Address Details');
+    suggestions.push('Add both current and permanent address details');
+  }
+
+  if (hasEmergency) percentage += weights.emergency;
+  else {
+    missingFields.push('Emergency Contact');
+    suggestions.push('Provide name, relationship, and mobile for primary emergency contact');
+  }
+
+  if (hasBank) percentage += weights.bank;
+  else {
+    missingFields.push('Bank Details');
+    suggestions.push('Add your salary bank account details (IFSC, Account Number)');
+  }
+
+  if (hasIdentity) percentage += weights.identity;
+  else {
+    missingFields.push('Identity Documents');
+    suggestions.push('Save verified Aadhaar and PAN details');
+  }
+
+  return { percentage, missingFields, suggestions };
 };
 
 export default useProfile;

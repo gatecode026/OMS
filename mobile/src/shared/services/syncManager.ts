@@ -5,6 +5,7 @@
 
 import { useOfflineStore } from '../store/offlineStore';
 import apiClient from './apiClient';
+import { queryClient } from '../api/queryClient';
 
 let isSyncing = false;
 
@@ -35,6 +36,18 @@ export const syncManager = {
           data: request.data,
           headers: request.headers,
         });
+
+        // Invalidate corresponding cache queries on successful sync
+        if (request.url.includes('/status')) {
+          queryClient.invalidateQueries({ queryKey: ['chat', 'presence'] });
+        } else if (request.url.includes('/mute') || request.url.includes('/wallpaper')) {
+          queryClient.invalidateQueries({ queryKey: ['chat', 'conversations'] });
+        } else if (request.url.includes('/profile')) {
+          queryClient.invalidateQueries({ queryKey: ['profile'] });
+        } else if (request.url.includes('/messages') || request.url.includes('/conversations')) {
+          queryClient.invalidateQueries({ queryKey: ['chat', 'messages'] });
+          queryClient.invalidateQueries({ queryKey: ['chat', 'conversations'] });
+        }
 
         // Success -> remove from queue
         await store.removeFromQueue(request.id);

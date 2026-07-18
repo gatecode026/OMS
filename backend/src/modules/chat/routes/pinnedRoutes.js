@@ -11,4 +11,10 @@ const router = express.Router();
 // Route: GET /api/v1/chat/conversations/:conversationId/pinned
 router.get('/:conversationId/pinned', pinnedController.getPinnedMessages);
 
+// Route: POST /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
+router.post('/:conversationId/messages/:messageId/pin', pinnedController.pinMessage);
+
+// Route: DELETE /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
+router.delete('/:conversationId/messages/:messageId/pin', pinnedController.unpinMessage);
+
 export default router;

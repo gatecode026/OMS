@@ -18,11 +18,23 @@ export interface FileProgress {
   fileSize?: number;
 }
 
+export interface NotificationConfig {
+  muteDuration?: '8 hours' | '1 week' | 'always' | null;
+  sound?: string;
+  vibration?: 'default' | 'short' | 'long' | 'none';
+  showPreview?: boolean;
+  priority?: boolean;
+}
+
 interface ChatSettingsState {
   mutedConversationIds: string[];
   wallpapers: Record<string, WallpaperConfig>;
   mediaAutoDownload: 'never' | 'wifi' | 'always';
   saveToGallery: boolean;
+  
+  // PRD 04 extensions
+  disappearingDurations: Record<string, string>; // conversationId -> duration ('off', '24h', '7d', '30d', '90d')
+  notificationConfigs: Record<string, NotificationConfig>; // conversationId -> config
   
   // Download Manager Queue
   transferQueue: Record<string, FileProgress>;
@@ -36,6 +48,13 @@ interface ChatSettingsState {
   setMediaAutoDownload: (config: 'never' | 'wifi' | 'always') => void;
   setSaveToGallery: (enabled: boolean) => void;
   
+  // PRD 04 setters
+  setDisappearingDuration: (conversationId: string, duration: string) => void;
+  getDisappearingDuration: (conversationId: string) => string;
+  
+  setNotificationConfig: (conversationId: string, config: Partial<NotificationConfig>) => void;
+  getNotificationConfig: (conversationId: string) => NotificationConfig;
+  
   // Queue operations
   updateTransferProgress: (id: string, progress: number, status: FileProgress['status'], fileName?: string, fileSize?: number) => void;
   removeTransfer: (id: string) => void;
@@ -46,6 +65,8 @@ export const useChatSettingsStore = create<ChatSettingsState>((set, get) => ({
   wallpapers: {},
   mediaAutoDownload: 'wifi',
   saveToGallery: true,
+  disappearingDurations: {},
+  notificationConfigs: {},
   transferQueue: {},
   
   toggleMuteConversation: (id) => set((state) => {
@@ -64,6 +85,34 @@ export const useChatSettingsStore = create<ChatSettingsState>((set, get) => ({
   
   setMediaAutoDownload: (mediaAutoDownload) => set({ mediaAutoDownload }),
   setSaveToGallery: (saveToGallery) => set({ saveToGallery }),
+  
+  setDisappearingDuration: (conversationId, duration) => set((state) => ({
+    disappearingDurations: { ...state.disappearingDurations, [conversationId]: duration }
+  })),
+  getDisappearingDuration: (conversationId) => get().disappearingDurations[conversationId] || 'off',
+  
+  setNotificationConfig: (conversationId, config) => set((state) => ({
+    notificationConfigs: {
+      ...state.notificationConfigs,
+      [conversationId]: {
+        ...(state.notificationConfigs[conversationId] || {
+          muteDuration: null,
+          sound: 'Default',
+          vibration: 'default',
+          showPreview: true,
+          priority: true,
+        }),
+        ...config,
+      },
+    }
+  })),
+  getNotificationConfig: (conversationId) => get().notificationConfigs[conversationId] || {
+    muteDuration: null,
+    sound: 'Default',
+    vibration: 'default',
+    showPreview: true,
+    priority: true,
+  },
   
   updateTransferProgress: (id, progress, status, fileName = 'File', fileSize) => set((state) => {
     const existing = state.transferQueue[id];
@@ -88,3 +137,4 @@ export const useChatSettingsStore = create<ChatSettingsState>((set, get) => ({
 }));
 
 export default useChatSettingsStore;
+

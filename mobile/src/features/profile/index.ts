@@ -19,6 +19,11 @@ export {
   useLeaveSummary,
   usePayroll,
   useProfileCompleteness,
+  useUpdateProfile,
+  useActiveSessions,
+  useActiveDevices,
+  useTerminateSession,
+  useTerminateOtherSessions,
 } from './hooks/useProfile';
 
 // Components

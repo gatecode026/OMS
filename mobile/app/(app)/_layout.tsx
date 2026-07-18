@@ -5,16 +5,20 @@
 
 import React from 'react';
 import { Stack } from 'expo-router';
+import SidebarDrawer from '../../src/shared/components/SidebarDrawer';
 
 export default function AppLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-      }}
-    >
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+        }}
+      >
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+      <SidebarDrawer />
+    </>
   );
 }

@@ -108,6 +108,7 @@ const sendExpoNotification = async (token, payload) => {
       channelId: isCall ? 'calls' : 'default',
       badge: payload.badge || 0,
       data: payload.data || {},
+      categoryIdentifier: isCall ? undefined : 'chatReply',
     };
 
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -163,7 +164,26 @@ export const sendNotificationToUser = async (employeeId, payload) => {
       logger.debug('[Push Service] Could not calculate badge count:', badgeErr.message);
     }
 
-    const promises = subscriptions.map(async (sub) => {
+    // Deduplicate subscriptions to prevent duplicate push notifications to the same token/endpoint
+    const uniqueExpoTokens = new Set();
+    const uniqueWebEndpoints = new Set();
+    const uniqueSubscriptions = [];
+
+    for (const sub of subscriptions) {
+      if (sub.expoPushToken) {
+        if (!uniqueExpoTokens.has(sub.expoPushToken)) {
+          uniqueExpoTokens.add(sub.expoPushToken);
+          uniqueSubscriptions.push(sub);
+        }
+      } else if (sub.subscription && sub.subscription.endpoint) {
+        if (!uniqueWebEndpoints.has(sub.subscription.endpoint)) {
+          uniqueWebEndpoints.add(sub.subscription.endpoint);
+          uniqueSubscriptions.push(sub);
+        }
+      }
+    }
+
+    const promises = uniqueSubscriptions.map(async (sub) => {
       try {
         if (sub.expoPushToken) {
           // Mobile Push (Expo)

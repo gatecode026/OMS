@@ -9,6 +9,9 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { successResponse } from '../../utils/response.js';
 import { getTenantConnection } from '../../utils/multidbConnection.js';
 import { getIO } from '../../config/socket.js';
+import presenceService from './services/presence.service.js';
+import redis from '../../config/redis.js';
+import { runWithTenant } from '../../utils/tenantContext.js';
 import Call from './call.model.js';
 import logger from '../../config/logger.js';
 import crypto from 'crypto';
@@ -1097,5 +1100,176 @@ export const forwardMessage = asyncHandler(async (req, res) => {
   }
 
   return successResponse(res, newMessages, 'Messages forwarded successfully');
+});
+
+// POST /api/v1/chat/conversations/:id/export
+export const exportChat = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { id: userId, companyId } = req.user;
+
+  await runWithTenant(companyId, async () => {
+    // Log export in activity logs for audit trail
+    await logChatActivity(companyId, {
+      actor: userId,
+      actionType: 'EXPORT_CHAT',
+      fieldChanged: 'conversation_export',
+      oldValue: conversationId,
+      newValue: 'Exported'
+    });
+  });
+
+  return successResponse(res, null, 'Export logged successfully');
+});
+
+// GET /api/v1/chat/messages/starred
+export const getStarredMessages = asyncHandler(async (req, res) => {
+  const { id: employeeId, companyId } = req.user;
+  const starred = await chatService.getStarredMessages(employeeId, companyId);
+  return successResponse(res, starred, 'Starred messages fetched');
+});
+
+// POST /api/v1/chat/messages/:id/star
+export const starMessage = asyncHandler(async (req, res) => {
+  const { id: messageId } = req.params;
+  const { id: employeeId, companyId } = req.user;
+
+  const msg = await chatService.starMessage(messageId, employeeId, companyId);
+  if (!msg) {
+    return res.status(404).json({ status: 'fail', message: 'Message not found' });
+  }
+
+  // Broadcast to conversation room
+  const io = getIO();
+  if (io && msg.conversationId) {
+    io.to(`conv:${msg.conversationId}`).emit("message_starred", {
+      messageId,
+      conversationId: msg.conversationId,
+      starredBy: employeeId,
+    });
+  }
+
+  return successResponse(res, msg, 'Message starred');
+});
+
+// DELETE /api/v1/chat/messages/:id/star
+export const unstarMessage = asyncHandler(async (req, res) => {
+  const { id: messageId } = req.params;
+  const { id: employeeId, companyId } = req.user;
+
+  const msg = await chatService.unstarMessage(messageId, employeeId, companyId);
+  if (!msg) {
+    return res.status(404).json({ status: 'fail', message: 'Message not found' });
+  }
+
+  // Broadcast to conversation room
+  const io = getIO();
+  if (io && msg.conversationId) {
+    io.to(`conv:${msg.conversationId}`).emit("message_unstarred", {
+      messageId,
+      conversationId: msg.conversationId,
+      unstarredBy: employeeId,
+    });
+  }
+
+  return successResponse(res, msg, 'Message unstarred');
+});
+
+// GET /api/v1/chat/conversations/:id/shared-content
+export const getSharedContentSummary = asyncHandler(async (req, res) => {
+  const { id: conversationId } = req.params;
+  const { companyId } = req.user;
+
+  const summary = await chatService.getSharedContentSummary(conversationId, companyId);
+  return successResponse(res, summary, 'Shared content summary fetched');
+});
+
+// PATCH /api/v1/chat/status
+export const updateChatStatus = asyncHandler(async (req, res) => {
+  const { id: userId, companyId } = req.user;
+  const { status, emoji, expiresInMinutes } = req.body;
+
+  const validStatuses = ["available", "away", "dnd", "offline"];
+  if (status && !validStatuses.includes(status)) {
+    return res.status(400).json({ status: 'fail', message: 'Invalid status' });
+  }
+
+  const expiresAt = expiresInMinutes
+    ? new Date(Date.now() + expiresInMinutes * 60000)
+    : null;
+
+  const conn = await getTenantConnection(companyId);
+  const updateData = {};
+  if (status) updateData.chatStatus = status;
+  if (emoji !== undefined) updateData.statusEmoji = emoji;
+  updateData.statusExpiry = expiresAt;
+
+  await conn.collection("employees").updateOne(
+    { id: userId },
+    { $set: updateData }
+  );
+
+  // Update Redis presence with new status
+  if (redis.isAvailable) {
+    const presenceKey = `presence:user:${userId}`;
+    const cached = await redis.get(presenceKey).catch(() => null);
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        if (status) data.chatStatus = status;
+        if (emoji !== undefined) data.statusEmoji = emoji;
+        if (data.status === "online") {
+          await redis.set(presenceKey, JSON.stringify(data), { EX: 120 }).catch(() => {});
+        } else {
+          await redis.set(presenceKey, JSON.stringify(data)).catch(() => {});
+        }
+      } catch (e) {}
+    }
+  }
+
+  // Broadcast to company room
+  const io = getIO();
+  if (io) {
+    io.to(`company:${companyId}`).emit("user_status_changed", {
+      employeeId: userId,
+      status: status || 'available',
+      emoji: emoji || null,
+      expiresAt,
+    });
+  }
+
+  return successResponse(res, { status, emoji, expiresAt }, 'Status updated successfully');
+});
+
+// GET /api/v1/chat/presence/:userId
+export const getPresence = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const presence = await presenceService.getUserPresence(userId);
+  return successResponse(res, presence, 'Presence fetched successfully');
+});
+
+// GET /api/v1/chat/users/:id/last-seen
+export const getLastSeen = asyncHandler(async (req, res) => {
+  const { id: userId } = req.params;
+  const { companyId } = req.user;
+  
+  const presence = await presenceService.getUserPresence(userId);
+  if (presence && presence.status === 'online') {
+    return successResponse(res, { lastSeen: null, isOnline: true }, 'User is online');
+  }
+
+  // Fallback to database
+  let lastSeen = presence?.lastSeen || null;
+  if (!lastSeen) {
+    const conn = await getTenantConnection(companyId);
+    const employee = await conn.collection("employees").findOne({ id: userId }, { projection: { lastSeen: 1 } });
+    lastSeen = employee?.lastSeen || null;
+  }
+
+  return successResponse(res, { lastSeen, isOnline: false }, 'Last seen fetched successfully');
+});
+
+// GET /api/v1/chat/ping
+export const ping = asyncHandler(async (req, res) => {
+  return successResponse(res, { timestamp: Date.now() }, 'Pong');
 });
 

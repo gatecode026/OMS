@@ -18,7 +18,11 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,11 +39,15 @@
           "backgroundColor": "#F8FAFC",
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-audio",
+      "expo-video"
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "3e61dfdd-7a18-4c32-80b5-5585efa7dcb0"
+        "projectId": "e9776efb-4007-4f61-8a80-f62454ad417c"
       }
     }
   }

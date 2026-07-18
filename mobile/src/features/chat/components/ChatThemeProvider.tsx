@@ -21,15 +21,21 @@ export const ChatThemeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { colors, isDark } = useTheme();
 
   const chatTheme: ChatTheme = {
-    bubbleMeBg: colors.primary,
-    bubbleOtherBg: colors.card,
-    textMe: '#FFFFFF',
+    // Sent bubble: primary color tint — matches OMS indigo branding
+    bubbleMeBg: isDark ? `${colors.primary}CC` : `${colors.primary}18`,
+    // Received bubble: card surface
+    bubbleOtherBg: isDark ? colors.card : colors.surface,
+    // Text colors — use theme text
+    textMe: isDark ? colors.text : colors.text,
     textOther: colors.text,
-    tickRead: '#38BDF8',
-    tickDelivered: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)',
-    tickSent: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
-    reactionBg: colors.neutralLight || (isDark ? '#334155' : '#F1F5F9'),
+    // Tick colors — use primary for read, muted for others
+    tickRead: colors.primary,
+    tickDelivered: colors.textLight,
+    tickSent: colors.textLight,
+    // Reaction chips
+    reactionBg: isDark ? colors.neutralLight : colors.neutralLight,
     reactionBorder: colors.border,
+    // Composer & header use surface
     composerBg: colors.surface,
     headerBg: colors.surface,
   };

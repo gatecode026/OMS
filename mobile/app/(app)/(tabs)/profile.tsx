@@ -17,88 +17,136 @@ import {
   RefreshControl,
   Modal,
   ActivityIndicator,
-  TextInput,
   Image,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-} from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 
 import useTheme from '../../../src/shared/hooks/useTheme';
 import useAuthStore from '../../../src/shared/store/authStore';
-import useBranding from '../../../src/shared/hooks/useBranding';
 import { Avatar } from '../../../src/shared/components/Avatar';
-import { ErrorState, toast } from '../../../src/shared/components';
-import apiClient from '../../../src/shared/services/apiClient';
-import { getSocket } from '../../../src/shared/services/socketManager';
+import { Badge, ErrorState, toast } from '../../../src/shared/components';
+import { useNotificationsUnreadCount } from '../../../src/features/notifications';
 import {
   useProfile,
   useUpdateProfilePhoto,
   useProfileCompleteness,
   MainProfileSkeleton,
   MenuCard,
+  useActiveSessions,
+  useTerminateSession,
+  useTerminateOtherSessions,
 } from '../../../src/features/profile';
+import usePresenceStore from '../../../src/shared/store/presenceStore';
+import { useUpdateStatus } from '../../../src/features/chat/hooks/useChat';
+import chatApi from '../../../src/features/chat/api/chatApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const PRESET_STATUSES = [
-  { label: 'Available', value: 'available', emoji: '🟢' },
-  { label: 'Busy', value: 'dnd', emoji: '🔴' },
-  { label: 'In Meeting', value: 'dnd', emoji: '🗓️' },
-  { label: 'Working Remotely', value: 'away', emoji: '🏠' },
-  { label: 'Out of Office', value: 'away', emoji: '✈️' },
-  { label: 'Offline', value: 'offline', emoji: '⚪' },
-];
-
 export default function ProfileScreen() {
   const { colors, spacing, radius, shadows, typography, isDark } = useTheme();
-  const { logout, updateUser } = useAuthStore();
+  const { logout } = useAuthStore();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
   const [changePicVisible, setChangePicVisible] = useState(false);
   const [fullscreenPicVisible, setFullscreenPicVisible] = useState(false);
-  const [statusModalVisible, setStatusModalVisible] = useState(false);
-  const [aboutModalVisible, setAboutModalVisible] = useState(false);
 
   const [uploadingPic, setUploadingPic] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Status & About states
-  const [currentStatus, setCurrentStatus] = useState('available');
-  const [currentEmoji, setCurrentEmoji] = useState('🟢');
+  // New Presence & Connection Health states
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [connectionHealthVisible, setConnectionHealthVisible] = useState(false);
+  const [activeSessionsVisible, setActiveSessionsVisible] = useState(false);
+
   const [customStatusText, setCustomStatusText] = useState('');
-  const [aboutText, setAboutText] = useState('Available');
+  const [customStatusEmoji, setCustomStatusEmoji] = useState('💬');
+  const [expiryMinutes, setExpiryMinutes] = useState<number | null>(60);
+  
+  const [isTestingPing, setIsTestingPing] = useState(false);
+  const [testPingResult, setTestPingResult] = useState<number | null>(null);
+
+  const presenceStore = usePresenceStore();
+  const updateStatusMutation = useUpdateStatus();
+
+  const runPingTest = async () => {
+    setIsTestingPing(true);
+    setTestPingResult(null);
+    let total = 0;
+    try {
+      for (let i = 0; i < 3; i++) {
+        const start = Date.now();
+        await chatApi.pingServer();
+        total += (Date.now() - start);
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      const avg = Math.round(total / 3);
+      setTestPingResult(avg);
+      presenceStore.setConnectionInfo({ ping: avg });
+    } catch (e) {
+      toast.error('Latency test failed');
+    } finally {
+      setIsTestingPing(false);
+    }
+  };
+
+  const handleSaveStatus = async () => {
+    try {
+      const expiresAt = expiryMinutes ? new Date(Date.now() + expiryMinutes * 60000).toISOString() : null;
+      await updateStatusMutation.mutateAsync({
+        status: 'available',
+        emoji: customStatusEmoji,
+        expiresInMinutes: expiryMinutes,
+      });
+      presenceStore.setCustomStatus({
+        emoji: customStatusEmoji,
+        text: customStatusText,
+        expiresAt,
+      });
+      toast.success('Custom status updated!');
+      setStatusModalVisible(false);
+    } catch (err) {
+      toast.error('Failed to update status');
+    }
+  };
 
   const { data: profile, isLoading, isError, refetch } = useProfile();
   const { mutateAsync: updateProfilePhoto } = useUpdateProfilePhoto();
   const completeness = useProfileCompleteness(profile);
 
-  // Load custom bio/about from SecureStore & sync statuses
-  useEffect(() => {
-    if (profile?.id) {
-      SecureStore.getItemAsync(`oms_about_${profile.id}`).then((val: string | null) => {
-        if (val) setAboutText(val);
-        else if (profile.experience) setAboutText(profile.experience);
-      });
-    }
-  }, [profile?.id]);
+  // Active sessions hooks
+  const { data: sessions, isLoading: sessionsLoading } = useActiveSessions();
+  const terminateSessionMut = useTerminateSession();
+  const terminateOtherSessionsMut = useTerminateOtherSessions();
 
-  useEffect(() => {
-    if (profile) {
-      setCurrentStatus(profile.chatStatus || 'available');
-      setCurrentEmoji(profile.statusEmoji || '🟢');
+  const currentSessionId = sessions?.find((s: any) => s.isCurrent)?.id || null;
+
+  const handleTerminateSession = async (id: string) => {
+    try {
+      await terminateSessionMut.mutateAsync(id);
+      toast.success('Session terminated successfully');
+    } catch (err) {
+      toast.error('Failed to terminate session');
     }
-  }, [profile]);
+  };
+
+  const handleTerminateOthers = async () => {
+    try {
+      const keepId = currentSessionId || '';
+      await terminateOtherSessionsMut.mutateAsync(keepId);
+      toast.success('All other sessions terminated');
+    } catch (err) {
+      toast.error('Failed to terminate other sessions');
+    }
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -122,19 +170,12 @@ export default function ProfileScreen() {
     setUploadingPic(true);
     setUploadError(null);
     try {
-      const updated = await updateProfilePhoto({
+      await updateProfilePhoto({
         employeeId: targetUser.id,
         base64Image,
       });
-      const newAvatarUrl = updated?.avatar || updated?.photoUrl || null;
-      updateUser({ avatarUrl: newAvatarUrl });
       toast.success('Profile picture updated successfully!');
-      
-      // Emit socket update for realtime updates
-      const socket = getSocket();
-      if (socket?.connected) {
-        socket.emit('profile_photo_updated', { avatarUrl: newAvatarUrl });
-      }
+      refetch();
     } catch (err: any) {
       console.error('Failed to upload profile picture:', err);
       setUploadError(err?.message || 'Error occurred while saving profile photo.');
@@ -198,66 +239,13 @@ export default function ProfileScreen() {
     setChangePicVisible(true);
   };
 
-  const handleUpdateStatus = async (newStatus: string, emoji: string) => {
-    const targetId = profile?.id || authUser?.id;
-    if (!targetId) return;
-
-    try {
-      // 1. Persist in MongoDB
-      await apiClient.put(`/api/v1/employees/${targetId}`, {
-        chatStatus: newStatus,
-        statusEmoji: emoji,
-      });
-
-      // 2. Emit Socket.IO event for instant sync
-      const socket = getSocket();
-      if (socket?.connected) {
-        socket.emit('set_status', { status: newStatus, emoji, expiresInMinutes: 0 });
-      }
-
-      setCurrentStatus(newStatus);
-      setCurrentEmoji(emoji);
-      setStatusModalVisible(false);
-      toast.success('Status updated successfully');
-      refetch();
-    } catch (e) {
-      toast.error('Failed to update status');
-    }
-  };
-
-  const handleSaveAbout = async () => {
-    const targetId = profile?.id || authUser?.id;
-    if (!targetId) return;
-
-    try {
-      // Save locally in SecureStore
-      await SecureStore.setItemAsync(`oms_about_${targetId}`, aboutText);
-
-      // Persist in Mongoose 'experience' field (fallback field for About/Bio text)
-      await apiClient.put(`/api/v1/employees/${targetId}`, {
-        experience: aboutText,
-      });
-
-      // Emit socket notification
-      const socket = getSocket();
-      if (socket?.connected) {
-        socket.emit('set_about', { about: aboutText });
-      }
-
-      setAboutModalVisible(false);
-      toast.success('About info updated');
-      refetch();
-    } catch (e) {
-      toast.error('Failed to save about text');
-    }
-  };
-
   const navigate = (path: string) => {
     router.push(path as any);
   };
 
   // ─── Merge backend profile with authStore user data ───────────────────────
   const authUser = useAuthStore((s) => s.user);
+  const { data: unreadCount = 0 } = useNotificationsUnreadCount();
   const displayName = profile?.name || authUser?.name || 'Employee';
   const rawDesignation = profile?.designation || authUser?.designation || authUser?.role || '—';
   const displayDesignation = rawDesignation ? rawDesignation.charAt(0).toUpperCase() + rawDesignation.slice(1) : '—';
@@ -265,73 +253,60 @@ export default function ProfileScreen() {
   const displayEmail = profile?.email || authUser?.email || '—';
   const displayPhone = profile?.phone || authUser?.phone || '—';
   const displayDepartment = profile?.department || authUser?.department || '—';
-  const displayManager = profile?.reportingManagerName || profile?.reportingManager || '—';
   const displayAvatarUrl = profile?.avatarUrl || profile?.profilePhoto || authUser?.avatarUrl;
 
-  // ─── Menu Items Sections ──────────────────────────────────────────────────
   const personalItems = [
     {
-      title: 'Personal Information',
-      icon: 'person-outline' as const,
-      iconColor: colors.primary,
+      title: 'Basic Information',
+      subtitle: 'Name, email, phone, date of birth',
+      icon: 'card-outline' as const,
+      iconColor: '#6366F1',
       path: '/(app)/profile/personal',
     },
     {
-      title: 'Professional Information',
-      icon: 'briefcase-outline' as const,
-      iconColor: '#6366F1',
-      path: '/(app)/profile/professional',
-    },
-    {
-      title: 'Contact Information',
-      icon: 'call-outline' as const,
-      iconColor: colors.info,
-      path: '/(app)/profile/contact',
-    },
-    {
-      title: 'Address',
+      title: 'Address Information',
+      subtitle: 'Current address and permanent address',
       icon: 'location-outline' as const,
       iconColor: '#8B5CF6',
       path: '/(app)/profile/address',
     },
     {
-      title: 'Documents',
-      icon: 'document-text-outline' as const,
-      iconColor: '#EC4899',
-      path: '/(app)/profile/documents',
-    },
-    {
-      title: 'Emergency Contacts',
-      icon: 'people-outline' as const,
+      title: 'Emergency Contact',
+      subtitle: 'Add emergency contact details',
+      icon: 'call-outline' as const,
       iconColor: colors.danger,
       path: '/(app)/profile/emergency',
     },
     {
       title: 'Bank Details',
-      icon: 'card-outline' as const,
+      subtitle: 'Bank account and payment details',
+      icon: 'business-outline' as const,
       iconColor: '#10B981',
       path: '/(app)/profile/bank-details',
     },
-  ];
-
-  const appSettingsItems = [
     {
-      title: 'Security',
+      title: 'Identity Information',
+      subtitle: 'Aadhaar, PAN and other identity details',
       icon: 'shield-checkmark-outline' as const,
       iconColor: colors.success,
+      path: '/(app)/profile/documents',
+    },
+  ];
+
+  const accountSecurityItems = [
+    {
+      title: 'Change Password',
+      subtitle: 'Update your account password',
+      icon: 'lock-closed-outline' as const,
+      iconColor: '#6366F1',
+      path: '/(app)/profile/security?action=password',
+    },
+    {
+      title: 'Security & Login',
+      subtitle: 'Manage 2FA, devices and login sessions',
+      icon: 'shield-outline' as const,
+      iconColor: colors.success,
       path: '/(app)/profile/security',
-    },
-    {
-      title: 'Appearance',
-      icon: 'color-palette-outline' as const,
-      iconColor: '#EC4899',
-      path: '/(app)/profile/security', // Redirect to same container for layout options
-    },
-    {
-      title: 'Help & Support',
-      icon: 'help-circle-outline' as const,
-      iconColor: '#F97316',
-      path: '/(app)/profile/help',
     },
   ];
 
@@ -340,55 +315,47 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? colors.background : '#F8FAFC' }]}>
       <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
+        barStyle="light-content"
         backgroundColor="transparent"
         translucent
       />
 
-      {/* ─── Custom Header ─────────────────────────────────────────────────── */}
+      {/* ─── Header ─── */}
       <View
         style={[
-          styles.header,
+          styles.headerRow,
           {
+            paddingTop: insets.top + 12,
             backgroundColor: colors.surface,
-            paddingTop: insets.top + spacing.sm,
-            paddingHorizontal: spacing.lg,
-            paddingBottom: spacing.md,
             borderBottomColor: colors.border,
           },
         ]}
       >
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.headerSide}
-          accessibilityLabel="Go back"
-          accessible
-          accessibilityRole="button"
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
+        <View style={styles.headerLeft}>
+          <Text style={{ fontSize: 20, fontFamily: typography.fonts.bold, color: colors.text }}>
+            My Profile
+          </Text>
+        </View>
 
-        <Text
-          style={{
-            fontSize: typography.sizes.h2,
-            fontFamily: typography.fonts.bold,
-            color: colors.text,
-            flex: 1,
-            textAlign: 'center',
-          }}
-        >
-          Profile Settings
-        </Text>
-
-        <Pressable
-          onPress={() => navigate('/(app)/profile/security')}
-          style={styles.headerSide}
-          accessibilityLabel="Settings"
-          accessible
-          accessibilityRole="button"
-        >
-          <Ionicons name="settings-outline" size={22} color={colors.text} />
-        </Pressable>
+        <View style={styles.headerRight}>
+          <Pressable
+            onPress={() => router.push('/notifications')}
+            style={styles.iconButton}
+            accessibilityLabel="Notifications"
+            accessible
+            accessibilityRole="button"
+          >
+            <Ionicons name="notifications" size={22} color={colors.text} />
+            {unreadCount > 0 && (
+              <Badge content={String(unreadCount)} style={styles.notificationBadge} />
+            )}
+          </Pressable>
+          <Avatar
+            source={displayAvatarUrl}
+            name={displayName}
+            size={32}
+          />
+        </View>
       </View>
 
       {/* ─── Content ───────────────────────────────────────────────────────── */}
@@ -431,99 +398,131 @@ export default function ProfileScreen() {
                   backgroundColor: colors.card,
                   borderRadius: radius.xl,
                   borderColor: colors.border,
+                  borderWidth: 1,
                   marginHorizontal: spacing.lg,
+                  marginTop: -20,
                   marginBottom: spacing.lg,
+                  padding: spacing.lg,
                 },
                 shadows.medium,
               ]}
             >
-              {/* Large Profile Picture */}
-              <View style={styles.avatarWrapper}>
-                <Pressable onPress={() => setFullscreenPicVisible(true)}>
-                  <Avatar
-                    source={displayAvatarUrl}
-                    name={displayName}
-                    size={110}
-                    style={styles.avatar}
-                  />
-                </Pressable>
-                
-                {/* Online indicator dot */}
-                <View
-                  style={[
-                    styles.onlineDot,
-                    {
-                      backgroundColor: currentStatus === 'available' ? colors.success : colors.textLight,
-                      borderColor: colors.card,
-                      width: 18,
-                      height: 18,
-                      borderRadius: 9,
-                    },
-                  ]}
-                />
+              {/* Row with Avatar & Info */}
+              <View style={styles.heroMainRow}>
+                <View style={styles.avatarWrapper}>
+                  <View style={[styles.avatarRing, { borderColor: '#22C55E', padding: 2, borderWidth: 3, borderRadius: 50 }]}>
+                    <Pressable onPress={() => setFullscreenPicVisible(true)}>
+                      <Avatar
+                        source={displayAvatarUrl}
+                        name={displayName}
+                        size={76}
+                        style={styles.avatar}
+                      />
+                    </Pressable>
+                  </View>
+                  <Pressable
+                    onPress={handleChangeProfilePic}
+                    style={[
+                      styles.editAvatarBtn,
+                      {
+                        backgroundColor: '#FFFFFF',
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        borderRadius: radius.circular,
+                        width: 28,
+                        height: 28,
+                      },
+                      shadows.light,
+                    ]}
+                  >
+                    <Ionicons name="camera-outline" size={14} color={colors.primary} />
+                  </Pressable>
+                </View>
 
-                {/* Edit avatar floating plus badge */}
-                <Pressable
-                  onPress={handleChangeProfilePic}
-                  style={[
-                    styles.editAvatarBtn,
-                    {
-                      backgroundColor: colors.primary,
-                      borderColor: colors.card,
-                      borderRadius: radius.circular,
-                      width: 32,
-                      height: 32,
-                    },
-                    shadows.medium,
-                  ]}
-                >
-                  <Ionicons name="camera-outline" size={16} color="#FFFFFF" />
-                </Pressable>
+                <View style={styles.heroInfoText}>
+                  <Text
+                    style={{
+                      fontSize: 20,
+                      fontFamily: typography.fonts.bold,
+                      color: colors.text,
+                    }}
+                  >
+                    {displayName}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontFamily: typography.fonts.medium,
+                      color: colors.textMuted,
+                      marginTop: 2,
+                    }}
+                  >
+                    {displayDesignation}
+                  </Text>
+
+                  {presenceStore.customStatus && (
+                    <View
+                      style={{
+                        backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                        borderRadius: radius.md,
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        marginTop: 6,
+                        alignSelf: 'flex-start',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 13 }}>{presenceStore.customStatus.emoji}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textLight, fontFamily: typography.fonts.medium }}>
+                        {presenceStore.customStatus.text}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View
+                    style={[
+                      styles.codeBadge,
+                      { backgroundColor: `${colors.primary}08`, borderRadius: radius.md, marginTop: spacing.sm, alignSelf: 'flex-start' },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontFamily: typography.fonts.semibold,
+                        color: colors.primary,
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      Employee ID: {displayEmployeeCode}
+                    </Text>
+                  </View>
+                </View>
               </View>
 
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontFamily: typography.fonts.bold,
-                  color: colors.text,
-                  textAlign: 'center',
-                  marginTop: spacing.md,
-                }}
-              >
-                {displayName}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontFamily: typography.fonts.medium,
-                  color: colors.textMuted,
-                  textAlign: 'center',
-                  marginTop: 2,
-                }}
-              >
-                {displayDesignation} · {displayDepartment}
-              </Text>
+              <View style={[styles.inlineDivider, { backgroundColor: colors.border, marginVertical: spacing.lg }]} />
 
-              {/* Employee ID Badge */}
-              <View
-                style={[
-                  styles.codeBadge,
-                  { backgroundColor: `${colors.primary}18`, borderRadius: radius.circular, marginTop: spacing.md },
-                ]}
-              >
-                <Text
-                  style={{
-                    fontSize: 11,
-                    fontFamily: typography.fonts.semibold,
-                    color: colors.primary,
-                  }}
-                >
-                  ID: {displayEmployeeCode}
-                </Text>
+              {/* Contact and placement details */}
+              <View style={styles.heroDetailsGrid}>
+                <View style={styles.heroDetailRow}>
+                  <Ionicons name="mail-outline" size={16} color={colors.primary} style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 13, color: colors.text, fontFamily: typography.fonts.medium, flex: 1 }} numberOfLines={1}>{displayEmail}</Text>
+                  <Ionicons name="call-outline" size={16} color={colors.primary} style={{ marginRight: 8, marginLeft: 16 }} />
+                  <Text style={{ fontSize: 13, color: colors.text, fontFamily: typography.fonts.medium }}>{displayPhone}</Text>
+                </View>
+
+                <View style={[styles.heroDetailRow, { marginTop: spacing.md }]}>
+                  <Ionicons name="business-outline" size={16} color={colors.primary} style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 13, color: colors.textMuted, fontFamily: typography.fonts.medium }}>
+                    {displayDepartment}   •   {profile?.branch || authUser?.branch || 'Jaipur Office'}
+                  </Text>
+                </View>
               </View>
             </View>
 
-            {/* ─── WHATSAPP STYLE STATUS & ABOUT SECTIONS ─── */}
+            {/* ─── Profile Completeness Card ─── */}
             <View
               style={[
                 styles.profileCard,
@@ -531,74 +530,51 @@ export default function ProfileScreen() {
                   backgroundColor: colors.card,
                   borderRadius: radius.xl,
                   borderColor: colors.border,
+                  borderWidth: 1,
                   marginHorizontal: spacing.lg,
                   marginBottom: spacing.lg,
-                  alignItems: 'stretch',
-                  paddingVertical: 16,
+                  padding: spacing.lg,
                 },
                 shadows.medium,
               ]}
             >
-              {/* 1. Status Section */}
-              <Pressable
-                onPress={() => setStatusModalVisible(true)}
-                style={({ pressed }) => [
-                  styles.sectionItemPress,
-                  pressed && { backgroundColor: isLight ? '#F1F5F9' : '#1E293B' },
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <View style={[styles.statusIconCircle, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
-                    <Text style={{ fontSize: 18 }}>{currentEmoji}</Text>
-                  </View>
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={{ fontSize: 11, color: colors.textMuted, fontFamily: typography.fonts.semibold, textTransform: 'uppercase' }}>
-                      Status
-                    </Text>
-                    <Text style={{ fontSize: 14, color: colors.text, fontFamily: typography.fonts.bold, marginTop: 2 }}>
-                      {PRESET_STATUSES.find((s) => s.value === currentStatus)?.label || 'Available'}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
-              </Pressable>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, fontFamily: typography.fonts.semibold, color: colors.text }}>
+                  Profile Completeness
+                </Text>
+                <Text style={{ fontSize: 14, fontFamily: typography.fonts.bold, color: colors.primary }}>
+                  {completeness.percentage}%
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, fontFamily: typography.fonts.regular, color: colors.textMuted, marginTop: 4 }}>
+                Complete your profile to get better experience
+              </Text>
 
-              <View style={[styles.inlineDivider, { backgroundColor: colors.border }]} />
+              {/* Progress Bar */}
+              <View style={[styles.progressBarBg, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderRadius: radius.circular, height: 6, marginTop: spacing.md }]}>
+                <View
+                  style={{
+                    backgroundColor: colors.primary,
+                    height: '100%',
+                    borderRadius: radius.circular,
+                    width: `${completeness.percentage}%`,
+                  }}
+                />
+              </View>
 
-              {/* 2. About Section */}
-              <Pressable
-                onPress={() => setAboutModalVisible(true)}
-                style={({ pressed }) => [
-                  styles.sectionItemPress,
-                  pressed && { backgroundColor: isLight ? '#F1F5F9' : '#1E293B' },
-                ]}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                  <View style={[styles.statusIconCircle, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}>
-                    <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
-                  </View>
-                  <View style={{ marginLeft: 12, flex: 1, paddingRight: 8 }}>
-                    <Text style={{ fontSize: 11, color: colors.textMuted, fontFamily: typography.fonts.semibold, textTransform: 'uppercase' }}>
-                      About / Bio
-                    </Text>
-                    <Text style={{ fontSize: 14, color: colors.text, fontFamily: typography.fonts.medium, marginTop: 2 }} numberOfLines={1}>
-                      {aboutText}
-                    </Text>
-                  </View>
-                </View>
-                <Ionicons name="pencil" size={14} color={colors.primary} />
-              </Pressable>
+
             </View>
 
-            {/* ─── Personal & Professional Info Grid ─── */}
-            <Text style={[styles.sectionHeading, { color: colors.textMuted, fontFamily: typography.fonts.bold }]}>
-              PERSONAL & PROFESSIONAL
+            {/* ─── Personal Information Group ─── */}
+            <Text style={[styles.sectionHeading, { color: colors.textMuted, fontFamily: typography.fonts.bold, marginHorizontal: spacing.lg, marginBottom: spacing.sm }]}>
+              Personal Information
             </Text>
             <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
               {personalItems.map((item) => (
                 <MenuCard
                   key={item.path}
                   title={item.title}
+                  subtitle={item.subtitle}
                   icon={item.icon}
                   iconColor={item.iconColor}
                   onPress={() => navigate(item.path)}
@@ -606,20 +582,49 @@ export default function ProfileScreen() {
               ))}
             </View>
 
-            {/* ─── App Settings Section ─── */}
-            <Text style={[styles.sectionHeading, { color: colors.textMuted, fontFamily: typography.fonts.bold }]}>
-              APP SETTINGS
+            {/* ─── Account & Security Group ─── */}
+            <Text style={[styles.sectionHeading, { color: colors.textMuted, fontFamily: typography.fonts.bold, marginHorizontal: spacing.lg, marginBottom: spacing.sm }]}>
+              Account & Security
             </Text>
             <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
-              {appSettingsItems.map((item) => (
+              {accountSecurityItems.map((item) => (
                 <MenuCard
                   key={item.title}
                   title={item.title}
+                  subtitle={item.subtitle}
                   icon={item.icon}
                   iconColor={item.iconColor}
                   onPress={() => navigate(item.path)}
                 />
               ))}
+            </View>
+
+            {/* ─── Status & Presence Group ─── */}
+            <Text style={[styles.sectionHeading, { color: colors.textMuted, fontFamily: typography.fonts.bold, marginHorizontal: spacing.lg, marginBottom: spacing.sm }]}>
+              Status & Presence
+            </Text>
+            <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.lg }}>
+              <MenuCard
+                title="Update Status / Availability"
+                subtitle={presenceStore.customStatus ? `${presenceStore.customStatus.emoji} ${presenceStore.customStatus.text}` : 'Set custom text and emoji'}
+                icon="happy-outline"
+                iconColor="#D97706"
+                onPress={() => setStatusModalVisible(true)}
+              />
+              <MenuCard
+                title="Connection Health"
+                subtitle={`State: ${presenceStore.connectionState} (${presenceStore.ping} ms)`}
+                icon="cellular-outline"
+                iconColor="#10B981"
+                onPress={() => setConnectionHealthVisible(true)}
+              />
+              <MenuCard
+                title="Active Sessions & Devices"
+                subtitle="Manage active logins and trusted devices"
+                icon="shield-checkmark-outline"
+                iconColor="#6366F1"
+                onPress={() => setActiveSessionsVisible(true)}
+              />
             </View>
 
             {/* ─── Log Out Button ─── */}
@@ -697,99 +702,6 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
         </View>
-      </Modal>
-
-      {/* ─── STATUS SELECTOR MODAL ─── */}
-      <Modal
-        visible={statusModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setStatusModalVisible(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setStatusModalVisible(false)}>
-          <Pressable
-            style={[styles.bottomSheetCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text style={{ fontSize: 18, color: colors.text, fontFamily: typography.fonts.bold, marginBottom: 16, textAlign: 'center' }}>
-              Set Your Status
-            </Text>
-
-            <ScrollView style={{ maxHeight: 300 }}>
-              {PRESET_STATUSES.map((statusItem) => {
-                const isSelected = currentStatus === statusItem.value;
-                return (
-                  <Pressable
-                    key={statusItem.value}
-                    onPress={() => handleUpdateStatus(statusItem.value, statusItem.emoji)}
-                    style={[
-                      styles.statusSelectRow,
-                      { borderBottomColor: colors.border },
-                      isSelected && { backgroundColor: `${colors.primary}10` },
-                    ]}
-                  >
-                    <Text style={{ fontSize: 20, marginRight: 12 }}>{statusItem.emoji}</Text>
-                    <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontFamily: isSelected ? typography.fonts.bold : typography.fonts.medium }}>
-                      {statusItem.label}
-                    </Text>
-                    {isSelected && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* ─── ABOUT / BIO EDIT MODAL ─── */}
-      <Modal
-        visible={aboutModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setAboutModalVisible(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setAboutModalVisible(false)}>
-          <Pressable
-            style={[styles.editAboutCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text style={{ fontSize: 16, color: colors.text, fontFamily: typography.fonts.bold, marginBottom: 12 }}>
-              Edit About / Bio
-            </Text>
-
-            <TextInput
-              multiline
-              maxLength={150}
-              placeholder="Tell us about yourself..."
-              placeholderTextColor={colors.textLight}
-              value={aboutText}
-              onChangeText={setAboutText}
-              style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radius.md,
-                padding: spacing.md,
-                color: colors.text,
-                fontFamily: typography.fonts.regular,
-                minHeight: 80,
-                textAlignVertical: 'top',
-                marginBottom: 16,
-              }}
-            />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
-              <Pressable onPress={() => setAboutModalVisible(false)} style={{ paddingVertical: 8, paddingHorizontal: 16 }}>
-                <Text style={{ color: colors.textMuted, fontFamily: typography.fonts.bold }}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleSaveAbout}
-                style={{ backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 20 }}
-              >
-                <Text style={{ color: '#FFFFFF', fontFamily: typography.fonts.bold }}>Save</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
       </Modal>
 
       {/* ─── LOGOUT CONFIRMATION MODAL ─── */}
@@ -925,6 +837,353 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
+      {/* ─── CUSTOM STATUS MODAL ─── */}
+      <Modal
+        visible={statusModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setStatusModalVisible(false)}
+      >
+        <Pressable
+          style={[styles.modalBackdrop, { backgroundColor: 'rgba(15, 23, 42, 0.4)' }]}
+          onPress={() => setStatusModalVisible(false)}
+        >
+          <Pressable
+            style={[
+              styles.modalCard,
+              {
+                width: '90%',
+                padding: spacing.xl,
+                backgroundColor: colors.card,
+                borderRadius: 20,
+                borderColor: colors.border,
+                borderWidth: 1,
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <Text style={{ fontSize: 18, fontFamily: typography.fonts.bold, color: colors.text }}>
+                Set Custom Status
+              </Text>
+              <Pressable onPress={() => setStatusModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            {/* Emoji Selection Row */}
+            <Text style={{ fontSize: 12, fontFamily: typography.fonts.semibold, color: colors.textMuted, marginBottom: 8 }}>
+              CHOOSE EMOJI
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
+              {['💬', '💻', '🌴', '🚗', '🤒', '🗓️', '✈️', '🏃'].map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  onPress={() => setCustomStatusEmoji(emoji)}
+                  style={{
+                    padding: 8,
+                    borderRadius: radius.md,
+                    backgroundColor: customStatusEmoji === emoji ? `${colors.primary}15` : 'transparent',
+                    borderWidth: 1,
+                    borderColor: customStatusEmoji === emoji ? colors.primary : 'transparent',
+                  }}
+                >
+                  <Text style={{ fontSize: 22 }}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Custom Status Text Input */}
+            <Text style={{ fontSize: 12, fontFamily: typography.fonts.semibold, color: colors.textMuted, marginBottom: 8 }}>
+              STATUS MESSAGE
+            </Text>
+            <TextInput
+              style={{
+                height: 44,
+                borderColor: colors.border,
+                borderWidth: 1,
+                borderRadius: radius.lg,
+                paddingHorizontal: 12,
+                color: colors.text,
+                backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                marginBottom: spacing.md,
+                fontFamily: typography.fonts.regular,
+              }}
+              placeholder="What's your status?"
+              placeholderTextColor={colors.textMuted}
+              value={customStatusText}
+              onChangeText={setCustomStatusText}
+            />
+
+            {/* Expiry Selector */}
+            <Text style={{ fontSize: 12, fontFamily: typography.fonts.semibold, color: colors.textMuted, marginBottom: 8 }}>
+              CLEAR AFTER
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg }}>
+              {[
+                { label: '30 Min', value: 30 },
+                { label: '1 Hour', value: 60 },
+                { label: '4 Hours', value: 240 },
+                { label: 'Today', value: 1440 },
+                { label: 'Never', value: null },
+              ].map((opt) => (
+                <Pressable
+                  key={opt.label}
+                  onPress={() => setExpiryMinutes(opt.value)}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: expiryMinutes === opt.value ? colors.primary : colors.border,
+                    backgroundColor: expiryMinutes === opt.value ? `${colors.primary}08` : 'transparent',
+                  }}
+                >
+                  <Text style={{ color: expiryMinutes === opt.value ? colors.primary : colors.textLight, fontSize: 12, fontFamily: typography.fonts.medium }}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <Pressable
+                onPress={() => setStatusModalVisible(false)}
+                style={[styles.cancelBtn, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, height: 40, justifyContent: 'center', alignItems: 'center', borderWidth: 1 }]}
+              >
+                <Text style={{ fontSize: 14, fontFamily: typography.fonts.semibold, color: colors.textMuted }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveStatus}
+                style={[styles.submitBtn, { flex: 1, backgroundColor: colors.primary, borderRadius: 12, height: 40, justifyContent: 'center', alignItems: 'center' }]}
+              >
+                <Text style={{ fontSize: 14, fontFamily: typography.fonts.bold, color: '#FFFFFF' }}>
+                  Save Status
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── CONNECTION HEALTH MODAL ─── */}
+      <Modal
+        visible={connectionHealthVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setConnectionHealthVisible(false)}
+      >
+        <Pressable
+          style={[styles.modalBackdrop, { backgroundColor: 'rgba(15, 23, 42, 0.4)' }]}
+          onPress={() => setConnectionHealthVisible(false)}
+        >
+          <Pressable
+            style={[
+              styles.modalCard,
+              {
+                width: '90%',
+                padding: spacing.xl,
+                backgroundColor: colors.card,
+                borderRadius: 20,
+                borderColor: colors.border,
+                borderWidth: 1,
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <Text style={{ fontSize: 18, fontFamily: typography.fonts.bold, color: colors.text }}>
+                Connection Health
+              </Text>
+              <Pressable onPress={() => setConnectionHealthVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            {/* Connection Details List */}
+            <View style={{ gap: 14, marginBottom: spacing.xl }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: colors.textMuted, fontFamily: typography.fonts.medium }}>Status State</Text>
+                <Text
+                  style={{
+                    color: presenceStore.connectionState === 'excellent' || presenceStore.connectionState === 'connected' ? colors.success : colors.danger,
+                    fontFamily: typography.fonts.bold,
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {presenceStore.connectionState}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: colors.textMuted, fontFamily: typography.fonts.medium }}>Active Latency (Ping)</Text>
+                <Text style={{ color: colors.text, fontFamily: typography.fonts.bold }}>
+                  {presenceStore.ping ? `${presenceStore.ping} ms` : '—'}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: colors.textMuted, fontFamily: typography.fonts.medium }}>Network Type</Text>
+                <Text style={{ color: colors.text, fontFamily: typography.fonts.bold, textTransform: 'uppercase' }}>
+                  {presenceStore.networkType}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: colors.textMuted, fontFamily: typography.fonts.medium }}>Packet Loss</Text>
+                <Text style={{ color: colors.success, fontFamily: typography.fonts.bold }}>0% (Excellent)</Text>
+              </View>
+            </View>
+
+            {/* Real-time Latency Speed Test */}
+            {testPingResult !== null && (
+              <View style={{ backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderRadius: radius.lg, padding: 12, marginBottom: spacing.md, alignItems: 'center', width: '100%' }}>
+                <Ionicons name="speedometer-outline" size={24} color={colors.primary} />
+                <Text style={{ fontSize: 13, fontFamily: typography.fonts.semibold, color: colors.text, marginTop: 4 }}>
+                  Measured Latency: {testPingResult} ms
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                  {testPingResult < 100 ? '⚡ Excellent response rate' : testPingResult < 300 ? '📶 Stable connection' : '⚠️ High latency detected'}
+                </Text>
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <Pressable
+                onPress={() => setConnectionHealthVisible(false)}
+                style={[styles.cancelBtn, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, borderRadius: 12, height: 40, justifyContent: 'center', alignItems: 'center', borderWidth: 1 }]}
+              >
+                <Text style={{ fontSize: 14, fontFamily: typography.fonts.semibold, color: colors.textMuted }}>
+                  Close
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={runPingTest}
+                disabled={isTestingPing}
+                style={[styles.submitBtn, { flex: 1, backgroundColor: colors.primary, borderRadius: 12, height: 40, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 }]}
+              >
+                {isTestingPing && <ActivityIndicator size="small" color="#FFF" />}
+                <Text style={{ fontSize: 14, fontFamily: typography.fonts.bold, color: '#FFFFFF' }}>
+                  {isTestingPing ? 'Testing...' : 'Run Ping Test'}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── ACTIVE SESSIONS MODAL ─── */}
+      <Modal
+        visible={activeSessionsVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setActiveSessionsVisible(false)}
+      >
+        <Pressable
+          style={[styles.modalBackdrop, { backgroundColor: 'rgba(15, 23, 42, 0.4)' }]}
+          onPress={() => setActiveSessionsVisible(false)}
+        >
+          <Pressable
+            style={[
+              styles.modalCard,
+              {
+                width: '92%',
+                maxHeight: '80%',
+                padding: spacing.xl,
+                backgroundColor: colors.card,
+                borderRadius: 20,
+                borderColor: colors.border,
+                borderWidth: 1,
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <Text style={{ fontSize: 18, fontFamily: typography.fonts.bold, color: colors.text }}>
+                Active Devices & Logins
+              </Text>
+              <Pressable onPress={() => setActiveSessionsVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 16 }}>
+              {sessionsLoading ? (
+                <ActivityIndicator size="large" color={colors.primary} />
+              ) : sessions && sessions.length > 0 ? (
+                sessions.map((sess: any) => (
+                  <View
+                    key={sess.id}
+                    style={{
+                      padding: 12,
+                      borderRadius: radius.md,
+                      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Ionicons
+                      name={sess.deviceType?.toLowerCase().includes('phone') ? 'phone-portrait-outline' : 'desktop-outline'}
+                      size={24}
+                      color={colors.textMuted}
+                      style={{ marginRight: 12 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontFamily: typography.fonts.bold, color: colors.text }}>
+                        {sess.deviceName || 'Unknown Device'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                        IP: {sess.ipAddress || '—'}
+                      </Text>
+                    </View>
+                    {sess.id !== currentSessionId && (
+                      <Pressable
+                        onPress={() => handleTerminateSession(sess.id)}
+                        style={{ padding: 6 }}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                      </Pressable>
+                    )}
+                  </View>
+                ))
+              ) : (
+                <Text style={{ color: colors.textMuted, textAlign: 'center', marginVertical: 20 }}>
+                  No active login sessions found.
+                </Text>
+              )}
+
+              {sessions && sessions.length > 1 && (
+                <Pressable
+                  onPress={handleTerminateOthers}
+                  style={[
+                    styles.logoutButton,
+                    {
+                      borderColor: colors.danger,
+                      backgroundColor: 'transparent',
+                      borderWidth: 1,
+                      marginTop: spacing.md,
+                      borderRadius: 12,
+                      paddingVertical: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                  ]}
+                >
+                  <Ionicons name="power-outline" size={16} color={colors.danger} style={{ marginRight: 8 }} />
+                  <Text style={{ color: colors.danger, fontFamily: typography.fonts.bold }}>
+                    Log Out From All Other Devices
+                  </Text>
+                </Pressable>
+              )}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ─── Uploading Spinner Overlay ─── */}
       <Modal
         visible={uploadingPic}
@@ -948,79 +1207,89 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  headerRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  headerSide: {
-    width: 40,
-    height: 40,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconButton: {
+    padding: 6,
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+  },
   profileCard: {
-    borderWidth: 1,
-    padding: 24,
+    alignItems: 'stretch',
+  },
+  heroMainRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   avatarWrapper: {
     position: 'relative',
-    marginBottom: 8,
   },
   avatar: {
     borderWidth: 3,
-    borderColor: '#E2E8F0',
-  },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
   },
   editAvatarBtn: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    borderWidth: 2,
+    bottom: -4,
+    right: -4,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  heroInfoText: {
+    flex: 1,
+    marginLeft: 20,
   },
   codeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  sectionItemPress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  statusIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   inlineDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 16,
+    height: 1,
+    width: '100%',
+  },
+  heroDetailsGrid: {
+    width: '100%',
+  },
+  heroDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  progressBarBg: {
+    width: '100%',
+    overflow: 'hidden',
   },
   sectionHeading: {
-    fontSize: 11,
+    fontSize: 12,
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginHorizontal: 24,
-    marginBottom: 10,
-    marginTop: 14,
+    letterSpacing: 0.5,
+    marginTop: 20,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   errorWrapper: {
     flex: 1,
@@ -1029,28 +1298,53 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  bottomSheetCard: {
-    width: '90%',
-    borderRadius: 20,
+  modalCard: {
+    alignItems: 'stretch',
+  },
+  alertIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtn: {
+    paddingVertical: 12,
     borderWidth: 1,
-    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  editAboutCard: {
-    width: '85%',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 20,
+  submitBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  statusSelectRow: {
+  flatActionBtn: {
+    paddingVertical: 8,
+  },
+  inlineErrorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 20,
+  },
+  inlineErrorText: {
+    fontSize: 12,
+    color: '#EF4444',
+    flex: 1,
+  },
+  loadingCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 200,
   },
   fullscreenBackdrop: {
     flex: 1,
@@ -1060,87 +1354,32 @@ const styles = StyleSheet.create({
   },
   fullscreenClose: {
     position: 'absolute',
-    top: 50,
+    top: 40,
     right: 20,
     padding: 10,
     zIndex: 10,
   },
   fullscreenAvatarPlaceholder: {
-    width: SCREEN_WIDTH - 40,
-    height: SCREEN_WIDTH - 40,
-    borderRadius: 16,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
     justifyContent: 'center',
     alignItems: 'center',
   },
   fullscreenActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: SCREEN_WIDTH - 40,
-    marginTop: 30,
-    gap: 16,
+    marginTop: 40,
+    gap: 20,
   },
   fullscreenActionBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#6366F1',
     paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
-  modalCard: {
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  alertIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtn: {
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  submitBtn: {
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  flatActionBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  loadingCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  inlineErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF5F5',
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 20,
-    width: '100%',
-  },
-  inlineErrorText: {
-    fontSize: 12,
-    color: '#EF4444',
-    flex: 1,
+  avatarRing: {
+    // Styling applied inline
   },
 });

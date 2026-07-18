@@ -109,6 +109,7 @@ export default function AttendanceHistoryScreen() {
   const {
     records,
     summary,
+    holidays,
     isLoading,
     isError,
     error,
@@ -206,6 +207,19 @@ export default function AttendanceHistoryScreen() {
       return { dotColor: 'transparent', text: 'Scheduled', color: '#94A3B8', labelBg: '#F8FAFC', borderColor: 'transparent' };
     }
 
+    // 1. Check if it's a Holiday
+    const isHoliday = dateStr && holidays?.some((h: any) => h.date === dateStr);
+    if (isHoliday) {
+      const holidayObj = holidays.find((h: any) => h.date === dateStr);
+      return {
+        dotColor: '#0EA5E9',
+        text: holidayObj?.name || 'Holiday',
+        color: '#0EA5E9',
+        labelBg: '#EFF6FF',
+        borderColor: '#DBEAFE',
+      };
+    }
+
     // Leave/Weekly Off exceptions
     if (statusStr) {
       const st = statusStr.toLowerCase();
@@ -214,7 +228,7 @@ export default function AttendanceHistoryScreen() {
       }
     }
 
-    if (dayOfWeek === 0) {
+    if (dayOfWeek === 0 || dayOfWeek === 6) { // 0 = Sunday, 6 = Saturday
       return { dotColor: '#94A3B8', text: 'Weekly Off', color: '#64748B', labelBg: '#F8FAFC', borderColor: 'transparent', isWeekend: true };
     }
 
@@ -684,9 +698,8 @@ export default function AttendanceHistoryScreen() {
                   const dayRecord = recordsMap.get(day.dateString);
                   const config = getStatusConfig(dayRecord?.status, day.dateString, dayRecord?.punchIn, dayRecord?.punchOut);
 
-                  // Day of week: 0 = Sun, 1 = Mon, ..., 6 = Sat
                   const dayOfWeek = day.date.day();
-                  const isWeekend = dayOfWeek === 0; // Only Sunday is weekly off weekend! Saturday is a normal working day.
+                  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Saturday & Sunday are weekly off weekends!
 
                   const isPastDay = dayjs(day.dateString).isBefore(dayjs(), 'day');
                   const hasPunchIn = !!(dayRecord && dayRecord.punchIn && dayRecord.punchIn !== '--:--');

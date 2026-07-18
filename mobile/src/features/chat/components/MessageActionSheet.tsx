@@ -43,7 +43,7 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
   isMe,
   isStarred,
 }) => {
-  const { colors, radius, typography } = useTheme();
+  const { colors, radius, typography, isDark } = useTheme();
 
   if (!message) return null;
 
@@ -53,6 +53,11 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
     onClose();
   };
 
+  const menuBgColor = isDark ? '#233138' : '#FFFFFF';
+  const textColor = isDark ? '#E9EDEF' : '#111B21';
+  const iconColor = isDark ? '#8696A0' : '#54656F';
+  const separatorColor = isDark ? '#2F3B43' : '#F0F2F5';
+
   return (
     <Modal
       visible={visible}
@@ -61,9 +66,9 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
       onRequestClose={onClose}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={[styles.modalCard, { backgroundColor: colors.card, borderRadius: radius.lg }]}>
-          {/* Reaction emojis row */}
-          <View style={[styles.reactionsRow, { borderBottomColor: colors.border }]}>
+        <View style={styles.contentContainer}>
+          {/* WhatsApp-style separate Floating Reactions Capsule */}
+          <View style={[styles.reactionsRow, { backgroundColor: menuBgColor }]}>
             {QUICK_REACTIONS.map((emoji) => (
               <Pressable
                 key={emoji}
@@ -78,25 +83,25 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
             ))}
           </View>
 
-          {/* Action List items */}
-          <View style={styles.actionsList}>
+          {/* WhatsApp-style Floating Actions Card */}
+          <View style={[styles.modalCard, { backgroundColor: menuBgColor }]}>
             <Pressable
               onPress={() => {
                 onReply();
                 onClose();
               }}
-              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: colors.neutralLight }]}
+              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: separatorColor }]}
             >
-              <Ionicons name="arrow-undo-outline" size={18} color={colors.text} style={{ marginRight: 12 }} />
-              <Text style={[styles.actionLabel, { color: colors.text, fontFamily: typography.fonts.medium }]}>Reply</Text>
+              <Ionicons name="arrow-undo-outline" size={20} color={iconColor} style={{ marginRight: 14 }} />
+              <Text style={[styles.actionLabel, { color: textColor, fontFamily: typography.fonts.medium }]}>Reply</Text>
             </Pressable>
 
             <Pressable
               onPress={handleCopy}
-              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: colors.neutralLight }]}
+              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: separatorColor }]}
             >
-              <Ionicons name="copy-outline" size={18} color={colors.text} style={{ marginRight: 12 }} />
-              <Text style={[styles.actionLabel, { color: colors.text, fontFamily: typography.fonts.medium }]}>Copy</Text>
+              <Ionicons name="copy-outline" size={20} color={iconColor} style={{ marginRight: 14 }} />
+              <Text style={[styles.actionLabel, { color: textColor, fontFamily: typography.fonts.medium }]}>Copy</Text>
             </Pressable>
 
             <Pressable
@@ -104,10 +109,10 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
                 onForward();
                 onClose();
               }}
-              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: colors.neutralLight }]}
+              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: separatorColor }]}
             >
-              <Ionicons name="arrow-redo-outline" size={18} color={colors.text} style={{ marginRight: 12 }} />
-              <Text style={[styles.actionLabel, { color: colors.text, fontFamily: typography.fonts.medium }]}>Forward</Text>
+              <Ionicons name="arrow-redo-outline" size={20} color={iconColor} style={{ marginRight: 14 }} />
+              <Text style={[styles.actionLabel, { color: textColor, fontFamily: typography.fonts.medium }]}>Forward</Text>
             </Pressable>
 
             <Pressable
@@ -115,10 +120,10 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
                 onPin();
                 onClose();
               }}
-              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: colors.neutralLight }]}
+              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: separatorColor }]}
             >
-              <Ionicons name="pin-outline" size={18} color={colors.text} style={{ marginRight: 12 }} />
-              <Text style={[styles.actionLabel, { color: colors.text, fontFamily: typography.fonts.medium }]}>
+              <Ionicons name="pin-outline" size={20} color={iconColor} style={{ marginRight: 14 }} />
+              <Text style={[styles.actionLabel, { color: textColor, fontFamily: typography.fonts.medium }]}>
                 {message.isPinned ? 'Unpin Message' : 'Pin Message'}
               </Text>
             </Pressable>
@@ -128,10 +133,10 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
                 onStar();
                 onClose();
               }}
-              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: colors.neutralLight }]}
+              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: separatorColor }]}
             >
-              <Ionicons name={isStarred ? "star" : "star-outline"} size={18} color={isStarred ? colors.warning : colors.text} style={{ marginRight: 12 }} />
-              <Text style={[styles.actionLabel, { color: colors.text, fontFamily: typography.fonts.medium }]}>
+              <Ionicons name={isStarred ? "star" : "star-outline"} size={20} color={isStarred ? colors.warning : iconColor} style={{ marginRight: 14 }} />
+              <Text style={[styles.actionLabel, { color: textColor, fontFamily: typography.fonts.medium }]}>
                 {isStarred ? 'Unstar Message' : 'Star Message'}
               </Text>
             </Pressable>
@@ -142,25 +147,25 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
                   onEdit();
                   onClose();
                 }}
-                style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: colors.neutralLight }]}
+                style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: separatorColor }]}
               >
-                <Ionicons name="create-outline" size={18} color={colors.text} style={{ marginRight: 12 }} />
-                <Text style={[styles.actionLabel, { color: colors.text, fontFamily: typography.fonts.medium }]}>Edit</Text>
+                <Ionicons name="create-outline" size={20} color={iconColor} style={{ marginRight: 14 }} />
+                <Text style={[styles.actionLabel, { color: textColor, fontFamily: typography.fonts.medium }]}>Edit</Text>
               </Pressable>
             )}
 
-            {isMe && (
-              <Pressable
-                onPress={() => {
-                  onDelete();
-                  onClose();
-                }}
-                style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: colors.neutralLight }]}
-              >
-                <Ionicons name="trash-outline" size={18} color={colors.danger} style={{ marginRight: 12 }} />
-                <Text style={[styles.actionLabel, { color: colors.danger, fontFamily: typography.fonts.medium }]}>Delete</Text>
-              </Pressable>
-            )}
+            <View style={[styles.separator, { backgroundColor: separatorColor }]} />
+
+            <Pressable
+              onPress={() => {
+                onDelete();
+                onClose();
+              }}
+              style={({ pressed }) => [styles.actionItem, pressed && { backgroundColor: separatorColor }]}
+            >
+              <Ionicons name="trash-outline" size={20} color={colors.danger} style={{ marginRight: 14 }} />
+              <Text style={[styles.actionLabel, { color: colors.danger, fontFamily: typography.fonts.medium }]}>Delete</Text>
+            </Pressable>
           </View>
         </View>
       </Pressable>
@@ -171,42 +176,57 @@ export const MessageActionSheet: React.FC<MessageActionSheetProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(9, 14, 17, 0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  modalCard: {
-    margin: 16,
-    padding: 16,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: -2 },
+  contentContainer: {
+    width: '78%',
+    alignItems: 'center',
   },
   reactionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingBottom: 16,
-    borderBottomWidth: 1,
+    width: '100%',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 30,
+    marginBottom: 10,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   reactionBtn: {
     padding: 6,
   },
   reactionText: {
-    fontSize: 24,
+    fontSize: 26,
   },
-  actionsList: {
-    marginTop: 8,
+  modalCard: {
+    width: '100%',
+    borderRadius: 16,
+    paddingVertical: 6,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    paddingHorizontal: 18,
   },
   actionLabel: {
-    fontSize: 14,
+    fontSize: 15,
+  },
+  separator: {
+    height: 1,
+    marginVertical: 4,
+    marginHorizontal: 12,
   },
 });
 

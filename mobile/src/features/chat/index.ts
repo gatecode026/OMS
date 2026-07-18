@@ -37,4 +37,6 @@ export {
   useClearChat,
   useBlockUser,
   useUnblockUser,
+  useReportUser,
+  useExportChat,
 } from './hooks/useChat';

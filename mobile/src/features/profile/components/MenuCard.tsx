@@ -16,6 +16,7 @@ import useTheme from '../../../shared/hooks/useTheme';
 
 interface MenuCardProps {
   title: string;
+  subtitle?: string;
   icon: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
   onPress: () => void;
@@ -26,6 +27,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export const MenuCard: React.FC<MenuCardProps> = ({
   title,
+  subtitle,
   icon,
   iconColor,
   onPress,
@@ -71,17 +73,29 @@ export const MenuCard: React.FC<MenuCardProps> = ({
         <Ionicons name={icon} size={20} color={effectiveIconColor} />
       </View>
 
-      <Text
-        style={{
-          flex: 1,
-          fontSize: typography.sizes.body,
-          fontFamily: typography.fonts.medium,
-          color: colors.text,
-          marginLeft: spacing.md,
-        }}
-      >
-        {title}
-      </Text>
+      <View style={{ flex: 1, marginLeft: spacing.md }}>
+        <Text
+          style={{
+            fontSize: typography.sizes.body,
+            fontFamily: typography.fonts.semibold,
+            color: colors.text,
+          }}
+        >
+          {title}
+        </Text>
+        {subtitle && (
+          <Text
+            style={{
+              fontSize: typography.sizes.caption,
+              fontFamily: typography.fonts.regular,
+              color: colors.textMuted,
+              marginTop: 2,
+            }}
+          >
+            {subtitle}
+          </Text>
+        )}
+      </View>
 
       <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
     </AnimatedPressable>

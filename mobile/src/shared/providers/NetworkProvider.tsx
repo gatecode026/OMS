@@ -5,8 +5,10 @@
 
 import React, { useEffect, useRef } from 'react';
 import NetInfo from '@react-native-community/netinfo';
+import { useQueryClient } from '@tanstack/react-query';
 import { useOfflineStore } from '../store/offlineStore';
 import syncManager from '../services/syncManager';
+import fileCacheService from '../services/fileCacheService';
 
 interface NetworkProviderProps {
   children: React.ReactNode;
@@ -16,15 +18,20 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
   const setConnectionStatus = useOfflineStore((state) => state.setConnectionStatus);
   const loadQueue = useOfflineStore((state) => state.loadQueue);
   const wasOffline = useRef(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    // 1. Load persisted queue on mount
+    // 1. Seed query client memory cache with local offline file-system cache
+    fileCacheService.loadAllIntoCache(queryClient);
+
+    // 2. Load persisted queue on mount
     loadQueue();
 
-    // 2. Subscribe to network status changes
+    // 3. Subscribe to network status changes
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const isConnected = __DEV__ ? true : !!state.isConnected;
-      const isInternetReachable = __DEV__ ? true : state.isInternetReachable;
+      // Allow proper offline testing even in development/debug mode
+      const isConnected = state.isConnected !== false;
+      const isInternetReachable = state.isInternetReachable !== false;
 
       setConnectionStatus(isConnected, isInternetReachable);
 
@@ -32,6 +39,7 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
       if (isConnected && wasOffline.current) {
         console.log('[NetworkProvider]: Network restored, initiating sync...');
         syncManager.sync();
+        queryClient.invalidateQueries();
       }
 
       wasOffline.current = !isConnected;
@@ -40,7 +48,7 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
     return () => {
       unsubscribe();
     };
-  }, [setConnectionStatus, loadQueue]);
+  }, [setConnectionStatus, loadQueue, queryClient]);
 
   return <>{children}</>;
 };

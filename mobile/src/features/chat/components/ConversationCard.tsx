@@ -5,13 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from '../../../shared/components/Avatar';
 import { ChatConversation } from '../types';
 import { useDraftStore } from '../../../shared/store/draftStore';
+import useTheme from '../../../shared/hooks/useTheme';
 
 interface ConversationCardProps {
   conv: ChatConversation;
-  colors: any;
-  spacing: any;
-  radius: any;
-  typography: any;
   currentUserId: string;
   isOnline: boolean;
   userStatus?: string;
@@ -48,10 +45,6 @@ const areEqual = (prev: ConversationCardProps, next: ConversationCardProps) => {
 
 export const ConversationCard: React.FC<ConversationCardProps> = React.memo(({
   conv,
-  colors,
-  spacing,
-  radius,
-  typography,
   currentUserId,
   isOnline,
   userStatus,
@@ -70,6 +63,8 @@ export const ConversationCard: React.FC<ConversationCardProps> = React.memo(({
   getTypingPreview,
   formatMessageTime,
 }) => {
+  // Own the theme subscription so this re-renders on mode switch
+  const { colors, spacing, radius, typography, isDark } = useTheme();
   const otherUser = conv.type === 'direct' ? conv.participants.find((p) => p.employeeId !== currentUserId) : null;
   const title = conv.type === 'direct' ? otherUser?.name || 'Chat Partner' : conv.name || 'Group Chat';
   const avatar = conv.type === 'direct' ? otherUser?.avatar || null : conv.avatar || null;

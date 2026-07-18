@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import dayjs from 'dayjs';
 import useTheme from '../../../shared/hooks/useTheme';
+import { Image as ExpoImage } from 'expo-image';
 import { ChatMessage } from '../types';
 import { UploadState } from '../hooks/useUploadQueue';
 import MessageBubble from './MessageBubble';
@@ -24,6 +25,7 @@ interface MessageListProps {
   uploadStates?: Record<string, UploadState>;
   wallpaper: { type: string; value: string };
   isGroup?: boolean;
+  highlightedMessageId?: string;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -41,6 +43,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   uploadStates,
   wallpaper,
   isGroup = false,
+  highlightedMessageId,
 }) => {
   const { colors, spacing } = useTheme();
   const [showScrollBtn, setShowScrollBtn] = React.useState(false);
@@ -88,8 +91,20 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   const AnyFlashList = FlashList as any;
 
+  const isSolid = wallpaper.type === 'solid';
+  const isImage = wallpaper.type === 'image';
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isSolid && { backgroundColor: wallpaper.value }]}>
+      {isImage && (
+        <View style={StyleSheet.absoluteFill}>
+          <ExpoImage
+            source={{ uri: wallpaper.value }}
+            style={StyleSheet.absoluteFillObject}
+            contentFit="cover"
+          />
+        </View>
+      )}
       <AnyFlashList
         ref={flatListRef}
         data={localMessages}
@@ -151,6 +166,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 isFirstOfGroup={isFirstOfGroup}
                 isLastOfGroup={isLastOfGroup}
                 isGroup={isGroup}
+                isHighlighted={item.id === highlightedMessageId}
               />
             </View>
           );
@@ -165,6 +181,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     position: 'relative',
+    overflow: 'hidden',
   },
   centerContainer: {
     flex: 1,

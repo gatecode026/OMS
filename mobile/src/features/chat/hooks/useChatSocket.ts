@@ -16,6 +16,7 @@ import secureStore from '../../../shared/services/secureStore';
 import useAuthStore from '../../../shared/store/authStore';
 import apiClient from '../../../shared/services/apiClient';
 import { ChatMessage, ChatConversation } from '../types';
+import { useThemeStore } from '../../../shared/store/themeStore';
 
 export const useChatSocket = (socket: Socket | null) => {
   const queryClient = useQueryClient();
@@ -115,16 +116,19 @@ export const useChatSocket = (socket: Socket | null) => {
       queryClient.setQueryData(['chat', 'messages', msg.conversationId], (oldData: any) => {
         const list = Array.isArray(oldData) ? oldData : [];
         
+        // Remove any message with the same ID first to prevent duplicate entries
+        const filteredList = list.filter((m: any) => m.id !== msg.id);
+        
         let newList = [];
         // Handle optimistic replacement by tempId or id
-        if (list.some((m: any) => m.id === msg.id || (msg.tempId && m.tempId === msg.tempId))) {
-          newList = list.map((m: any) => 
-            (m.id === msg.id || (msg.tempId && m.tempId === msg.tempId))
+        if (filteredList.some((m: any) => msg.tempId && m.tempId === msg.tempId)) {
+          newList = filteredList.map((m: any) => 
+            (msg.tempId && m.tempId === msg.tempId)
               ? { ...m, ...msg, status: m.status === 'failed' ? 'failed' : msg.status || 'sent' }
               : m
           );
         } else {
-          newList = [...list, { ...msg, status: msg.status || 'sent' }];
+          newList = [...filteredList, { ...msg, status: msg.status || 'sent' }];
         }
 
         // Sort strictly by server-generated timestamp
@@ -134,10 +138,32 @@ export const useChatSocket = (socket: Socket | null) => {
 
     // ── SOCKET.IO EVENT LISTENERS ──
 
+    // Heartbeat & Latency monitor interval
+    let heartbeatInterval: any = null;
+    const startHeartbeat = () => {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval = setInterval(() => {
+        if (socket.connected) {
+          const startTime = Date.now();
+          socket.emit('heartbeat', { clientTime: startTime }, (ack: any) => {
+            const rtt = Date.now() - startTime;
+            let state: 'excellent' | 'poor' | 'connected' = 'excellent';
+            if (rtt > 300) state = 'poor';
+            usePresenceStore.getState().setConnectionInfo({
+              ping: rtt,
+              connectionState: state,
+            });
+          });
+        }
+      }, 15000);
+    };
+
     // Reconnection and automatic retry resend
     const handleConnect = () => {
       console.log('[ChatSocket] Connected to backend websocket.');
+      usePresenceStore.getState().setConnectionInfo({ connectionState: 'connected' });
       socket.emit('get_online_users');
+      startHeartbeat();
       
       // Auto-resend failed messages from cache
       if (activeConvIdRef.current) {
@@ -178,6 +204,35 @@ export const useChatSocket = (socket: Socket | null) => {
             });
           });
         }
+      }
+    };
+
+    const handleDisconnect = (reason: string) => {
+      console.log('[ChatSocket] Disconnected from websocket:', reason);
+      usePresenceStore.getState().setConnectionInfo({ connectionState: 'disconnected', ping: 0 });
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+    };
+
+    const handleConnectError = (error: any) => {
+      console.log('[ChatSocket] Connection error:', error);
+      usePresenceStore.getState().setConnectionInfo({ connectionState: 'connecting' });
+    };
+
+    const handleReconnectAttempt = (attempt: number) => {
+      console.log('[ChatSocket] Reconnect attempt #:', attempt);
+      usePresenceStore.getState().setConnectionInfo({ connectionState: 'reconnecting' });
+    };
+
+    const handleUserViewingChat = ({ userId, conversationId, isViewing }: any) => {
+      if (userId) {
+        presenceStoreRef.current.setChatscreenStatus(userId, isViewing);
+      }
+    };
+
+    const handleUserViewingProfile = ({ viewerId, viewerName, isViewing }: any) => {
+      if (isViewing && viewerId !== currentUserIdRef.current) {
+        // Safe check to prevent spamming toasts
+        console.log(`[ChatSocket] ${viewerName} is viewing your profile.`);
       }
     };
 
@@ -270,11 +325,14 @@ export const useChatSocket = (socket: Socket | null) => {
 
           if (formattedOptMsg.senderId !== currentUserIdRef.current && AppState.currentState !== 'active') {
             try {
+              const companyName = useThemeStore.getState().tenantBranding?.companyName || 'Gatecode Technologies';
               await Notifications.scheduleNotificationAsync({
                 content: {
                   title: formattedOptMsg.senderName || 'New Message',
+                  subtitle: companyName,
                   body: formattedOptMsg.content || (formattedOptMsg.media ? '📎 Attachment' : ''),
                   data: { conversationId: formattedOptMsg.conversationId },
+                  categoryIdentifier: 'chatReply',
                 },
                 trigger: null,
               });
@@ -319,11 +377,14 @@ export const useChatSocket = (socket: Socket | null) => {
         
         if (isBackgrounded || isNotActiveChat) {
           try {
+            const companyName = useThemeStore.getState().tenantBranding?.companyName || 'Gatecode Technologies';
             await Notifications.scheduleNotificationAsync({
               content: {
                 title: formattedMsg.senderName || 'New Message',
+                subtitle: companyName,
                 body: formattedMsg.content || (formattedMsg.media ? '📎 Attachment' : ''),
                 data: { conversationId: formattedMsg.conversationId },
+                categoryIdentifier: 'chatReply',
               },
               trigger: null,
             });
@@ -343,11 +404,14 @@ export const useChatSocket = (socket: Socket | null) => {
 
       if (isBackgrounded || isNotActiveChat) {
         try {
+          const companyName = useThemeStore.getState().tenantBranding?.companyName || 'Gatecode Technologies';
           await Notifications.scheduleNotificationAsync({
             content: {
               title: notification.senderName || 'New Message',
+              subtitle: companyName,
               body: notification.preview || '',
               data: { conversationId: notification.conversationId },
+              categoryIdentifier: 'chatReply',
             },
             trigger: null,
           });
@@ -545,7 +609,13 @@ export const useChatSocket = (socket: Socket | null) => {
     // Message Deleted
     const handleMessageDeleted = async ({ messageId, conversationId, deleteForEveryone }: any) => {
       console.log('[ChatSocket] Message deleted:', messageId);
-      if (!deleteForEveryone) return;
+      if (!deleteForEveryone) {
+        queryClient.setQueryData(['chat', 'messages', conversationId], (prev: any) => {
+          if (!Array.isArray(prev)) return [];
+          return prev.filter((m: any) => m.id !== messageId);
+        });
+        return;
+      }
 
       const updateFn = (prev: ChatMessage[]) => {
         if (!Array.isArray(prev)) return [];
@@ -858,7 +928,6 @@ export const useChatSocket = (socket: Socket | null) => {
     socket.on('connect', handleConnect);
     socket.on('missed_events', handleMissedEvents);
     socket.on('new_message', handleNewMessage);
-    socket.on('message:new', handleNewMessage);
     socket.on('new_message_notification', handleNewMessageNotification);
     socket.on('message_delivered', handleMessageDelivered);
     socket.on('message:delivery_update', handleDeliveryUpdate);
@@ -916,16 +985,22 @@ export const useChatSocket = (socket: Socket | null) => {
     socket.on('conversation_unpinned', handleConversationSync);
     socket.on('thread:updated', handleThreadSync);
 
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleConnectError);
+    socket.on('reconnect_attempt', handleReconnectAttempt);
+    socket.on('user_viewing_chat', handleUserViewingChat);
+    socket.on('user_viewing_profile', handleUserViewingProfile);
+
     // Initial fetch of online users
     if (socket.connected) {
       socket.emit('get_online_users');
+      startHeartbeat();
     }
 
     return () => {
       socket.off('connect', handleConnect);
       socket.off('missed_events', handleMissedEvents);
       socket.off('new_message', handleNewMessage);
-      socket.off('message:new', handleNewMessage);
       socket.off('new_message_notification', handleNewMessageNotification);
       socket.off('message_delivered', handleMessageDelivered);
       socket.off('message:delivery_update', handleDeliveryUpdate);
@@ -969,6 +1044,12 @@ export const useChatSocket = (socket: Socket | null) => {
       socket.off('poll:updated', handlePollUpdated);
       socket.off('poll:deleted', handlePollDeleted);
 
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleConnectError);
+      socket.off('reconnect_attempt', handleReconnectAttempt);
+      socket.off('user_viewing_chat', handleUserViewingChat);
+      socket.off('user_viewing_profile', handleUserViewingProfile);
+
       socket.off('conversation:deleted_for_me', handleConversationSync);
       socket.off('conversation:cleared', handleConversationSync);
       socket.off('conversation:hidden', handleConversationSync);
@@ -978,6 +1059,8 @@ export const useChatSocket = (socket: Socket | null) => {
       socket.off('conversation_pinned', handleConversationSync);
       socket.off('conversation_unpinned', handleConversationSync);
       socket.off('thread:updated', handleThreadSync);
+
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
     };
   }, [socket, queryClient]);
 };

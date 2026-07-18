@@ -250,6 +250,7 @@ export default function AttendanceScreen() {
   const { 
     records, 
     summary, 
+    holidays,
     isLoading, 
     isError, 
     error, 
@@ -346,16 +347,30 @@ export default function AttendanceScreen() {
 
   const getStatusDetails = () => {
     if (!recordToDisplay) {
+      // 1. Check if it's a Holiday
+      const isHoliday = holidays?.some((h: any) => h.date === selectedDate);
+      if (isHoliday) {
+        const holidayObj = holidays.find((h: any) => h.date === selectedDate);
+        return {
+          text: 'Holiday',
+          color: colors.info || '#0EA5E9',
+          desc: holidayObj?.name || 'Public Holiday',
+          indicator: colors.info || '#0EA5E9',
+        };
+      }
+
+      // 2. Check if it's a Weekly Off (Saturday & Sunday)
       const dayOfWeek = dayjs(selectedDate).day();
-      if (dayOfWeek === 0) {
+      if (dayOfWeek === 0 || dayOfWeek === 6) { // 0 = Sunday, 6 = Saturday
         return {
           text: 'Weekly Off',
           color: colors.textMuted,
-          desc: 'Sunday Weekly Off',
+          desc: dayOfWeek === 0 ? 'Sunday Weekly Off' : 'Saturday Weekly Off',
           indicator: colors.textMuted,
         };
       }
       
+      // 3. Past/Today dates: mark as Absent. Future dates: mark as Scheduled.
       const isFuture = dayjs(selectedDate).isAfter(dayjs(), 'day');
       return {
         text: isFuture ? 'Scheduled' : 'Absent',

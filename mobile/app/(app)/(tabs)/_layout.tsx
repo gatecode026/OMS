@@ -9,9 +9,14 @@ import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 import useTheme from '../../../src/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
+import { useConversations } from '../../../src/features/chat';
 
 export default function TabsLayout() {
   const { colors, typography } = useTheme();
+  const { data: conversations = [] } = useConversations();
+
+  // Calculate total unread messages across all active conversations
+  const totalUnreadChat = conversations.reduce((acc: number, conv: any) => acc + (conv.unreadCount || 0), 0);
 
   return (
     <Tabs
@@ -102,6 +107,12 @@ export default function TabsLayout() {
               color={color}
             />
           ),
+          tabBarBadge: totalUnreadChat > 0 ? totalUnreadChat : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: colors.primary,
+            color: '#FFFFFF',
+            fontSize: 10,
+          },
         }}
       />
       <Tabs.Screen
