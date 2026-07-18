@@ -88,7 +88,15 @@ self.addEventListener('push', function (event) {
         clients[0].postMessage({
           type: 'PLAY_SOUND',
           notificationType: type || 'message',
-          callId: data.callId
+          callId: data.callId,
+          callData: type === 'incoming_call' ? {
+            callId: data.callId,
+            callerId: data.callerId,
+            callerName: data.callerName,
+            callerAvatar: data.callerAvatar,
+            callType: data.callType,
+            conversationId: data.conversationId
+          } : null
         });
       }
     })
@@ -118,6 +126,13 @@ self.addEventListener('push', function (event) {
 
   event.waitUntil(
     self.registration.showNotification(title, options)
+      .catch(err => {
+        console.error('[Service Worker] Failed to show notification with actions/interaction:', err);
+        const fallbackOptions = { ...options };
+        delete fallbackOptions.actions;
+        delete fallbackOptions.requireInteraction;
+        return self.registration.showNotification(title, fallbackOptions);
+      })
   );
 });
 
@@ -198,4 +213,14 @@ self.addEventListener('notificationclick', function (event) {
       }
     })
   );
+});
+
+// Force immediate activation on new Service Worker installation
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+// Force new Service Worker to claim clients immediately on activation
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
 });

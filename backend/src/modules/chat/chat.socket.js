@@ -1820,16 +1820,14 @@ export const registerChatSocketHandlers = (io) => {
           });
           socket.emit("call:ringing", { callId, callType });
 
-          if (isTargetOnline) {
-            io.to(`user:${targetUserId}`).emit("call:incoming", {
-              callId,
-              callerId: userId,
-              callerName: name,
-              callerAvatar: avatar || null,
-              callType,
-              conversationId,
-            });
-          }
+          io.to(`user:${targetUserId}`).emit("call:incoming", {
+            callId,
+            callerId: userId,
+            callerName: name,
+            callerAvatar: avatar || null,
+            callType,
+            conversationId,
+          });
 
           // Always dispatch Web Push Call Notification immediately (to wake up background/offline devices)
           const pushPayload = {

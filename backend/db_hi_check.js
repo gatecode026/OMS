@@ -40,7 +40,9 @@ async function run() {
     id: m.id,
     senderId: m.senderId,
     content: m.content,
-    createdAt: m.createdAt
+    createdAt: m.createdAt,
+    readBy: m.readBy,
+    deliveredTo: m.deliveredTo
   })), null, 2));
   process.exit(0);
 }
