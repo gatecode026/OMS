@@ -46,6 +46,29 @@ export const usePushNotifications = (currentUser) => {
     checkSubscription();
   }, [currentUser?.id, checkSubscription]);
 
+  // Auto-prompt permission request on first user click gesture if permission is default
+  useEffect(() => {
+    if (permission === 'default' && currentUser?.id) {
+      const handleUserGesture = async () => {
+        window.removeEventListener('click', handleUserGesture);
+        try {
+          const result = await notificationService.requestPermission();
+          setPermission(result);
+          if (result === 'granted') {
+            const subscription = await notificationService.subscribeUser();
+            setIsSubscribed(!!subscription);
+          }
+        } catch (err) {
+          console.warn('[Push Hook] Auto-prompt gesture subscription failed:', err);
+        }
+      };
+      window.addEventListener('click', handleUserGesture);
+      return () => {
+        window.removeEventListener('click', handleUserGesture);
+      };
+    }
+  }, [permission, currentUser?.id]);
+
   // Subscribe to push notifications
   const subscribe = useCallback(async () => {
     setLoading(true);
