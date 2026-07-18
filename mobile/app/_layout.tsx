@@ -157,20 +157,20 @@ function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
 
   // Show enterprise SplashScreen until everything is ready
   if (!splashDone) {
-    return <SplashScreen />;
+    return <SplashScreen key="splash-init" />;
   }
 
   const inAuthGroup = segments[0] === '(auth)';
 
   // Prevent flashing of dashboard/auth screens before redirect completes
   if (!isAuthenticated && !inAuthGroup) {
-    return <SplashScreen />;
+    return <SplashScreen key="splash-redirect-auth" />;
   }
   if (isAuthenticated && inAuthGroup) {
-    return <SplashScreen />;
+    return <SplashScreen key="splash-redirect-app" />;
   }
 
-  return <Slot />;
+  return <Slot key="app-slot" />;
 }
 
 // ─── Root Layout ──────────────────────────────────────────────────────────────

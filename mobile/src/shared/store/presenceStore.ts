@@ -10,7 +10,7 @@ interface PresenceState {
   typingUsers: Record<string, Record<string, { name: string; isRecording: boolean }>>;
   chatscreenUsers: Record<string, boolean>;
   activeConversationId: string | null;
-  statuses: Record<string, { status: string; emoji: string | null }>;
+  statuses: Record<string, { status: string; emoji: string | null; lastSeen?: string | Date | null }>;
   setOnlineUsers: (ids: Set<string>) => void;
   addUserOnline: (userId: string) => void;
   addUserOffline: (userId: string) => void;
@@ -18,7 +18,7 @@ interface PresenceState {
   stopTyping: (conversationId: string, userId: string) => void;
   setChatscreenStatus: (employeeId: string, isOnChatScreen: boolean) => void;
   setActiveConversationId: (id: string | null) => void;
-  setUserStatus: (employeeId: string, status: string, emoji: string | null) => void;
+  setUserStatus: (employeeId: string, status: string, emoji: string | null, lastSeen?: string | Date | null) => void;
 }
 
 export const usePresenceStore = create<PresenceState>((set) => ({
@@ -74,10 +74,14 @@ export const usePresenceStore = create<PresenceState>((set) => ({
     },
   })),
   setActiveConversationId: (id) => set({ activeConversationId: id }),
-  setUserStatus: (employeeId, status, emoji) => set((state) => ({
+  setUserStatus: (employeeId, status, emoji, lastSeen) => set((state) => ({
     statuses: {
       ...state.statuses,
-      [employeeId]: { status, emoji },
+      [employeeId]: {
+        status,
+        emoji,
+        lastSeen: lastSeen !== undefined ? lastSeen : state.statuses[employeeId]?.lastSeen,
+      },
     },
   })),
 }));

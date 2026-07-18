@@ -65,7 +65,7 @@ const ChatRoomScreenInner: React.FC = () => {
   const { colors } = useTheme();
   const authUser = useAuthStore((s) => s.user);
 
-  const { initiateCall } = useCall();
+  const { activeCall, initiateCall } = useCall();
   const { activeSheet, sheetData, openSheet, closeSheet } = useBottomSheetManager();
 
   const flags = useChatFeatureFlags();
@@ -111,6 +111,7 @@ const ChatRoomScreenInner: React.FC = () => {
       const otherId = otherUser?.employeeId || '';
       const isOnline = otherId ? onlineUserIds.has(otherId) : false;
       const presence = otherId ? statuses[otherId] : null;
+      const inCall = !!(activeCall && activeCall.targetUser?.id === otherId && (activeCall.status === 'active' || activeCall.status === 'ringing'));
       return {
         title: otherUser?.name || 'User',
         avatar: otherUser?.avatar || null,
@@ -119,6 +120,8 @@ const ChatRoomScreenInner: React.FC = () => {
         userStatus: isOnline ? (presence?.status || 'available') : 'offline',
         statusEmoji: isOnline ? (presence?.emoji || null) : null,
         otherUserIsOnChatScreen: otherId ? !!chatscreenUsers[otherId] : false,
+        lastSeen: presence?.lastSeen || (otherUser as any)?.lastSeen || null,
+        inCall,
       };
     }
     return {
@@ -129,8 +132,10 @@ const ChatRoomScreenInner: React.FC = () => {
       userStatus: 'offline',
       statusEmoji: null,
       otherUserIsOnChatScreen: false,
+      lastSeen: null,
+      inCall: false,
     };
-  }, [conversation, authUser, onlineUserIds, statuses, chatscreenUsers]);
+  }, [conversation, authUser, onlineUserIds, statuses, chatscreenUsers, activeCall]);
 
   // Sync DB messages with real-time updates (including empty cleared states)
   useEffect(() => {
@@ -390,6 +395,7 @@ const ChatRoomScreenInner: React.FC = () => {
         socket.emit('join_conversation', conversationId);
         socket.emit('mark_read', { conversationId });
         socket.emit('user_chatscreen_status', { isOnChatScreen: true });
+        socket.emit('get_online_users');
       };
 
       if (socket.connected) {

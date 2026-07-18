@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import dayjs from 'dayjs';
 import { Avatar } from '../../../shared/components/Avatar';
 import useTheme from '../../../shared/hooks/useTheme';
 import { ChatConversation } from '../types';
@@ -18,6 +19,8 @@ interface ChatHeaderProps {
     userStatus?: string;
     statusEmoji?: string | null;
     otherUserIsOnChatScreen?: boolean;
+    lastSeen?: string | Date | null;
+    inCall?: boolean;
   };
   typingState: Record<string, { name: string; isRecording: boolean }> | undefined;
   getTypingPreview: (tState: Record<string, { name: string; isRecording: boolean }> | undefined) => { text: string; isRecording: boolean } | null;
@@ -27,6 +30,23 @@ interface ChatHeaderProps {
   onVideoCallInit: () => void;
   insets: EdgeInsets;
 }
+
+const formatLastSeen = (dateStr: string | Date | null | undefined): string => {
+  if (!dateStr) return 'Offline';
+  const date = dayjs(dateStr);
+  const now = dayjs();
+  const timeStr = date.format('hh:mm A');
+  if (date.isSame(now, 'day')) {
+    return `Last seen today at ${timeStr}`;
+  }
+  if (date.isSame(now.subtract(1, 'day'), 'day')) {
+    return `Last seen yesterday at ${timeStr}`;
+  }
+  if (now.diff(date, 'day') < 7) {
+    return `Last seen ${date.format('dddd')} at ${timeStr}`;
+  }
+  return `Last seen ${date.format('DD/MM/YYYY')} at ${timeStr}`;
+};
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
   conversationId,
@@ -58,6 +78,28 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
 
   const currentStatus = chatMeta.userStatus || (chatMeta.isOnline ? 'available' : 'offline');
 
+  const getSubtitle = () => {
+    if (isTyping && typingPreview) {
+      return typingPreview.text;
+    }
+    if (chatMeta.inCall) {
+      return 'In Call';
+    }
+    if (chatMeta.isOnline && currentStatus !== 'offline') {
+      if (currentStatus === 'available') {
+        return chatMeta.otherUserIsOnChatScreen ? 'Online' : 'Available';
+      }
+      if (currentStatus === 'dnd') {
+        return 'Do Not Disturb';
+      }
+      return currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1);
+    }
+    if (chatMeta.lastSeen) {
+      return formatLastSeen(chatMeta.lastSeen);
+    }
+    return 'Offline';
+  };
+
   return (
     <View style={{ width: '100%' }}>
       {/* ─── HEADER ─── */}
@@ -84,23 +126,13 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
               style={[
                 styles.headerSubtitle,
                 {
-                  color: isTyping ? '#10B981' : colors.textMuted,
+                  color: (isTyping || chatMeta.inCall) ? '#10B981' : colors.textMuted,
                   fontFamily: typography.fonts.medium,
                 },
               ]}
               numberOfLines={1}
             >
-              {isTyping
-                ? typingPreview?.text
-                : (currentStatus === 'offline' || !chatMeta.isOnline)
-                  ? 'Offline'
-                  : currentStatus === 'available'
-                    ? chatMeta.otherUserIsOnChatScreen
-                      ? 'Online'
-                      : 'Available'
-                    : currentStatus === 'dnd'
-                      ? 'Do Not Disturb'
-                      : currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
+              {getSubtitle()}
             </Text>
           </View>
         </Pressable>

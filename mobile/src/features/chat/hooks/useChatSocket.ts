@@ -137,6 +137,7 @@ export const useChatSocket = (socket: Socket | null) => {
     // Reconnection and automatic retry resend
     const handleConnect = () => {
       console.log('[ChatSocket] Connected to backend websocket.');
+      socket.emit('get_online_users');
       
       // Auto-resend failed messages from cache
       if (activeConvIdRef.current) {
@@ -193,7 +194,7 @@ export const useChatSocket = (socket: Socket | null) => {
             ids.add(id);
             const status = u.chatStatus || u.status || 'available';
             const emoji = u.statusEmoji || u.emoji || null;
-            presenceStoreRef.current.setUserStatus(id, status, emoji);
+            presenceStoreRef.current.setUserStatus(id, status, emoji, u.lastSeen);
             presenceStoreRef.current.setChatscreenStatus(id, u.isOnChatScreen || false);
           }
         });
@@ -672,7 +673,7 @@ export const useChatSocket = (socket: Socket | null) => {
           ids.add(id);
           const status = u.chatStatus || u.status || 'available';
           const emoji = u.statusEmoji || u.emoji || null;
-          presenceStoreRef.current.setUserStatus(id, status, emoji);
+          presenceStoreRef.current.setUserStatus(id, status, emoji, u.lastSeen);
           presenceStoreRef.current.setChatscreenStatus(id, u.isOnChatScreen || false);
         }
       });
@@ -686,16 +687,17 @@ export const useChatSocket = (socket: Socket | null) => {
         presenceStoreRef.current.addUserOnline(userId);
         const status = chatStatus || data.status || 'available';
         const emoji = statusEmoji || data.emoji || null;
-        presenceStoreRef.current.setUserStatus(userId, status, emoji);
+        presenceStoreRef.current.setUserStatus(userId, status, emoji, data.lastSeen);
         presenceStoreRef.current.setChatscreenStatus(userId, isOnChatScreen || false);
       }
     };
 
-    const handleUserOffline = ({ userId }: any) => {
+    const handleUserOffline = ({ userId, lastSeen }: any) => {
       console.log('[ChatSocket] User offline broadcast received for userId:', userId);
       if (userId) {
         presenceStoreRef.current.addUserOffline(userId);
         presenceStoreRef.current.setChatscreenStatus(userId, false);
+        presenceStoreRef.current.setUserStatus(userId, 'offline', null, lastSeen);
       }
     };
 

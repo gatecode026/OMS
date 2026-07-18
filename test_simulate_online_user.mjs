@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 
 const DB_URI = 'mongodb+srv://gatecode026:tBNyNzO68BNn3Zkn@cluster0.1meot8l.mongodb.net/office-management';
 const JWT_SECRET = 'super_secret_jwt_sign_key_office_management_2026';
-const SOCKET_URL = 'http://192.168.1.14:5000';
+const SOCKET_URL = 'http://localhost:5000';
 
 async function main() {
   console.log('Connecting to database...');
@@ -13,7 +13,7 @@ async function main() {
 
   // Find another employee in the DB
   const Employee = mongoose.model('Employee', new mongoose.Schema({}, { strict: false }), 'employees');
-  const employee = await Employee.findOne({ email: { $ne: 'balram@saas.com' } });
+  const employee = await Employee.findOne({ email: 'harsh@gmail.com' });
   
   if (!employee) {
     console.error('No other employees found in database!');

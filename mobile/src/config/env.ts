@@ -17,7 +17,7 @@ export interface Config {
 }
 
 // Connect to host machine IP on local Wi-Fi to support physical devices
-const DEV_API_URL = 'http://192.168.1.23:5000';
+const DEV_API_URL = 'http://192.168.1.16:5000';
 const environments: Record<Environment, Config> = {
   development: {
     ENV: 'development',
