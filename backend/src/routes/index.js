@@ -66,5 +66,7 @@ router.use('/events', eventsRouter);
 router.use('/companies', companiesRouter);
 router.use('/admin', adminRouter);
 router.use('/chat', chatRouter);
+import healthRouter from './health.routes.js';
+router.use('/health', healthRouter);
 
 export default router;
