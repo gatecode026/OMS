@@ -26,6 +26,13 @@ export const usePushNotifications = (currentUser) => {
       const sub = await notificationService.getSubscription();
       setIsSubscribed(!!sub);
       setPermission('Notification' in window ? Notification.permission : 'unsupported');
+
+      // Auto-heal: if subscription exists in browser, ensure it is synced to backend database
+      if (sub) {
+        notificationService._sendSubscriptionToBackend(sub).catch(err => {
+          console.warn('[Push Hook] Failed to auto-sync existing subscription to backend:', err);
+        });
+      }
     } catch (err) {
       console.error('[Push Hook] Error checking subscription:', err);
       setError(err.message);
