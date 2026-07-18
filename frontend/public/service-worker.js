@@ -214,3 +214,13 @@ self.addEventListener('notificationclick', function (event) {
     })
   );
 });
+
+// Force immediate activation on new Service Worker installation
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+// Force new Service Worker to claim clients immediately on activation
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
