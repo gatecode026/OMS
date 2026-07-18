@@ -16,7 +16,7 @@ export const getAll = asyncHandler(async (req, res) => {
 });
 
 export const getById = asyncHandler(async (req, res) => {
-  const data = await service.findById(req.params.id);
+  const data = await service.findById(req.params.id, req.user);
   return successResponse(res, data, 'Record fetched successfully');
 });
 
@@ -33,6 +33,36 @@ export const update = asyncHandler(async (req, res) => {
 export const remove = asyncHandler(async (req, res) => {
   const data = await service.deleteRecord(req.params.id, req.user);
   return successResponse(res, data, 'Record deleted successfully');
+});
+
+export const restore = asyncHandler(async (req, res) => {
+  const data = await service.restoreRecord(req.params.id, req.user);
+  return successResponse(res, data, 'Record restored successfully');
+});
+
+export const archive = asyncHandler(async (req, res) => {
+  const data = await service.archiveRecord(req.params.id, req.user);
+  return successResponse(res, data, 'Record archived successfully');
+});
+
+export const uploadVersion = asyncHandler(async (req, res) => {
+  const data = await service.uploadVersion(req.params.id, req.body, req.user);
+  return successResponse(res, data, 'Version uploaded successfully', 201);
+});
+
+export const move = asyncHandler(async (req, res) => {
+  const data = await service.moveRecord(req.params.id, req.body, req.user);
+  return successResponse(res, data, 'Record moved successfully');
+});
+
+export const getFolderStructure = asyncHandler(async (req, res) => {
+  const data = await service.getFolders(req.user);
+  return successResponse(res, data, 'Folders structure fetched successfully');
+});
+
+export const getAnalytics = asyncHandler(async (req, res) => {
+  const data = await service.getAnalytics(req.user);
+  return successResponse(res, data, 'Analytics fetched successfully');
 });
 
 export const getPublicData = asyncHandler(async (req, res) => {
@@ -54,8 +84,7 @@ export const serveFile = asyncHandler(async (req, res) => {
     }
   }
 
-  // Reverse XSS entity encoding applied by the global sanitizeInputMiddleware,
-  // which escapes forward slashes in JWT tokens (/ → &#x2F;) and other chars.
+  // Reverse XSS entity encoding applied by global middleware
   if (token && typeof token === 'string') {
     token = token
       .replace(/&amp;/g, '&')
@@ -81,8 +110,8 @@ export const serveFile = asyncHandler(async (req, res) => {
   const docId = req.params.id;
   const isDownload = req.query.download === 'true';
 
-  // Wrap DB calls in tenant context (since this route runs outside authenticate middleware)
-  const document = await runWithTenant(companyId, () => service.findById(docId));
+  // Wrap DB calls in tenant context
+  const document = await runWithTenant(companyId, () => service.findById(docId, decoded));
 
   if (!document || !document.fileUrl) {
     return res.status(404).json({ status: 'fail', message: 'File not found' });
@@ -102,7 +131,6 @@ export const serveFile = asyncHandler(async (req, res) => {
   const contentType = response.headers.get('content-type') || 'application/octet-stream';
   res.setHeader('Content-Type', contentType);
 
-  // Relax security headers to allow cross-origin image rendering and iframe embedding
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.removeHeader('X-Frame-Options');
   res.setHeader('Content-Security-Policy', "frame-ancestors 'self' *");
@@ -122,13 +150,120 @@ export const serveFile = asyncHandler(async (req, res) => {
   return res.send(buffer);
 });
 
+export const exportReport = asyncHandler(async (req, res) => {
+  const query = req.query || {};
+  const format = query.format || 'csv';
+  const currentUser = req.user;
+
+  const data = await service.findAll(query, currentUser);
+  const reportDate = new Date().toLocaleDateString();
+  const filename = `Document_Report_${Date.now()}`;
+
+  if (format === 'csv' || format === 'excel') {
+    const sep = format === 'csv' ? ',' : '\t';
+    const headerRow = ['ID', 'Name', 'Scope', 'Project', 'Department', 'Category', 'Visibility', 'Type', 'Size', 'Version', 'Status', 'Uploaded By', 'Upload Date', 'Downloads'];
+    const rows = [headerRow.join(sep)];
+
+    data.forEach(d => {
+      rows.push([
+        d.id,
+        `"${d.name}"`,
+        d.documentScope,
+        `"${d.projectName || ''}"`,
+        `"${d.departmentName || ''}"`,
+        `"${d.category}"`,
+        `"${d.visibility}"`,
+        d.type,
+        d.size,
+        d.version,
+        d.status,
+        `"${d.uploadedBy}"`,
+        d.uploadDate,
+        d.downloads || 0
+      ].join(sep));
+    });
+
+    const content = rows.join('\n');
+    const mimeType = format === 'csv' ? 'text/csv' : 'application/vnd.ms-excel';
+    const fileExt = format === 'csv' ? 'csv' : 'xls';
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}.${fileExt}"`);
+    return res.send(content);
+  } else if (format === 'pdf') {
+    const rowsHtml = data.map(d => `
+      <tr>
+        <td style="padding:6px;border:1px solid #334155;">${d.id}</td>
+        <td style="padding:6px;border:1px solid #334155;font-weight:600;">${d.name}</td>
+        <td style="padding:6px;border:1px solid #334155;">${d.documentScope}</td>
+        <td style="padding:6px;border:1px solid #334155;">${d.projectName || d.departmentName || '—'}</td>
+        <td style="padding:6px;border:1px solid #334155;">${d.category}</td>
+        <td style="padding:6px;border:1px solid #334155;text-align:center;">${d.version}</td>
+        <td style="padding:6px;border:1px solid #334155;text-align:center;">${d.size}</td>
+        <td style="padding:6px;border:1px solid #334155;">${d.uploadedBy}</td>
+        <td style="padding:6px;border:1px solid #334155;text-align:center;">${d.uploadDate}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <html>
+      <head>
+        <title>Document Management Report</title>
+        <style>
+          body { font-family: sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+          th { background: #1e293b; color: #f1f5f9; padding: 8px; border: 1px solid #334155; text-align: left; }
+          td { border: 1px solid #334155; padding: 6px; color: #e2e8f0; font-size: 13px; }
+          h1 { color: #db2777; }
+        </style>
+      </head>
+      <body>
+        <h1>Document Management System Report</h1>
+        <p>Report Date: ${reportDate} | Generated By: ${currentUser.name}</p>
+        <hr style="border-color: #334155; margin-bottom: 24px;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Scope</th>
+              <th>Location</th>
+              <th>Category</th>
+              <th>Ver</th>
+              <th>Size</th>
+              <th>Uploaded By</th>
+              <th>Upload Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+        <script>setTimeout(() => { window.print(); }, 500);</script>
+      </body>
+      </html>
+    `;
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(html);
+  }
+
+  return res.status(400).json({ status: 'fail', message: 'Unsupported format' });
+});
+
 export default {
   getAll,
   getById,
   create,
   update,
   remove,
+  restore,
+  archive,
+  uploadVersion,
+  move,
+  getFolderStructure,
+  getAnalytics,
   getPublicData,
   incrementDownloads,
-  serveFile
+  serveFile,
+  exportReport
 };

@@ -16,6 +16,7 @@ import {
 } from '../../security/repositoryContract.js';
 import { DocumentsQueryBuilder } from './documents.queryBuilder.js';
 import { getStore } from '../../utils/tenantContext.js';
+import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
 
 /**
  * Assign virtual matching userId property to Document record for ownership validation.
@@ -106,7 +107,9 @@ export const save = async (data) => {
 
   logger.info(`DocumentsRepository::save creating document: ${data.name}`);
   if (!data.id) {
-    data.id = 'DOC-' + Math.floor(100 + Math.random() * 900);
+    const store = getStore();
+    const companyId = store?.user?.companyId || 'COMP-DEFAULT';
+    data.id = await generateCompanyUniqueId(companyId, 'documents');
   }
 
   // Upload file to ImageKit if it is sent as a base64 string
@@ -162,8 +165,14 @@ export const remove = async (id) => {
     });
   }
 
-  logger.info(`DocumentsRepository::remove deleting document with ID: ${id}`);
-  return Document.findOneAndDelete({ id });
+  if (record.status === 'Deleted') {
+    logger.info(`DocumentsRepository::remove permanently deleting document with ID: ${id}`);
+    return Document.findOneAndDelete({ id });
+  } else {
+    logger.info(`DocumentsRepository::remove soft-deleting document with ID: ${id}`);
+    record.status = 'Deleted';
+    return record.save();
+  }
 };
 
 export default {

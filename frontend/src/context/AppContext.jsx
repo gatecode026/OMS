@@ -774,7 +774,8 @@ export const AppProvider = ({ children }) => {
       fetchLeaves,
       fetchAttendance,
       fetchDailyReports,
-      fetchCorrectionRequests
+      fetchCorrectionRequests,
+      fetchDocuments
     };
   });
 
@@ -1066,6 +1067,20 @@ export const AppProvider = ({ children }) => {
           }
           break;
 
+        case 'documents':
+          if (action === 'create') {
+            setDocumentsList(prev => {
+              if (prev.some(d => d.id === data.id || d._id === data._id)) return prev;
+              return [data, ...prev];
+            });
+          } else if (action === 'update') {
+            setDocumentsList(prev => prev.map(d => (d.id === data.id || d._id === data._id) ? data : d));
+          } else if (action === 'delete') {
+            const id = typeof data === 'string' ? data : (data.id || data._id);
+            setDocumentsList(prev => prev.filter(d => d.id !== id && d._id !== id));
+          }
+          break;
+
         default:
           break;
       }
@@ -1080,6 +1095,7 @@ export const AppProvider = ({ children }) => {
         if (activeActionsRef.current.fetchAttendance) activeActionsRef.current.fetchAttendance();
         if (activeActionsRef.current.fetchDailyReports) activeActionsRef.current.fetchDailyReports();
         if (activeActionsRef.current.fetchCorrectionRequests) activeActionsRef.current.fetchCorrectionRequests();
+        if (activeActionsRef.current.fetchDocuments) activeActionsRef.current.fetchDocuments();
       }
     };
 
@@ -1820,6 +1836,142 @@ export const AppProvider = ({ children }) => {
       console.error('Failed to increment download count:', err);
     }
     return false;
+  };
+
+  const restoreDocument = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/${id}/restore`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDocuments();
+        addActivityLog(`Restored document ID: ${id}`, 'Documents', 'success');
+        addToast('success', 'Document restored successfully.');
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to restore document.');
+      }
+    } catch (err) {
+      console.error('Failed to restore document:', err);
+      addToast('danger', 'Error restoring document.');
+    }
+  };
+
+  const archiveDocument = async (id) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/${id}/archive`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDocuments();
+        addActivityLog(`Archived document ID: ${id}`, 'Documents', 'warning');
+        addToast('warning', 'Document archived successfully.');
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to archive document.');
+      }
+    } catch (err) {
+      console.error('Failed to archive document:', err);
+      addToast('danger', 'Error archiving document.');
+    }
+  };
+
+  const moveDocument = async (id, moveData) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/${id}/move`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(moveData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDocuments();
+        addActivityLog(`Moved document ID: ${id}`, 'Documents', 'info');
+        addToast('success', 'Document moved successfully.');
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to move document.');
+      }
+    } catch (err) {
+      console.error('Failed to move document:', err);
+      addToast('danger', 'Error moving document.');
+    }
+  };
+
+  const createVersion = async (id, versionData) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/${id}/versions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(versionData)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        await fetchDocuments();
+        addActivityLog(`Uploaded version for document ID: ${id}`, 'Documents', 'success');
+        addToast('success', 'New version uploaded successfully.');
+        return result.data;
+      } else {
+        addToast('danger', result.message || 'Failed to upload new version.');
+      }
+    } catch (err) {
+      console.error('Failed to upload version:', err);
+      addToast('danger', 'Error uploading version.');
+    }
+  };
+
+  const getDocumentFolders = async () => {
+    if (!token) return { projectFolders: { active: [], archived: [] }, generalFolders: [] };
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/folders`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to fetch document folders:', err);
+    }
+    return { projectFolders: { active: [], archived: [] }, generalFolders: [] };
+  };
+
+  const getDocumentAnalytics = async () => {
+    if (!token) return null;
+    try {
+      const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/analytics`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        return result.data;
+      }
+    } catch (err) {
+      console.error('Failed to fetch document analytics:', err);
+    }
+    return null;
   };
 
   const addNotification = async (notifData) => {
@@ -5845,6 +5997,12 @@ export const AppProvider = ({ children }) => {
         addDocument,
         deleteDocument,
         downloadDocument,
+        restoreDocument,
+        archiveDocument,
+        moveDocument,
+        createVersion,
+        getDocumentFolders,
+        getDocumentAnalytics,
         activityLogs,
         addActivityLog,
         fetchActivityLogs,

@@ -105,51 +105,69 @@ export const healPermissionMatrix = async (companyId) => {
       const isFull = ['super_admin', 'company_admin'].includes(r.id) || 
                      ['super_admin', 'company_admin'].includes((r.name || '').toLowerCase().replace(/\s+/g, '_'));
       
-      const newPerms = new Map();
+      if (!r.permissions) {
+        r.permissions = new Map();
+      }
 
       expectedModules.forEach(mod => {
         const isHierarchical = hierarchicalKeys.includes(mod.key);
         
         if (isHierarchical) {
-          if (isFull) {
-            newPerms.set(`${mod.key}_self`, getPerms(true, true, true, true, true, true));
-            newPerms.set(mod.key, getPerms(true, true, true, true, true, true));
-          } else if (r.id === 'hr') {
-            const isHR = ['employee_management', 'attendance_management', 'leave_management', 'payroll_management'].includes(mod.key);
-            newPerms.set(`${mod.key}_self`, getPerms(true, true, true, true, true, true));
-            newPerms.set(mod.key, getPerms(isHR, true, isHR, isHR, isHR, isHR));
-          } else if (r.id === 'manager') {
-            const isMgr = ['attendance_management', 'leave_management', 'task_monitoring', 'project_management', 'team_management'].includes(mod.key);
-            newPerms.set(`${mod.key}_self`, getPerms(true, true, true, true, true, true));
-            newPerms.set(mod.key, getPerms(isMgr, true, isMgr, false, isMgr, isMgr));
-          } else if (r.id === 'team_leader') {
-            const isTL = ['attendance_management', 'task_monitoring', 'project_management'].includes(mod.key);
-            newPerms.set(`${mod.key}_self`, getPerms(true, true, true, true, true, true));
-            newPerms.set(mod.key, getPerms(isTL, true, isTL, false, false, false));
-          } else {
-            newPerms.set(`${mod.key}_self`, getPerms(false, true, false, false, false, false));
-            newPerms.set(mod.key, getPerms(false, false, false, false, false, false));
+          const selfKey = `${mod.key}_self`;
+          const compKey = mod.key;
+
+          if (!r.permissions.has(selfKey)) {
+            if (isFull) {
+              r.permissions.set(selfKey, getPerms(true, true, true, true, true, true));
+            } else if (r.id === 'hr') {
+              r.permissions.set(selfKey, getPerms(true, true, true, true, true, true));
+            } else if (r.id === 'manager') {
+              r.permissions.set(selfKey, getPerms(true, true, true, true, true, true));
+            } else if (r.id === 'team_leader') {
+              r.permissions.set(selfKey, getPerms(true, true, true, true, true, true));
+            } else {
+              r.permissions.set(selfKey, getPerms(false, true, false, false, false, false));
+            }
+          }
+
+          if (!r.permissions.has(compKey)) {
+            if (isFull) {
+              r.permissions.set(compKey, getPerms(true, true, true, true, true, true));
+            } else if (r.id === 'hr') {
+              const isHR = ['employee_management', 'attendance_management', 'leave_management', 'payroll_management'].includes(mod.key);
+              r.permissions.set(compKey, getPerms(isHR, true, isHR, isHR, isHR, isHR));
+            } else if (r.id === 'manager') {
+              const isMgr = ['attendance_management', 'leave_management', 'task_monitoring', 'project_management', 'team_management'].includes(mod.key);
+              r.permissions.set(compKey, getPerms(isMgr, true, isMgr, false, isMgr, isMgr));
+            } else if (r.id === 'team_leader') {
+              const isTL = ['attendance_management', 'task_monitoring', 'project_management'].includes(mod.key);
+              r.permissions.set(compKey, getPerms(isTL, true, isTL, false, false, false));
+            } else {
+              r.permissions.set(compKey, getPerms(false, false, false, false, false, false));
+            }
           }
         } else {
-          if (isFull) {
-            newPerms.set(mod.key, getPerms(true, true, true, true, true, true));
-          } else if (r.id === 'hr') {
-            const isHR = ['employee_management', 'department_management', 'agency_branch_management', 'team_management'].includes(mod.key);
-            newPerms.set(mod.key, getPerms(isHR, true, isHR, isHR, isHR, isHR));
-          } else if (r.id === 'manager') {
-            const isMgr = ['department_management', 'team_management'].includes(mod.key);
-            newPerms.set(mod.key, getPerms(isMgr, true, isMgr, false, isMgr, isMgr));
-          } else if (r.id === 'team_leader') {
-            const isTL = ['team_management'].includes(mod.key);
-            newPerms.set(mod.key, getPerms(isTL, true, isTL, false, false, false));
-          } else {
-            const isEmpAllowed = ['dashboard', 'notifications', 'document_management', 'profile_settings'].includes(mod.key);
-            newPerms.set(mod.key, getPerms(false, isEmpAllowed, false, false, false, false));
+          const key = mod.key;
+          if (!r.permissions.has(key)) {
+            if (isFull) {
+              r.permissions.set(key, getPerms(true, true, true, true, true, true));
+            } else if (r.id === 'hr') {
+              const isHR = ['employee_management', 'department_management', 'agency_branch_management', 'team_management'].includes(mod.key);
+              r.permissions.set(key, getPerms(isHR, true, isHR, isHR, isHR, isHR));
+            } else if (r.id === 'manager') {
+              const isMgr = ['department_management', 'team_management'].includes(mod.key);
+              r.permissions.set(key, getPerms(isMgr, true, isMgr, false, isMgr, isMgr));
+            } else if (r.id === 'team_leader') {
+              const isTL = ['team_management'].includes(mod.key);
+              r.permissions.set(key, getPerms(isTL, true, isTL, false, false, false));
+            } else {
+              const isEmpAllowed = ['dashboard', 'notifications', 'document_management', 'profile_settings'].includes(mod.key);
+              r.permissions.set(key, getPerms(false, isEmpAllowed, false, false, false, false));
+            }
           }
         }
       });
 
-      r.permissions = newPerms;
       r.markModified('permissions');
       await r.save();
     }
