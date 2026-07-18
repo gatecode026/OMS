@@ -22,12 +22,18 @@ export class PayrollResourceQueryBuilder {
     }
 
     // HR Manager / Finance Manager: company-wide calculations (unscoped)
-    if (this.context.role === 'hr_manager' || this.context.role === 'finance_manager') {
+    const roleLower = (this.context.role || '').toLowerCase();
+    if (
+      roleLower === 'hr_manager' || 
+      roleLower === 'finance_manager' || 
+      roleLower.includes('hr') || 
+      roleLower.includes('finance')
+    ) {
       return filters;
     }
 
     // Branch Manager / Branch Admin
-    if (this.context.role === 'branch_manager' || this.context.role === 'manager' || this.context.role === 'branch_admin') {
+    if (roleLower === 'branch_manager' || roleLower === 'manager' || roleLower === 'branch_admin') {
       if (this.context.branch) {
         const emps = await Employee.find({ branch: this.context.branch }).select('id').lean();
         const empIds = emps.map(e => e.id);

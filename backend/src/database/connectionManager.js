@@ -86,6 +86,9 @@ export const ensureAllModelsRegistered = async () => {
     import('../modules/security/security.model.js'),
     import('../modules/work-reports/work-reports.model.js'),
     import('../modules/payroll-queries/payroll-query.model.js'),
+    import('../modules/kpi-templates/kpi-template.model.js'),
+    import('../modules/kpi-evaluation-cycles/kpi-evaluation-cycle.model.js'),
+    import('../modules/kpi-employee-evaluations/kpi-employee-evaluation.model.js'),
   ];
 
   await Promise.all(modelImports.map(p => p.catch(err => logger.error('Error registering model:', err))));
@@ -338,7 +341,8 @@ export const provisionTenantDatabase = async (company, clusterKey, dbName, admin
       'WorkReport', 'ActivityLog', 'Event', 'Announcement', 'EmergencyAlert', 
       'AnnouncementTrackingLog', 'AnnouncementAuditLog', 'Notification', 
       'Document', 'UserOverride', 'Goal', 'Pip', 'IpWhitelist', 'IpBlocklist', 
-      'UserDevice', 'UserSession', 'SecurityAlert', 'Task', 'Workflow', 'PayrollQuery'
+      'UserDevice', 'UserSession', 'SecurityAlert', 'Task', 'Workflow', 'PayrollQuery',
+      'KpiTemplate', 'KpiEvaluationCycle', 'KpiEmployeeEvaluation'
     ];
 
     for (const modelName of tenantScopedModelNames) {
@@ -351,18 +355,27 @@ export const provisionTenantDatabase = async (company, clusterKey, dbName, admin
     // 3. Seed Default Permission Modules
     const TenantPermissionModule = connection.model('PermissionModule');
     const modulesToSeed = [
-      { key: 'employees', label: 'Employees Management' },
-      { key: 'attendance', label: 'Attendance Tracking' },
-      { key: 'leaves', label: 'Leaves Management' },
-      { key: 'payroll', label: 'Payroll Management' },
-      { key: 'departments', label: 'Departments Management' },
-      { key: 'branches', label: 'Branches Management' },
-      { key: 'projects', label: 'Projects Management' },
-      { key: 'tasks', label: 'Tasks Management' },
-      { key: 'teams', label: 'Teams Management' },
-      { key: 'settings', label: 'System Settings' },
-      { key: 'notifications', label: 'Notifications Management' },
-      { key: 'documents', label: 'Documents Management' }
+      { key: 'dashboard', label: 'Dashboard' },
+      { key: 'company_overview', label: 'Branch Overview' },
+      { key: 'employee_management', label: 'Employee Management' },
+      { key: 'agency_branch_management', label: 'Agency Branch Management' },
+      { key: 'department_management', label: 'Department Management' },
+      { key: 'team_management', label: 'Team Management' },
+      { key: 'attendance_management', label: 'Attendance Management' },
+      { key: 'leave_management', label: 'Leave Management' },
+      { key: 'project_management', label: 'Project Management' },
+      { key: 'task_monitoring', label: 'Task Monitoring' },
+      { key: 'work_reports', label: 'Work Reports' },
+      { key: 'performance_analytics', label: 'KPI Management' },
+      { key: 'payroll_management', label: 'Payroll Management' },
+      { key: 'announcements', label: 'Announcements' },
+      { key: 'meetings_calendar', label: 'Meetings & Calendar' },
+      { key: 'notifications', label: 'Notifications' },
+      { key: 'document_management', label: 'Document Management' },
+      { key: 'role_permission', label: 'Role & Permission' },
+      { key: 'system_settings', label: 'System Settings' },
+      { key: 'security_audit_logs', label: 'Security & Audit Logs' },
+      { key: 'profile_settings', label: 'Profile Settings' }
     ];
 
     await TenantPermissionModule.insertMany(
@@ -372,10 +385,64 @@ export const provisionTenantDatabase = async (company, clusterKey, dbName, admin
     // 4. Seed Default Roles
     const TenantRole = connection.model('Role');
     
-    // Helper to generate full permission object
-    const getPerms = (create, read, update, del, approve, exp) => ({
-      create, read, update, delete: del, approve, export: exp
-    });
+    const buildDefaultPermissions = (roleId) => {
+      const getPerms = (create, read, update, del, approve, exp) => ({
+        create, read, update, delete: del, approve, export: exp
+      });
+
+      const hierarchicalKeys = [
+        'attendance_management',
+        'leave_management',
+        'project_management',
+        'task_monitoring',
+        'work_reports',
+        'performance_analytics',
+        'payroll_management',
+        'announcements',
+        'meetings_calendar'
+      ];
+
+      const permMap = new Map();
+
+      modulesToSeed.forEach(mod => {
+        const isHierarchical = hierarchicalKeys.includes(mod.key);
+        
+        if (isHierarchical) {
+          if (roleId === 'company_admin') {
+            permMap.set(`${mod.key}_self`, getPerms(true, true, true, true, true, true));
+            permMap.set(mod.key, getPerms(true, true, true, true, true, true));
+          } else if (roleId === 'hr') {
+            const isHR = ['employee_management', 'attendance_management', 'leave_management', 'payroll_management'].includes(mod.key);
+            permMap.set(`${mod.key}_self`, getPerms(true, true, true, true, true, true));
+            permMap.set(mod.key, getPerms(isHR, true, isHR, isHR, isHR, isHR));
+          } else if (roleId === 'manager') {
+            const isMgr = ['attendance_management', 'leave_management', 'task_monitoring', 'project_management', 'team_management'].includes(mod.key);
+            permMap.set(`${mod.key}_self`, getPerms(true, true, true, true, true, true));
+            permMap.set(mod.key, getPerms(isMgr, true, isMgr, false, isMgr, isMgr));
+          } else {
+            // Employee
+            permMap.set(`${mod.key}_self`, getPerms(false, true, false, false, false, false));
+            permMap.set(mod.key, getPerms(false, false, false, false, false, false));
+          }
+        } else {
+          if (roleId === 'company_admin') {
+            permMap.set(mod.key, getPerms(true, true, true, true, true, true));
+          } else if (roleId === 'hr') {
+            const isHR = ['employee_management', 'department_management', 'agency_branch_management', 'team_management'].includes(mod.key);
+            permMap.set(mod.key, getPerms(isHR, true, isHR, isHR, isHR, isHR));
+          } else if (roleId === 'manager') {
+            const isMgr = ['department_management', 'team_management'].includes(mod.key);
+            permMap.set(mod.key, getPerms(isMgr, true, isMgr, false, isMgr, isMgr));
+          } else {
+            // Employee
+            const isEmpAllowed = ['dashboard', 'notifications', 'document_management', 'profile_settings'].includes(mod.key);
+            permMap.set(mod.key, getPerms(false, isEmpAllowed, false, false, false, false));
+          }
+        }
+      });
+
+      return permMap;
+    };
 
     const rolesToSeed = [
       {
@@ -384,7 +451,7 @@ export const provisionTenantDatabase = async (company, clusterKey, dbName, admin
         description: 'Administrator with full scoped privileges',
         accentColor: '#ef4444',
         companyId: company.id,
-        permissions: new Map(modulesToSeed.map(m => [m.key, getPerms(true, true, true, true, true, true)]))
+        permissions: buildDefaultPermissions('company_admin')
       },
       {
         id: 'hr',
@@ -392,10 +459,7 @@ export const provisionTenantDatabase = async (company, clusterKey, dbName, admin
         description: 'Human Resources manager scoped permissions',
         accentColor: '#3b82f6',
         companyId: company.id,
-        permissions: new Map(modulesToSeed.map(m => {
-          const isHRScoped = ['employees', 'attendance', 'leaves', 'payroll'].includes(m.key);
-          return [m.key, getPerms(isHRScoped, true, isHRScoped, isHRScoped, isHRScoped, isHRScoped)];
-        }))
+        permissions: buildDefaultPermissions('hr')
       },
       {
         id: 'manager',
@@ -403,10 +467,7 @@ export const provisionTenantDatabase = async (company, clusterKey, dbName, admin
         description: 'Team leader and project manager permissions',
         accentColor: '#10b981',
         companyId: company.id,
-        permissions: new Map(modulesToSeed.map(m => {
-          const isManagerScoped = ['attendance', 'leaves', 'tasks', 'projects', 'teams'].includes(m.key);
-          return [m.key, getPerms(isManagerScoped, true, isManagerScoped, false, isManagerScoped, isManagerScoped)];
-        }))
+        permissions: buildDefaultPermissions('manager')
       },
       {
         id: 'employee',
@@ -414,7 +475,7 @@ export const provisionTenantDatabase = async (company, clusterKey, dbName, admin
         description: 'Standard employee scoped access',
         accentColor: '#64748b',
         companyId: company.id,
-        permissions: new Map(modulesToSeed.map(m => [m.key, getPerms(false, m.key !== 'settings', false, false, false, false)]))
+        permissions: buildDefaultPermissions('employee')
       }
     ];
 

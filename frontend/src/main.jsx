@@ -37,6 +37,7 @@ const Teams = lazy(() => import('./pages/Teams'));
 const TeamLeaders = lazy(() => import('./pages/TeamLeaders'));
 const Projects = lazy(() => import('./pages/projects/index'));
 const Performance = lazy(() => import('./pages/Performance'));
+const KPI = lazy(() => import('./pages/KPI'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 // const ActivityLogs = lazy(() => import('./pages/ActivityLogs'));
 const Announcements = lazy(() => import('./pages/Announcements'));
@@ -105,6 +106,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/tasks" element={<TaskMonitoring />} />
                 <Route path="/work-reports" element={<WorkReports />} />
                 <Route path="/performance" element={<Performance />} />
+                <Route path="/kpi" element={<KPI />} />
+                <Route path="/kpi/:tab" element={<KPI />} />
+                <Route path="/kpi/:tab/:id" element={<KPI />} />
                 <Route path="/payroll" element={<Payroll />} />
                 <Route path="/calendar" element={<Calendar />} />
 

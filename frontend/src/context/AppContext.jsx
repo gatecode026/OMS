@@ -302,6 +302,7 @@ export const AppProvider = ({ children }) => {
   const [payrollAdvances, setPayrollAdvances] = useState([]);
   const [payrollBonuses, setPayrollBonuses] = useState([]);
   const [payrollPayments, setPayrollPayments] = useState([]);
+  const [payrollLeavePolicies, setPayrollLeavePolicies] = useState([]);
   const [payrollConfigs, setPayrollConfigs] = useState({
     id: 'GLOBAL_CONFIG',
     leaveDeductionRate: 0,
@@ -1240,6 +1241,7 @@ export const AppProvider = ({ children }) => {
       setPayrollAdvances([]);
       setPayrollBonuses([]);
       setPayrollPayments([]);
+      setPayrollLeavePolicies([]);
       setPayrollConfigs({
         id: 'GLOBAL_CONFIG',
         leaveDeductionRate: 0,
@@ -1266,6 +1268,7 @@ export const AppProvider = ({ children }) => {
         setPayrollAdvances(advances || []);
         setPayrollBonuses(bonuses || []);
         setPayrollPayments(payments || []);
+        setPayrollLeavePolicies(result.data.leavePolicies || []);
         setPayroll(payments || []);
         if (config) {
           setPayrollConfigs(config);
@@ -5622,7 +5625,8 @@ export const AppProvider = ({ children }) => {
       'payroll_management', 'payroll',
       'work_reports',
       'meetings_calendar',
-      'announcements'
+      'announcements',
+      'performance_analytics'
     ];
 
     const baseKey = MODULE_MAPPING[module] || module;
@@ -5804,6 +5808,7 @@ export const AppProvider = ({ children }) => {
         payrollBonuses,
         payrollPayments,
         payrollConfigs,
+        payrollLeavePolicies,
         fetchPayrollData,
         payrollQueries,
         fetchPayrollQueries,
