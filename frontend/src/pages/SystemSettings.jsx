@@ -1164,10 +1164,7 @@ const SystemSettings = () => {
             Only users with the role of <strong>Super Admin</strong> or <strong>Company Admin</strong> are authorized to view and modify system-wide configuration metrics.
           </p>
           <div className="denied-actions">
-            <Button variant="primary" onClick={() => setCurrentUserRole('company_admin')}>
-              <Sparkles size={16} /> Switch to Company Admin
-            </Button>
-            <Button variant="ghost" onClick={() => window.history.back()}>
+            <Button variant="primary" onClick={() => window.history.back()}>
               Return Back
             </Button>
           </div>

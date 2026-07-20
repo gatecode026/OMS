@@ -88,7 +88,6 @@ const menuStructure = [
       { name: 'Project Management', icon: Briefcase, path: '/projects' },
       { name: 'Task Monitoring', icon: KanbanSquare, path: '/tasks' },
       { name: 'Work Reports', icon: FileText, path: '/work-reports' },
-      { name: 'Performance Analytics', icon: BarChart3, path: '/performance' },
       { name: 'KPI Management', icon: TrendingUp, path: '/kpi' },
       { name: 'Payroll Management', icon: DollarSign, path: '/payroll' },
       { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }

@@ -203,7 +203,7 @@ const RolesPermissions = () => {
     { key: 'project_management', label: 'Project Management' },
     { key: 'task_monitoring', label: 'Task Monitoring' },
     { key: 'work_reports', label: 'Work Reports' },
-    { key: 'performance_analytics', label: 'Performance Analytics' },
+    { key: 'performance_analytics', label: 'KPI Management' },
     { key: 'payroll_management', label: 'Payroll Management' },
     { key: 'announcements', label: 'Announcements' },
     { key: 'meetings_calendar', label: 'Meetings & Calendar' },
