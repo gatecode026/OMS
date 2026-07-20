@@ -5772,6 +5772,7 @@ export const AppProvider = ({ children }) => {
     };
 
     const HIERARCHICAL_MODULES = [
+      'dashboard_management', 'dashboard',
       'attendance_management', 'attendance',
       'leave_management', 'leaves',
       'project_management', 'projects',

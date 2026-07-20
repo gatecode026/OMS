@@ -71,14 +71,7 @@ const menuStructure = [
           { name: 'Team Leaders', path: '/teams/leaders' }
         ]
       },
-      {
-        name: 'Attendance Management',
-        icon: Clock,
-        subItems: [
-          { name: 'Punch In Out Reports', path: '/attendance' },
-          { name: 'Web Portal Punch', path: '/attendance/webportal' }
-        ]
-      },
+      { name: 'Attendance Management', icon: Clock, path: '/attendance' },
       { name: 'Leave Management', icon: CalendarDays, path: '/leaves' }
     ]
   },
@@ -420,7 +413,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
             </div>
           ) : (
             (() => {
-              const isBranchScoped = currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin' && currentUserRole !== 'SuperAdmin' && currentUser?.branch;
+              const isCompanyLevel = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes((currentUserRole || '').toLowerCase());
+              const isBranchScoped = !isCompanyLevel && !!currentUser?.branch;
               return filterMenuByRole(
                 menuStructure.map(sec => ({
                   ...sec,
