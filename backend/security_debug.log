@@ -846,3 +846,87 @@
 [2026-07-18T09:08:20.660Z] restrictedFields: []
 [2026-07-18T09:08:31.508Z] moduleName: Attendance, role: company_admin, updatePayload: {"employeeId":"GATECO-EMP-014","employeeName":"Akshita","department":"—","branch":"Jaipur","date":"2026-07-18","punchIn":"09:44","punchOut":"--:--","breakTime":"45 mins","totalHours":0,"status":"Present","source":"Biometric","workMode":"WFO","overtime":"0 hrs"}
 [2026-07-18T09:08:31.510Z] restrictedFields: []
+[2026-07-20T08:34:22.886Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T08:34:22.750Z"}}
+[2026-07-20T08:34:22.913Z] restrictedFields: []
+[2026-07-20T08:34:22.983Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T08:34:22.761Z"}}
+[2026-07-20T08:34:22.984Z] restrictedFields: []
+[2026-07-20T08:34:23.124Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T08:34:22.976Z"}}
+[2026-07-20T08:34:23.127Z] restrictedFields: []
+[2026-07-20T08:34:23.150Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T08:34:23.008Z"}}
+[2026-07-20T08:34:23.152Z] restrictedFields: []
+[2026-07-20T08:34:23.431Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T08:34:23.309Z"}}
+[2026-07-20T08:34:23.432Z] restrictedFields: []
+[2026-07-20T08:34:23.446Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T08:34:23.316Z"}}
+[2026-07-20T08:34:23.451Z] restrictedFields: []
+[2026-07-20T08:34:23.625Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T08:34:23.469Z"}}
+[2026-07-20T08:34:23.626Z] restrictedFields: []
+[2026-07-20T11:25:30.407Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:30.282Z"}}
+[2026-07-20T11:25:30.416Z] restrictedFields: []
+[2026-07-20T11:25:30.618Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:30.503Z"}}
+[2026-07-20T11:25:30.620Z] restrictedFields: []
+[2026-07-20T11:25:30.633Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:30.510Z"}}
+[2026-07-20T11:25:30.635Z] restrictedFields: []
+[2026-07-20T11:25:31.218Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:31.097Z"}}
+[2026-07-20T11:25:31.220Z] restrictedFields: []
+[2026-07-20T11:25:31.229Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:31.101Z"}}
+[2026-07-20T11:25:31.233Z] restrictedFields: []
+[2026-07-20T11:25:31.844Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:31.697Z"}}
+[2026-07-20T11:25:31.846Z] restrictedFields: []
+[2026-07-20T11:25:32.367Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:32.253Z"}}
+[2026-07-20T11:25:32.369Z] restrictedFields: []
+[2026-07-20T11:25:32.900Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:32.780Z"}}
+[2026-07-20T11:25:32.902Z] restrictedFields: []
+[2026-07-20T11:25:33.423Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:33.311Z"}}
+[2026-07-20T11:25:33.425Z] restrictedFields: []
+[2026-07-20T11:25:33.968Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:33.845Z"}}
+[2026-07-20T11:25:33.969Z] restrictedFields: []
+[2026-07-20T11:25:34.518Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:34.378Z"}}
+[2026-07-20T11:25:34.519Z] restrictedFields: []
+[2026-07-20T11:25:34.579Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a5e05ae7c90c18712f030a2","content":"hello","type":"text","senderId":"GATECO-EMP-012","senderName":"Animesh Jain","sentAt":"2026-07-20T11:25:34.548Z"},"lastActivityAt":"2026-07-20T11:25:34.548Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-20T11:25:34.582Z] restrictedFields: []
+[2026-07-20T11:25:35.250Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:35.126Z"}}
+[2026-07-20T11:25:35.251Z] restrictedFields: []
+[2026-07-20T11:25:35.765Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:35.653Z"}}
+[2026-07-20T11:25:35.766Z] restrictedFields: []
+[2026-07-20T11:25:36.296Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:36.180Z"}}
+[2026-07-20T11:25:36.298Z] restrictedFields: []
+[2026-07-20T11:25:36.830Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:36.716Z"}}
+[2026-07-20T11:25:36.831Z] restrictedFields: []
+[2026-07-20T11:25:37.338Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:37.226Z"}}
+[2026-07-20T11:25:37.340Z] restrictedFields: []
+[2026-07-20T11:25:37.868Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:37.748Z"}}
+[2026-07-20T11:25:37.870Z] restrictedFields: []
+[2026-07-20T11:25:38.386Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:38.275Z"}}
+[2026-07-20T11:25:38.388Z] restrictedFields: []
+[2026-07-20T11:25:38.892Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:38.778Z"}}
+[2026-07-20T11:25:38.895Z] restrictedFields: []
+[2026-07-20T11:25:39.450Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:39.335Z"}}
+[2026-07-20T11:25:39.452Z] restrictedFields: []
+[2026-07-20T11:25:39.981Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:39.871Z"}}
+[2026-07-20T11:25:39.982Z] restrictedFields: []
+[2026-07-20T11:25:51.205Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:51.056Z"}}
+[2026-07-20T11:25:51.207Z] restrictedFields: []
+[2026-07-20T11:25:51.475Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:51.254Z"}}
+[2026-07-20T11:25:51.483Z] restrictedFields: []
+[2026-07-20T11:25:51.574Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:51.346Z"}}
+[2026-07-20T11:25:51.575Z] restrictedFields: []
+[2026-07-20T11:25:51.650Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:51.468Z"}}
+[2026-07-20T11:25:51.652Z] restrictedFields: []
+[2026-07-20T11:25:51.721Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:51.288Z"}}
+[2026-07-20T11:25:51.723Z] restrictedFields: []
+[2026-07-20T11:25:52.255Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:52.134Z"}}
+[2026-07-20T11:25:52.259Z] restrictedFields: []
+[2026-07-20T11:25:52.800Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:52.677Z"}}
+[2026-07-20T11:25:52.802Z] restrictedFields: []
+[2026-07-20T11:25:53.433Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:25:53.227Z"}}
+[2026-07-20T11:25:53.435Z] restrictedFields: []
+[2026-07-20T11:27:11.479Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:27:11.331Z"}}
+[2026-07-20T11:27:11.480Z] restrictedFields: []
+[2026-07-20T11:27:11.486Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:27:11.335Z"}}
+[2026-07-20T11:27:11.487Z] restrictedFields: []
+[2026-07-20T11:27:12.083Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T11:27:11.941Z"}}
+[2026-07-20T11:27:12.084Z] restrictedFields: []
+[2026-07-20T12:03:14.412Z] moduleName: Attendance, role: role_hr, updatePayload: {"companyId":"COMP-001","employeeId":"GATECO-EMP-008","employeeName":"Rahul Kumawat","department":"IT","branch":"Jaipur","date":"2026-07-13","punchIn":"10:00","punchOut":"18:00","totalHours":7.25,"status":"Present","shift":"Day Shift","overtime":"0 hrs","notes":"Approved correction correction details: Punch Error\n"}
+[2026-07-20T12:03:14.418Z] restrictedFields: []
+[2026-07-20T12:03:14.496Z] moduleName: Attendance, role: role_hr, updatePayload: {"status":"Approved","approverId":"GATECO-EMP-014","approvedBy":"Akshita","approvalDate":"2026-07-20T12:03:14.464Z","attendanceId":"ATT-1783918631188-3320","$push":{"timeline":{"action":"Approved","actorId":"GATECO-EMP-014","actorName":"Akshita","actorRole":"role_hr","timestamp":"2026-07-20T12:03:14.464Z","comments":"Attendance corrected successfully"}}}
+[2026-07-20T12:03:14.498Z] restrictedFields: []

@@ -17,8 +17,7 @@ export const isMenuItemAccessible = (item, userRole, hasPermission) => {
   if (hasPermission && item.path) {
     const moduleKey = PATH_TO_MODULE[item.path];
     if (moduleKey) {
-      const hasDbPerm = hasPermission(moduleKey, 'read', 'self') || hasPermission(moduleKey, 'read', 'company');
-      if (hasDbPerm) return true;
+      return hasPermission(moduleKey, 'read', 'self') || hasPermission(moduleKey, 'read', 'company');
     }
   }
 

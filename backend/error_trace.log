@@ -2224,3 +2224,28 @@ Stack: Error: Manual score for "Task Completion" must be a number between 0 and 
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/kpi-employee-evaluations/kpi-employee-evaluation.controller.js:34:16
 Body: {"scores":[{"attributeId":"1","value":"15"}]}
+
+[2026-07-20T10:51:28.571Z] POST /api/v1/auth/login
+Error: Invalid email or password
+Stack: Error: Invalid email or password
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:152:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
+Body: {"email":"geerta@gmail.com","password":"password"}
+
+[2026-07-20T11:25:34.733Z] GET /api/v1/chat/messages/6a5e05ae7c90c18712f030a2
+Error: Message.findOne(...).lean is not a function
+Stack: TypeError: Message.findOne(...).lean is not a function
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/chat/chat.service.js:497:8
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at runWithTenant (file:///C:/Users/Shubh/Desktop/OMS/backend/src/utils/tenantContext.js:41:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Body: {}
+
+[2026-07-20T11:37:04.084Z] POST /api/v1/auth/login
+Error: Invalid email or password
+Stack: Error: Invalid email or password
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:152:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
+Body: {"email":"rashul@gmail.com","password":"password"}
