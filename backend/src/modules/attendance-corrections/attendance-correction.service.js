@@ -107,19 +107,21 @@ const notifyApprovers = async (companyId, title, message, requestData) => {
       status: 'Active'
     }).toArray();
 
-    for (const emp of employees) {
-      // Use existing permission engine check
-      const canApprove = await checkActionPermission('Attendance', emp.roleId || 'employee', 'approve');
-      if (canApprove && emp.id) {
-        await createNotification(emp.id, companyId, {
-          type: 'attendance',
-          title,
-          message,
-          data: { correctionId: requestData.id, employeeId: requestData.employeeId },
-          priority: 'normal'
-        });
-      }
-    }
+    // Parallelize permission checks and notifications creation across approvers
+    await Promise.all(
+      employees.map(async (emp) => {
+        const canApprove = await checkActionPermission('Attendance', emp.roleId || 'employee', 'approve');
+        if (canApprove && emp.id) {
+          await createNotification(emp.id, companyId, {
+            type: 'attendance',
+            title,
+            message,
+            data: { correctionId: requestData.id, employeeId: requestData.employeeId },
+            priority: 'normal'
+          });
+        }
+      })
+    );
   } catch (err) {
     logger.error('Error notifying approvers: ' + err.message);
   }
@@ -208,10 +210,10 @@ export const createRequest = async (data, currentUser) => {
   const record = await repository.save(payload);
 
   if (record) {
-    // Notify Approvers
+    // Notify Approvers in background without blocking API response
     const title = 'New Attendance Correction Request';
     const message = `${currentUser.name} requested correction for ${date} (${data.correctionType}).`;
-    await notifyApprovers(currentUser.companyId, title, message, record);
+    notifyApprovers(currentUser.companyId, title, message, record).catch(err => logger.error('Error notifying approvers: ' + err.message));
 
     // Sync state
     emitEntitySync(currentUser.companyId, {

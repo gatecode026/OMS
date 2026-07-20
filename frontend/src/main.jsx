@@ -105,7 +105,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/managers" element={<Managers />} />
                 <Route path="/tasks" element={<TaskMonitoring />} />
                 <Route path="/work-reports" element={<WorkReports />} />
-                <Route path="/performance" element={<Performance />} />
+                <Route path="/performance" element={<KPI />} />
                 <Route path="/kpi" element={<KPI />} />
                 <Route path="/kpi/:tab" element={<KPI />} />
                 <Route path="/kpi/:tab/:id" element={<KPI />} />

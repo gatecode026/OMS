@@ -400,7 +400,7 @@ const Topbar = ({ onMenuToggle }) => {
       msg.includes('kpi') ||
       cat.includes('performance')
     ) {
-      return { path: '/performance', state: {} };
+      return { path: '/kpi', state: {} };
     }
 
     // Task / Project → /tasks

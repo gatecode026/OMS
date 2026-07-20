@@ -78,9 +78,14 @@ export const healPermissionMatrix = async (companyId) => {
 
     logger.info(`[Self-Healing] Resolving permission modules in DB for company ${companyId}`);
     
-    // 1. Clear existing modules and bulk write
-    await PermissionModule.deleteMany({});
-    await PermissionModule.insertMany(expectedModules.map(m => ({ ...m, companyId })));
+    // 1. Ensure expected modules exist in DB without clearing custom ones
+    for (const m of expectedModules) {
+      await PermissionModule.updateOne(
+        { key: m.key },
+        { $setOnInsert: { ...m, companyId } },
+        { upsert: true }
+      );
+    }
 
     // 2. Refresh role-specific permission maps
     const rolesList = await Role.find({});
@@ -180,12 +185,8 @@ export const healPermissionMatrix = async (companyId) => {
 export const findModules = async (query = {}) => {
   logger.info('RolesRepository::findModules querying permission modules from database...');
   const count = await PermissionModule.countDocuments({});
-  const adminRole = await Role.findOne({ id: 'company_admin' });
-  const needsHealing = !adminRole || !adminRole.permissions || !adminRole.permissions.has('performance_analytics_self');
-  const oldLabelExists = await PermissionModule.findOne({ label: 'Performance Analytics' });
-  
-  if (count < 21 || needsHealing || oldLabelExists) {
-    logger.info(`[Self-Healing] Count is ${count}/21 or matrix needs hierarchical/label healing. Restoring default matrix...`);
+  if (count === 0) {
+    logger.info(`[Self-Healing] Modules collection empty. Initializing default permission modules...`);
     const companyId = query.companyId || 'COMP-DEFAULT';
     await healPermissionMatrix(companyId);
   }

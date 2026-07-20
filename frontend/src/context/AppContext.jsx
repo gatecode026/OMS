@@ -2265,6 +2265,7 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
+        localStorage.removeItem('swr_roles');
         fetchRoles();
         addActivityLog(`Updated role: ${roleData.name || id}`, 'Permissions', 'success');
         addToast('success', `Role details updated successfully.`);
@@ -5626,6 +5627,7 @@ export const AppProvider = ({ children }) => {
       });
       const result = await response.json();
       if (result.status === 'success') {
+        localStorage.removeItem('swr_roles');
         fetchRoles();
         addActivityLog(`Modified system permissions for role: ${roleId}`, 'Permissions', 'success');
         addToast('success', 'Permission saved automatically.');
