@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './Documents.css';
 import { useApp } from '../context/AppContext';
 import usePageLoading from '../hooks/usePageLoading';
@@ -7,186 +7,84 @@ import Button from '../components/common/Button';
 import Skeleton from '../components/common/Skeleton';
 import Modal from '../components/common/Modal';
 import {
-  FolderClosed, Upload, Search, FileText, FileImage, File,
-  Download, Trash2, Eye, FolderOpen, Clock, User
+  FolderOpen, Upload, Search, FileText, Download, Trash2, Eye, Clock, User, 
+  Grid, List, Filter, FileDown, Calendar, RefreshCw, X, ShieldAlert, Archive
 } from 'lucide-react';
+
+// Modular Subcomponents
+import DocumentDashboard from './documents/DocumentDashboard';
+import ProjectDocuments from './documents/ProjectDocuments';
+import GeneralDocuments from './documents/GeneralDocuments';
+import UploadDocumentModal from './documents/UploadDocumentModal';
+import DocumentDetails from './documents/DocumentDetails';
+import DocumentPreview from './documents/DocumentPreview';
 
 const typeColorMap = {
   PDF: '#ef4444', XLSX: '#10b981', PNG: '#8b5cf6',
   ZIP: '#f59e0b', DOCX: '#3b82f6', PPTX: '#f97316'
 };
 
-const getIconForType = (type) => {
-  const t = type ? type.toUpperCase() : 'FILE';
-  if (t === 'PDF' || t === 'DOCX') return FileText;
-  if (t === 'PNG' || t === 'JPG') return FileImage;
-  return File;
-};
-
 const Documents = () => {
-  const isLoading = usePageLoading(500);
-  const { addToast, showConfirm, documentsList, addDocument, deleteDocument, downloadDocument, currentUser, currentUserRole } = useApp();
-  const [previewDoc, setPreviewDoc] = useState(null);
-  const isEmployee = currentUserRole === 'employee';
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('All');
+  const isLoading = usePageLoading(400);
+  const { 
+    addToast, 
+    showConfirm, 
+    documentsList, 
+    deleteDocument, 
+    restoreDocument,
+    archiveDocument,
+    downloadDocument, 
+    currentUser, 
+    currentUserRole 
+  } = useApp();
+
+  // Active section view tab: 'dashboard' | 'project' | 'general' | 'bin'
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Layout views
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  
+  // Search & Filter state
+  const [search, setSearch] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterFormat, setFilterFormat] = useState('All');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [filterUploader, setFilterUploader] = useState('');
+
+  // Selection states (for bulk actions)
+  const [selectedDocIds, setSelectedDocIds] = useState([]);
+  
+  // Modal states
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploadForm, setUploadForm] = useState({ name: '', type: 'PDF', category: isEmployee ? 'Project' : 'HR Policies', size: '1.2 MB' });
-  const fileInputRef = useRef(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState(null);
+  const [selectedDocForDetails, setSelectedDocForDetails] = useState(null);
+  
+  // Export Report Dialog state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState('csv');
 
-  // Build a backend-proxied URL for a document (avoids CORS when fileUrl is external e.g. ImageKit)
-  const getProxyUrl = (doc, download = false) => {
-    if (!doc?.fileUrl) return null;
-    // If the fileUrl is a base64 data URL, use it directly (no proxy needed)
-    if (doc.fileUrl.startsWith('data:')) return doc.fileUrl;
-    // Get the JWT token for query-param auth (img/iframe can't send headers)
-    const token = localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token') || '';
-    // Route through the backend proxy — same origin (Vite proxies /api → localhost:5000)
-    const base = (window.API_URL || '') + '/api/v1';
-    const params = new URLSearchParams({ token });
-    if (download) params.set('download', 'true');
-    return `${base}/documents/${doc.id}/file?${params.toString()}`;
-  };
-
-  const visibleDocs = React.useMemo(() => {
-    if (isEmployee) {
-      return documentsList.filter(d => d.category === 'Project' || d.category === 'Reports' || d.category === 'HR Policies');
+  // Bulk operations states
+  const [isBulkMoving, setIsBulkMoving] = useState(false);
+  
+  // Sync selectedDocForDetails when documentsList changes
+  useEffect(() => {
+    if (selectedDocForDetails) {
+      const fresh = documentsList.find(d => d.id === selectedDocForDetails.id);
+      setSelectedDocForDetails(fresh || null);
     }
-    return documentsList;
-  }, [documentsList, isEmployee]);
+  }, [documentsList, selectedDocForDetails]);
 
-  const categories = React.useMemo(() => {
-    const allCats = ['All', 'Project', 'HR Policies', 'Payroll', 'Marketing', 'Engineering', 'Reports', 'Compliance'];
-    if (isEmployee) {
-      return allCats.filter(c => c === 'All' || c === 'Project' || c === 'Reports' || c === 'HR Policies');
-    }
-    return allCats;
-  }, [isEmployee]);
-
-  const filtered = visibleDocs.filter(d => {
-    const matchSearch = d.name.toLowerCase().includes(search.toLowerCase()) ||
-      d.uploadedBy.toLowerCase().includes(search.toLowerCase());
-    const matchCat = category === 'All' || d.category === category;
-    return matchSearch && matchCat;
-  });
-
-  const computeTotalSize = (list) => {
-    let sum = 0;
-    list.forEach(d => {
-      const sizeStr = d.size || '0 KB';
-      const num = parseFloat(sizeStr);
-      if (sizeStr.toUpperCase().includes('MB')) {
-        sum += num;
-      } else if (sizeStr.toUpperCase().includes('KB')) {
-        sum += num / 1024;
-      }
-    });
-    return sum.toFixed(1) + ' MB';
-  };
-  const totalSize = computeTotalSize(visibleDocs);
-
-  const handleCloseModal = () => {
-    setShowUploadModal(false);
-    setSelectedFile(null);
-    setUploadForm({ name: '', type: 'PDF', category: 'HR Policies', size: '1.2 MB' });
-    setIsUploading(false);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setSelectedFile(file);
-
-    // Auto-detect extension
-    const ext = file.name.split('.').pop().toUpperCase();
-    let type = 'PDF';
-    if (['PDF'].includes(ext)) type = 'PDF';
-    else if (['XLSX', 'XLS'].includes(ext)) type = 'XLSX';
-    else if (['PNG', 'JPG', 'JPEG', 'GIF'].includes(ext)) type = 'PNG';
-    else if (['ZIP', 'RAR', '7Z', 'TAR', 'GZ'].includes(ext)) type = 'ZIP';
-    else if (['DOCX', 'DOC'].includes(ext)) type = 'DOCX';
-    else if (['PPTX', 'PPT'].includes(ext)) type = 'PPTX';
-
-    // Format size
-    let sizeStr = '0 KB';
-    if (file.size < 1024 * 1024) {
-      sizeStr = `${(file.size / 1024).toFixed(1)} KB`;
-    } else {
-      sizeStr = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
-    }
-
-    // Remove extension from name for cleaner title
-    const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-
-    setUploadForm(prev => ({
-      ...prev,
-      name: nameWithoutExt,
-      type: type,
-      size: sizeStr
-    }));
-  };
-
-  const handleUploadSubmit = async (e) => {
-    e.preventDefault();
-    if (!uploadForm.name.trim()) {
-      addToast('warning', 'Document name is required.');
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      let fileBase64 = '';
-      if (selectedFile) {
-        try {
-          fileBase64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(selectedFile);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = (error) => reject(error);
-          });
-        } catch (err) {
-          console.error('FileReader error:', err);
-          addToast('danger', 'Failed to read the selected file.');
-          setIsUploading(false);
-          return;
-        }
-      }
-
-      const docData = {
-        name: uploadForm.name,
-        type: uploadForm.type,
-        category: uploadForm.category,
-        size: uploadForm.size,
-        uploadedBy: currentUser?.name || 'Unknown',
-        uploadDate: new Date().toISOString().split('T')[0],
-        downloads: 0,
-        fileUrl: fileBase64,
-        branch: currentUser?.branch || ''
-      };
-      await addDocument(docData);
-      handleCloseModal();
-    } catch (err) {
-      console.error('Upload document error:', err);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
+  // Document file downloader (uses proxy path to avoid CORS issues)
   const handleDownloadFile = (doc) => {
     if (!doc.fileUrl) {
-      addToast('warning', 'No download file available.');
+      addToast('warning', 'No download link available.');
       return;
     }
 
-    const proxyUrl = getProxyUrl(doc, true);
-
     if (doc.fileUrl.startsWith('data:')) {
-      // base64 data URL — create a blob and trigger download directly
-      const [meta, b64] = proxyUrl.split(',');
+      const [meta, b64] = doc.fileUrl.split(',');
       const mime = meta.match(/:(.*?);/)?.[1] || 'application/octet-stream';
       const binary = atob(b64);
       const arr = new Uint8Array(binary.length);
@@ -206,17 +104,122 @@ const Documents = () => {
       return;
     }
 
-    // For external URLs proxied through the backend — use a direct anchor download
-    // This is synchronous (no await / popup blocker issues)
+    const token = localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token') || '';
+    const base = (window.API_URL || '') + '/api/v1';
+    const params = new URLSearchParams({ token, download: 'true' });
+    const proxyUrl = `${base}/documents/${doc.id}/file?${params.toString()}`;
+
     const link = document.createElement('a');
     link.href = proxyUrl;
-    const fileExt = doc.type ? doc.type.toLowerCase() : 'bin';
-    link.download = doc.name.endsWith(`.${fileExt}`) ? doc.name : `${doc.name}.${fileExt}`;
+    link.download = doc.name;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     addToast('success', `Downloading "${doc.name}"...`);
   };
+
+  // Bulk Operations Handlers
+  const handleToggleSelectAll = (docsToToggle) => {
+    const allSelected = docsToToggle.every(d => selectedDocIds.includes(d.id));
+    if (allSelected) {
+      setSelectedDocIds(prev => prev.filter(id => !docsToToggle.some(d => d.id === id)));
+    } else {
+      setSelectedDocIds(prev => {
+        const next = [...prev];
+        docsToToggle.forEach(d => {
+          if (!next.includes(d.id)) next.push(d.id);
+        });
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDelete = () => {
+    showConfirm(
+      'Bulk Delete Documents',
+      `Delete all ${selectedDocIds.length} selected documents permanently? This action is irreversible.`,
+      async () => {
+        for (const id of selectedDocIds) {
+          await deleteDocument(id);
+        }
+        setSelectedDocIds([]);
+        addToast('success', 'Selected documents deleted successfully.');
+      },
+      'danger'
+    );
+  };
+
+  const handleBulkArchive = () => {
+    showConfirm(
+      'Bulk Archive Documents',
+      `Archive all ${selectedDocIds.length} selected documents?`,
+      async () => {
+        for (const id of selectedDocIds) {
+          await archiveDocument(id);
+        }
+        setSelectedDocIds([]);
+        addToast('success', 'Selected documents archived successfully.');
+      },
+      'warning'
+    );
+  };
+
+  const handleExecuteExport = () => {
+    const token = localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token') || '';
+    const base = (window.API_URL || '') + '/api/v1';
+    const params = new URLSearchParams({
+      token,
+      format: exportFormat,
+      category: filterCategory !== 'All' ? filterCategory : '',
+      type: filterFormat !== 'All' ? filterFormat : '',
+      dateFrom: filterDateFrom,
+      dateTo: filterDateTo,
+      uploadedBy: filterUploader
+    });
+
+    const exportUrl = `${base}/documents/reports?${params.toString()}`;
+    window.open(exportUrl, '_blank');
+    setShowExportModal(false);
+    addToast('success', `Report generated and downloading in ${exportFormat.toUpperCase()} format.`);
+  };
+
+  // Compile matching files for general views (Recycle Bin / Search results)
+  const queryMatchedDocs = React.useMemo(() => {
+    return documentsList.filter(d => {
+      // Status Filter
+      if (activeTab === 'bin') {
+        if (d.status !== 'Deleted') return false;
+      } else {
+        if (d.status === 'Deleted') return false;
+      }
+
+      // Scope matches if general / project tabs are active
+      if (activeTab === 'project' && d.documentScope !== 'PROJECT') return false;
+      if (activeTab === 'general' && d.documentScope !== 'GENERAL') return false;
+
+      // Text query search
+      const textMatch = d.name.toLowerCase().includes(search.toLowerCase()) ||
+        d.uploadedBy.toLowerCase().includes(search.toLowerCase()) ||
+        (d.tags || []).some(t => t.toLowerCase().includes(search.toLowerCase()));
+
+      if (!textMatch) return false;
+
+      // Category filter
+      if (filterCategory !== 'All' && d.category !== filterCategory) return false;
+
+      // Format filter
+      if (filterFormat !== 'All' && d.type !== filterFormat) return false;
+
+      // Date range filter
+      if (filterDateFrom && new Date(d.uploadDate) < new Date(filterDateFrom)) return false;
+      if (filterDateTo && new Date(d.uploadDate) > new Date(filterDateTo)) return false;
+
+      // Uploader filter
+      if (filterUploader && !d.uploadedBy.toLowerCase().includes(filterUploader.toLowerCase())) return false;
+
+      return true;
+    });
+  }, [documentsList, activeTab, search, filterCategory, filterFormat, filterDateFrom, filterDateTo, filterUploader]);
 
   if (isLoading) {
     return (
@@ -235,276 +238,353 @@ const Documents = () => {
   return (
     <div className="documents-page">
 
-      {/* Header */}
+      {/* Premium Subheader Panel */}
       <div className="card docs-header">
         <div className="docs-header-left">
           <div className="docs-header-icon">
             <FolderOpen size={22} />
           </div>
           <div>
-            <h2 className="ann-page-title">Document Vault</h2>
-            <p className="ann-page-sub">{visibleDocs.length} documents • {totalSize} total</p>
+            <h2 className="ann-page-title" style={{ color: 'var(--text-primary)' }}>Document Vault</h2>
+            <p className="ann-page-sub">{documentsList.length} total elements monitored</p>
           </div>
         </div>
-        <Button variant="primary" icon={Upload} onClick={() => setShowUploadModal(true)}>
-          Upload Document
-        </Button>
-      </div>
 
-      {/* Toolbar */}
-      <div className="card docs-toolbar">
-        <div className="dept-search-wrap">
-          <Search size={16} className="dept-search-icon" />
-          <input
-            className="dept-search-input"
-            placeholder="Search documents..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-
-        <div className="docs-filters">
-          {categories.map(c => (
-            <button
-              key={c}
-              className={`notif-filter-btn ${category === c ? 'active' : ''}`}
-              onClick={() => setCategory(c)}
-            >
-              {c}
-            </button>
-          ))}
+        <div className="flex-row gap-3">
+          <Button variant="secondary" icon={FileDown} onClick={() => setShowExportModal(true)}>
+            Export Details
+          </Button>
+          <Button variant="primary" icon={Upload} onClick={() => setShowUploadModal(true)}>
+            Upload Document
+          </Button>
         </div>
       </div>
 
-      {/* Documents Grid */}
-      <div className="docs-grid">
-        {filtered.map(doc => {
-          const Icon = getIconForType(doc.type);
-          const typeColor = typeColorMap[doc.type] || '#64748b';
-          return (
-            <div key={doc.id} className="card doc-card animate-fade-in">
-              <div className="doc-card-icon" style={{ background: `${typeColor}18`, color: typeColor }}>
-                <Icon size={28} />
-              </div>
-
-              <div className="doc-type-badge" style={{ background: `${typeColor}20`, color: typeColor }}>
-                {doc.type}
-              </div>
-
-              <h4 className="doc-name" title={doc.name}>{doc.name}</h4>
-
-              <div className="doc-meta">
-                <span className="doc-size">{doc.size}</span>
-                <Badge variant="neutral">{doc.category}</Badge>
-              </div>
-
-              <div className="doc-uploader">
-                <User size={11} />
-                <span>{doc.uploadedBy}</span>
-                <Clock size={11} />
-                <span>{doc.uploadDate}</span>
-              </div>
-
-              <div className="doc-actions">
-                <button
-                  className="doc-action-btn"
-                  title="Preview"
-                  onClick={() => {
-                    if (doc.fileUrl) {
-                      setPreviewDoc(doc);
-                    } else {
-                      addToast('warning', 'No preview file available.');
-                    }
-                  }}
-                >
-                  <Eye size={14} />
-                </button>
-                <button
-                  className="doc-action-btn"
-                  title="Download"
-                  onClick={() => handleDownloadFile(doc)}
-                >
-                  <Download size={14} />
-                </button>
-                <button
-                  className="doc-action-btn doc-action-danger"
-                  title="Delete"
-                  onClick={() => showConfirm(
-                    'Delete Document',
-                    `Delete "${doc.name}" permanently?`,
-                    async () => {
-                      await deleteDocument(doc.id);
-                    },
-                    'danger'
-                  )}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-
-              <div className="doc-downloads">
-                <Download size={11} />
-                <span>{doc.downloads} downloads</span>
-              </div>
-            </div>
-          );
-        })}
+      {/* Main Navigation Sub-tabs */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color-dark)', paddingBottom: '8px' }}>
+        <button 
+          className={`notif-filter-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('dashboard'); setSelectedDocForDetails(null); }}
+        >
+          Overview Stats
+        </button>
+        <button 
+          className={`notif-filter-btn ${activeTab === 'project' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('project'); setSelectedDocForDetails(null); }}
+        >
+          Project Documents
+        </button>
+        <button 
+          className={`notif-filter-btn ${activeTab === 'general' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('general'); setSelectedDocForDetails(null); }}
+        >
+          General Documents
+        </button>
+        <button 
+          className={`notif-filter-btn ${activeTab === 'bin' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('bin'); setSelectedDocForDetails(null); }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          Recycle Bin
+          {documentsList.filter(d => d.status === 'Deleted').length > 0 && (
+            <span style={{ fontSize: '0.7rem', background: '#ef4444', color: '#fff', padding: '1px 6px', borderRadius: '10px' }}>
+              {documentsList.filter(d => d.status === 'Deleted').length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Upload Document Modal */}
-      <Modal
-        isOpen={showUploadModal}
-        onClose={handleCloseModal}
-        title="Upload Document"
-        size="sm"
-      >
-        <form onSubmit={handleUploadSubmit} className="flex-column gap-3 padding-1">
-          <div className="form-group flex-column gap-1">
-            <label>Choose File</label>
-            <div className="file-upload-wrapper" style={{ position: 'relative' }}>
+      {/* Toolbar - Search, Layout and Filters */}
+      {activeTab !== 'dashboard' && (
+        <div className="card docs-toolbar flex-column gap-3">
+          <div className="flex-row gap-3 justify-between align-center" style={{ width: '100%' }}>
+            
+            <div className="dept-search-wrap" style={{ flex: 1, maxWidth: '400px' }}>
+              <Search size={16} className="dept-search-icon" />
               <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  opacity: 0,
-                  width: '100%',
-                  height: '100%',
-                  cursor: 'pointer',
-                  zIndex: 2
-                }}
+                className="dept-search-input"
+                placeholder="Search documents by name, tags, description..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
               />
-              <div
-                className="file-upload-btn"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  padding: '12px',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px dashed var(--border-color-dark)',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--text-secondary)',
-                  transition: 'all 0.2s',
-                  textAlign: 'center'
-                }}
+            </div>
+
+            <div className="flex-row gap-2">
+              <Button 
+                variant="secondary" 
+                icon={Filter} 
+                onClick={() => setShowFilters(!showFilters)}
+                style={{ background: showFilters ? 'rgba(219,39,119,0.08)' : 'none', color: showFilters ? 'var(--accent-color)' : 'var(--text-secondary)' }}
               >
-                <Upload size={16} />
-                <span style={{ fontSize: '0.85rem' }}>
-                  {selectedFile ? selectedFile.name : 'Choose local file...'}
-                </span>
+                Filters
+              </Button>
+              <div className="flex-row gap-1" style={{ border: '1px solid var(--border-color-dark)', padding: '2px', borderRadius: 'var(--radius-md)' }}>
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  style={{ background: viewMode === 'grid' ? 'rgba(255,255,255,0.05)' : 'none', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer', color: viewMode === 'grid' ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+                >
+                  <Grid size={15} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  style={{ background: viewMode === 'list' ? 'rgba(255,255,255,0.05)' : 'none', border: 'none', padding: '6px', borderRadius: '4px', cursor: 'pointer', color: viewMode === 'list' ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+                >
+                  <List size={15} />
+                </button>
               </div>
             </div>
+
           </div>
 
-          <div className="form-group flex-column gap-1">
-            <label>Document Name</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. Employee Handbook 2026.pdf"
-              value={uploadForm.name}
-              onChange={e => setUploadForm({ ...uploadForm, name: e.target.value })}
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          <div className="form-group flex-column gap-1">
-            <label>Document Category</label>
-            <select
-              value={uploadForm.category}
-              onChange={e => setUploadForm({ ...uploadForm, category: e.target.value })}
-              style={{ width: '100%' }}
-            >
-              {categories.filter(c => c !== 'All').map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group flex-column gap-1">
-            <label>File Type</label>
-            <select
-              value={uploadForm.type}
-              onChange={e => setUploadForm({ ...uploadForm, type: e.target.value })}
-              style={{ width: '100%' }}
-            >
-              <option value="PDF">PDF Document</option>
-              <option value="XLSX">Excel Sheet (XLSX)</option>
-              <option value="PNG">Image file (PNG)</option>
-              <option value="ZIP">ZIP Archive</option>
-              <option value="DOCX">Word Document (DOCX)</option>
-              <option value="PPTX">PowerPoint Presentation (PPTX)</option>
-            </select>
-          </div>
-
-          <div className="form-group flex-column gap-1">
-            <label>File Size</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. 1.2 MB"
-              value={uploadForm.size}
-              onChange={e => setUploadForm({ ...uploadForm, size: e.target.value })}
-              style={{ width: '100%' }}
-            />
-          </div>
-
-          <div className="flex-row gap-3 justify-end mt-2">
-            <Button type="button" variant="secondary" onClick={handleCloseModal}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" disabled={isUploading} loading={isUploading}>
-              Upload
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Preview Document Modal */}
-      <Modal
-        isOpen={!!previewDoc}
-        onClose={() => setPreviewDoc(null)}
-        title={previewDoc?.name || 'Document Preview'}
-        size="md"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', width: '100%', overflow: 'hidden', background: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
-            {previewDoc?.type === 'PNG' || previewDoc?.type === 'JPG' || (previewDoc?.fileUrl && /\.(png|jpg|jpeg|gif|webp)$/i.test(previewDoc.fileUrl)) ? (
-              <img 
-                src={getProxyUrl(previewDoc)} 
-                alt={previewDoc.name} 
-                style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: '4px' }} 
-              />
-            ) : previewDoc?.type === 'PDF' || (previewDoc?.fileUrl && /\.pdf$/i.test(previewDoc.fileUrl)) ? (
-              <iframe 
-                src={getProxyUrl(previewDoc)} 
-                title={previewDoc.name} 
-                style={{ width: '100%', height: '60vh', border: 'none', borderRadius: '4px' }} 
-              />
-            ) : (
-              <div style={{ textAlign: 'center', padding: '24px' }}>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                  Preview is not supported for this file type ({previewDoc?.type}).
-                </p>
-                <Button onClick={() => { handleDownloadFile(previewDoc); setPreviewDoc(null); }}>
-                  Download File
-                </Button>
+          {/* Expandable Advanced Filters Drawer */}
+          {showFilters && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '16px', width: '100%' }}>
+              <div className="form-group flex-column gap-1">
+                <label style={{ fontSize: '0.78rem' }}>Format Type</label>
+                <select value={filterFormat} onChange={e => setFilterFormat(e.target.value)} style={{ fontSize: '0.8rem' }}>
+                  <option value="All">All Formats</option>
+                  <option value="PDF">PDF Documents</option>
+                  <option value="XLSX">Excel Sheets (XLSX)</option>
+                  <option value="DOCX">Word Documents (DOCX)</option>
+                  <option value="PNG">Image Files (PNG/JPG)</option>
+                  <option value="ZIP">ZIP Archives</option>
+                </select>
               </div>
-            )}
-          </div>
-          {previewDoc?.fileUrl && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <Button variant="secondary" size="sm" onClick={() => setPreviewDoc(null)}>Close</Button>
-              <Button variant="primary" size="sm" onClick={() => { handleDownloadFile(previewDoc); setPreviewDoc(null); }}>Download</Button>
+
+              <div className="form-group flex-column gap-1">
+                <label style={{ fontSize: '0.78rem' }}>Uploaded After</label>
+                <input 
+                  type="date" 
+                  value={filterDateFrom} 
+                  onChange={e => setFilterDateFrom(e.target.value)} 
+                  style={{ fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div className="form-group flex-column gap-1">
+                <label style={{ fontSize: '0.78rem' }}>Uploaded Before</label>
+                <input 
+                  type="date" 
+                  value={filterDateTo} 
+                  onChange={e => setFilterDateTo(e.target.value)} 
+                  style={{ fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div className="form-group flex-column gap-1">
+                <label style={{ fontSize: '0.78rem' }}>Uploader Name</label>
+                <input 
+                  type="text" 
+                  placeholder="Search uploader..." 
+                  value={filterUploader} 
+                  onChange={e => setFilterUploader(e.target.value)} 
+                  style={{ fontSize: '0.8rem' }}
+                />
+              </div>
             </div>
           )}
         </div>
+      )}
+
+      {/* Main Content Layout panels */}
+      <div className="flex-row gap-4" style={{ display: 'flex', width: '100%', flex: 1 }}>
+        
+        {/* Left Side Content Container */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          
+          {activeTab === 'dashboard' && (
+            <DocumentDashboard onNavigateToSection={setActiveTab} />
+          )}
+
+          {activeTab === 'project' && (
+            <ProjectDocuments 
+              onSelectDoc={setSelectedDocForDetails}
+              onPreviewDoc={setPreviewDoc}
+              onDownloadDoc={handleDownloadFile}
+              onDeleteDoc={(doc) => showConfirm('Delete Document', `Move "${doc.name}" to Recycle Bin?`, async () => deleteDocument(doc.id), 'warning')}
+              onArchiveDoc={(doc) => archiveDocument(doc.id)}
+              onRestoreDoc={(doc) => restoreDocument(doc.id)}
+              viewMode={viewMode}
+              search={search}
+              currentUserRole={currentUserRole}
+            />
+          )}
+
+          {activeTab === 'general' && (
+            <GeneralDocuments 
+              onSelectDoc={setSelectedDocForDetails}
+              onPreviewDoc={setPreviewDoc}
+              onDownloadDoc={handleDownloadFile}
+              onDeleteDoc={(doc) => showConfirm('Delete Document', `Move "${doc.name}" to Recycle Bin?`, async () => deleteDocument(doc.id), 'warning')}
+              onArchiveDoc={(doc) => archiveDocument(doc.id)}
+              onRestoreDoc={(doc) => restoreDocument(doc.id)}
+              viewMode={viewMode}
+              search={search}
+            />
+          )}
+
+          {/* Recycle Bin Tab View */}
+          {activeTab === 'bin' && (
+            <div className="flex-column gap-4 animate-fade-in">
+              <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.15)', padding: '16px', borderRadius: 'var(--radius-lg)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <ShieldAlert size={22} style={{ color: '#ef4444' }} />
+                <div>
+                  <h4 style={{ margin: '0 0 2px 0', fontSize: '0.875rem', color: 'var(--text-primary)' }}>Recycle Bin Storage</h4>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Soft-deleted documents remain here and are reviewable before permanent purging.</span>
+                </div>
+              </div>
+
+              {queryMatchedDocs.length === 0 ? (
+                <div className="card flex-column align-center justify-center" style={{ padding: '40px', textAlign: 'center' }}>
+                  <Trash2 size={40} style={{ color: 'var(--text-secondary)', marginBottom: '12px', opacity: 0.3 }} />
+                  <h4 style={{ margin: 0, fontWeight: '600', color: 'var(--text-primary)' }}>Recycle Bin is empty</h4>
+                </div>
+              ) : (
+                <div className="flex-column gap-2">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={queryMatchedDocs.length > 0 && queryMatchedDocs.every(d => selectedDocIds.includes(d.id))}
+                        onChange={() => handleToggleSelectAll(queryMatchedDocs)} 
+                      />
+                      <span>Select all recycle items</span>
+                    </label>
+                    <span>{queryMatchedDocs.length} elements</span>
+                  </div>
+
+                  <div className="flex-column gap-3">
+                    {queryMatchedDocs.map(doc => {
+                      const isSelected = selectedDocIds.includes(doc.id);
+                      return (
+                        <div 
+                          key={doc.id} 
+                          className={`card doc-card flex-row justify-between align-center`} 
+                          style={{ padding: '12px 16px', display: 'flex', gap: '16px', borderLeft: isSelected ? '3px solid var(--accent-color)' : '1px solid var(--border-color-dark)' }}
+                        >
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected}
+                              onChange={() => setSelectedDocIds(prev => prev.includes(doc.id) ? prev.filter(id => id !== doc.id) : [...prev, doc.id])} 
+                            />
+                            <FileText size={18} style={{ color: typeColorMap[doc.type] }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span 
+                                style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', cursor: 'pointer' }}
+                                onClick={() => setSelectedDocForDetails(doc)}
+                              >
+                                {doc.name}
+                              </span>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                Scope: {doc.documentScope} | Type: {doc.type} | Size: {doc.size}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              icon={RefreshCw} 
+                              onClick={() => restoreDocument(doc.id)}
+                            >
+                              Restore
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              icon={Trash2} 
+                              style={{ border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444' }} 
+                              onClick={() => showConfirm('Permanent Delete', `Permanently delete "${doc.name}"? This is irreversible.`, () => deleteDocument(doc.id), 'danger')}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        {/* Right Side Inspector Drawer */}
+        {selectedDocForDetails && (
+          <DocumentDetails 
+            doc={selectedDocForDetails}
+            onClose={() => setSelectedDocForDetails(null)}
+            onPreviewDoc={setPreviewDoc}
+            onDownloadDoc={handleDownloadFile}
+          />
+        )}
+
+      </div>
+
+      {/* Floating Bulk Action Toolbar */}
+      {selectedDocIds.length > 0 && (
+        <div className="bulk-actions-toolbar animate-fade-in">
+          <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+            {selectedDocIds.length} items selected
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Button size="sm" variant="secondary" icon={Archive} onClick={handleBulkArchive}>
+              Bulk Archive
+            </Button>
+            <Button size="sm" variant="secondary" icon={Trash2} style={{ color: '#ef4444' }} onClick={handleBulkDelete}>
+              Bulk Delete
+            </Button>
+            <button 
+              onClick={() => setSelectedDocIds([])}
+              style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Export Selection Modal */}
+      <Modal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        title="Export Documents Details"
+        size="sm"
+      >
+        <div className="flex-column gap-3 padding-1">
+          <div className="form-group flex-column gap-1">
+            <label>Report Format</label>
+            <select value={exportFormat} onChange={e => setExportFormat(e.target.value)} style={{ width: '100%' }}>
+              <option value="csv">CSV Spreadsheet (.csv)</option>
+              <option value="excel">Microsoft Excel (.xls)</option>
+              <option value="pdf">Print Ready Document (.pdf)</option>
+            </select>
+          </div>
+          <div className="flex-row gap-3 justify-end mt-2">
+            <Button variant="secondary" onClick={() => setShowExportModal(false)}>Cancel</Button>
+            <Button variant="primary" icon={FileDown} onClick={handleExecuteExport}>Export</Button>
+          </div>
+        </div>
       </Modal>
+
+      {/* Upload Modal Mounting */}
+      <UploadDocumentModal 
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+      />
+
+      {/* Preview Modal Mounting */}
+      {previewDoc && (
+        <DocumentPreview 
+          isOpen={!!previewDoc}
+          doc={previewDoc}
+          onClose={() => setPreviewDoc(null)}
+          onDownloadDoc={handleDownloadFile}
+        />
+      )}
 
     </div>
   );

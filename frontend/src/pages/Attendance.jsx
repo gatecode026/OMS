@@ -1068,6 +1068,7 @@ const Attendance = () => {
 
   const handleSubmitCorrection = async (e) => {
     e.preventDefault();
+    if (correctionSubmitting) return;
 
     if (!correctionForm.date) {
       addToast('error', 'Date is required.');
@@ -1086,6 +1087,7 @@ const Attendance = () => {
       return;
     }
 
+    setCorrectionSubmitting(true);
     try {
       const isResubmit = selectedCorrection && selectedCorrection.status === 'More Information Required';
       const url = isResubmit 
@@ -1113,6 +1115,8 @@ const Attendance = () => {
     } catch (err) {
       console.error(err);
       addToast('error', 'Network error occurred.');
+    } finally {
+      setCorrectionSubmitting(false);
     }
   };
 
@@ -2105,14 +2109,15 @@ const Attendance = () => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
-            <Button type="button" variant="ghost" onClick={() => {
+            <Button type="button" variant="ghost" disabled={correctionSubmitting} onClick={() => {
+              if (correctionSubmitting) return;
               setIsCorrectionOpen(false);
               setSelectedCorrection(null);
             }}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary">
-              {selectedCorrection ? "Resubmit Request" : "Submit Request"}
+            <Button type="submit" variant="primary" disabled={correctionSubmitting} style={{ minWidth: '130px', cursor: correctionSubmitting ? 'not-allowed' : 'pointer', opacity: correctionSubmitting ? 0.7 : 1 }}>
+              {correctionSubmitting ? "Submitting..." : (selectedCorrection ? "Resubmit Request" : "Submit Request")}
             </Button>
           </div>
         </div>

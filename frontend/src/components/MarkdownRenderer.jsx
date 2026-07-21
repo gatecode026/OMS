@@ -58,7 +58,7 @@ const MarkdownRenderer = ({ content, className = '' }) => {
     // Sanitize generated HTML to guarantee safety
     const sanitizedHtml = DOMPurify.sanitize(rawHtml, {
       ALLOWED_TAGS: [
-        'p', 'br', 'strong', 'em', 'del', 'code', 'pre', 'span', 'div', 'button',
+        'p', 'br', 'strong', 'em', 'del', 's', 'code', 'pre', 'span', 'div', 'button',
         'blockquote', 'ul', 'ol', 'li', 'a', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
       ],
       ALLOWED_ATTR: ['class', 'href', 'target', 'rel', 'data-code', 'disabled', 'checked', 'type']

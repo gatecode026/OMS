@@ -13,7 +13,8 @@ import {
 } from './payroll.model.js';
 import logger from '../../config/logger.js';
 import { getTenantId } from '../../utils/tenantContext.js';
-import { CacheKeys, TTL, cacheGetOrSet, cacheDel } from '../../services/cache.service.js';
+import { getTenantConnection } from '../../utils/multidbConnection.js';
+import { CacheKeys, TTL, cacheGetOrSet, cacheDel, cacheDelPattern } from '../../services/cache.service.js';
 
 // Security and Query Builder Imports
 import { resolveSecurityContext } from '../../security/scopeEngine.js';
@@ -36,6 +37,22 @@ const overrideDepartmentForAdminRoles = (record, context) => {
     }
   }
   return record;
+};
+
+/**
+ * Utility helper to invalidate all cached payroll dashboard views when any mutation happens
+ */
+const clearPayrollCache = async () => {
+  try {
+    const companyId = getTenantId();
+    if (companyId) {
+      await cacheDelPattern(`payroll_master:${companyId}:*`);
+    } else {
+      await cacheDelPattern('payroll_master:*');
+    }
+  } catch (err) {
+    logger.error('Failed to clear payroll cache:', err);
+  }
 };
 
 // Get unified master dataset — cached for 5 minutes to avoid 6 sequential DB queries on every login
@@ -131,6 +148,16 @@ export const getMasterPayrollData = async () => {
       }
     }
 
+    // Fetch leave policies from the tenant database
+    let leavePolicies = [];
+    try {
+      const conn = await getTenantConnection(companyId);
+      if (conn.asPromise) await conn.asPromise();
+      leavePolicies = await conn.collection('leaves').find({ isPolicy: true }).toArray();
+    } catch (e) {
+      logger.warn('Could not fetch leave policies for payroll master data: ' + e.message);
+    }
+
     return {
       grades,
       reimbursements,
@@ -138,7 +165,8 @@ export const getMasterPayrollData = async () => {
       advances: loans.filter(l => l.type === 'Advance'),
       bonuses,
       payments,
-      config
+      config,
+      leavePolicies
     };
   };
 
@@ -159,11 +187,16 @@ export const saveGrade = async (gradeData) => {
   }
 
   logger.debug('Executing PayrollRepository::saveGrade', gradeData);
+  if (!gradeData.companyId) {
+    gradeData.companyId = getTenantId() || 'COMP-001';
+  }
   if (!gradeData.id) {
     const count = await PayrollGrade.countDocuments();
     gradeData.id = `GRD-${Date.now().toString().slice(-3)}-${count + 1}`;
   }
-  return PayrollGrade.findOneAndUpdate({ id: gradeData.id }, gradeData, { upsert: true, new: true }).lean();
+  const result = await PayrollGrade.findOneAndUpdate({ id: gradeData.id }, gradeData, { upsert: true, new: true }).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 export const deleteGrade = async (id) => {
@@ -177,7 +210,9 @@ export const deleteGrade = async (id) => {
   }
 
   logger.debug('Executing PayrollRepository::deleteGrade for: ' + id);
-  return PayrollGrade.findOneAndDelete({ id }).lean();
+  const result = await PayrollGrade.findOneAndDelete({ id }).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 // CRUD for Loans & Advances
@@ -191,6 +226,9 @@ export const saveLoanAdvance = async (loanData) => {
   }
 
   logger.debug('Executing PayrollRepository::saveLoanAdvance', loanData);
+  if (!loanData.companyId) {
+    loanData.companyId = getTenantId() || 'COMP-001';
+  }
   if (loanData.type === 'Advance') {
     loanData.loanType = 'Advance Salary';
     loanData.emi = 0;
@@ -200,7 +238,9 @@ export const saveLoanAdvance = async (loanData) => {
     const prefix = loanData.type === 'Loan' ? 'LON' : 'ADV';
     loanData.id = `${prefix}-${Date.now().toString().slice(-3)}-${count + 1}`;
   }
-  return PayrollLoanAdvance.findOneAndUpdate({ id: loanData.id }, loanData, { upsert: true, new: true }).lean();
+  const result = await PayrollLoanAdvance.findOneAndUpdate({ id: loanData.id }, loanData, { upsert: true, new: true }).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 export const updateLoanAdvanceStatus = async (id, status) => {
@@ -214,11 +254,13 @@ export const updateLoanAdvanceStatus = async (id, status) => {
   }
 
   logger.debug(`Executing PayrollRepository::updateLoanAdvanceStatus: ${id} -> ${status}`);
-  return PayrollLoanAdvance.findOneAndUpdate(
+  const result = await PayrollLoanAdvance.findOneAndUpdate(
     { id },
     { status },
     { new: true }
   ).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 // CRUD for Bonuses
@@ -232,11 +274,16 @@ export const saveBonus = async (bonusData) => {
   }
 
   logger.debug('Executing PayrollRepository::saveBonus', bonusData);
+  if (!bonusData.companyId) {
+    bonusData.companyId = getTenantId() || 'COMP-001';
+  }
   if (!bonusData.id) {
     const count = await PayrollBonus.countDocuments();
     bonusData.id = `BNS-${Date.now().toString().slice(-3)}-${count + 1}`;
   }
-  return PayrollBonus.findOneAndUpdate({ id: bonusData.id }, bonusData, { upsert: true, new: true }).lean();
+  const result = await PayrollBonus.findOneAndUpdate({ id: bonusData.id }, bonusData, { upsert: true, new: true }).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 export const updateBonusStatus = async (id, status, reviewerName) => {
@@ -258,7 +305,9 @@ export const updateBonusStatus = async (id, status, reviewerName) => {
     bonus.approvalFlow.push(`${status} by ${reviewerName}`);
   }
   await bonus.save();
-  return bonus.toObject();
+  const result = bonus.toObject();
+  await clearPayrollCache();
+  return result;
 };
 
 // CRUD for Reimbursements
@@ -273,11 +322,13 @@ export const updateReimbursementStatus = async (id, status, approvedBy) => {
   }
 
   logger.debug(`Executing PayrollRepository::updateReimbursementStatus: ${id} -> ${status}`);
-  return PayrollReimbursement.findOneAndUpdate(
+  const result = await PayrollReimbursement.findOneAndUpdate(
     { id },
     { status, approvedBy },
     { new: true }
   ).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 // CRUD for Monthly Processed Payments
@@ -296,6 +347,10 @@ export const saveMonthlyPayment = async (paymentData) => {
   delete updatePayload.createdAt;
   delete updatePayload.updatedAt;
 
+  if (!updatePayload.companyId) {
+    updatePayload.companyId = getTenantId() || 'COMP-001';
+  }
+
   if (!updatePayload.id) {
     updatePayload.id = `${updatePayload.employeeId}-${updatePayload.month}-${updatePayload.year}`;
   }
@@ -307,7 +362,9 @@ export const saveMonthlyPayment = async (paymentData) => {
     updatePayload.payrollCode = await generateCompanyUniqueId(companyId, 'payroll');
   }
 
-  return PayrollPayment.findOneAndUpdate({ id: updatePayload.id }, updatePayload, { upsert: true, new: true }).lean();
+  const result = await PayrollPayment.findOneAndUpdate({ id: updatePayload.id }, updatePayload, { upsert: true, new: true }).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 export const updatePaymentStatus = async (empId, month, year, status) => {
@@ -326,7 +383,9 @@ export const updatePaymentStatus = async (empId, month, year, status) => {
   }
 
   logger.debug(`Executing PayrollRepository::updatePaymentStatus: ${empId} for ${month} ${year} -> ${status}`);
-  return PayrollPayment.findOneAndUpdate({ id }, { status }, { new: true }).lean();
+  const result = await PayrollPayment.findOneAndUpdate({ id }, { status }, { new: true }).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 export const bulkUpdatePaymentStatus = async (month, year, status) => {
@@ -339,7 +398,9 @@ export const bulkUpdatePaymentStatus = async (month, year, status) => {
 
   logger.debug(`Executing PayrollRepository::bulkUpdatePaymentStatus: ${month} ${year} -> ${status}`);
   await PayrollPayment.updateMany({ month, year }, { status });
-  return PayrollPayment.find({ month, year }).lean();
+  const result = await PayrollPayment.find({ month, year }).lean();
+  await clearPayrollCache();
+  return result;
 };
 
 // Global config mutations
@@ -352,13 +413,7 @@ export const saveGlobalConfigs = async (configs) => {
   }
 
   logger.debug('Executing PayrollRepository::saveGlobalConfigs', configs);
-  const companyId = getTenantId();
-  if (companyId) {
-    const roles = ['hr_manager', 'finance_manager', 'branch_manager', 'branch_admin', 'super_admin', 'company_admin', 'employee'];
-    for (const r of roles) {
-      await cacheDel(`payroll_master:${companyId}:${r}`);
-    }
-  }
+  await clearPayrollCache();
 
   return PayrollConfig.findOneAndUpdate(
     { id: 'GLOBAL_CONFIG' },
@@ -403,6 +458,7 @@ export const resetPaymentDeductions = async ({ employeeId, month, year, fields }
     );
   }
 
+  await clearPayrollCache();
   return { updated: records.length };
 };
 

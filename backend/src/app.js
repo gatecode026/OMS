@@ -94,6 +94,7 @@ app.use('/uploads', express.static('uploads'));
 
 // ─── HEALTH & METRICS ROUTES ──────────────────────────────────────────────────
 app.use('/health', healthRouter);
+app.use('/api/health', healthRouter);
 
 // ─── PUBLIC BRANDING ROUTES ──────────────────────────────────────────────────
 app.use('/api/public', publicRouter);
@@ -123,7 +124,7 @@ app.get('/api/presence/company/:companyId', authenticate, async (req, res, next)
 // ─── GLOBAL MODULAR ROUTING BINDING ─────────────────────────────────────────
 app.use('/api/v1', (req, res, next) => {
   // Skip global auth for routes that handle their own token verification
-  if (req.path.startsWith('/auth')) {
+  if (req.path.startsWith('/auth') || req.path.startsWith('/health')) {
     return next();
   }
   // Document file proxy — token is verified via ?token= query param inside the controller

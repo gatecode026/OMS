@@ -168,6 +168,7 @@ const RolesPermissions = () => {
 
   // Expandable modules list tracking
   const [expandedModules, setExpandedModules] = useState({
+    dashboard: true,
     attendance_management: true,
     leave_management: true,
     project_management: true,
@@ -179,12 +180,14 @@ const RolesPermissions = () => {
   });
 
   const HIERARCHICAL_MODULES = [
+    'dashboard',
     'attendance_management',
     'leave_management',
     'project_management',
     'task_monitoring',
     'payroll_management',
     'work_reports',
+    'performance_analytics',
     'meetings_calendar',
     'announcements'
   ];
@@ -202,7 +205,7 @@ const RolesPermissions = () => {
     { key: 'project_management', label: 'Project Management' },
     { key: 'task_monitoring', label: 'Task Monitoring' },
     { key: 'work_reports', label: 'Work Reports' },
-    { key: 'performance_analytics', label: 'Performance Analytics' },
+    { key: 'performance_analytics', label: 'KPI Management' },
     { key: 'payroll_management', label: 'Payroll Management' },
     { key: 'announcements', label: 'Announcements' },
     { key: 'meetings_calendar', label: 'Meetings & Calendar' },

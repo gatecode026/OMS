@@ -95,8 +95,13 @@ export const sanitizeNoSql = (input) => {
  * @param {Any} input - The input payload to sanitize.
  * @returns {Any} - The sanitized input.
  */
-export const sanitizeXss = (input) => {
+export const sanitizeXss = (input, keyName = '') => {
   if (typeof input === 'string') {
+    // Whitelist cryptographic keys, endpoints, tokens, signatures, and URLs from HTML escaping
+    const whitelistedKeys = ['p256dh', 'auth', 'endpoint', 'url', 'avatar', 'link', 'href', 'src', 'publicKey', 'privateKey', 'token', 'signature'];
+    if (whitelistedKeys.includes(keyName)) {
+      return input;
+    }
     // Skip escaping for base64 data URLs and HTTP/HTTPS URLs to prevent corrupting binary data and links
     if (input.startsWith('data:') || input.startsWith('http://') || input.startsWith('https://')) {
       return input;
@@ -110,14 +115,13 @@ export const sanitizeXss = (input) => {
       .replace(/\//g, '&#x2F;');
   }
   if (input instanceof Array) {
-    return input.map(item => sanitizeXss(item));
+    return input.map(item => sanitizeXss(item, keyName));
   }
   if (input !== null && typeof input === 'object') {
     const sanitized = {};
     for (const key in input) {
       if (Object.prototype.hasOwnProperty.call(input, key)) {
-        // Do not escape binary/base64 strings or media URLs specifically if needed, but escape everything by default
-        sanitized[key] = sanitizeXss(input[key]);
+        sanitized[key] = sanitizeXss(input[key], key);
       }
     }
     return sanitized;

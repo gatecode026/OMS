@@ -153,7 +153,11 @@ export const checkAllHealth = async () => {
     timestamp: new Date().toISOString(),
     mongo: { status: mongo.status, state: mongo.connectionState },
     redis: { status: redisHealth.status, connection: redisHealth.connection },
-    socket: { status: socket.status, activeConnections: socket.activeConnections }
+    socket: { status: socket.status, activeConnections: socket.activeConnections },
+    vapid: {
+      keysConfigured: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+      publicKeyLength: process.env.VAPID_PUBLIC_KEY ? process.env.VAPID_PUBLIC_KEY.length : 0
+    }
   };
 };
 

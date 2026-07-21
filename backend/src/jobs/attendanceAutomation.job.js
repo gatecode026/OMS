@@ -137,117 +137,117 @@ export const checkAttendanceAutomation = async () => {
         }
       }
 
-      // ─── 2. ATTENDANCE REMINDERS ────────────────────────────────────────────
-      if (rules.attendanceReminders && rules.startTime) {
-        const startMinutes = parseTimeToMinutes(rules.startTime);
-        const currentMinutes = parseTimeToMinutes(timeStr);
+      // ─── 2. ATTENDANCE REMINDER (5 Minutes After Shift Start) ────────────────
+      const shiftStartTime = rules.startTime || '09:00';
+      const startMinutes = parseTimeToMinutes(shiftStartTime);
+      const currentMinutes = parseTimeToMinutes(timeStr);
+      const reminderMinutes = startMinutes + 5;
 
-        // Run when current time matches rules.startTime, and not run today
-        if (currentMinutes >= startMinutes && lastRunState.reminders[companyId] !== dateStr) {
-          logger.info(`[AttendanceAutomationJob] Triggering Attendance Reminders for tenant ${companyId}`);
+      if (currentMinutes >= reminderMinutes && lastRunState.reminders[companyId] !== dateStr) {
+        logger.info(`[AttendanceAutomationJob] Triggering 5-Min Post-Shift Punch-In Reminder for tenant ${companyId}`);
 
-          const activeEmployees = await EmployeeModel.find({ status: 'Active' }).lean();
+        const activeEmployees = await EmployeeModel.find({ status: 'Active' }).lean();
 
-          for (const employee of activeEmployees) {
-            // Check if already punched in
-            const punchedToday = await AttendanceModel.findOne({
-              employeeId: employee.id,
-              date: dateStr
+        for (const employee of activeEmployees) {
+          const punchedToday = await AttendanceModel.findOne({
+            employeeId: employee.id,
+            date: dateStr
+          });
+
+          if (!punchedToday) {
+            await createNotification(employee.id, companyId, {
+              type: 'attendance',
+              title: 'Attendance Punch-In Reminder',
+              message: `Good morning ${employee.name}! Your shift started at ${shiftStartTime} (5 mins ago). Please punch in to avoid being marked Absent.`,
+              priority: 'high'
             });
-
-            if (!punchedToday) {
-              await createNotification(employee.id, companyId, {
-                type: 'attendance',
-                title: 'Attendance Reminder',
-                message: `Good morning ${employee.name}! Remember to punch in for work. Start time is ${rules.startTime}.`,
-                priority: 'high'
-              });
-            }
           }
-
-          lastRunState.reminders[companyId] = dateStr;
         }
+
+        lastRunState.reminders[companyId] = dateStr;
       }
 
-      // ─── 3. MISSING ATTENDANCE ALERTS ───────────────────────────────────────
-      if (rules.missingAlerts && rules.startTime) {
-        const startMinutes = parseTimeToMinutes(rules.startTime);
-        const currentMinutes = parseTimeToMinutes(timeStr);
-        // Alert trigger is set to 2 hours after standard start time
-        const alertMinutes = startMinutes + 120;
+      // ─── 3. AUTO MARK ABSENT (If still unpunched 30 Mins After Shift Start) ────────
+      const absentCutoffMinutes = startMinutes + 30;
 
-        if (currentMinutes >= alertMinutes && lastRunState.missingAlerts[companyId] !== dateStr) {
-          logger.info(`[AttendanceAutomationJob] Analyzing missing attendance for tenant ${companyId}`);
+      if (currentMinutes >= absentCutoffMinutes && lastRunState.missingAlerts[companyId] !== dateStr) {
+        logger.info(`[AttendanceAutomationJob] Executing Auto-Mark Absent for tenant ${companyId}`);
 
-          const activeEmployees = await EmployeeModel.find({ status: 'Active' }).lean();
+        const activeEmployees = await EmployeeModel.find({ status: 'Active' }).lean();
 
-          for (const employee of activeEmployees) {
-            // Check if has attendance record
-            const punchedToday = await AttendanceModel.findOne({
+        for (const employee of activeEmployees) {
+          const punchedToday = await AttendanceModel.findOne({
+            employeeId: employee.id,
+            date: dateStr
+          });
+
+          if (!punchedToday) {
+            // Check if employee is on approved leave today
+            const activeLeave = await LeaveModel.findOne({
               employeeId: employee.id,
-              date: dateStr
+              status: 'Approved',
+              fromDate: { $lte: dateStr },
+              toDate: { $gte: dateStr }
             });
 
-            if (!punchedToday) {
-              // Check if employee is on approved leave today
-              const activeLeave = await LeaveModel.findOne({
+            if (!activeLeave) {
+              // 1. Create Attendance record with status 'Absent'
+              await AttendanceModel.create({
+                id: `ATT-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+                companyId,
                 employeeId: employee.id,
-                status: 'Approved',
-                fromDate: { $lte: dateStr },
-                toDate: { $gte: dateStr }
+                employeeName: employee.name,
+                department: employee.department || 'General',
+                branch: employee.branch || 'Main',
+                date: dateStr,
+                status: 'Absent',
+                workMode: 'Office',
+                punchIn: '--:--',
+                punchOut: '--:--',
+                totalHours: 0,
+                notes: `System Auto-Marked Absent (No Punch-In 30 mins after ${shiftStartTime} start)`
               });
 
-              if (!activeLeave) {
-                // Determine Department Head (HOD) or Admin/HR to alert
-                const dept = employee.department;
-                let managerId = null;
-
-                if (dept) {
-                  const departmentObj = (company.departments || []).find(d => d.name === dept);
-                  if (departmentObj && departmentObj.head) {
-                    // Try to find the HOD employee by name or ID to get their correct custom ID
-                    const hodEmployee = await EmployeeModel.findOne({
-                      $or: [
-                        { id: departmentObj.head },
-                        { name: departmentObj.head }
-                      ]
-                    }).lean();
-                    if (hodEmployee) {
-                      managerId = hodEmployee.id;
-                    }
+              // 2. Update employee document status fields
+              await EmployeeModel.updateOne(
+                { id: employee.id },
+                {
+                  $set: {
+                    todayPunchStatus: 'Absent',
+                    attendanceStatus: 'Absent'
                   }
                 }
+              );
 
-                // If we found a valid HOD, alert them
-                if (managerId) {
-                  await createNotification(managerId, companyId, {
+              // 3. Send notification to Employee
+              await createNotification(employee.id, companyId, {
+                type: 'attendance',
+                title: 'Marked Absent for Today',
+                message: `You did not punch in after shift start (${shiftStartTime}). You have been automatically marked Absent for today (${dateStr}).`,
+                priority: 'high'
+              });
+
+              // 4. Send notification to Department Head / Admin
+              const managers = await EmployeeModel.find({
+                roleId: { $in: ['manager', 'branch_manager', 'hr', 'admin'] },
+                status: 'Active'
+              }).lean();
+
+              for (const mgr of managers) {
+                if (mgr.id !== employee.id) {
+                  await createNotification(mgr.id, companyId, {
                     type: 'attendance',
-                    title: 'Missing Attendance Alert',
-                    message: `Alert: Employee ${employee.name} (${employee.department || 'No Dept'}) has not punched in today as of ${timeStr}.`,
+                    title: 'Employee Marked Absent (Missing Punch)',
+                    message: `Notice: Employee ${employee.name} (${employee.department || 'General'}) failed to punch in after shift start and has been automatically marked Absent.`,
                     priority: 'high'
                   });
-                } else {
-                  // Fallback: Notify admins/HR
-                  const managers = await EmployeeModel.find({
-                    roleId: { $in: ['manager', 'hr', 'admin'] },
-                    status: 'Active'
-                  }).lean();
-
-                  for (const manager of managers) {
-                    await createNotification(manager.id, companyId, {
-                      type: 'attendance',
-                      title: 'Missing Attendance Alert',
-                      message: `Alert: Employee ${employee.name} (${employee.department || 'No Dept'}) has not punched in today as of ${timeStr}.`,
-                      priority: 'high'
-                    });
-                  }
                 }
               }
             }
           }
-
-          lastRunState.missingAlerts[companyId] = dateStr;
         }
+
+        lastRunState.missingAlerts[companyId] = dateStr;
       }
 
     } catch (err) {

@@ -887,11 +887,7 @@ const MessageBubble = ({
                   </div>
                 </div>
               ) : (
-                msg.contentType === 'markdown' ? (
-                  <MarkdownRenderer content={msg.content} className="msg-markdown-content" />
-                ) : (
-                  <p className="msg-text">{msg.content}</p>
-                )
+                <MarkdownRenderer content={msg.content} className="msg-markdown-content" />
               )}
 
               {/* Edited tag */}

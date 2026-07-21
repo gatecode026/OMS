@@ -13,6 +13,7 @@ const tenantScopedModelNames = new Set([
   'UserOverride', 'Goal', 'Pip', 'IpWhitelist', 'IpBlocklist', 
   'UserDevice', 'UserSession', 'SecurityAlert', 'Task', 'Workflow', 
   'SystemSettings', 'PayrollQuery',
+  'KpiTemplate', 'KpiEvaluationCycle', 'KpiEmployeeEvaluation',
   // Chat module — tenant-scoped per company database
   'Conversation', 'Message', 'Call', 'PushSubscription', 'Thread', 'Poll'
 ]);
