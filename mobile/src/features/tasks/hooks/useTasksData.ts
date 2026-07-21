@@ -16,10 +16,12 @@ export const useMyTasks = (month?: number, year?: number) => {
     queryFn: async () => {
       if (!user) return { tasks: [], summary: getEmptySummary() };
 
+      console.log('[DEBUG useMyTasks] Fetching for user:', user.id, 'role:', user.roleId || user.role, 'month:', month, 'year:', year);
       const [rawTasks, projects] = await Promise.all([
         tasksApi.fetchTasks(month, year),
         tasksApi.fetchProjects(),
       ]);
+      console.log('[DEBUG useMyTasks] rawTasks received length:', rawTasks?.length, 'projects received length:', projects?.length);
 
       // Map project details (name, code, id) to each task by searching project tasks list
       const mappedTasks: TaskItem[] = rawTasks.map((task) => {
@@ -47,7 +49,7 @@ export const useMyTasks = (month?: number, year?: number) => {
           };
         }
 
-        const parts = task.id.split('-');
+        const parts = (task.id || '').split('-');
         const parsedProjectId = parts.length >= 3 ? `${parts[1]}-${parts[2]}` : 'PRJ-001';
         return {
           ...task,
@@ -57,10 +59,17 @@ export const useMyTasks = (month?: number, year?: number) => {
         };
       });
 
-      // Filter tasks assigned to current employee
-      const employeeTasks = mappedTasks.filter(
-        (t) => t.assigneeId === user.id
-      );
+      // Filter tasks: standard employees see only their assigned tasks,
+      // while Managers, Team Leaders and Admins see all tasks scoped for them by the backend
+      const isEmployee = ['employee', 'staff'].includes(user.roleId?.toLowerCase() || user.role?.toLowerCase() || '');
+      const employeeTasks = isEmployee
+        ? mappedTasks.filter((t) => t.assigneeId === user.id)
+        : mappedTasks;
+
+      console.log('[DEBUG useMyTasks] mappedTasks length:', mappedTasks.length, 'employeeTasks length:', employeeTasks.length, 'isEmployee:', isEmployee);
+      if (employeeTasks.length > 0) {
+        console.log('[DEBUG useMyTasks] Sample employeeTask:', JSON.stringify(employeeTasks[0]));
+      }
 
       // Compute summary metrics
       const summary = computeSummary(employeeTasks);

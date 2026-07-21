@@ -5714,3 +5714,21 @@
 [2026-07-17T11:47:41.813Z] restrictedFields: []
 [2026-07-17T11:47:42.391Z] moduleName: Chat, role: manager, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-17T11:47:42.275Z"}}
 [2026-07-17T11:47:42.392Z] restrictedFields: []
+[2026-07-20T10:22:25.865Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T10:22:25.547Z"}}
+[2026-07-20T10:22:25.866Z] restrictedFields: []
+[2026-07-20T10:22:26.036Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T10:22:25.754Z"}}
+[2026-07-20T10:22:26.036Z] restrictedFields: []
+[2026-07-20T10:25:44.100Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T10:25:43.837Z"}}
+[2026-07-20T10:25:44.101Z] restrictedFields: []
+[2026-07-20T10:25:47.876Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T10:25:44.034Z"}}
+[2026-07-20T10:25:47.876Z] restrictedFields: []
+[2026-07-20T10:27:41.952Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T10:27:41.679Z"}}
+[2026-07-20T10:27:41.953Z] restrictedFields: []
+[2026-07-20T10:27:42.122Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T10:27:41.864Z"}}
+[2026-07-20T10:27:42.123Z] restrictedFields: []
+[2026-07-20T10:47:13.360Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T10:47:13.148Z"}}
+[2026-07-20T10:47:13.364Z] restrictedFields: []
+[2026-07-20T10:47:13.481Z] moduleName: Chat, role: employee, updatePayload: {"$set":{"participants.$.lastReadAt":"2026-07-20T10:47:13.288Z"}}
+[2026-07-20T10:47:13.481Z] restrictedFields: []
+[2026-07-20T10:47:20.091Z] moduleName: Chat, role: employee, updatePayload: {"lastMessage":{"messageId":"6a5dfcb727df77e8bb320d8c","content":"Hyy","type":"text","senderId":"GATECO-EMP-008","senderName":"Rahul Kumawat","sentAt":"2026-07-20T10:47:20.034Z"},"lastActivityAt":"2026-07-20T10:47:20.034Z","hiddenBy":[],"archivedBy":[]}
+[2026-07-20T10:47:20.091Z] restrictedFields: []

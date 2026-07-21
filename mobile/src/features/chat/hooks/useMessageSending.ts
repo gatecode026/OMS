@@ -124,14 +124,15 @@ export const useMessageSending = ({ conversationId, authUser, setLocalMessages }
 
   const handleRetrySend = (msg: ChatMessage) => {
     const socket = getSocket();
-    const tempId = msg.id;
+    const tempId = msg.tempId || msg.id;
+    const isTarget = (m: ChatMessage) => m.id === tempId || m.tempId === tempId || m.id === msg.id;
 
     if (!socket?.connected) {
       toast.error('No connection available. Auto-retry pending.');
       
       const markRetrying = (prev: ChatMessage[]) => {
         if (!prev) return [];
-        return prev.map(m => m.id === tempId ? { ...m, status: 'retrying' as const, failureReason: 'disconnected' as const } : m);
+        return prev.map(m => isTarget(m) ? { ...m, status: 'retrying' as const, failureReason: 'disconnected' as const } : m);
       };
       setLocalMessages(markRetrying);
       queryClient.setQueryData(['chat', 'messages', conversationId], markRetrying);
@@ -140,7 +141,7 @@ export const useMessageSending = ({ conversationId, authUser, setLocalMessages }
 
     const markRetrying = (prev: ChatMessage[]) => {
       if (!prev) return [];
-      return prev.map(m => m.id === tempId ? { ...m, status: 'retrying' as const, failureReason: undefined } : m);
+      return prev.map(m => isTarget(m) ? { ...m, status: 'retrying' as const, failureReason: undefined } : m);
     };
     setLocalMessages(markRetrying);
     queryClient.setQueryData(['chat', 'messages', conversationId], markRetrying);
@@ -161,7 +162,7 @@ export const useMessageSending = ({ conversationId, authUser, setLocalMessages }
     const timer = setTimeout(() => {
       const markFailed = (prev: ChatMessage[]) => {
         if (!prev) return [];
-        return prev.map(m => m.id === tempId ? { ...m, status: 'failed' as const, failureReason: 'timeout' as const } : m);
+        return prev.map(m => isTarget(m) ? { ...m, status: 'failed' as const, failureReason: 'timeout' as const } : m);
       };
       setLocalMessages(markFailed);
       queryClient.setQueryData(['chat', 'messages', conversationId], markFailed);
@@ -177,7 +178,7 @@ export const useMessageSending = ({ conversationId, authUser, setLocalMessages }
         }
         const markSent = (prev: ChatMessage[]) => {
           if (!prev) return [];
-          return prev.map(m => m.id === tempId ? { ...m, id: ack.messageId, status: 'sent' as const } : m);
+          return prev.map(m => isTarget(m) ? { ...m, id: ack.messageId, status: 'sent' as const } : m);
         };
         setLocalMessages(markSent);
         queryClient.setQueryData(['chat', 'messages', conversationId], markSent);
@@ -188,7 +189,7 @@ export const useMessageSending = ({ conversationId, authUser, setLocalMessages }
         }
         const markFailed = (prev: ChatMessage[]) => {
           if (!prev) return [];
-          return prev.map(m => m.id === tempId ? { ...m, status: 'failed' as const, failureReason: 'timeout' as const } : m);
+          return prev.map(m => isTarget(m) ? { ...m, status: 'failed' as const, failureReason: 'timeout' as const } : m);
         };
         setLocalMessages(markFailed);
         queryClient.setQueryData(['chat', 'messages', conversationId], markFailed);

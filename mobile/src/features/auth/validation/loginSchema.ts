@@ -1,7 +1,4 @@
-/**
- * @file loginSchema.ts
- * @description Validation schema for the Login form. Supports Employee ID, email, and company code fields.
- */
+import { z } from 'zod';
 
 export interface LoginFormValues {
   companyCode: string;
@@ -15,13 +12,12 @@ export type LoginFormErrors = Partial<Record<keyof LoginFormValues, string>>;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPLOYEE_ID_REGEX = /^[A-Za-z0-9_\-\.]{3,50}$/;
 
-function isEmailFormat(value: string): boolean {
-  return EMAIL_REGEX.test(value);
-}
-
-function isEmployeeIdFormat(value: string): boolean {
-  return EMPLOYEE_ID_REGEX.test(value);
-}
+export const loginValidationSchema = z.object({
+  companyCode: z.string(),
+  identifier: z.string().trim().min(1, 'Employee ID or email is required.'),
+  password: z.string().min(1, 'Password is required.').min(4, 'Password must be at least 4 characters.'),
+  rememberMe: z.boolean(),
+});
 
 /**
  * Validates the login form and returns an errors object.
@@ -33,32 +29,35 @@ export function validateLoginForm(
 ): LoginFormErrors {
   const errors: LoginFormErrors = {};
 
+  // Run Zod schema validation
+  const result = loginValidationSchema.safeParse(values);
+  if (!result.success) {
+    result.error.issues.forEach((issue) => {
+      const field = issue.path[0] as keyof LoginFormValues;
+      if (field && !errors[field]) {
+        errors[field] = issue.message;
+      }
+    });
+  }
+
   // Company Code validation (only when multi-tenant mode enabled)
   if (requireCompanyCode) {
-    if (!values.companyCode.trim()) {
+    const code = (values.companyCode || '').trim();
+    if (!code) {
       errors.companyCode = 'Company code is required.';
-    } else if (values.companyCode.trim().length < 2) {
+    } else if (code.length < 2) {
       errors.companyCode = 'Company code must be at least 2 characters.';
     }
   }
 
-  // Identifier validation
-  if (!values.identifier.trim()) {
-    errors.identifier = 'Employee ID or email is required.';
-  } else {
-    const id = values.identifier.trim();
-    const isEmail = isEmailFormat(id);
-    const isEmployeeId = isEmployeeIdFormat(id);
+  // Identifier custom union validation (must be either valid email or valid employee ID)
+  const idVal = (values.identifier || '').trim();
+  if (idVal) {
+    const isEmail = EMAIL_REGEX.test(idVal);
+    const isEmployeeId = EMPLOYEE_ID_REGEX.test(idVal);
     if (!isEmail && !isEmployeeId) {
       errors.identifier = 'Enter a valid email address or employee ID.';
     }
-  }
-
-  // Password validation
-  if (!values.password) {
-    errors.password = 'Password is required.';
-  } else if (values.password.length < 4) {
-    errors.password = 'Password must be at least 4 characters.';
   }
 
   return errors;

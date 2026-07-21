@@ -6,13 +6,29 @@
 import apiClient from '../../../shared/services/apiClient';
 import { AttendanceRecord, ClockInPayload, ClockOutPayload } from '../types';
 
+const mapRecord = (record: any): AttendanceRecord => {
+  if (!record) return record;
+  const isPunchedIn = record.punchIn && record.punchIn !== '--:--';
+  const isPunchedOut = record.punchOut && record.punchOut !== '--:--';
+  return {
+    ...record,
+    checkIn: record.checkIn || (isPunchedIn ? (record.createdAt || new Date().toISOString()) : undefined),
+    checkOut: record.checkOut || (isPunchedOut ? (record.updatedAt || new Date().toISOString()) : undefined),
+  };
+};
+
+const mapRecords = (records: any[]): AttendanceRecord[] => {
+  if (!Array.isArray(records)) return [];
+  return records.map(mapRecord);
+};
+
 export const attendanceApi = {
   /**
    * Fetch today's check-in record status
    */
   async fetchTodayStatus(): Promise<AttendanceRecord | null> {
     const response = await apiClient.get('/api/v1/attendance/today');
-    return response.data?.data || null;
+    return mapRecord(response.data?.data || null);
   },
 
   /**
@@ -20,7 +36,7 @@ export const attendanceApi = {
    */
   async clockIn(payload: ClockInPayload): Promise<AttendanceRecord> {
     const response = await apiClient.post('/api/v1/attendance', payload);
-    return response.data?.data;
+    return mapRecord(response.data?.data);
   },
 
   /**
@@ -28,7 +44,7 @@ export const attendanceApi = {
    */
   async clockOut(id: string, payload: ClockOutPayload): Promise<AttendanceRecord> {
     const response = await apiClient.put(`/api/v1/attendance/${id}`, payload);
-    return response.data?.data;
+    return mapRecord(response.data?.data);
   },
 
   /**
@@ -38,7 +54,7 @@ export const attendanceApi = {
     const response = await apiClient.get('/api/v1/attendance', {
       params: { from, to }
     });
-    return response.data?.data || [];
+    return mapRecords(response.data?.data || []);
   },
 
   /**

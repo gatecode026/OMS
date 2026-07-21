@@ -62,11 +62,13 @@ export const connectSocket = (token: string | null = null, tenantId: string | nu
     const activeUser = authStore.user;
     const activeTenantId =
       cachedCompanyId || tenantId || authStore.companyId || activeUser?.companyId || 'default';
+    const activeUserId = activeUser?.id || '';
     const activeLastSyncTime = cachedLastSyncTime || new Date().toISOString();
 
     cb({
       token: activeToken,
       tenantId: activeTenantId,
+      userId: activeUserId,
       lastSyncTime: activeLastSyncTime,
     });
   };
@@ -78,6 +80,7 @@ export const connectSocket = (token: string | null = null, tenantId: string | nu
       const activeUser = authStore.user;
       const activeTenantId =
         tenantId || authStore.companyId || activeUser?.companyId || 'default';
+      const activeUserId = activeUser?.id || '';
 
       let lastSyncTime = new Date().toISOString();
       if (activeUser?.id) {
@@ -93,7 +96,18 @@ export const connectSocket = (token: string | null = null, tenantId: string | nu
       cachedLastSyncTime = lastSyncTime;
 
       if (!currentSocket.connected && !currentSocket.active) {
-        console.log('[SocketManager] Connecting socket to: ' + ENV.API_URL);
+        currentSocket.io.opts.extraHeaders = {
+          Authorization: `Bearer ${activeToken}`,
+          'Tenant-ID': activeTenantId,
+          'User-ID': activeUserId,
+        };
+        console.log(`[Socket]
+Connecting: true
+Socket ID: null
+User ID: ${activeUserId}
+Tenant ID: ${activeTenantId}
+Environment: ${ENV.ENV}
+URL: ${ENV.API_URL}`);
         currentSocket.connect();
       }
     } catch (err) {

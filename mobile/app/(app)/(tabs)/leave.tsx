@@ -236,7 +236,7 @@ export default function LeaveManagementScreen() {
           },
         ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={12}>
+        <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text, fontFamily: typography.fonts.bold }]}>

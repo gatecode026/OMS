@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-native';
 import { useUploadQueue } from '../useUploadQueue';
 
 jest.mock('@tanstack/react-query', () => ({
@@ -19,7 +19,7 @@ describe('useUploadQueue', () => {
     );
 
     expect(result.current.uploadsProgress).toEqual({});
-    expect(result.current.uploadErrors).toEqual({});
+    expect(result.current.uploadStates).toEqual({});
     expect(result.current.uploadFileDirect).toBeDefined();
     expect(result.current.cancelUpload).toBeDefined();
   });

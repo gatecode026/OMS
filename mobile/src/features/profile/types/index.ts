@@ -21,6 +21,9 @@ export interface EmployeeProfile {
   officePhone?: string;
   avatarUrl?: string;
   profilePhoto?: string;
+  qrCode?: string;
+  qrCodeUrl?: string;
+  attendanceQr?: string;
 
   // Role & Position
   role?: string;

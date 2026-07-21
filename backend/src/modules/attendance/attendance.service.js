@@ -64,11 +64,21 @@ export const createRecord = async (data, currentUser) => {
   const todayStr = `${year}-${month}-${day}`;
   const currentTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
+  const empId = currentUser?.id || data?.employeeId;
+
+  // Check if today's record already exists to prevent E11000 duplicate key errors
+  const existingRecords = await repository.find({ employeeId: empId, date: todayStr });
+  if (existingRecords && existingRecords.length > 0) {
+    const existing = existingRecords[0];
+    logger.info(`Attendance record for ${empId} on ${todayStr} already exists (${existing.id}). Updating existing record.`);
+    return updateRecord(existing.id, data, currentUser);
+  }
+
   const enrichedData = {
-    employeeId: currentUser?.id,
-    employeeName: currentUser?.name || 'Employee',
-    department: currentUser?.department || 'Operations',
-    branch: currentUser?.branch || 'Headquarters',
+    employeeId: empId,
+    employeeName: currentUser?.name || data?.employeeName || 'Employee',
+    department: currentUser?.department || data?.department || 'Operations',
+    branch: currentUser?.branch || data?.branch || 'Headquarters',
     date: todayStr,
     punchIn: currentTimeStr,
     punchOut: '--:--',
@@ -97,10 +107,14 @@ export const createRecord = async (data, currentUser) => {
 export const updateRecord = async (id, data, currentUser) => {
   logger.info('Executing AttendanceService::updateRecord for: ' + id + ' by user: ' + currentUser?.id);
 
-  const existing = await repository.findOne(id);
+  let existing = await repository.findOne(id);
+  if (!existing && currentUser?.id) {
+    existing = await findToday(currentUser.id);
+  }
   if (!existing) {
     throw new Error('Attendance record not found');
   }
+  id = existing.id || existing._id;
 
   const d = new Date();
   const currentTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;

@@ -17,6 +17,7 @@ import {
   Dimensions,
   PanResponder,
   Animated,
+  Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -110,39 +111,44 @@ const SwipeButton: React.FC<SwipeButtonProps> = ({
   isLoading,
 }) => {
   const pan = React.useRef(new Animated.Value(0)).current;
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(300);
   const thumbSize = 46;
   const padding = 4;
-  const maxTravel = containerWidth - thumbSize - padding * 2;
+  const maxTravel = Math.max(100, containerWidth - thumbSize - padding * 2);
+
+  const triggerSwipeComplete = () => {
+    if (isLoading) return;
+    Animated.timing(pan, {
+      toValue: maxTravel,
+      duration: 150,
+      useNativeDriver: false,
+    }).start(() => {
+      onSwipeComplete();
+      Animated.spring(pan, {
+        toValue: 0,
+        tension: 40,
+        friction: 8,
+        useNativeDriver: false,
+      }).start();
+    });
+  };
 
   const panResponder = React.useMemo(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 3,
       onPanResponderGrant: () => {},
       onPanResponderMove: (e, gestureState) => {
-        if (maxTravel <= 0 || isLoading) return;
+        if (isLoading) return;
         let x = gestureState.dx;
         if (x < 0) x = 0;
         if (x > maxTravel) x = maxTravel;
         pan.setValue(x);
       },
       onPanResponderRelease: (e, gestureState) => {
-        if (maxTravel <= 0 || isLoading) return;
-        if (gestureState.dx >= maxTravel * 0.8) {
-          Animated.timing(pan, {
-            toValue: maxTravel,
-            duration: 100,
-            useNativeDriver: false,
-          }).start(() => {
-            onSwipeComplete();
-            Animated.spring(pan, {
-              toValue: 0,
-              tension: 40,
-              friction: 8,
-              useNativeDriver: false,
-            }).start();
-          });
+        if (isLoading) return;
+        if (gestureState.dx >= maxTravel * 0.75) {
+          triggerSwipeComplete();
         } else {
           Animated.spring(pan, {
             toValue: 0,
@@ -156,8 +162,7 @@ const SwipeButton: React.FC<SwipeButtonProps> = ({
     [maxTravel, isLoading, onSwipeComplete, pan]
   );
 
-  const { colors } = useTheme();
-  const thumbColor = isPunchedIn ? colors.primary : '#10B981'; // Primary theme color when punched in, Green before
+  const thumbColor = isPunchedIn ? '#EF4444' : '#10B981';
 
   const rotation = pan.interpolate({
     inputRange: [0, maxTravel > 0 ? maxTravel : 100],
@@ -165,9 +170,14 @@ const SwipeButton: React.FC<SwipeButtonProps> = ({
   });
 
   return (
-    <View
+    <Pressable
+      onPress={triggerSwipeComplete}
       style={styles.swipeContainer}
-      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+      onLayout={(e) => {
+        if (e.nativeEvent.layout.width > 0) {
+          setContainerWidth(e.nativeEvent.layout.width);
+        }
+      }}
     >
       <Text style={styles.swipeText} numberOfLines={1}>
         {isLoading ? 'Processing...' : title}
@@ -191,7 +201,7 @@ const SwipeButton: React.FC<SwipeButtonProps> = ({
       >
         <Ionicons name="finger-print-outline" size={22} color="#FFFFFF" />
       </Animated.View>
-    </View>
+    </Pressable>
   );
 };
 
@@ -268,26 +278,19 @@ export default function DashboardScreen() {
 
   // Component UI local states
   const [refreshing, setRefreshing] = useState(false);
-  const [isActionsVisible, setIsActionsVisible] = useState(false);
   const [elapsedTime, setElapsedTime] = useState('00h 00m 00s');
+  const [justPunchedOutStatus, setJustPunchedOutStatus] = useState<string | null>(null);
+  const [justPunchedOutTime, setJustPunchedOutTime] = useState<string | null>(null);
 
-  // Register global floating FAB trigger
-  useEffect(() => {
-    (global as any).showQuickActionsSheet = () => {
-      setIsActionsVisible(true);
-    };
-    return () => {
-      (global as any).showQuickActionsSheet = undefined;
-    };
-  }, []);
-
-  // Update working time counter dynamically with seconds
+  // Update working time counter dynamically with seconds (stops when punched out)
   useEffect(() => {
     const updateTimer = () => {
+      const isShiftEnded = (todayRecord?.punchOut && todayRecord.punchOut !== '--:--') || !!justPunchedOutStatus;
+
       if (
         todayRecord?.punchIn &&
         todayRecord.punchIn !== '--:--' &&
-        (!todayRecord.punchOut || todayRecord.punchOut === '--:--' || todayRecord.punchOut === 'Pending')
+        !isShiftEnded
       ) {
         const punchDate = parseTimeToDate(todayRecord.punchIn);
         if (punchDate && punchDate.isValid()) {
@@ -304,6 +307,29 @@ export default function DashboardScreen() {
           }
         } else {
           setElapsedTime('00h 00m 00s');
+        }
+      } else if (isShiftEnded && todayRecord?.punchIn) {
+        // Freeze timer at final shift duration
+        const punchInDate = parseTimeToDate(todayRecord.punchIn);
+        const outTimeStr = todayRecord?.punchOut !== '--:--' ? todayRecord?.punchOut : justPunchedOutTime;
+        const punchOutDate = outTimeStr ? parseTimeToDate(outTimeStr) : dayjs();
+
+        if (punchInDate && punchDateIsValid(punchInDate) && punchOutDate && punchDateIsValid(punchOutDate)) {
+          const diffSecs = Math.max(0, punchOutDate.diff(punchInDate, 'second'));
+          const hrs = Math.floor(diffSecs / 3600);
+          const mins = Math.floor((diffSecs % 3600) / 60);
+          const secs = diffSecs % 60;
+          setElapsedTime(
+            `${String(hrs).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`
+          );
+        } else if (todayRecord?.totalHours) {
+          const totalSecs = Math.round(todayRecord.totalHours * 3600);
+          const hrs = Math.floor(totalSecs / 3600);
+          const mins = Math.floor((totalSecs % 3600) / 60);
+          const secs = totalSecs % 60;
+          setElapsedTime(
+            `${String(hrs).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`
+          );
         }
       } else if (todayRecord?.totalHours) {
         let breakSecs = 0;
@@ -331,45 +357,58 @@ export default function DashboardScreen() {
       }
     };
 
+    const punchDateIsValid = (d: any) => d && typeof d.isValid === 'function' && d.isValid();
+
     updateTimer();
-    const interval = setInterval(updateTimer, 1000); // Check every 1 second for live seconds
+    const isShiftEnded = (todayRecord?.punchOut && todayRecord.punchOut !== '--:--') || !!justPunchedOutStatus;
+    if (isShiftEnded) return; // Do not run interval if shift is completed
+
+    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [todayRecord]);
+  }, [todayRecord, justPunchedOutStatus, justPunchedOutTime]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Invalidate every active query on the screen to trigger fresh network refetches
     await queryClient.invalidateQueries();
     setRefreshing(false);
   };
 
   const handleQuickClockToggle = async () => {
-    setIsActionsVisible(false);
+    try {
+      const hasPunchedIn = todayRecord && todayRecord.punchIn && todayRecord.punchIn !== '--:--';
+      const hasPunchedOut = (todayRecord && todayRecord.punchOut && todayRecord.punchOut !== '--:--') || !!justPunchedOutStatus;
 
-    const hasPunchedIn = todayRecord && todayRecord.punchIn && todayRecord.punchIn !== '--:--';
-    const hasPunchedOut = todayRecord && todayRecord.punchOut && todayRecord.punchOut !== '--:--';
+      if (hasPunchedOut) {
+        Alert.alert('Shift Completed', 'You have already punched out for today.');
+        return;
+      }
 
-    if (hasPunchedOut) {
-      return;
+      if (!hasPunchedIn) {
+        await clockIn({
+          location: {
+            latitude: 28.6139,
+            longitude: 77.2090,
+          },
+        });
+      } else {
+        const attendanceId = (todayRecord as any)?.id || (todayRecord as any)?._id || 'today';
+        await clockOut({
+          id: attendanceId,
+          payload: {
+            notes: 'Shift completed.',
+          },
+        });
+        setJustPunchedOutStatus(todayRecord?.status || 'Present');
+        setJustPunchedOutTime(dayjs().format('HH:mm'));
+      }
+      await Promise.all([refetchTodayAttendance(), refetchHistory()]);
+    } catch (error: any) {
+      console.error('Punch action failed:', error);
+      Alert.alert(
+        'Punch Error',
+        error?.response?.data?.message || error?.message || 'Failed to update attendance status. Please try again.'
+      );
     }
-
-    if (!hasPunchedIn) {
-      await clockIn({
-        location: {
-          latitude: 28.6139,
-          longitude: 77.2090,
-        },
-      });
-    } else {
-      await clockOut({
-        id: todayRecord.id,
-        payload: {
-          notes: 'Shift completed.',
-        },
-      });
-    }
-    // Refresh states after punching
-    await Promise.all([refetchTodayAttendance(), refetchHistory()]);
   };
 
   // Get Today's overtime dynamically from totalHours (>8 hours limit)
@@ -491,10 +530,13 @@ export default function DashboardScreen() {
               )}
             </Pressable>
           </View>
-          <Avatar
-            name={user?.name || 'User'}
-            size={38}
-          />
+          <Pressable onPress={() => router.push('/(app)/attendance-qr' as any)} accessibilityLabel="View Attendance ID Card">
+            <Avatar
+              name={user?.name || 'User'}
+              size={38}
+              source={user?.avatarUrl || (user as any)?.avatar || (user as any)?.profilePhoto || (user as any)?.photoUrl || (user as any)?.image || undefined}
+            />
+          </Pressable>
         </View>
       </View>
 
@@ -621,11 +663,35 @@ export default function DashboardScreen() {
 
               {/* Swipe to check in / out slider */}
               <View style={{ marginTop: 12 }}>
-                {todayRecord?.punchOut && todayRecord.punchOut !== '--:--' ? (
-                  <View style={[styles.swipeContainer, { backgroundColor: getShiftCompletedBgColor(todayRecord?.status), borderColor: 'transparent' }]}>
-                    <Text style={[styles.swipeText, { color: '#FFFFFF', fontFamily: typography.fonts.bold }]}>
-                      Shift Completed ({todayRecord?.status || 'Present'}) 🎉
-                    </Text>
+                {(todayRecord?.punchOut && todayRecord.punchOut !== '--:--') || justPunchedOutStatus ? (
+                  <View
+                    style={[
+                      styles.shiftCompletedCard,
+                      {
+                        backgroundColor: getShiftCompletedBgColor(todayRecord?.status || justPunchedOutStatus || undefined),
+                        shadowColor: getShiftCompletedBgColor(todayRecord?.status || justPunchedOutStatus || undefined),
+                      },
+                    ]}
+                  >
+                    <View style={styles.shiftCompletedLeft}>
+                      <View style={styles.shiftIconCircle}>
+                        <Ionicons name="checkmark-done-circle" size={24} color="#FFFFFF" />
+                      </View>
+                      <View style={{ marginLeft: 12 }}>
+                        <Text style={[styles.shiftCompletedMainTitle, { fontFamily: typography.fonts.bold }]}>
+                          Shift Completed
+                        </Text>
+                        <Text style={[styles.shiftCompletedSubText, { fontFamily: typography.fonts.medium }]}>
+                          Out at {formatTime12h(todayRecord?.punchOut !== '--:--' ? todayRecord?.punchOut : (justPunchedOutTime || undefined))}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.shiftStatusTag}>
+                      <Text style={[styles.shiftStatusTagText, { fontFamily: typography.fonts.bold }]}>
+                        {(todayRecord?.status || justPunchedOutStatus || 'Present').toUpperCase()}
+                      </Text>
+                    </View>
                   </View>
                 ) : (
                   <SwipeButton
@@ -746,49 +812,6 @@ export default function DashboardScreen() {
           </>
         )}
       </ScrollView>
-
-      {/* Center FAB actions Bottom Sheet */}
-      <BottomSheet
-        visible={isActionsVisible}
-        onClose={() => setIsActionsVisible(false)}
-        title="Quick Actions"
-      >
-        <View style={styles.actionsSheetList}>
-          <ListItem
-            title="Clock In / Out"
-            description="Toggle your daily attendance check-in status"
-            leftIcon="time-outline"
-            onPress={handleQuickClockToggle}
-          />
-          <ListItem
-            title="Request Leave"
-            description="Apply for annual, sick, or casual leaves"
-            leftIcon="calendar-outline"
-            onPress={() => {
-              setIsActionsVisible(false);
-              router.push('/leave' as any);
-            }}
-          />
-          <ListItem
-            title="Submit Work Report"
-            description="Log your daily completed tasks and milestones"
-            leftIcon="create-outline"
-            onPress={() => {
-              setIsActionsVisible(false);
-              router.push('/work' as any);
-            }}
-          />
-          <ListItem
-            title="Upload Document"
-            description="Add certifications, invoices or receipts"
-            leftIcon="cloud-upload-outline"
-            onPress={() => {
-              setIsActionsVisible(false);
-              router.push('/documents' as any);
-            }}
-          />
-        </View>
-      </BottomSheet>
     </View>
   );
 }
@@ -1016,6 +1039,54 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 3,
     elevation: 3,
+  },
+  shiftCompletedCard: {
+    height: 64,
+    width: '100%',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+  },
+  shiftCompletedLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  shiftIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shiftCompletedMainTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+  },
+  shiftCompletedSubText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  shiftStatusTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  shiftStatusTagText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    letterSpacing: 0.8,
   },
   eventCard: {
     flexDirection: 'row',

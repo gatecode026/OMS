@@ -634,7 +634,7 @@ export default function InboxScreen() {
           <Pressable style={styles.headerBtn} onPress={() => router.push('/chat/create-group' as any)} accessibilityLabel="Create Group">
             <Ionicons name="people-outline" size={22} color={colors.text} />
           </Pressable>
-          <Pressable style={{ marginLeft: 12, marginRight: 4 }} onPress={() => router.push('/(tabs)/profile' as any)} accessibilityLabel="View Profile">
+          <Pressable style={{ marginLeft: 12, marginRight: 4 }} onPress={() => router.push('/(app)/attendance-qr' as any)} accessibilityLabel="View Attendance ID Pass">
             <Avatar name={authUser?.name || 'Me'} size={32} source={authUser?.avatarUrl || undefined} />
           </Pressable>
           <Pressable style={[styles.headerBtn, { marginLeft: 4 }]} onPress={() => setMenuDropdownVisible(!menuDropdownVisible)} accessibilityLabel="More Options">

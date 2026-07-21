@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-native';
 import { useMessageSending } from '../useMessageSending';
 
 jest.mock('@tanstack/react-query', () => ({

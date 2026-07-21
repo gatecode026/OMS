@@ -26,6 +26,16 @@ export interface NotificationConfig {
   priority?: boolean;
 }
 
+const DEFAULT_WALLPAPER: WallpaperConfig = { type: 'default', value: '' };
+
+const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
+  muteDuration: null,
+  sound: 'Default',
+  vibration: 'default',
+  showPreview: true,
+  priority: true,
+};
+
 interface ChatSettingsState {
   mutedConversationIds: string[];
   wallpapers: Record<string, WallpaperConfig>;
@@ -81,7 +91,7 @@ export const useChatSettingsStore = create<ChatSettingsState>((set, get) => ({
   setWallpaper: (conversationId, config) => set((state) => ({
     wallpapers: { ...state.wallpapers, [conversationId]: config }
   })),
-  getWallpaper: (conversationId) => get().wallpapers[conversationId] || { type: 'default', value: '' },
+  getWallpaper: (conversationId) => get().wallpapers[conversationId] || DEFAULT_WALLPAPER,
   
   setMediaAutoDownload: (mediaAutoDownload) => set({ mediaAutoDownload }),
   setSaveToGallery: (saveToGallery) => set({ saveToGallery }),
@@ -106,13 +116,7 @@ export const useChatSettingsStore = create<ChatSettingsState>((set, get) => ({
       },
     }
   })),
-  getNotificationConfig: (conversationId) => get().notificationConfigs[conversationId] || {
-    muteDuration: null,
-    sound: 'Default',
-    vibration: 'default',
-    showPreview: true,
-    priority: true,
-  },
+  getNotificationConfig: (conversationId) => get().notificationConfigs[conversationId] || DEFAULT_NOTIFICATION_CONFIG,
   
   updateTransferProgress: (id, progress, status, fileName = 'File', fileSize) => set((state) => {
     const existing = state.transferQueue[id];

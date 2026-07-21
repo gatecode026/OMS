@@ -34,6 +34,7 @@ import eventsRouter from '../modules/events/event.routes.js';
 import companiesRouter from '../modules/companies/company.routes.js';
 import adminRouter from '../modules/admin/admin.routes.js';
 import chatRouter from '../modules/chat/chat.routes.js';
+import brandingRouter from '../modules/companies/branding.routes.js';
 
 const router = express.Router();
 
@@ -66,5 +67,6 @@ router.use('/events', eventsRouter);
 router.use('/companies', companiesRouter);
 router.use('/admin', adminRouter);
 router.use('/chat', chatRouter);
+router.use('/branding', brandingRouter);
 
 export default router;

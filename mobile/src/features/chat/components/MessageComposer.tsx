@@ -7,7 +7,7 @@
  * - Reply/Edit preview bars nested inside the unified card
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import {
   StyleSheet,
   PanResponder,
   Animated,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '../../../shared/hooks/useTheme';
@@ -134,8 +136,26 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     },
   });
 
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   return (
-    <View style={{ width: '100%', paddingBottom: insets.bottom || 6, backgroundColor: 'transparent' }}>
+    <View style={{ width: '100%', paddingBottom: isKeyboardVisible ? 6 : (insets.bottom || 6), backgroundColor: 'transparent' }}>
       {isBlockedByMe ? (
         <View style={[styles.blockedBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.blockedText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>

@@ -248,11 +248,29 @@ export const useUserPermissions = () => {
     if (moduleName === 'payroll_management') {
       return ['super_admin', 'company_admin', 'branch_admin', 'hr', 'employee'].includes(userRole);
     }
-    if (moduleName === 'role_permission' || moduleName === 'system_settings') {
+    if (moduleName === 'role_permission' || moduleName === 'system_settings' || moduleName === 'security_audit_logs' || moduleName === 'work_reports' || moduleName === 'performance_analytics') {
       return ['super_admin', 'company_admin'].includes(userRole);
     }
 
-    return true; // General access fallback for standard items like Dashboard, Chat, etc.
+    // Strict whitelist fallback for general employees to prevent security bypasses when offline
+    const EMPLOYEE_ALLOWED_MODULES = [
+      'dashboard',
+      'attendance_management',
+      'leave_management',
+      'document_management',
+      'notifications',
+      'task_monitoring',
+      'profile_settings',
+      'meetings_calendar',
+      'announcements'
+    ];
+
+    if (userRole === 'employee') {
+      return EMPLOYEE_ALLOWED_MODULES.includes(moduleName) || EMPLOYEE_ALLOWED_MODULES.includes(baseKey);
+    }
+
+    // Default general access fallback for admins/hr roles
+    return ['super_admin', 'company_admin', 'branch_admin', 'hr'].includes(userRole);
   };
 
   return {

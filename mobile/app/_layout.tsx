@@ -7,6 +7,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
+import { Platform } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import {
@@ -55,34 +56,36 @@ ExpoSplashScreen.preventAutoHideAsync().catch(() => {
   /* safe in Expo Go — no native splash */
 });
 
-// Configure global notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
-    const { data } = notification.request.content;
-    const conversationId = data?.conversationId;
-    const activeConversationId = usePresenceStore.getState().activeConversationId;
+if (Platform.OS !== 'web') {
+  // Configure global notification handler
+  Notifications.setNotificationHandler({
+    handleNotification: async (notification) => {
+      const { data } = notification.request.content;
+      const conversationId = data?.conversationId;
+      const activeConversationId = usePresenceStore.getState().activeConversationId;
 
-    // Suppress notifications entirely if already looking at the conversation
-    if (activeConversationId === conversationId) {
+      // Suppress notifications entirely if already looking at the conversation
+      if (activeConversationId === conversationId) {
+        return {
+          shouldShowAlert: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+          shouldShowBanner: false,
+          shouldShowList: false,
+        };
+      }
+
+      // Suppress native system banner in foreground to avoid duplicates, but play a soft sound
       return {
         shouldShowAlert: false,
-        shouldPlaySound: false,
+        shouldPlaySound: true,
         shouldSetBadge: false,
         shouldShowBanner: false,
         shouldShowList: false,
       };
-    }
-
-    // Suppress native system banner in foreground to avoid duplicates, but play a soft sound
-    return {
-      shouldShowAlert: false,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: false,
-      shouldShowList: false,
-    };
-  },
-});
+    },
+  });
+}
 
 // ─── Navigation Gate (runs inside RootProvider — has full theme/branding context) ──
 
@@ -98,6 +101,8 @@ function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
 
   // Configure notification permissions and response listener (tap to deep link)
   useEffect(() => {
+    if (Platform.OS === 'web') return;
+
     const requestPermissions = async () => {
       try {
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -249,7 +254,7 @@ function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
 
   // Register push notifications when authenticated
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && Platform.OS !== 'web') {
       registerDeviceForPushNotifications().catch((err) => {
         console.error('[RootLayout] Error registering push notifications:', err);
       });

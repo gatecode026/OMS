@@ -1,15 +1,10 @@
-/**
- * @file _layout.tsx
- * @description Bottom Tab Bar layout config for the primary app screens.
- *              Implements the center FAB (+) and approved mockup tab selections.
- */
-
 import React from 'react';
 import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 import useTheme from '../../../src/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useConversations } from '../../../src/features/chat';
+import { useQuickActionsStore } from '../../../src/shared/store/quickActionsStore';
 
 export default function TabsLayout() {
   const { colors, typography } = useTheme();
@@ -64,10 +59,8 @@ export default function TabsLayout() {
           tabPress: (e) => {
             // Prevent default navigation
             e.preventDefault();
-            // Emit action trigger
-            if ((global as any).showQuickActionsSheet) {
-              (global as any).showQuickActionsSheet();
-            }
+            // Open the global quick actions bottom sheet
+            useQuickActionsStore.getState().openActions();
           },
         }}
         options={{

@@ -653,8 +653,8 @@ export default function AttendanceScreen() {
 
       {/* ─── 1. Header Row ─── */}
       <View style={[styles.header, { paddingTop: insets.top + 16, backgroundColor: colors.surface }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={isDark ? colors.text : '#3F51B5'} />
+        <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityLabel="Back" accessibilityRole="button">
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
         <Text style={[styles.title, { color: isDark ? colors.text : '#3F51B5', fontFamily: typography.fonts.bold }]}>
           Attendance

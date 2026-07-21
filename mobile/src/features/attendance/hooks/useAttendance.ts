@@ -32,7 +32,12 @@ export const useAttendance = () => {
           data: payload,
           description: 'Clocking In',
         });
-        return { id: 'offline-pending-in', status: 'Present', date: new Date().toISOString() } as any;
+        return { 
+          id: 'offline-pending-in', 
+          status: 'Present', 
+          date: new Date().toISOString().split('T')[0], 
+          checkIn: new Date().toISOString() 
+        } as any;
       }
       return attendanceApi.clockIn(payload);
     },

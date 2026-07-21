@@ -165,7 +165,7 @@ export const SidebarDrawer: React.FC = () => {
   const handleProfilePress = () => {
     closeDrawer();
     setTimeout(() => {
-      router.push('/(app)/(tabs)/profile');
+      router.push('/(app)/attendance-qr' as any);
     }, 180);
   };
 

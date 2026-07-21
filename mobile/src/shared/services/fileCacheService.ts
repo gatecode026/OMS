@@ -4,10 +4,10 @@
  *              Allows automatic React Query cache persistence without Android's 2KB SecureStore limits.
  */
 
-import * as FileSystem from 'expo-file-system';
+import { File, Directory, Paths } from 'expo-file-system';
 import { QueryClient } from '@tanstack/react-query';
 
-const CACHE_DIR = `${FileSystem.documentDirectory}react_query_cache/`;
+const CACHE_DIR = new Directory(Paths.document, 'react_query_cache');
 
 export const fileCacheService = {
   /**
@@ -15,12 +15,16 @@ export const fileCacheService = {
    */
   async init(): Promise<void> {
     try {
-      const info = await FileSystem.getInfoAsync(CACHE_DIR);
-      if (!info.exists) {
-        await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
+      if (!CACHE_DIR.exists) {
+        CACHE_DIR.create({ intermediates: true, idempotent: true });
       }
-    } catch (e) {
-      console.error('[FileCacheService] Initialization error:', e);
+    } catch (e: any) {
+      console.error(`[FileCacheService]
+Operation: init
+Directory: ${CACHE_DIR.uri}
+Error: ${e.message || e}
+Stack: ${e.stack}
+Recovery Action: Fallback to in-memory cache.`);
     }
   },
 
@@ -28,14 +32,19 @@ export const fileCacheService = {
    * Save a query key and its data to disk
    */
   async save(key: any, data: any): Promise<void> {
+    const filename = encodeURIComponent(JSON.stringify(key)) + '.json';
     try {
       await this.init();
-      // Safe filename generation by stringifying and encoding the query key
-      const filename = encodeURIComponent(JSON.stringify(key)) + '.json';
-      const fileUri = `${CACHE_DIR}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(data));
-    } catch (e) {
-      console.error('[FileCacheService] Error saving cache for key:', key, e);
+      const file = new File(CACHE_DIR, filename);
+      file.write(JSON.stringify(data));
+    } catch (e: any) {
+      console.error(`[FileCacheService]
+Operation: save
+Directory: ${CACHE_DIR.uri}
+File: ${filename}
+Error: ${e.message || e}
+Stack: ${e.stack}
+Recovery Action: Cache write failed. Proceeding without file cache.`);
     }
   },
 
@@ -43,16 +52,21 @@ export const fileCacheService = {
    * Retrieve cached data for a specific query key
    */
   async get(key: any): Promise<any | null> {
+    const filename = encodeURIComponent(JSON.stringify(key)) + '.json';
     try {
-      const filename = encodeURIComponent(JSON.stringify(key)) + '.json';
-      const fileUri = `${CACHE_DIR}${filename}`;
-      const info = await FileSystem.getInfoAsync(fileUri);
-      if (info.exists) {
-        const content = await FileSystem.readAsStringAsync(fileUri);
+      const file = new File(CACHE_DIR, filename);
+      if (file.exists) {
+        const content = await file.text();
         return JSON.parse(content);
       }
-    } catch (e) {
-      // Return null quietly if not found
+    } catch (e: any) {
+      console.error(`[FileCacheService]
+Operation: get
+Directory: ${CACHE_DIR.uri}
+File: ${filename}
+Error: ${e.message || e}
+Stack: ${e.stack}
+Recovery Action: Cache read failed. Returning null (cache miss).`);
     }
     return null;
   },
@@ -62,12 +76,16 @@ export const fileCacheService = {
    */
   async clearAll(): Promise<void> {
     try {
-      const info = await FileSystem.getInfoAsync(CACHE_DIR);
-      if (info.exists) {
-        await FileSystem.deleteAsync(CACHE_DIR, { idempotent: true });
+      if (CACHE_DIR.exists) {
+        CACHE_DIR.delete();
       }
-    } catch (e) {
-      console.error('[FileCacheService] Error clearing all cache files:', e);
+    } catch (e: any) {
+      console.error(`[FileCacheService]
+Operation: clearAll
+Directory: ${CACHE_DIR.uri}
+Error: ${e.message || e}
+Stack: ${e.stack}
+Recovery Action: Clear cache directory failed.`);
     }
   },
 
@@ -77,15 +95,14 @@ export const fileCacheService = {
   async loadAllIntoCache(client: QueryClient): Promise<void> {
     try {
       await this.init();
-      const files = await FileSystem.readDirectoryAsync(CACHE_DIR);
+      const files = CACHE_DIR.list();
       let count = 0;
-      for (const file of files) {
-        if (file.endsWith('.json')) {
-          const fileUri = `${CACHE_DIR}${file}`;
-          const content = await FileSystem.readAsStringAsync(fileUri);
+      for (const item of files) {
+        if (item instanceof File && item.name.endsWith('.json')) {
+          const content = await item.text();
           const data = JSON.parse(content);
 
-          const keyString = decodeURIComponent(file.slice(0, -5));
+          const keyString = decodeURIComponent(item.name.slice(0, -5));
           const key = JSON.parse(keyString);
 
           client.setQueryData(key, data);
@@ -93,8 +110,13 @@ export const fileCacheService = {
         }
       }
       console.log(`[FileCacheService] Pre-populated ${count} queries into query cache.`);
-    } catch (e) {
-      console.error('[FileCacheService] Error pre-populating query cache:', e);
+    } catch (e: any) {
+      console.error(`[FileCacheService]
+Operation: loadAllIntoCache
+Directory: ${CACHE_DIR.uri}
+Error: ${e.message || e}
+Stack: ${e.stack}
+Recovery Action: Skip pre-populating TanStack query cache from file-system.`);
     }
   }
 };

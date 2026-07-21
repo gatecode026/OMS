@@ -317,8 +317,16 @@ export default function MyWorkScreen() {
 
   // Filter and Search Logic
   const filteredTasks = useMemo(() => {
-    if (!data?.tasks) return [];
+    if (!data?.tasks) {
+      console.log('[DEBUG work.tsx] No tasks in data object');
+      return [];
+    }
     
+    console.log('[DEBUG work.tsx] Filtering tasks. Total tasks count:', data.tasks.length, 'selectedDay:', selectedDay, 'selectedMonth:', selectedMonth, 'selectedYear:', selectedYear);
+    if (data.tasks.length > 0) {
+      console.log('[DEBUG work.tsx] Sample task in list:', JSON.stringify(data.tasks[0]));
+    }
+
     return data.tasks.filter((task) => {
       // 0. Filter by Selected Day, Month & Year
       if (task.dueDate) {
@@ -459,7 +467,9 @@ export default function MyWorkScreen() {
               <Badge content={String(unreadCount)} style={styles.notificationBadge} />
             )}
           </Pressable>
-          <Avatar name={user?.name || 'Employee'} size={32} />
+          <Pressable onPress={() => router.push('/(app)/attendance-qr' as any)} accessibilityLabel="View Attendance ID Pass">
+            <Avatar name={user?.name || 'Employee'} size={32} />
+          </Pressable>
         </View>
       </View>
 

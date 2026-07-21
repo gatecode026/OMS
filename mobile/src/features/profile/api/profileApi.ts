@@ -63,20 +63,18 @@ export const profileApi = {
     }
 
     if (!profile) {
-      try {
-        const response = await apiClient.get('/api/v1/profile');
-        profile = response.data?.data || response.data || null;
-      } catch (err: any) {
-        if (err?.statusCode === 404) {
-          try {
-            const fallback = await apiClient.get('/api/v1/me');
-            profile = fallback.data?.data || fallback.data || null;
-          } catch {
-            profile = null;
-          }
-        } else {
-          throw err;
-        }
+      const authUser = useAuthStore.getState().user;
+      if (authUser) {
+        profile = {
+          id: authUser.id,
+          name: authUser.name,
+          email: authUser.email,
+          role: authUser.role,
+          designation: (authUser as any).designation || 'Software Engineer',
+          department: (authUser as any).department || 'Engineering',
+          avatarUrl: authUser.avatarUrl,
+          companyName: (authUser as any).companyName || 'Gatecode Technologies',
+        };
       }
     }
 

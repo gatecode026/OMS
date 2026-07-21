@@ -6,6 +6,7 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import NetInfo from '@react-native-community/netinfo';
 import ENV from '../../config/env';
 import useAuthStore from '../store/authStore';
 import useOfflineStore from '../store/offlineStore';
@@ -39,7 +40,6 @@ export const mapAxiosError = (error: AxiosError): AppError => {
     return {
       status: 'fail',
       message: 'Network offline or server unreachable. Please check your connection.',
-      statusCode: 503,
       originalError: error,
     };
   }
@@ -131,8 +131,8 @@ apiClient.interceptors.request.use(
       config.headers['x-tenant-id'] = companyId;
     }
 
-    // Inject Device / App Metadata
-    if (config.headers) {
+    // Inject Device / App Metadata (disabled on web to prevent CORS preflight header errors)
+    if (Platform.OS !== 'web' && config.headers) {
       config.headers['x-device-id'] = Constants.installationId || Constants.sessionId || 'device-id-placeholder';
       config.headers['x-app-version'] = Constants.expoConfig?.version || '1.0.0';
       config.headers['x-timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -164,6 +164,7 @@ apiClient.interceptors.request.use(
         status: 'fail',
         message: 'Offline: Action queued for synchronization.',
         isOfflineQueued: true,
+        config: config,
       });
     }
 
@@ -177,10 +178,40 @@ apiClient.interceptors.request.use(
 // Response Interceptor: Handle silent token refresh and error mapping
 apiClient.interceptors.response.use(
   (response) => {
-    // Return standard response data envelope directly for ease of use
+    // Structured success log format
+    const method = response.config?.method?.toUpperCase() || 'UNKNOWN';
+    const url = response.config?.url || 'UNKNOWN';
+    const status = response.status || 200;
+    const token = useAuthStore.getState().token;
+    const isTokenValid = !!token;
+    const companyId = useAuthStore.getState().companyId || 'default';
+
+    console.log(`[API]
+Base URL: ${ENV.API_URL}
+Environment: ${ENV.ENV}
+JWT Valid: ${isTokenValid}
+Tenant ID: ${companyId}
+Response: Success (HTTP ${status} for ${method} ${url})`);
+
     return response;
   },
   async (error: AxiosError) => {
+    // If the request was queued offline in the request interceptor,
+    // resolve successfully with a synthetic success envelope instead of throwing an error.
+    if ((error as any).isOfflineQueued) {
+      return {
+        data: {
+          status: 'success',
+          message: error.message || 'Offline: Action queued for synchronization.',
+          data: { queued: true },
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: (error as any).config || error.config,
+      } as any;
+    }
+
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number };
 
     // Retry Logic for network / server errors
@@ -193,7 +224,7 @@ apiClient.interceptors.response.use(
       if ((isNetworkError || isServerError) && retryCount < MAX_RETRIES) {
         originalRequest._retryCount = retryCount + 1;
         console.log(`[apiClient] Retrying request (${originalRequest._retryCount}/${MAX_RETRIES}) for URL: ${originalRequest.url}`);
-        await new Promise((resolve) => setTimeout(resolve, originalRequest._retryCount * 1500));
+        await new Promise((resolve) => setTimeout(resolve, (retryCount + 1) * 1500));
         return apiClient(originalRequest);
       }
     }
@@ -253,17 +284,88 @@ apiClient.interceptors.response.use(
     }
 
     const mappedError = mapAxiosError(error);
-    if (__DEV__) {
-      console.error('[apiClient] Request failed:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        statusCode: mappedError.statusCode,
-        message: mappedError.message,
-        originalError: error.message || error
-      });
+    
+    // Structured error log format
+    const method = error.config?.method?.toUpperCase() || 'UNKNOWN';
+    const url = error.config?.url || 'UNKNOWN';
+    const retryCount = (error.config as any)?._retryCount || 0;
+    const status = error.response?.status || mappedError.statusCode || 'UNKNOWN';
+    const errorMsg = error.message || mappedError.message || 'UNKNOWN';
+
+    console.error(`[apiClient]
+Method: ${method}
+URL: ${url}
+Environment: ${ENV.ENV}
+Retry Count: ${retryCount}
+Status: ${status}
+Error: ${errorMsg}`);
+
+    // Run diagnostics if the server is unreachable or offline
+    if (!error.response) {
+      runNetworkDiagnostics(error).catch(() => {});
     }
+
     return Promise.reject(mappedError);
   }
 );
+
+/**
+ * Executes a full network diagnostics sweep and prints a structured warning log.
+ */
+export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
+  let netInfoState;
+  try {
+    netInfoState = await NetInfo.fetch();
+  } catch (e) {
+    netInfoState = { isConnected: false, isInternetReachable: false };
+  }
+  
+  const isConnected = netInfoState.isConnected !== false;
+
+  let apiReachable = 'No';
+  try {
+    const response = await fetch(`${ENV.API_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    apiReachable = `Yes (HTTP ${response.status})`;
+  } catch (e: any) {
+    apiReachable = `No (${e.message || e})`;
+  }
+
+  let socketReachable = 'No';
+  try {
+    const response = await fetch(`${ENV.API_URL}/socket.io/?EIO=4&transport=polling`, { signal: AbortSignal.timeout(3000) });
+    socketReachable = `Yes (HTTP ${response.status})`;
+  } catch (e: any) {
+    socketReachable = `No (${e.message || e})`;
+  }
+
+  let errorDetail = 'None';
+  if (error) {
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      errorDetail = 'Timeout Failure';
+    } else if (error.message.includes('ENOTFOUND') || error.message.includes('EAI_AGAIN')) {
+      errorDetail = 'DNS Resolution Failure';
+    } else if (error.message.includes('ECONNREFUSED')) {
+      errorDetail = 'Connection Refused';
+    } else if (error.message.toLowerCase().includes('ssl') || error.message.toLowerCase().includes('cert')) {
+      errorDetail = 'SSL/TLS Error';
+    } else if (!error.response) {
+      errorDetail = 'Network offline or host unreachable';
+    } else {
+      errorDetail = `HTTP ${error.response.status} (${error.response.statusText})`;
+    }
+  }
+
+  console.warn(`
+====== NETWORK DIAGNOSTICS ======
+Environment: ${ENV.ENV}
+Current Base URL: ${ENV.API_URL}
+Current Platform: ${Platform.OS} (v${Platform.Version})
+Is Connected: ${isConnected ? 'Yes' : 'No'} (Internet Reachable: ${netInfoState.isInternetReachable !== false ? 'Yes' : 'No'})
+API Reachable: ${apiReachable}
+Socket Reachable: ${socketReachable}
+Error Diagnostics: ${errorDetail}
+=================================
+`);
+}
 
 export default apiClient;

@@ -104,6 +104,8 @@ export default function AttendanceHistoryScreen() {
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'));
   const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [refreshing, setRefreshing] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<'All' | 'Present' | 'Late' | 'Absent' | 'Half Day'>('All');
 
   // Fetch month data and summary from React Query hooks
   const {
@@ -204,7 +206,13 @@ export default function AttendanceHistoryScreen() {
     const isPast = dateStr ? dayjs(dateStr).isBefore(dayjs(), 'day') : false;
     
     if (isFuture) {
-      return { dotColor: 'transparent', text: 'Scheduled', color: '#94A3B8', labelBg: '#F8FAFC', borderColor: 'transparent' };
+      return { 
+        dotColor: 'transparent', 
+        text: 'Scheduled', 
+        color: isDark ? colors.textMuted : '#94A3B8', 
+        labelBg: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC', 
+        borderColor: 'transparent' 
+      };
     }
 
     // 1. Check if it's a Holiday
@@ -215,8 +223,8 @@ export default function AttendanceHistoryScreen() {
         dotColor: '#0EA5E9',
         text: holidayObj?.name || 'Holiday',
         color: '#0EA5E9',
-        labelBg: '#EFF6FF',
-        borderColor: '#DBEAFE',
+        labelBg: isDark ? 'rgba(14, 165, 233, 0.15)' : '#EFF6FF',
+        borderColor: isDark ? 'rgba(14, 165, 233, 0.3)' : '#DBEAFE',
       };
     }
 
@@ -224,12 +232,25 @@ export default function AttendanceHistoryScreen() {
     if (statusStr) {
       const st = statusStr.toLowerCase();
       if (st.includes('leave') || st.includes('off')) {
-        return { dotColor: '#8B5CF6', text: 'Paid Leave', color: '#8B5CF6', labelBg: '#FAF5FF', borderColor: '#F3E8FF' };
+        return { 
+          dotColor: '#8B5CF6', 
+          text: 'Paid Leave', 
+          color: '#8B5CF6', 
+          labelBg: isDark ? 'rgba(139, 92, 246, 0.15)' : '#FAF5FF', 
+          borderColor: isDark ? 'rgba(139, 92, 246, 0.3)' : '#F3E8FF' 
+        };
       }
     }
 
     if (dayOfWeek === 0 || dayOfWeek === 6) { // 0 = Sunday, 6 = Saturday
-      return { dotColor: '#94A3B8', text: 'Weekly Off', color: '#64748B', labelBg: '#F8FAFC', borderColor: 'transparent', isWeekend: true };
+      return { 
+        dotColor: isDark ? colors.textMuted : '#94A3B8', 
+        text: 'Weekly Off', 
+        color: isDark ? colors.textMuted : '#64748B', 
+        labelBg: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC', 
+        borderColor: 'transparent', 
+        isWeekend: true 
+      };
     }
 
     // Check if there are no punches at all (Absent) or if it is a punch error (only punch-in but no punch-out)
@@ -241,35 +262,77 @@ export default function AttendanceHistoryScreen() {
         dotColor: 'transparent',
         text: 'Punch Error',
         color: '#D97706',
-        labelBg: '#FFFBEB',
-        borderColor: '#FDE68A'
+        labelBg: isDark ? 'rgba(217, 119, 6, 0.15)' : '#FFFBEB',
+        borderColor: isDark ? 'rgba(217, 119, 6, 0.3)' : '#FDE68A'
       };
     }
 
     const hasPunches = hasPunchIn || hasPunchOut;
     if (isPast && !hasPunches) {
-      return { dotColor: '#EF4444', text: 'Absent', color: '#EF4444', labelBg: '#FFF5F5', borderColor: '#FEE2E2' };
+      return { 
+        dotColor: '#EF4444', 
+        text: 'Absent', 
+        color: '#EF4444', 
+        labelBg: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FFF5F5', 
+        borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FEE2E2' 
+      };
     }
 
     if (!statusStr) {
-      return { dotColor: '#EF4444', text: 'Absent', color: '#EF4444', labelBg: '#FFF5F5', borderColor: '#FEE2E2' };
+      return { 
+        dotColor: '#EF4444', 
+        text: 'Absent', 
+        color: '#EF4444', 
+        labelBg: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FFF5F5', 
+        borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FEE2E2' 
+      };
     }
 
     const st = statusStr.toLowerCase();
     if (st.includes('present')) {
-      return { dotColor: '#10B981', text: 'Present', color: '#10B981', labelBg: '#F0FDF4', borderColor: '#D1FAE5' };
+      return { 
+        dotColor: '#10B981', 
+        text: 'Present', 
+        color: '#10B981', 
+        labelBg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#F0FDF4', 
+        borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#D1FAE5' 
+      };
     }
     if (st.includes('late')) {
-      return { dotColor: '#3B82F6', text: 'Late', color: '#3B82F6', labelBg: '#EFF6FF', borderColor: '#DBEAFE' };
+      return { 
+        dotColor: '#3B82F6', 
+        text: 'Late', 
+        color: '#3B82F6', 
+        labelBg: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF', 
+        borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : '#DBEAFE' 
+      };
     }
     if (st.includes('absent')) {
-      return { dotColor: '#EF4444', text: 'Absent', color: '#EF4444', labelBg: '#FFF5F5', borderColor: '#FEE2E2' };
+      return { 
+        dotColor: '#EF4444', 
+        text: 'Absent', 
+        color: '#EF4444', 
+        labelBg: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FFF5F5', 
+        borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : '#FEE2E2' 
+      };
     }
     if (st.includes('half')) {
-      return { dotColor: '#EAB308', text: 'Half Day', color: '#EAB308', labelBg: '#FEFCE8', borderColor: '#FEF9C3' };
+      return { 
+        dotColor: '#EAB308', 
+        text: 'Half Day', 
+        color: '#EAB308', 
+        labelBg: isDark ? 'rgba(234, 179, 8, 0.15)' : '#FEFCE8', 
+        borderColor: isDark ? 'rgba(234, 179, 8, 0.3)' : '#FEF9C3' 
+      };
     }
 
-    return { dotColor: '#10B981', text: 'Present', color: '#10B981', labelBg: '#F0FDF4', borderColor: '#D1FAE5' };
+    return { 
+      dotColor: '#10B981', 
+      text: 'Present', 
+      color: '#10B981', 
+      labelBg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#F0FDF4', 
+      borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#D1FAE5' 
+    };
   };
 
   // Find record for currently selected day
@@ -545,24 +608,76 @@ export default function AttendanceHistoryScreen() {
     }, 1200);
   };
   return (
-    <View style={[styles.container, { backgroundColor: '#F8FAFC' }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <View style={[styles.container, { backgroundColor: isDark ? colors.background : '#F8FAFC' }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       {/* ─── Sticky Header ─── */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 16, backgroundColor: colors.surface, borderBottomColor: colors.border, zIndex: 100, position: 'relative' }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
-        <Text style={[styles.title, { fontFamily: typography.fonts.bold }]}>
+        <Text style={[styles.title, { fontFamily: typography.fonts.bold, color: colors.text }]}>
           Attendance History
         </Text>
-        <View style={styles.headerRightGroup}>
-          <Pressable style={styles.headerIconButton}>
-            <Ionicons name="filter-outline" size={22} color="#1E293B" />
+        <View style={[styles.headerRightGroup, { position: 'relative', zIndex: 101 }]}>
+          <Pressable onPress={() => setIsDropdownOpen(!isDropdownOpen)} style={styles.headerIconButton}>
+            <Ionicons name="filter-outline" size={22} color={colors.text} />
           </Pressable>
-          <Pressable style={styles.headerIconButton}>
-            <Ionicons name="calendar-outline" size={22} color="#1E293B" />
-          </Pressable>
+          
+          {isDropdownOpen && (
+            <View style={{
+              position: 'absolute',
+              top: 40,
+              right: 0,
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              borderWidth: 1.5,
+              borderRadius: 16,
+              padding: 6,
+              width: 140,
+              shadowColor: '#0F172A',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 16,
+              elevation: 8,
+              zIndex: 9999,
+            }}>
+              {[
+                { label: 'All Statuses', value: 'All' },
+                { label: 'Present', value: 'Present' },
+                { label: 'Late', value: 'Late' },
+                { label: 'Absent', value: 'Absent' },
+                { label: 'Half Day', value: 'Half Day' },
+              ].map((opt) => {
+                const isSelected = selectedFilter === opt.value;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() => {
+                      setSelectedFilter(opt.value as any);
+                      setIsDropdownOpen(false);
+                    }}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 10,
+                      backgroundColor: isSelected 
+                        ? (isDark ? 'rgba(63, 81, 181, 0.15)' : '#EEF2FF') 
+                        : 'transparent',
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: 13,
+                      color: isSelected ? (isDark ? colors.primary : '#3F51B5') : colors.text,
+                      fontFamily: isSelected ? typography.fonts.bold : typography.fonts.semibold,
+                    }}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
         </View>
       </View>
 
@@ -582,27 +697,27 @@ export default function AttendanceHistoryScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={['#4F46E5']}
-              tintColor="#4F46E5"
+              colors={[isDark ? colors.primary : '#4F46E5']}
+              tintColor={isDark ? colors.primary : '#4F46E5'}
             />
           }
         >
           {/* ─── Month Navigation Card ─── */}
-          <Card style={[styles.monthCard, { marginHorizontal: 20, marginTop: spacing.md, borderRadius: 16 }]}>
+          <Card style={[styles.monthCard, { marginHorizontal: 20, marginTop: spacing.md, borderRadius: 16, backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.monthNavRow}>
-              <Pressable onPress={handlePrevMonth} style={styles.monthNavArrow}>
-                <Ionicons name="chevron-back" size={20} color="#4F46E5" />
+              <Pressable onPress={handlePrevMonth} style={[styles.monthNavArrow, { backgroundColor: isDark ? colors.border : '#F8FAFC' }]}>
+                <Ionicons name="chevron-back" size={20} color={isDark ? colors.primary : '#4F46E5'} />
               </Pressable>
               <View style={styles.monthTitleWrapper}>
-                <Text style={[styles.monthLabel, { fontFamily: typography.fonts.bold }]}>
+                <Text style={[styles.monthLabel, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                   {dayjs(selectedMonth).format('MMMM YYYY')}
                 </Text>
-                <Text style={[styles.monthSubLabel, { fontFamily: typography.fonts.medium }]}>
+                <Text style={[styles.monthSubLabel, { fontFamily: typography.fonts.medium, color: colors.textMuted }]}>
                   {Math.ceil(calendarDays.length / 7)} Weeks Overview
                 </Text>
               </View>
-              <Pressable onPress={handleNextMonth} style={styles.monthNavArrow}>
-                <Ionicons name="chevron-forward" size={20} color="#4F46E5" />
+              <Pressable onPress={handleNextMonth} style={[styles.monthNavArrow, { backgroundColor: isDark ? colors.border : '#F8FAFC' }]}>
+                <Ionicons name="chevron-forward" size={20} color={isDark ? colors.primary : '#4F46E5'} />
               </Pressable>
             </View>
           </Card>
@@ -617,54 +732,66 @@ export default function AttendanceHistoryScreen() {
           ) : (
             <View style={styles.statsRow}>
               {/* Present Card */}
-              <View style={[styles.statCard, { backgroundColor: '#E6F7F0' }]}>
+              <View style={[styles.statCard, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#E6F7F0' }]}>
                 <View style={styles.statHeader}>
                   <Ionicons name="checkmark-circle" size={14} color="#10B981" />
                   <Text style={[styles.statLabel, { color: '#10B981', fontFamily: typography.fonts.bold }]}>
                     PRESENT
                   </Text>
                 </View>
-                <Text style={[styles.statValue, { fontFamily: typography.fonts.bold }]}>
+                <Text style={[styles.statValue, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                   {String(activePresentCount).padStart(2, '0')}{' '}
-                  <Text style={[styles.statUnit, { fontFamily: typography.fonts.medium }]}>days</Text>
+                  <Text style={[styles.statUnit, { fontFamily: typography.fonts.medium, color: colors.textMuted }]}>days</Text>
                 </Text>
               </View>
 
               {/* Late Card */}
-              <View style={[styles.statCard, { backgroundColor: '#EBF5FF' }]}>
+              <View style={[styles.statCard, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EBF5FF' }]}>
                 <View style={styles.statHeader}>
                   <Ionicons name="time" size={14} color="#3B82F6" />
                   <Text style={[styles.statLabel, { color: '#3B82F6', fontFamily: typography.fonts.bold }]}>
                     LATE
                   </Text>
                 </View>
-                <Text style={[styles.statValue, { fontFamily: typography.fonts.bold }]}>
+                <Text style={[styles.statValue, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                   {String(activeLateCount).padStart(2, '0')}{' '}
-                  <Text style={[styles.statUnit, { fontFamily: typography.fonts.medium }]}>days</Text>
+                  <Text style={[styles.statUnit, { fontFamily: typography.fonts.medium, color: colors.textMuted }]}>days</Text>
                 </Text>
               </View>
 
               {/* Avg Hours Card */}
-              <View style={[styles.statCard, { backgroundColor: '#EEF2FF' }]}>
+              <View style={[styles.statCard, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#EEF2FF' }]}>
                 <View style={styles.statHeader}>
                   <Ionicons name="pulse" size={14} color="#8B5CF6" />
                   <Text style={[styles.statLabel, { color: '#8B5CF6', fontFamily: typography.fonts.bold }]}>
                     AVG HOURS
                   </Text>
                 </View>
-                <Text style={[styles.statValue, { fontFamily: typography.fonts.bold }]}>
+                <Text style={[styles.statValue, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                   {activeAvgHours}{' '}
-                  <Text style={[styles.statUnit, { fontFamily: typography.fonts.medium }]}>hrs</Text>
+                  <Text style={[styles.statUnit, { fontFamily: typography.fonts.medium, color: colors.textMuted }]}>hrs</Text>
                 </Text>
               </View>
             </View>
           )}
 
           {/* ─── Activity Calendar ─── */}
-          <View style={styles.calendarCard}>
-            <Text style={[styles.sectionTitle, { fontFamily: typography.fonts.bold, marginBottom: spacing.lg }]}>
-              Activity Calendar
-            </Text>
+          <View style={[styles.calendarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }}>
+              <Text style={[styles.sectionTitle, { fontFamily: typography.fonts.bold, color: colors.text, marginBottom: 0 }]}>
+                Activity Calendar
+              </Text>
+              {selectedFilter !== 'All' && (
+                <View style={[styles.statusLabelBadge, { backgroundColor: isDark ? colors.border : '#EEF2FF', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center' }]}>
+                  <Text style={{ fontSize: 11, color: isDark ? colors.primary : '#4F46E5', fontFamily: typography.fonts.bold }}>
+                    {selectedFilter}
+                  </Text>
+                  <Pressable onPress={() => setSelectedFilter('All')} style={{ marginLeft: 6 }}>
+                    <Ionicons name="close-circle" size={14} color={isDark ? colors.primary : '#4F46E5'} />
+                  </Pressable>
+                </View>
+              )}
+            </View>
 
             {/* Weekday headers aligned mathematically with columns */}
             <View style={styles.weekHeadersRow}>
@@ -697,6 +824,12 @@ export default function AttendanceHistoryScreen() {
                   const isToday = day.dateString === dayjs().format('YYYY-MM-DD');
                   const dayRecord = recordsMap.get(day.dateString);
                   const config = getStatusConfig(dayRecord?.status, day.dateString, dayRecord?.punchIn, dayRecord?.punchOut);
+                  
+                  const matchesFilter = selectedFilter === 'All' || 
+                    (selectedFilter === 'Present' && config.text === 'Present') ||
+                    (selectedFilter === 'Late' && config.text === 'Late') ||
+                    (selectedFilter === 'Absent' && config.text === 'Absent') ||
+                    (selectedFilter === 'Half Day' && config.text === 'Half Day');
 
                   const dayOfWeek = day.date.day();
                   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Saturday & Sunday are weekly off weekends!
@@ -729,11 +862,11 @@ export default function AttendanceHistoryScreen() {
                       // Weekday with no record (Absent or today/future)
                       const isTodayOrFuture = day.dateString === dayjs().format('YYYY-MM-DD') || dayjs(day.dateString).isAfter(dayjs(), 'day');
                       if (isTodayOrFuture) {
-                        cellBg = '#F8FAFC'; // default soft gray
+                        cellBg = isDark ? colors.border : '#F8FAFC'; // default soft gray
                       } else {
                         // Past weekday with no record is Absent
-                        cellBg = '#FFF5F5'; // Soft light red
-                        cellBorderColor = '#FEE2E2';
+                        cellBg = isDark ? 'rgba(239, 68, 68, 0.15)' : '#FFF5F5'; // Soft light red
+                        cellBorderColor = isDark ? 'rgba(239, 68, 68, 0.3)' : '#FEE2E2';
                         cellBorderWidth = 1;
                       }
                     }
@@ -746,13 +879,15 @@ export default function AttendanceHistoryScreen() {
                     }
                   }
 
-                  let textColor = '#1E293B';
+                  let textColor = isDark ? colors.text : '#1E293B';
                   if (isSelected) {
                     textColor = '#FFFFFF';
                   } else if (isPunchError) {
                     textColor = '#D97706'; // warning orange/amber text
                   } else if (!day.isCurrentMonth) {
-                    textColor = '#CBD5E1'; // faint gray padding day text
+                    textColor = isDark ? colors.textMuted : '#CBD5E1'; // faint gray padding day text
+                  } else if (dayRecord) {
+                    textColor = config.color;
                   }
 
                   let dotColor = config.dotColor;
@@ -764,6 +899,7 @@ export default function AttendanceHistoryScreen() {
                     <Pressable
                       key={idx}
                       onPress={() => handleDateSelect(day.dateString)}
+                      disabled={!matchesFilter}
                       style={[
                         styles.dayCell,
                         {
@@ -774,6 +910,7 @@ export default function AttendanceHistoryScreen() {
                           borderWidth: cellBorderWidth,
                           borderRadius: 12,
                           marginRight: (idx % 7 < 6) ? 8 : 0,
+                          opacity: matchesFilter ? 1 : 0.15,
                         },
                         isSelected && {
                           shadowColor: '#3F51B5',
@@ -818,27 +955,27 @@ export default function AttendanceHistoryScreen() {
             )}
 
             {/* Calendar Legends */}
-            <View style={styles.legendContainer}>
+            <View style={[styles.legendContainer, { borderTopColor: colors.border }]}>
               <View style={styles.legendRow}>
-                <View style={[styles.legendItem, { backgroundColor: '#E6F7F0' }]}>
+                <View style={[styles.legendItem, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#E6F7F0' }]}>
                   <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
                   <Text style={[styles.legendText, { color: '#10B981', fontFamily: typography.fonts.semibold }]}>Present</Text>
                 </View>
-                <View style={[styles.legendItem, { backgroundColor: '#EBF5FF' }]}>
+                <View style={[styles.legendItem, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EBF5FF' }]}>
                   <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
                   <Text style={[styles.legendText, { color: '#3B82F6', fontFamily: typography.fonts.semibold }]}>Late</Text>
                 </View>
-                <View style={[styles.legendItem, { backgroundColor: '#FEE2E2' }]}>
+                <View style={[styles.legendItem, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2' }]}>
                   <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
                   <Text style={[styles.legendText, { color: '#EF4444', fontFamily: typography.fonts.semibold }]}>Absent</Text>
                 </View>
-                <View style={[styles.legendItem, { backgroundColor: '#FEF3C7' }]}>
+                <View style={[styles.legendItem, { backgroundColor: isDark ? 'rgba(234, 179, 8, 0.15)' : '#FEF3C7' }]}>
                   <View style={[styles.legendDot, { backgroundColor: '#EAB308' }]} />
                   <Text style={[styles.legendText, { color: '#EAB308', fontFamily: typography.fonts.semibold }]}>Half Day</Text>
                 </View>
               </View>
               <View style={[styles.legendRow, { marginTop: 8, justifyContent: 'flex-start' }]}>
-                <View style={[styles.legendItem, { backgroundColor: '#F3E8FF' }]}>
+                <View style={[styles.legendItem, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F3E8FF' }]}>
                   <View style={[styles.legendDot, { backgroundColor: '#8B5CF6' }]} />
                   <Text style={[styles.legendText, { color: '#8B5CF6', fontFamily: typography.fonts.semibold }]}>Paid Leave</Text>
                 </View>
@@ -848,39 +985,78 @@ export default function AttendanceHistoryScreen() {
 
           {/* ─── Detailed Logs Section ─── */}
           <View style={[styles.detailedLogsHeader, { paddingHorizontal: 20 }]}>
-            <Text style={[styles.sectionTitle, { fontFamily: typography.fonts.bold }]}>
+            <Text style={[styles.sectionTitle, { fontFamily: typography.fonts.bold, color: colors.text }]}>
               Detailed Logs
             </Text>
           </View>
 
-          {isLoading ? (
-            <View style={{ paddingHorizontal: 20 }}>
-              <Skeleton height={160} borderRadius={24} />
-            </View>
-          ) : dailyRecord ? (
-            <Card
-              style={[
-                styles.logCard,
-                {
-                  marginHorizontal: 20,
-                  borderRadius: 24,
-                  borderTopWidth: 6,
-                  borderTopColor: selectedConfig.color,
-                },
-              ]}
-            >
+          {(() => {
+            const selectedMatchesFilter = selectedFilter === 'All' || 
+              (selectedFilter === 'Present' && selectedConfig.text === 'Present') ||
+              (selectedFilter === 'Late' && selectedConfig.text === 'Late') ||
+              (selectedFilter === 'Absent' && selectedConfig.text === 'Absent') ||
+              (selectedFilter === 'Half Day' && selectedConfig.text === 'Half Day');
+
+            if (isLoading) {
+              return (
+                <View style={{ paddingHorizontal: 20 }}>
+                  <Skeleton height={160} borderRadius={24} />
+                </View>
+              );
+            }
+
+            if (!selectedMatchesFilter) {
+              return (
+                <View style={{ paddingHorizontal: 20 }}>
+                  <View style={{
+                    alignItems: 'center',
+                    paddingVertical: 32,
+                    backgroundColor: isDark ? colors.border : '#F8FAFC',
+                    borderRadius: 24,
+                    borderStyle: 'dashed',
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                    marginTop: 8,
+                  }}>
+                    <Ionicons name="funnel-outline" size={36} color={colors.textMuted} style={{ marginBottom: 12 }} />
+                    <Text style={{ color: colors.text, fontSize: 14, fontFamily: typography.fonts.bold, textAlign: 'center', paddingHorizontal: 24, marginBottom: 6 }}>
+                      No "{selectedFilter}" log for this date
+                    </Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12, fontFamily: typography.fonts.medium, textAlign: 'center', paddingHorizontal: 24 }}>
+                      Tap on any highlighted day in the calendar grid to view details.
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+
+            if (dailyRecord) {
+              return (
+                <Card
+                  style={[
+                    styles.logCard,
+                    {
+                      marginHorizontal: 20,
+                      borderRadius: 24,
+                      borderTopWidth: 6,
+                      borderTopColor: selectedConfig.color,
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
               <View style={styles.logCardHeader}>
                 <View style={styles.logCardDateCol}>
-                  <View style={styles.dateBubble}>
-                    <Text style={[styles.dateBubbleDay, { fontFamily: typography.fonts.medium }]}>
+                  <View style={[styles.dateBubble, { backgroundColor: isDark ? colors.border : '#EEF2FF' }]}>
+                    <Text style={[styles.dateBubbleDay, { fontFamily: typography.fonts.medium, color: isDark ? colors.text : '#4F46E5' }]}>
                       {dayjs(selectedDate).format('ddd').toUpperCase()}
                     </Text>
-                    <Text style={[styles.dateBubbleNum, { fontFamily: typography.fonts.bold }]}>
+                    <Text style={[styles.dateBubbleNum, { fontFamily: typography.fonts.bold, color: isDark ? colors.text : '#4F46E5' }]}>
                       {dayjs(selectedDate).format('D')}
                     </Text>
                   </View>
                   <View style={styles.dateLabelGroup}>
-                    <Text style={[styles.logDateVal, { fontFamily: typography.fonts.bold }]}>
+                    <Text style={[styles.logDateVal, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                       {dayjs(selectedDate).format('MMMM D, YYYY')}
                     </Text>
                     <View
@@ -900,10 +1076,10 @@ export default function AttendanceHistoryScreen() {
                 </View>
 
                 <View style={styles.durationCol}>
-                  <Text style={[styles.durationVal, { fontFamily: typography.fonts.bold }]}>
+                  <Text style={[styles.durationVal, { fontFamily: typography.fonts.bold, color: isDark ? colors.primary : '#4F46E5' }]}>
                     {activeDurationDisplay}
                   </Text>
-                  <Text style={[styles.durationLabel, { fontFamily: typography.fonts.bold }]}>
+                  <Text style={[styles.durationLabel, { fontFamily: typography.fonts.bold, color: colors.textMuted }]}>
                     TOTAL DURATION
                   </Text>
                 </View>
@@ -914,15 +1090,15 @@ export default function AttendanceHistoryScreen() {
                 <View style={{
                   alignItems: 'center',
                   paddingVertical: 24,
-                  backgroundColor: '#F8FAFC',
+                  backgroundColor: isDark ? colors.border : '#F8FAFC',
                   borderRadius: 16,
                   borderStyle: 'dashed',
                   borderWidth: 1.5,
-                  borderColor: '#E2E8F0',
+                  borderColor: colors.border,
                   marginTop: 8,
                 }}>
-                  <Ionicons name="calendar-clear-outline" size={32} color="#94A3B8" style={{ marginBottom: 8 }} />
-                  <Text style={{ color: '#64748B', fontSize: 13, fontFamily: typography.fonts.medium }}>
+                  <Ionicons name="calendar-clear-outline" size={32} color={colors.textMuted} style={{ marginBottom: 8 }} />
+                  <Text style={{ color: colors.textMuted, fontSize: 13, fontFamily: typography.fonts.medium }}>
                     No data available for this date
                   </Text>
                 </View>
@@ -933,15 +1109,15 @@ export default function AttendanceHistoryScreen() {
                     {/* Punch In */}
                     <Pressable
                       onPress={() => handleOpenCorrectionModal('In')}
-                      style={styles.punchDetailsBox}
+                      style={[styles.punchDetailsBox, { backgroundColor: isDark ? colors.border : '#F1F5F9' }]}
                     >
                       <View style={styles.punchHeader}>
-                        <Text style={[styles.punchTitle, { fontFamily: typography.fonts.bold }]}>
+                        <Text style={[styles.punchTitle, { fontFamily: typography.fonts.bold, color: colors.textMuted }]}>
                           PUNCH IN
                         </Text>
-                        <Ionicons name="create-outline" size={14} color="#64748B" />
+                        <Ionicons name="create-outline" size={14} color={colors.textMuted} />
                       </View>
-                      <Text style={[styles.punchTimeText, { fontFamily: typography.fonts.bold }]}>
+                      <Text style={[styles.punchTimeText, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                         {formatTime12h(dailyRecord.punchIn)}
                       </Text>
                       <Text style={[styles.punchStatusSubtitle, { color: dailyRecord.status === 'Late' ? '#F59E0B' : '#10B981', fontFamily: typography.fonts.bold }]}>
@@ -952,18 +1128,18 @@ export default function AttendanceHistoryScreen() {
                     {/* Punch Out */}
                     <Pressable
                       onPress={() => handleOpenCorrectionModal('Out')}
-                      style={styles.punchDetailsBox}
+                      style={[styles.punchDetailsBox, { backgroundColor: isDark ? colors.border : '#F1F5F9' }]}
                     >
                       <View style={styles.punchHeader}>
-                        <Text style={[styles.punchTitle, { fontFamily: typography.fonts.bold }]}>
+                        <Text style={[styles.punchTitle, { fontFamily: typography.fonts.bold, color: colors.textMuted }]}>
                           PUNCH OUT
                         </Text>
-                        <Ionicons name="create-outline" size={14} color="#64748B" />
+                        <Ionicons name="create-outline" size={14} color={colors.textMuted} />
                       </View>
-                      <Text style={[styles.punchTimeText, { fontFamily: typography.fonts.bold }]}>
+                      <Text style={[styles.punchTimeText, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                         {formatTime12h(dailyRecord.punchOut)}
                       </Text>
-                      <Text style={[styles.punchStatusSubtitle, { color: dailyRecord.punchOut && dailyRecord.punchOut !== '--:--' ? '#10B981' : '#94A3B8', fontFamily: typography.fonts.bold }]}>
+                      <Text style={[styles.punchStatusSubtitle, { color: dailyRecord.punchOut && dailyRecord.punchOut !== '--:--' ? '#10B981' : (isDark ? colors.textMuted : '#94A3B8'), fontFamily: typography.fonts.bold }]}>
                         {dailyRecord.punchOut && dailyRecord.punchOut !== '--:--' ? 'Regular Exit' : 'Pending'}
                       </Text>
                     </Pressable>
@@ -973,10 +1149,10 @@ export default function AttendanceHistoryScreen() {
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md }}>
                     <Pressable
                       onPress={() => handleOpenCorrectionModal('In')}
-                      style={[styles.correctionTriggerBtn, { flex: 1 }]}
+                      style={[styles.correctionTriggerBtn, { flex: 1, backgroundColor: isDark ? colors.border : '#F8FAFC', borderColor: colors.border }]}
                     >
-                      <Ionicons name="git-pull-request" size={16} color="#3F51B5" style={{ marginRight: 6 }} />
-                      <Text style={[styles.correctionTriggerText, { color: '#3F51B5', fontFamily: typography.fonts.semibold }]}>
+                      <Ionicons name="git-pull-request" size={16} color={isDark ? colors.primary : '#3F51B5'} style={{ marginRight: 6 }} />
+                      <Text style={[styles.correctionTriggerText, { color: isDark ? colors.primary : '#3F51B5', fontFamily: typography.fonts.semibold }]}>
                         Request Punch Correction
                       </Text>
                     </Pressable>
@@ -984,9 +1160,9 @@ export default function AttendanceHistoryScreen() {
                     {/* Small button with badge */}
                     <Pressable
                       onPress={() => setIsHistoryModalOpen(true)}
-                      style={styles.requestCountBtn}
+                      style={[styles.requestCountBtn, { backgroundColor: isDark ? colors.border : '#F8FAFC', borderColor: colors.border }]}
                     >
-                      <Ionicons name="list-outline" size={20} color="#3F51B5" />
+                      <Ionicons name="list-outline" size={20} color={isDark ? colors.primary : '#3F51B5'} />
                       {requestCount > 0 && (
                         <View style={styles.badgeContainer}>
                           <Text style={styles.badgeText}>{requestCount}</Text>
@@ -997,9 +1173,9 @@ export default function AttendanceHistoryScreen() {
 
                   {/* Work Location details if available */}
                   {dailyRecord.location?.address && (
-                    <View style={styles.locationDetailsRow}>
-                      <Ionicons name="location-outline" size={14} color="#64748B" style={{ marginRight: 6 }} />
-                      <Text style={[styles.locationText, { color: '#64748B', fontFamily: typography.fonts.medium }]} numberOfLines={1}>
+                    <View style={[styles.locationDetailsRow, { borderTopColor: colors.border }]}>
+                      <Ionicons name="location-outline" size={14} color={colors.textMuted} style={{ marginRight: 6 }} />
+                      <Text style={[styles.locationText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]} numberOfLines={1}>
                         Location: {dailyRecord.location.address}
                       </Text>
                     </View>
@@ -1007,15 +1183,19 @@ export default function AttendanceHistoryScreen() {
                 </View>
               )}
             </Card>
-          ) : (
-            <View style={{ paddingHorizontal: 20 }}>
-              <EmptyState
-                title="No logs recorded"
-                description={`No attendance punches registered for ${dayjs(selectedDate).format('MMM DD, YYYY')}.`}
-                icon="calendar-clear-outline"
-              />
-            </View>
-          )}
+          );
+        }
+
+            return (
+              <View style={{ paddingHorizontal: 20 }}>
+                <EmptyState
+                  title="No logs recorded"
+                  description={`No attendance punches registered for ${dayjs(selectedDate).format('MMM DD, YYYY')}.`}
+                  icon="calendar-clear-outline"
+                />
+              </View>
+            );
+          })()}
         </ScrollView>
       )}
 
@@ -1028,19 +1208,19 @@ export default function AttendanceHistoryScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalBackdrop}
+          style={[styles.modalBackdrop, { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(15, 23, 42, 0.5)' }]}
         >
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
             {successText ? (
               /* Inline Success Feedback */
               <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-                <View style={[styles.alertIconCircle, { backgroundColor: '#ECFDF5', marginBottom: 16 }]}>
+                <View style={[styles.alertIconCircle, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', marginBottom: 16 }]}>
                   <Ionicons name="checkmark-circle" size={48} color="#10B981" />
                 </View>
-                <Text style={[styles.modalTitle, { fontFamily: typography.fonts.bold, textAlign: 'center', marginBottom: 8 }]}>
+                <Text style={[styles.modalTitle, { fontFamily: typography.fonts.bold, textAlign: 'center', marginBottom: 8, color: colors.text }]}>
                   {successText}
                 </Text>
-                <Text style={{ textAlign: 'center', color: '#64748B', fontFamily: typography.fonts.medium, fontSize: 13 }}>
+                <Text style={{ textAlign: 'center', color: colors.textMuted, fontFamily: typography.fonts.medium, fontSize: 13 }}>
                   This request will close automatically...
                 </Text>
               </View>
@@ -1049,36 +1229,36 @@ export default function AttendanceHistoryScreen() {
               <View>
                 {/* Header */}
                 <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { fontFamily: typography.fonts.bold }]}>
+                  <Text style={[styles.modalTitle, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                     {editingRequestId ? 'Edit Punch Request' : 'Punch Correction'}
                   </Text>
                   <Pressable onPress={() => setIsCorrectionModalOpen(false)} style={styles.modalCloseBtn}>
-                    <Ionicons name="close" size={24} color="#64748B" />
+                    <Ionicons name="close" size={24} color={colors.textMuted} />
                   </Pressable>
                 </View>
 
                 {/* Selected Date Indicator */}
-                <View style={styles.modalDateInfo}>
-                  <Ionicons name="calendar-outline" size={16} color="#4F46E5" style={{ marginRight: 6 }} />
-                  <Text style={[styles.modalDateText, { fontFamily: typography.fonts.semibold }]}>
+                <View style={[styles.modalDateInfo, { backgroundColor: isDark ? colors.border : '#EEF2FF' }]}>
+                  <Ionicons name="calendar-outline" size={16} color={isDark ? colors.text : '#4F46E5'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.modalDateText, { fontFamily: typography.fonts.semibold, color: isDark ? colors.text : '#4F46E5' }]}>
                     For {dayjs(selectedDate).format('MMMM DD, YYYY')}
                   </Text>
                 </View>
 
                 {/* Segmented Punch Type Selector */}
-                <View style={styles.segmentContainer}>
+                <View style={[styles.segmentContainer, { backgroundColor: isDark ? colors.border : '#F1F5F9' }]}>
                   <Pressable
                     onPress={() => handlePunchTypeChange('In')}
                     style={[
                       styles.segmentBtn,
-                      punchType === 'In' && styles.segmentBtnActive,
+                      punchType === 'In' && [styles.segmentBtnActive, { backgroundColor: isDark ? colors.card : '#FFFFFF' }],
                     ]}
                   >
                     <Text
                       style={[
                         styles.segmentText,
                         { fontFamily: typography.fonts.bold },
-                        punchType === 'In' && styles.segmentTextActive,
+                        punchType === 'In' ? { color: isDark ? colors.text : '#3F51B5' } : { color: colors.textMuted },
                       ]}
                     >
                       Punch In
@@ -1088,14 +1268,14 @@ export default function AttendanceHistoryScreen() {
                     onPress={() => handlePunchTypeChange('Out')}
                     style={[
                       styles.segmentBtn,
-                      punchType === 'Out' && styles.segmentBtnActive,
+                      punchType === 'Out' && [styles.segmentBtnActive, { backgroundColor: isDark ? colors.card : '#FFFFFF' }],
                     ]}
                   >
                     <Text
                       style={[
                         styles.segmentText,
                         { fontFamily: typography.fonts.bold },
-                        punchType === 'Out' && styles.segmentTextActive,
+                        punchType === 'Out' ? { color: isDark ? colors.text : '#3F51B5' } : { color: colors.textMuted },
                       ]}
                     >
                       Punch Out
@@ -1104,52 +1284,52 @@ export default function AttendanceHistoryScreen() {
                 </View>
 
                 {/* Time Picker Inputs */}
-                <Text style={[styles.inputLabel, { fontFamily: typography.fonts.bold }]}>
+                <Text style={[styles.inputLabel, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                   Proposed Time
                 </Text>
                 <View style={styles.timeInputsRow}>
                   <View style={styles.timeInputWrapper}>
                     <TextInput
-                      style={[styles.timeInput, { fontFamily: typography.fonts.bold }]}
+                      style={[styles.timeInput, { fontFamily: typography.fonts.bold, backgroundColor: isDark ? colors.border : '#F8FAFC', borderColor: colors.border, color: colors.text }]}
                       placeholder="09"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={colors.textMuted}
                       keyboardType="numeric"
                       maxLength={2}
                       value={proposedHour}
                       onChangeText={setProposedHour}
                     />
-                    <Text style={styles.timeInputSub}>HH</Text>
+                    <Text style={[styles.timeInputSub, { color: colors.textMuted }]}>HH</Text>
                   </View>
 
-                  <Text style={[styles.timeColon, { fontFamily: typography.fonts.bold }]}>:</Text>
+                  <Text style={[styles.timeColon, { fontFamily: typography.fonts.bold, color: colors.textMuted }]}>:</Text>
 
                   <View style={styles.timeInputWrapper}>
                     <TextInput
-                      style={[styles.timeInput, { fontFamily: typography.fonts.bold }]}
+                      style={[styles.timeInput, { fontFamily: typography.fonts.bold, backgroundColor: isDark ? colors.border : '#F8FAFC', borderColor: colors.border, color: colors.text }]}
                       placeholder="30"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={colors.textMuted}
                       keyboardType="numeric"
                       maxLength={2}
                       value={proposedMin}
                       onChangeText={setProposedMin}
                     />
-                    <Text style={styles.timeInputSub}>MM</Text>
+                    <Text style={[styles.timeInputSub, { color: colors.textMuted }]}>MM</Text>
                   </View>
 
                   {/* AM/PM Toggle */}
-                  <View style={styles.ampmToggleContainer}>
+                  <View style={[styles.ampmToggleContainer, { backgroundColor: isDark ? colors.border : '#F1F5F9' }]}>
                     <Pressable
                       onPress={() => setProposedAmPm('AM')}
                       style={[
                         styles.ampmBtn,
-                        proposedAmPm === 'AM' && styles.ampmBtnActive,
+                        proposedAmPm === 'AM' && [styles.ampmBtnActive, { backgroundColor: isDark ? colors.card : '#FFFFFF' }],
                       ]}
                     >
                       <Text
                         style={[
                           styles.ampmText,
                           { fontFamily: typography.fonts.bold },
-                          proposedAmPm === 'AM' && styles.ampmTextActive,
+                          proposedAmPm === 'AM' ? { color: isDark ? colors.text : '#3F51B5' } : { color: colors.textMuted },
                         ]}
                       >
                         AM
@@ -1159,14 +1339,14 @@ export default function AttendanceHistoryScreen() {
                       onPress={() => setProposedAmPm('PM')}
                       style={[
                         styles.ampmBtn,
-                        proposedAmPm === 'PM' && styles.ampmBtnActive,
+                        proposedAmPm === 'PM' && [styles.ampmBtnActive, { backgroundColor: isDark ? colors.card : '#FFFFFF' }],
                       ]}
                     >
                       <Text
                         style={[
                           styles.ampmText,
                           { fontFamily: typography.fonts.bold },
-                          proposedAmPm === 'PM' && styles.ampmTextActive,
+                          proposedAmPm === 'PM' ? { color: isDark ? colors.text : '#3F51B5' } : { color: colors.textMuted },
                         ]}
                       >
                         PM
@@ -1176,15 +1356,15 @@ export default function AttendanceHistoryScreen() {
                 </View>
 
                 {/* Reason Text Area */}
-                <Text style={[styles.inputLabel, { fontFamily: typography.fonts.bold, marginTop: 16 }]}>
+                <Text style={[styles.inputLabel, { fontFamily: typography.fonts.bold, marginTop: 16, color: colors.text }]}>
                   Reason for Correction
                 </Text>
                 <TextInput
-                  style={[styles.reasonTextarea, { fontFamily: typography.fonts.medium }]}
+                  style={[styles.reasonTextarea, { fontFamily: typography.fonts.medium, backgroundColor: isDark ? colors.border : '#F8FAFC', borderColor: colors.border, color: colors.text }]}
                   multiline={true}
                   numberOfLines={4}
                   placeholder="Provide a reason for approval..."
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={colors.textMuted}
                   value={reason}
                   onChangeText={setReason}
                 />
@@ -1203,16 +1383,16 @@ export default function AttendanceHistoryScreen() {
                 <View style={styles.modalActionsRow}>
                   <Pressable
                     onPress={() => setIsCorrectionModalOpen(false)}
-                    style={styles.cancelBtn}
+                    style={[styles.cancelBtn, { borderColor: colors.border }]}
                     disabled={isSubmittingRequest}
                   >
-                    <Text style={[styles.cancelBtnText, { fontFamily: typography.fonts.semibold }]}>
+                    <Text style={[styles.cancelBtnText, { fontFamily: typography.fonts.semibold, color: colors.textMuted }]}>
                       Cancel
                     </Text>
                   </Pressable>
                   <Pressable
                     onPress={handleSubmitCorrection}
-                    style={[styles.submitBtn, { backgroundColor: '#3F51B5' }]}
+                    style={[styles.submitBtn, { backgroundColor: isDark ? colors.primary : '#3F51B5' }]}
                     disabled={isSubmittingRequest}
                   >
                     {isSubmittingRequest ? (
@@ -1238,20 +1418,20 @@ export default function AttendanceHistoryScreen() {
         onRequestClose={() => setIsHistoryModalOpen(false)}
       >
         <Pressable
-          style={styles.modalBackdrop}
+          style={[styles.modalBackdrop, { backgroundColor: isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(15, 23, 42, 0.5)' }]}
           onPress={() => setIsHistoryModalOpen(false)}
         >
           <Pressable
-            style={[styles.modalCard, { maxHeight: '80%', padding: 24 }]}
+            style={[styles.modalCard, { maxHeight: '80%', padding: 24, backgroundColor: colors.card }]}
             onPress={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { fontFamily: typography.fonts.bold }]}>
+              <Text style={[styles.modalTitle, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                 Correction Requests
               </Text>
               <Pressable onPress={() => setIsHistoryModalOpen(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={24} color="#64748B" />
+                <Ionicons name="close" size={24} color={colors.textMuted} />
               </Pressable>
             </View>
 
@@ -1261,8 +1441,12 @@ export default function AttendanceHistoryScreen() {
                 style={[
                   styles.inlineErrorBanner,
                   {
-                    backgroundColor: historyAlert.type === 'success' ? '#ECFDF5' : '#FFF5F5',
-                    borderColor: historyAlert.type === 'success' ? '#D1FAE5' : '#FEE2E2',
+                    backgroundColor: historyAlert.type === 'success' 
+                      ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5') 
+                      : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FFF5F5'),
+                    borderColor: historyAlert.type === 'success' 
+                      ? (isDark ? 'rgba(16, 185, 129, 0.3)' : '#D1FAE5') 
+                      : (isDark ? 'rgba(239, 68, 68, 0.3)' : '#FEE2E2'),
                     marginBottom: 12,
                   },
                 ]}
@@ -1290,8 +1474,8 @@ export default function AttendanceHistoryScreen() {
             {/* Requests List */}
             {filteredRequests.length === 0 ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <Ionicons name="git-pull-request-outline" size={48} color="#94A3B8" style={{ marginBottom: 12 }} />
-                <Text style={{ color: '#64748B', fontFamily: typography.fonts.medium }}>No requests submitted for this date yet.</Text>
+                <Ionicons name="git-pull-request-outline" size={48} color={colors.textMuted} style={{ marginBottom: 12 }} />
+                <Text style={{ color: colors.textMuted, fontFamily: typography.fonts.medium }}>No requests submitted for this date yet.</Text>
               </View>
             ) : (
               <FlatList
@@ -1302,15 +1486,15 @@ export default function AttendanceHistoryScreen() {
                   const isApproved = item.status === 'Approved';
                   const isPending = item.status === 'Pending';
                   return (
-                    <View style={styles.requestHistoryCard}>
+                    <View style={[styles.requestHistoryCard, { backgroundColor: isDark ? colors.border : '#F8FAFC', borderColor: colors.border }]}>
                       <View style={styles.requestHistoryHeader}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons
                             name={item.type === 'In' ? 'enter-outline' : 'exit-outline'}
                             size={16}
-                            color="#3F51B5"
+                            color={isDark ? colors.primary : '#3F51B5'}
                           />
-                          <Text style={[styles.requestHistoryType, { fontFamily: typography.fonts.bold }]}>
+                          <Text style={[styles.requestHistoryType, { fontFamily: typography.fonts.bold, color: colors.text }]}>
                             Punch {item.type}
                           </Text>
                         </View>
@@ -1338,14 +1522,14 @@ export default function AttendanceHistoryScreen() {
                       </View>
                       
                       <View style={{ marginTop: 8, gap: 4 }}>
-                        <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium }]}>
-                          Date: <Text style={{ fontFamily: typography.fonts.semibold, color: '#0F172A' }}>{dayjs(item.date).format('MMM DD, YYYY')}</Text>
+                        <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium, color: colors.textMuted }]}>
+                          Date: <Text style={{ fontFamily: typography.fonts.semibold, color: colors.text }}>{dayjs(item.date).format('MMM DD, YYYY')}</Text>
                         </Text>
-                        <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium }]}>
-                          Proposed Time: <Text style={{ fontFamily: typography.fonts.semibold, color: '#3F51B5' }}>{item.proposedTime}</Text>
+                        <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium, color: colors.textMuted }]}>
+                          Proposed Time: <Text style={{ fontFamily: typography.fonts.semibold, color: isDark ? colors.primary : '#3F51B5' }}>{item.proposedTime}</Text>
                         </Text>
-                        <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium }]} numberOfLines={2}>
-                          Reason: <Text style={{ color: '#64748B', fontStyle: 'italic' }}>"{item.reason}"</Text>
+                        <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium, color: colors.textMuted }]} numberOfLines={2}>
+                          Reason: <Text style={{ color: colors.textMuted, fontStyle: 'italic' }}>"{item.reason}"</Text>
                         </Text>
                       </View>
 
@@ -1353,10 +1537,10 @@ export default function AttendanceHistoryScreen() {
                         <View style={{ flexDirection: 'row', gap: 8, alignSelf: 'flex-end', marginTop: 8 }}>
                           <Pressable
                             onPress={() => handleEditRequest(item)}
-                            style={styles.editRequestBtn}
+                            style={[styles.editRequestBtn, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EEF2FF', borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : '#C7D2FE' }]}
                           >
-                            <Ionicons name="create-outline" size={14} color="#3F51B5" style={{ marginRight: 4 }} />
-                            <Text style={[styles.editRequestBtnText, { fontFamily: typography.fonts.bold }]}>Edit</Text>
+                            <Ionicons name="create-outline" size={14} color={isDark ? colors.primary : '#3F51B5'} style={{ marginRight: 4 }} />
+                            <Text style={[styles.editRequestBtnText, { fontFamily: typography.fonts.bold, color: isDark ? colors.primary : '#3F51B5' }]}>Edit</Text>
                           </Pressable>
 
                           <Pressable
@@ -1376,7 +1560,7 @@ export default function AttendanceHistoryScreen() {
 
             <Pressable
               onPress={() => setIsHistoryModalOpen(false)}
-              style={[styles.submitBtn, { backgroundColor: '#3F51B5', width: '100%', marginTop: 16 }]}
+              style={[styles.submitBtn, { backgroundColor: isDark ? colors.primary : '#3F51B5', width: '100%', marginTop: 16 }]}
             >
               <Text style={[styles.submitBtnText, { fontFamily: typography.fonts.bold }]}>
                 Close
@@ -1439,6 +1623,7 @@ export default function AttendanceHistoryScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
     </View>
   );
 }

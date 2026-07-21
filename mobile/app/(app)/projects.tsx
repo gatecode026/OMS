@@ -29,6 +29,7 @@ import { Avatar } from '../../src/shared/components/Avatar';
 import { toast } from '../../src/shared/components';
 import { Project } from '../../src/features/projects/types';
 import useAuthStore from '../../src/shared/store/authStore';
+import { useQuickActionsStore } from '../../src/shared/store/quickActionsStore';
 
 const { width } = Dimensions.get('window');
 const ITEMS_PER_PAGE = 6;
@@ -598,9 +599,7 @@ export default function MyProjectsScreen() {
         <Pressable
           style={styles.tabItem}
           onPress={() => {
-            if ((global as any).showQuickActionsSheet) {
-              (global as any).showQuickActionsSheet();
-            }
+            useQuickActionsStore.getState().openActions();
           }}
         >
           <View style={[styles.centerActionBtn, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>

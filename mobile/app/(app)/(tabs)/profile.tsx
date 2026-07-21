@@ -253,7 +253,7 @@ export default function ProfileScreen() {
   const displayEmail = profile?.email || authUser?.email || '—';
   const displayPhone = profile?.phone || authUser?.phone || '—';
   const displayDepartment = profile?.department || authUser?.department || '—';
-  const displayAvatarUrl = profile?.avatarUrl || profile?.profilePhoto || authUser?.avatarUrl;
+  const displayAvatarUrl = profile?.avatarUrl || profile?.avatar || profile?.profilePhoto || (profile as any)?.photoUrl || (profile as any)?.image || (profile as any)?.profileImage || authUser?.avatarUrl || (authUser as any)?.avatar;
 
   const personalItems = [
     {
@@ -332,6 +332,14 @@ export default function ProfileScreen() {
         ]}
       >
         <View style={styles.headerLeft}>
+          <Pressable
+            onPress={() => router.back()}
+            style={{ padding: 4 }}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </Pressable>
           <Text style={{ fontSize: 20, fontFamily: typography.fonts.bold, color: colors.text }}>
             My Profile
           </Text>
@@ -350,11 +358,13 @@ export default function ProfileScreen() {
               <Badge content={String(unreadCount)} style={styles.notificationBadge} />
             )}
           </Pressable>
-          <Avatar
-            source={displayAvatarUrl}
-            name={displayName}
-            size={32}
-          />
+          <Pressable onPress={() => router.push('/(app)/attendance-qr' as any)} accessibilityLabel="View Attendance ID Pass">
+            <Avatar
+              source={displayAvatarUrl}
+              name={displayName}
+              size={32}
+            />
+          </Pressable>
         </View>
       </View>
 

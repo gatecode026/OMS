@@ -35,12 +35,6 @@ export const useChatSocket = (socket: Socket | null) => {
     activeConvIdRef.current = activeConvId;
   }, [activeConvId]);
 
-  const presenceStore = usePresenceStore();
-  const presenceStoreRef = useRef(presenceStore);
-  useEffect(() => {
-    presenceStoreRef.current = presenceStore;
-  }, [presenceStore]);
-
   useEffect(() => {
     if (!socket) return;
 
@@ -124,7 +118,7 @@ export const useChatSocket = (socket: Socket | null) => {
         if (filteredList.some((m: any) => msg.tempId && m.tempId === msg.tempId)) {
           newList = filteredList.map((m: any) => 
             (msg.tempId && m.tempId === msg.tempId)
-              ? { ...m, ...msg, status: m.status === 'failed' ? 'failed' : msg.status || 'sent' }
+              ? { ...m, ...msg, status: msg.status || 'sent' }
               : m
           );
         } else {
@@ -160,7 +154,18 @@ export const useChatSocket = (socket: Socket | null) => {
 
     // Reconnection and automatic retry resend
     const handleConnect = () => {
-      console.log('[ChatSocket] Connected to backend websocket.');
+      const authStore = useAuthStore.getState();
+      const userId = authStore.user?.id || 'unknown';
+      const companyId = authStore.companyId || 'default';
+
+      console.log(`[Socket]
+Connected: true
+Socket ID: ${socket.id}
+User ID: ${userId}
+Tenant ID: ${companyId}
+Environment: ${ENV.ENV}
+URL: ${ENV.API_URL}`);
+
       usePresenceStore.getState().setConnectionInfo({ connectionState: 'connected' });
       socket.emit('get_online_users');
       startHeartbeat();
@@ -176,7 +181,7 @@ export const useChatSocket = (socket: Socket | null) => {
               conversationId: msg.conversationId,
               content: msg.content,
               type: msg.type,
-              tempId: msg.id,
+              tempId: msg.tempId || msg.id,
               media: msg.media,
               replyTo: msg.replyTo,
             };
@@ -208,24 +213,58 @@ export const useChatSocket = (socket: Socket | null) => {
     };
 
     const handleDisconnect = (reason: string) => {
-      console.log('[ChatSocket] Disconnected from websocket:', reason);
+      const authStore = useAuthStore.getState();
+      const userId = authStore.user?.id || 'unknown';
+      const companyId = authStore.companyId || 'default';
+
+      console.log(`[Socket]
+Connected: false
+Reason: ${reason}
+User ID: ${userId}
+Tenant ID: ${companyId}
+Environment: ${ENV.ENV}
+URL: ${ENV.API_URL}`);
+
       usePresenceStore.getState().setConnectionInfo({ connectionState: 'disconnected', ping: 0 });
       if (heartbeatInterval) clearInterval(heartbeatInterval);
     };
 
     const handleConnectError = (error: any) => {
-      console.log('[ChatSocket] Connection error:', error);
+      const authStore = useAuthStore.getState();
+      const userId = authStore.user?.id || 'unknown';
+      const companyId = authStore.companyId || 'default';
+
+      console.log(`[Socket]
+Connected: false
+Error: ${error?.message || error}
+User ID: ${userId}
+Tenant ID: ${companyId}
+Environment: ${ENV.ENV}
+URL: ${ENV.API_URL}`);
+
       usePresenceStore.getState().setConnectionInfo({ connectionState: 'connecting' });
     };
 
     const handleReconnectAttempt = (attempt: number) => {
-      console.log('[ChatSocket] Reconnect attempt #:', attempt);
+      const authStore = useAuthStore.getState();
+      const userId = authStore.user?.id || 'unknown';
+      const companyId = authStore.companyId || 'default';
+
+      console.log(`[Socket]
+Connecting: true
+Reconnecting: true
+Attempt: ${attempt}
+User ID: ${userId}
+Tenant ID: ${companyId}
+Environment: ${ENV.ENV}
+URL: ${ENV.API_URL}`);
+
       usePresenceStore.getState().setConnectionInfo({ connectionState: 'reconnecting' });
     };
 
     const handleUserViewingChat = ({ userId, conversationId, isViewing }: any) => {
       if (userId) {
-        presenceStoreRef.current.setChatscreenStatus(userId, isViewing);
+        usePresenceStore.getState().setChatscreenStatus(userId, isViewing);
       }
     };
 
@@ -242,18 +281,18 @@ export const useChatSocket = (socket: Socket | null) => {
       
       // Process presence changes
       if (presenceChanges.length > 0) {
-        const ids = new Set<string>(presenceStoreRef.current.onlineUserIds);
+        const ids = new Set<string>(usePresenceStore.getState().onlineUserIds);
         presenceChanges.forEach((u: any) => {
           const id = u.userId || u.employeeId || u.id;
           if (id) {
             ids.add(id);
             const status = u.chatStatus || u.status || 'available';
             const emoji = u.statusEmoji || u.emoji || null;
-            presenceStoreRef.current.setUserStatus(id, status, emoji, u.lastSeen);
-            presenceStoreRef.current.setChatscreenStatus(id, u.isOnChatScreen || false);
+            usePresenceStore.getState().setUserStatus(id, status, emoji, u.lastSeen);
+            usePresenceStore.getState().setChatscreenStatus(id, u.isOnChatScreen || false);
           }
         });
-        presenceStoreRef.current.setOnlineUsers(ids);
+        usePresenceStore.getState().setOnlineUsers(ids);
       }
 
       // Process missed messages
@@ -723,13 +762,13 @@ export const useChatSocket = (socket: Socket | null) => {
     // Typing Indicators
     const handleUserTyping = ({ userId, name, conversationId, isRecording }: any) => {
       if (userId && userId !== currentUserIdRef.current) {
-        presenceStoreRef.current.setTyping(conversationId, userId, name, isRecording);
+        usePresenceStore.getState().setTyping(conversationId, userId, name, isRecording);
       }
     };
 
     const handleUserStoppedTyping = ({ userId, conversationId }: any) => {
       if (userId && userId !== currentUserIdRef.current) {
-        presenceStoreRef.current.stopTyping(conversationId, userId);
+        usePresenceStore.getState().stopTyping(conversationId, userId);
       }
     };
 
@@ -743,42 +782,54 @@ export const useChatSocket = (socket: Socket | null) => {
           ids.add(id);
           const status = u.chatStatus || u.status || 'available';
           const emoji = u.statusEmoji || u.emoji || null;
-          presenceStoreRef.current.setUserStatus(id, status, emoji, u.lastSeen);
-          presenceStoreRef.current.setChatscreenStatus(id, u.isOnChatScreen || false);
+          usePresenceStore.getState().setUserStatus(id, status, emoji, u.lastSeen);
+          usePresenceStore.getState().setChatscreenStatus(id, u.isOnChatScreen || false);
         }
       });
-      presenceStoreRef.current.setOnlineUsers(ids);
+      usePresenceStore.getState().setOnlineUsers(ids);
     };
 
     const handleUserOnline = (data: any) => {
-      const { userId, chatStatus, statusEmoji, isOnChatScreen } = data;
-      console.log('[ChatSocket] User online broadcast received:', data);
+      const { userId, name, chatStatus, statusEmoji, isOnChatScreen, lastSeen } = data;
+      const status = chatStatus || data.status || 'available';
+      const emoji = statusEmoji || data.emoji || null;
+
+      console.log(`[Presence]
+User Online: true
+Updated User: ${name || 'unknown'} (${userId})
+Status: ${status}
+Emoji: ${emoji || 'none'}
+Last Seen: ${lastSeen || 'now'}`);
+
       if (userId) {
-        presenceStoreRef.current.addUserOnline(userId);
-        const status = chatStatus || data.status || 'available';
-        const emoji = statusEmoji || data.emoji || null;
-        presenceStoreRef.current.setUserStatus(userId, status, emoji, data.lastSeen);
-        presenceStoreRef.current.setChatscreenStatus(userId, isOnChatScreen || false);
+        usePresenceStore.getState().addUserOnline(userId);
+        usePresenceStore.getState().setUserStatus(userId, status, emoji, lastSeen);
+        usePresenceStore.getState().setChatscreenStatus(userId, isOnChatScreen || false);
       }
     };
 
-    const handleUserOffline = ({ userId, lastSeen }: any) => {
-      console.log('[ChatSocket] User offline broadcast received for userId:', userId);
+    const handleUserOffline = (data: any) => {
+      const { userId, name, lastSeen } = data;
+      console.log(`[Presence]
+User Offline: true
+Updated User: ${name || 'unknown'} (${userId})
+Last Seen: ${lastSeen || 'just now'}`);
+
       if (userId) {
-        presenceStoreRef.current.addUserOffline(userId);
-        presenceStoreRef.current.setChatscreenStatus(userId, false);
-        presenceStoreRef.current.setUserStatus(userId, 'offline', null, lastSeen);
+        usePresenceStore.getState().addUserOffline(userId);
+        usePresenceStore.getState().setChatscreenStatus(userId, false);
+        usePresenceStore.getState().setUserStatus(userId, 'offline', null, lastSeen);
       }
     };
 
     const handleChatscreenChanged = ({ employeeId, isOnChatScreen }: any) => {
-      presenceStoreRef.current.setChatscreenStatus(employeeId, isOnChatScreen);
+      usePresenceStore.getState().setChatscreenStatus(employeeId, isOnChatScreen);
     };
 
     const handleUserStatusChanged = ({ employeeId, status, emoji }: any) => {
       console.log(`[ChatSocket] User status changed: ${employeeId} -> ${status} (${emoji})`);
       if (employeeId) {
-        presenceStoreRef.current.setUserStatus(employeeId, status, emoji);
+        usePresenceStore.getState().setUserStatus(employeeId, status, emoji);
       }
     };
 

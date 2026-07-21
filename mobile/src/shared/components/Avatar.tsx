@@ -37,10 +37,26 @@ export const Avatar: React.FC<AvatarProps> = ({
   const initials = getInitials(name);
   const borderRadius = rounded ? radius.circular : radius.md;
 
-  if (source && !hasError) {
+  // Helper function resolving relative image paths to full HTTP URLs
+  const resolveUri = (url?: string): string | undefined => {
+    if (!url || typeof url !== 'string') return undefined;
+    const clean = url.trim();
+    if (!clean) return undefined;
+    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image/')) {
+      return clean;
+    }
+    const apiEnv = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
+    const baseUrl = apiEnv.replace(/\/+$/, '').replace(/\/api\/v1\/?$/, '');
+    const cleanPath = clean.startsWith('/') ? clean : `/${clean}`;
+    return `${baseUrl}${cleanPath}`;
+  };
+
+  const imageUri = resolveUri(source);
+
+  if (imageUri && !hasError) {
     return (
       <Image
-        source={{ uri: source }}
+        source={{ uri: imageUri }}
         onError={() => setHasError(true)}
         style={[
           {

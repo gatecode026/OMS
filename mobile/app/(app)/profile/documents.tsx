@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import useTheme from '../../../src/shared/hooks/useTheme';
 import useAuthStore from '../../../src/shared/store/authStore';
 import { toast } from '../../../src/shared/components';
+import ImageKitUploadService from '../../../src/shared/services/imagekitUploadService';
 import {
   useProfile,
   useUpdateProfile,
@@ -115,30 +116,46 @@ export default function DocumentsScreen() {
         mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.7,
-        base64: true,
+        base64: false,
       });
 
-      if (!result.canceled && result.assets?.[0]?.base64) {
-        const base64Data = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        const localUri = result.assets[0].uri;
+        const fileName = `${category.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
+        const mimeType = result.assets[0].mimeType || 'image/jpeg';
+
+        // Fetch ImageKit upload credentials from the backend
+        const authParams = await ImageKitUploadService.fetchAuthParams();
+
+        // Perform the direct upload to ImageKit with full progress hooks
+        const uploadRes = await ImageKitUploadService.upload(
+          localUri,
+          fileName,
+          mimeType,
+          authParams,
+          () => {}
+        );
         
         // Remove existing document of the same category if exists
         const filteredDocs = localDocs.filter((d) => d.category !== category);
 
         const newDocObj = {
           category,
-          fileName: `${category.replace(/\s+/g, '_')}_${Date.now()}.jpg`,
+          fileName: uploadRes.name || fileName,
           uploadDate: new Date().toISOString(),
-          fileType: 'image/jpeg',
-          downloadUrl: base64Data,
+          fileType: uploadRes.fileType || mimeType,
+          downloadUrl: uploadRes.url,
+          imageKitFileId: uploadRes.fileId,
+          imageKitFilePath: uploadRes.filePath,
         };
 
         const updatedDocs = [...filteredDocs, newDocObj];
         setLocalDocs(updatedDocs);
-        toast.success(`${category} attached. Press Save to upload.`);
+        toast.success(`${category} attached successfully. Press Save to upload.`);
       }
-    } catch (err) {
-      console.error('Failed to select file:', err);
-      toast.error('Failed to select document.');
+    } catch (err: any) {
+      console.error('Failed to upload file to ImageKit:', err);
+      toast.error(err?.message || 'Failed to upload document.');
     } finally {
       setUploadingCategory(null);
     }
@@ -242,7 +259,7 @@ export default function DocumentsScreen() {
           {DOCUMENT_CATEGORIES.map((category) => {
             const doc = localDocs.find((d) => d.category === category);
             const downloadUrl = doc?.downloadUrl;
-            const isLocalBase64 = downloadUrl?.startsWith('data:');
+            const isUnsaved = doc && !profile?.documents?.some((d: any) => d.category === category && d.downloadUrl === doc.downloadUrl);
 
             return (
               <View
@@ -267,7 +284,7 @@ export default function DocumentsScreen() {
                   </Text>
                   {doc ? (
                     <Text style={{ fontSize: 11, fontFamily: typography.fonts.medium, color: colors.success, marginTop: 2 }}>
-                      {isLocalBase64 ? 'Document attached (unsaved)' : 'Verified Document Uploaded'}
+                      {isUnsaved ? 'Document attached (unsaved)' : 'Verified Document Uploaded'}
                     </Text>
                   ) : (
                     <Text style={{ fontSize: 11, fontFamily: typography.fonts.medium, color: colors.textLight, marginTop: 2 }}>
@@ -277,7 +294,7 @@ export default function DocumentsScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {doc && !isLocalBase64 && (
+                  {doc && (
                     <Pressable
                       onPress={() => handlePreview(downloadUrl)}
                       style={[styles.docActionBtn, { backgroundColor: colors.border, borderRadius: radius.md }]}

@@ -1,7 +1,7 @@
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-native';
 import { useTyping } from '../useTyping';
 
-jest.mock('../../../shared/services/socketManager', () => ({
+jest.mock('../../../../shared/services/socketManager', () => ({
   getSocket: jest.fn(() => ({
     connected: true,
     emit: jest.fn(),

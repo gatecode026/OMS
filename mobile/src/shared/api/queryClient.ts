@@ -41,7 +41,7 @@ queryClient.getQueryCache().subscribe((event) => {
     const key = event.query.queryKey;
     const data = event.action.data;
 
-    const cacheableKeys = ['profile', 'chat', 'conversations', 'messages', 'starred', 'pinned', 'shared-content', 'settings', 'wallpaper'];
+    const cacheableKeys = ['profile', 'chat', 'conversations', 'messages', 'starred', 'pinned', 'shared-content', 'settings', 'wallpaper', 'roles', 'overrides'];
     const isCacheable = key.some(
       (part: any) => typeof part === 'string' && cacheableKeys.some((k) => part.includes(k))
     );
