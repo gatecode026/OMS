@@ -4,8 +4,10 @@
  */
 
 import * as pinnedService from '../services/pinnedService.js';
+import * as chatService from '../chat.service.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { successResponse } from '../../../utils/response.js';
+import { getIO } from '../../../config/socket.js';
 
 // GET /api/v1/chat/conversations/:conversationId/pinned
 export const getPinnedMessages = asyncHandler(async (req, res) => {
@@ -31,4 +33,51 @@ export const getPinnedMessages = asyncHandler(async (req, res) => {
     }
     throw error;
   }
+});
+
+// POST /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
+export const pinMessage = asyncHandler(async (req, res) => {
+  const { conversationId, messageId } = req.params;
+  const { id: employeeId, companyId } = req.user;
+
+  const msg = await chatService.pinMessage(messageId, employeeId, companyId);
+  if (!msg) {
+    return res.status(404).json({ status: 'fail', message: 'Message not found' });
+  }
+
+  // Broadcast to conversation room
+  const io = getIO();
+  if (io) {
+    io.to(`conv:${conversationId}`).emit("message_pinned", {
+      messageId,
+      conversationId,
+      pinnedBy: employeeId,
+      pinnedAt: new Date(),
+    });
+  }
+
+  return successResponse(res, msg, 'Message pinned successfully');
+});
+
+// DELETE /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
+export const unpinMessage = asyncHandler(async (req, res) => {
+  const { conversationId, messageId } = req.params;
+  const { companyId } = req.user;
+
+  const msg = await chatService.unpinMessage(messageId, companyId);
+  if (!msg) {
+    return res.status(404).json({ status: 'fail', message: 'Message not found' });
+  }
+
+  // Broadcast to conversation room
+  const io = getIO();
+  if (io) {
+    io.to(`conv:${conversationId}`).emit("message_unpinned", {
+      messageId,
+      conversationId,
+      unpinnedBy: req.user.id,
+    });
+  }
+
+  return successResponse(res, msg, 'Message unpinned successfully');
 });

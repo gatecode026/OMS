@@ -3,6 +3,28 @@ import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { successResponse } from '../../../utils/response.js';
 import { getIO } from '../../../config/socket.js';
 import { runWithTenant } from '../../../utils/tenantContext.js';
+import ActivityLog from '../../activity-logs/activity-log.model.js';
+import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
+import logger from '../../../config/logger.js';
+
+const logChatActivity = async (companyId, { actor, actionType, fieldChanged, oldValue, newValue }) => {
+  try {
+    const logId = await generateCompanyUniqueId(companyId, 'activity_logs');
+    await ActivityLog.create({
+      id: logId,
+      companyId,
+      timestamp: new Date().toISOString(),
+      actor: actor || 'System',
+      actionType,
+      fieldChanged: fieldChanged || '—',
+      oldValue: oldValue || '—',
+      newValue: newValue || '—',
+      ip: '127.0.0.1'
+    });
+  } catch (err) {
+    logger.error('[UserController] Failed to write ActivityLog:', err);
+  }
+};
 
 // POST /chat/users/:id/block
 export const blockUser = asyncHandler(async (req, res) => {
@@ -85,4 +107,28 @@ export const getBlockedUsers = asyncHandler(async (req, res) => {
   });
 
   return successResponse(res, data, 'Blocked users fetched');
+});
+
+// POST /chat/users/:id/report
+export const reportUser = asyncHandler(async (req, res) => {
+  const { id: targetUserId } = req.params;
+  const { id: userId, companyId } = req.user;
+  const { category, description, screenshotUrl } = req.body;
+
+  if (!category) {
+    return res.status(400).json({ status: 'fail', message: 'Report category is required' });
+  }
+
+  await runWithTenant(companyId, async () => {
+    // Log report in activity logs for compliance audit
+    await logChatActivity(companyId, {
+      actor: userId,
+      actionType: 'REPORT_USER',
+      fieldChanged: 'user_report',
+      oldValue: targetUserId,
+      newValue: JSON.stringify({ category, description, screenshotUrl })
+    });
+  });
+
+  return successResponse(res, null, 'Report submitted successfully');
 });

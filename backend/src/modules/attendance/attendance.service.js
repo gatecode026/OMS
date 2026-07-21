@@ -56,7 +56,38 @@ export const findById = async (id) => {
 
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing AttendanceService::createRecord by user: ' + currentUser?.id);
-  const record = await repository.save(data);
+  
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+  const currentTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+  const empId = currentUser?.id || data?.employeeId;
+
+  // Check if today's record already exists to prevent E11000 duplicate key errors
+  const existingRecords = await repository.find({ employeeId: empId, date: todayStr });
+  if (existingRecords && existingRecords.length > 0) {
+    const existing = existingRecords[0];
+    logger.info(`Attendance record for ${empId} on ${todayStr} already exists (${existing.id}). Updating existing record.`);
+    return updateRecord(existing.id, data, currentUser);
+  }
+
+  const enrichedData = {
+    employeeId: empId,
+    employeeName: currentUser?.name || data?.employeeName || 'Employee',
+    department: currentUser?.department || data?.department || 'Operations',
+    branch: currentUser?.branch || data?.branch || 'Headquarters',
+    date: todayStr,
+    punchIn: currentTimeStr,
+    punchOut: '--:--',
+    status: 'Present',
+    source: 'Mobile App',
+    ...data
+  };
+
+  const record = await repository.save(enrichedData);
   if (record) {
     const title = 'Employee Punched In';
     const message = `${record.employeeName} (${record.department}) punched in at ${record.punchIn} on ${record.date} (${record.workMode || 'Office'}).${record.notes ? ' Notes: ' + record.notes : ''}`;
@@ -75,7 +106,33 @@ export const createRecord = async (data, currentUser) => {
 
 export const updateRecord = async (id, data, currentUser) => {
   logger.info('Executing AttendanceService::updateRecord for: ' + id + ' by user: ' + currentUser?.id);
-  const record = await repository.update(id, data);
+
+  let existing = await repository.findOne(id);
+  if (!existing && currentUser?.id) {
+    existing = await findToday(currentUser.id);
+  }
+  if (!existing) {
+    throw new Error('Attendance record not found');
+  }
+  id = existing.id || existing._id;
+
+  const d = new Date();
+  const currentTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+  const punchInTime = new Date(existing.createdAt);
+  const now = new Date();
+  const diffMs = now.getTime() - punchInTime.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  const totalHours = parseFloat(diffHours.toFixed(2));
+
+  const enrichedData = {
+    punchOut: currentTimeStr,
+    totalHours: totalHours > 0 ? totalHours : 0.01,
+    status: existing.status === 'Late' ? 'Late' : 'Present',
+    ...data
+  };
+
+  const record = await repository.update(id, enrichedData);
   if (record) {
     const title = 'Employee Punched Out';
     const message = `${record.employeeName} (${record.department}) punched out at ${record.punchOut} on ${record.date}. Total Hours: ${record.totalHours} hrs.${record.notes ? ' Notes: ' + record.notes : ''}`;

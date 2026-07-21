@@ -5,6 +5,7 @@
 
 import Attendance from './attendance.model.js';
 import logger from '../../config/logger.js';
+import mongoose from 'mongoose';
 
 // Security and Query Builder Imports
 import { resolveSecurityContext } from '../../security/scopeEngine.js';
@@ -75,10 +76,16 @@ export const find = async (query = {}) => {
  * Find a single attendance record by business ID.
  * @param {String} id - Attendance record ID
  */
+/**
+ * Find a single attendance record by business ID or Mongo _id.
+ * @param {String} id - Attendance record ID
+ */
 export const findOne = async (id) => {
   const context = resolveSecurityContext();
 
-  const record = await Attendance.findOne({ id });
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const query = isObjectId ? { $or: [{ id: id }, { _id: id }] } : { id: id };
+  const record = await Attendance.findOne(query);
 
   if (record && context) {
     await validateRepositoryAccess('read', record, {
@@ -131,7 +138,9 @@ export const save = async (data) => {
 export const update = async (id, data) => {
   const context = resolveSecurityContext();
 
-  const record = await Attendance.findOne({ id });
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const query = isObjectId ? { $or: [{ id: id }, { _id: id }] } : { id: id };
+  const record = await Attendance.findOne(query);
   if (!record) return null;
 
   // 1. Validate write scoping constraints
@@ -163,7 +172,7 @@ export const update = async (id, data) => {
     - Decision: APPROVED`);
   }
 
-  return Attendance.findOneAndUpdate({ id }, data, { new: true });
+  return Attendance.findOneAndUpdate({ _id: record._id }, data, { new: true });
 };
 
 /**
@@ -173,7 +182,9 @@ export const update = async (id, data) => {
 export const remove = async (id) => {
   const context = resolveSecurityContext();
 
-  const record = await Attendance.findOne({ id });
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const query = isObjectId ? { $or: [{ id: id }, { _id: id }] } : { id: id };
+  const record = await Attendance.findOne(query);
   if (!record) return null;
 
   if (context) {
@@ -190,7 +201,7 @@ export const remove = async (id) => {
     - Decision: APPROVED`);
   }
 
-  return Attendance.findOneAndDelete({ id });
+  return Attendance.findOneAndDelete({ _id: record._id });
 };
 
 export default {

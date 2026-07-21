@@ -147,8 +147,21 @@ export const save = async (data) => {
 
   logger.debug('Executing ProjectsRepository::save', data);
   if (!data.id) {
-    const count = await Project.countDocuments();
-    data.id = `PRJ-${String(count + 1).padStart(3, '0')}`;
+    const projects = await Project.find({}, { id: 1 }).lean();
+    let maxNum = 0;
+    projects.forEach(p => {
+      if (p.id && p.id.includes('PRJ-')) {
+        const parts = p.id.split('PRJ-');
+        const num = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    });
+    data.id = `PRJ-${String(maxNum + 1).padStart(3, '0')}`;
+  }
+  if (!data.projectCode || data.projectCode.trim() === '') {
+    data.projectCode = data.id;
   }
 
   // Auto-resolve branch from department

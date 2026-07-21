@@ -511,7 +511,21 @@ export const markAsRead = async (id, userId, companyId) => {
               { id: id }
             ].filter(Boolean)
           },
-          { userId }
+          {
+            $or: [
+              { userId },
+              { recipientId: userId },
+              { forUserId: userId },
+              { targetUserId: userId },
+              { 
+                $and: [
+                  { userId: { $in: [null, ""] } },
+                  { recipientId: { $in: [null, ""] } },
+                  { forUserId: { $in: [null, ""] } }
+                ]
+              }
+            ]
+          }
         ]
       },
       { $set: { isRead: true, read: true } },

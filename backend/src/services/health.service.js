@@ -38,6 +38,15 @@ export const checkMongoHealth = async () => {
  * @returns {Promise<Object>}
  */
 export const checkRedisHealth = async () => {
+  if (process.env.DISABLE_REDIS === 'true') {
+    return {
+      status: 'healthy',
+      connection: 'disabled',
+      pingLatency: '0ms',
+      timestamp: new Date().toISOString()
+    };
+  }
+
   let redisStatus = 'disconnected';
   let isHealthy = false;
   let latencyMs = 0;

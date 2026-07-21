@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import dns, { setServers } from 'dns';
-setServers(['8.8.8.8', '1.1.1.1']);
+setServers(['1.1.1.1', '8.8.8.8']);
 import bcrypt from 'bcryptjs';
 import env from './env.js';
 import logger from './logger.js';
