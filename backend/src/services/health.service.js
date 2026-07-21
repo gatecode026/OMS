@@ -145,7 +145,7 @@ export const checkAllHealth = async () => {
   const redisHealth = await checkRedisHealth();
   const socket = await checkSocketHealth();
   
-  const isHealthy = mongo.status === 'healthy' && redisHealth.status === 'healthy';
+  const isHealthy = mongo.status === 'healthy';
 
   return {
     status: isHealthy ? 'healthy' : 'unhealthy',
