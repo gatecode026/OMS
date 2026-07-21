@@ -238,9 +238,24 @@ projectSchema.pre('save', async function(next) {
   if (this.isNew) {
     try {
       const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-      const generatedCode = await generateCompanyUniqueId(this.companyId, 'projects');
-      if (!this.id || this.id.trim() === '') this.id = generatedCode;
-      if (!this.projectCode || this.projectCode.trim() === '') this.projectCode = generatedCode;
+      if (!this.id || this.id.trim() === '') {
+        let uniqueId;
+        let exists = true;
+        let maxAttempts = 100;
+        const ProjectModel = mongoose.models.Project || mongoose.model('Project', projectSchema);
+        while (exists && maxAttempts > 0) {
+          maxAttempts--;
+          uniqueId = await generateCompanyUniqueId(this.companyId, 'projects');
+          const existing = await ProjectModel.findOne({ id: uniqueId }).lean();
+          if (!existing) {
+            exists = false;
+          }
+        }
+        this.id = uniqueId;
+      }
+      if (!this.projectCode || this.projectCode.trim() === '') {
+        this.projectCode = this.id;
+      }
     } catch (err) {
       return next(err);
     }

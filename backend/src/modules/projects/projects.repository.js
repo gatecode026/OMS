@@ -146,9 +146,23 @@ export const save = async (data) => {
   }
 
   logger.debug('Executing ProjectsRepository::save', data);
-  if (!data.id) {
-    const count = await Project.countDocuments();
-    data.id = `PRJ-${String(count + 1).padStart(3, '0')}`;
+  if (!data.id || data.id.trim() === '') {
+    const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
+    let uniqueId;
+    let exists = true;
+    let maxAttempts = 100;
+    while (exists && maxAttempts > 0) {
+      maxAttempts--;
+      uniqueId = await generateCompanyUniqueId(data.companyId || context?.companyId, 'projects');
+      const existing = await Project.findOne({ id: uniqueId }).lean();
+      if (!existing) {
+        exists = false;
+      }
+    }
+    data.id = uniqueId;
+  }
+  if (!data.projectCode || data.projectCode.trim() === '') {
+    data.projectCode = data.id;
   }
 
   // Auto-resolve branch from department
