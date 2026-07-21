@@ -120,7 +120,7 @@ export const SidebarDrawer: React.FC = () => {
   const displayName = profile?.name || user?.name || 'Employee';
   const displayDesignation = profile?.designation || user?.role || 'Staff Member';
   const displayEmail = profile?.email || user?.email || '';
-  const displayAvatar = profile?.avatarUrl || profile?.profilePhoto || user?.avatarUrl;
+  const displayAvatar = profile?.avatar || profile?.avatarUrl || profile?.profilePhoto || user?.avatar || user?.avatarUrl;
 
   // Sidebar Menu Items
   const menuItems: MenuItem[] = [

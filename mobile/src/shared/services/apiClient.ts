@@ -310,6 +310,27 @@ Error: ${errorMsg}`);
 );
 
 /**
+ * Safely performs a fetch request with a timeout fallback, as AbortSignal.timeout
+ * is not supported on all React Native platforms/Hermes versions.
+ */
+async function fetchWithTimeout(url: string, ms: number = 3000): Promise<Response> {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return fetch(url, { signal: AbortSignal.timeout(ms) });
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+/**
  * Executes a full network diagnostics sweep and prints a structured warning log.
  */
 export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
@@ -324,7 +345,7 @@ export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
 
   let apiReachable = 'No';
   try {
-    const response = await fetch(`${ENV.API_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    const response = await fetchWithTimeout(`${ENV.API_URL}/health`, 3000);
     apiReachable = `Yes (HTTP ${response.status})`;
   } catch (e: any) {
     apiReachable = `No (${e.message || e})`;
@@ -332,7 +353,7 @@ export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
 
   let socketReachable = 'No';
   try {
-    const response = await fetch(`${ENV.API_URL}/socket.io/?EIO=4&transport=polling`, { signal: AbortSignal.timeout(3000) });
+    const response = await fetchWithTimeout(`${ENV.API_URL}/socket.io/?EIO=4&transport=polling`, 3000);
     socketReachable = `Yes (HTTP ${response.status})`;
   } catch (e: any) {
     socketReachable = `No (${e.message || e})`;
