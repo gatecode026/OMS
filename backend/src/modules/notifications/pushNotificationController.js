@@ -27,26 +27,39 @@ export const getPublicKey = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/v1/notifications/push/subscribe
- * Subscribes user devices by saving subscriptions to MongoDB
+ * Subscribes user devices by saving subscriptions to MongoDB (supports Web & Mobile)
  */
 export const subscribe = asyncHandler(async (req, res) => {
-  const { subscription, userAgent, deviceType } = req.body;
+  const { subscription, expoPushToken, deviceId, platform, appVersion, userAgent, deviceType } = req.body;
   const employeeId = req.user.id;
   const companyId = req.user.companyId;
 
-  if (!subscription || !subscription.endpoint || !subscription.keys) {
-    return res.status(400).json({
-      status: 'fail',
-      message: 'Invalid subscription object. Must contain endpoint and keys.'
-    });
+  let registrationPayload;
+
+  if (expoPushToken) {
+    if (!deviceId) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'deviceId is required for mobile push subscription'
+      });
+    }
+    registrationPayload = { expoPushToken, deviceId, platform, appVersion };
+  } else {
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({
+        status: 'fail',
+        message: 'Invalid subscription object. Must contain endpoint and keys.'
+      });
+    }
+    registrationPayload = subscription;
   }
 
   const sub = await pushNotificationService.subscribe(
     employeeId,
     companyId,
-    subscription,
+    registrationPayload,
     userAgent || req.headers['user-agent'] || '',
-    deviceType || 'unknown'
+    deviceType || (expoPushToken ? 'mobile' : 'unknown')
   );
 
   return successResponse(res, sub, 'Subscribed to push notifications successfully', 201);
@@ -57,17 +70,18 @@ export const subscribe = asyncHandler(async (req, res) => {
  * Unsubscribes a device by deleting its subscription from MongoDB
  */
 export const unsubscribe = asyncHandler(async (req, res) => {
-  const { endpoint } = req.body;
+  const { endpoint, expoPushToken, deviceId } = req.body;
   const employeeId = req.user.id;
 
-  if (!endpoint) {
+  const target = expoPushToken || deviceId || endpoint;
+  if (!target) {
     return res.status(400).json({
       status: 'fail',
-      message: 'Endpoint parameter is required to unsubscribe'
+      message: 'Unsubscribe target (endpoint, expoPushToken, or deviceId) is required'
     });
   }
 
-  await pushNotificationService.unsubscribe(employeeId, endpoint);
+  await pushNotificationService.unsubscribe(employeeId, target);
 
   return successResponse(res, null, 'Unsubscribed from push notifications successfully');
 });

@@ -20,7 +20,7 @@ const pushSubscriptionSchema = new mongoose.Schema({
   subscription: {
     endpoint: {
       type: String,
-      required: true
+      default: null
     },
     expirationTime: {
       type: Number,
@@ -29,13 +29,31 @@ const pushSubscriptionSchema = new mongoose.Schema({
     keys: {
       p256dh: {
         type: String,
-        required: true
+        default: null
       },
       auth: {
         type: String,
-        required: true
+        default: null
       }
     }
+  },
+  expoPushToken: {
+    type: String,
+    default: null,
+    index: true
+  },
+  deviceId: {
+    type: String,
+    default: null,
+    index: true
+  },
+  platform: {
+    type: String,
+    default: null
+  },
+  appVersion: {
+    type: String,
+    default: null
   },
   userAgent: {
     type: String,

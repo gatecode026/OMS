@@ -146,20 +146,19 @@ export const save = async (data) => {
   }
 
   logger.debug('Executing ProjectsRepository::save', data);
-  if (!data.id || data.id.trim() === '') {
-    const { generateCompanyUniqueId } = await import('../../utils/idGenerator.js');
-    let uniqueId;
-    let exists = true;
-    let maxAttempts = 100;
-    while (exists && maxAttempts > 0) {
-      maxAttempts--;
-      uniqueId = await generateCompanyUniqueId(data.companyId || context?.companyId, 'projects');
-      const existing = await Project.findOne({ id: uniqueId }).lean();
-      if (!existing) {
-        exists = false;
+  if (!data.id) {
+    const projects = await Project.find({}, { id: 1 }).lean();
+    let maxNum = 0;
+    projects.forEach(p => {
+      if (p.id && p.id.includes('PRJ-')) {
+        const parts = p.id.split('PRJ-');
+        const num = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
       }
-    }
-    data.id = uniqueId;
+    });
+    data.id = `PRJ-${String(maxNum + 1).padStart(3, '0')}`;
   }
   if (!data.projectCode || data.projectCode.trim() === '') {
     data.projectCode = data.id;

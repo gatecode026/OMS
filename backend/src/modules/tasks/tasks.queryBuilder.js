@@ -8,6 +8,24 @@ export class TasksQueryBuilder {
   async buildReadQuery(incomingQuery = {}) {
     const filters = { ...incomingQuery };
 
+    // Extract and format month & year to filter by dueDate string (e.g. "2026-07-10")
+    let monthStr = '';
+    if (filters.month) {
+      monthStr = String(filters.month).padStart(2, '0');
+      delete filters.month;
+    }
+    let yearStr = '';
+    if (filters.year) {
+      yearStr = String(filters.year);
+      delete filters.year;
+    }
+
+    if (yearStr && monthStr) {
+      filters.dueDate = { $regex: new RegExp(`^${yearStr}-${monthStr}`) };
+    } else if (yearStr) {
+      filters.dueDate = { $regex: new RegExp(`^${yearStr}`) };
+    }
+
     if (!this.context) return filters;
 
     if (this.context.isSuperAdmin || this.context.isCompanyAdmin) {
