@@ -57,7 +57,7 @@ export const useMessageSending = ({ conversationId, authUser, setLocalMessages }
       conversationId,
       senderId: authUser?.id || '',
       senderName: authUser?.name || 'Me',
-      senderAvatar: authUser?.avatarUrl || null,
+      senderAvatar: authUser?.avatar || authUser?.avatarUrl || null,
       senderRole: authUser?.role || 'employee',
       content: text.trim(),
       type: 'text',
