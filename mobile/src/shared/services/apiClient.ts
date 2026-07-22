@@ -313,7 +313,7 @@ Error: ${errorMsg}`);
  * Safely performs a fetch request with a timeout fallback, as AbortSignal.timeout
  * is not supported on all React Native platforms/Hermes versions.
  */
-async function fetchWithTimeout(url: string, ms: number = 3000): Promise<Response> {
+async function fetchWithTimeout(url: string, ms: number = 15000): Promise<Response> {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
     return fetch(url, { signal: AbortSignal.timeout(ms) });
   }
@@ -345,7 +345,7 @@ export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
 
   let apiReachable = 'No';
   try {
-    const response = await fetchWithTimeout(`${ENV.API_URL}/health`, 3000);
+    const response = await fetchWithTimeout(`${ENV.API_URL}/health`, 15000);
     apiReachable = `Yes (HTTP ${response.status})`;
   } catch (e: any) {
     apiReachable = `No (${e.message || e})`;
@@ -353,7 +353,7 @@ export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
 
   let socketReachable = 'No';
   try {
-    const response = await fetchWithTimeout(`${ENV.API_URL}/socket.io/?EIO=4&transport=polling`, 3000);
+    const response = await fetchWithTimeout(`${ENV.API_URL}/socket.io/?EIO=4&transport=polling`, 15000);
     socketReachable = `Yes (HTTP ${response.status})`;
   } catch (e: any) {
     socketReachable = `No (${e.message || e})`;
