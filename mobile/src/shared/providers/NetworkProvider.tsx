@@ -36,18 +36,28 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
     // 2. Load persisted queue on mount
     loadQueue();
 
-    // 3. Subscribe to network status changes
+    // 3. Fetch initial network state & subscribe to changes
+    NetInfo.fetch().then((state) => {
+      const isConnected = state.isConnected !== false;
+      const isInternetReachable = state.isInternetReachable !== false;
+      setConnectionStatus(isConnected, isInternetReachable);
+      if (isConnected) {
+        queryClient.invalidateQueries();
+      }
+    });
+
     const unsubscribe = NetInfo.addEventListener((state) => {
-      // Allow proper offline testing even in development/debug mode
       const isConnected = state.isConnected !== false;
       const isInternetReachable = state.isInternetReachable !== false;
 
       setConnectionStatus(isConnected, isInternetReachable);
 
-      // Trigger synchronization when transition is offline -> online
-      if (isConnected && wasOffline.current) {
-        console.log('[NetworkProvider]: Network restored, initiating sync...');
-        syncManager.sync();
+      // Trigger synchronization and refetch queries when network is online
+      if (isConnected) {
+        if (wasOffline.current) {
+          console.log('[NetworkProvider]: Network restored, initiating sync...');
+          syncManager.sync();
+        }
         queryClient.invalidateQueries();
       }
 
