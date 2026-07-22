@@ -11,6 +11,8 @@ import { useAuthStore } from '../../../shared/store/authStore';
 import { useThemeStore } from '../../../shared/store/themeStore';
 import { validateLoginForm, LoginFormValues, LoginFormErrors } from '../validation/loginSchema';
 import { mapAxiosError } from '../../../shared/services/apiClient';
+import { ENV } from '../../../config/env';
+import { useOfflineStore } from '../../../shared/store/offlineStore';
 
 export type LoginErrorCode =
   | 'WRONG_PASSWORD'
@@ -64,7 +66,7 @@ function resolveErrorCode(statusCode?: number, message?: string): LoginErrorCode
 function userFriendlyMessage(code: LoginErrorCode, raw?: string): string {
   switch (code) {
     case 'WRONG_PASSWORD':
-      return 'Incorrect password. Please try again.';
+      return raw || 'Incorrect password. Please try again.';
     case 'USER_NOT_FOUND':
       return 'No account found with this Employee ID or email.';
     case 'INACTIVE_USER':
@@ -114,12 +116,19 @@ export function useLogin(showCompanyCode: boolean = false): UseLoginReturn {
     // Client-side validation
     const validationErrors = validateLoginForm(form, showCompanyCode);
     if (Object.keys(validationErrors).length > 0) {
+      if (__DEV__) {
+        console.log('[useLogin] Validation failed:', validationErrors);
+      }
       setErrors(validationErrors);
       return;
     }
 
     setLoading(true);
     setLoginError(null);
+
+    if (__DEV__) {
+      console.log('[useLogin] Initiating login for:', form.identifier.trim());
+    }
 
     try {
       const payload: Record<string, string> = {
@@ -149,12 +158,17 @@ export function useLogin(showCompanyCode: boolean = false): UseLoginReturn {
           secondary: response.company.settings?.secondaryColor,
         });
       }
-
-      // Navigation handled by the root layout NavigationGate
     } catch (err: any) {
       const mapped = mapAxiosError(err);
-      const code = resolveErrorCode(mapped.statusCode, mapped.message);
-      setLoginError({ code, message: userFriendlyMessage(code, mapped.message) });
+      const statusCode = mapped.statusCode || err.statusCode || err.response?.status;
+      const rawMessage = mapped.message || err.message || err.response?.data?.message || err.response?.data?.error;
+      const code = resolveErrorCode(statusCode, rawMessage);
+
+      if (__DEV__) {
+        console.log('[useLogin] Auth failure resolved:', { statusCode, rawMessage, code });
+      }
+
+      setLoginError({ code, message: userFriendlyMessage(code, rawMessage) });
     } finally {
       setLoading(false);
     }

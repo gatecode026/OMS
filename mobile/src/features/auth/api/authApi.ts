@@ -21,7 +21,6 @@ export interface BrandingResponse {
     address?: string;
   };
 }
-
 export const authApi = {
   /**
    * Fetch company tenant branding settings by subdomain or code
@@ -44,7 +43,7 @@ export const authApi = {
    */
   async login(payload: Record<string, any>): Promise<any> {
     const response = await apiClient.post('/api/v1/auth/login', payload);
-    return response.data?.data;
+    return response.data?.data ?? response.data;
   },
 };
 export default authApi;
