@@ -89,10 +89,20 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="calendar"
+        options={{
+          title: 'Calendar',
+          tabBarLabel: 'Calendar',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="inbox"
         options={{
-          title: 'Chat',
-          tabBarLabel: 'Chat',
+          title: 'Inbox',
+          tabBarLabel: 'Inbox',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'}
@@ -116,6 +126,12 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="action"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen

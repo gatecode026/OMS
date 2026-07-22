@@ -28,7 +28,7 @@ export interface ActiveCall {
   callType: 'audio' | 'video';
   targetUser: CallUser;
   isIncoming: boolean;
-  status: 'ringing' | 'active' | 'rejected' | 'ended' | 'missed';
+  status: 'ringing' | 'active' | 'rejected' | 'ended' | 'missed' | 'on_hold' | 'connecting';
   conversationId: string;
 }
 
@@ -43,11 +43,16 @@ interface CallContextType {
   isMuted: boolean;
   isVideoOff: boolean;
   isFrontCamera: boolean;
+  isSpeakerOn: boolean;
+  isOnHold: boolean;
   callDuration: number;
   connectionState: string;
+  networkQuality: string;
   toggleMute: () => void;
   toggleVideo: () => void;
   flipCamera: () => void;
+  toggleSpeaker: () => void;
+  toggleHold: () => void;
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined);
@@ -444,6 +449,24 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [activeCall, callEndCleanup, safeBack]);
 
+  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const [isOnHold, setIsOnHold] = useState(false);
+
+  const toggleSpeaker = useCallback(() => {
+    setIsSpeakerOn((prev) => !prev);
+  }, []);
+
+  const toggleHold = useCallback(() => {
+    if (!activeCall) return;
+    setIsOnHold((prev) => {
+      const nextState = !prev;
+      webrtc.toggleHold(nextState);
+      socketRef.current?.emit(nextState ? 'call:hold' : 'call:resume', { callId: activeCall.callId });
+      setActiveCall((c) => (c ? { ...c, status: nextState ? 'on_hold' : 'active' } : null));
+      return nextState;
+    });
+  }, [activeCall, webrtc]);
+
   const value: CallContextType = {
     activeCall,
     initiateCall,
@@ -455,11 +478,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isMuted: webrtc.isMuted,
     isVideoOff: webrtc.isVideoOff,
     isFrontCamera: webrtc.isFrontCamera,
+    isSpeakerOn,
+    isOnHold,
     callDuration: webrtc.callDuration,
     connectionState: webrtc.connectionState,
+    networkQuality: webrtc.networkQuality || 'Excellent',
     toggleMute: webrtc.toggleMute,
     toggleVideo: webrtc.toggleVideo,
     flipCamera: webrtc.flipCamera,
+    toggleSpeaker,
+    toggleHold,
   };
 
   return (

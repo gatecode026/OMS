@@ -52,14 +52,17 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // 12-hour format converter helper
 const formatTime12h = (time24?: string) => {
   if (!time24 || time24 === '--:--') return 'Pending';
+  if (time24.toLowerCase().includes('am') || time24.toLowerCase().includes('pm')) {
+    return time24;
+  }
   const parts = time24.split(':');
   if (parts.length < 2) return time24;
-  let h = parseInt(parts[0], 10);
-  const m = parts[1];
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return time24;
   const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12;
-  h = h ? h : 12; // Hour '0' -> '12'
-  return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
 };
 
 // Robust format parser helper supporting 12h, 24h and ISO strings

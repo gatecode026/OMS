@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Appearance } from 'react-native';
 import { useThemeStore } from '../store/themeStore';
 import { lightColors } from './tokens';
 
@@ -15,6 +15,7 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const loadThemeSettings = useThemeStore((state) => state.loadThemeSettings);
   const [loading, setLoading] = useState(true);
+  const [, setSystemScheme] = useState(Appearance.getColorScheme());
 
   useEffect(() => {
     const initializeTheme = async () => {
@@ -27,6 +28,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       }
     };
     initializeTheme();
+
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setSystemScheme(colorScheme);
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [loadThemeSettings]);
 
   if (loading) {

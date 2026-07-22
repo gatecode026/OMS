@@ -32,6 +32,7 @@ import eventsRouter from "../modules/events/event.routes.js";
 import companiesRouter from "../modules/companies/company.routes.js";
 import adminRouter from "../modules/admin/admin.routes.js";
 import chatRouter from "../modules/chat/chat.routes.js";
+import callingRouter from "../modules/calling/calling.routes.js";
 // kpi modules do not exist yet in the codebase
 // import kpiTemplatesRouter from "../modules/kpi-templates/kpi-template.routes.js";
 // import kpiEvaluationCyclesRouter from "../modules/kpi-evaluation-cycles/kpi-evaluation-cycle.routes.js";
@@ -68,6 +69,7 @@ router.use("/events", eventsRouter);
 router.use("/companies", companiesRouter);
 router.use("/admin", adminRouter);
 router.use("/chat", chatRouter);
+router.use("/calls", callingRouter);
 // router.use("/kpi-templates", kpiTemplatesRouter);
 // router.use("/kpi-evaluation-cycles", kpiEvaluationCyclesRouter);
 // router.use("/kpi-employee-evaluations", kpiEmployeeEvaluationsRouter);

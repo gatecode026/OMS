@@ -300,6 +300,38 @@ export const useWebRTC = (socket: Socket | null, currentUserId: string | null) =
     setIsVideoOff((prev) => !prev);
   }, []);
 
+  // ICE Restart for network recovery
+  const restartIce = useCallback(async () => {
+    if (!hasNativeWebRTC || !pcRef.current) return;
+    try {
+      console.log('[WebRTC] Initiating ICE restart...');
+      setConnectionState('reconnecting' as any);
+      setNetworkQuality('Reconnecting');
+      const offer = await pcRef.current.createOffer({ iceRestart: true });
+      await pcRef.current.setLocalDescription(offer);
+      socket?.emit('call:signal:offer', {
+        callId: callIdRef.current,
+        signal: offer,
+        targetUserId: targetUserIdRef.current,
+      });
+    } catch (err) {
+      console.error('[WebRTC] ICE restart failed:', err);
+    }
+  }, [socket]);
+
+  // Toggle Call Hold
+  const toggleHold = useCallback((isOnHold: boolean) => {
+    if (!localStreamRef.current) return;
+    try {
+      localStreamRef.current.getAudioTracks().forEach((track: any) => {
+        track.enabled = !isOnHold;
+      });
+      localStreamRef.current.getVideoTracks().forEach((track: any) => {
+        track.enabled = !isOnHold;
+      });
+    } catch (e) {}
+  }, []);
+
   // Flip Camera
   const flipCamera = useCallback(() => {
     if (!localStreamRef.current) return;
@@ -334,6 +366,8 @@ export const useWebRTC = (socket: Socket | null, currentUserId: string | null) =
     toggleMute,
     toggleVideo,
     flipCamera,
+    restartIce,
+    toggleHold,
     cleanUp,
   };
 };
