@@ -21,6 +21,15 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Configure NetInfo to use HTTPS for reachability checks to prevent Android cleartext HTTP blocks
+    NetInfo.configure({
+      reachabilityUrl: 'https://clients3.google.com/generate_204',
+      reachabilityTest: async (response) => response.status === 204 || response.status === 200,
+      reachabilityLongTimeout: 30000,
+      reachabilityShortTimeout: 10000,
+      reachabilityRequestTimeout: 15000,
+    });
+
     // 1. Seed query client memory cache with local offline file-system cache
     fileCacheService.loadAllIntoCache(queryClient);
 
