@@ -39,7 +39,7 @@ describe('syncManager', () => {
       removeFromQueue: mockRemoveFromQueue,
     });
 
-    (apiClient as jest.Mock).mockResolvedValue({ status: 200 });
+    (apiClient as unknown as jest.Mock).mockResolvedValue({ status: 200 });
 
     await syncManager.sync();
 
@@ -62,7 +62,7 @@ describe('syncManager', () => {
       removeFromQueue: mockRemoveFromQueue,
     });
 
-    (apiClient as jest.Mock)
+    (apiClient as unknown as jest.Mock)
       .mockRejectedValueOnce({ statusCode: 400 }) // Client error -> discard
       .mockRejectedValueOnce({ statusCode: 500 }); // Server error -> halt
 
