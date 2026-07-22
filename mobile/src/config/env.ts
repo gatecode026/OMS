@@ -17,14 +17,14 @@ const currentEnv = (process.env.EXPO_PUBLIC_APP_ENV as Environment) || 'producti
 // Safe fallback values for all environments
 const fallbacks: Record<Environment, Omit<Config, 'ENV'>> = {
   local: {
-    API_URL: 'http://localhost:5000',
+    API_URL: 'https://oms-xdcz.onrender.com',
     TIMEOUT: 60000,
     APP_NAME: 'OMS (Local)',
     ENABLE_LOGGER: true,
     SECURE_STORE_KEY_PREFIX: 'oms_local_',
   },
   development: {
-    API_URL: 'http://192.168.1.16:5000',
+    API_URL: 'https://oms-xdcz.onrender.com',
     TIMEOUT: 60000,
     APP_NAME: 'OMS (Dev)',
     ENABLE_LOGGER: true,
