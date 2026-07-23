@@ -905,7 +905,17 @@ const MessageBubble = ({
               </span>
             )}
             {msg.isPinned && (
-              <span className="msg-pin-icon" title="Pinned message">
+              <span
+                className="msg-pin-icon"
+                title={`Pinned by ${
+                  msg.pinnedBy === currentUser?.id
+                    ? 'You'
+                    : msg.pinnedByName ||
+                      conversation?.participants?.find(p => p.employeeId === msg.pinnedBy || p.id === msg.pinnedBy)?.name ||
+                      employees?.find(e => e.id === msg.pinnedBy || e.employeeId === msg.pinnedBy)?.name ||
+                      'Someone'
+                }`}
+              >
                 <svg
                   width="13"
                   height="13"
@@ -931,71 +941,46 @@ const MessageBubble = ({
           <div className="msg-reactions">
             {Object.entries(
               msg.reactions.reduce((acc, r) => {
-                acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                const emoji = r.emoji;
+                if (!acc[emoji]) {
+                  acc[emoji] = { count: 0, users: [] };
+                }
+                acc[emoji].count += 1;
+
+                let name = r.name;
+                if (r.employeeId === currentUser?.id) {
+                  name = 'You';
+                } else if (!name || name === 'User' || name === 'Employee') {
+                  const emp = employees?.find(e => e.id === r.employeeId || e.employeeId === r.employeeId);
+                  if (emp) name = emp.name;
+                }
+                if (!name) name = r.employeeId || 'Someone';
+
+                if (!acc[emoji].users.includes(name)) {
+                  acc[emoji].users.push(name);
+                }
                 return acc;
               }, {})
-            ).map(([emoji, count]) => (
-              <button
-                key={emoji}
-                className="msg-reaction-badge"
-                onClick={() => onReact(msg.id, emoji)}
-                title="React"
-              >
-                {emoji} {count > 1 && <span>{count}</span>}
-              </button>
-            ))}
+            ).map(([emoji, data]) => {
+              const tooltipText = data.users.join(', ');
+              return (
+                <div key={emoji} className="msg-reaction-badge-wrap">
+                  <button
+                    className="msg-reaction-badge"
+                    onClick={() => onReact(msg.id, emoji)}
+                    title={`Reacted by ${tooltipText}`}
+                  >
+                    <span>{emoji}</span>
+                    <span style={{ fontSize: '11px', fontWeight: '600', marginLeft: '3px' }}>{data.count}</span>
+                  </button>
+                  <span className="msg-reaction-tooltip">{tooltipText}</span>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Thread Summary Footer */}
-        {msg.threadId && (
-          <div
-            className={`msg-thread-footer ${isOwn ? 'thread-own' : 'thread-other'}`}
-            onClick={(e) => { e.stopPropagation(); openThread(msg.id); }}
-            style={{ cursor: 'pointer' }}
-          >
-            {msg.threadDetails && msg.threadDetails.replyCount > 0 ? (
-              <>
-                <div className="thread-footer-avatars">
-                  {(msg.threadDetails.participants || []).slice(0, 3).map(pId => {
-                    const participant = conversation?.participants?.find(p => p.employeeId === pId);
-                    const name = participant?.name || 'User';
-                    const avatar = participant?.avatar || null;
-                    return (
-                      <div key={pId} className="thread-footer-avatar" title={name}>
-                        {avatar ? (
-                          <img src={avatar} alt={name} />
-                        ) : (
-                          <span>{name.charAt(0).toUpperCase()}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {(msg.threadDetails.participants || []).length > 3 && (
-                    <div className="thread-footer-avatar-more">
-                      +{msg.threadDetails.participants.length - 3}
-                    </div>
-                  )}
-                </div>
-                <span className="thread-footer-text">
-                  {msg.threadDetails.replyCount} {msg.threadDetails.replyCount === 1 ? 'reply' : 'replies'}
-                </span>
-                {msg.threadDetails.lastReplyAt && (
-                  <span className="thread-footer-time">
-                    Last reply {formatTime(msg.threadDetails.lastReplyAt)}
-                  </span>
-                )}
-                {msg.threadDetails.status && msg.threadDetails.status !== 'open' && (
-                  <span className={`thread-footer-status status-${msg.threadDetails.status}`}>
-                    {msg.threadDetails.status === 'resolved' ? '✓ Resolved' : '🔒 Closed'}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="thread-footer-view-link">View Thread</span>
-            )}
-          </div>
-        )}
+
 
         {/* Status indicator below bubble/reactions for own messages */}
         {isOwn && <MessageStatus message={msg} conversation={conversation} onRetry={onRetry} />}
@@ -1067,14 +1052,7 @@ const MessageBubble = ({
               <CornerUpLeft size={16} strokeWidth={2} />
             </button>
 
-            {/* Reply in Thread */}
-            <button
-              className="msg-action-btn"
-              onClick={() => { openThread(msg.id); setShowOptions(false); }}
-              title="Reply in Thread"
-            >
-              <MessageSquare size={16} strokeWidth={2} />
-            </button>
+
 
             {/* Forward */}
             <button

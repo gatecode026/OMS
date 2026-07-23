@@ -1366,11 +1366,11 @@ export const unpinConversation = async (
 /**
  * Pin a message in a conversation
  */
-export const pinMessage = async (messageId, employeeId, companyId) => {
+export const pinMessage = async (messageId, employeeId, employeeName, companyId) => {
   return runWithTenant(companyId, async () => {
     return await Message.findOneAndUpdate(
       { id: messageId },
-      { isPinned: true, pinnedBy: employeeId, pinnedAt: new Date() },
+      { isPinned: true, pinnedBy: employeeId, pinnedByName: employeeName, pinnedAt: new Date() },
       { new: true },
     );
   });
@@ -1383,7 +1383,7 @@ export const unpinMessage = async (messageId, companyId) => {
   return runWithTenant(companyId, async () => {
     return await Message.findOneAndUpdate(
       { id: messageId },
-      { isPinned: false, pinnedBy: null, pinnedAt: null },
+      { isPinned: false, pinnedBy: null, pinnedByName: null, pinnedAt: null },
       { new: true },
     );
   });

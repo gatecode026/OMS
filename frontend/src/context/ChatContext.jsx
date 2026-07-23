@@ -2505,14 +2505,14 @@ export const ChatProvider = ({ children }) => {
     });
 
     // ── Pin / Unpin Message ────────────────────────────────────────────────
-    socket.on('message_pinned', ({ messageId, conversationId, pinnedBy, pinnedAt }) => {
+    socket.on('message_pinned', ({ messageId, conversationId, pinnedBy, pinnedByName, pinnedAt }) => {
       setMessages(prev => {
         const convMsgs = prev[conversationId] || [];
         return {
           ...prev,
           [conversationId]: convMsgs.map(msg =>
             msg.id === messageId
-              ? { ...msg, isPinned: true, pinnedBy, pinnedAt }
+              ? { ...msg, isPinned: true, pinnedBy, pinnedByName, pinnedAt }
               : msg
           )
         };

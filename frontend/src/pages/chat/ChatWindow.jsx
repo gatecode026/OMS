@@ -503,7 +503,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
   if (!conv) return null;
 
   return (
-    <div className={`chat-window-container-split ${activeThread ? 'thread-open' : ''}`}>
+    <div className="chat-window-container-split">
       <div className="chat-window" onClick={handleWindowClick}>
         {/* ── HEADER ──────────────────────────────────────────────── */}
       {isSelectMode ? (
@@ -929,14 +929,10 @@ const ChatWindow = ({ currentUser, onBack }) => {
       {showCreatePoll && (
         <CreatePollModal
           conversationId={activeConvId}
-          threadId={activeThread?._id}
           onClose={() => setShowCreatePoll(false)}
         />
       )}
       </div>
-      {activeThread && (
-        <ThreadPanel onClose={closeThread} />
-      )}
     </div>
   );
 };

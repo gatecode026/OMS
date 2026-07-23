@@ -133,7 +133,7 @@ const PinnedMessageCard = ({ msg, conversation, currentUser, onUnpin, onNavigate
       <div className="pinned-card-footer">
         <Pin size={11} className="pin-footer-icon" />
         <span>
-          Pinned on {formatDate(msg.pinnedTimestamp)} at {formatTime(msg.pinnedTimestamp)}
+          Pinned by {msg.pinnedByName || (msg.pinnedBy === currentUser?.id ? 'You' : 'Someone')} on {formatDate(msg.pinnedTimestamp)} at {formatTime(msg.pinnedTimestamp)}
         </span>
       </div>
     </div>
