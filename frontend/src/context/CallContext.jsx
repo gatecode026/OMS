@@ -14,7 +14,7 @@ const formatDuration = (seconds) => {
 };
 
 export const CallProvider = ({ children }) => {
-  const { socket, isConnected } = useChat();
+  const { socket, isConnected, blockedUsers, blockedByUsers } = useChat();
   const { currentUser, addToast } = useApp();
 
   // ── Call State ────────────────────────────────
@@ -53,6 +53,13 @@ export const CallProvider = ({ children }) => {
   // ── Initiate Call ─────────────────────────────
   const initiateCall = useCallback(async (targetUser, callType, conversationId) => {
     console.log('[CallContext] initiateCall entered:', { targetUser, callType, conversationId, socketConnected: socket?.connected, callState });
+    
+    if (targetUser?.id && (blockedUsers?.includes(targetUser.id) || blockedByUsers?.includes(targetUser.id))) {
+      console.log('[CallContext] initiateCall aborted: user is blocked');
+      addToast?.('error', 'Cannot call a blocked contact');
+      return;
+    }
+
     if (!socket?.connected) {
       console.log('[CallContext] initiateCall aborted: socket not connected');
       addToast?.('error', 'Not connected to server');
@@ -96,7 +103,7 @@ export const CallProvider = ({ children }) => {
       cleanup();
       addToast?.('error', err.message);
     }
-  }, [socket, callState, getMedia, cleanup, addToast]);
+  }, [socket, callState, getMedia, cleanup, addToast, blockedUsers, blockedByUsers]);
 
   // ── Reject Call ───────────────────────────────
   const rejectCall = useCallback((reason = 'declined') => {
@@ -163,6 +170,7 @@ export const CallProvider = ({ children }) => {
   }, [socket]);
 
   // Refs to avoid stale closures in socket listeners
+  const socketRef = useRef(socket);
   const callStateRef = useRef(callState);
   const callInfoRef = useRef(callInfo);
   const localStreamRef = useRef(localStream);
@@ -171,6 +179,7 @@ export const CallProvider = ({ children }) => {
   const cleanupRef = useRef(cleanup);
   const addToastRef = useRef(addToast);
 
+  useEffect(() => { socketRef.current = socket; }, [socket]);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
   useEffect(() => { callInfoRef.current = callInfo; }, [callInfo]);
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
@@ -270,8 +279,16 @@ export const CallProvider = ({ children }) => {
             setCallState('incoming');
           }
         }
-      } else if (event.data && event.data.type === 'STOP_SOUND') {
-        console.log('[CallContext] STOP_SOUND event received from Service Worker:', event.data);
+      } else if (event.data && (event.data.type === 'STOP_SOUND' || event.data.type === 'REJECT_CALL')) {
+        console.log('[CallContext] STOP_SOUND/REJECT_CALL event received from Service Worker:', event.data);
+        const targetCallId = event.data.callId || callInfoRef.current?.callId;
+        if (targetCallId && socketRef.current?.connected) {
+          console.log('[CallContext] Emitting call:reject via socket for callId:', targetCallId);
+          socketRef.current.emit('call:reject', {
+            callId: targetCallId,
+            reason: 'declined'
+          });
+        }
         callSounds.stopAll();
         cleanupRef.current();
         setCallState('idle');

@@ -599,7 +599,7 @@ const MessageBubble = ({
         }}
       >
         {/* Sender name */}
-        {msg.senderName && (
+        {!isOwn && msg.senderName && (
           <span className="msg-sender-name">{msg.senderName}</span>
         )}
 

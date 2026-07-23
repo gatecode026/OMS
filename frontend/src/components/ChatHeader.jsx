@@ -25,7 +25,8 @@ const ChatHeader = ({
   setShowPinBoard,
   initiateCall,
   callState,
-  conversationId
+  conversationId,
+  isBlocked
 }) => {
   const getAvatarBg = (str) => {
     const colors = [
@@ -111,7 +112,7 @@ const ChatHeader = ({
 
       {/* Actions */}
       <div className="chat-win-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        {isDirect && other && (
+        {isDirect && other && !isBlocked && (
           <>
             {/* Voice Call */}
             <button

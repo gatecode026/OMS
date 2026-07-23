@@ -807,16 +807,92 @@ mark.search-highlight, .search-highlight {
 }
 
 .msg-bubble-own {
-  background: var(--chat-own-bg);
-  color: var(--chat-own-text);
+  background: var(--chat-own-bg, var(--chat-primary, #6366f1));
+  color: #ffffff !important;
   border-radius: var(--chat-radius) var(--chat-radius) 4px var(--chat-radius);
 }
 
+.msg-bubble-own,
+.msg-bubble-own .msg-text,
+.msg-bubble-own .msg-markdown-content,
+.msg-bubble-own .markdown-renderer,
+.msg-bubble-own .markdown-renderer p,
+.msg-bubble-own .markdown-renderer span,
+.msg-bubble-own .markdown-renderer li,
+.msg-bubble-own .markdown-renderer strong,
+.msg-bubble-own .markdown-renderer em,
+.msg-bubble-own .markdown-renderer h1,
+.msg-bubble-own .markdown-renderer h2,
+.msg-bubble-own .markdown-renderer h3,
+.msg-bubble-own .markdown-renderer h4 {
+  color: #ffffff !important;
+}
+
+.msg-bubble-own .msg-time {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
 .msg-bubble-other {
-  background: var(--chat-other-bg);
-  color: var(--chat-other-text);
-  border: 1px solid var(--chat-border);
+  background: var(--chat-other-bg, var(--bg-card, #ffffff));
+  color: var(--chat-other-text, var(--text-primary, #0f172a));
+  border: 1px solid var(--chat-border, #e2e8f0);
   border-radius: var(--chat-radius) var(--chat-radius) var(--chat-radius) 4px;
+}
+
+.msg-bubble-other .msg-text,
+.msg-bubble-other .msg-markdown-content,
+.msg-bubble-other .markdown-renderer,
+.msg-bubble-other .markdown-renderer p,
+.msg-bubble-other .markdown-renderer span,
+.msg-bubble-other .markdown-renderer li,
+.msg-bubble-other .markdown-renderer strong,
+.msg-bubble-other .markdown-renderer em,
+.msg-bubble-other .markdown-renderer h1,
+.msg-bubble-other .markdown-renderer h2,
+.msg-bubble-other .markdown-renderer h3,
+.msg-bubble-other .markdown-renderer h4 {
+  color: var(--chat-other-text, var(--text-primary, #0f172a)) !important;
+}
+
+.msg-bubble-other .msg-time {
+  color: var(--text-muted, #64748b) !important;
+}
+
+:root.dark-theme .msg-bubble-other,
+.dark-mode .msg-bubble-other,
+[data-theme="dark"] .msg-bubble-other,
+body.dark .msg-bubble-other {
+  background: var(--bg-card, #1e293b) !important;
+  color: #f8fafc !important;
+  border-color: var(--border-color, rgba(255, 255, 255, 0.12)) !important;
+}
+
+:root.dark-theme .msg-bubble-other .msg-text,
+:root.dark-theme .msg-bubble-other .msg-markdown-content,
+:root.dark-theme .msg-bubble-other .markdown-renderer,
+:root.dark-theme .msg-bubble-other .markdown-renderer p,
+:root.dark-theme .msg-bubble-other .markdown-renderer span,
+:root.dark-theme .msg-bubble-other .markdown-renderer li,
+:root.dark-theme .msg-bubble-other .markdown-renderer strong,
+:root.dark-theme .msg-bubble-other .markdown-renderer em,
+:root.dark-theme .msg-bubble-other .markdown-renderer h1,
+:root.dark-theme .msg-bubble-other .markdown-renderer h2,
+:root.dark-theme .msg-bubble-other .markdown-renderer h3,
+:root.dark-theme .msg-bubble-other .markdown-renderer h4,
+.dark-mode .msg-bubble-other .msg-text,
+.dark-mode .msg-bubble-other .markdown-renderer p,
+[data-theme="dark"] .msg-bubble-other .msg-text,
+[data-theme="dark"] .msg-bubble-other .markdown-renderer p,
+body.dark .msg-bubble-other .msg-text,
+body.dark .msg-bubble-other .markdown-renderer p {
+  color: #f8fafc !important;
+}
+
+:root.dark-theme .msg-bubble-other .msg-time,
+.dark-mode .msg-bubble-other .msg-time,
+[data-theme="dark"] .msg-bubble-other .msg-time,
+body.dark .msg-bubble-other .msg-time {
+  color: #94a3b8 !important;
 }
 
 .msg-bubble-deleted {
