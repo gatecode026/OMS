@@ -570,6 +570,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
           initiateCall={initiateCall}
           callState={callState}
           conversationId={activeConvId}
+          isBlocked={isDirect && (blockedUsers.includes(other?.employeeId) || blockedByUsers.includes(other?.employeeId))}
         />
       )}
 
