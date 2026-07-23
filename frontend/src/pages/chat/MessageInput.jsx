@@ -592,6 +592,19 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
                     <div className="plus-icon-circle" style={{ backgroundColor: '#f97316' }}><Headphones size={16} /></div>
                     Audio
                   </button>
+                  {conv?.type === 'group' && (
+                    <button
+                      className="plus-action-item"
+                      type="button"
+                      onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('open-create-poll')); }}
+                      disabled={!canCreatePollOrTask}
+                      title={!canCreatePollOrTask ? "Only group admins or management (managers) can create polls" : ""}
+                      style={!canCreatePollOrTask ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    >
+                      <div className="plus-icon-circle" style={{ backgroundColor: '#eab308' }}><BarChart2 size={16} /></div>
+                      Poll {!canCreatePollOrTask && '🔒'}
+                    </button>
+                  )}
                   <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); alert('Create Event simulation.'); }}>
                     <div className="plus-icon-circle" style={{ backgroundColor: '#e11d48' }}><Calendar size={16} /></div>
                     Event
