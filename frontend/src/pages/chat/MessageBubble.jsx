@@ -673,7 +673,7 @@ const MessageBubble = ({
             </div>
           ) : (
             <>
-              {msg.type === 'poll' && conversation?.type === 'group' ? (
+              {msg.type === 'poll' ? (
                 <PollBubble message={msg} isOwn={isOwn} />
               ) : msg.type === 'audio' ? (
                 <VoiceMessageBubble message={msg} isOwn={isOwn} />
@@ -1122,19 +1122,6 @@ const MessageBubble = ({
               <CheckSquare size={16} strokeWidth={2} />
             </button>
 
-            {/* Create Task */}
-            {canCreateTask && (
-              <button
-                className="msg-action-btn"
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('create-task-from-message', { detail: msg }));
-                  setShowOptions(false);
-                }}
-                title="Create Task from Message"
-              >
-                <ClipboardList size={16} strokeWidth={2} />
-              </button>
-            )}
 
             {/* Edit (own text only) */}
             {isOwn && msg.type === 'text' && (
