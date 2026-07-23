@@ -141,10 +141,12 @@ const ConversationItem = ({
   // Handle right-click (desktop)
   const handleContextMenu = (e) => {
     e.preventDefault();
+    e.stopPropagation();
 
-    // Adjust position so menu doesn't overflow viewport
-    const x = Math.min(e.clientX, window.innerWidth - 220);
-    const y = Math.min(e.clientY, window.innerHeight - 400);
+    const menuHeight = 360;
+    const menuWidth = 210;
+    const x = Math.max(10, Math.min(e.clientX, window.innerWidth - menuWidth - 10));
+    const y = Math.max(10, Math.min(e.clientY, window.innerHeight - menuHeight - 10));
 
     setMenuPos({ x, y });
     setShowContextMenu(true);
@@ -402,10 +404,19 @@ const ConversationItem = ({
                   setShowContextMenu(false);
                 } else {
                   const rect = e.currentTarget.getBoundingClientRect();
-                  setMenuPos({
-                    x: rect.right - 200,
-                    y: rect.bottom + 5
-                  });
+                  const menuHeight = 360;
+                  const menuWidth = 210;
+
+                  const x = Math.max(10, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 10));
+                  
+                  let y;
+                  if (rect.bottom + menuHeight > window.innerHeight - 10) {
+                    y = Math.max(10, rect.top - menuHeight - 5);
+                  } else {
+                    y = rect.bottom + 5;
+                  }
+
+                  setMenuPos({ x, y });
                   setShowContextMenu(prev => !prev);
                   setShowBottomSheet(false);
                 }
@@ -466,7 +477,7 @@ const ConversationItem = ({
             boxShadow: '0 12px 40px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.08)',
             padding: '6px',
             minWidth: '200px',
-            maxHeight: '400px',
+            maxHeight: 'calc(100vh - 20px)',
             overflowY: 'auto'
           }}
           onClick={(e) => e.stopPropagation()}

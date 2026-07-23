@@ -597,12 +597,9 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
                       className="plus-action-item"
                       type="button"
                       onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('open-create-poll')); }}
-                      disabled={!canCreatePollOrTask}
-                      title={!canCreatePollOrTask ? "Only group admins or management (managers) can create polls" : ""}
-                      style={!canCreatePollOrTask ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                     >
                       <div className="plus-icon-circle" style={{ backgroundColor: '#eab308' }}><BarChart2 size={16} /></div>
-                      Poll {!canCreatePollOrTask && '🔒'}
+                      Poll
                     </button>
                   )}
                   <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); alert('Create Event simulation.'); }}>
@@ -664,14 +661,22 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
               {showEmojiPicker && (
                 <div style={{
                   position: 'absolute',
-                  bottom: '52px',
+                  bottom: '54px',
                   left: '0',
                   zIndex: 1000,
                   borderRadius: '12px',
-                  overflow: 'hidden',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-                  border: '1px solid var(--border-color, #e2e8f0)'
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  maxHeight: 'calc(100vh - 120px)'
                 }}>
+                  <style>{`
+                    em-emoji-picker {
+                      --height: 340px !important;
+                      height: 340px !important;
+                      max-height: calc(100vh - 130px) !important;
+                      border-radius: 12px;
+                    }
+                  `}</style>
                   <Picker
                     data={data}
                     onEmojiSelect={handleEmojiSelect}

@@ -561,33 +561,6 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
           >
             Call Logs
           </button>
-          <button
-            onClick={() => setActiveTab('threads')}
-            style={{
-              flex: 1,
-              padding: '8px 0',
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === 'threads' ? '2.5px solid var(--chat-primary, #6366f1)' : '2.5px solid transparent',
-              color: activeTab === 'threads' ? 'var(--chat-primary, #6366f1)' : 'var(--text-secondary, #64748b)',
-              fontWeight: '600',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              textAlign: 'center',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
-          >
-            Threads
-            {Object.values(threadUnreadCounts || {}).reduce((a, b) => a + b, 0) > 0 && (
-              <span className="conv-list-total-badge" style={{ padding: '1px 5px', fontSize: '9.5px', background: '#ef4444' }}>
-                {Object.values(threadUnreadCounts || {}).reduce((a, b) => a + b, 0)}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Search */}

@@ -1172,17 +1172,77 @@ body.dark .msg-bubble-other .msg-time {
 
 .msg-emoji-picker-popup {
   position: absolute;
-  top: calc(100% + 8px);
+  bottom: calc(100% + 8px);
   left: 0;
-  z-index: 100;
-  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0,0,0,.25);
   border-radius: 16px;
-  overflow: hidden;
 }
 
 .msg-emoji-picker-own {
   left: auto;
   right: 0;
+}
+
+/* Reaction Badges & Tooltip */
+.msg-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  z-index: 5;
+}
+
+.msg-reaction-badge-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.msg-reaction-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--chat-border, #cbd5e1);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.15s ease;
+  color: var(--text-primary, #0f172a);
+}
+
+.msg-reaction-badge:hover {
+  background: var(--chat-hover, #f1f5f9);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.msg-reaction-badge-wrap .msg-reaction-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  background: #1e293b;
+  color: #ffffff !important;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  pointer-events: none;
+  z-index: 1000;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.msg-reaction-badge-wrap:hover .msg-reaction-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(-6px);
 }
 
 /* Delete menu */
