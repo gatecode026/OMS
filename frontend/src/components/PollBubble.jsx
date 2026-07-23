@@ -124,7 +124,7 @@ const PollBubble = ({ message, isOwn }) => {
 
     setIsSubmitting(true);
     try {
-      const apiUrl = window.API_URL || window.location.origin;
+      const apiUrl = window.API_URL || 'http://localhost:5000';
       const res = await fetch(`${apiUrl}/api/v1/chat/polls/${pollId}/vote`, {
         method: 'POST',
         headers: {
@@ -148,11 +148,12 @@ const PollBubble = ({ message, isOwn }) => {
 
   // Handle Poll Actions (Close / Reopen / Delete)
   const handleAction = async (action) => {
-    const actionUrl = `${window.API_URL || window.location.origin}/api/v1/chat/polls/${pollId}/${action}`;
+    const apiUrl = window.API_URL || 'http://localhost:5000';
+    const actionUrl = `${apiUrl}/api/v1/chat/polls/${pollId}/${action}`;
     const method = action === 'delete' ? 'DELETE' : 'POST';
 
     try {
-      const res = await fetch(action === 'delete' ? `${window.API_URL || window.location.origin}/api/v1/chat/polls/${pollId}` : actionUrl, {
+      const res = await fetch(action === 'delete' ? `${apiUrl}/api/v1/chat/polls/${pollId}` : actionUrl, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`

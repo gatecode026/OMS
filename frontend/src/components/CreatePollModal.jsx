@@ -73,7 +73,7 @@ const CreatePollModal = ({ conversationId, threadId, onClose }) => {
     setIsSubmitting(true);
 
     try {
-      const apiUrl = window.API_URL || window.location.origin;
+      const apiUrl = window.API_URL || 'http://localhost:5000';
       const res = await fetch(`${apiUrl}/api/v1/chat/polls`, {
         method: 'POST',
         headers: {
