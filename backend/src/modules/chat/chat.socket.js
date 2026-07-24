@@ -500,6 +500,9 @@ export const registerChatSocketHandlers = (io) => {
         socket.companyId = newCompanyId;
         socket.tokenExp = newTokenExp;
 
+        socket.join(`company:${newCompanyId}`);
+        socket.join(`user:${user.id}`);
+
         logger.info(
           `[Socket.io] Socket re-authenticated successfully for ${user.name} (${user.id})`,
         );
@@ -1932,7 +1935,13 @@ export const registerChatSocketHandlers = (io) => {
           };
 
           io.to(`user:${targetUserId}`).emit("call:incoming", incomingCallPayload);
-          io.to(`conv:${conversationId}`).emit("call:incoming", incomingCallPayload);
+
+          // Direct socket fallback to target user active sockets (excluding caller)
+          for (const [, s] of io.sockets.sockets) {
+            if (s?.user?.id === targetUserId && s.id !== socket.id) {
+              s.emit("call:incoming", incomingCallPayload);
+            }
+          }
 
           // Always dispatch Web Push Call Notification immediately (to wake up background/offline devices)
           const pushPayload = {
