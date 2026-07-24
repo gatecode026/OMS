@@ -9,9 +9,11 @@ import { Pin, Trash2, Calendar, FileText, Package, Paperclip, Mic } from 'lucide
 import MarkdownRenderer from './MarkdownRenderer';
 
 const PinnedMessageCard = ({ msg, conversation, currentUser, onUnpin, onNavigate }) => {
-  const isDirect = conversation?.type === 'direct';
-  const myParticipant = conversation?.participants?.find(p => p.employeeId === currentUser?.id);
-  const canUnpin = isDirect || myParticipant?.isAdmin;
+  const isPinner = msg.pinnedBy === currentUser?.id;
+  const isAuthor = msg.senderId === currentUser?.id;
+  const isAdmin = myParticipant?.isAdmin || ['super_admin', 'company_admin'].includes(currentUser?.role);
+
+  const canUnpin = isPinner || isAuthor || isAdmin;
 
   // Formatting helpers
   const formatTime = (isoString) => {

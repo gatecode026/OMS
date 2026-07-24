@@ -58,9 +58,9 @@ export const pinMessage = asyncHandler(async (req, res) => {
 // DELETE /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
 export const unpinMessage = asyncHandler(async (req, res) => {
   const { conversationId, messageId } = req.params;
-  const { id: employeeId, companyId } = req.user;
+  const { id: employeeId, companyId, role } = req.user;
 
-  const result = await chatService.unpinMessage(messageId, companyId);
+  const result = await chatService.unpinMessage(messageId, employeeId, companyId, role);
   try {
     const io = getIO();
     io.to(`conv:${conversationId}`).emit("message_unpinned", {
