@@ -131,26 +131,23 @@ const bootstrap = async () => {
     // Connect to database (simulated/future integration)
     await database.connect();
 
-    // Connect to Redis/Valkey and verify connectivity
+    // Connect to Redis and verify connectivity
     try {
-      if (!redisClient.isOpen && !redisClient.isAvailable) {
-        await redisClient.connect();
-      }
+      await redisClient.connect();
+      // Perform a functional test write check to ensure Redis is fully functional (e.g. not limited by free-tier limits)
+      await redisClient.set('startup_test_key', 'ok', { EX: 2 });
+      await redisClient.del('startup_test_key');
       const pingResponse = await redisClient.ping();
-      redisClient.isAvailable = true;
-      logger.info('✅ Redis/Valkey Connected');
-      logger.info(`Redis/Valkey Ping: ${pingResponse}`);
-      console.log('✅ Redis/Valkey Connected');
+      logger.info('✅ Redis Connected');
+      logger.info(`Redis Ping: ${pingResponse}`);
+      console.log('✅ Redis Connected');
     } catch (err) {
-      const errMsg = err?.message || String(err);
-      if (errMsg.includes('Socket already opened') || redisClient.isOpen) {
-        redisClient.isAvailable = true;
-        logger.info('✅ Redis/Valkey Connected');
-      } else {
-        logger.error(`[Redis/Valkey] Failed to connect on startup: ${errMsg}`);
-        redisClient.isAvailable = false;
-        logger.warn('[Redis/Valkey] Operating in fallback offline mode');
-      }
+      logger.error(`[Redis] Failed to connect or functional check failed on startup: ${err.message || err}`);
+      redisClient.isAvailable = false;
+      try {
+        await redisClient.disconnect();
+      } catch (_) {}
+      logger.warn('[Redis] Operating in fallback offline mode (in-memory caching & rate-limiting enabled)');
     }
 
     // Start background meeting reminder checks

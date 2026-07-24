@@ -500,9 +500,6 @@ export const registerChatSocketHandlers = (io) => {
         socket.companyId = newCompanyId;
         socket.tokenExp = newTokenExp;
 
-        socket.join(`company:${newCompanyId}`);
-        socket.join(`user:${user.id}`);
-
         logger.info(
           `[Socket.io] Socket re-authenticated successfully for ${user.name} (${user.id})`,
         );
@@ -890,21 +887,6 @@ export const registerChatSocketHandlers = (io) => {
       }
     });
 
-    // ── EVENT: LEAVE SPECIFIC CONVERSATION ─────────────────────────────────
-    socket.on("leave_conversation", async (conversationId) => {
-      try {
-        if (socket.activeConversationId === conversationId) {
-          socket.activeConversationId = null;
-        }
-        if (redis.isAvailable) {
-          await redis.del(`active_conv:${userId}`).catch(() => {});
-        }
-        socket.emit("left_conversation", { conversationId });
-      } catch (err) {
-        logger.error("[Chat] leave_conversation error:", err);
-      }
-    });
-
     // ── EVENT: JOIN SPECIFIC THREAD ────────────────────────────────────────
     socket.on("join_thread", async ({ threadId }) => {
       try {
@@ -1219,10 +1201,8 @@ export const registerChatSocketHandlers = (io) => {
             replyTo: savedMessage.replyTo,
           };
 
-          // Broadcast to conversation room and user rooms
-          io.to(`conv:${conversationId}`).emit("new_message", msgPayload);
-          io.to(`conv:${conversationId}`).emit("message:new", msgPayload);
-
+          // Broadcast to all participants' user rooms directly.
+          // This avoids cluster-wide fetchSockets() / socketsJoin() and resolves live performance lags.
           if (conv?.participants) {
             for (const p of conv.participants) {
               io.to(`user:${p.employeeId}`).emit("new_message", msgPayload);
@@ -1264,15 +1244,17 @@ export const registerChatSocketHandlers = (io) => {
                         .get(`active_conv:${participant.employeeId}`)
                         .catch(() => null);
                       isLookingAtThisConv = activeConv === conversationId;
-                    }
-                    if (!isLookingAtThisConv) {
-                      for (const [, s] of io.sockets.sockets) {
-                        if (
-                          s?.user?.id === participant.employeeId &&
-                          s?.activeConversationId === conversationId
-                        ) {
-                          isLookingAtThisConv = true;
-                          break;
+                    } else {
+                      const roomSockets = io.sockets.adapter.rooms.get(
+                        `conv:${conversationId}`,
+                      );
+                      if (roomSockets) {
+                        for (const socketId of roomSockets) {
+                          const s = io.sockets.sockets.get(socketId);
+                          if (s?.user?.id === participant.employeeId) {
+                            isLookingAtThisConv = true;
+                            break;
+                          }
                         }
                       }
                     }
@@ -1925,23 +1907,14 @@ export const registerChatSocketHandlers = (io) => {
           });
           socket.emit("call:ringing", { callId, callType });
 
-          const incomingCallPayload = {
+          io.to(`user:${targetUserId}`).emit("call:incoming", {
             callId,
             callerId: userId,
             callerName: name,
             callerAvatar: avatar || null,
             callType,
             conversationId,
-          };
-
-          io.to(`user:${targetUserId}`).emit("call:incoming", incomingCallPayload);
-
-          // Direct socket fallback to target user active sockets (excluding caller)
-          for (const [, s] of io.sockets.sockets) {
-            if (s?.user?.id === targetUserId && s.id !== socket.id) {
-              s.emit("call:incoming", incomingCallPayload);
-            }
-          }
+          });
 
           // Always dispatch Web Push Call Notification immediately (to wake up background/offline devices)
           const pushPayload = {

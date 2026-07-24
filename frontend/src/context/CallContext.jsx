@@ -314,12 +314,9 @@ export const CallProvider = ({ children }) => {
     // Incoming call
     const onCallIncoming = (data) => {
       console.log('[Call] Incoming call data:', data);
+      // data mein callId hona chahiye
       if (!data.callId) {
         console.error('[Call] Incoming call missing callId!', data);
-        return;
-      }
-      if (data.callerId === currentUser?.id) {
-        console.warn('[Call] Suppressed self-call incoming prompt');
         return;
       }
       if (callStateRef.current !== 'idle') {

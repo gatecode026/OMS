@@ -9,32 +9,20 @@ import logger from "./logger.js";
 
 dotenv.config();
 
-const RAW_URL = process.env.VALKEY_URL || process.env.REDIS_URL;
+const REDIS_URL = process.env.REDIS_URL;
 const DISABLE_REDIS = process.env.DISABLE_REDIS === 'true';
 
-// Normalize valkey:// or valkeys:// protocol schemes to redis:// or rediss://
-let finalUrl = RAW_URL;
-if (finalUrl && finalUrl.startsWith("valkey:")) {
-  finalUrl = finalUrl.replace(/^valkey:/, "redis:");
-}
-if (finalUrl && finalUrl.startsWith("valkeys:")) {
-  finalUrl = finalUrl.replace(/^valkeys:/, "rediss:");
-}
-
-const isTlsRequired = process.env.REDIS_TLS === 'true' || (finalUrl && finalUrl.startsWith("rediss:"));
-
-if (finalUrl && isTlsRequired && finalUrl.startsWith("redis://")) {
-  finalUrl = finalUrl.replace(/^redis:/, "rediss:");
-}
+// Convert redis:// to rediss:// to satisfy TLS/SSL requirements of Upstash Redis v4
+const finalUrl = REDIS_URL && REDIS_URL.startsWith("redis://")
+  ? REDIS_URL.replace(/^redis:/, "rediss:")
+  : REDIS_URL;
 
 let client;
-let lastRedisError = null;
 
 if (DISABLE_REDIS || !finalUrl) {
-  logger.warn('[Redis/Valkey] Disabled or REDIS_URL/VALKEY_URL not configured. Running in fallback mode.');
+  logger.warn('[Redis] Disabled or REDIS_URL not configured. Running in fallback mode.');
   client = {
     isAvailable: false,
-    getLastError: () => 'REDIS_URL/VALKEY_URL not configured',
     on: () => {},
     off: () => {},
     once: () => {},
@@ -52,36 +40,13 @@ if (DISABLE_REDIS || !finalUrl) {
     duplicate: function() { return this; },
   };
 } else {
-  let hostname = undefined;
-  try {
-    if (finalUrl) {
-      const parsed = new URL(finalUrl);
-      hostname = parsed.hostname;
-    }
-  } catch (e) {}
-
-  const clientOptions = {
+  client = createClient({
     url: finalUrl,
     socket: {
-      connectTimeout: 8000,
-      reconnectStrategy: (retries) => {
-        if (retries > 20) return false;
-        return Math.min(retries * 200, 2000);
-      }
+      tls: true,
+      rejectUnauthorized: false
     }
-  };
-
-  if (isTlsRequired) {
-    clientOptions.socket.tls = true;
-    clientOptions.socket.rejectUnauthorized = false;
-    clientOptions.socket.checkServerIdentity = () => undefined;
-    if (hostname) {
-      clientOptions.socket.servername = hostname;
-    }
-  }
-
-  client = createClient(clientOptions);
-  client.getLastError = () => lastRedisError;
+  });
 
   // Flag to track client availability across the application
   client.isAvailable = false;
@@ -89,42 +54,27 @@ if (DISABLE_REDIS || !finalUrl) {
   // ── Event Handlers ───────────────────────────────────────────────────────────
   client.on("connect", () => {
     client.isAvailable = true;
-    lastRedisError = null;
-    logger.info(`[Redis/Valkey] Connected successfully at ${finalUrl ? finalUrl.replace(/\/\/.*@/, '//') : ''}`);
+    logger.info(`[Redis] Connected successfully at ${REDIS_URL ? REDIS_URL.replace(/\/\/.*@/, '//') : ''}`);
   });
 
   client.on("ready", () => {
     client.isAvailable = true;
-    lastRedisError = null;
-    logger.info("[Redis/Valkey] Client is ready to accept commands");
+    logger.info("[Redis] Client is ready to accept commands");
   });
 
   client.on("error", (err) => {
-    const msg = err?.message || String(err);
-    if (msg.includes("Socket already opened")) return;
     client.isAvailable = false;
-    lastRedisError = msg;
-    logger.error(`[Redis/Valkey] Error: ${msg}`);
+    logger.error(`[Redis] Error: ${err.message || err}`);
   });
 
   client.on("reconnecting", () => {
-    logger.info("[Redis/Valkey] Reconnecting...");
+    logger.info("[Redis] Reconnecting...");
   });
 
   client.on("end", () => {
     client.isAvailable = false;
-    logger.warn("[Redis/Valkey] Connection closed");
+    logger.warn("[Redis] Connection closed");
   });
-
-  // Asynchronously connect main Redis/Valkey client with fallback
-  if (!client.isOpen) {
-    client.connect().catch((err) => {
-      const msg = err?.message || String(err);
-      if (msg.includes("Socket already opened")) return;
-      client.isAvailable = false;
-      logger.warn(`[Redis/Valkey] Connection failed (${msg}). Running in fallback mode.`);
-    });
-  }
 
   // ── Safe Exec Helper ──────────────────────────────────────────────────────────
   client.safeExec = async (fn) => {
@@ -221,12 +171,15 @@ if (DISABLE_REDIS || !finalUrl) {
     dup.on("connect", () => { dup.isAvailable = true; });
     dup.on("ready", () => { dup.isAvailable = true; });
     dup.on("error", (err) => {
-      const msg = err?.message || String(err);
-      if (msg.includes("Socket already opened")) return;
       dup.isAvailable = false;
-      logger.error(`[Redis Duplicate] Error: ${msg}`);
+      logger.error(`[Redis Duplicate] Error: ${err.message || err}`);
     });
     dup.on("end", () => { dup.isAvailable = false; });
+
+    // Asynchronously connect the duplicate client to mirror auto-connect behavior of ioredis
+    dup.connect().catch((err) => {
+      logger.error(`[Redis] Failed to connect duplicate client: ${err.message}`);
+    });
 
     return wrapClient(dup);
   };
