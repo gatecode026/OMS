@@ -4,6 +4,8 @@
  */
 
 import * as pinnedService from '../services/pinnedService.js';
+import * as chatService from '../chat.service.js';
+import { getIO } from '../../../config/socket.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { successResponse } from '../../../utils/response.js';
 
@@ -31,4 +33,42 @@ export const getPinnedMessages = asyncHandler(async (req, res) => {
     }
     throw error;
   }
+});
+
+// POST /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
+export const pinMessage = asyncHandler(async (req, res) => {
+  const { conversationId, messageId } = req.params;
+  const { id: employeeId, name: employeeName, companyId } = req.user;
+
+  const result = await chatService.pinMessage(messageId, employeeId, employeeName, companyId);
+  try {
+    const io = getIO();
+    io.to(`conv:${conversationId}`).emit("message_pinned", {
+      messageId,
+      conversationId,
+      pinnedBy: employeeId,
+      pinnedByName: employeeName,
+      pinnedAt: new Date()
+    });
+  } catch (err) {}
+
+  return successResponse(res, result, 'Message pinned successfully');
+});
+
+// DELETE /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
+export const unpinMessage = asyncHandler(async (req, res) => {
+  const { conversationId, messageId } = req.params;
+  const { id: employeeId, companyId } = req.user;
+
+  const result = await chatService.unpinMessage(messageId, companyId);
+  try {
+    const io = getIO();
+    io.to(`conv:${conversationId}`).emit("message_unpinned", {
+      messageId,
+      conversationId,
+      unpinnedBy: employeeId
+    });
+  } catch (err) {}
+
+  return successResponse(res, result, 'Message unpinned successfully');
 });

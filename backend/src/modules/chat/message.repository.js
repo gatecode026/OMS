@@ -78,11 +78,23 @@ export const findOneAndUpdate = async (query, updatePayload, options = { new: tr
   const msg = await Message.findOne(query);
   if (msg && context) {
     await conversationRepository.findOne({ id: msg.conversationId });
-    await validateRepositoryAccess('update', msg, { 
-      moduleName: 'Chat',
-      ownerIdFields: ['senderId'],
-      updatePayload
-    });
+
+    // Room-level actions (pinning, unpinning, starring, reacting) can be performed by any room member
+    const isRoomAction = updatePayload?.isPinned !== undefined || 
+                         updatePayload?.isPinned === false ||
+                         updatePayload?.isPinned === true ||
+                         updatePayload?.$addToSet?.starredBy !== undefined || 
+                         updatePayload?.$pull?.starredBy !== undefined ||
+                         updatePayload?.$push?.reactions !== undefined ||
+                         updatePayload?.$pull?.reactions !== undefined;
+
+    if (!isRoomAction) {
+      await validateRepositoryAccess('update', msg, { 
+        moduleName: 'Chat',
+        ownerIdFields: ['senderId'],
+        updatePayload
+      });
+    }
   }
 
   return Message.findOneAndUpdate(query, updatePayload, options);
