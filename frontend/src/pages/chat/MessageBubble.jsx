@@ -450,8 +450,11 @@ const MessageBubble = ({
   // System message
   if (msg.type === 'system') {
     return (
-      <div className="msg-system">
-        <span>{msg.content}</span>
+      <div className="msg-system-wrapper">
+        <div className="msg-system-pill">
+          <span className="msg-system-icon">ℹ️</span>
+          <span className="msg-system-text">{msg.content}</span>
+        </div>
       </div>
     );
   }
