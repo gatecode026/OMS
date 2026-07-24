@@ -9,18 +9,28 @@ import logger from "./logger.js";
 
 dotenv.config();
 
-const REDIS_URL = process.env.REDIS_URL;
+const RAW_URL = process.env.VALKEY_URL || process.env.REDIS_URL;
 const DISABLE_REDIS = process.env.DISABLE_REDIS === 'true';
 
-// Convert redis:// to rediss:// to satisfy TLS/SSL requirements of Upstash Redis v4
-const finalUrl = REDIS_URL && REDIS_URL.startsWith("redis://")
-  ? REDIS_URL.replace(/^redis:/, "rediss:")
-  : REDIS_URL;
+// Normalize valkey:// or valkeys:// protocol schemes to redis:// or rediss://
+let finalUrl = RAW_URL;
+if (finalUrl && finalUrl.startsWith("valkey:")) {
+  finalUrl = finalUrl.replace(/^valkey:/, "redis:");
+}
+if (finalUrl && finalUrl.startsWith("valkeys:")) {
+  finalUrl = finalUrl.replace(/^valkeys:/, "rediss:");
+}
+
+const isTlsRequired = process.env.REDIS_TLS === 'true' || (finalUrl && finalUrl.startsWith("rediss:"));
+
+if (finalUrl && isTlsRequired && finalUrl.startsWith("redis://")) {
+  finalUrl = finalUrl.replace(/^redis:/, "rediss:");
+}
 
 let client;
 
 if (DISABLE_REDIS || !finalUrl) {
-  logger.warn('[Redis] Disabled or REDIS_URL not configured. Running in fallback mode.');
+  logger.warn('[Redis/Valkey] Disabled or REDIS_URL/VALKEY_URL not configured. Running in fallback mode.');
   client = {
     isAvailable: false,
     on: () => {},
@@ -40,13 +50,17 @@ if (DISABLE_REDIS || !finalUrl) {
     duplicate: function() { return this; },
   };
 } else {
-  client = createClient({
-    url: finalUrl,
-    socket: {
+  const clientOptions = {
+    url: finalUrl
+  };
+  if (isTlsRequired) {
+    clientOptions.socket = {
       tls: true,
       rejectUnauthorized: false
-    }
-  });
+    };
+  }
+
+  client = createClient(clientOptions);
 
   // Flag to track client availability across the application
   client.isAvailable = false;
