@@ -1007,8 +1007,9 @@ export const addGroupMembers = async (
         conversationId,
         senderId: "system",
         senderName: "System",
-        preview: sysMsg.content,
+        content: sysMsg.content,
         type: "system",
+        systemMeta: sysMsg.systemMeta,
         createdAt: sysMsg.createdAt,
         _isOptimized: true,
       });
@@ -1057,31 +1058,29 @@ export const removeGroupMember = async (
     let autoPromotedMsg = null;
     let autoPromotedMemberId = null;
 
-    if (target.isAdmin) {
-      const admins = conv.participants.filter((p) => p.isAdmin);
-      if (admins.length === 1) {
-        const otherParticipants = conv.participants.filter(
-          (p) => p.employeeId !== targetEmployeeId,
+    const admins = conv.participants.filter((p) => p.isAdmin);
+    if (admins.length === 1) {
+      const otherParticipants = conv.participants.filter(
+        (p) => p.employeeId !== targetEmployeeId,
+      );
+      if (otherParticipants.length > 0) {
+        // Sort by joinedAt ascending to find the longest standing member
+        otherParticipants.sort(
+          (a, b) => new Date(a.joinedAt) - new Date(b.joinedAt),
         );
-        if (otherParticipants.length > 0) {
-          // Sort by joinedAt ascending to find the longest standing member
-          otherParticipants.sort(
-            (a, b) => new Date(a.joinedAt) - new Date(b.joinedAt),
-          );
-          const longestStanding = otherParticipants[0];
-          autoPromotedMemberId = longestStanding.employeeId;
+        const longestStanding = otherParticipants[0];
+        autoPromotedMemberId = longestStanding.employeeId;
 
-          // Promote them in DB
-          await Conversation.findOneAndUpdate(
-            {
-              id: conversationId,
-              "participants.employeeId": longestStanding.employeeId,
-            },
-            { $set: { "participants.$.isAdmin": true } },
-          );
+        // Promote them in DB
+        await Conversation.findOneAndUpdate(
+          {
+            id: conversationId,
+            "participants.employeeId": longestStanding.employeeId,
+          },
+          { $set: { "participants.$.isAdmin": true } },
+        );
 
-          autoPromotedMsg = `${longestStanding.name} has been promoted to Admin (auto-promoted)`;
-        }
+        autoPromotedMsg = `${longestStanding.name} has been promoted to Admin (auto-promoted)`;
       }
     }
 
@@ -1122,8 +1121,9 @@ export const removeGroupMember = async (
         conversationId,
         senderId: "system",
         senderName: "System",
-        preview: sysMsg.content,
+        content: sysMsg.content,
         type: "system",
+        systemMeta: sysMsg.systemMeta,
         createdAt: sysMsg.createdAt,
         _isOptimized: true,
       });
