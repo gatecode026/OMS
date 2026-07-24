@@ -53,7 +53,11 @@ if (DISABLE_REDIS || !finalUrl) {
   const clientOptions = {
     url: finalUrl,
     socket: {
-      reconnectStrategy: (retries) => Math.min(retries * 200, 3000)
+      connectTimeout: 5000,
+      reconnectStrategy: (retries) => {
+        if (retries > 10) return false;
+        return Math.min(retries * 200, 2000);
+      }
     }
   };
   if (isTlsRequired) {

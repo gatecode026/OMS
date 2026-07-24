@@ -54,7 +54,12 @@ export const checkRedisHealth = async () => {
   if (redis.isAvailable) {
     try {
       const start = performance.now();
-      const pingResponse = await redis.ping();
+      const pingPromise = redis.ping();
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Redis ping timeout (1500ms)')), 1500)
+      );
+
+      const pingResponse = await Promise.race([pingPromise, timeoutPromise]);
       const end = performance.now();
       latencyMs = Math.round(end - start);
       if (pingResponse === 'PONG') {
