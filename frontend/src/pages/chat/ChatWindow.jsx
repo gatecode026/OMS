@@ -577,91 +577,120 @@ const ChatWindow = ({ currentUser, onBack }) => {
       {/* Pinned message banner (Carousel) */}
       {pinnedMessages && pinnedMessages.length > 0 && (
         <div 
+          className="chat-pinned-banner"
           style={{
             background: 'var(--bg-card, #ffffff)',
             borderBottom: '1px solid var(--chat-border, #e2e8f0)',
-            padding: '10px 16px',
+            padding: '8px 16px',
             fontSize: '13px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             zIndex: 5,
-            color: 'var(--text-secondary, #475569)'
+            color: 'var(--text-secondary, #475569)',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
           }}
         >
           <div 
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minWidth: 0, flex: 1 }} 
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0, flex: 1 }} 
             onClick={() => {
               const currentPin = pinnedMessages[carouselIndex];
               if (currentPin) {
-                setHighlightedMessageId(currentPin.messageId);
+                const elId = `msg-${currentPin.messageId}`;
+                const targetEl = document.getElementById(elId);
+                if (targetEl) {
+                  targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  targetEl.classList.add('msg-bubble-highlight');
+                  setTimeout(() => targetEl.classList.remove('msg-bubble-highlight'), 2000);
+                } else {
+                  setHighlightedMessageId(currentPin.messageId);
+                }
               }
             }}
           >
-            <Pin 
-              size={14} 
-              fill="var(--chat-primary, #6366f1)" 
-              color="var(--chat-primary, #6366f1)" 
-              strokeWidth={2} 
-              style={{ 
-                transform: 'rotate(45deg)', 
-                flexShrink: 0 
-              }}
-            />
-            <span style={{ fontWeight: '600', color: 'var(--chat-primary, #6366f1)' }}>
-              📌 {pinnedMessages[carouselIndex]?.senderName}:
-            </span>
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, marginLeft: '4px' }}>
-              {pinnedMessages[carouselIndex]?.text ? stripMarkdown(pinnedMessages[carouselIndex].text) : (pinnedMessages[carouselIndex]?.messageType === 'image' ? '📷 Image' : '📎 Attachment')}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.12)', flexShrink: 0 }}>
+              <Pin 
+                size={14} 
+                fill="var(--chat-primary, #6366f1)" 
+                color="var(--chat-primary, #6366f1)" 
+                strokeWidth={2} 
+                style={{ transform: 'rotate(45deg)' }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                <span style={{ fontWeight: '600', color: 'var(--chat-primary, #6366f1)', fontSize: '13px' }}>
+                  {pinnedMessages[carouselIndex]?.senderName || 'User'}:
+                </span>
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary, #0f172a)', fontWeight: '500' }}>
+                  {pinnedMessages[carouselIndex]?.text ? stripMarkdown(pinnedMessages[carouselIndex].text) : (pinnedMessages[carouselIndex]?.messageType === 'image' ? '📷 Image' : '📎 Attachment')}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted, #64748b)', marginTop: '2px' }}>
+                <span>
+                  Pinned by <strong style={{ color: 'var(--chat-primary, #6366f1)' }}>{
+                    pinnedMessages[carouselIndex]?.pinnedBy === currentUser?.id
+                      ? 'You'
+                      : pinnedMessages[carouselIndex]?.pinnedByName ||
+                        conv?.participants?.find(p => p.employeeId === pinnedMessages[carouselIndex]?.pinnedBy || p.id === pinnedMessages[carouselIndex]?.pinnedBy)?.name ||
+                        'Someone'
+                  }</strong>
+                </span>
+                <span>•</span>
+                <span>📌 {totalPinned || pinnedMessages.length} { (totalPinned || pinnedMessages.length) === 1 ? 'Pinned Message' : 'Pinned Messages'}</span>
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '12px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted, #94a3b8)', whiteSpace: 'nowrap' }}>
-              {carouselIndex + 1} of {totalPinned}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '12px', flexShrink: 0 }}>
+            <span style={{ fontSize: '11.5px', fontWeight: '600', color: 'var(--text-muted, #64748b)', background: 'var(--bg-secondary, #f1f5f9)', padding: '2px 8px', borderRadius: '12px' }}>
+              {carouselIndex + 1} / {totalPinned || pinnedMessages.length}
             </span>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCarouselIndex(prev => (prev - 1 + pinnedMessages.length) % pinnedMessages.length);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary, #475569)',
-                  padding: '4px 6px',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  fontWeight: 'bold'
-                }}
-                title="Previous Pinned Message"
-              >
-                ←
-              </button>
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCarouselIndex(prev => (prev + 1) % pinnedMessages.length);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-secondary, #475569)',
-                  padding: '4px 6px',
-                  borderRadius: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  fontWeight: 'bold'
-                }}
-                title="Next Pinned Message"
-              >
-                →
-              </button>
-            </div>
+
+            {pinnedMessages.length > 1 && (
+              <div style={{ display: 'flex', gap: '3px' }}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCarouselIndex(prev => (prev - 1 + pinnedMessages.length) % pinnedMessages.length);
+                  }}
+                  style={{
+                    background: 'var(--bg-secondary, #f1f5f9)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-primary, #0f172a)',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: 'bold'
+                  }}
+                  title="Previous Pinned Message"
+                >
+                  ‹
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCarouselIndex(prev => (prev + 1) % pinnedMessages.length);
+                  }}
+                  style={{
+                    background: 'var(--bg-secondary, #f1f5f9)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-primary, #0f172a)',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: 'bold'
+                  }}
+                  title="Next Pinned Message"
+                >
+                  ›
+                </button>
+              </div>
+            )}
 
             <button 
               onClick={(e) => {
@@ -680,7 +709,7 @@ const ChatWindow = ({ currentUser, onBack }) => {
               }}
               title="Open PinBoard"
             >
-              Open PinBoard
+              All Pinned
             </button>
           </div>
         </div>

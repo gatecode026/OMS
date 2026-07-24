@@ -1808,36 +1808,66 @@ body.dark .msg-bubble-other .msg-time {
   transition: all 0.25s ease;
 }
 
-/* Other person's bubble (light theme) */
-:root.light-theme .msg-bubble-other.msg-bubble-pinned {
-  background-color: #eef2ff !important; /* indigo-50 */
-  border: 1px solid rgba(99, 102, 241, 0.4) !important;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
-  color: #1e293b !important;
+/* Light Theme Pinned Messages (Own & Other) */
+:root.light-theme .msg-bubble.msg-bubble-pinned {
+  background-color: #eef2ff !important; /* light indigo-50 */
+  border: 1.5px solid #6366f1 !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
 }
 
-/* Other person's bubble (dark theme - default) */
-.msg-bubble-other.msg-bubble-pinned {
-  background-color: #1e1b4b !important; /* dark indigo */
-  border: 1px solid rgba(165, 180, 252, 0.5) !important;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
-  color: #e0e7ff !important;
+:root.light-theme .msg-bubble.msg-bubble-pinned,
+:root.light-theme .msg-bubble.msg-bubble-pinned .msg-text,
+:root.light-theme .msg-bubble.msg-bubble-pinned .msg-markdown-content,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer p,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer span,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer li,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer strong,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer em,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer h1,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer h2,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer h3,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer h4 {
+  color: #0f172a !important; /* Crisp dark slate for high contrast */
 }
 
-/* Own bubble (light theme) */
-:root.light-theme .msg-bubble-own.msg-bubble-pinned {
-  background-color: #eef2ff !important; /* indigo-50 */
+:root.light-theme .msg-bubble.msg-bubble-pinned .msg-time {
+  color: #475569 !important;
+}
+
+:root.light-theme .msg-bubble.msg-bubble-pinned .msg-pin-icon {
+  color: #d946ef !important;
+}
+
+/* Dark Theme Pinned Messages (Own & Other) */
+.msg-bubble.msg-bubble-pinned {
+  background-color: #1e1b4b !important; /* Dark indigo */
   border: 1.5px solid #818cf8 !important;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
-  color: #1e293b !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
 }
 
-/* Own bubble (dark theme - default) */
-.msg-bubble-own.msg-bubble-pinned {
-  background-color: #1e1b4b !important; /* dark indigo */
-  border: 1.5px solid #a5b4fc !important;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
-  color: #e0e7ff !important;
+.msg-bubble.msg-bubble-pinned,
+.msg-bubble.msg-bubble-pinned .msg-text,
+.msg-bubble.msg-bubble-pinned .msg-markdown-content,
+.msg-bubble.msg-bubble-pinned .markdown-renderer,
+.msg-bubble.msg-bubble-pinned .markdown-renderer p,
+.msg-bubble.msg-bubble-pinned .markdown-renderer span,
+.msg-bubble.msg-bubble-pinned .markdown-renderer li,
+.msg-bubble.msg-bubble-pinned .markdown-renderer strong,
+.msg-bubble.msg-bubble-pinned .markdown-renderer em,
+.msg-bubble.msg-bubble-pinned .markdown-renderer h1,
+.msg-bubble.msg-bubble-pinned .markdown-renderer h2,
+.msg-bubble.msg-bubble-pinned .markdown-renderer h3,
+.msg-bubble.msg-bubble-pinned .markdown-renderer h4 {
+  color: #f8fafc !important; /* Bright text */
+}
+
+.msg-bubble.msg-bubble-pinned .msg-time {
+  color: #cbd5e1 !important;
+}
+
+.msg-bubble.msg-bubble-pinned .msg-pin-icon {
+  color: #e879f9 !important;
 }
 
 /* ── Icon Highlighting Contrast Overrides ──────────────────────── */

@@ -1049,23 +1049,48 @@ export const ChatProvider = ({ children }) => {
   const pinMessage = useCallback((messageId, convId) => {
     if (!messageId || !convId) return;
 
+    let newlyPinnedCard = null;
+
     setMessages(prev => {
       const convMsgs = prev[convId] || [];
-      return {
-        ...prev,
-        [convId]: convMsgs.map(msg =>
-          msg.id === messageId
-            ? {
-                ...msg,
-                isPinned: true,
-                pinnedBy: currentUserRef.current?.id,
-                pinnedByName: currentUserRef.current?.name || 'You',
-                pinnedAt: new Date().toISOString()
-              }
-            : msg
-        )
-      };
+      const updatedMsgs = convMsgs.map(msg => {
+        if (msg.id === messageId) {
+          const updated = {
+            ...msg,
+            isPinned: true,
+            pinnedBy: currentUserRef.current?.id,
+            pinnedByName: currentUserRef.current?.name || 'You',
+            pinnedAt: new Date().toISOString()
+          };
+          newlyPinnedCard = {
+            messageId: msg.id,
+            senderId: msg.senderId,
+            senderName: msg.senderName,
+            senderAvatar: msg.senderAvatar,
+            messageType: msg.type,
+            text: msg.content,
+            attachment: msg.media || null,
+            originalTimestamp: msg.createdAt,
+            pinnedBy: currentUserRef.current?.id,
+            pinnedByName: currentUserRef.current?.name || 'You',
+            pinnedTimestamp: new Date().toISOString(),
+            isPinned: true
+          };
+          return updated;
+        }
+        return msg;
+      });
+      return { ...prev, [convId]: updatedMsgs };
     });
+
+    if (newlyPinnedCard) {
+      setPinnedMessages(prev => {
+        const exists = prev.some(m => m.messageId === messageId);
+        if (exists) return prev;
+        return [newlyPinnedCard, ...prev];
+      });
+      setTotalPinned(prev => prev + 1);
+    }
 
     socketRef.current?.emit('pin_message', { messageId, conversationId: convId });
   }, []);
@@ -1084,6 +1109,9 @@ export const ChatProvider = ({ children }) => {
         )
       };
     });
+
+    setPinnedMessages(prev => prev.filter(m => m.messageId !== messageId));
+    setTotalPinned(prev => Math.max(0, prev - 1));
 
     socketRef.current?.emit('unpin_message', { messageId, conversationId: convId });
   }, []);

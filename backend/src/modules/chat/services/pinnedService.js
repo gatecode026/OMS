@@ -101,6 +101,8 @@ export const getPinnedMessages = async (conversationId, employeeId, companyId, q
       text: msg.content,
       attachment: msg.media || null,
       originalTimestamp: msg.createdAt,
+      pinnedBy: msg.pinnedBy,
+      pinnedByName: msg.pinnedByName,
       pinnedTimestamp: msg.pinnedAt,
       isPinned: msg.isPinned
     }));
