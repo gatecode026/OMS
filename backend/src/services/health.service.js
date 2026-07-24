@@ -71,10 +71,13 @@ export const checkRedisHealth = async () => {
     }
   }
 
+  const lastError = typeof redis.getLastError === 'function' ? redis.getLastError() : null;
+
   return {
     status: isHealthy ? 'healthy' : 'unhealthy',
     connection: redisStatus,
     pingLatency: `${latencyMs}ms`,
+    error: isHealthy ? undefined : (lastError || 'Redis/Valkey client disconnected or environment variable missing'),
     timestamp: new Date().toISOString()
   };
 };
