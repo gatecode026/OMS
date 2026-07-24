@@ -1870,6 +1870,28 @@ body.dark .msg-bubble-other .msg-time {
   color: #e879f9 !important;
 }
 
+.msg-mention-tag {
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(99, 102, 241, 0.15);
+  color: var(--chat-primary, #6366f1);
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin: 0 2px;
+  font-size: 0.95em;
+}
+
+:root.light-theme .msg-bubble-own .msg-mention-tag {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff !important;
+}
+
+.msg-bubble-own .msg-mention-tag {
+  background-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff !important;
+}
+
 /* ── Icon Highlighting Contrast Overrides ──────────────────────── */
 .msg-pin-icon {
   display: inline-flex;

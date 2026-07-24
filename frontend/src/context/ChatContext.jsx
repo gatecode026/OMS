@@ -910,6 +910,15 @@ export const ChatProvider = ({ children }) => {
       body: JSON.stringify({ memberIds })
     });
     if (data.status === 'success') {
+      const updatedConv = data.data?.conversation;
+      if (updatedConv && updatedConv.participants) {
+        setConversations(prev => prev.map(c => {
+          if (c.id === conversationId) {
+            return { ...c, participants: updatedConv.participants };
+          }
+          return c;
+        }));
+      }
       return data.data;
     }
     throw new Error(data.message || 'Failed to add members');
@@ -921,6 +930,15 @@ export const ChatProvider = ({ children }) => {
       method: 'DELETE'
     });
     if (data.status === 'success') {
+      const updatedConv = data.data?.conversation;
+      if (updatedConv && updatedConv.participants) {
+        setConversations(prev => prev.map(c => {
+          if (c.id === conversationId) {
+            return { ...c, participants: updatedConv.participants };
+          }
+          return c;
+        }));
+      }
       return data.data;
     }
     throw new Error(data.message || 'Failed to remove member');
@@ -2486,6 +2504,18 @@ export const ChatProvider = ({ children }) => {
         }
         return c;
       }));
+    });
+
+    socket.on('new_conversation', (newConv) => {
+      if (!newConv || !newConv.id) return;
+      setConversations(prev => {
+        const exists = prev.some(c => c.id === newConv.id);
+        if (exists) {
+          return prev.map(c => c.id === newConv.id ? { ...c, ...newConv } : c);
+        }
+        return [newConv, ...prev];
+      });
+      socketRef.current?.emit('join_conversation', { conversationId: newConv.id });
     });
 
     socket.on('member_added', ({ conversationId, participants }) => {
