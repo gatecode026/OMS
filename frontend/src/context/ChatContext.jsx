@@ -905,44 +905,67 @@ export const ChatProvider = ({ children }) => {
 
   // ── ADD MEMBERS TO GROUP ──────────────────────────────────────────────────
   const addMembersToGroup = useCallback(async (conversationId, memberIds) => {
-    const data = await apiFetch(`/chat/conversations/${conversationId}/members`, {
-      method: 'POST',
-      body: JSON.stringify({ memberIds })
-    });
-    if (data.status === 'success') {
-      const updatedConv = data.data?.conversation;
-      if (updatedConv && updatedConv.participants) {
-        setConversations(prev => prev.map(c => {
-          if (c.id === conversationId) {
-            return { ...c, participants: updatedConv.participants };
-          }
-          return c;
-        }));
+    try {
+      const data = await apiFetch(`/chat/conversations/${conversationId}/members`, {
+        method: 'POST',
+        body: JSON.stringify({ memberIds })
+      });
+      if (data.status === 'success') {
+        const updatedConv = data.data?.conversation;
+        if (updatedConv && updatedConv.participants) {
+          setConversations(prev => prev.map(c => {
+            if (c.id === conversationId) {
+              return { ...c, participants: updatedConv.participants };
+            }
+            return c;
+          }));
+        } else {
+          fetchConversations();
+        }
+        return data.data;
       }
-      return data.data;
+      throw new Error(data.message || 'Failed to add members');
+    } catch (err) {
+      fetchConversations();
+      throw err;
     }
-    throw new Error(data.message || 'Failed to add members');
-  }, [apiFetch]);
+  }, [apiFetch, fetchConversations]);
 
   // ── REMOVE MEMBER FROM GROUP ──────────────────────────────────────────────
   const removeMemberFromGroup = useCallback(async (conversationId, memberId) => {
-    const data = await apiFetch(`/chat/conversations/${conversationId}/members/${memberId}`, {
-      method: 'DELETE'
-    });
-    if (data.status === 'success') {
-      const updatedConv = data.data?.conversation;
-      if (updatedConv && updatedConv.participants) {
-        setConversations(prev => prev.map(c => {
-          if (c.id === conversationId) {
-            return { ...c, participants: updatedConv.participants };
-          }
-          return c;
-        }));
+    // Instant optimistic update
+    setConversations(prev => prev.map(c => {
+      if (c.id === conversationId) {
+        return {
+          ...c,
+          participants: (c.participants || []).filter(p => p.employeeId !== memberId && p.id !== memberId)
+        };
       }
-      return data.data;
+      return c;
+    }));
+
+    try {
+      const data = await apiFetch(`/chat/conversations/${conversationId}/members/${memberId}`, {
+        method: 'DELETE'
+      });
+      if (data.status === 'success') {
+        const updatedConv = data.data?.conversation;
+        if (updatedConv && updatedConv.participants) {
+          setConversations(prev => prev.map(c => {
+            if (c.id === conversationId) {
+              return { ...c, participants: updatedConv.participants };
+            }
+            return c;
+          }));
+        }
+        return data.data;
+      }
+      throw new Error(data.message || 'Failed to remove member');
+    } catch (err) {
+      fetchConversations();
+      throw err;
     }
-    throw new Error(data.message || 'Failed to remove member');
-  }, [apiFetch]);
+  }, [apiFetch, fetchConversations]);
 
   // ── LEAVE GROUP ───────────────────────────────────────────────────────────
   const leaveGroup = useCallback((conversationId) => {
