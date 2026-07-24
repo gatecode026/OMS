@@ -5,13 +5,35 @@ import { getRequiredRoleForPath, hasRoleAccess, PATH_TO_MODULE } from '../../per
 import { decodeEmployeeId } from '../../utils/hashId';
 
 /**
- * Route protector checking if the user session token is present.
- * Redirects to `/login` if unauthenticated.
+ * Helper to check if a JWT token is expired
+ */
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(atob(parts[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return true;
+    }
+  } catch (e) {
+    // If not a valid JWT format, ignore and let server validate
+  }
+  return false;
+};
+
+/**
+ * Route protector checking if the user session token is present and valid.
+ * Redirects to `/login` if unauthenticated or expired.
  */
 export const AuthGuard = ({ children }) => {
   const token = localStorage.getItem('saas_token') || sessionStorage.getItem('saas_token');
 
-  if (!token) {
+  if (!token || isTokenExpired(token)) {
+    if (token) {
+      localStorage.removeItem('saas_token');
+      sessionStorage.removeItem('saas_token');
+    }
     return <Navigate to="/login" replace />;
   }
 

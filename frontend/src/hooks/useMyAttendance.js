@@ -3,17 +3,31 @@ import { useApp } from '../context/AppContext';
 
 export const useMyAttendance = (filters = {}) => {
   const { currentUser, token } = useApp();
-  const [loading, setLoading] = useState(true);
+  const userId = currentUser?.id || '';
+
+  const getSwrCache = () => {
+    if (!userId) return null;
+    try {
+      const saved = localStorage.getItem(`swr_my_attendance_${userId}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const initialCache = getSwrCache();
+
+  const [loading, setLoading] = useState(!initialCache);
   const [error, setError] = useState(null);
-  const [todayRecord, setTodayRecord] = useState(null);
-  const [summary, setSummary] = useState({
+  const [todayRecord, setTodayRecord] = useState(initialCache?.todayRecord || null);
+  const [summary, setSummary] = useState(initialCache?.summary || {
     presentDays: 0,
     absentDays: 0,
     lateDays: 0,
     avgHours: 0,
     totalWorkingDays: 22
   });
-  const [records, setRecords] = useState([]);
+  const [records, setRecords] = useState(initialCache?.records || []);
 
   const { from, to, month } = filters;
 
@@ -23,7 +37,11 @@ export const useMyAttendance = (filters = {}) => {
       return;
     }
 
-    setLoading(true);
+    // If no initial cache, set loading to true
+    const cache = getSwrCache();
+    if (!cache) {
+      setLoading(true);
+    }
     setError(null);
 
     const headers = {
@@ -95,12 +113,21 @@ export const useMyAttendance = (filters = {}) => {
       if (summaryData) {
         setSummary(summaryData);
       }
+
+      // Save to SWR Cache for instant 0ms subsequent loads
+      if (userId) {
+        localStorage.setItem(`swr_my_attendance_${userId}`, JSON.stringify({
+          records: recordsData,
+          todayRecord: todayData,
+          summary: summaryData
+        }));
+      }
     } catch (err) {
       setError(err.message || 'An error occurred fetching attendance data.');
     } finally {
       setLoading(false);
     }
-  }, [currentUser, token, from, to, month]);
+  }, [currentUser, token, from, to, month, userId]);
 
   useEffect(() => {
     fetchMyAttendanceData();

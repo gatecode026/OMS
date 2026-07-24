@@ -12,6 +12,7 @@ import { useApp } from '../context/AppContext';
 import WelcomeModal from './employeeDashboard/WelcomeModal';
 import { useTitleWithUnread } from '../hooks/useTitleWithUnread';
 import { Flame, ExternalLink, X } from 'lucide-react';
+import ErrorBoundary from './common/ErrorBoundary';
 
 const AppShell = () => {
   const { 
@@ -101,21 +102,23 @@ const AppShell = () => {
         {/* Scrollable page viewport */}
         <main className="app-shell-content">
           <div className="page-entry-container animate-fade-in">
-            <Suspense fallback={
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <Skeleton variant="rect" height={40} width={300} />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)' }}>
-                  <Skeleton variant="rect" height={100} />
-                  <Skeleton variant="rect" height={100} />
-                  <Skeleton variant="rect" height={100} />
-                  <Skeleton variant="rect" height={100} />
+            <ErrorBoundary>
+              <Suspense fallback={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                  <Skeleton variant="rect" height={40} width={300} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-4)' }}>
+                    <Skeleton variant="rect" height={100} />
+                    <Skeleton variant="rect" height={100} />
+                    <Skeleton variant="rect" height={100} />
+                    <Skeleton variant="rect" height={100} />
+                  </div>
+                  <Skeleton variant="rect" height={220} />
+                  <Skeleton variant="text" count={4} />
                 </div>
-                <Skeleton variant="rect" height={220} />
-                <Skeleton variant="text" count={4} />
-              </div>
-            }>
-              <Outlet />
-            </Suspense>
+              }>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </main>
       </div>
