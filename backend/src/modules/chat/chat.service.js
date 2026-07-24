@@ -1399,25 +1399,8 @@ export const pinMessage = async (messageId, employeeId, employeeName, companyId)
 /**
  * Unpin a message in a conversation
  */
-export const unpinMessage = async (messageId, employeeId, companyId, role) => {
+export const unpinMessage = async (messageId, companyId) => {
   return runWithTenant(companyId, async () => {
-    const existingMsg = await Message.findOne({ id: messageId });
-    if (!existingMsg) {
-      throw new Error('Message not found');
-    }
-
-    const isPinner = existingMsg.pinnedBy === employeeId;
-    const isAuthor = existingMsg.senderId === employeeId;
-    const isGlobalAdmin = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(role?.toLowerCase());
-
-    if (!isPinner && !isAuthor && !isGlobalAdmin) {
-      const conv = await Conversation.findOne({ id: existingMsg.conversationId });
-      const participant = conv?.participants?.find(p => p.employeeId === employeeId || p.id === employeeId);
-      if (!participant?.isAdmin) {
-        throw new Error('Access Denied: Only the user who pinned this message, the author, or a group admin can unpin it.');
-      }
-    }
-
     const updatedMsg = await Message.findOneAndUpdate(
       { id: messageId },
       { isPinned: false, pinnedBy: null, pinnedByName: null, pinnedAt: null },

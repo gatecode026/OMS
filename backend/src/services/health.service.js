@@ -54,12 +54,7 @@ export const checkRedisHealth = async () => {
   if (redis.isAvailable) {
     try {
       const start = performance.now();
-      const pingPromise = redis.ping();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Redis ping timeout (1500ms)')), 1500)
-      );
-
-      const pingResponse = await Promise.race([pingPromise, timeoutPromise]);
+      const pingResponse = await redis.ping();
       const end = performance.now();
       latencyMs = Math.round(end - start);
       if (pingResponse === 'PONG') {
@@ -71,13 +66,10 @@ export const checkRedisHealth = async () => {
     }
   }
 
-  const lastError = typeof redis.getLastError === 'function' ? redis.getLastError() : null;
-
   return {
     status: isHealthy ? 'healthy' : 'unhealthy',
     connection: redisStatus,
     pingLatency: `${latencyMs}ms`,
-    error: isHealthy ? undefined : (lastError || 'Redis/Valkey client disconnected or environment variable missing'),
     timestamp: new Date().toISOString()
   };
 };

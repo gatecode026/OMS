@@ -95,7 +95,6 @@ app.use('/uploads', express.static('uploads'));
 // ─── HEALTH & METRICS ROUTES ──────────────────────────────────────────────────
 app.use('/health', healthRouter);
 app.use('/api/health', healthRouter);
-app.use('/api/v1/health', healthRouter);
 
 // ─── PUBLIC BRANDING ROUTES ──────────────────────────────────────────────────
 app.use('/api/public', publicRouter);
