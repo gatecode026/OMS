@@ -100,8 +100,9 @@ if (DISABLE_REDIS || !finalUrl) {
   });
 
   client.on("error", (err) => {
-    client.isAvailable = false;
     const msg = err?.message || String(err);
+    if (msg.includes("Socket already opened")) return;
+    client.isAvailable = false;
     lastRedisError = msg;
     logger.error(`[Redis/Valkey] Error: ${msg}`);
   });
@@ -216,15 +217,12 @@ if (DISABLE_REDIS || !finalUrl) {
     dup.on("connect", () => { dup.isAvailable = true; });
     dup.on("ready", () => { dup.isAvailable = true; });
     dup.on("error", (err) => {
+      const msg = err?.message || String(err);
+      if (msg.includes("Socket already opened")) return;
       dup.isAvailable = false;
-      logger.error(`[Redis Duplicate] Error: ${err.message || err}`);
+      logger.error(`[Redis Duplicate] Error: ${msg}`);
     });
     dup.on("end", () => { dup.isAvailable = false; });
-
-    // Asynchronously connect the duplicate client to mirror auto-connect behavior of ioredis
-    dup.connect().catch((err) => {
-      logger.error(`[Redis] Failed to connect duplicate client: ${err.message}`);
-    });
 
     return wrapClient(dup);
   };
