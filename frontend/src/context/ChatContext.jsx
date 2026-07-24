@@ -1161,7 +1161,13 @@ export const ChatProvider = ({ children }) => {
     }
 
     socketRef.current?.emit('pin_message', { messageId, conversationId: convId });
-  }, []);
+
+    apiFetch(`/chat/conversations/${convId}/messages/${messageId}/pin`, {
+      method: 'POST'
+    }).catch(err => {
+      console.warn('[ChatContext] API pinMessage fallback error:', err);
+    });
+  }, [apiFetch]);
 
   const unpinMessage = useCallback((messageId, convId) => {
     if (!messageId || !convId) return;
@@ -1182,7 +1188,13 @@ export const ChatProvider = ({ children }) => {
     setTotalPinned(prev => Math.max(0, prev - 1));
 
     socketRef.current?.emit('unpin_message', { messageId, conversationId: convId });
-  }, []);
+
+    apiFetch(`/chat/conversations/${convId}/messages/${messageId}/pin`, {
+      method: 'DELETE'
+    }).catch(err => {
+      console.warn('[ChatContext] API unpinMessage fallback error:', err);
+    });
+  }, [apiFetch]);
 
   const loadPinnedMessages = useCallback(async (convId, params = {}) => {
     if (!convId) return;

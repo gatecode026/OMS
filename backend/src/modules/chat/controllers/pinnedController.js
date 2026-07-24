@@ -5,6 +5,7 @@
 
 import * as pinnedService from '../services/pinnedService.js';
 import * as chatService from '../chat.service.js';
+import { getIO } from '../../../config/socket.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { successResponse } from '../../../utils/response.js';
 import { getIO } from '../../../config/socket.js';
@@ -38,46 +39,37 @@ export const getPinnedMessages = asyncHandler(async (req, res) => {
 // POST /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
 export const pinMessage = asyncHandler(async (req, res) => {
   const { conversationId, messageId } = req.params;
-  const { id: employeeId, companyId } = req.user;
+  const { id: employeeId, name: employeeName, companyId } = req.user;
 
-  const msg = await chatService.pinMessage(messageId, employeeId, companyId);
-  if (!msg) {
-    return res.status(404).json({ status: 'fail', message: 'Message not found' });
-  }
-
-  // Broadcast to conversation room
-  const io = getIO();
-  if (io) {
+  const result = await chatService.pinMessage(messageId, employeeId, employeeName, companyId);
+  try {
+    const io = getIO();
     io.to(`conv:${conversationId}`).emit("message_pinned", {
       messageId,
       conversationId,
       pinnedBy: employeeId,
-      pinnedAt: new Date(),
+      pinnedByName: employeeName,
+      pinnedAt: new Date()
     });
-  }
+  } catch (err) {}
 
-  return successResponse(res, msg, 'Message pinned successfully');
+  return successResponse(res, result, 'Message pinned successfully');
 });
 
 // DELETE /api/v1/chat/conversations/:conversationId/messages/:messageId/pin
 export const unpinMessage = asyncHandler(async (req, res) => {
   const { conversationId, messageId } = req.params;
-  const { companyId } = req.user;
+  const { id: employeeId, companyId } = req.user;
 
-  const msg = await chatService.unpinMessage(messageId, companyId);
-  if (!msg) {
-    return res.status(404).json({ status: 'fail', message: 'Message not found' });
-  }
-
-  // Broadcast to conversation room
-  const io = getIO();
-  if (io) {
+  const result = await chatService.unpinMessage(messageId, companyId);
+  try {
+    const io = getIO();
     io.to(`conv:${conversationId}`).emit("message_unpinned", {
       messageId,
       conversationId,
-      unpinnedBy: req.user.id,
+      unpinnedBy: employeeId
     });
-  }
+  } catch (err) {}
 
-  return successResponse(res, msg, 'Message unpinned successfully');
+  return successResponse(res, result, 'Message unpinned successfully');
 });
