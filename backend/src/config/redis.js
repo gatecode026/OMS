@@ -68,26 +68,33 @@ if (DISABLE_REDIS || !finalUrl) {
   // ── Event Handlers ───────────────────────────────────────────────────────────
   client.on("connect", () => {
     client.isAvailable = true;
-    logger.info(`[Redis] Connected successfully at ${REDIS_URL ? REDIS_URL.replace(/\/\/.*@/, '//') : ''}`);
+    logger.info(`[Redis/Valkey] Connected successfully at ${finalUrl ? finalUrl.replace(/\/\/.*@/, '//') : ''}`);
   });
 
   client.on("ready", () => {
     client.isAvailable = true;
-    logger.info("[Redis] Client is ready to accept commands");
+    logger.info("[Redis/Valkey] Client is ready to accept commands");
   });
 
   client.on("error", (err) => {
     client.isAvailable = false;
-    logger.error(`[Redis] Error: ${err.message || err}`);
+    const msg = err?.message || String(err);
+    logger.error(`[Redis/Valkey] Error: ${msg}`);
   });
 
   client.on("reconnecting", () => {
-    logger.info("[Redis] Reconnecting...");
+    logger.info("[Redis/Valkey] Reconnecting...");
   });
 
   client.on("end", () => {
     client.isAvailable = false;
-    logger.warn("[Redis] Connection closed");
+    logger.warn("[Redis/Valkey] Connection closed");
+  });
+
+  // Asynchronously connect main Redis/Valkey client with fallback
+  client.connect().catch((err) => {
+    client.isAvailable = false;
+    logger.warn(`[Redis/Valkey] Connection failed (${err.message || err}). Running in fallback mode.`);
   });
 
   // ── Safe Exec Helper ──────────────────────────────────────────────────────────
