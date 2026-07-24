@@ -1047,10 +1047,44 @@ export const ChatProvider = ({ children }) => {
 
   // ── PIN / UNPIN MESSAGE ───────────────────────────────────────────────────
   const pinMessage = useCallback((messageId, convId) => {
+    if (!messageId || !convId) return;
+
+    setMessages(prev => {
+      const convMsgs = prev[convId] || [];
+      return {
+        ...prev,
+        [convId]: convMsgs.map(msg =>
+          msg.id === messageId
+            ? {
+                ...msg,
+                isPinned: true,
+                pinnedBy: currentUserRef.current?.id,
+                pinnedByName: currentUserRef.current?.name || 'You',
+                pinnedAt: new Date().toISOString()
+              }
+            : msg
+        )
+      };
+    });
+
     socketRef.current?.emit('pin_message', { messageId, conversationId: convId });
   }, []);
 
   const unpinMessage = useCallback((messageId, convId) => {
+    if (!messageId || !convId) return;
+
+    setMessages(prev => {
+      const convMsgs = prev[convId] || [];
+      return {
+        ...prev,
+        [convId]: convMsgs.map(msg =>
+          msg.id === messageId
+            ? { ...msg, isPinned: false, pinnedBy: null, pinnedByName: null, pinnedAt: null }
+            : msg
+        )
+      };
+    });
+
     socketRef.current?.emit('unpin_message', { messageId, conversationId: convId });
   }, []);
 
