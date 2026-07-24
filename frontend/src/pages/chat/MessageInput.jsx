@@ -290,6 +290,16 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
     }, 10);
   };
 
+  // Auto-scroll mention popover container to keep highlighted item in view
+  useEffect(() => {
+    if (showMentionPopover && mentionPopoverRef.current) {
+      const activeEl = mentionPopoverRef.current.querySelector(`.mention-item-${mentionIndex}`);
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [mentionIndex, showMentionPopover]);
+
   const handleChange = (e) => {
     const val = e.target.value;
     const cursorPos = e.target.selectionStart;
@@ -905,6 +915,7 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
                     return (
                       <div
                         key={c.id}
+                        className={`msg-mention-candidate-item mention-item-${idx}`}
                         onClick={() => selectMentionCandidate(c)}
                         onMouseEnter={() => setMentionIndex(idx)}
                         style={{
