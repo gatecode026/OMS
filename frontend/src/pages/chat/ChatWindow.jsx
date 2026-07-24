@@ -619,18 +619,9 @@ const ChatWindow = ({ currentUser, onBack }) => {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                <span style={{ fontWeight: '600', color: 'var(--chat-primary, #6366f1)', fontSize: '13px' }}>
-                  {pinnedMessages[carouselIndex]?.senderName || 'User'}:
-                </span>
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-primary, #0f172a)', fontWeight: '500' }}>
-                  {pinnedMessages[carouselIndex]?.text ? stripMarkdown(pinnedMessages[carouselIndex].text) : (pinnedMessages[carouselIndex]?.messageType === 'image' ? '📷 Image' : '📎 Attachment')}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted, #64748b)', marginTop: '2px' }}>
-                <span>
-                  Pinned by <strong style={{ color: 'var(--chat-primary, #6366f1)' }}>{(() => {
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--chat-primary, #6366f1)', fontWeight: '600' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  📌 Pinned by <span style={{ textDecoration: 'underline' }}>{(() => {
                     const pin = pinnedMessages[carouselIndex];
                     if (!pin) return 'User';
                     const isId = pin.pinnedByName && (pin.pinnedByName.startsWith('COMP-') || pin.pinnedByName.startsWith('EMP-') || pin.pinnedByName === pin.pinnedBy);
@@ -639,10 +630,21 @@ const ChatWindow = ({ currentUser, onBack }) => {
                     if (part?.name) return part.name;
                     if (pin.pinnedBy === currentUser?.id) return 'You';
                     return pin.pinnedByName || 'User';
-                  })()}</strong>
+                  })()}</span>
                 </span>
-                <span>•</span>
-                <span>📌 {totalPinned || pinnedMessages.length} { (totalPinned || pinnedMessages.length) === 1 ? 'Pinned Message' : 'Pinned Messages'}</span>
+                <span style={{ color: 'var(--text-muted, #94a3b8)' }}>•</span>
+                <span style={{ color: 'var(--text-muted, #64748b)', fontWeight: '500' }}>
+                  {totalPinned || pinnedMessages.length} { (totalPinned || pinnedMessages.length) === 1 ? 'Pinned Message' : 'Pinned Messages'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, marginTop: '2px' }}>
+                <span style={{ fontWeight: '600', color: 'var(--text-primary, #0f172a)', fontSize: '13px' }}>
+                  {pinnedMessages[carouselIndex]?.senderName || 'User'}:
+                </span>
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-secondary, #334155)', fontWeight: '400', fontSize: '13px' }}>
+                  {pinnedMessages[carouselIndex]?.text ? stripMarkdown(pinnedMessages[carouselIndex].text) : (pinnedMessages[carouselIndex]?.messageType === 'image' ? '📷 Image' : '📎 Attachment')}
+                </span>
               </div>
             </div>
           </div>
