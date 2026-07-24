@@ -2511,6 +2511,13 @@ export const ChatProvider = ({ children }) => {
       }));
     });
 
+    // ── In-App Notifications ─────────────────────────────────────────────
+    socket.on('notification', (notif) => {
+      if (notif?.message && addToastRef.current) {
+        addToastRef.current('info', notif.message);
+      }
+    });
+
     // ── Group Socket Events ───────────────────────────────────────────────
     socket.on('new_conversation', (conversation) => {
       setConversations(prev => {

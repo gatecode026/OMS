@@ -929,10 +929,13 @@ export const addGroupMembers = async (
     if (!conv || conv.type !== "group") throw new Error("Group not found");
 
     const adminParticipant = conv.participants.find(
-      (p) => p.employeeId === adminId,
+      (p) => p.employeeId?.toString() === adminId?.toString() || p.id?.toString() === adminId?.toString(),
     );
-    if (!adminParticipant?.isAdmin)
-      throw new Error("Only admins can add members");
+    const isUserAdmin = adminParticipant?.isAdmin || conv.canAddMembers !== false;
+    if (!isUserAdmin)
+      throw new Error("Only admins can add members to this group");
+
+    const adderName = adminParticipant?.name || "An admin";
 
     const validNewMembers = [];
     const addedNames = [];
@@ -965,11 +968,11 @@ export const addGroupMembers = async (
     // Create a single batched system message
     let content = "";
     if (addedNames.length === 1) {
-      content = `${adminParticipant.name} added ${addedNames[0]}`;
+      content = `${adderName} added ${addedNames[0]}`;
     } else if (addedNames.length === 2) {
-      content = `${adminParticipant.name} added ${addedNames[0]} and ${addedNames[1]}`;
+      content = `${adderName} added ${addedNames[0]} and ${addedNames[1]}`;
     } else {
-      content = `${adminParticipant.name} added ${addedNames[0]}, ${addedNames[1]} and ${addedNames.length - 2} others`;
+      content = `${adderName} added ${addedNames[0]}, ${addedNames[1]} and ${addedNames.length - 2} others`;
     }
 
     const msgId = new mongoose.Types.ObjectId().toString();
