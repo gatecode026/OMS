@@ -117,10 +117,14 @@ if (DISABLE_REDIS || !finalUrl) {
   });
 
   // Asynchronously connect main Redis/Valkey client with fallback
-  client.connect().catch((err) => {
-    client.isAvailable = false;
-    logger.warn(`[Redis/Valkey] Connection failed (${err.message || err}). Running in fallback mode.`);
-  });
+  if (!client.isOpen) {
+    client.connect().catch((err) => {
+      const msg = err?.message || String(err);
+      if (msg.includes("Socket already opened")) return;
+      client.isAvailable = false;
+      logger.warn(`[Redis/Valkey] Connection failed (${msg}). Running in fallback mode.`);
+    });
+  }
 
   // ── Safe Exec Helper ──────────────────────────────────────────────────────────
   client.safeExec = async (fn) => {
