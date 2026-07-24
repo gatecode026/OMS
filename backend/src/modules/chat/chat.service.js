@@ -1046,9 +1046,10 @@ export const removeGroupMember = async (
     let adminParticipant = null;
     if (!isSelf) {
       adminParticipant = conv.participants.find(
-        (p) => p.employeeId === adminId,
+        (p) => p.employeeId?.toString() === adminId?.toString() || p.id?.toString() === adminId?.toString(),
       );
-      if (!adminParticipant?.isAdmin)
+      const isUserAdmin = adminParticipant?.isAdmin || conv.canAddMembers !== false;
+      if (!isUserAdmin)
         throw new Error("Only admins can remove members");
     }
 
@@ -1088,9 +1089,10 @@ export const removeGroupMember = async (
     }
 
     const action = isSelf ? "member_left" : "member_removed";
+    const removerName = adminParticipant?.name || "Admin";
     const content = isSelf
       ? `${target.name} left the group`
-      : `${adminParticipant ? adminParticipant.name : "Admin"} removed ${target.name}`;
+      : `${removerName} removed ${target.name}`;
 
     // Pull member out
     const updatedConv = await Conversation.findOneAndUpdate(
@@ -1382,11 +1384,15 @@ export const unpinConversation = async (
  */
 export const pinMessage = async (messageId, employeeId, employeeName, companyId) => {
   return runWithTenant(companyId, async () => {
-    return await Message.findOneAndUpdate(
+    const updatedMsg = await Message.findOneAndUpdate(
       { id: messageId },
       { isPinned: true, pinnedBy: employeeId, pinnedByName: employeeName, pinnedAt: new Date() },
       { new: true },
     );
+    if (updatedMsg) {
+      cacheDel(CacheKeys.convMsgs(companyId, updatedMsg.conversationId)).catch(() => {});
+    }
+    return updatedMsg;
   });
 };
 
@@ -1395,11 +1401,15 @@ export const pinMessage = async (messageId, employeeId, employeeName, companyId)
  */
 export const unpinMessage = async (messageId, companyId) => {
   return runWithTenant(companyId, async () => {
-    return await Message.findOneAndUpdate(
+    const updatedMsg = await Message.findOneAndUpdate(
       { id: messageId },
       { isPinned: false, pinnedBy: null, pinnedByName: null, pinnedAt: null },
       { new: true },
     );
+    if (updatedMsg) {
+      cacheDel(CacheKeys.convMsgs(companyId, updatedMsg.conversationId)).catch(() => {});
+    }
+    return updatedMsg;
   });
 };
 

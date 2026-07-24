@@ -922,6 +922,9 @@ export const ChatProvider = ({ children }) => {
         } else {
           fetchConversations();
         }
+
+        // Fetch messages to immediately pull server system message
+        fetchMessages(conversationId);
         return data.data;
       }
       throw new Error(data.message || 'Failed to add members');
@@ -929,11 +932,17 @@ export const ChatProvider = ({ children }) => {
       fetchConversations();
       throw err;
     }
-  }, [apiFetch, fetchConversations]);
+  }, [apiFetch, fetchConversations, fetchMessages]);
 
   // ── REMOVE MEMBER FROM GROUP ──────────────────────────────────────────────
   const removeMemberFromGroup = useCallback(async (conversationId, memberId) => {
-    // Instant optimistic update
+    // Find target name before removing
+    const currentConv = conversations.find(c => c.id === conversationId);
+    const targetMember = currentConv?.participants?.find(p => p.employeeId === memberId || p.id === memberId);
+    const targetName = targetMember?.name || 'a member';
+    const currentUserName = currentUser?.name || 'Admin';
+
+    // Instant optimistic update for group members list
     setConversations(prev => prev.map(c => {
       if (c.id === conversationId) {
         return {
@@ -942,6 +951,23 @@ export const ChatProvider = ({ children }) => {
         };
       }
       return c;
+    }));
+
+    // Optimistically insert system message into chat timeline
+    const sysMsgId = `sys_${Date.now()}`;
+    const sysMsg = {
+      id: sysMsgId,
+      conversationId,
+      senderId: 'system',
+      senderName: 'System',
+      content: `${currentUserName} removed ${targetName}`,
+      type: 'system',
+      createdAt: new Date().toISOString()
+    };
+
+    setMessages(prev => ({
+      ...prev,
+      [conversationId]: [...(prev[conversationId] || []).filter(m => m.id !== sysMsgId), sysMsg]
     }));
 
     try {
@@ -958,6 +984,7 @@ export const ChatProvider = ({ children }) => {
             return c;
           }));
         }
+        fetchMessages(conversationId);
         return data.data;
       }
       throw new Error(data.message || 'Failed to remove member');
@@ -965,7 +992,7 @@ export const ChatProvider = ({ children }) => {
       fetchConversations();
       throw err;
     }
-  }, [apiFetch, fetchConversations]);
+  }, [apiFetch, fetchConversations, fetchMessages, conversations, currentUser]);
 
   // ── LEAVE GROUP ───────────────────────────────────────────────────────────
   const leaveGroup = useCallback((conversationId) => {

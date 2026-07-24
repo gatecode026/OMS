@@ -17,8 +17,10 @@ export const getPinnedMessages = async (conversationId, employeeId, companyId, q
     // 1. Verify membership and active conversation status
     const conv = await Conversation.findOne({
       id: conversationId,
-      'participants.employeeId': employeeId,
-      isActive: true
+      $or: [
+        { 'participants.employeeId': employeeId },
+        { 'participants.id': employeeId }
+      ]
     });
     if (!conv) {
       throw new Error('Conversation not found or access denied');

@@ -1892,6 +1892,50 @@ body.dark .msg-bubble-other .msg-time {
   color: #ffffff !important;
 }
 
+/* ── System Message Bubble Styling ────────────────────────────── */
+.msg-system-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 14px 0;
+  width: 100%;
+}
+
+.msg-system-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--chat-hover, #f1f5f9);
+  border: 1px solid var(--chat-border, #cbd5e1);
+  color: var(--text-secondary, #475569);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+:root.light-theme .msg-system-pill {
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+:root.dark-theme .msg-system-pill {
+  background-color: rgba(30, 41, 59, 0.8);
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.msg-system-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.msg-system-text {
+  font-weight: 600;
+}
+
 /* ── Icon Highlighting Contrast Overrides ──────────────────────── */
 .msg-pin-icon {
   display: inline-flex;
