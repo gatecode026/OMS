@@ -28,11 +28,13 @@ if (finalUrl && isTlsRequired && finalUrl.startsWith("redis://")) {
 }
 
 let client;
+let lastRedisError = null;
 
 if (DISABLE_REDIS || !finalUrl) {
   logger.warn('[Redis/Valkey] Disabled or REDIS_URL/VALKEY_URL not configured. Running in fallback mode.');
   client = {
     isAvailable: false,
+    getLastError: () => 'REDIS_URL/VALKEY_URL not configured',
     on: () => {},
     off: () => {},
     once: () => {},
@@ -50,23 +52,36 @@ if (DISABLE_REDIS || !finalUrl) {
     duplicate: function() { return this; },
   };
 } else {
+  let hostname = undefined;
+  try {
+    if (finalUrl) {
+      const parsed = new URL(finalUrl);
+      hostname = parsed.hostname;
+    }
+  } catch (e) {}
+
   const clientOptions = {
     url: finalUrl,
     socket: {
-      connectTimeout: 5000,
+      connectTimeout: 8000,
       reconnectStrategy: (retries) => {
-        if (retries > 10) return false;
+        if (retries > 20) return false;
         return Math.min(retries * 200, 2000);
       }
     }
   };
+
   if (isTlsRequired) {
     clientOptions.socket.tls = true;
     clientOptions.socket.rejectUnauthorized = false;
     clientOptions.socket.checkServerIdentity = () => undefined;
+    if (hostname) {
+      clientOptions.socket.servername = hostname;
+    }
   }
 
   client = createClient(clientOptions);
+  client.getLastError = () => lastRedisError;
 
   // Flag to track client availability across the application
   client.isAvailable = false;
@@ -74,17 +89,20 @@ if (DISABLE_REDIS || !finalUrl) {
   // ── Event Handlers ───────────────────────────────────────────────────────────
   client.on("connect", () => {
     client.isAvailable = true;
+    lastRedisError = null;
     logger.info(`[Redis/Valkey] Connected successfully at ${finalUrl ? finalUrl.replace(/\/\/.*@/, '//') : ''}`);
   });
 
   client.on("ready", () => {
     client.isAvailable = true;
+    lastRedisError = null;
     logger.info("[Redis/Valkey] Client is ready to accept commands");
   });
 
   client.on("error", (err) => {
     client.isAvailable = false;
     const msg = err?.message || String(err);
+    lastRedisError = msg;
     logger.error(`[Redis/Valkey] Error: ${msg}`);
   });
 
