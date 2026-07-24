@@ -38,7 +38,7 @@ const TodayTasksWidget = ({
   const completed = tasks.filter(t => t.status === 'Done' || t.status === 'done').length;
   const inProgress = tasks.filter(t => t.status === 'In Progress' || t.status === 'in_progress').length;
   const pending = tasks.filter(t => t.status === 'To Do' || t.status === 'todo').length;
-  
+
   // Calculate overdue: due date is in the past and task is not completed
   const todayStr = new Date().toISOString().split('T')[0];
   const overdue = tasks.filter(t => t.dueDate < todayStr && t.status !== 'Done' && t.status !== 'done').length;
@@ -47,6 +47,7 @@ const TodayTasksWidget = ({
   const highPriority = tasks.filter(t => t.priority === 'High' || t.priority === 'Critical').length;
   const mediumPriority = tasks.filter(t => t.priority === 'Medium').length;
   const lowPriority = tasks.filter(t => t.priority === 'Low').length;
+
 
   const getPriorityBadge = (priority) => {
     const p = (priority || '').toLowerCase();
@@ -103,19 +104,19 @@ const TodayTasksWidget = ({
           <div className="flex-row justify-between text-xs">
             <span className="bold-text">Priority Breakdown</span>
           </div>
-          
+
           <div className="flex-column gap-1">
             <div className="flex-row justify-between text-xs text-text-muted align-center">
               <span className="flex-row align-center gap-2"><span className="task-dot bg-danger"></span> High Priority</span>
               <span>{highPriority} tasks</span>
             </div>
             <div className="progress-bar-bg">
-              <div 
-                className="progress-bar-fill" 
-                style={{ 
-                  width: `${totalAssigned > 0 ? (highPriority / totalAssigned) * 100 : 0}%`, 
-                  backgroundColor: 'var(--color-danger)' 
-                }} 
+              <div
+                className="progress-bar-fill"
+                style={{
+                  width: `${totalAssigned > 0 ? (highPriority / totalAssigned) * 100 : 0}%`,
+                  backgroundColor: 'var(--color-danger)'
+                }}
               />
             </div>
           </div>
@@ -126,12 +127,12 @@ const TodayTasksWidget = ({
               <span>{mediumPriority} tasks</span>
             </div>
             <div className="progress-bar-bg">
-              <div 
-                className="progress-bar-fill" 
-                style={{ 
-                  width: `${totalAssigned > 0 ? (mediumPriority / totalAssigned) * 100 : 0}%`, 
-                  backgroundColor: 'var(--color-warning)' 
-                }} 
+              <div
+                className="progress-bar-fill"
+                style={{
+                  width: `${totalAssigned > 0 ? (mediumPriority / totalAssigned) * 100 : 0}%`,
+                  backgroundColor: 'var(--color-warning)'
+                }}
               />
             </div>
           </div>
@@ -142,12 +143,12 @@ const TodayTasksWidget = ({
               <span>{lowPriority} tasks</span>
             </div>
             <div className="progress-bar-bg">
-              <div 
-                className="progress-bar-fill" 
-                style={{ 
-                  width: `${totalAssigned > 0 ? (lowPriority / totalAssigned) * 100 : 0}%`, 
-                  backgroundColor: 'var(--color-success)' 
-                }} 
+              <div
+                className="progress-bar-fill"
+                style={{
+                  width: `${totalAssigned > 0 ? (lowPriority / totalAssigned) * 100 : 0}%`,
+                  backgroundColor: 'var(--color-success)'
+                }}
               />
             </div>
           </div>
@@ -178,17 +179,17 @@ const TodayTasksWidget = ({
                     <td style={{ padding: '8px 12px' }}>{getPriorityBadge(task.priority)}</td>
                     <td style={{ padding: '8px 12px', fontSize: '0.8rem' }}>{task.dueDate}</td>
                     <td style={{ padding: '8px 12px' }}>
-                       <span 
-                         className="text-xs font-semibold px-2 py-1 rounded" 
-                         style={{ 
-                           backgroundColor: 'var(--bg-elevated)', 
-                           color: 'var(--text-primary)',
-                           display: 'inline-block'
-                         }}
-                       >
-                         {getDisplayStatus(task.status)}
-                       </span>
-                     </td>
+                      <span
+                        className="text-xs font-semibold px-2 py-1 rounded"
+                        style={{
+                          backgroundColor: 'var(--bg-elevated)',
+                          color: 'var(--text-primary)',
+                          display: 'inline-block'
+                        }}
+                      >
+                        {getDisplayStatus(task.status)}
+                      </span>
+                    </td>
                   </tr>
                 ))}
                 {tasks.length === 0 && (

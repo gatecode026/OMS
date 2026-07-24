@@ -6,28 +6,31 @@ import CompanyDashboard from './CompanyDashboard';
 import EmployeeDashboard from './EmployeeDashboard';
 
 const Dashboard = () => {
-  const { currentUserRole, hasPermission } = useApp();
+  const { currentUserRole, currentUser, hasPermission } = useApp();
   const isLoading = usePageLoading(600);
   const location = useLocation();
 
   const hasCompany = useMemo(() => hasPermission('dashboard', 'read', 'company'), [hasPermission]);
   const hasSelf = useMemo(() => hasPermission('dashboard', 'read', 'self'), [hasPermission]);
 
+  const isCompanyLevel = useMemo(() => {
+    const roleStr = (currentUserRole || '').toLowerCase();
+    return ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes(roleStr);
+  }, [currentUserRole]);
+
+  const companyLabel = isCompanyLevel ? 'Company Info' : 'Branch Info';
+
   const [perspective, setPerspective] = useState(() => {
     if (currentUserRole === 'employee') return 'self';
     
-    const isEmployeeRoute = location.pathname === '/employee-dashboard';
+    if (hasSelf && !hasCompany) return 'self';
+    if (hasCompany && !hasSelf) return 'company';
+    
     const saved = localStorage.getItem('perspective_dashboard');
+    if (saved === 'self' && hasSelf) return 'self';
+    if (saved === 'company' && hasCompany) return 'company';
     
-    if (saved === 'self' || saved === 'company') {
-      if (saved === 'self' && !hasSelf) return 'company';
-      if (saved === 'company' && !hasCompany) return 'self';
-      return saved;
-    }
-    
-    return isEmployeeRoute 
-      ? (hasSelf ? 'self' : 'company') 
-      : (hasCompany ? 'company' : 'self');
+    return hasCompany ? 'company' : 'self';
   });
 
   useEffect(() => {
@@ -35,24 +38,33 @@ const Dashboard = () => {
       setPerspective('self');
       return;
     }
-    const saved = localStorage.getItem('perspective_dashboard');
-    if (saved === 'self' && !hasSelf) {
-      setPerspective('company');
-    } else if (saved === 'company' && !hasCompany) {
+    if (hasSelf && !hasCompany) {
       setPerspective('self');
-    } else if (!saved) {
-      const isEmployeeRoute = location.pathname === '/employee-dashboard';
-      setPerspective(isEmployeeRoute ? (hasSelf ? 'self' : 'company') : (hasCompany ? 'company' : 'self'));
+      return;
     }
-  }, [hasCompany, hasSelf, currentUserRole, location.pathname]);
+    if (hasCompany && !hasSelf) {
+      setPerspective('company');
+      return;
+    }
+    const saved = localStorage.getItem('perspective_dashboard');
+    if (saved === 'self' && hasSelf) {
+      setPerspective('self');
+    } else if (saved === 'company' && hasCompany) {
+      setPerspective('company');
+    }
+  }, [hasCompany, hasSelf, currentUserRole]);
 
-  useEffect(() => {
+  const showPerspectiveDropdown = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    return hasCompany && hasSelf;
+  }, [currentUserRole, hasCompany, hasSelf]);
+
+  const handlePerspectiveChange = (val) => {
+    setPerspective(val);
     if (currentUserRole !== 'employee') {
-      localStorage.setItem('perspective_dashboard', perspective);
+      localStorage.setItem('perspective_dashboard', val);
     }
-  }, [perspective, currentUserRole]);
-
-  const showPerspectiveDropdown = hasSelf && hasCompany && currentUserRole !== 'employee';
+  };
 
   if (isLoading) {
     return (
@@ -82,9 +94,9 @@ const Dashboard = () => {
           <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>View Mode:</span>
           <select
             value={perspective}
-            onChange={(e) => setPerspective(e.target.value)}
+            onChange={(e) => handlePerspectiveChange(e.target.value)}
             style={{
-              padding: '6px 12px',
+              padding: '6px 14px',
               borderRadius: 'var(--radius-md)',
               background: 'var(--bg-elevated)',
               border: '1px solid var(--border-color)',
@@ -97,8 +109,8 @@ const Dashboard = () => {
               transition: 'all 0.2s'
             }}
           >
-            <option value="company">Company Info</option>
             <option value="self">Self Info</option>
+            <option value="company">{companyLabel}</option>
           </select>
         </div>
       )}

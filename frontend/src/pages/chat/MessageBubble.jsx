@@ -438,7 +438,7 @@ const MessageBubble = ({
   // Deleted message
   if (msg.isDeleted) {
     return (
-      <div className={`msg-row ${isOwn ? 'msg-row-other' : 'msg-row-own'}`}>
+      <div className={`msg-row ${isOwn ? 'msg-row-own' : 'msg-row-other'}`}>
         <div className={`msg-bubble msg-bubble-deleted`}>
           <em className="msg-deleted-text">🚫 This message was deleted</em>
           <span className="msg-time">{timeStr}</span>

@@ -1,4 +1,35 @@
 /**
+ * Role Authority Levels mapping for dynamic RBAC queries.
+ */
+export const ROLE_AUTHORITY_RANKS = {
+  super_admin: 100,
+  superadmin: 100,
+  company_admin: 100,
+  companyadmin: 100,
+  branch_admin: 60,
+  branchadmin: 60,
+  manager: 50,
+  branch_manager: 50,
+  hr_manager: 50,
+  finance_manager: 50,
+  dept_admin: 50,
+  project_manager: 50,
+  team_leader: 30,
+  employee: 10
+};
+
+export const getRoleAuthorityRank = (roleId) => {
+  if (!roleId) return 10;
+  const normalized = String(roleId).toLowerCase().trim();
+  return ROLE_AUTHORITY_RANKS[normalized] || 10;
+};
+
+export const getHigherAuthorityRoles = (userRole) => {
+  const userRank = getRoleAuthorityRank(userRole);
+  return Object.keys(ROLE_AUTHORITY_RANKS).filter(role => ROLE_AUTHORITY_RANKS[role] > userRank);
+};
+
+/**
  * Employee Query Builder responsible for translating the generic security context 
  * into Employee-specific MongoDB query criteria.
  */
@@ -19,34 +50,51 @@ export class EmployeeQueryBuilder {
       return filters;
     }
 
-    // Branch Admin / Team Leader / Manager see employees in their branch
-    if (this.context.isBranchAdmin || this.context.isTeamLeader || this.context.isManager) {
-      if (this.context.branch) {
-        filters.branch = this.context.branch;
-      }
-    }
+    const currentUserId = this.context.userId || this.context.employeeId;
+    const userRole = this.context.role || 'employee';
+    const scopeFilter = {};
 
-    // Employee sees employees in their department (cannot access other departments)
-    if (this.context.isEmployee) {
+    // Branch Admin / Manager see employees in their branch
+    if (this.context.isBranchAdmin || this.context.isManager) {
       if (this.context.branch) {
-        filters.branch = this.context.branch;
+        scopeFilter.branch = this.context.branch;
+      }
+      // Dynamically exclude top platform-level admins above branch/manager level
+      const higherRoles = getHigherAuthorityRoles(userRole);
+      if (higherRoles.length > 0) {
+        scopeFilter.roleId = { $nin: higherRoles };
+      }
+    } else if (this.context.isTeamLeader) {
+      if (this.context.branch) {
+        scopeFilter.branch = this.context.branch;
+      }
+      // Dynamically exclude roles with higher authority than team leader
+      const higherRoles = getHigherAuthorityRoles(userRole);
+      if (higherRoles.length > 0) {
+        scopeFilter.roleId = { $nin: higherRoles };
+      }
+    } else if (this.context.isEmployee) {
+      if (this.context.branch) {
+        scopeFilter.branch = this.context.branch;
       }
       if (this.context.department) {
-        filters.department = this.context.department;
+        scopeFilter.department = this.context.department;
+      }
+      // Dynamically exclude roles with higher authority than standard employee
+      const higherRoles = getHigherAuthorityRoles(userRole);
+      if (higherRoles.length > 0) {
+        scopeFilter.roleId = { $nin: higherRoles };
       }
     }
 
-    // Exclude manager/admin profiles based on authority level
-    if (!this.context.isSuperAdmin && !this.context.isCompanyAdmin) {
-      if (this.context.isEmployee || this.context.isTeamLeader) {
-        // Lower authority cannot see any managers, HR, finance, branch admins, or company admins
-        const excludedRoles = ['manager', 'branch_manager', 'hr_manager', 'finance_manager', 'super_admin', 'company_admin', 'branch_admin'];
-        filters.roleId = { $nin: excludedRoles };
-      } else {
-        // Other authority dashboards/lists (like HR, Finance, Branch Managers) cannot see manager roles
-        const managerRoles = ['manager', 'branch_manager', 'branch_admin'];
-        filters.roleId = { $nin: managerRoles };
-      }
+    // Always ensure logged-in user can see their own profile (self-access override)
+    if (currentUserId) {
+      filters.$or = [
+        { id: currentUserId },
+        scopeFilter
+      ];
+    } else {
+      Object.assign(filters, scopeFilter);
     }
 
     return filters;

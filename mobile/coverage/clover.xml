@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1784710275931" clover="3.2.0">
+  <project timestamp="1784710275932" name="All files">
+    <metrics statements="47" coveredstatements="46" conditionals="26" coveredconditionals="26" methods="17" coveredmethods="17" elements="90" coveredelements="89" complexity="0" loc="47" ncloc="47" packages="3" files="4" classes="4"/>
+    <package name="hooks">
+      <metrics statements="9" coveredstatements="9" conditionals="2" coveredconditionals="2" methods="4" coveredmethods="4"/>
+      <file name="useTheme.ts" path="R:\OMS\mobile\src\shared\hooks\useTheme.ts">
+        <metrics statements="9" coveredstatements="9" conditionals="2" coveredconditionals="2" methods="4" coveredmethods="4"/>
+        <line num="16" count="6" type="stmt"/>
+        <line num="17" count="46" type="stmt"/>
+        <line num="18" count="141" type="stmt"/>
+        <line num="19" count="141" type="stmt"/>
+        <line num="20" count="141" type="stmt"/>
+        <line num="22" count="46" type="stmt"/>
+        <line num="23" count="46" type="cond" truecount="2" falsecount="0"/>
+        <line num="24" count="46" type="stmt"/>
+        <line num="26" count="46" type="stmt"/>
+      </file>
+    </package>
+    <package name="store">
+      <metrics statements="31" coveredstatements="31" conditionals="16" coveredconditionals="16" methods="12" coveredmethods="12"/>
+      <file name="offlineStore.ts" path="R:\OMS\mobile\src\shared\store\offlineStore.ts">
+        <metrics statements="13" coveredstatements="13" conditionals="2" coveredconditionals="2" methods="7" coveredmethods="7"/>
+        <line num="30" count="6" type="stmt"/>
+        <line num="36" count="1" type="stmt"/>
+        <line num="40" count="3" type="stmt"/>
+        <line num="46" count="3" type="stmt"/>
+        <line num="47" count="3" type="stmt"/>
+        <line num="48" count="3" type="stmt"/>
+        <line num="52" count="1" type="stmt"/>
+        <line num="53" count="1" type="stmt"/>
+        <line num="54" count="1" type="stmt"/>
+        <line num="58" count="1" type="stmt"/>
+        <line num="59" count="1" type="stmt"/>
+        <line num="63" count="2" type="stmt"/>
+        <line num="64" count="2" type="cond" truecount="2" falsecount="0"/>
+      </file>
+      <file name="themeStore.ts" path="R:\OMS\mobile\src\shared\store\themeStore.ts">
+        <metrics statements="18" coveredstatements="18" conditionals="14" coveredconditionals="14" methods="5" coveredmethods="5"/>
+        <line num="28" count="7" type="stmt"/>
+        <line num="33" count="1" type="stmt"/>
+        <line num="34" count="1" type="stmt"/>
+        <line num="38" count="4" type="stmt"/>
+        <line num="39" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="40" count="3" type="stmt"/>
+        <line num="42" count="1" type="stmt"/>
+        <line num="47" count="48" type="stmt"/>
+        <line num="48" count="48" type="cond" truecount="2" falsecount="0"/>
+        <line num="49" count="48" type="cond" truecount="2" falsecount="0"/>
+        <line num="51" count="48" type="cond" truecount="2" falsecount="0"/>
+        <line num="52" count="4" type="stmt"/>
+        <line num="54" count="48" type="cond" truecount="2" falsecount="0"/>
+        <line num="55" count="3" type="stmt"/>
+        <line num="58" count="48" type="stmt"/>
+        <line num="62" count="2" type="stmt"/>
+        <line num="63" count="2" type="stmt"/>
+        <line num="65" count="2" type="stmt"/>
+      </file>
+    </package>
+    <package name="utils">
+      <metrics statements="7" coveredstatements="6" conditionals="8" coveredconditionals="8" methods="1" coveredmethods="1"/>
+      <file name="format.ts" path="R:\OMS\mobile\src\shared\utils\format.ts">
+        <metrics statements="7" coveredstatements="6" conditionals="8" coveredconditionals="8" methods="1" coveredmethods="1"/>
+        <line num="6" count="1" type="stmt"/>
+        <line num="7" count="6" type="cond" truecount="4" falsecount="0"/>
+        <line num="8" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="9" count="4" type="cond" truecount="2" falsecount="0"/>
+        <line num="11" count="3" type="stmt"/>
+        <line num="12" count="3" type="stmt"/>
+        <line num="18" count="0" type="stmt"/>
+      </file>
+    </package>
+  </project>
+</coverage>

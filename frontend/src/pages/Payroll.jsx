@@ -74,6 +74,7 @@ const Payroll = () => {
     showConfirm,
     currentUserRole,
     currentUser,
+    generalSettings,
     payrollGrades,
     payrollReimbursements,
     payrollLoans,
@@ -81,6 +82,7 @@ const Payroll = () => {
     payrollBonuses,
     payrollPayments,
     payrollConfigs,
+    payrollLeavePolicies,
     activityLogs,
     addOrUpdateSalaryGrade,
     deleteSalaryGrade,
@@ -166,6 +168,7 @@ const Payroll = () => {
   const isCompanyView = perspective === 'company';
 
   const [activeTab, setActiveTab] = useState('processing');
+  const [updatingEmpId, setUpdatingEmpId] = useState(null);
   const [recalcPreviewData, setRecalcPreviewData] = useState(null);
   const [showRecalcModal, setShowRecalcModal] = useState(false);
   const [isSubmittingRecalc, setIsSubmittingRecalc] = useState(false);
@@ -742,8 +745,26 @@ const Payroll = () => {
       // 2. Daily Salary Rate
       const dailySalary = workingDays > 0 ? Math.round(empBasicSalary / workingDays) : 0;
 
-      // 3. Unpaid days
-      let unpaidDays = summary.unpaidLeaveDays || 0;
+      // 3. Auto-prioritize paid leaves before unpaid:
+      //    Available paid leave = annual entitlement from DB policy defaultDays (source of truth).
+      //    Employee balance fields (clBalance etc.) are deducted at leave-approval time and may
+      //    not match the current payroll month's usage, so we use defaultDays for the cap.
+      let availablePaidLeaves = 0;
+      if (payrollLeavePolicies && payrollLeavePolicies.length > 0) {
+        payrollLeavePolicies.forEach(policy => {
+          if (policy.leaveCode !== 'UL' && policy.leaveCode !== 'LOP' && policy.isActive !== false) {
+            availablePaidLeaves += (policy.defaultDays || 0);
+          }
+        });
+      }
+
+      // Total leaves/absences taken this month (paid + unpaid as classified by attendance)
+      const totalLeavesTaken = (summary.paidLeaveDays || 0) + (summary.unpaidLeaveDays || 0);
+      // Priority rule: consume paid leave first, overflow → unpaid/LOP
+      const finalPaidLeaveDays = Math.min(totalLeavesTaken, availablePaidLeaves);
+      const finalUnpaidLeaveDays = totalLeavesTaken - finalPaidLeaveDays;
+
+      let unpaidDays = finalUnpaidLeaveDays;
       if (configHalfDayPolicy === 'Deduct Half Day') {
         unpaidDays += (summary.halfDays || 0) * 0.5;
       }
@@ -802,8 +823,9 @@ const Payroll = () => {
         designation: (emp?.designation || p.designation || '-').trim(),
         basicSalary: struct.basic || empBasicSalary,
         grossSalary,
-        attendanceDays: summary.presentDays + summary.paidLeaveDays + (summary.halfDays * (configHalfDayPolicy === 'Deduct Half Day' ? 0.5 : 1)),
-        paidLeaveDays: summary.paidLeaveDays,
+        attendanceDays: summary.presentDays + finalPaidLeaveDays + (summary.halfDays * (configHalfDayPolicy === 'Deduct Half Day' ? 0.5 : 1)),
+        paidLeaveDays: finalPaidLeaveDays,
+        totalPaidLeavesFromDB: availablePaidLeaves,
         unpaidLeaveDays: unpaidDays,
         leaveDeductions: leaveDeduction,
         lateDeductions: lateDeduction,
@@ -982,10 +1004,12 @@ const Payroll = () => {
 
   // Handle single status change
   const handleStatusChange = async (empId, nextStatus) => {
-    const paymentObj = calculatedPayrollData.find(p => p.employeeId === empId);
-    const success = await updateSinglePayrollStatus(paymentObj, nextStatus);
-    if (success) {
-      addPageToast('info', `Status of employee ${empId} set to: ${nextStatus}`);
+    setUpdatingEmpId(empId);
+    try {
+      const paymentObj = calculatedPayrollData.find(p => p.employeeId === empId);
+      await updateSinglePayrollStatus(paymentObj, nextStatus);
+    } finally {
+      setUpdatingEmpId(null);
     }
   };
 
@@ -1154,59 +1178,202 @@ const Payroll = () => {
     return calculatedPayrollData.find(e => e.employeeId === targetId) || calculatedPayrollData[0];
   }, [calculatedPayrollData, payslipEmpId, currentUser, currentUserRole, perspective]);
 
+  const numberToWordsInINR = (num) => {
+    if (!num || isNaN(num) || num <= 0) return 'Zero Rupees Only';
+    const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    
+    const inWords = (n) => {
+      if (n < 20) return a[n];
+      if (n < 100) return b[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + a[n % 10] : '');
+      if (n < 1000) return a[Math.floor(n / 100)] + 'Hundred ' + (n % 100 !== 0 ? 'and ' + inWords(n % 100) : '');
+      if (n < 100000) return inWords(Math.floor(n / 1000)) + 'Thousand ' + (n % 1000 !== 0 ? ' ' + inWords(n % 1000) : '');
+      if (n < 10000000) return inWords(Math.floor(n / 100000)) + 'Lakh ' + (n % 100000 !== 0 ? ' ' + inWords(n % 100000) : '');
+      return inWords(Math.floor(n / 10000000)) + 'Crore ' + (n % 10000000 !== 0 ? ' ' + inWords(n % 10000000) : '');
+    };
+    return inWords(Math.floor(num)).trim() + ' Rupees Only';
+  };
+
   // Download PDF Action handler
   const handleDownloadPayslip = (empObj) => {
-    const docText = `
-========================================================================
-                  ENTERPRISE PAYROLL - COMPENSATION RECEIPT             
-========================================================================
-Employee ID   : ${empObj.employeeId}
-Employee Name : ${empObj.employeeName}
-Department    : ${empObj.department}
-Designation   : ${empObj.designation}
-Branch Office : ${empObj.branch}
-Pay Period    : ${month} ${year}
-========================================================================
-EARNINGS BREAKDOWN:
-  Basic Salary                    : ${formatCurrency(empObj.basicSalary)}
-  HRA & Allowances                : ${formatCurrency(empObj.grossSalary - empObj.basicSalary - empObj.overtimeAmount)}
-  Overtime Pay                    : ${formatCurrency(empObj.overtimeAmount)}
-  Bonuses & Incentives            : ${formatCurrency(empObj.bonusAmount)}
-------------------------------------------------------------------------
-GROSS PAY                         : ${formatCurrency(empObj.grossSalary)}
-========================================================================
-DEDUCTIONS BREAKDOWN:
-  PF & Statutory Taxes            : ${formatCurrency(empObj.statutoryDeductions)}
-  Attendance / Unpaid Leave Deduct: ${formatCurrency(empObj.leaveDeductions)}
-  Late Arrival Penalties          : ${formatCurrency(empObj.lateDeductions)}
-  Loan EMI Recovery               : ${formatCurrency(empObj.loanEMI)}
-  Advance Recovery Deductions     : ${formatCurrency(empObj.advanceDeduct)}
-------------------------------------------------------------------------
-TOTAL DEDUCTIONS                  : ${formatCurrency(empObj.totalDeductions)}
-========================================================================
-NET TAKE-HOME SALARY              : ${formatCurrency(empObj.netSalary)}
-========================================================================
-BANK PAYMENT & COMPLIANCE DETAIL:
-  PAN Number                      : ${empObj.pan}
-  Tax Regime                      : ${empObj.regime} Regime
-  Credit Bank                     : ${empObj.bankName}
-  Account Number                  : ${empObj.bankAccount}
-  Transaction Status              : ${empObj.status === 'Released' ? 'PROCESSED & DISTRIBUTED' : 'AWAITING DISTRIBUTION'}
-========================================================================
-  Auto-generated on behalf of SaaS Corporate Finance Division.
-========================================================================
-    `;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      addPageToast('danger', 'Pop-up blocker prevented opening payslip print window.');
+      return;
+    }
 
-    // Download text block as simulated PDF
-    const blob = new Blob([docText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Payslip_${empObj.employeeName.replace(/\s+/g, '_')}_${month}_${year}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addPageToast('success', `Downloaded PDF payslip for ${empObj.employeeName}.`);
+    const companyNameUpper = (generalSettings?.companyName || currentUser?.companyName || 'Gatecode OMS').toUpperCase();
+    const panText = empObj.pan && empObj.pan !== '-' && empObj.pan !== '—' ? empObj.pan : 'N/A';
+    const regimeText = empObj.regime && empObj.regime !== '-' && empObj.regime !== '—' ? (empObj.regime.toLowerCase().includes('regime') ? empObj.regime : `${empObj.regime} Regime`) : 'Standard Regime';
+    const bankText = empObj.bankName && empObj.bankName !== '-' && empObj.bankName !== '—' ? empObj.bankName : 'N/A';
+    const accountText = empObj.bankAccount && empObj.bankAccount !== '-' && empObj.bankAccount !== '—' ? empObj.bankAccount : 'N/A';
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Payslip_${empObj.employeeName.replace(/\\s+/g, '_')}_${month}_${year}</title>
+          <style>
+            @page { size: A4; margin: 12mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; background: #ffffff; margin: 0; padding: 20px; font-size: 13px; line-height: 1.4; }
+            .payslip-card { max-width: 800px; margin: 0 auto; border: 1px solid #cbd5e1; border-radius: 8px; padding: 25px 30px; background: #fff; }
+            
+            /* Header */
+            .company-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
+            .company-title { margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; letter-spacing: 0.5px; }
+            .company-sub { margin: 3px 0 0 0; color: #64748b; font-size: 12px; font-weight: 500; }
+            .statement-badge { text-align: right; }
+            .statement-title { font-size: 16px; font-weight: 700; color: #2563eb; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+            .statement-period { font-size: 12px; color: #475569; margin-top: 4px; font-weight: 600; }
+
+            /* Employee & Bank Info Table */
+            .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; }
+            .info-table td { padding: 8px 12px; border: 1px solid #e2e8f0; font-size: 12px; }
+            .info-table td.lbl { background-color: #f8fafc; font-weight: 600; color: #475569; width: 18%; }
+            .info-table td.val { font-weight: 600; color: #0f172a; width: 32%; }
+
+            /* Breakdown Section */
+            .breakdown-grid { display: flex; gap: 15px; margin-bottom: 20px; }
+            .breakdown-col { flex: 1; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; }
+            .breakdown-head { background: #f1f5f9; padding: 8px 12px; font-weight: 700; font-size: 13px; color: #0f172a; border-bottom: 1px solid #cbd5e1; display: flex; justify-content: space-between; text-transform: uppercase; letter-spacing: 0.5px; }
+            .item-row { display: flex; justify-content: space-between; padding: 7px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+            .item-row:last-child { border-bottom: none; }
+            .total-row { background: #f8fafc; font-weight: 700; border-top: 1px solid #cbd5e1; color: #0f172a; }
+
+            /* Net Salary Banner */
+            .net-banner { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+            .net-left { display: flex; flex-direction: column; }
+            .net-lbl { font-size: 12px; font-weight: 700; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px; }
+            .net-words { font-size: 11px; color: #0284c7; font-weight: 600; margin-top: 2px; font-style: italic; }
+            .net-val { font-size: 20px; font-weight: 800; color: #0369a1; }
+
+            /* Footer Signatures */
+            .sign-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; padding-top: 15px; border-top: 1px solid #e2e8f0; }
+            .sign-box { text-align: center; }
+            .sign-line { width: 160px; border-bottom: 1px dashed #94a3b8; margin-bottom: 6px; display: inline-block; }
+            .sign-txt { font-size: 11px; color: #64748b; font-weight: 600; }
+            .disclaimer { text-align: center; font-size: 10px; color: #94a3b8; margin-top: 20px; }
+
+            @media print {
+              body { padding: 0; }
+              .payslip-card { border: none; padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="payslip-card">
+            <!-- Header -->
+            <div class="company-header">
+              <div>
+                <h1 class="company-title">${companyNameUpper}</h1>
+                <p class="company-sub">Official Compensation & Salary Statement</p>
+              </div>
+              <div class="statement-badge">
+                <div class="statement-title">SALARY SLIP</div>
+                <div class="statement-period">Period: ${month} ${year}</div>
+              </div>
+            </div>
+
+            <!-- Employee & Bank Info Table -->
+            <table class="info-table">
+              <tr>
+                <td class="lbl">Employee ID:</td>
+                <td class="val">${empObj.employeeId}</td>
+                <td class="lbl">PAN Number:</td>
+                <td class="val">${panText}</td>
+              </tr>
+              <tr>
+                <td class="lbl">Employee Name:</td>
+                <td class="val">${empObj.employeeName}</td>
+                <td class="lbl">Tax Regime:</td>
+                <td class="val">${regimeText}</td>
+              </tr>
+              <tr>
+                <td class="lbl">Department:</td>
+                <td class="val">${empObj.department}</td>
+                <td class="lbl">Bank Name:</td>
+                <td class="val">${bankText}</td>
+              </tr>
+              <tr>
+                <td class="lbl">Designation:</td>
+                <td class="val">${empObj.designation}</td>
+                <td class="lbl">Bank Account:</td>
+                <td class="val">${accountText}</td>
+              </tr>
+              <tr>
+                <td class="lbl">Branch Office:</td>
+                <td class="val">${empObj.branch || 'Headquarters'}</td>
+                <td class="lbl">Payment Status:</td>
+                <td class="val" style="color: ${empObj.status === 'Released' ? '#059669' : '#d97706'}">${empObj.status === 'Released' ? 'Processed & Credit Confirmed' : 'Payment Awaiting Distribution'}</td>
+              </tr>
+            </table>
+
+            <!-- Breakdown Section -->
+            <div class="breakdown-grid">
+              <!-- Earnings -->
+              <div class="breakdown-col">
+                <div class="breakdown-head"><span>EARNINGS</span><span>AMOUNT</span></div>
+                <div class="item-row"><span>Basic Salary</span><span>${formatCurrency(empObj.basicSalary)}</span></div>
+                <div class="item-row"><span>House Rent Allowance (HRA)</span><span>${formatCurrency(empObj.hra || 0)}</span></div>
+                <div class="item-row"><span>Conveyance Allowance</span><span>${formatCurrency(empObj.travel || 0)}</span></div>
+                <div class="item-row"><span>Medical Allowance</span><span>${formatCurrency(empObj.medical || 0)}</span></div>
+                <div class="item-row"><span>Special Allowance</span><span>${formatCurrency(empObj.special || 0)}</span></div>
+                <div class="item-row"><span>Overtime Remunerations</span><span>${formatCurrency(empObj.overtimeAmount || 0)}</span></div>
+                <div class="item-row"><span>Performance Bonus</span><span>${formatCurrency(empObj.bonusAmount || 0)}</span></div>
+                <div class="item-row total-row"><span>GROSS EARNINGS</span><span>${formatCurrency(empObj.grossSalary)}</span></div>
+              </div>
+
+              <!-- Deductions -->
+              <div class="breakdown-col">
+                <div class="breakdown-head"><span>DEDUCTIONS</span><span>AMOUNT</span></div>
+                <div class="item-row"><span>Statutory Taxes (PF/PT)</span><span>${formatCurrency(empObj.statutoryDeductions || 0)}</span></div>
+                <div class="item-row"><span>Unpaid Leave Deductions</span><span>${formatCurrency(empObj.leaveDeductions || 0)}</span></div>
+                <div class="item-row"><span>Late Arrival Penalties</span><span>${formatCurrency(empObj.lateDeductions || 0)}</span></div>
+                <div class="item-row"><span>Loan EMI Recovery</span><span>${formatCurrency(empObj.loanEMI || 0)}</span></div>
+                <div class="item-row"><span>Advance Recovery</span><span>${formatCurrency(empObj.advanceDeduct || 0)}</span></div>
+                <div class="item-row"><span>&nbsp;</span><span>&nbsp;</span></div>
+                <div class="item-row"><span>&nbsp;</span><span>&nbsp;</span></div>
+                <div class="item-row total-row"><span>TOTAL DEDUCTIONS</span><span>${formatCurrency(empObj.totalDeductions)}</span></div>
+              </div>
+            </div>
+
+            <!-- Net Salary Banner -->
+            <div class="net-banner">
+              <div class="net-left">
+                <div class="net-lbl">NET TAKE-HOME SALARY</div>
+                <div class="net-words">${numberToWordsInINR(empObj.netSalary)}</div>
+              </div>
+              <div class="net-val">${formatCurrency(empObj.netSalary)}</div>
+            </div>
+
+            <!-- Footer Signatures -->
+            <div class="sign-section">
+              <div class="sign-box">
+                <div class="sign-line"></div>
+                <div class="sign-txt">Employee Signature</div>
+              </div>
+              <div class="sign-box">
+                <div class="sign-line"></div>
+                <div class="sign-txt">Authorized Signatory</div>
+              </div>
+            </div>
+
+            <div class="disclaimer">
+              This is a system-generated compensation statement. Generated on ${new Date().toLocaleDateString()}.
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    addPageToast('success', `PDF Print window opened for ${empObj.employeeName}.`);
   };
 
   const handleQuerySubmit = async (e) => {
@@ -1913,13 +2080,23 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                                 />
                               )}
 
-                              {perspective !== 'self' && perspective !== 'employee' && row.status !== 'Released' && (
+                              {perspective !== 'self' && perspective !== 'employee' && (
                                 <button
                                   className="action-circle-btn success-btn"
                                   onClick={() => handleStatusChange(row.employeeId, 'Released')}
-                                  title="Distribute Salary"
+                                  title={row.status === 'Released' ? "Salary Distributed" : "Distribute Salary"}
+                                  disabled={updatingEmpId === row.employeeId || row.status === 'Released'}
+                                  style={
+                                    updatingEmpId === row.employeeId || row.status === 'Released'
+                                      ? { opacity: 0.6, cursor: 'not-allowed' }
+                                      : {}
+                                  }
                                 >
-                                  <Check size={14} />
+                                  {updatingEmpId === row.employeeId ? (
+                                    <RefreshCw size={14} className="animate-spin" />
+                                  ) : (
+                                    <Check size={14} />
+                                  )}
                                 </button>
                               )}
                             </div>
@@ -3124,7 +3301,7 @@ BANK PAYMENT & COMPLIANCE DETAIL:
             <div className="modal-header-section flex-center justify-between pb-3 border-bottom mb-4">
               <div className="flex-center gap-2">
                 <Receipt className="text-primary" size={24} />
-                <h3 className="modal-title-bold">SaaS Corporate Payslip Receipt</h3>
+                <h3 className="modal-title-bold">{generalSettings?.companyName || 'Gatecode OMS'} Payslip Receipt</h3>
               </div>
               <button className="action-circle-btn text-muted" onClick={() => setPayslipModalOpen(false)}>
                 <X size={18} />
@@ -3187,22 +3364,56 @@ BANK PAYMENT & COMPLIANCE DETAIL:
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.25rem' }}>
                   <div className="flex-column gap-1">
                     <div className="flex-center justify-between">
-                      <span className="text-muted">Paid Leave Used:</span>
+                      <span className="text-muted">Present Days:</span>
+                      <strong>{(() => {
+                        const summary = monthlyPayrollSummary?.[payslipEmployeeObj.employeeId];
+                        return summary ? (summary.presentDays || 0) : 0;
+                      })()} Days</strong>
+                    </div>
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">Total Paid Leaves:</span>
+                      <strong>{(() => {
+                        // Total Paid Leaves = company-allocated annual entitlement from DB policies (defaultDays)
+                        if (payrollLeavePolicies && payrollLeavePolicies.length > 0) {
+                          const total = payrollLeavePolicies
+                            .filter(p => p.leaveCode !== 'UL' && p.leaveCode !== 'LOP' && p.isActive !== false)
+                            .reduce((sum, p) => sum + (p.defaultDays || 0), 0);
+                          return `${total} Days`;
+                        }
+                        return '0 Days';
+                      })()}</strong>
+                    </div>
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">Used Paid Leaves:</span>
                       <strong>{payslipEmployeeObj.paidLeaveDays || 0} Days</strong>
                     </div>
                     <div className="flex-center justify-between">
                       <span className="text-muted">Remaining Paid Leave:</span>
                       <strong>{(() => {
-                        const emp = resolveEmployee(payslipEmployeeObj.employeeId);
-                        if (!emp) return '0 Days';
-                        const cl = typeof emp.clBalance === 'number' ? emp.clBalance : 0;
-                        const sl = typeof emp.slBalance === 'number' ? emp.slBalance : 0;
-                        const pl = typeof emp.plBalance === 'number' ? emp.plBalance : 0;
-                        return `${cl + sl + pl} Days`;
+                        // Remaining = Total allocated by company (DB defaultDays) - Used this month
+                        const total = payslipEmployeeObj.totalPaidLeavesFromDB != null
+                          ? payslipEmployeeObj.totalPaidLeavesFromDB
+                          : (payrollLeavePolicies || [])
+                              .filter(p => p.leaveCode !== 'UL' && p.leaveCode !== 'LOP' && p.isActive !== false)
+                              .reduce((s, p) => s + (p.defaultDays || 0), 0);
+                        const used = payslipEmployeeObj.paidLeaveDays || 0;
+                        return `${Math.max(0, total - used)} Days`;
                       })()}</strong>
                     </div>
                   </div>
                   <div className="flex-column gap-1">
+                    <div className="flex-center justify-between">
+                      <span className="text-muted">No. of Working Days:</span>
+                      <strong>{(() => {
+                        const months = {
+                          'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
+                          'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12
+                        };
+                        const monthNum = months[month] || 6;
+                        const yrNum = parseInt(year || '2026');
+                        return new Date(yrNum, monthNum, 0).getDate();
+                      })()} Days</strong>
+                    </div>
                     <div className="flex-center justify-between">
                       <span className="text-muted">Unpaid / LOP Leave:</span>
                       <strong>{payslipEmployeeObj.unpaidLeaveDays || 0} Days</strong>

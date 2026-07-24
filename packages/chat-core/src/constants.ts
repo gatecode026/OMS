@@ -1,0 +1,15 @@
+export const CHAT_EVENTS = {
+  CONNECT: 'connect',
+  DISCONNECT: 'disconnect',
+  JOIN_CONVERSATION: 'join_conversation',
+  LEAVE_CONVERSATION: 'leave_conversation',
+  SEND_MESSAGE: 'send_message',
+  RECEIVE_MESSAGE: 'receive_message',
+  MESSAGE_DELIVERED: 'message_delivered',
+  MESSAGE_READ: 'message_read',
+  TYPING_START: 'typing_start',
+  TYPING_STOP: 'typing_stop',
+  MARK_READ: 'mark_read',
+  USER_CHATSCREEN_STATUS: 'user_chatscreen_status',
+  PRESENCE_CHANGE: 'presence_change',
+} as const;

@@ -542,6 +542,17 @@ export const getMessageDetail = async (messageId, employeeId, companyId) => {
  */
 export const saveMessage = async (messageData, companyId, existingConv = null) => {
   return runWithTenant(companyId, async () => {
+    if (messageData.tempId) {
+      const existingMsg = await Message.findOne({
+        conversationId: messageData.conversationId,
+        tempId: messageData.tempId,
+      });
+      if (existingMsg) {
+        logger.info(`[ChatService] Duplicate message detected for tempId: ${messageData.tempId}. Returning existing message.`);
+        return existingMsg;
+      }
+    }
+
     // Enforce onlyAdminsCanMessage settings
     const conv = existingConv || await Conversation.findOne({ id: messageData.conversationId });
     if (!conv) throw new Error("Conversation not found");
@@ -1853,5 +1864,94 @@ export const getHiddenConversations = async (
     );
 
     return convsWithUnread;
+  });
+};
+
+/**
+ * Retrieve all starred messages of a specific employee
+ */
+export const getStarredMessages = async (employeeId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    return await Message.find({
+      starredBy: employeeId,
+      isDeleted: false,
+      "deletedFor.employeeId": { $ne: employeeId },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+  });
+};
+
+/**
+ * Retrieve a summary of shared media, documents, and links in a conversation
+ */
+export const getSharedContentSummary = async (conversationId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    // 1. Fetch messages containing media in this conversation
+    const mediaMessages = await Message.find({
+      conversationId,
+      isDeleted: false,
+      "media.url": { $ne: null },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const images = [];
+    const videos = [];
+    const audio = [];
+    const documents = [];
+
+    mediaMessages.forEach((m) => {
+      const media = m.media;
+      const fileData = {
+        messageId: m.id,
+        senderId: m.senderId,
+        senderName: m.senderName,
+        createdAt: m.createdAt,
+        url: media.url,
+        fileName: media.fileName || "File",
+        fileSize: media.fileSize || 0,
+        mimeType: media.mimeType || "",
+      };
+
+      if (m.type === "image" || media.mimeType?.startsWith("image/")) {
+        images.push(fileData);
+      } else if (m.type === "video" || media.mimeType?.startsWith("video/")) {
+        videos.push(fileData);
+      } else if (m.type === "audio" || media.mimeType?.startsWith("audio/")) {
+        audio.push(fileData);
+      } else {
+        documents.push(fileData);
+      }
+    });
+
+    // 2. Fetch messages containing links in this conversation
+    const linkMessages = await Message.find({
+      conversationId,
+      isDeleted: false,
+      content: { $regex: /https?:\/\/[^\s]+/i },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const links = linkMessages.map((m) => {
+      const matches = m.content.match(/https?:\/\/[^\s]+/gi);
+      return {
+        messageId: m.id,
+        senderId: m.senderId,
+        senderName: m.senderName,
+        createdAt: m.createdAt,
+        content: m.content,
+        urls: matches || [],
+      };
+    });
+
+    return {
+      images,
+      videos,
+      audio,
+      documents,
+      links,
+    };
   });
 };

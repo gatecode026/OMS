@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  position: relative;
 }
 
 .docs-header {
@@ -9,6 +10,9 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-5);
+  background: rgba(255, 255, 255, 0.01);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color-dark);
 }
 
 .docs-header-left {
@@ -20,8 +24,8 @@
 .docs-header-icon {
   width: 52px;
   height: 52px;
-  background: rgba(100, 116, 139, 0.15);
-  color: var(--text-secondary);
+  background: rgba(219, 39, 119, 0.1);
+  color: var(--accent-color);
   border-radius: var(--radius-xl);
   display: flex;
   align-items: center;
@@ -34,6 +38,8 @@
   gap: var(--space-4);
   padding: var(--space-3) var(--space-5);
   flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--border-color-dark);
 }
 
 .docs-filters {
@@ -41,6 +47,7 @@
   flex-wrap: wrap;
   gap: var(--space-1);
 }
+
 .docs-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -54,11 +61,14 @@
   gap: var(--space-3);
   position: relative;
   transition: transform 0.2s, box-shadow 0.2s;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color-dark);
 }
 
 .doc-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  border-color: var(--accent-color);
 }
 
 .doc-card-icon {
@@ -137,12 +147,14 @@
 
 .doc-action-btn:hover {
   color: var(--text-primary);
-  border-color: var(--color-primary);
+  border-color: var(--accent-color);
+  background: rgba(219, 39, 119, 0.05);
 }
 
 .doc-action-danger:hover {
   color: var(--color-danger);
   border-color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.05);
 }
 
 .doc-downloads {
@@ -155,6 +167,46 @@
   border-top: 1px solid var(--border-color-dark);
 }
 
+/* Premium Drawer Panel */
+.documents-drawer {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color-dark);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  z-index: 100;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.25);
+  transition: all 0.3s ease;
+}
+
+/* Dynamic Cards Styles */
+.dashboard-metric-card {
+  transition: transform 0.2s;
+}
+.dashboard-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Floating Bulk Action Toolbar */
+.bulk-actions-toolbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(15px);
+  border: 1px solid var(--accent-color);
+  border-radius: var(--radius-xl);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 1000;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Layout Responsiveness */
 @media (max-width: 1300px) {
   .docs-grid { grid-template-columns: repeat(3, 1fr); }
 }

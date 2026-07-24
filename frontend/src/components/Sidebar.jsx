@@ -34,7 +34,8 @@ import {
   UserSquare2,
   LogOut,
   Sparkles,
-  UserCog
+  UserCog,
+  TrendingUp
 } from 'lucide-react';
 
 const menuStructure = [
@@ -70,14 +71,7 @@ const menuStructure = [
           { name: 'Team Leaders', path: '/teams/leaders' }
         ]
       },
-      {
-        name: 'Attendance Management',
-        icon: Clock,
-        subItems: [
-          { name: 'Punch In Out Reports', path: '/attendance' },
-          { name: 'Web Portal Punch', path: '/attendance/webportal' }
-        ]
-      },
+      { name: 'Attendance Management', icon: Clock, path: '/attendance' },
       { name: 'Leave Management', icon: CalendarDays, path: '/leaves' }
     ]
   },
@@ -87,7 +81,7 @@ const menuStructure = [
       { name: 'Project Management', icon: Briefcase, path: '/projects' },
       { name: 'Task Monitoring', icon: KanbanSquare, path: '/tasks' },
       { name: 'Work Reports', icon: FileText, path: '/work-reports' },
-      { name: 'Performance Analytics', icon: BarChart3, path: '/performance' },
+      { name: 'KPI Management', icon: TrendingUp, path: '/kpi' },
       { name: 'Payroll Management', icon: DollarSign, path: '/payroll' },
       { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }
     ]
@@ -408,6 +402,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                   { name: 'Announcements', icon: Megaphone, path: '/announcements' },
                   { name: 'Notifications', icon: Bell, path: '/notifications', badgeKey: 'notifications' },
                   { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat' },
+                  { name: 'KPI Management', icon: TrendingUp, path: '/kpi' },
                   { name: 'Payroll', icon: DollarSign, path: '/payroll' },
                   { name: 'Documents', icon: FolderClosed, path: '/documents' },
                   { name: 'Meetings & Calendar', icon: CalendarDays, path: '/calendar' }
@@ -418,7 +413,8 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
             </div>
           ) : (
             (() => {
-              const isBranchScoped = currentUserRole !== 'super_admin' && currentUserRole !== 'company_admin' && currentUserRole !== 'SuperAdmin' && currentUser?.branch;
+              const isCompanyLevel = ['super_admin', 'company_admin', 'superadmin', 'companyadmin'].includes((currentUserRole || '').toLowerCase());
+              const isBranchScoped = !isCompanyLevel && !!currentUser?.branch;
               return filterMenuByRole(
                 menuStructure.map(sec => ({
                   ...sec,

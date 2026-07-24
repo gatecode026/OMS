@@ -8,6 +8,7 @@ import * as chatService from '../chat.service.js';
 import { getIO } from '../../../config/socket.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { successResponse } from '../../../utils/response.js';
+import { getIO } from '../../../config/socket.js';
 
 // GET /api/v1/chat/conversations/:conversationId/pinned
 export const getPinnedMessages = asyncHandler(async (req, res) => {

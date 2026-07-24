@@ -1,5 +1,6 @@
 import express from 'express';
 import Company from './company.model.js';
+import TenantBranding from './tenantBranding.model.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -35,16 +36,25 @@ router.get('/branding', asyncHandler(async (req, res) => {
     });
   }
 
-  return res.status(200).json({
-    status: 'success',
-    data: {
+  // Fetch the branding config from TenantBranding
+  let tenantBranding = await TenantBranding.findOne({ tenantId: company.id }).lean();
+
+  if (!tenantBranding) {
+    // If not found, compile from company settings
+    tenantBranding = {
+      tenantId: company.id,
       companyName: company.name,
       logoUrl: company.settings?.logoUrl || '',
       primaryColor: company.settings?.primaryColor || '#3b82f6',
       secondaryColor: company.settings?.secondaryColor || '#1d4ed8',
       faviconUrl: company.settings?.faviconUrl || '',
       timezone: company.settings?.timezone || 'Asia/Kolkata'
-    },
+    };
+  }
+
+  return res.status(200).json({
+    status: 'success',
+    data: tenantBranding,
     message: 'Company branding fetched successfully'
   });
 }));
@@ -72,16 +82,23 @@ router.get('/branding/:companyId', asyncHandler(async (req, res) => {
     });
   }
 
-  return res.status(200).json({
-    status: 'success',
-    data: {
+  let tenantBranding = await TenantBranding.findOne({ tenantId: company.id }).lean();
+
+  if (!tenantBranding) {
+    tenantBranding = {
+      tenantId: company.id,
       companyName: company.name,
       logoUrl: company.settings?.logoUrl || '',
       primaryColor: company.settings?.primaryColor || '#3b82f6',
       secondaryColor: company.settings?.secondaryColor || '#1d4ed8',
       faviconUrl: company.settings?.faviconUrl || '',
       timezone: company.settings?.timezone || 'Asia/Kolkata'
-    },
+    };
+  }
+
+  return res.status(200).json({
+    status: 'success',
+    data: tenantBranding,
     message: 'Company branding fetched successfully'
   });
 }));
