@@ -630,13 +630,16 @@ const ChatWindow = ({ currentUser, onBack }) => {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: 'var(--text-muted, #64748b)', marginTop: '2px' }}>
                 <span>
-                  Pinned by <strong style={{ color: 'var(--chat-primary, #6366f1)' }}>{
-                    pinnedMessages[carouselIndex]?.pinnedBy === currentUser?.id
-                      ? 'You'
-                      : pinnedMessages[carouselIndex]?.pinnedByName ||
-                        conv?.participants?.find(p => p.employeeId === pinnedMessages[carouselIndex]?.pinnedBy || p.id === pinnedMessages[carouselIndex]?.pinnedBy)?.name ||
-                        'Someone'
-                  }</strong>
+                  Pinned by <strong style={{ color: 'var(--chat-primary, #6366f1)' }}>{(() => {
+                    const pin = pinnedMessages[carouselIndex];
+                    if (!pin) return 'User';
+                    const isId = pin.pinnedByName && (pin.pinnedByName.startsWith('COMP-') || pin.pinnedByName.startsWith('EMP-') || pin.pinnedByName === pin.pinnedBy);
+                    if (!isId && pin.pinnedByName) return pin.pinnedByName;
+                    const part = conv?.participants?.find(p => p.employeeId === pin.pinnedBy || p.id === pin.pinnedBy);
+                    if (part?.name) return part.name;
+                    if (pin.pinnedBy === currentUser?.id) return 'You';
+                    return pin.pinnedByName || 'User';
+                  })()}</strong>
                 </span>
                 <span>•</span>
                 <span>📌 {totalPinned || pinnedMessages.length} { (totalPinned || pinnedMessages.length) === 1 ? 'Pinned Message' : 'Pinned Messages'}</span>
