@@ -93,14 +93,50 @@ export const ChatProvider = ({ children }) => {
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [isConnected, setIsConnected] = useState(false);
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState(() => {
+    try {
+      const cached = localStorage.getItem('chat_local_conversations');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [activeConvId, setActiveConvId] = useState(null);
   const [archivedConversations, setArchivedConversations] = useState([]);
   const [isLoadingArchived, setIsLoadingArchived] = useState(false);
   const [hiddenConversations, setHiddenConversations] = useState([]);
   const [isLoadingHidden, setIsLoadingHidden] = useState(false);
-  const [messages, setMessages] = useState({});
+  const [messages, setMessages] = useState(() => {
+    try {
+      const cached = localStorage.getItem('chat_local_recent_messages');
+      return cached ? JSON.parse(cached) : {};
+    } catch (e) {
+      return {};
+    }
+  });
   // { convId: Message[] }
+
+  // ── Local Storage Cache Persistence for Instant 0ms Chat Render ──────────
+  useEffect(() => {
+    if (conversations && conversations.length > 0) {
+      try {
+        localStorage.setItem('chat_local_conversations', JSON.stringify(conversations.slice(0, 50)));
+      } catch (e) {}
+    }
+  }, [conversations]);
+
+  useEffect(() => {
+    if (messages && Object.keys(messages).length > 0) {
+      try {
+        const trimmed = {};
+        const keys = Object.keys(messages);
+        keys.slice(-10).forEach(cid => {
+          trimmed[cid] = (messages[cid] || []).slice(-30);
+        });
+        localStorage.setItem('chat_local_recent_messages', JSON.stringify(trimmed));
+      } catch (e) {}
+    }
+  }, [messages]);
   const [onlineUsers, setOnlineUsers] = useState(new Map());
   // Map<userId, { name, avatar, onlineAt }>
   const [currentUserStatus, setCurrentUserStatus] = useState({ status: 'available', emoji: null });
