@@ -276,7 +276,14 @@ const CompanyDashboard = () => {
 
   // Dedicated real-time fetch for today's attendance — used ONLY for the dashboard card.
   // This is separate from the global `attendance` array (which covers 60 days for other pages).
-  const [todayAttendance, setTodayAttendance] = React.useState([]);
+  const [todayAttendance, setTodayAttendance] = React.useState(() => {
+    try {
+      const cached = localStorage.getItem('swr_today_attendance');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   React.useEffect(() => {
     if (!token) return;
@@ -289,6 +296,7 @@ const CompanyDashboard = () => {
         const result = await response.json();
         if (result.status === 'success') {
           setTodayAttendance(result.data || []);
+          localStorage.setItem('swr_today_attendance', JSON.stringify(result.data || []));
         }
       } catch (err) {
         console.error('[Dashboard] Failed to fetch today attendance:', err);

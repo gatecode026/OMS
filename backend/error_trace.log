@@ -2249,3 +2249,11 @@ Stack: Error: Invalid email or password
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
 Body: {"email":"rashul@gmail.com","password":"password"}
+
+[2026-07-24T09:16:16.289Z] POST /api/v1/auth/login
+Error: Invalid email or password
+Stack: Error: Invalid email or password
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:152:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
+Body: {"email":"harssh@gmail.com","password":"password"}

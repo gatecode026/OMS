@@ -1626,6 +1626,12 @@ export const AppProvider = ({ children }) => {
       setAttendance([]);
       return;
     }
+    const cached = localStorage.getItem('swr_attendance');
+    if (cached) {
+      try {
+        setAttendance(JSON.parse(cached));
+      } catch (e) {}
+    }
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/attendance', {
         headers: {
@@ -1635,10 +1641,11 @@ export const AppProvider = ({ children }) => {
       const result = await response.json();
       if (result.status === 'success') {
         setAttendance(result.data || []);
+        localStorage.setItem('swr_attendance', JSON.stringify(result.data || []));
       }
     } catch (err) {
       console.error('Failed to fetch attendance from backend:', err);
-      setAttendance([]);
+      if (!cached) setAttendance([]);
     }
   };
 
@@ -2835,7 +2842,14 @@ export const AppProvider = ({ children }) => {
       setInitialized(true);
       return;
     }
-    setInitialized(false);
+
+    // If cached user exists in localStorage, unblock UI immediately (0ms) instead of blocking behind full-page spinner
+    const hasCachedUser = !!localStorage.getItem('saas_user');
+    if (hasCachedUser) {
+      setInitialized(true);
+    } else {
+      setInitialized(false);
+    }
 
     const loadInitialData = async () => {
       // ─── Phase 1: Critical data — unblocks UI as soon as these complete ───
