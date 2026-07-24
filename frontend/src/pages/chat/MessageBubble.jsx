@@ -636,18 +636,6 @@ const MessageBubble = ({
 
         {/* Bubble */}
         <div id={`msg-${msg.id}`} className={`msg-bubble ${isOwn ? 'msg-bubble-own' : 'msg-bubble-other'} ${isStarred ? 'msg-bubble-starred' : ''} ${msg.isPinned ? 'msg-bubble-pinned' : ''}`}>
-          {/* Hover Actions */}
-          {!msg.isDeleted && msg.type !== 'system' && !isEditing && (
-            <div className={`msg-bubble-hover-actions ${isOwn ? 'hover-other' : 'hover-own'}`}>
-              <button
-                className="msg-bubble-hover-action-btn"
-                onClick={(e) => { e.stopPropagation(); openThread(msg.id); }}
-                title="Reply in Thread"
-              >
-                <MessageSquare size={14} />
-              </button>
-            </div>
-          )}
           {msg.isForwarded && (
             <div className="msg-forwarded-indicator" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: isOwn ? 'rgba(255, 255, 255, 0.75)' : 'var(--text-muted, #64748b)', marginBottom: '4px', fontStyle: 'italic' }}>
               <span>{msg.forwardedCount >= 2 ? '➡️ Forwarded many times' : '➡️ Forwarded'}</span>
