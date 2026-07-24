@@ -51,13 +51,15 @@ if (DISABLE_REDIS || !finalUrl) {
   };
 } else {
   const clientOptions = {
-    url: finalUrl
+    url: finalUrl,
+    socket: {
+      reconnectStrategy: (retries) => Math.min(retries * 200, 3000)
+    }
   };
   if (isTlsRequired) {
-    clientOptions.socket = {
-      tls: true,
-      rejectUnauthorized: false
-    };
+    clientOptions.socket.tls = true;
+    clientOptions.socket.rejectUnauthorized = false;
+    clientOptions.socket.checkServerIdentity = () => undefined;
   }
 
   client = createClient(clientOptions);
