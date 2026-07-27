@@ -1,17 +1,17 @@
 /**
- * @file src/modules/kpi-scoring/kpi-scoring.service.js
+ * @file src/modules/kpi/kpi-scoring/kpi-scoring.service.js
  * @description Automatic KPI Scoring Engine. Resolves metrics from tasks, attendance, reports, projects, leaves, and corrections.
  */
 
 import mongoose from 'mongoose';
-import Task from '../tasks/tasks.model.js';
-import Attendance from '../attendance/attendance.model.js';
-import WorkReport from '../work-reports/work-reports.model.js';
-import Leave from '../leaves/leaves.model.js';
-import Project from '../projects/projects.model.js';
-import AttendanceCorrection from '../attendance-corrections/attendance-correction.model.js';
-import Employee from '../employees/employees.model.js';
-import logger from '../../config/logger.js';
+import Task from '../../tasks/tasks.model.js';
+import Attendance from '../../attendance/attendance.model.js';
+import WorkReport from '../../work-reports/work-reports.model.js';
+import Leave from '../../leaves/leaves.model.js';
+import Project from '../../projects/projects.model.js';
+import AttendanceCorrection from '../../attendance-corrections/attendance-correction.model.js';
+import Employee from '../../employees/employees.model.js';
+import logger from '../../../config/logger.js';
 
 // Format Date object to YYYY-MM-DD string
 const formatDateStr = (dateObj) => {

@@ -1,10 +1,10 @@
 /**
- * @file src/modules/kpi-templates/kpi-template.model.js
+ * @file src/modules/kpi/kpi-templates/kpi-template.model.js
  * @description Mongoose schema definition for KPI Templates.
  */
 
 import mongoose from 'mongoose';
-import { tenantPlugin } from '../../utils/tenantPlugin.js';
+import { tenantPlugin } from '../../../utils/tenantPlugin.js';
 
 const kpiTemplateSchema = new mongoose.Schema(
   {

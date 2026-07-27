@@ -1,11 +1,11 @@
 /**
- * @file src/modules/kpi-evaluation-cycles/kpi-evaluation-cycle.routes.js
+ * @file src/modules/kpi/kpi-evaluation-cycles/kpi-evaluation-cycle.routes.js
  * @description API Routes for KPI Evaluation Cycles.
  */
 
 import express from 'express';
 import controller from './kpi-evaluation-cycle.controller.js';
-import { authenticate } from '../../middlewares/auth.middleware.js';
+import { authenticate } from '../../../middlewares/auth.middleware.js';
 
 const router = express.Router();
 

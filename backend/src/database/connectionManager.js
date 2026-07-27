@@ -86,9 +86,9 @@ export const ensureAllModelsRegistered = async () => {
     import('../modules/security/security.model.js'),
     import('../modules/work-reports/work-reports.model.js'),
     import('../modules/payroll-queries/payroll-query.model.js'),
-    import('../modules/kpi-templates/kpi-template.model.js'),
-    import('../modules/kpi-evaluation-cycles/kpi-evaluation-cycle.model.js'),
-    import('../modules/kpi-employee-evaluations/kpi-employee-evaluation.model.js'),
+    import('../modules/kpi/kpi-templates/kpi-template.model.js'),
+    import('../modules/kpi/kpi-evaluation-cycles/kpi-evaluation-cycle.model.js'),
+    import('../modules/kpi/kpi-employee-evaluations/kpi-employee-evaluation.model.js'),
   ];
 
   await Promise.all(modelImports.map(p => p.catch(err => logger.error('Error registering model:', err))));

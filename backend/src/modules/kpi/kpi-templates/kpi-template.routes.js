@@ -1,11 +1,11 @@
 /**
- * @file src/modules/kpi-templates/kpi-template.routes.js
+ * @file src/modules/kpi/kpi-templates/kpi-template.routes.js
  * @description API Routes for KPI Templates.
  */
 
 import express from 'express';
 import controller from './kpi-template.controller.js';
-import { authenticate } from '../../middlewares/auth.middleware.js';
+import { authenticate } from '../../../middlewares/auth.middleware.js';
 
 const router = express.Router();
 

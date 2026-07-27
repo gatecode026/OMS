@@ -1,12 +1,12 @@
 /**
- * @file src/modules/kpi-evaluation-cycles/kpi-evaluation-cycle.repository.js
+ * @file src/modules/kpi/kpi-evaluation-cycles/kpi-evaluation-cycle.repository.js
  * @description Data Access layer for KPI Evaluation Cycles.
  */
 
 import KpiEvaluationCycle from './kpi-evaluation-cycle.model.js';
-import logger from '../../config/logger.js';
-import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
-import { getTenantId } from '../../utils/tenantContext.js';
+import logger from '../../../config/logger.js';
+import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
+import { getTenantId } from '../../../utils/tenantContext.js';
 
 export const find = async (query = {}) => {
   logger.info('KpiEvaluationCycleRepository::find querying cycles...');

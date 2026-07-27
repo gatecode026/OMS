@@ -1,11 +1,11 @@
 /**
- * @file src/modules/kpi-employee-evaluations/kpi-employee-evaluation.controller.js
+ * @file src/modules/kpi/kpi-employee-evaluations/kpi-employee-evaluation.controller.js
  * @description Controllers for KPI Employee Evaluations.
  */
 
 import service from './kpi-employee-evaluation.service.js';
-import { successResponse } from '../../utils/response.js';
-import { asyncHandler } from '../../utils/asyncHandler.js';
+import { successResponse } from '../../../utils/response.js';
+import { asyncHandler } from '../../../utils/asyncHandler.js';
 
 export const getEvaluations = asyncHandler(async (req, res) => {
   const data = await service.findAllEvaluations(req.query);

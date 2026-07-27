@@ -1,10 +1,10 @@
 /**
- * @file src/modules/kpi-evaluation-cycles/kpi-evaluation-cycle.model.js
+ * @file src/modules/kpi/kpi-evaluation-cycles/kpi-evaluation-cycle.model.js
  * @description Mongoose schema definition for KPI Evaluation Cycles.
  */
 
 import mongoose from 'mongoose';
-import { tenantPlugin } from '../../utils/tenantPlugin.js';
+import { tenantPlugin } from '../../../utils/tenantPlugin.js';
 
 const kpiEvaluationCycleSchema = new mongoose.Schema(
   {
