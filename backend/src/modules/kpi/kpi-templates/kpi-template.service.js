@@ -1,15 +1,15 @@
 /**
- * @file src/modules/kpi-templates/kpi-template.service.js
+ * @file src/modules/kpi/kpi-templates/kpi-template.service.js
  * @description Service business logic for KPI Templates.
  */
 
 import repository from './kpi-template.repository.js';
-import logger from '../../config/logger.js';
-import { emitEntitySync } from '../../services/sync.service.js';
-import activityLogRepository from '../activity-logs/activity-logs.repository.js';
-import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
-import { createNotification } from '../notifications/notifications.service.js';
-import Employee from '../employees/employees.model.js';
+import logger from '../../../config/logger.js';
+import { emitEntitySync } from '../../../services/sync.service.js';
+import activityLogRepository from '../../activity-logs/activity-logs.repository.js';
+import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
+import { createNotification } from '../../notifications/notifications.service.js';
+import Employee from '../../employees/employees.model.js';
 
 import mongoose from 'mongoose';
 

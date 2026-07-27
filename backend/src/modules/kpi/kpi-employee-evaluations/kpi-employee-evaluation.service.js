@@ -1,5 +1,5 @@
 /**
- * @file src/modules/kpi-employee-evaluations/kpi-employee-evaluation.service.js
+ * @file src/modules/kpi/kpi-employee-evaluations/kpi-employee-evaluation.service.js
  * @description Service business logic for KPI Employee Evaluations.
  */
 
@@ -7,11 +7,11 @@ import repository from './kpi-employee-evaluation.repository.js';
 import KpiEvaluationCycle from '../kpi-evaluation-cycles/kpi-evaluation-cycle.model.js';
 import cycleService from '../kpi-evaluation-cycles/kpi-evaluation-cycle.service.js';
 import kpiScoringService from '../kpi-scoring/kpi-scoring.service.js';
-import logger from '../../config/logger.js';
-import { emitEntitySync } from '../../services/sync.service.js';
-import activityLogRepository from '../activity-logs/activity-logs.repository.js';
-import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
-import { createNotification } from '../notifications/notifications.service.js';
+import logger from '../../../config/logger.js';
+import { emitEntitySync } from '../../../services/sync.service.js';
+import activityLogRepository from '../../activity-logs/activity-logs.repository.js';
+import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
+import { createNotification } from '../../notifications/notifications.service.js';
 
 export const findAllEvaluations = async (query = {}) => {
   logger.info('Executing KpiEmployeeEvaluationService::findAllEvaluations');
@@ -73,7 +73,7 @@ export const updateScoresAndComments = async (id, data, currentUser) => {
         attr.isOverridden = true;
         attr.overrideReason = s.overrideReason;
         attr.finalScore = val;
-        
+
         // Audit log override
         try {
           generateCompanyUniqueId(currentUser.companyId, 'activitylogs').then(logId => {
@@ -93,7 +93,7 @@ export const updateScoresAndComments = async (id, data, currentUser) => {
         }
       }
     }
-    
+
     if (s.managerComment !== undefined) {
       attr.managerComment = s.managerComment;
     }

@@ -1,12 +1,12 @@
 /**
- * @file src/modules/kpi-templates/kpi-template.repository.js
+ * @file src/modules/kpi/kpi-templates/kpi-template.repository.js
  * @description Data Access layer for KPI Templates.
  */
 
 import KpiTemplate from './kpi-template.model.js';
-import logger from '../../config/logger.js';
-import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
-import { getTenantId } from '../../utils/tenantContext.js';
+import logger from '../../../config/logger.js';
+import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
+import { getTenantId } from '../../../utils/tenantContext.js';
 
 export const find = async (query = {}) => {
   logger.info('KpiTemplateRepository::find querying templates...');

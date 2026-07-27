@@ -1,11 +1,11 @@
 /**
- * @file src/modules/kpi-employee-evaluations/kpi-employee-evaluation.routes.js
+ * @file src/modules/kpi/kpi-employee-evaluations/kpi-employee-evaluation.routes.js
  * @description API Routes for KPI Employee Evaluations.
  */
 
 import express from 'express';
 import controller from './kpi-employee-evaluation.controller.js';
-import { authenticate } from '../../middlewares/auth.middleware.js';
+import { authenticate } from '../../../middlewares/auth.middleware.js';
 
 const router = express.Router();
 

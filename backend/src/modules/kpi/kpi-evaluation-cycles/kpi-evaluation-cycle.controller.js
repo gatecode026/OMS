@@ -1,11 +1,11 @@
 /**
- * @file src/modules/kpi-evaluation-cycles/kpi-evaluation-cycle.controller.js
+ * @file src/modules/kpi/kpi-evaluation-cycles/kpi-evaluation-cycle.controller.js
  * @description Controllers for KPI Evaluation Cycles.
  */
 
 import service from './kpi-evaluation-cycle.service.js';
-import { successResponse } from '../../utils/response.js';
-import { asyncHandler } from '../../utils/asyncHandler.js';
+import { successResponse } from '../../../utils/response.js';
+import { asyncHandler } from '../../../utils/asyncHandler.js';
 
 export const getCycles = asyncHandler(async (req, res) => {
   const data = await service.findAllCycles(req.query);

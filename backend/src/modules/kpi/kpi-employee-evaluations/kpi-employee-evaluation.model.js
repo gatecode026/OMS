@@ -1,10 +1,10 @@
 /**
- * @file src/modules/kpi-employee-evaluations/kpi-employee-evaluation.model.js
+ * @file src/modules/kpi/kpi-employee-evaluations/kpi-employee-evaluation.model.js
  * @description Mongoose schema definition for KPI Employee Evaluations.
  */
 
 import mongoose from 'mongoose';
-import { tenantPlugin } from '../../utils/tenantPlugin.js';
+import { tenantPlugin } from '../../../utils/tenantPlugin.js';
 
 const kpiEmployeeEvaluationSchema = new mongoose.Schema(
   {

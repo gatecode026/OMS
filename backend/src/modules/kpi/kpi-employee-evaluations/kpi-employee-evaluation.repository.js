@@ -1,12 +1,12 @@
 /**
- * @file src/modules/kpi-employee-evaluations/kpi-employee-evaluation.repository.js
+ * @file src/modules/kpi/kpi-employee-evaluations/kpi-employee-evaluation.repository.js
  * @description Data Access layer for KPI Employee Evaluations.
  */
 
 import KpiEmployeeEvaluation from './kpi-employee-evaluation.model.js';
-import logger from '../../config/logger.js';
-import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
-import { getTenantId } from '../../utils/tenantContext.js';
+import logger from '../../../config/logger.js';
+import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
+import { getTenantId } from '../../../utils/tenantContext.js';
 
 export const find = async (query = {}) => {
   logger.info('KpiEmployeeEvaluationRepository::find querying employee evaluations...');

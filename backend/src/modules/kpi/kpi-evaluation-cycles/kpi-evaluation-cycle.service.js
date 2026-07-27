@@ -1,18 +1,18 @@
 /**
- * @file src/modules/kpi-evaluation-cycles/kpi-evaluation-cycle.service.js
+ * @file src/modules/kpi/kpi-evaluation-cycles/kpi-evaluation-cycle.service.js
  * @description Service business logic for KPI Evaluation Cycles.
  */
 
 import repository from './kpi-evaluation-cycle.repository.js';
 import KpiTemplate from '../kpi-templates/kpi-template.model.js';
 import KpiEmployeeEvaluation from '../kpi-employee-evaluations/kpi-employee-evaluation.model.js';
-import Employee from '../employees/employees.model.js';
+import Employee from '../../employees/employees.model.js';
 import kpiScoringService from '../kpi-scoring/kpi-scoring.service.js';
-import logger from '../../config/logger.js';
-import { emitEntitySync } from '../../services/sync.service.js';
-import activityLogRepository from '../activity-logs/activity-logs.repository.js';
-import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
-import { createNotification } from '../notifications/notifications.service.js';
+import logger from '../../../config/logger.js';
+import { emitEntitySync } from '../../../services/sync.service.js';
+import activityLogRepository from '../../activity-logs/activity-logs.repository.js';
+import { generateCompanyUniqueId } from '../../../utils/idGenerator.js';
+import { createNotification } from '../../notifications/notifications.service.js';
 
 export const findAllCycles = async (query) => {
   logger.info('Executing KpiEvaluationCycleService::findAllCycles');

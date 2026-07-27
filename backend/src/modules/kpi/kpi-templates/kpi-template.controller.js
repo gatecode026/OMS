@@ -1,11 +1,11 @@
 /**
- * @file src/modules/kpi-templates/kpi-template.controller.js
+ * @file src/modules/kpi/kpi-templates/kpi-template.controller.js
  * @description Controllers for KPI Templates.
  */
 
 import service from './kpi-template.service.js';
-import { successResponse } from '../../utils/response.js';
-import { asyncHandler } from '../../utils/asyncHandler.js';
+import { successResponse } from '../../../utils/response.js';
+import { asyncHandler } from '../../../utils/asyncHandler.js';
 
 export const getTemplates = asyncHandler(async (req, res) => {
   const data = await service.findAllTemplates(req.query);
