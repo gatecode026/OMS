@@ -2347,3 +2347,11 @@ Stack: Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 
     at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
     at Route.dispatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:119:3)
 Body: {}
+
+[2026-07-27T11:41:36.702Z] POST /api/v1/auth/login
+Error: Invalid email or password
+Stack: Error: Invalid email or password
+    at Object.login (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.service.js:152:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
+Body: {"email":"animeshh@gmail.com","password":"password"}

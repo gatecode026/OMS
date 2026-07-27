@@ -3475,6 +3475,15 @@ export const AppProvider = ({ children }) => {
   };
 
   const addLeaveRequest = async (newLeave) => {
+    const tempId = newLeave.id || `LR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const optimisticLeave = { ...newLeave, id: tempId };
+
+    // ⚡ Instant Optimistic Update
+    setLeaveRequests(prev => {
+      if (prev.some(l => l.id === tempId)) return prev;
+      return [optimisticLeave, ...prev];
+    });
+
     try {
       const response = await fetch((window.API_URL || 'http://localhost:5000') + '/api/v1/leaves', {
         method: 'POST',
@@ -3487,12 +3496,10 @@ export const AppProvider = ({ children }) => {
 
       const result = await response.json();
       if (result.status === 'success') {
-        setLeaveRequests(prev => {
-          if (prev.some(l => l.id === result.data.id)) return prev;
-          return [result.data, ...prev];
-        });
+        setLeaveRequests(prev =>
+          prev.map(l => (l.id === tempId ? result.data : l))
+        );
 
-        // If the leave is pre-approved (assigned directly by Admin), update employee status to 'On Leave'
         if (result.data.status === 'Approved') {
           try {
             await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/employees/${result.data.employeeId}`, {
@@ -3510,19 +3517,30 @@ export const AppProvider = ({ children }) => {
         }
 
         addActivityLog(`Submitted leave request for ${result.data.employeeName}`, 'Leaves', 'success');
-        addToast('success', result.data.status === 'Approved' ? `Leave assigned successfully for ${result.data.employeeName}.` : 'Leave request submitted successfully for approval.');
-
+        addToast('success', result.data.status === 'Approved' ? `Leave assigned successfully for ${result.data.employeeName}.` : 'Leave request submitted successfully.');
         return result.data;
       } else {
+        // Revert on error
+        setLeaveRequests(prev => prev.filter(l => l.id !== tempId));
         addToast('error', result.message || 'Failed to submit leave request');
       }
     } catch (err) {
       console.error('Error adding leave request:', err);
+      // Revert on error
+      setLeaveRequests(prev => prev.filter(l => l.id !== tempId));
       addToast('error', 'Network error while submitting leave request');
     }
   };
 
   const updateLeaveRequest = async (id, updatedLeave) => {
+    let originalLeave = null;
+
+    // ⚡ Instant Optimistic Update
+    setLeaveRequests(prev => {
+      originalLeave = prev.find(l => l.id === id);
+      return prev.map(l => (l.id === id ? { ...l, ...updatedLeave } : l));
+    });
+
     try {
       const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/leaves/${id}`, {
         method: 'PUT',
@@ -3539,13 +3557,19 @@ export const AppProvider = ({ children }) => {
           prev.map(l => (l.id === id ? result.data : l))
         );
         addActivityLog(`Updated leave request ${id}`, 'Leaves', 'success');
-        addToast('success', `Leave request ${id} updated successfully.`);
         return result.data;
       } else {
+        // Revert on error
+        if (originalLeave) {
+          setLeaveRequests(prev => prev.map(l => (l.id === id ? originalLeave : l)));
+        }
         addToast('error', result.message || 'Failed to update leave request');
       }
     } catch (err) {
       console.error('Error updating leave request:', err);
+      if (originalLeave) {
+        setLeaveRequests(prev => prev.map(l => (l.id === id ? originalLeave : l)));
+      }
       addToast('error', 'Network error while updating leave request');
     }
   };

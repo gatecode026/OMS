@@ -3261,7 +3261,13 @@ const LeaveManagement = () => {
                 type="date"
                 value={assignForm.startDate}
                 min={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setAssignForm({ ...assignForm, startDate: e.target.value })}
+                max="2099-12-31"
+                onChange={(e) => {
+                  let val = e.target.value;
+                  const parts = val.split('-');
+                  if (parts[0] && parts[0].length > 4) val = `${parts[0].slice(0, 4)}-${parts[1] || ''}-${parts[2] || ''}`;
+                  setAssignForm({ ...assignForm, startDate: val });
+                }}
                 required
               />
             </div>
@@ -3325,7 +3331,13 @@ const LeaveManagement = () => {
                 type="date"
                 value={applyForm.startDate}
                 min={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setApplyForm({ ...applyForm, startDate: e.target.value })}
+                max="2099-12-31"
+                onChange={(e) => {
+                  let val = e.target.value;
+                  const parts = val.split('-');
+                  if (parts[0] && parts[0].length > 4) val = `${parts[0].slice(0, 4)}-${parts[1] || ''}-${parts[2] || ''}`;
+                  setApplyForm({ ...applyForm, startDate: val });
+                }}
                 required
               />
             </div>
