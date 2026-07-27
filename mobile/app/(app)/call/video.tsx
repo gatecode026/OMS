@@ -33,9 +33,12 @@ import { Ionicons } from '@expo/vector-icons';
 import useTheme from '../../../src/shared/hooks/useTheme';
 import { Avatar } from '../../../src/shared/components';
 import { useCall } from '../../../src/shared/providers/CallProvider';
-import { AudioRoutePickerModal } from '../../../src/features/calling/components/AudioRoutePickerModal';
-import { CallStatisticsSheet } from '../../../src/features/calling/components/CallStatisticsSheet';
-import { useAudioRoute } from '../../../src/features/calling/hooks/useAudioRoute';
+import {
+  AudioRoutePickerModal,
+  CallStatisticsSheet,
+  useAudioRoute,
+} from '../../../src/features/calling';
+
 
 const { width: W, height: H } = Dimensions.get('window');
 

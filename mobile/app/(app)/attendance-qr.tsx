@@ -201,9 +201,10 @@ export default function AttendanceQRScreen() {
   const displayBloodGroup = profile?.bloodGroup || 'O+';
 
   const qrValue = useMemo(() => {
-    if (dbQrCode) return dbQrCode;
-    if (profile?.qrCode) return profile.qrCode;
-    if (profile?.attendanceQr) return profile.attendanceQr;
+    const isLocalUrl = (str?: string) => typeof str === 'string' && (str.includes('localhost') || str.includes('127.0.0.1'));
+    if (dbQrCode && !isLocalUrl(dbQrCode)) return dbQrCode;
+    if (profile?.qrCode && !isLocalUrl(profile.qrCode)) return profile.qrCode;
+    if (profile?.attendanceQr && !isLocalUrl(profile.attendanceQr)) return profile.attendanceQr;
 
     return JSON.stringify({
       employeeId: profile?.id || profile?.employeeId || authUser?.id || 'GATECO-EMP-008',

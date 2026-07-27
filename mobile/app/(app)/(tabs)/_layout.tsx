@@ -1,5 +1,12 @@
+/**
+ * @file app/(app)/(tabs)/_layout.tsx
+ * @description Pixel-Perfect Floating Glassmorphic Bottom Navigation Bar.
+ *              Features 4 tabs (Home, My Tasks, Chat, Profile) and a center elevated
+ *              floating purple action button with a lightning bolt icon.
+ */
+
 import React from 'react';
-import { View } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import useTheme from '../../../src/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +14,7 @@ import { useConversations } from '../../../src/features/chat';
 import { useQuickActionsStore } from '../../../src/shared/store/quickActionsStore';
 
 export default function TabsLayout() {
-  const { colors, typography } = useTheme();
+  const { colors, typography, isDark } = useTheme();
   const { data: conversations = [] } = useConversations();
 
   // Calculate total unread messages across all active conversations
@@ -17,19 +24,30 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarActiveTintColor: '#A78BFA', // Soft bright purple
+        tabBarInactiveTintColor: '#94A3B8', // Slate grey
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          backgroundColor: isDark ? '#0F1221' : '#1E1B4B',
+          borderColor: 'rgba(255,255,255,0.08)',
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
+          height: Platform.OS === 'ios' ? 72 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 12 : 8,
           paddingTop: 8,
+          position: 'absolute',
+          bottom: 16,
+          left: 16,
+          right: 16,
+          borderRadius: 32,
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.35,
+          shadowRadius: 16,
+          elevation: 10,
         },
         tabBarLabelStyle: {
-          fontSize: typography.sizes.label,
+          fontSize: 11,
           fontFamily: typography.fonts.semibold,
+          marginTop: 2,
         },
       }}
     >
@@ -57,9 +75,7 @@ export default function TabsLayout() {
         name="action"
         listeners={{
           tabPress: (e) => {
-            // Prevent default navigation
             e.preventDefault();
-            // Open the global quick actions bottom sheet
             useQuickActionsStore.getState().openActions();
           },
         }}
@@ -67,23 +83,10 @@ export default function TabsLayout() {
           title: '',
           tabBarLabel: () => null,
           tabBarIcon: () => (
-            <View
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 16,
-                backgroundColor: colors.primary,
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginTop: -16,
-                shadowColor: colors.primary,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.35,
-                shadowRadius: 8,
-                elevation: 6,
-              }}
-            >
-              <Ionicons name="apps" size={24} color="#FFFFFF" />
+            <View style={styles.floatingActionWrapper}>
+              <View style={styles.floatingActionCircle}>
+                <Ionicons name="flash" size={24} color="#FFFFFF" />
+              </View>
             </View>
           ),
         }}
@@ -97,8 +100,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="inbox"
         options={{
-          title: 'Inbox',
-          tabBarLabel: 'Inbox',
+          title: 'Chat',
+          tabBarLabel: 'Chat',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'}
@@ -108,7 +111,7 @@ export default function TabsLayout() {
           ),
           tabBarBadge: totalUnreadChat > 0 ? totalUnreadChat : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: colors.primary,
+            backgroundColor: '#8B5CF6',
             color: '#FFFFFF',
             fontSize: 10,
           },
@@ -139,3 +142,26 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  floatingActionWrapper: {
+    top: -16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  floatingActionCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#8B5CF6', // Vibrant purple
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 3,
+    borderColor: '#0F1221',
+  },
+});

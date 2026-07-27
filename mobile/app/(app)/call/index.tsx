@@ -33,12 +33,15 @@ import { Ionicons } from '@expo/vector-icons';
 import useTheme from '../../../src/shared/hooks/useTheme';
 import { Avatar } from '../../../src/shared/components';
 import { useCall } from '../../../src/shared/providers/CallProvider';
-import { useCallTimer } from '../../../src/features/calling/hooks/useCallTimer';
-import { useAudioRoute } from '../../../src/features/calling/hooks/useAudioRoute';
-import { AnimatedVoiceWave } from '../../../src/features/calling/components/AnimatedVoiceWave';
-import { AudioRoutePickerModal } from '../../../src/features/calling/components/AudioRoutePickerModal';
-import { CallStatisticsSheet } from '../../../src/features/calling/components/CallStatisticsSheet';
-import { KeypadModal } from '../../../src/features/calling/components/KeypadModal';
+import {
+  useCallTimer,
+  useAudioRoute,
+  AnimatedVoiceWave,
+  AudioRoutePickerModal,
+  CallStatisticsSheet,
+  KeypadModal,
+} from '../../../src/features/calling';
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
