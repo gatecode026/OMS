@@ -1429,7 +1429,6 @@ export const ChatProvider = ({ children }) => {
 
       const result = resultData.data;
 
-      // Record successful response
       updateUploadItem(id, {
         status: 'success',
         progress: 100,
