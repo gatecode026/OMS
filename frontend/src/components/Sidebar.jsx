@@ -91,7 +91,7 @@ const menuStructure = [
     items: [
       { name: 'Announcements', icon: Megaphone, path: '/announcements' },
       { name: 'Notifications', icon: Bell, path: '/notifications', badgeKey: 'notifications' },
-      { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat' },
+      { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat', disabled: true },
       { name: 'Document Management', icon: FolderClosed, path: '/documents' }
     ]
   },
@@ -330,6 +330,28 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
       );
     }
 
+    if (item.disabled) {
+      return (
+        <div
+          key={item.name}
+          className={`menu-link disabled ${effectiveCollapsed ? 'justify-center' : ''}`}
+          style={{ opacity: 0.45, cursor: 'not-allowed', pointerEvents: 'none', userSelect: 'none' }}
+          title={effectiveCollapsed ? `${item.name} (Disabled)` : 'Disabled'}
+        >
+          <div className="menu-item-content">
+            <Icon size={18} className="menu-icon" />
+            {!effectiveCollapsed && <span className="menu-label-text">{item.name}</span>}
+          </div>
+          {!effectiveCollapsed && (
+            <span style={{ fontSize: '10px', background: 'rgba(156, 163, 175, 0.15)', padding: '2px 6px', borderRadius: '4px', color: '#9ca3af', marginLeft: 'auto' }}>
+              Disabled
+            </span>
+          )}
+          {effectiveCollapsed && <div className="collapsed-tooltip">{item.name} (Disabled)</div>}
+        </div>
+      );
+    }
+
     return (
       <Link
         key={item.name}
@@ -401,7 +423,7 @@ const Sidebar = ({ mobileOpen, setMobileOpen }) => {
                   { name: 'Daily Work Reports', icon: FileText, path: '/work-reports' },
                   { name: 'Announcements', icon: Megaphone, path: '/announcements' },
                   { name: 'Notifications', icon: Bell, path: '/notifications', badgeKey: 'notifications' },
-                  { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat' },
+                  { name: 'Chat', icon: MessageSquare, path: '/chat', badgeKey: 'chat', disabled: true },
                   { name: 'KPI Management', icon: TrendingUp, path: '/kpi' },
                   { name: 'Payroll', icon: DollarSign, path: '/payroll' },
                   { name: 'Documents', icon: FolderClosed, path: '/documents' },

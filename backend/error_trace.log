@@ -2257,3 +2257,93 @@ Stack: Error: Invalid email or password
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
 Body: {"email":"harssh@gmail.com","password":"password"}
+
+[2026-07-27T06:30:26.822Z] GET /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009
+Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+Stack: Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/app.js:150:17
+    at Layer.handle [as handle_request] (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:149:13)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at Route.dispatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:119:3)
+Body: {}
+
+[2026-07-27T06:30:27.059Z] GET /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009
+Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+Stack: Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/app.js:150:17
+    at Layer.handle [as handle_request] (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:149:13)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at Route.dispatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:119:3)
+Body: {}
+
+[2026-07-27T06:30:41.585Z] GET /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009
+Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+Stack: Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/app.js:150:17
+    at Layer.handle [as handle_request] (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:149:13)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at Route.dispatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:119:3)
+Body: {}
+
+[2026-07-27T06:30:41.816Z] GET /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009
+Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+Stack: Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/app.js:150:17
+    at Layer.handle [as handle_request] (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:149:13)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at Route.dispatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:119:3)
+Body: {}
+
+[2026-07-27T06:31:12.814Z] GET /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009
+Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+Stack: Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/app.js:150:17
+    at Layer.handle [as handle_request] (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:149:13)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at Route.dispatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:119:3)
+Body: {}
+
+[2026-07-27T06:31:13.055Z] GET /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009
+Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+Stack: Error: Resource /api/v1/kpi-employee-evaluations/employee/GATECO-EMP-009 not found on this server
+    at file:///C:/Users/Shubh/Desktop/OMS/backend/src/app.js:150:17
+    at Layer.handle [as handle_request] (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:149:13)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at next (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:145:7)
+    at Route.dispatch (C:\Users\Shubh\Desktop\OMS\backend\node_modules\express\lib\router\route.js:119:3)
+Body: {}

@@ -93,7 +93,12 @@ export default function KPI() {
     };
     const options = { method, headers };
     if (body) options.body = JSON.stringify(body);
-    const res = await fetch(url, options);
+    const fullUrl = url.startsWith('http') ? url : `${window.API_URL || ''}${url}`;
+    const res = await fetch(fullUrl, options);
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(`Server returned non-JSON response (${res.status})`);
+    }
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'API request failed');
     return data.data;

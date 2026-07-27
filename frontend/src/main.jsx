@@ -120,8 +120,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                   <Route path="/announcements" element={<Announcements />} />
                   <Route path="/notifications" element={<Notifications />} />
                   <Route path="/documents" element={<Documents />} />
-                  <Route path="/chat" element={<ChatPage />} />
-                  <Route path="/chat/privacy" element={<ChatPrivacySettings />} />
+                  <Route path="/chat" element={<Placeholder title="Chat" />} />
+                  <Route path="/chat/privacy" element={<Placeholder title="Chat" />} />
 
                   {/* ── Administration & Security (Centralized Role Restricted) ── */}
                   <Route path="/permissions" element={<RolesPermissions />} />
