@@ -9,10 +9,14 @@ import logger from '../../config/logger.js';
 export const getDashboardSummary = async (currentUser) => {
   logger.info(`[AnalyticsService] Fetching dashboard summary for tenant company: ${currentUser?.companyId}`);
   const companyId = currentUser?.companyId;
+  const userId = currentUser?.id || currentUser?._id;
 
   try {
     const conn = await getTenantConnection(companyId);
     
+    // Build user filter for workreports — only count the current user's reports
+    const userFilter = userId ? { $or: [{ userId }, { employee: userId }, { createdBy: userId }] } : {};
+
     // Query actual collections in tenant DB
     const [
       totalReports,
@@ -23,10 +27,10 @@ export const getDashboardSummary = async (currentUser) => {
       employeesCount,
       tasksCount,
     ] = await Promise.all([
-      conn.collection('workreports').countDocuments().catch(() => 0),
-      conn.collection('workreports').countDocuments({ status: { $regex: /scheduled/i } }).catch(() => 0),
-      conn.collection('workreports').countDocuments({ status: { $regex: /pending|draft/i } }).catch(() => 0),
-      conn.collection('workreports').countDocuments({ status: { $regex: /completed|approved/i } }).catch(() => 0),
+      conn.collection('workreports').countDocuments(userFilter).catch(() => 0),
+      conn.collection('workreports').countDocuments({ ...userFilter, status: { $regex: /scheduled/i } }).catch(() => 0),
+      conn.collection('workreports').countDocuments({ ...userFilter, status: { $regex: /pending|draft/i } }).catch(() => 0),
+      conn.collection('workreports').countDocuments({ ...userFilter, status: { $regex: /completed|approved/i } }).catch(() => 0),
       conn.collection('departments').countDocuments().catch(() => 0),
       conn.collection('employees').countDocuments().catch(() => 0),
       conn.collection('tasks').countDocuments().catch(() => 0),
@@ -89,12 +93,18 @@ export const getDashboardSummary = async (currentUser) => {
 export const getPerformanceOverview = async (period = 'yearly', currentUser) => {
   logger.info(`[AnalyticsService] Fetching performance overview for period: ${period}`);
   const companyId = currentUser?.companyId;
+  const userId = currentUser?.id || currentUser?._id;
 
   try {
     const conn = await getTenantConnection(companyId);
-    
-    // Group workreports or tasks created per month from DB
+
+    // Only aggregate the current user's workreports per month
+    const userMatch = userId
+      ? { $match: { $or: [{ userId }, { employee: userId }, { createdBy: userId }] } }
+      : null;
+
     const pipeline = [
+      ...(userMatch ? [userMatch] : []),
       {
         $group: {
           _id: { $month: '$createdAt' },
@@ -173,9 +183,16 @@ export const getDepartmentAnalytics = async (currentUser) => {
 
 export const getRecentReports = async (category = 'All', currentUser) => {
   const companyId = currentUser?.companyId;
+  const userId = currentUser?.id || currentUser?._id;
+
   try {
     const conn = await getTenantConnection(companyId);
-    const filter = category && category !== 'All' ? { category } : {};
+
+    // Base filter: only show the current user's own reports
+    const userFilter = userId ? { $or: [{ userId }, { employee: userId }, { createdBy: userId }] } : {};
+    const categoryFilter = category && category !== 'All' ? { category } : {};
+    const filter = { ...userFilter, ...categoryFilter };
+
     const reports = await conn.collection('workreports').find(filter).sort({ createdAt: -1 }).limit(10).toArray().catch(() => []);
 
     if (reports && reports.length > 0) {

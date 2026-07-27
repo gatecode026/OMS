@@ -62,8 +62,8 @@ export const ReportsOverview: React.FC = () => {
           </TouchableOpacity>
 
           <View style={styles.headerTitleBox}>
-            <Text style={styles.headerTitle}>Analytics</Text>
-            <Text style={styles.headerSubtitle}>Insights & Reports Overview</Text>
+            <Text style={styles.headerTitle}>My Reports</Text>
+            <Text style={styles.headerSubtitle}>{user?.name ? `${user.name}'s Analytics` : 'Your Analytics & Reports'}</Text>
           </View>
 
           <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/(app)/profile')}>
@@ -263,11 +263,11 @@ export const ReportsOverview: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* ─── RECENT REPORTS LIST ─────────────────────────────────── */}
+          {/* ─── RECENT REPORTS LIST ──────────────────────────────────── */}
           <View style={styles.recentReportsSection}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { color: isDark ? '#F8FAFC' : '#0F172A' }]}>
-                Recent Reports
+                My Recent Reports
               </Text>
               <TouchableOpacity onPress={() => router.push('/(app)/documents')}>
                 <Text style={styles.viewDetailsText}>View All</Text>
@@ -320,7 +320,7 @@ export const ReportsOverview: React.FC = () => {
             ) : (
               <View style={styles.emptyBox}>
                 <Ionicons name="folder-open-outline" size={32} color="#94A3B8" />
-                <Text style={styles.emptyText}>No recent reports found in database.</Text>
+                <Text style={styles.emptyText}>You have not submitted any reports yet.</Text>
               </View>
             )}
           </View>
