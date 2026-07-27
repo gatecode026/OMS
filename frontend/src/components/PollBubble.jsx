@@ -5,7 +5,7 @@
  *   and administrative controls (close, reopen, delete).
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useChat } from '../context/ChatContext';
 import { Check, Users, Lock, Unlock, Calendar, Trash2, Trophy } from 'lucide-react';
@@ -16,9 +16,13 @@ const PollBubble = ({ message, isOwn }) => {
   const { socket } = useChat();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const poll = message.pollId;
+  const poll = (message && typeof message.pollId === 'object' && message.pollId !== null)
+    ? message.pollId
+    : (message && typeof message.poll === 'object' && message.poll !== null)
+      ? message.poll
+      : null;
 
-  if (!poll) {
+  if (!poll || typeof poll !== 'object') {
     return (
       <div style={{ fontStyle: 'italic', padding: '10px', color: 'var(--text-muted, #94a3b8)' }}>
         [Poll details unavailable]
@@ -120,7 +124,7 @@ const PollBubble = ({ message, isOwn }) => {
 
     setIsSubmitting(true);
     try {
-      const apiUrl = window.API_URL || window.location.origin;
+      const apiUrl = window.API_URL || 'http://localhost:5000';
       const res = await fetch(`${apiUrl}/api/v1/chat/polls/${pollId}/vote`, {
         method: 'POST',
         headers: {
@@ -144,11 +148,12 @@ const PollBubble = ({ message, isOwn }) => {
 
   // Handle Poll Actions (Close / Reopen / Delete)
   const handleAction = async (action) => {
-    const actionUrl = `${window.API_URL || window.location.origin}/api/v1/chat/polls/${pollId}/${action}`;
+    const apiUrl = window.API_URL || 'http://localhost:5000';
+    const actionUrl = `${apiUrl}/api/v1/chat/polls/${pollId}/${action}`;
     const method = action === 'delete' ? 'DELETE' : 'POST';
 
     try {
-      const res = await fetch(action === 'delete' ? `${window.API_URL || window.location.origin}/api/v1/chat/polls/${pollId}` : actionUrl, {
+      const res = await fetch(action === 'delete' ? `${apiUrl}/api/v1/chat/polls/${pollId}` : actionUrl, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`

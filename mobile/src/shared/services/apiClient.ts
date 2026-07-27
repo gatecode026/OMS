@@ -11,6 +11,22 @@ import ENV from '../../config/env';
 import useAuthStore from '../store/authStore';
 import useOfflineStore from '../store/offlineStore';
 
+// Reusable Public Routes list
+export const PUBLIC_ROUTES = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/public',
+];
+
+/**
+ * Checks whether a given request URL matches any declared public endpoint.
+ */
+export const isPublicRoute = (url?: string): boolean => {
+  if (!url) return false;
+  return PUBLIC_ROUTES.some((route) => url.includes(route));
+};
+
 // Interface for request queue while refreshing token
 interface FailedRequest {
   resolve: (value: any) => void;
@@ -20,26 +36,40 @@ interface FailedRequest {
 
 // Map HTTP status codes to user friendly error messages
 export interface AppError {
-  status: string;
+  status: 'fail' | 'error';
   message: string;
   statusCode?: number;
-  originalError?: AxiosError;
-  validationErrors?: Record<string, string>;
+  originalError?: unknown;
+  code?: string;
+  validationErrors?: Record<string, string> | null;
 }
 
-export const mapAxiosError = (error: AxiosError): AppError => {
-  if (!error.response) {
-    if (error.code === 'ECONNABORTED') {
+export const mapAxiosError = (error: any): AppError => {
+  // If object is already a mapped AppError, return it directly to preserve statusCode
+  if (
+    error &&
+    typeof error === 'object' &&
+    'status' in error &&
+    'message' in error &&
+    ('statusCode' in error || 'originalError' in error || 'code' in error)
+  ) {
+    return error as AppError;
+  }
+
+  if (!error || !error.response) {
+    if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
       return {
         status: 'fail',
         message: 'Request timed out. Please check your network connection and try again.',
         statusCode: 408,
+        code: 'ECONNABORTED',
         originalError: error,
       };
     }
     return {
       status: 'fail',
       message: 'Network offline or server unreachable. Please check your connection.',
+      code: 'ERR_NETWORK',
       originalError: error,
     };
   }
@@ -55,7 +85,7 @@ export const mapAxiosError = (error: AxiosError): AppError => {
       message = serverMessage || 'Invalid request. Please check your input parameters.';
       break;
     case 401:
-      message = 'Your session has expired. Please log in again.';
+      message = serverMessage || 'Invalid email or password. Please try again.';
       break;
     case 403:
       message = serverMessage || 'Access denied. You do not have permissions for this action.';
@@ -81,7 +111,7 @@ export const mapAxiosError = (error: AxiosError): AppError => {
   }
 
   return {
-    status: responseData?.status || 'fail',
+    status: responseData?.status === 'error' ? 'error' : 'fail',
     message,
     statusCode,
     originalError: error,
@@ -131,18 +161,11 @@ apiClient.interceptors.request.use(
       config.headers['x-tenant-id'] = companyId;
     }
 
-    // Inject Device / App Metadata (disabled on web to prevent CORS preflight header errors)
-    if (Platform.OS !== 'web' && config.headers) {
-      config.headers['x-device-id'] = Constants.installationId || Constants.sessionId || 'device-id-placeholder';
-      config.headers['x-app-version'] = Constants.expoConfig?.version || '1.0.0';
-      config.headers['x-timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-      config.headers['x-language'] = 'en';
-      config.headers['x-platform'] = Platform.OS;
-    }
-
-    // Intercept mutating requests when offline and queue them
+    // Intercept mutating requests when offline and queue them (except public endpoints)
     const isMutating = ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '');
-    if (!isConnected && isMutating) {
+    const isPublic = isPublicRoute(config.url);
+
+    if (!isConnected && isMutating && !isPublic) {
       const headersObject: Record<string, string> = {};
       if (config.headers) {
         Object.keys(config.headers).forEach((k) => {
@@ -168,6 +191,10 @@ apiClient.interceptors.request.use(
       });
     }
 
+    if (__DEV__) {
+      console.log('[STEP 5] Axios request interceptor running for:', config.method?.toUpperCase(), config.url);
+    }
+
     return config;
   },
   (error) => {
@@ -186,12 +213,9 @@ apiClient.interceptors.response.use(
     const isTokenValid = !!token;
     const companyId = useAuthStore.getState().companyId || 'default';
 
-    console.log(`[API]
-Base URL: ${ENV.API_URL}
-Environment: ${ENV.ENV}
-JWT Valid: ${isTokenValid}
-Tenant ID: ${companyId}
-Response: Success (HTTP ${status} for ${method} ${url})`);
+    if (__DEV__) {
+      console.log(`[API] Success HTTP ${status} for ${method} ${url}`);
+    }
 
     return response;
   },
@@ -213,9 +237,10 @@ Response: Success (HTTP ${status} for ${method} ${url})`);
     }
 
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number };
+    const isPublic = isPublicRoute(originalRequest?.url);
 
-    // Retry Logic for network / server errors
-    if (originalRequest) {
+    // Retry Logic for network / server errors (only for protected endpoints)
+    if (originalRequest && !isPublic) {
       const isNetworkError = !error.response;
       const isServerError = error.response?.status === 503 || error.response?.status === 504;
       const retryCount = originalRequest._retryCount || 0;
@@ -223,14 +248,16 @@ Response: Success (HTTP ${status} for ${method} ${url})`);
 
       if ((isNetworkError || isServerError) && retryCount < MAX_RETRIES) {
         originalRequest._retryCount = retryCount + 1;
-        console.log(`[apiClient] Retrying request (${originalRequest._retryCount}/${MAX_RETRIES}) for URL: ${originalRequest.url}`);
+        if (__DEV__) {
+          console.log(`[apiClient] Retrying request (${originalRequest._retryCount}/${MAX_RETRIES}) for URL: ${originalRequest.url}`);
+        }
         await new Promise((resolve) => setTimeout(resolve, (retryCount + 1) * 1500));
         return apiClient(originalRequest);
       }
     }
 
-    // Handle token expiration/401 errors
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Handle token expiration/401 errors for protected endpoints
+    if (error.response?.status === 401 && !originalRequest._retry && !isPublic) {
       // If we are already refreshing, queue this request
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -310,6 +337,27 @@ Error: ${errorMsg}`);
 );
 
 /**
+ * Safely performs a fetch request with a timeout fallback, as AbortSignal.timeout
+ * is not supported on all React Native platforms/Hermes versions.
+ */
+async function fetchWithTimeout(url: string, ms: number = 15000): Promise<Response> {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return fetch(url, { signal: AbortSignal.timeout(ms) });
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
+/**
  * Executes a full network diagnostics sweep and prints a structured warning log.
  */
 export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
@@ -324,7 +372,7 @@ export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
 
   let apiReachable = 'No';
   try {
-    const response = await fetch(`${ENV.API_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    const response = await fetchWithTimeout(`${ENV.API_URL}/health`, 15000);
     apiReachable = `Yes (HTTP ${response.status})`;
   } catch (e: any) {
     apiReachable = `No (${e.message || e})`;
@@ -332,7 +380,7 @@ export async function runNetworkDiagnostics(error?: AxiosError): Promise<void> {
 
   let socketReachable = 'No';
   try {
-    const response = await fetch(`${ENV.API_URL}/socket.io/?EIO=4&transport=polling`, { signal: AbortSignal.timeout(3000) });
+    const response = await fetchWithTimeout(`${ENV.API_URL}/socket.io/?EIO=4&transport=polling`, 15000);
     socketReachable = `Yes (HTTP ${response.status})`;
   } catch (e: any) {
     socketReachable = `No (${e.message || e})`;

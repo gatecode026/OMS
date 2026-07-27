@@ -21,24 +21,43 @@ export const NetworkProvider: React.FC<NetworkProviderProps> = ({ children }) =>
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Configure NetInfo to use HTTPS for reachability checks to prevent Android cleartext HTTP blocks
+    NetInfo.configure({
+      reachabilityUrl: 'https://clients3.google.com/generate_204',
+      reachabilityTest: async (response) => response.status === 204 || response.status === 200,
+      reachabilityLongTimeout: 30000,
+      reachabilityShortTimeout: 10000,
+      reachabilityRequestTimeout: 15000,
+    });
+
     // 1. Seed query client memory cache with local offline file-system cache
     fileCacheService.loadAllIntoCache(queryClient);
 
     // 2. Load persisted queue on mount
     loadQueue();
 
-    // 3. Subscribe to network status changes
+    // 3. Fetch initial network state & subscribe to changes
+    NetInfo.fetch().then((state) => {
+      const isConnected = state.isConnected !== false;
+      const isInternetReachable = state.isInternetReachable !== false;
+      setConnectionStatus(isConnected, isInternetReachable);
+      if (isConnected) {
+        queryClient.invalidateQueries();
+      }
+    });
+
     const unsubscribe = NetInfo.addEventListener((state) => {
-      // Allow proper offline testing even in development/debug mode
       const isConnected = state.isConnected !== false;
       const isInternetReachable = state.isInternetReachable !== false;
 
       setConnectionStatus(isConnected, isInternetReachable);
 
-      // Trigger synchronization when transition is offline -> online
-      if (isConnected && wasOffline.current) {
-        console.log('[NetworkProvider]: Network restored, initiating sync...');
-        syncManager.sync();
+      // Trigger synchronization and refetch queries when network is online
+      if (isConnected) {
+        if (wasOffline.current) {
+          console.log('[NetworkProvider]: Network restored, initiating sync...');
+          syncManager.sync();
+        }
         queryClient.invalidateQueries();
       }
 

@@ -133,7 +133,14 @@ const PinnedMessageCard = ({ msg, conversation, currentUser, onUnpin, onNavigate
       <div className="pinned-card-footer">
         <Pin size={11} className="pin-footer-icon" />
         <span>
-          Pinned on {formatDate(msg.pinnedTimestamp)} at {formatTime(msg.pinnedTimestamp)}
+          Pinned by {(() => {
+            const isId = msg.pinnedByName && (msg.pinnedByName.startsWith('COMP-') || msg.pinnedByName.startsWith('EMP-') || msg.pinnedByName === msg.pinnedBy);
+            if (!isId && msg.pinnedByName) return msg.pinnedByName;
+            const p = conversation?.participants?.find(part => part.employeeId === msg.pinnedBy || part.id === msg.pinnedBy);
+            if (p?.name) return p.name;
+            if (msg.pinnedBy === currentUser?.id) return 'You';
+            return msg.pinnedByName || 'User';
+          })()} on {formatDate(msg.pinnedTimestamp)} at {formatTime(msg.pinnedTimestamp)}
         </span>
       </div>
     </div>

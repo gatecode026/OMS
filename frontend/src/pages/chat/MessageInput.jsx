@@ -52,6 +52,13 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
 
+  // Mention feature states
+  const [showMentionPopover, setShowMentionPopover] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionStartPos, setMentionStartPos] = useState(0);
+  const mentionPopoverRef = useRef(null);
+
   const fileInputRef = useRef(null);
   const docInputRef = useRef(null);
   const mediaInputRef = useRef(null);
@@ -125,6 +132,10 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
           !plusMenuRef.current.contains(e.target) && 
           !e.target.closest('.plus-trigger-btn')) {
         setShowPlusMenu(false);
+      }
+      if (mentionPopoverRef.current && 
+          !mentionPopoverRef.current.contains(e.target)) {
+        setShowMentionPopover(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -207,10 +218,95 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
     }, 10);
   };
 
+  // Mention candidates from group participants
+  const mentionCandidates = React.useMemo(() => {
+    const list = conv?.participants || [];
+    const candidates = list.map(p => ({
+      id: p.employeeId || p.id,
+      name: p.name || 'User',
+      avatar: p.avatar,
+      isAdmin: p.isAdmin
+    }));
+
+    if (conv?.type === 'group' && candidates.length > 0) {
+      candidates.unshift({
+        id: 'all',
+        name: 'all',
+        displayName: 'all (Notify everyone)',
+        isAll: true
+      });
+    }
+
+    return candidates;
+  }, [conv]);
+
+  const filteredMentionCandidates = React.useMemo(() => {
+    if (!mentionQuery) return mentionCandidates;
+    const q = mentionQuery.toLowerCase();
+    return mentionCandidates.filter(c => 
+      c.name.toLowerCase().includes(q) || 
+      (c.id && String(c.id).toLowerCase().includes(q))
+    );
+  }, [mentionCandidates, mentionQuery]);
+
+  const checkForMention = (text, cursorPos) => {
+    const textBeforeCursor = text.slice(0, cursorPos);
+    const lastAtPos = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtPos !== -1) {
+      const charBefore = lastAtPos > 0 ? textBeforeCursor[lastAtPos - 1] : ' ';
+      if (/\s/.test(charBefore) || lastAtPos === 0) {
+        const query = textBeforeCursor.slice(lastAtPos + 1);
+        if (!/\s/.test(query) && query.length <= 25) {
+          setMentionQuery(query);
+          setMentionStartPos(lastAtPos);
+          setMentionIndex(0);
+          setShowMentionPopover(true);
+          return;
+        }
+      }
+    }
+    setShowMentionPopover(false);
+  };
+
+  const selectMentionCandidate = (candidate) => {
+    const ta = textareaRef.current;
+    const cursorPos = ta?.selectionStart ?? message.length;
+    const beforeAt = message.slice(0, mentionStartPos);
+    const afterCursor = message.slice(cursorPos);
+
+    const insertedText = `@${candidate.name} `;
+    const newMsg = beforeAt + insertedText + afterCursor;
+    setMessage(newMsg);
+    setShowMentionPopover(false);
+
+    setTimeout(() => {
+      if (ta) {
+        ta.focus();
+        const newPos = mentionStartPos + insertedText.length;
+        ta.setSelectionRange(newPos, newPos);
+        resizeTextarea();
+      }
+    }, 10);
+  };
+
+  // Auto-scroll mention popover container to keep highlighted item in view
+  useEffect(() => {
+    if (showMentionPopover && mentionPopoverRef.current) {
+      const activeEl = mentionPopoverRef.current.querySelector(`.mention-item-${mentionIndex}`);
+      if (activeEl) {
+        activeEl.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [mentionIndex, showMentionPopover]);
+
   const handleChange = (e) => {
     const val = e.target.value;
+    const cursorPos = e.target.selectionStart;
     setMessage(val);
     resizeTextarea();
+
+    checkForMention(val, cursorPos);
 
     if (!val.trim()) {
       stopTypingState();
@@ -304,6 +400,29 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
   }, [message, queue, isUploading, onSend, stopTypingState, clearQueue, activeConvId]);
 
   const handleKeyDown = (e) => {
+    // 0. Mention popover navigation
+    if (showMentionPopover && filteredMentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex(i => (i + 1) % filteredMentionCandidates.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex(i => (i - 1 + filteredMentionCandidates.length) % filteredMentionCandidates.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        selectMentionCandidate(filteredMentionCandidates[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentionPopover(false);
+        return;
+      }
+    }
     // 1. Check for formatting keyboard shortcuts
     if (e.ctrlKey || e.metaKey) {
       const key = e.key.toLowerCase();
@@ -597,25 +716,11 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
                       className="plus-action-item"
                       type="button"
                       onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('open-create-poll')); }}
-                      disabled={!canCreatePollOrTask}
-                      title={!canCreatePollOrTask ? "Only group admins or management (managers) can create polls" : ""}
-                      style={!canCreatePollOrTask ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                     >
                       <div className="plus-icon-circle" style={{ backgroundColor: '#eab308' }}><BarChart2 size={16} /></div>
-                      Poll {!canCreatePollOrTask && '🔒'}
+                      Poll
                     </button>
                   )}
-                  <button
-                    className="plus-action-item"
-                    type="button"
-                    onClick={() => { setShowPlusMenu(false); window.dispatchEvent(new CustomEvent('create-task-from-message', { detail: {} })); }}
-                    disabled={!canCreatePollOrTask}
-                    title={!canCreatePollOrTask ? "Only group admins or management (managers) can assign tasks" : ""}
-                    style={!canCreatePollOrTask ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-                  >
-                    <div className="plus-icon-circle" style={{ backgroundColor: '#10b981' }}><CheckSquare size={16} /></div>
-                    Assign Task {!canCreatePollOrTask && '🔒'}
-                  </button>
                   <button className="plus-action-item" type="button" onClick={() => { setShowPlusMenu(false); alert('Create Event simulation.'); }}>
                     <div className="plus-icon-circle" style={{ backgroundColor: '#e11d48' }}><Calendar size={16} /></div>
                     Event
@@ -675,14 +780,22 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
               {showEmojiPicker && (
                 <div style={{
                   position: 'absolute',
-                  bottom: '52px',
+                  bottom: '54px',
                   left: '0',
                   zIndex: 1000,
                   borderRadius: '12px',
-                  overflow: 'hidden',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-                  border: '1px solid var(--border-color, #e2e8f0)'
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  maxHeight: 'calc(100vh - 120px)'
                 }}>
+                  <style>{`
+                    em-emoji-picker {
+                      --height: 340px !important;
+                      height: 340px !important;
+                      max-height: calc(100vh - 130px) !important;
+                      border-radius: 12px;
+                    }
+                  `}</style>
                   <Picker
                     data={data}
                     onEmojiSelect={handleEmojiSelect}
@@ -772,6 +885,81 @@ const MessageInput = ({ activeConvId, onSend, onTypingStart, onTypingStop }) => 
                 </div>
               )}
             </div>
+
+            {/* ── Mention Autocomplete Popover ───────────────────────────── */}
+            {showMentionPopover && filteredMentionCandidates.length > 0 && (
+              <div 
+                ref={mentionPopoverRef}
+                className="msg-mention-popover animate-slide-up"
+                style={{
+                  position: 'absolute',
+                  bottom: 'calc(100% + 8px)',
+                  left: '10px',
+                  width: '280px',
+                  maxHeight: '220px',
+                  overflowY: 'auto',
+                  backgroundColor: 'var(--bg-card, #ffffff)',
+                  border: '1px solid var(--chat-border, #e2e8f0)',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+                  zIndex: 1020,
+                  padding: '6px'
+                }}
+              >
+                <div style={{ padding: '4px 8px 6px', fontSize: '11px', fontWeight: '700', color: 'var(--text-muted, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--chat-border, #f1f5f9)' }}>
+                  Mention Members
+                </div>
+                <div style={{ marginTop: '4px' }}>
+                  {filteredMentionCandidates.map((c, idx) => {
+                    const isSelected = idx === mentionIndex;
+                    return (
+                      <div
+                        key={c.id}
+                        className={`msg-mention-candidate-item mention-item-${idx}`}
+                        onClick={() => selectMentionCandidate(c)}
+                        onMouseEnter={() => setMentionIndex(idx)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          padding: '8px 10px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          backgroundColor: isSelected ? 'var(--chat-active-bg, #eef2ff)' : 'transparent',
+                          color: isSelected ? 'var(--chat-primary, #6366f1)' : 'var(--text-primary, #0f172a)',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {c.isAll ? (
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--chat-primary, #6366f1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>
+                            @
+                          </div>
+                        ) : c.avatar ? (
+                          <img src={c.avatar} alt={c.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '600', fontSize: '12px' }}>
+                            {c.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: '600', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              @{c.displayName || c.name}
+                            </span>
+                            {c.isAdmin && (
+                              <span style={{ fontSize: '10px', background: '#f59e0b', color: '#fff', padding: '1px 5px', borderRadius: '4px', fontWeight: '700' }}>
+                                Admin
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {isPreviewMode ? (
               <div className="msg-input-preview-wrap" style={{ flex: 1, minHeight: '38px', boxSizing: 'border-box' }}>

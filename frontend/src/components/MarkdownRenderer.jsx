@@ -64,10 +64,13 @@ const MarkdownRenderer = ({ content, className = '' }) => {
       ALLOWED_ATTR: ['class', 'href', 'target', 'rel', 'data-code', 'disabled', 'checked', 'type']
     });
 
-    // Post-process task lists: Replace [ ] and [x] in list items
+    // Post-process task lists & mentions
     const processedHtml = sanitizedHtml
       .replace(/<li>\[ \]\s*/g, '<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled /> ')
-      .replace(/<li>\[x\]\s*/gi, '<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked disabled /> ');
+      .replace(/<li>\[x\]\s*/gi, '<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked disabled /> ')
+      .replace(/(^|\s)(@[A-Za-z0-9_.\-]+(?:\s+[A-Za-z0-9_.\-]+)?)/g, (match, prefix, mention) => {
+        return `${prefix}<span class="msg-mention-tag">${mention}</span>`;
+      });
 
     return processedHtml;
   }, [content]);

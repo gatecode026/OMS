@@ -31,7 +31,20 @@ export const corsOptions = {
     }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'x-tenant-id',
+    'X-Tenant-Id',
+    'x-device-id',
+    'x-app-version',
+    'x-timezone',
+    'x-language',
+    'x-platform',
+    'x-action-description',
+  ],
   credentials: true,
   optionsSuccessStatus: 200,
 };

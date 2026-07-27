@@ -807,16 +807,92 @@ mark.search-highlight, .search-highlight {
 }
 
 .msg-bubble-own {
-  background: var(--chat-own-bg);
-  color: var(--chat-own-text);
+  background: var(--chat-own-bg, var(--chat-primary, #6366f1));
+  color: #ffffff !important;
   border-radius: var(--chat-radius) var(--chat-radius) 4px var(--chat-radius);
 }
 
+.msg-bubble-own,
+.msg-bubble-own .msg-text,
+.msg-bubble-own .msg-markdown-content,
+.msg-bubble-own .markdown-renderer,
+.msg-bubble-own .markdown-renderer p,
+.msg-bubble-own .markdown-renderer span,
+.msg-bubble-own .markdown-renderer li,
+.msg-bubble-own .markdown-renderer strong,
+.msg-bubble-own .markdown-renderer em,
+.msg-bubble-own .markdown-renderer h1,
+.msg-bubble-own .markdown-renderer h2,
+.msg-bubble-own .markdown-renderer h3,
+.msg-bubble-own .markdown-renderer h4 {
+  color: #ffffff !important;
+}
+
+.msg-bubble-own .msg-time {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
 .msg-bubble-other {
-  background: var(--chat-other-bg);
-  color: var(--chat-other-text);
-  border: 1px solid var(--chat-border);
+  background: var(--chat-other-bg, var(--bg-card, #ffffff));
+  color: var(--chat-other-text, var(--text-primary, #0f172a));
+  border: 1px solid var(--chat-border, #e2e8f0);
   border-radius: var(--chat-radius) var(--chat-radius) var(--chat-radius) 4px;
+}
+
+.msg-bubble-other .msg-text,
+.msg-bubble-other .msg-markdown-content,
+.msg-bubble-other .markdown-renderer,
+.msg-bubble-other .markdown-renderer p,
+.msg-bubble-other .markdown-renderer span,
+.msg-bubble-other .markdown-renderer li,
+.msg-bubble-other .markdown-renderer strong,
+.msg-bubble-other .markdown-renderer em,
+.msg-bubble-other .markdown-renderer h1,
+.msg-bubble-other .markdown-renderer h2,
+.msg-bubble-other .markdown-renderer h3,
+.msg-bubble-other .markdown-renderer h4 {
+  color: var(--chat-other-text, var(--text-primary, #0f172a)) !important;
+}
+
+.msg-bubble-other .msg-time {
+  color: var(--text-muted, #64748b) !important;
+}
+
+:root.dark-theme .msg-bubble-other,
+.dark-mode .msg-bubble-other,
+[data-theme="dark"] .msg-bubble-other,
+body.dark .msg-bubble-other {
+  background: var(--bg-card, #1e293b) !important;
+  color: #f8fafc !important;
+  border-color: var(--border-color, rgba(255, 255, 255, 0.12)) !important;
+}
+
+:root.dark-theme .msg-bubble-other .msg-text,
+:root.dark-theme .msg-bubble-other .msg-markdown-content,
+:root.dark-theme .msg-bubble-other .markdown-renderer,
+:root.dark-theme .msg-bubble-other .markdown-renderer p,
+:root.dark-theme .msg-bubble-other .markdown-renderer span,
+:root.dark-theme .msg-bubble-other .markdown-renderer li,
+:root.dark-theme .msg-bubble-other .markdown-renderer strong,
+:root.dark-theme .msg-bubble-other .markdown-renderer em,
+:root.dark-theme .msg-bubble-other .markdown-renderer h1,
+:root.dark-theme .msg-bubble-other .markdown-renderer h2,
+:root.dark-theme .msg-bubble-other .markdown-renderer h3,
+:root.dark-theme .msg-bubble-other .markdown-renderer h4,
+.dark-mode .msg-bubble-other .msg-text,
+.dark-mode .msg-bubble-other .markdown-renderer p,
+[data-theme="dark"] .msg-bubble-other .msg-text,
+[data-theme="dark"] .msg-bubble-other .markdown-renderer p,
+body.dark .msg-bubble-other .msg-text,
+body.dark .msg-bubble-other .markdown-renderer p {
+  color: #f8fafc !important;
+}
+
+:root.dark-theme .msg-bubble-other .msg-time,
+.dark-mode .msg-bubble-other .msg-time,
+[data-theme="dark"] .msg-bubble-other .msg-time,
+body.dark .msg-bubble-other .msg-time {
+  color: #94a3b8 !important;
 }
 
 .msg-bubble-deleted {
@@ -1096,17 +1172,77 @@ mark.search-highlight, .search-highlight {
 
 .msg-emoji-picker-popup {
   position: absolute;
-  top: calc(100% + 8px);
+  bottom: calc(100% + 8px);
   left: 0;
-  z-index: 100;
-  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0,0,0,.25);
   border-radius: 16px;
-  overflow: hidden;
 }
 
 .msg-emoji-picker-own {
   left: auto;
   right: 0;
+}
+
+/* Reaction Badges & Tooltip */
+.msg-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  z-index: 5;
+}
+
+.msg-reaction-badge-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.msg-reaction-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--chat-border, #cbd5e1);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.15s ease;
+  color: var(--text-primary, #0f172a);
+}
+
+.msg-reaction-badge:hover {
+  background: var(--chat-hover, #f1f5f9);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.msg-reaction-badge-wrap .msg-reaction-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  background: #1e293b;
+  color: #ffffff !important;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  pointer-events: none;
+  z-index: 1000;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.msg-reaction-badge-wrap:hover .msg-reaction-tooltip {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(-6px);
 }
 
 /* Delete menu */
@@ -1672,36 +1808,132 @@ mark.search-highlight, .search-highlight {
   transition: all 0.25s ease;
 }
 
-/* Other person's bubble (light theme) */
-:root.light-theme .msg-bubble-other.msg-bubble-pinned {
-  background-color: #eef2ff !important; /* indigo-50 */
-  border: 1px solid rgba(99, 102, 241, 0.4) !important;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
-  color: #1e293b !important;
+/* Light Theme Pinned Messages (Own & Other) */
+:root.light-theme .msg-bubble.msg-bubble-pinned {
+  background-color: #eef2ff !important; /* light indigo-50 */
+  border: 1.5px solid #6366f1 !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
 }
 
-/* Other person's bubble (dark theme - default) */
-.msg-bubble-other.msg-bubble-pinned {
-  background-color: #1e1b4b !important; /* dark indigo */
-  border: 1px solid rgba(165, 180, 252, 0.5) !important;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
-  color: #e0e7ff !important;
+:root.light-theme .msg-bubble.msg-bubble-pinned,
+:root.light-theme .msg-bubble.msg-bubble-pinned .msg-text,
+:root.light-theme .msg-bubble.msg-bubble-pinned .msg-markdown-content,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer p,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer span,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer li,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer strong,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer em,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer h1,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer h2,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer h3,
+:root.light-theme .msg-bubble.msg-bubble-pinned .markdown-renderer h4 {
+  color: #0f172a !important; /* Crisp dark slate for high contrast */
 }
 
-/* Own bubble (light theme) */
-:root.light-theme .msg-bubble-own.msg-bubble-pinned {
-  background-color: #eef2ff !important; /* indigo-50 */
+:root.light-theme .msg-bubble.msg-bubble-pinned .msg-time {
+  color: #475569 !important;
+}
+
+:root.light-theme .msg-bubble.msg-bubble-pinned .msg-pin-icon {
+  color: #d946ef !important;
+}
+
+/* Dark Theme Pinned Messages (Own & Other) */
+.msg-bubble.msg-bubble-pinned {
+  background-color: #1e1b4b !important; /* Dark indigo */
   border: 1.5px solid #818cf8 !important;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
-  color: #1e293b !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
 }
 
-/* Own bubble (dark theme - default) */
-.msg-bubble-own.msg-bubble-pinned {
-  background-color: #1e1b4b !important; /* dark indigo */
-  border: 1.5px solid #a5b4fc !important;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
-  color: #e0e7ff !important;
+.msg-bubble.msg-bubble-pinned,
+.msg-bubble.msg-bubble-pinned .msg-text,
+.msg-bubble.msg-bubble-pinned .msg-markdown-content,
+.msg-bubble.msg-bubble-pinned .markdown-renderer,
+.msg-bubble.msg-bubble-pinned .markdown-renderer p,
+.msg-bubble.msg-bubble-pinned .markdown-renderer span,
+.msg-bubble.msg-bubble-pinned .markdown-renderer li,
+.msg-bubble.msg-bubble-pinned .markdown-renderer strong,
+.msg-bubble.msg-bubble-pinned .markdown-renderer em,
+.msg-bubble.msg-bubble-pinned .markdown-renderer h1,
+.msg-bubble.msg-bubble-pinned .markdown-renderer h2,
+.msg-bubble.msg-bubble-pinned .markdown-renderer h3,
+.msg-bubble.msg-bubble-pinned .markdown-renderer h4 {
+  color: #f8fafc !important; /* Bright text */
+}
+
+.msg-bubble.msg-bubble-pinned .msg-time {
+  color: #cbd5e1 !important;
+}
+
+.msg-bubble.msg-bubble-pinned .msg-pin-icon {
+  color: #e879f9 !important;
+}
+
+.msg-mention-tag {
+  display: inline-flex;
+  align-items: center;
+  background-color: rgba(99, 102, 241, 0.15);
+  color: var(--chat-primary, #6366f1);
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin: 0 2px;
+  font-size: 0.95em;
+}
+
+:root.light-theme .msg-bubble-own .msg-mention-tag {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #ffffff !important;
+}
+
+.msg-bubble-own .msg-mention-tag {
+  background-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff !important;
+}
+
+/* ── System Message Bubble Styling ────────────────────────────── */
+.msg-system-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 14px 0;
+  width: 100%;
+}
+
+.msg-system-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--chat-hover, #f1f5f9);
+  border: 1px solid var(--chat-border, #cbd5e1);
+  color: var(--text-secondary, #475569);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+:root.light-theme .msg-system-pill {
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+:root.dark-theme .msg-system-pill {
+  background-color: rgba(30, 41, 59, 0.8);
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+.msg-system-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.msg-system-text {
+  font-weight: 600;
 }
 
 /* ── Icon Highlighting Contrast Overrides ──────────────────────── */

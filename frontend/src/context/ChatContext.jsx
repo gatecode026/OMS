@@ -905,26 +905,94 @@ export const ChatProvider = ({ children }) => {
 
   // ── ADD MEMBERS TO GROUP ──────────────────────────────────────────────────
   const addMembersToGroup = useCallback(async (conversationId, memberIds) => {
-    const data = await apiFetch(`/chat/conversations/${conversationId}/members`, {
-      method: 'POST',
-      body: JSON.stringify({ memberIds })
-    });
-    if (data.status === 'success') {
-      return data.data;
+    try {
+      const data = await apiFetch(`/chat/conversations/${conversationId}/members`, {
+        method: 'POST',
+        body: JSON.stringify({ memberIds })
+      });
+      if (data.status === 'success') {
+        const updatedConv = data.data?.conversation;
+        if (updatedConv && updatedConv.participants) {
+          setConversations(prev => prev.map(c => {
+            if (c.id === conversationId) {
+              return { ...c, participants: updatedConv.participants };
+            }
+            return c;
+          }));
+        } else {
+          fetchConversations();
+        }
+
+        // Fetch messages to immediately pull server system message
+        fetchMessages(conversationId);
+        return data.data;
+      }
+      throw new Error(data.message || 'Failed to add members');
+    } catch (err) {
+      fetchConversations();
+      throw err;
     }
-    throw new Error(data.message || 'Failed to add members');
-  }, [apiFetch]);
+  }, [apiFetch, fetchConversations, fetchMessages]);
 
   // ── REMOVE MEMBER FROM GROUP ──────────────────────────────────────────────
   const removeMemberFromGroup = useCallback(async (conversationId, memberId) => {
-    const data = await apiFetch(`/chat/conversations/${conversationId}/members/${memberId}`, {
-      method: 'DELETE'
-    });
-    if (data.status === 'success') {
-      return data.data;
+    // Find target name before removing
+    const currentConv = conversations.find(c => c.id === conversationId);
+    const targetMember = currentConv?.participants?.find(p => p.employeeId === memberId || p.id === memberId);
+    const targetName = targetMember?.name || 'a member';
+    const currentUserName = currentUser?.name || 'Admin';
+
+    // Instant optimistic update for group members list
+    setConversations(prev => prev.map(c => {
+      if (c.id === conversationId) {
+        return {
+          ...c,
+          participants: (c.participants || []).filter(p => p.employeeId !== memberId && p.id !== memberId)
+        };
+      }
+      return c;
+    }));
+
+    // Optimistically insert system message into chat timeline
+    const sysMsgId = `sys_${Date.now()}`;
+    const sysMsg = {
+      id: sysMsgId,
+      conversationId,
+      senderId: 'system',
+      senderName: 'System',
+      content: `${currentUserName} removed ${targetName}`,
+      type: 'system',
+      createdAt: new Date().toISOString()
+    };
+
+    setMessages(prev => ({
+      ...prev,
+      [conversationId]: [...(prev[conversationId] || []).filter(m => m.id !== sysMsgId), sysMsg]
+    }));
+
+    try {
+      const data = await apiFetch(`/chat/conversations/${conversationId}/members/${memberId}`, {
+        method: 'DELETE'
+      });
+      if (data.status === 'success') {
+        const updatedConv = data.data?.conversation;
+        if (updatedConv && updatedConv.participants) {
+          setConversations(prev => prev.map(c => {
+            if (c.id === conversationId) {
+              return { ...c, participants: updatedConv.participants };
+            }
+            return c;
+          }));
+        }
+        fetchMessages(conversationId);
+        return data.data;
+      }
+      throw new Error(data.message || 'Failed to remove member');
+    } catch (err) {
+      fetchConversations();
+      throw err;
     }
-    throw new Error(data.message || 'Failed to remove member');
-  }, [apiFetch]);
+  }, [apiFetch, fetchConversations, fetchMessages, conversations, currentUser]);
 
   // ── LEAVE GROUP ───────────────────────────────────────────────────────────
   const leaveGroup = useCallback((conversationId) => {
@@ -1047,12 +1115,86 @@ export const ChatProvider = ({ children }) => {
 
   // ── PIN / UNPIN MESSAGE ───────────────────────────────────────────────────
   const pinMessage = useCallback((messageId, convId) => {
+    if (!messageId || !convId) return;
+
+    let newlyPinnedCard = null;
+
+    setMessages(prev => {
+      const convMsgs = prev[convId] || [];
+      const updatedMsgs = convMsgs.map(msg => {
+        if (msg.id === messageId) {
+          const updated = {
+            ...msg,
+            isPinned: true,
+            pinnedBy: currentUserRef.current?.id,
+            pinnedByName: currentUserRef.current?.name || 'You',
+            pinnedAt: new Date().toISOString()
+          };
+          newlyPinnedCard = {
+            messageId: msg.id,
+            senderId: msg.senderId,
+            senderName: msg.senderName,
+            senderAvatar: msg.senderAvatar,
+            messageType: msg.type,
+            text: msg.content,
+            attachment: msg.media || null,
+            originalTimestamp: msg.createdAt,
+            pinnedBy: currentUserRef.current?.id,
+            pinnedByName: currentUserRef.current?.name || 'You',
+            pinnedTimestamp: new Date().toISOString(),
+            isPinned: true
+          };
+          return updated;
+        }
+        return msg;
+      });
+      return { ...prev, [convId]: updatedMsgs };
+    });
+
+    if (newlyPinnedCard) {
+      setPinnedMessages(prev => {
+        const exists = prev.some(m => m.messageId === messageId);
+        if (exists) return prev;
+        return [newlyPinnedCard, ...prev];
+      });
+      setTotalPinned(prev => prev + 1);
+    }
+
     socketRef.current?.emit('pin_message', { messageId, conversationId: convId });
-  }, []);
+
+    apiFetch(`/chat/conversations/${convId}/messages/${messageId}/pin`, {
+      method: 'POST'
+    }).catch(err => {
+      console.warn('[ChatContext] API pinMessage fallback error:', err);
+    });
+  }, [apiFetch]);
 
   const unpinMessage = useCallback((messageId, convId) => {
+    if (!messageId || !convId) return;
+
+    setMessages(prev => {
+      const convMsgs = prev[convId] || [];
+      return {
+        ...prev,
+        [convId]: convMsgs.map(msg =>
+          msg.id === messageId
+            ? { ...msg, isPinned: false, pinnedBy: null, pinnedByName: null, pinnedAt: null }
+            : msg
+        )
+      };
+    });
+
+    setPinnedMessages(prev => prev.filter(m => m.messageId !== messageId));
+    setTotalPinned(prev => Math.max(0, prev - 1));
+
     socketRef.current?.emit('unpin_message', { messageId, conversationId: convId });
-  }, []);
+
+    apiFetch(`/chat/conversations/${convId}/messages/${messageId}/pin`, {
+      method: 'DELETE'
+    }).catch(err => {
+      console.warn('[ChatContext] API unpinMessage fallback error:', err);
+    });
+  }, [apiFetch]);
 
   const loadPinnedMessages = useCallback(async (convId, params = {}) => {
     if (!convId) return;
@@ -2408,6 +2550,13 @@ export const ChatProvider = ({ children }) => {
       }));
     });
 
+    // ── In-App Notifications ─────────────────────────────────────────────
+    socket.on('notification', (notif) => {
+      if (notif?.message && addToastRef.current) {
+        addToastRef.current('info', notif.message);
+      }
+    });
+
     // ── Group Socket Events ───────────────────────────────────────────────
     socket.on('new_conversation', (conversation) => {
       setConversations(prev => {
@@ -2424,6 +2573,18 @@ export const ChatProvider = ({ children }) => {
         }
         return c;
       }));
+    });
+
+    socket.on('new_conversation', (newConv) => {
+      if (!newConv || !newConv.id) return;
+      setConversations(prev => {
+        const exists = prev.some(c => c.id === newConv.id);
+        if (exists) {
+          return prev.map(c => c.id === newConv.id ? { ...c, ...newConv } : c);
+        }
+        return [newConv, ...prev];
+      });
+      socketRef.current?.emit('join_conversation', { conversationId: newConv.id });
     });
 
     socket.on('member_added', ({ conversationId, participants }) => {
@@ -2505,14 +2666,14 @@ export const ChatProvider = ({ children }) => {
     });
 
     // ── Pin / Unpin Message ────────────────────────────────────────────────
-    socket.on('message_pinned', ({ messageId, conversationId, pinnedBy, pinnedAt }) => {
+    socket.on('message_pinned', ({ messageId, conversationId, pinnedBy, pinnedByName, pinnedAt }) => {
       setMessages(prev => {
         const convMsgs = prev[conversationId] || [];
         return {
           ...prev,
           [conversationId]: convMsgs.map(msg =>
             msg.id === messageId
-              ? { ...msg, isPinned: true, pinnedBy, pinnedAt }
+              ? { ...msg, isPinned: true, pinnedBy, pinnedByName, pinnedAt }
               : msg
           )
         };

@@ -561,33 +561,6 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
           >
             Call Logs
           </button>
-          <button
-            onClick={() => setActiveTab('threads')}
-            style={{
-              flex: 1,
-              padding: '8px 0',
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === 'threads' ? '2.5px solid var(--chat-primary, #6366f1)' : '2.5px solid transparent',
-              color: activeTab === 'threads' ? 'var(--chat-primary, #6366f1)' : 'var(--text-secondary, #64748b)',
-              fontWeight: '600',
-              fontSize: '14px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              textAlign: 'center',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px'
-            }}
-          >
-            Threads
-            {Object.values(threadUnreadCounts || {}).reduce((a, b) => a + b, 0) > 0 && (
-              <span className="conv-list-total-badge" style={{ padding: '1px 5px', fontSize: '9.5px', background: '#ef4444' }}>
-                {Object.values(threadUnreadCounts || {}).reduce((a, b) => a + b, 0)}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Search */}
@@ -1123,59 +1096,61 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
                     </div>
                   </div>
 
-                  {/* Quick Call Action Buttons */}
-                  <div style={{ display: 'flex', gap: '8px', marginLeft: '12px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    {/* Voice Call Redial */}
-                    <button
-                      onClick={(e) => handleRedial(e, { id: otherId, name: otherName, avatar: otherAvatar }, 'audio')}
-                      disabled={callState !== 'idle'}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: '6px',
-                        borderRadius: '50%',
-                        cursor: callState !== 'idle' ? 'not-allowed' : 'pointer',
-                        color: 'var(--text-muted, #64748b)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'background 0.2s, color 0.2s'
-                      }}
-                      onMouseEnter={e => { if (callState === 'idle') { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'; e.currentTarget.style.color = 'var(--chat-primary, #6366f1)'; } }}
-                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted, #64748b)'; }}
-                      title="Voice Call"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
-                      </svg>
-                    </button>
+                  {/* Quick Call Action Buttons (Hidden if user is blocked) */}
+                  {!(blockedUsers?.includes(otherId) || blockedByUsers?.includes(otherId)) && (
+                    <div style={{ display: 'flex', gap: '8px', marginLeft: '12px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      {/* Voice Call Redial */}
+                      <button
+                        onClick={(e) => handleRedial(e, { id: otherId, name: otherName, avatar: otherAvatar }, 'audio')}
+                        disabled={callState !== 'idle'}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: '6px',
+                          borderRadius: '50%',
+                          cursor: callState !== 'idle' ? 'not-allowed' : 'pointer',
+                          color: 'var(--text-muted, #64748b)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'background 0.2s, color 0.2s'
+                        }}
+                        onMouseEnter={e => { if (callState === 'idle') { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'; e.currentTarget.style.color = 'var(--chat-primary, #6366f1)'; } }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted, #64748b)'; }}
+                        title="Voice Call"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                        </svg>
+                      </button>
 
-                    {/* Video Call Redial */}
-                    <button
-                      onClick={(e) => handleRedial(e, { id: otherId, name: otherName, avatar: otherAvatar }, 'video')}
-                      disabled={callState !== 'idle'}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: '6px',
-                        borderRadius: '50%',
-                        cursor: callState !== 'idle' ? 'not-allowed' : 'pointer',
-                        color: 'var(--text-muted, #64748b)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'background 0.2s, color 0.2s'
-                      }}
-                      onMouseEnter={e => { if (callState === 'idle') { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'; e.currentTarget.style.color = 'var(--chat-primary, #6366f1)'; } }}
-                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted, #64748b)'; }}
-                      title="Video Call"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <polygon points="23 7 16 12 23 17 23 7"/>
-                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                      </svg>
-                    </button>
-                  </div>
+                      {/* Video Call Redial */}
+                      <button
+                        onClick={(e) => handleRedial(e, { id: otherId, name: otherName, avatar: otherAvatar }, 'video')}
+                        disabled={callState !== 'idle'}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: '6px',
+                          borderRadius: '50%',
+                          cursor: callState !== 'idle' ? 'not-allowed' : 'pointer',
+                          color: 'var(--text-muted, #64748b)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'background 0.2s, color 0.2s'
+                        }}
+                        onMouseEnter={e => { if (callState === 'idle') { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'; e.currentTarget.style.color = 'var(--chat-primary, #6366f1)'; } }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-muted, #64748b)'; }}
+                        title="Video Call"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polygon points="23 7 16 12 23 17 23 7"/>
+                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })

@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, StyleProp } from 'react-native';
 import { Image } from 'expo-image';
 import useTheme from '../hooks/useTheme';
+import ENV from '../../config/env';
 
 export interface AvatarProps {
   source?: string;
@@ -45,8 +46,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image/')) {
       return clean;
     }
-    const apiEnv = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000';
-    const baseUrl = apiEnv.replace(/\/+$/, '').replace(/\/api\/v1\/?$/, '');
+    const baseUrl = ENV.API_URL.replace(/\/+$/, '').replace(/\/api\/v1\/?$/, '');
     const cleanPath = clean.startsWith('/') ? clean : `/${clean}`;
     return `${baseUrl}${cleanPath}`;
   };

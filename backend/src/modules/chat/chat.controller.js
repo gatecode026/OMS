@@ -352,11 +352,35 @@ export const addMembers = asyncHandler(async (req, res) => {
 
       members.forEach(m => {
         io.to(`user:${m.id}`).emit('new_conversation', result.conversation);
+        io.to(`user:${m.id}`).emit('notification', {
+          type: 'group_added',
+          category: 'group',
+          title: 'Added to Group',
+          message: `${req.user?.name || 'An admin'} added you to "${result.conversation?.name || 'group'}"`,
+          conversationId
+        });
         io.in(`user:${m.id}`).socketsJoin(`conv:${conversationId}`);
       });
     }
+
+    // Save in-app notification records in DB
+    const notifDocs = members.map(m => ({
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      companyId,
+      userId: m.id,
+      type: 'group_added',
+      category: 'group',
+      title: 'Added to Group',
+      message: `${req.user?.name || 'An admin'} added you to "${result.conversation?.name || 'group'}"`,
+      link: `/chat?conv=${conversationId}`,
+      read: false,
+      createdAt: new Date()
+    }));
+    if (notifDocs.length > 0) {
+      await conn.collection('notifications').insertMany(notifDocs);
+    }
   } catch (socketErr) {
-    // handle socket error
+    logger.error('[Chat] Error sending member added notifications:', socketErr);
   }
 
   return successResponse(res, result, 'Members added');

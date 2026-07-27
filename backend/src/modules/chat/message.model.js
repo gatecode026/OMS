@@ -127,6 +127,7 @@ const messageSchema = new mongoose.Schema({
   // Pinning (WhatsApp style)
   isPinned: { type: Boolean, default: false },
   pinnedBy: { type: String, default: null },
+  pinnedByName: { type: String, default: null },
   pinnedAt: { type: Date, default: null },
 
   // Forwarding (WhatsApp style)

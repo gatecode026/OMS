@@ -156,17 +156,21 @@ self.addEventListener('notificationclick', function (event) {
 
         console.log('[Service Worker] Sending background call rejection for callId:', callId);
 
-        // Broadcast STOP_SOUND to all open window clients immediately
+        // Broadcast REJECT_CALL and STOP_SOUND to all open window clients immediately
         try {
           const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
           clients.forEach(client => {
+            client.postMessage({
+              type: 'REJECT_CALL',
+              callId: callId
+            });
             client.postMessage({
               type: 'STOP_SOUND',
               callId: callId
             });
           });
         } catch (err) {
-          console.error('[Service Worker] Failed to post STOP_SOUND to clients:', err);
+          console.error('[Service Worker] Failed to post REJECT_CALL to clients:', err);
         }
 
         try {

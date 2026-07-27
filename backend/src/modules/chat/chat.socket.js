@@ -1745,12 +1745,13 @@ export const registerChatSocketHandlers = (io) => {
       try {
         if (!messageId || !conversationId) return;
         await runTrackedWrite(() =>
-          chatService.pinMessage(messageId, userId, companyId),
+          chatService.pinMessage(messageId, userId, name, companyId),
         );
         io.to(`conv:${conversationId}`).emit("message_pinned", {
           messageId,
           conversationId,
           pinnedBy: userId,
+          pinnedByName: name,
           pinnedAt: new Date(),
         });
       } catch (err) {

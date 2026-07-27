@@ -940,10 +940,13 @@ export const addGroupMembers = async (
     if (!conv || conv.type !== "group") throw new Error("Group not found");
 
     const adminParticipant = conv.participants.find(
-      (p) => p.employeeId === adminId,
+      (p) => p.employeeId?.toString() === adminId?.toString() || p.id?.toString() === adminId?.toString(),
     );
-    if (!adminParticipant?.isAdmin)
-      throw new Error("Only admins can add members");
+    const isUserAdmin = adminParticipant?.isAdmin || conv.canAddMembers !== false;
+    if (!isUserAdmin)
+      throw new Error("Only admins can add members to this group");
+
+    const adderName = adminParticipant?.name || "An admin";
 
     const validNewMembers = [];
     const addedNames = [];
@@ -976,11 +979,11 @@ export const addGroupMembers = async (
     // Create a single batched system message
     let content = "";
     if (addedNames.length === 1) {
-      content = `${adminParticipant.name} added ${addedNames[0]}`;
+      content = `${adderName} added ${addedNames[0]}`;
     } else if (addedNames.length === 2) {
-      content = `${adminParticipant.name} added ${addedNames[0]} and ${addedNames[1]}`;
+      content = `${adderName} added ${addedNames[0]} and ${addedNames[1]}`;
     } else {
-      content = `${adminParticipant.name} added ${addedNames[0]}, ${addedNames[1]} and ${addedNames.length - 2} others`;
+      content = `${adderName} added ${addedNames[0]}, ${addedNames[1]} and ${addedNames.length - 2} others`;
     }
 
     const msgId = new mongoose.Types.ObjectId().toString();
@@ -1007,8 +1010,9 @@ export const addGroupMembers = async (
         conversationId,
         senderId: "system",
         senderName: "System",
-        preview: sysMsg.content,
+        content: sysMsg.content,
         type: "system",
+        systemMeta: sysMsg.systemMeta,
         createdAt: sysMsg.createdAt,
         _isOptimized: true,
       });
@@ -1042,9 +1046,10 @@ export const removeGroupMember = async (
     let adminParticipant = null;
     if (!isSelf) {
       adminParticipant = conv.participants.find(
-        (p) => p.employeeId === adminId,
+        (p) => p.employeeId?.toString() === adminId?.toString() || p.id?.toString() === adminId?.toString(),
       );
-      if (!adminParticipant?.isAdmin)
+      const isUserAdmin = adminParticipant?.isAdmin || conv.canAddMembers !== false;
+      if (!isUserAdmin)
         throw new Error("Only admins can remove members");
     }
 
@@ -1057,38 +1062,37 @@ export const removeGroupMember = async (
     let autoPromotedMsg = null;
     let autoPromotedMemberId = null;
 
-    if (target.isAdmin) {
-      const admins = conv.participants.filter((p) => p.isAdmin);
-      if (admins.length === 1) {
-        const otherParticipants = conv.participants.filter(
-          (p) => p.employeeId !== targetEmployeeId,
+    const admins = conv.participants.filter((p) => p.isAdmin);
+    if (admins.length === 1) {
+      const otherParticipants = conv.participants.filter(
+        (p) => p.employeeId !== targetEmployeeId,
+      );
+      if (otherParticipants.length > 0) {
+        // Sort by joinedAt ascending to find the longest standing member
+        otherParticipants.sort(
+          (a, b) => new Date(a.joinedAt) - new Date(b.joinedAt),
         );
-        if (otherParticipants.length > 0) {
-          // Sort by joinedAt ascending to find the longest standing member
-          otherParticipants.sort(
-            (a, b) => new Date(a.joinedAt) - new Date(b.joinedAt),
-          );
-          const longestStanding = otherParticipants[0];
-          autoPromotedMemberId = longestStanding.employeeId;
+        const longestStanding = otherParticipants[0];
+        autoPromotedMemberId = longestStanding.employeeId;
 
-          // Promote them in DB
-          await Conversation.findOneAndUpdate(
-            {
-              id: conversationId,
-              "participants.employeeId": longestStanding.employeeId,
-            },
-            { $set: { "participants.$.isAdmin": true } },
-          );
+        // Promote them in DB
+        await Conversation.findOneAndUpdate(
+          {
+            id: conversationId,
+            "participants.employeeId": longestStanding.employeeId,
+          },
+          { $set: { "participants.$.isAdmin": true } },
+        );
 
-          autoPromotedMsg = `${longestStanding.name} has been promoted to Admin (auto-promoted)`;
-        }
+        autoPromotedMsg = `${longestStanding.name} has been promoted to Admin (auto-promoted)`;
       }
     }
 
     const action = isSelf ? "member_left" : "member_removed";
+    const removerName = adminParticipant?.name || "Admin";
     const content = isSelf
       ? `${target.name} left the group`
-      : `${adminParticipant ? adminParticipant.name : "Admin"} removed ${target.name}`;
+      : `${removerName} removed ${target.name}`;
 
     // Pull member out
     const updatedConv = await Conversation.findOneAndUpdate(
@@ -1122,8 +1126,9 @@ export const removeGroupMember = async (
         conversationId,
         senderId: "system",
         senderName: "System",
-        preview: sysMsg.content,
+        content: sysMsg.content,
         type: "system",
+        systemMeta: sysMsg.systemMeta,
         createdAt: sysMsg.createdAt,
         _isOptimized: true,
       });
@@ -1377,13 +1382,17 @@ export const unpinConversation = async (
 /**
  * Pin a message in a conversation
  */
-export const pinMessage = async (messageId, employeeId, companyId) => {
+export const pinMessage = async (messageId, employeeId, employeeName, companyId) => {
   return runWithTenant(companyId, async () => {
-    return await Message.findOneAndUpdate(
+    const updatedMsg = await Message.findOneAndUpdate(
       { id: messageId },
-      { isPinned: true, pinnedBy: employeeId, pinnedAt: new Date() },
+      { isPinned: true, pinnedBy: employeeId, pinnedByName: employeeName, pinnedAt: new Date() },
       { new: true },
     );
+    if (updatedMsg) {
+      cacheDel(CacheKeys.convMsgs(companyId, updatedMsg.conversationId)).catch(() => {});
+    }
+    return updatedMsg;
   });
 };
 
@@ -1392,11 +1401,15 @@ export const pinMessage = async (messageId, employeeId, companyId) => {
  */
 export const unpinMessage = async (messageId, companyId) => {
   return runWithTenant(companyId, async () => {
-    return await Message.findOneAndUpdate(
+    const updatedMsg = await Message.findOneAndUpdate(
       { id: messageId },
-      { isPinned: false, pinnedBy: null, pinnedAt: null },
+      { isPinned: false, pinnedBy: null, pinnedByName: null, pinnedAt: null },
       { new: true },
     );
+    if (updatedMsg) {
+      cacheDel(CacheKeys.convMsgs(companyId, updatedMsg.conversationId)).catch(() => {});
+    }
+    return updatedMsg;
   });
 };
 

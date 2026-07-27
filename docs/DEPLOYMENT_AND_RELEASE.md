@@ -19,8 +19,11 @@ The mobile app utilizes **Expo Application Services (EAS)** for native iOS (`.ip
 
 ### Execution Commands
 ```bash
-# Build Android Development APK
+# Build Android Development APK (local dev)
 eas build --profile development --platform android
+
+# Build Android Testing/Ad-Hoc APK (points to Render Backend)
+eas build --profile preview --platform android
 
 # Build Production Android Bundle (.aab)
 eas build --profile production --platform android

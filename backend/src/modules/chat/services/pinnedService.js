@@ -17,8 +17,10 @@ export const getPinnedMessages = async (conversationId, employeeId, companyId, q
     // 1. Verify membership and active conversation status
     const conv = await Conversation.findOne({
       id: conversationId,
-      'participants.employeeId': employeeId,
-      isActive: true
+      $or: [
+        { 'participants.employeeId': employeeId },
+        { 'participants.id': employeeId }
+      ]
     });
     if (!conv) {
       throw new Error('Conversation not found or access denied');
@@ -91,19 +93,37 @@ export const getPinnedMessages = async (conversationId, employeeId, companyId, q
       Message.countDocuments(query)
     ]);
 
+    // Create participant lookup map for pinner name resolution
+    const participantNameMap = new Map();
+    (conv.participants || []).forEach(p => {
+      if (p.name) {
+        participantNameMap.set(p.employeeId?.toString(), p.name);
+        if (p.id) participantNameMap.set(p.id?.toString(), p.name);
+      }
+    });
+
     // Format output
-    const formattedMessages = messages.map(msg => ({
-      messageId: msg.id,
-      senderId: msg.senderId,
-      senderName: msg.senderName,
-      senderAvatar: msg.senderAvatar,
-      messageType: msg.type,
-      text: msg.content,
-      attachment: msg.media || null,
-      originalTimestamp: msg.createdAt,
-      pinnedTimestamp: msg.pinnedAt,
-      isPinned: msg.isPinned
-    }));
+    const formattedMessages = messages.map(msg => {
+      const isIdString = msg.pinnedByName && (msg.pinnedByName.startsWith('COMP-') || msg.pinnedByName.startsWith('EMP-') || msg.pinnedByName === msg.pinnedBy);
+      const resolvedPinnerName = (!isIdString && msg.pinnedByName)
+        ? msg.pinnedByName
+        : (participantNameMap.get(msg.pinnedBy?.toString()) || msg.pinnedByName || 'User');
+
+      return {
+        messageId: msg.id,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        senderAvatar: msg.senderAvatar,
+        messageType: msg.type,
+        text: msg.content,
+        attachment: msg.media || null,
+        originalTimestamp: msg.createdAt,
+        pinnedBy: msg.pinnedBy,
+        pinnedByName: resolvedPinnerName,
+        pinnedTimestamp: msg.pinnedAt,
+        isPinned: msg.isPinned
+      };
+    });
 
     const totalPages = Math.ceil(totalPinned / limit);
 

@@ -136,20 +136,8 @@ export const createPoll = async (pollData, creator, companyId) => {
       const hydratedMessage = message.toObject();
       hydratedMessage.pollId = poll.toObject();
 
-      io.to(`conv:${conversationId}`).emit('message:new', {
-        id: msgId,
-        conversationId,
-        senderId: creator.id,
-        senderName: creator.name,
-        senderAvatar: creator.avatar,
-        preview: `📊 Poll: ${question.trim()}`,
-        type: 'poll',
-        createdAt: message.createdAt,
-        pollId: poll.toObject(),
-        threadId: message.threadId,
-        isThreadReply: message.isThreadReply
-      });
-
+      // Emit new_message so ChatContext adds the message immediately in real-time
+      io.to(`conv:${conversationId}`).emit('new_message', hydratedMessage);
       io.to(`conv:${conversationId}`).emit('message:new', hydratedMessage);
       io.to(`conv:${conversationId}`).emit('poll:created', poll);
 
