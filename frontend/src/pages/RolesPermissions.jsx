@@ -1127,9 +1127,6 @@ const RolesPermissions = () => {
           <button className={`tab-btn ${activeTab === 'matrix' ? 'active' : ''}`} onClick={() => setActiveTab('matrix')}>
             <Key size={16} /> Permissions Matrix
           </button>
-          <button className={`tab-btn ${activeTab === 'user_access' ? 'active' : ''}`} onClick={() => setActiveTab('user_access')}>
-            <Lock size={16} /> User Access
-          </button>
           <button className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}>
             <Database size={16} /> Audit Logs
           </button>
@@ -1813,90 +1810,7 @@ const RolesPermissions = () => {
         </div>
       )}
 
-      {/* User Access Tab */}
-      {activeTab === 'user_access' && (
-        <div className="flex-column gap-4">
-          {/* User access header & quick restrict */}
-          <div className="rp-filter-bar card p-4 flex-between gap-4 flex-wrap">
-            <div className="flex-center gap-3 flex-wrap flex-grow-1">
-              <div className="flex-center gap-2">
-                <Search size={16} className="text-muted" />
-                <input
-                  type="text"
-                  placeholder="Search user access overrides..."
-                  value={userAccessSearch}
-                  onChange={(e) => setUserAccessSearch(e.target.value)}
-                  className="table-search-input"
-                  style={{ minWidth: 280 }}
-                />
-              </div>
-            </div>
 
-            <div className="flex-center gap-2">
-              <Button variant="primary" onClick={() => setShowRestrictModal(true)} icon={ShieldAlert}>
-                Add User Access Override
-              </Button>
-            </div>
-          </div>
-
-          {/* User Overrides Grid */}
-          <div className="user-override-grid">
-            {filteredUserOverrides.map((ov) => {
-              const initials = ov.userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-              const isDenial = ov.scope.includes('Restricted') || ov.type.includes('Denial');
-              return (
-                <div key={ov.id} className="user-override-card card flex-column gap-3">
-                  <div className="flex-between">
-                    <div className="flex-center gap-2">
-                      <Avatar name={ov.userName} size="md" />
-                      <div>
-                        <h4 className="font-semibold text-primary">{ov.userName}</h4>
-                        <span className="text-xs text-muted">{ov.userId}</span>
-                      </div>
-                    </div>
-                    <Badge variant={isDenial ? 'danger' : 'success'}>
-                      {ov.type}
-                    </Badge>
-                  </div>
-
-                  <div className="border-bottom pb-2">
-                    <div className="text-xs text-muteduppercase tracking-wide">Target Module</div>
-                    <div className="font-semibold text-sm">{ov.module}</div>
-                  </div>
-
-                  <div className="flex-between text-xs">
-                    <div>
-                      <span className="text-muted">Scope:</span> <strong className={isDenial ? 'text-danger' : 'text-success'}>{ov.scope}</strong>
-                    </div>
-                    <div>
-                      <span className="text-muted">Expires:</span> <span className="font-semibold">{ov.expiry}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex-center justify-end gap-2 pt-2 border-top">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveOverride(ov.id, ov.userName)}
-                      icon={Trash2}
-                    >
-                      Revoke Override
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-            {filteredUserOverrides.length === 0 && (
-              <div className="card p-6 flex-column flex-center text-center">
-                <Lock size={48} className="text-muted mb-2" />
-                <h4 className="font-semibold text-primary">No user overrides found</h4>
-                <p className="text-xs text-muted">All active employees inherit roles permissions directly. Use override to grant/deny modules access.</p>
-              </div>
-            )}
-        </div>
-      )}
 
       {/* Audit Logs Tab */}
       {activeTab === 'audit' && (
