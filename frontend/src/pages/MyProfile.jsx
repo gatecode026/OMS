@@ -63,7 +63,8 @@ const ProfileHeroCard = ({ user }) => {
         reader.onerror = (error) => reject(error);
       });
 
-      const uploadRes = await fetch(`/api/v1/chat/imagekit/upload`, {
+      const baseUrl = window.API_URL || '';
+      const uploadRes = await fetch(`${baseUrl}/api/v1/chat/imagekit/upload`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -88,7 +89,7 @@ const ProfileHeroCard = ({ user }) => {
       const imageUrl = uploadResult.data.url;
 
       // Use the dedicated self-service avatar endpoint — bypasses permission matrix
-      const res = await fetch(`/api/v1/employees/${user.id}/avatar`, {
+      const res = await fetch(`${baseUrl}/api/v1/employees/${user.id}/avatar`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

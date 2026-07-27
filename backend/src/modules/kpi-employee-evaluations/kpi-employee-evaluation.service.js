@@ -13,8 +13,18 @@ import activityLogRepository from '../activity-logs/activity-logs.repository.js'
 import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
 import { createNotification } from '../notifications/notifications.service.js';
 
-export const findAllEvaluations = async (query) => {
+export const findAllEvaluations = async (query = {}) => {
   logger.info('Executing KpiEmployeeEvaluationService::findAllEvaluations');
+  if (query.employeeId) {
+    const mongoQuery = {
+      $or: [
+        { employeeId: query.employeeId },
+        { employeeCode: query.employeeId }
+      ]
+    };
+    if (query.cycleId) mongoQuery.cycleId = query.cycleId;
+    return repository.find(mongoQuery);
+  }
   return repository.find(query);
 };
 
