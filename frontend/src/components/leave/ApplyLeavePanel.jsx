@@ -13,6 +13,30 @@ const LEAVE_TYPES = [
   { code: 'Other',     label: 'Other',            Icon: MdAssignment },
 ];
 
+const sanitizeYearInput = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    let [year, month, day] = parts;
+    if (year.length > 4) {
+      year = year.slice(0, 4);
+      return `${year}-${month}-${day}`;
+    }
+  }
+  return dateStr;
+};
+
+const isValidYYYY = (dateStr) => {
+  if (!dateStr) return true;
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const yrStr = parts[0];
+    const yr = parseInt(yrStr, 10);
+    return yrStr.length === 4 && yr >= 1900 && yr <= 2099;
+  }
+  return true;
+};
+
 const diffWorkingDays = (from, to, holidays = []) => {
   if (!from || !to) return 0;
   if (from === to) return 1;
@@ -125,8 +149,10 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
     setError('');
     if (!form.type || !form.type.trim()) { setError('Please select Leave Type.'); return; }
     if (form.type === 'custom' && (!customType || !customType.trim())) { setError('Please specify custom Leave Type.'); return; }
-    if (!form.from || !form.to) { setError('Please select From and To dates.'); return; }
-    if (days <= 0) { setError('Date range has 0 working days. Please adjust.'); return; }
+    if (!isValidYYYY(form.from) || !isValidYYYY(form.to)) {
+      setError('Invalid year format. Please enter a valid 4-digit year (YYYY).');
+      return;
+    }
 
     const today = new Date().toISOString().split('T')[0];
     if (form.from < today) {
@@ -274,8 +300,9 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
                 type="date"
                 value={form.from}
                 min={new Date().toISOString().split('T')[0]}
+                max="2099-12-31"
                 onChange={e => {
-                  const val = e.target.value;
+                  const val = sanitizeYearInput(e.target.value);
                   setForm(p => {
                     const next = { ...p, from: val };
                     if (p.to && p.to < val) {
@@ -296,7 +323,11 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
                 value={form.to}
                 disabled={!form.from}
                 min={form.from}
-                onChange={e => setForm(p => ({ ...p, to: e.target.value }))}
+                max="2099-12-31"
+                onChange={e => {
+                  const val = sanitizeYearInput(e.target.value);
+                  setForm(p => ({ ...p, to: val }));
+                }}
                 style={{
                   ...inputStyle,
                   opacity: form.from ? 1 : 0.6,

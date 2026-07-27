@@ -4,6 +4,30 @@ import { useApp } from '../../../context/AppContext';
 import { BsCalendar2Date, BsInfoCircle } from 'react-icons/bs';
 import { IoSendSharp } from 'react-icons/io5';
 
+const sanitizeYearInput = (dateStr) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    let [year, month, day] = parts;
+    if (year.length > 4) {
+      year = year.slice(0, 4);
+      return `${year}-${month}-${day}`;
+    }
+  }
+  return dateStr;
+};
+
+const isValidYYYY = (dateStr) => {
+  if (!dateStr) return true;
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const yrStr = parts[0];
+    const yr = parseInt(yrStr, 10);
+    return yrStr.length === 4 && yr >= 1900 && yr <= 2099;
+  }
+  return true;
+};
+
 const getWorkingDaysDiff = (start, end, holidays = []) => {
   if (!start || !end) return 0;
   if (start === end) return 1;
@@ -75,6 +99,11 @@ const ApplyLeaveModal = ({
 
     if (!type.trim() || !startDate || !endDate) {
       addToast('error', 'Please fill in all required fields.');
+      return;
+    }
+
+    if (!isValidYYYY(startDate) || !isValidYYYY(endDate)) {
+      addToast('error', 'Invalid year format. Please enter a valid 4-digit year (YYYY).');
       return;
     }
 
@@ -216,7 +245,7 @@ const ApplyLeaveModal = ({
               type="date"
               value={startDate}
               onChange={(e) => {
-                const val = e.target.value;
+                const val = sanitizeYearInput(e.target.value);
                 setStartDate(val);
                 if (endDate && endDate < val) {
                   setEndDate('');
@@ -224,6 +253,7 @@ const ApplyLeaveModal = ({
               }}
               required
               min={new Date().toISOString().split('T')[0]}
+              max="2099-12-31"
               style={inputStyle}
               onFocus={(e) => e.target.style.borderColor = 'var(--color-primary, #d946ef)'}
               onBlur={(e) => e.target.style.borderColor = '#282F3E'}
@@ -236,10 +266,14 @@ const ApplyLeaveModal = ({
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                const val = sanitizeYearInput(e.target.value);
+                setEndDate(val);
+              }}
               required
               disabled={!startDate}
               min={startDate}
+              max="2099-12-31"
               style={{
                 ...inputStyle,
                 opacity: startDate ? 1 : 0.6,
