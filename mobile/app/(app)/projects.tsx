@@ -24,6 +24,8 @@ import dayjs from 'dayjs';
 
 import useTheme from '../../src/shared/hooks/useTheme';
 import { useProjects } from '../../src/features/projects/hooks/useProjectsData';
+import { useQueryClient } from '@tanstack/react-query';
+import profileApi from '../../src/features/profile/api/profileApi';
 import DonutChart from '../../src/features/projects/components/DonutChart';
 import { Avatar } from '../../src/shared/components/Avatar';
 import { toast } from '../../src/shared/components';
@@ -35,9 +37,11 @@ const { width } = Dimensions.get('window');
 const ITEMS_PER_PAGE = 6;
 
 export default function MyProjectsScreen() {
-  const { colors, spacing, radius, typography, shadows, isDark, setThemeMode } = useTheme();
+  const { colors, spacing, radius, shadows, typography, isDark, setThemeMode } = useTheme();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [refreshing, setRefreshing] = useState(false);
   const user = useAuthStore((s) => s.user);
 
   // API query hook
@@ -101,11 +105,20 @@ export default function MyProjectsScreen() {
 
   // Handle refresh callback
   const handleRefresh = async () => {
+    setRefreshing(true);
     try {
-      await refetch();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['projects'] }),
+        profileApi.fetchProfile(),
+        refetch(),
+      ]);
       toast.success('Projects refreshed successfully!');
     } catch {
       toast.error('Failed to reload projects.');
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
     }
   };
 
@@ -195,7 +208,14 @@ export default function MyProjectsScreen() {
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isLoading || isRefetching} onRefresh={handleRefresh} tintColor={colors.primary} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* ─── PROJECT SUMMARY GRADIENT CARD ─── */}
         <View style={[styles.gradientCardWrapper, shadows.medium]}>

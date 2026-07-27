@@ -10,7 +10,9 @@ import Conversation from './conversation.repository.js';
 import Message from './message.repository.js';
 import { generateCompanyUniqueId } from '../../utils/idGenerator.js';
 import { runWithTenant } from '../../utils/tenantContext.js';
+import { getTenantConnection } from '../../utils/multidbConnection.js';
 import { getIO } from '../../config/socket.js';
+import redis from '../../config/redis.js';
 import { uploadToImageKit, deleteFromImageKit, uploadToImageKitDetailed, deleteFileFromImageKitById } from '../../utils/imagekit.js';
 import logger from '../../config/logger.js';
 import * as readReceiptService from './services/readReceipt.service.js';
@@ -210,13 +212,14 @@ export const createGroupConversation = async (
  * Helper to enrich conversation with user-specific unread counts and dynamic last message
  */
 const enrichConversationForUser = async (conv, employeeId) => {
-  const participant = conv.participants.find(
-    (p) => p.employeeId === employeeId,
+  const targetIdStr = String(employeeId || '');
+  const participant = conv.participants?.find(
+    (p) => String(p.employeeId || p.userId || p.id || p._id || '') === targetIdStr,
   );
   const lastReadAt = participant?.lastReadAt || new Date(0);
 
   const deleteEntry = conv.deletedBy?.find(
-    (d) => d.userId?.toString() === employeeId?.toString(),
+    (d) => String(d.userId || d.employeeId || '') === targetIdStr,
   );
   const minCreatedAt = deleteEntry ? deleteEntry.deletedAt : new Date(0);
   const unreadAfter = new Date(
@@ -224,7 +227,7 @@ const enrichConversationForUser = async (conv, employeeId) => {
   );
 
   const unreadCount = await readReceiptService.getUnreadCount(
-    employeeId,
+    targetIdStr,
     conv.id,
     unreadAfter,
     conv.companyId,
@@ -322,6 +325,54 @@ export const getUserConversations = async (
           }
           return true;
         });
+
+        // Dynamic single-source-of-truth profile hydration for all participants
+        const participantIds = new Set();
+        activeConversations.forEach((conv) => {
+          conv.participants?.forEach((p) => {
+            const pId = p.employeeId || p.userId || p.id || p._id;
+            if (pId) participantIds.add(String(pId));
+          });
+        });
+
+        if (participantIds.size > 0) {
+          try {
+            const conn = await getTenantConnection(companyId);
+            const employees = await conn.collection('employees').find(
+              { id: { $in: Array.from(participantIds) } },
+              { projection: { id: 1, name: 1, avatar: 1, photoUrl: 1, designation: 1, department: 1 } }
+            ).toArray();
+
+            const empMap = new Map();
+            employees.forEach((e) => {
+              empMap.set(String(e.id), e);
+            });
+
+            activeConversations.forEach((conv) => {
+              if (Array.isArray(conv.participants)) {
+                conv.participants = conv.participants.map((p) => {
+                  const pId = String(p.employeeId || p.userId || p.id || p._id || '');
+                  const emp = empMap.get(pId);
+                  if (emp) {
+                    const freshAvatar = emp.avatar || emp.photoUrl || null;
+                    return {
+                      ...p,
+                      name: emp.name || p.name,
+                      avatar: freshAvatar,
+                      avatarUrl: freshAvatar,
+                      photoUrl: freshAvatar,
+                      designation: emp.designation || p.designation,
+                      department: emp.department || p.department,
+                    };
+                  }
+                  return p;
+                });
+              }
+            });
+          } catch (hydrErr) {
+            logger.error('[getUserConversations] Dynamic profile hydration error:', hydrErr);
+          }
+        }
 
         // Add unread count and compute dynamic lastMessage for each conversation
         const convsWithUnread = await Promise.all(
@@ -663,8 +714,20 @@ export const markAsRead = async (
   employeeName,
   companyId,
 ) => {
-  return runWithTenant(companyId, async () => {
+  if (redis.isAvailable) {
+    const unreadKey = `unread:${employeeId}:${conversationId}`;
+    await redis.set(unreadKey, 0).catch(() => {});
+  }
+
+  const result = await runWithTenant(companyId, async () => {
     const now = new Date();
+
+    // Find latest visible message in conversation to persist lastReadMessageId
+    const latestMsg = await Message.findOne(
+      { conversationId, isDeleted: false },
+      { sort: { createdAt: -1 } }
+    );
+    const lastReadMessageId = latestMsg?.id || null;
 
     // Add readBy to all unread messages in this conversation
     await Message.updateMany(
@@ -681,21 +744,77 @@ export const markAsRead = async (
       },
     );
 
-    // Update participant's lastReadAt
-    await Conversation.findOneAndUpdate(
-      {
-        id: conversationId,
-        "participants.employeeId": employeeId,
-      },
-      {
-        $set: {
-          "participants.$.lastReadAt": now,
-        },
-      },
+    // Update participant's lastReadAt AND lastReadMessageId
+    const updateFields = { "participants.$[elem].lastReadAt": now };
+    if (lastReadMessageId) {
+      updateFields["participants.$[elem].lastReadMessageId"] = lastReadMessageId;
+    }
+
+    await Conversation.updateOne(
+      { id: conversationId },
+      { $set: updateFields },
+      // Participant subdocs are keyed by employeeId (see conversation.model.js).
+      // Referencing non-schema paths (userId/id) throws a Mongoose
+      // "Could not find path participants.N.userId in schema" strict-mode error.
+      { arrayFilters: [{ "elem.employeeId": employeeId }] }
     );
 
-    return { success: true, readAt: now };
+    return { success: true, readAt: now, lastReadMessageId };
   });
+
+  cacheDel(CacheKeys.sidebar(companyId, employeeId)).catch(() => {});
+  cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
+  return result;
+};
+
+/**
+ * Mark a conversation as UNREAD for a user (manual "mark as unread").
+ * Unread is derived from getUnreadCount, which excludes messages the user has a
+ * readBy entry on. So we (1) drop the user's readBy from the latest incoming
+ * message, (2) rewind the participant's lastReadAt to just before it, and
+ * (3) invalidate the redis unread key + sidebar cache so counts recompute.
+ */
+export const markAsUnread = async (conversationId, employeeId, companyId) => {
+  const result = await runWithTenant(companyId, async () => {
+    const latestIncoming = await Message.findOne(
+      { conversationId, isDeleted: false, senderId: { $ne: employeeId } },
+      { sort: { createdAt: -1 } },
+    );
+
+    // Nothing from anyone else → nothing to mark unread.
+    if (!latestIncoming) {
+      return { success: true, unreadCount: 0 };
+    }
+
+    // Remove this user's read receipt so the message is counted as unread.
+    await Message.updateOne(
+      { id: latestIncoming.id },
+      { $pull: { readBy: { employeeId } } },
+    );
+
+    // Rewind lastReadAt to just before that message.
+    const unreadFrom = new Date(new Date(latestIncoming.createdAt).getTime() - 1);
+    await Conversation.updateOne(
+      { id: conversationId },
+      {
+        $set: {
+          "participants.$[elem].lastReadAt": unreadFrom,
+          "participants.$[elem].lastReadMessageId": null,
+        },
+      },
+      { arrayFilters: [{ "elem.employeeId": employeeId }] },
+    );
+
+    return { success: true, readAt: unreadFrom };
+  });
+
+  // Invalidate cached unread count so getUnreadCount recomputes from Mongo.
+  if (redis.isAvailable) {
+    await redis.del(`unread:${employeeId}:${conversationId}`).catch(() => {});
+  }
+  cacheDel(CacheKeys.sidebar(companyId, employeeId)).catch(() => {});
+  cacheDelPattern(CacheKeys.sidebar(companyId, "*")).catch(() => {});
+  return result;
 };
 
 /**
@@ -854,6 +973,19 @@ export const addReaction = async (
       },
     );
 
+    return { success: true };
+  });
+};
+
+/**
+ * Remove reaction from message
+ */
+export const removeReaction = async (messageId, employeeId, companyId) => {
+  return runWithTenant(companyId, async () => {
+    await Message.findOneAndUpdate(
+      { id: messageId },
+      { $pull: { reactions: { employeeId } } },
+    );
     return { success: true };
   });
 };
@@ -1367,6 +1499,45 @@ export const unpinConversation = async (
     return await Conversation.findOneAndUpdate(
       { id: conversationId },
       { $pull: { pinnedBy: { employeeId } } },
+      { new: true },
+    );
+  });
+  cacheDel(CacheKeys.sidebar(companyId, employeeId)).catch(() => {});
+  return result;
+};
+
+/**
+ * Mute a conversation for a specific employee
+ */
+export const muteConversation = async (
+  conversationId,
+  employeeId,
+  companyId,
+  mutedUntil = null,
+) => {
+  const result = await runWithTenant(companyId, async () => {
+    return await Conversation.findOneAndUpdate(
+      { id: conversationId },
+      { $addToSet: { mutedBy: { employeeId, mutedUntil } } },
+      { new: true },
+    );
+  });
+  cacheDel(CacheKeys.sidebar(companyId, employeeId)).catch(() => {});
+  return result;
+};
+
+/**
+ * Unmute a conversation for a specific employee
+ */
+export const unmuteConversation = async (
+  conversationId,
+  employeeId,
+  companyId,
+) => {
+  const result = await runWithTenant(companyId, async () => {
+    return await Conversation.findOneAndUpdate(
+      { id: conversationId },
+      { $pull: { mutedBy: { employeeId } } },
       { new: true },
     );
   });

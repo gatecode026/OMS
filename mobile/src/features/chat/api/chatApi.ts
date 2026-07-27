@@ -46,6 +46,15 @@ export const chatApi = {
   },
 
   /**
+   * Send a text/media message to a conversation via REST API (fallback if socket disconnected).
+   */
+  async sendMessage(payload: { conversationId: string; content?: string; type?: string; media?: any; isForwarded?: boolean; originalSenderName?: string }): Promise<ChatMessage> {
+    const response = await apiClient.post(`/api/v1/chat/conversations/${payload.conversationId}/messages`, payload);
+    const data = response.data?.data || response.data;
+    return normalizeId(data) as ChatMessage;
+  },
+
+  /**
    * Start a direct chat with another employee.
    */
   async startDirectChat(targetEmployeeId: string): Promise<ChatConversation> {
@@ -77,11 +86,17 @@ export const chatApi = {
   },
 
   /**
-   * Fetch call history.
+   * Fetch call history with enterprise fallback.
    */
   async fetchCallHistory(): Promise<CallLog[]> {
-    const response = await apiClient.get('/api/v1/chat/calls/history');
-    return response.data?.data || response.data || [];
+    try {
+      const response = await apiClient.get('/api/v1/chat/calls/history');
+      const raw: any[] = response.data?.data || (Array.isArray(response.data) ? response.data : []);
+      return raw.map(normalizeId) as CallLog[];
+    } catch (err: any) {
+      console.warn('[chatApi] Error fetching call history:', err?.message || err);
+      return [];
+    }
   },
 
   /**

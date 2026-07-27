@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import useTheme from '../../../src/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { Avatar, Badge, Tag, Skeleton, LoadingState, ErrorState } from '../../../src/shared/components';
@@ -226,6 +227,7 @@ const WheelPickerItem = ({
 export default function MyWorkScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { colors, spacing, radius, typography, shadows, isDark, setThemeMode } = useTheme();
   const user = useAuthStore((state) => state.user);
   const { data: unreadCount = 0 } = useNotificationsUnreadCount();
@@ -311,8 +313,19 @@ export default function MyWorkScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['my-tasks'] }),
+        queryClient.invalidateQueries({ queryKey: ['projects'] }),
+        refetch(),
+      ]);
+    } catch (err) {
+      console.warn('[WorkScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
+    }
   };
 
   // Filter and Search Logic
@@ -572,6 +585,62 @@ export default function MyWorkScreen() {
                 </View>
               </View>
             </Animated.View>
+
+            {/* ── ENTERPRISE WORKSPACE HUB ── */}
+            <View style={styles.enterpriseHubSection}>
+              <Text style={[styles.enterpriseHubTitle, { color: colors.text, fontFamily: typography.fonts.semibold }]}>
+                ENTERPRISE MODULES
+              </Text>
+              <View style={styles.enterpriseGrid}>
+                <Pressable
+                  style={[styles.hubTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => router.push('/announcements' as any)}
+                >
+                  <Ionicons name="megaphone-outline" size={22} color="#3B82F6" />
+                  <Text style={[styles.hubTileText, { color: colors.text }]}>Announcements</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.hubTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => router.push('/departments' as any)}
+                >
+                  <Ionicons name="business-outline" size={22} color="#8B5CF6" />
+                  <Text style={[styles.hubTileText, { color: colors.text }]}>Departments</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.hubTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => router.push('/work-reports' as any)}
+                >
+                  <Ionicons name="document-text-outline" size={22} color="#10B981" />
+                  <Text style={[styles.hubTileText, { color: colors.text }]}>Work Reports</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.hubTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => router.push('/performance' as any)}
+                >
+                  <Ionicons name="trophy-outline" size={22} color="#F59E0B" />
+                  <Text style={[styles.hubTileText, { color: colors.text }]}>Performance</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.hubTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => router.push('/documents' as any)}
+                >
+                  <Ionicons name="folder-open-outline" size={22} color="#EC4899" />
+                  <Text style={[styles.hubTileText, { color: colors.text }]}>Documents</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.hubTile, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => router.push('/activity-logs' as any)}
+                >
+                  <Ionicons name="shield-checkmark-outline" size={22} color="#6366F1" />
+                  <Text style={[styles.hubTileText, { color: colors.text }]}>Audit Logs</Text>
+                </Pressable>
+              </View>
+            </View>
 
             {/* ── FILTER CHIPS ── */}
             <ScrollView
@@ -1346,5 +1415,34 @@ const styles = StyleSheet.create({
   },
   actionRowBtnText: {
     fontSize: 15,
+  },
+  enterpriseHubSection: {
+    paddingHorizontal: 16,
+    marginVertical: 14,
+  },
+  enterpriseHubTitle: {
+    fontSize: 12,
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  enterpriseGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  hubTile: {
+    width: '31%',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hubTileText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 6,
+    textAlign: 'center',
   },
 });

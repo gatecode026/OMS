@@ -14,7 +14,6 @@ export const useNotifications = () => {
     queryFn: () => notificationsApi.fetchNotifications(),
     enabled: isConnected,
     staleTime: 30 * 1000, // 30 seconds stale time
-    refetchInterval: 15 * 1000, // Refetch every 15 seconds to keep lists live
   });
 };
 
@@ -25,7 +24,6 @@ export const useNotificationsUnreadCount = () => {
     queryFn: () => notificationsApi.fetchUnreadCount(),
     enabled: isConnected,
     staleTime: 10 * 1000, // 10 seconds stale time
-    refetchInterval: 10 * 1000, // Poll count every 10 seconds for real-time badge count
   });
 };
 

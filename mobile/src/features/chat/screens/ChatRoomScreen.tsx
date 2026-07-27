@@ -40,7 +40,14 @@ import MessageList from '../components/MessageList';
 import MessageComposer from '../components/MessageComposer';
 import AttachmentMenu from '../components/AttachmentMenu';
 import MessageActionSheet from '../components/MessageActionSheet';
+import MessageInfoModal from '../components/MessageInfoModal';
+import ForwardMessageModal from '../components/ForwardMessageModal';
+import SharedMediaModal from '../components/SharedMediaModal';
 import AttachmentPreviewModal, { PreviewItem } from '../components/AttachmentPreviewModal';
+
+import MessageActionManager from '../services/MessageActionManager';
+import useMessageActionStore from '../stores/useMessageActionStore';
+import useSharedMediaStore from '../stores/useSharedMediaStore';
 
 // Advanced Providers
 import { ChatThemeProvider } from '../components/ChatThemeProvider';
@@ -71,6 +78,17 @@ const ChatRoomScreenInner: React.FC = () => {
 
   const { activeCall, initiateCall } = useCall();
   const { activeSheet, sheetData, openSheet, closeSheet } = useBottomSheetManager();
+
+  const {
+    infoMessage,
+    setInfoMessage,
+    forwardingMessages,
+    setForwardingMessages,
+    isForwardModalOpen,
+    setIsForwardModalOpen,
+  } = useMessageActionStore();
+
+  const { isModalOpen: isSharedMediaOpen, setIsModalOpen: setIsSharedMediaOpen } = useSharedMediaStore();
 
   const wallpaperConfig = useChatSettingsStore(
     useCallback((s) => s.getWallpaper(conversationId || ''), [conversationId])
@@ -152,8 +170,12 @@ const ChatRoomScreenInner: React.FC = () => {
       };
     }
     if (conversation.type === 'direct') {
-      const otherUser = conversation.participants.find((p) => p.employeeId !== authUser?.id);
-      const otherId = otherUser?.employeeId || '';
+      const myId = String(authUser?.id || (authUser as any)?.employeeId || (authUser as any)?._id || '');
+      const otherUser = conversation.participants.find((p) => {
+        const pId = String(p.employeeId || (p as any).id || (p as any)._id || (p as any).userId || '');
+        return pId && pId !== myId;
+      });
+      const otherId = otherUser ? String(otherUser.employeeId || (otherUser as any).id || (otherUser as any)._id || (otherUser as any).userId || '') : '';
       const isBlockedByMe = blockedList.some((b) => b.id === otherId);
       const isBlockedByThem = blockedByList.includes(otherId);
       const isBlocked = isBlockedByMe || isBlockedByThem;
@@ -161,9 +183,10 @@ const ChatRoomScreenInner: React.FC = () => {
       const isOnline = isBlocked ? false : (otherId ? onlineUserIds.has(otherId) : false);
       const presence = isBlocked ? null : (otherId ? statuses[otherId] : null);
       const inCall = !!(activeCall && activeCall.targetUser?.id === otherId && (activeCall.status === 'active' || activeCall.status === 'ringing'));
+      const otherAvatar = otherUser?.avatar || (otherUser as any)?.avatarUrl || (otherUser as any)?.profilePhoto || (otherUser as any)?.photoUrl || null;
       return {
         title: otherUser?.name || 'User',
-        avatar: otherUser?.avatar || null,
+        avatar: otherAvatar,
         otherUser,
         isOnline,
         userStatus: isOnline ? (presence?.status || 'available') : 'offline',
@@ -191,12 +214,35 @@ const ChatRoomScreenInner: React.FC = () => {
     };
   }, [conversation, authUser, onlineUserIds, statuses, chatscreenUsers, activeCall, blockedList, blockedByList]);
 
-  // Sync DB messages with real-time updates (including empty cleared states)
+  // Sync DB messages with real-time updates (preserving pending optimistic uploads/sends)
   useEffect(() => {
     if (dbMessages) {
-      setLocalMessages(dbMessages);
+      setLocalMessages((prevLocal) => {
+        if (!prevLocal || prevLocal.length === 0) return dbMessages;
+        const pendingOptimistic = prevLocal.filter(
+          (m) =>
+            (m.id.startsWith('temp_') || m.tempId) &&
+            !dbMessages.some((dbM) => dbM.id === m.id || (m.tempId && dbM.tempId === m.tempId))
+        );
+        if (pendingOptimistic.length === 0) return dbMessages;
+        const merged = [...dbMessages, ...pendingOptimistic];
+        return merged.sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      });
     }
   }, [dbMessages]);
+
+  // Mark conversation as read whenever entering chat room or receiving new messages
+  useEffect(() => {
+    if (conversationId) {
+      markRead(conversationId);
+      const socket = getSocket();
+      if (socket && socket.connected) {
+        socket.emit('mark_read', { conversationId });
+      }
+    }
+  }, [conversationId, dbMessages?.length]);
 
   // Load draft text on conversation change
   useEffect(() => {
@@ -537,7 +583,12 @@ const ChatRoomScreenInner: React.FC = () => {
   const handleVoiceCallInit = () => {
     if (conversation?.type === 'direct' && chatMeta.otherUser) {
       analytics.trackCallStarted('audio', conversationId || '');
-      initiateCall(chatMeta.otherUser.employeeId, 'audio', conversationId);
+      initiateCall(chatMeta.otherUser.employeeId, 'audio', conversationId, {
+        name: chatMeta.otherUser.name,
+        avatar: chatMeta.otherUser.avatar || undefined,
+        role: (chatMeta.otherUser as any).designation || chatMeta.otherUser.role,
+        department: (chatMeta.otherUser as any).department,
+      });
     } else {
       toast.error('Calls are only available in Direct Chats');
     }
@@ -546,7 +597,12 @@ const ChatRoomScreenInner: React.FC = () => {
   const handleVideoCallInit = () => {
     if (conversation?.type === 'direct' && chatMeta.otherUser) {
       analytics.trackCallStarted('video', conversationId || '');
-      initiateCall(chatMeta.otherUser.employeeId, 'video', conversationId);
+      initiateCall(chatMeta.otherUser.employeeId, 'video', conversationId, {
+        name: chatMeta.otherUser.name,
+        avatar: chatMeta.otherUser.avatar || undefined,
+        role: (chatMeta.otherUser as any).designation || chatMeta.otherUser.role,
+        department: (chatMeta.otherUser as any).department,
+      });
     } else {
       toast.error('Calls are only available in Direct Chats');
     }
@@ -739,6 +795,7 @@ const ChatRoomScreenInner: React.FC = () => {
           }}
           onVoiceCallInit={handleVoiceCallInit}
           onVideoCallInit={handleVideoCallInit}
+          onOpenSharedMedia={() => setIsSharedMediaOpen(true)}
           insets={insets}
         />
       </ChatErrorBoundary>
@@ -820,74 +877,88 @@ const ChatRoomScreenInner: React.FC = () => {
         />
       )}
 
-      {/* Long Press Actions overlays */}
+      {/* Long Press Actions Overlay */}
       <MessageActionSheet
         visible={activeSheet === 'actions'}
         message={sheetData}
+        currentUserId={authUser?.id || ''}
+        userRole={authUser?.role}
         onClose={closeSheet}
-        onReact={handleSelectReaction}
+        onReact={(emoji) => {
+          if (sheetData) {
+            MessageActionManager.toggleReaction(sheetData, emoji, conversationId || '', authUser?.id || '', queryClient);
+          }
+        }}
         onReply={() => {
           if (sheetData) {
             startReply(sheetData);
           }
         }}
-        onForward={() => toast.success('Forwarded message!')}
+        onForward={() => {
+          if (sheetData) {
+            setForwardingMessages([sheetData]);
+          }
+        }}
         onEdit={handleStartEdit}
         onPin={() => {
           if (sheetData) {
-            handlePinMessage(sheetData);
+            MessageActionManager.togglePin(sheetData, conversationId || '', queryClient);
           }
         }}
         onStar={() => {
           if (sheetData) {
-            handleStarMessage(sheetData);
+            MessageActionManager.toggleStar(sheetData, conversationId || '', authUser?.id || '', queryClient);
           }
         }}
-        onDelete={() => {
+        onCopy={() => {
           if (sheetData) {
-            if (sheetData.senderId === authUser?.id) {
-              Alert.alert(
-                'Delete message?',
-                undefined,
-                [
-                  {
-                    text: 'Delete for everyone',
-                    onPress: () => handleDeleteMessage(sheetData, true),
-                    style: 'destructive',
-                  },
-                  {
-                    text: 'Delete for me',
-                    onPress: () => handleDeleteMessage(sheetData, false),
-                  },
-                  {
-                    text: 'Cancel',
-                    style: 'cancel',
-                  },
-                ],
-                { cancelable: true }
-              );
-            } else {
-              Alert.alert(
-                'Delete message?',
-                undefined,
-                [
-                  {
-                    text: 'Delete for me',
-                    onPress: () => handleDeleteMessage(sheetData, false),
-                    style: 'destructive',
-                  },
-                  {
-                    text: 'Cancel',
-                    style: 'cancel',
-                  },
-                ],
-                { cancelable: true }
-              );
-            }
+            MessageActionManager.copyContent(sheetData);
           }
         }}
-        isMe={sheetData?.senderId === authUser?.id}
-        isStarred={sheetData?.starredBy?.includes(authUser?.id || '') || false}
+        onShare={() => {
+          if (sheetData) {
+            MessageActionManager.shareMedia(sheetData);
+          }
+        }}
+        onInfo={() => {
+          if (sheetData) {
+            setInfoMessage(sheetData);
+          }
+        }}
+        onDeleteForMe={() => {
+          if (sheetData) {
+            MessageActionManager.deleteForMe(sheetData, conversationId || '', queryClient);
+          }
+        }}
+        onDeleteForEveryone={() => {
+          if (sheetData) {
+            MessageActionManager.deleteForEveryone(sheetData, conversationId || '', queryClient);
+          }
+        }}
+      />
+
+      {/* Message Delivery & Info Modal */}
+      <MessageInfoModal
+        visible={!!infoMessage}
+        message={infoMessage}
+        onClose={() => setInfoMessage(null)}
+      />
+
+      {/* Multi-Target Forwarding Modal */}
+      <ForwardMessageModal
+        visible={isForwardModalOpen}
+        messages={forwardingMessages}
+        onClose={() => {
+          setIsForwardModalOpen(false);
+          setForwardingMessages([]);
+        }}
+      />
+
+      {/* Enterprise Shared Media, Files, Links & Starred Hub */}
+      <SharedMediaModal
+        visible={isSharedMediaOpen}
+        messages={localMessages}
+        onClose={() => setIsSharedMediaOpen(false)}
       />
 
       <AttachmentPreviewModal

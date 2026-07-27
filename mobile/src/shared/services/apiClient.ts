@@ -128,23 +128,55 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Flag to prevent multiple concurrent token refresh requests
-let isRefreshing = false;
-let failedQueue: FailedRequest[] = [];
+let refreshPromise: Promise<string | null> | null = null;
 
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      if (prom.config.headers) {
-        prom.config.headers.Authorization = `Bearer ${token}`;
+/**
+ * Centrally manages and deduplicates concurrent token refresh requests.
+ * If a refresh is already in-flight, returns the existing active promise.
+ */
+export const refreshAuthToken = async (): Promise<string | null> => {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const currentToken = useAuthStore.getState().token;
+      if (!currentToken) return null;
+
+      const refreshResponse = await axios.post(
+        `${ENV.API_URL}/api/v1/auth/refresh`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${currentToken}`,
+          },
+        }
+      );
+
+      const newToken = refreshResponse.data?.data?.token;
+      if (newToken) {
+        const user = useAuthStore.getState().user;
+        const rememberMe = useAuthStore.getState().rememberMe;
+        if (user) {
+          await useAuthStore.getState().login(newToken, user, rememberMe);
+        }
+        return newToken;
       }
-      prom.resolve(apiClient(prom.config));
+      return null;
+    } catch (err) {
+      console.error('[apiClient] Centralized silent refresh failed:', err);
+      return null;
+    } finally {
+      refreshPromise = null;
     }
-  });
-  failedQueue = [];
+  })();
+
+  return refreshPromise;
 };
+
+// In-flight request deduplication cache for concurrent GET requests
+const inFlightRequests = new Map<string, Promise<any>>();
 
 // Request Interceptor: Inject JWT token, tenant company header, device metadata, and handle offline queueing
 apiClient.interceptors.request.use(
@@ -258,41 +290,11 @@ apiClient.interceptors.response.use(
 
     // Handle token expiration/401 errors for protected endpoints
     if (error.response?.status === 401 && !originalRequest._retry && !isPublic) {
-      // If we are already refreshing, queue this request
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject, config: originalRequest });
-        });
-      }
-
       originalRequest._retry = true;
-      isRefreshing = true;
 
       try {
-        // Attempt silent refresh
-        const currentToken = useAuthStore.getState().token;
-        const refreshResponse = await axios.post(
-          `${ENV.API_URL}/api/v1/auth/refresh`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${currentToken}`,
-            },
-          }
-        );
-
-        const newToken = refreshResponse.data?.data?.token;
-
+        const newToken = await refreshAuthToken();
         if (newToken) {
-          // Update credentials in AuthStore
-          const user = useAuthStore.getState().user;
-          const rememberMe = useAuthStore.getState().rememberMe;
-          if (user) {
-            await useAuthStore.getState().login(newToken, user, rememberMe);
-          }
-
-          processQueue(null, newToken);
-          
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
           }
@@ -301,12 +303,9 @@ apiClient.interceptors.response.use(
           throw new Error('Refresh token request did not return a valid token');
         }
       } catch (refreshError) {
-        processQueue(refreshError, null);
         // Silent refresh failed (token is completely dead) -> perform forced logout
         await useAuthStore.getState().logout();
         return Promise.reject(mapAxiosError(error));
-      } finally {
-        isRefreshing = false;
       }
     }
 

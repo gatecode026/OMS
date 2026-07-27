@@ -28,27 +28,57 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import useTheme from '../../../src/shared/hooks/useTheme';
+import { formatAttendanceTime, to24hAttendanceTime } from '../../../src/shared/utils/format';
 import useBranding from '../../../src/shared/hooks/useBranding';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useAttendance, useAttendanceHistory } from '../../../src/features/attendance/hooks/useAttendance';
+import attendanceApi from '../../../src/features/attendance/api/attendanceApi';
+import profileApi from '../../../src/features/profile/api/profileApi';
 import { Card, Badge, BottomSheet, Divider, Skeleton, EmptyState, ErrorState } from '../../../src/shared/components';
+import { toast } from '../../../src/shared/components/Toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Helper to format 24h or 12h times cleanly to 12h AM/PM format
-const formatTime12h = (timeStr?: string) => {
-  if (!timeStr || timeStr === '--:--') return '--:--';
-  if (timeStr.toLowerCase().includes('am') || timeStr.toLowerCase().includes('pm')) {
-    return timeStr;
+const parseToMinutes = (timeStr?: string): number | null => {
+  if (!timeStr || timeStr === '--:--' || timeStr === 'Pending') return null;
+  const clean = timeStr.trim();
+  const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const ampm = (match[3] || '').toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
   }
-  const parts = timeStr.split(':');
-  if (parts.length < 2) return timeStr;
-  const h = parseInt(parts[0], 10);
-  const m = parseInt(parts[1], 10);
-  if (isNaN(h) || isNaN(m)) return timeStr;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const displayH = h % 12 === 0 ? 12 : h % 12;
-  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+  return null;
+};
+
+/// 12h Time Formatting Helper (with robust UTC offset & AM/PM auto-resolution)
+const formatTime12h = (timeStr?: string, punchInStr?: string, totalHours?: number) => {
+  if (!timeStr || timeStr === '--:--' || timeStr === 'Pending') return '--:--';
+  const clean = timeStr.trim();
+
+  let outMins = parseToMinutes(clean);
+  if (outMins === null) return clean;
+
+  const inMins = parseToMinutes(punchInStr);
+
+  // UTC to IST offset correction (+5h30m = +330 mins):
+  // Check if punchOut in UTC is before punchIn or yields working duration far less than totalHours
+  if (inMins !== null) {
+    const diff = outMins - inMins;
+    const expectedDiffMins = totalHours && totalHours > 0.5 ? totalHours * 60 : 120;
+    if (diff < 0 || (diff < expectedDiffMins - 90)) {
+      outMins = (outMins + 330) % 1440;
+    }
+  }
+
+  const h24 = Math.floor(outMins / 60);
+  const mins = outMins % 60;
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const displayH = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${String(displayH).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${ampm}`;
 };
 
 export default function AttendanceScreen() {
@@ -133,16 +163,17 @@ export default function AttendanceScreen() {
     setIsCorrectionModalOpen(true); // Open edit inputs
   };
 
-  // Prepopulate correction fields
+  // Prepopulate correction fields according to single source of truth rules
   const handleOpenCorrectionModal = (type: 'In' | 'Out') => {
-    setEditingRequestId(null); // Reset edit state
+    setEditingRequestId(null);
     setPunchType(type);
     setInlineError(null);
     setSuccessText(null);
-    let sourceTime = type === 'In' ? recordToDisplay?.punchIn : recordToDisplay?.punchOut;
     
-    const formattedSourceTime = formatTime12h(sourceTime);
-    if (formattedSourceTime && formattedSourceTime !== '--:--') {
+    const sourceTime = type === 'In' ? recordToDisplay?.punchIn : recordToDisplay?.punchOut;
+    const formattedSourceTime = formatAttendanceTime(sourceTime);
+    
+    if (formattedSourceTime !== '--:--') {
       const match = formattedSourceTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
       if (match) {
         setProposedHour(match[1]);
@@ -152,7 +183,7 @@ export default function AttendanceScreen() {
     } else {
       setProposedHour('');
       setProposedMin('');
-      setProposedAmPm('AM');
+      setProposedAmPm(type === 'In' ? 'AM' : 'PM');
     }
     setReason('');
     setIsCorrectionModalOpen(true);
@@ -174,9 +205,9 @@ export default function AttendanceScreen() {
 
   const handlePunchTypeChange = (type: 'In' | 'Out') => {
     setPunchType(type);
-    let sourceTime = type === 'In' ? recordToDisplay?.punchIn : recordToDisplay?.punchOut;
-    const formattedSourceTime = formatTime12h(sourceTime);
-    if (formattedSourceTime && formattedSourceTime !== '--:--') {
+    const sourceTime = type === 'In' ? recordToDisplay?.punchIn : recordToDisplay?.punchOut;
+    const formattedSourceTime = formatAttendanceTime(sourceTime);
+    if (formattedSourceTime !== '--:--') {
       const match = formattedSourceTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
       if (match) {
         setProposedHour(match[1]);
@@ -186,11 +217,18 @@ export default function AttendanceScreen() {
     } else {
       setProposedHour('');
       setProposedMin('');
-      setProposedAmPm('AM');
+      setProposedAmPm(type === 'In' ? 'AM' : 'PM');
     }
   };
 
-  const handleSubmitCorrection = () => {
+  // Fetch real attendance corrections from DB
+  const { data: serverCorrections } = useQuery({
+    queryKey: ['attendance-corrections'],
+    queryFn: () => attendanceApi.fetchCorrections(),
+    refetchInterval: 5000, // Realtime polling every 5s for manager approvals
+  });
+
+  const handleSubmitCorrection = async () => {
     const hh = parseInt(proposedHour, 10);
     const mm = parseInt(proposedMin, 10);
 
@@ -209,41 +247,63 @@ export default function AttendanceScreen() {
 
     setInlineError(null);
     setIsSubmittingRequest(true);
-    // Mock API request delay
-    setTimeout(() => {
+
+    try {
       const timeStr = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} ${proposedAmPm}`;
-      
-      if (editingRequestId) {
-        setCorrectionRequests(prev => prev.map(r => r.id === editingRequestId ? { ...r, type: punchType, proposedTime: timeStr, reason: reason } : r));
-        setEditingRequestId(null);
-        setIsSubmittingRequest(false);
-        setSuccessText('Request Updated Successfully');
-        
-        // Auto close after 2.5 seconds
-        setTimeout(() => {
-          setIsCorrectionModalOpen(false);
-          setSuccessText(null);
-        }, 2200);
+
+      // Load and normalize stored DB values without inventing defaults
+      const storedPunchIn = formatAttendanceTime(recordToDisplay?.punchIn);
+      const storedPunchOut = formatAttendanceTime(recordToDisplay?.punchOut);
+
+      const rawIn = punchType === 'In' ? timeStr : storedPunchIn;
+      const rawOut = punchType === 'Out' ? timeStr : storedPunchOut;
+
+      const payload = {
+        date: selectedDate,
+        correctionType: punchType === 'In' ? 'Wrong Punch In Time' : 'Wrong Punch Out Time',
+        requestedPunchIn: to24hAttendanceTime(rawIn),
+        requestedPunchOut: to24hAttendanceTime(rawOut),
+        requestedStatus: recordToDisplay?.status || 'Present',
+        reason: reason.trim(),
+      };
+
+      // Check if a pending correction request already exists for this date
+      const existingPending = Array.isArray(serverCorrections)
+        ? serverCorrections.find((c: any) => c.date === selectedDate && c.status === 'Pending')
+        : null;
+
+      const isUpdate = !!(editingRequestId || existingPending);
+      const targetId = editingRequestId || existingPending?.id;
+
+      if (isUpdate && targetId) {
+        await attendanceApi.updateCorrection(targetId, payload);
       } else {
-        const newReq = {
-          id: String(Date.now()),
-          date: selectedDate,
-          type: punchType,
-          proposedTime: timeStr,
-          reason: reason,
-          status: 'Pending'
-        };
-        setCorrectionRequests(prev => [newReq, ...prev]);
-        setIsSubmittingRequest(false);
-        setSuccessText('Request Submitted Successfully');
-        
-        // Auto close after 2.5 seconds
-        setTimeout(() => {
-          setIsCorrectionModalOpen(false);
-          setSuccessText(null);
-        }, 2200);
+        await attendanceApi.submitCorrection(payload);
       }
-    }, 1200);
+
+      // Auto close modal & reset state
+      setIsSubmittingRequest(false);
+      setIsCorrectionModalOpen(false);
+      setInlineError(null);
+      setProposedHour('');
+      setProposedMin('');
+      setReason('');
+
+      // Show Toast
+      toast.success(isUpdate ? 'Attendance correction request updated successfully.' : 'Attendance correction request submitted successfully.');
+
+      // Automatically refresh queries to show newly submitted request immediately
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['attendance-corrections'] }),
+        queryClient.invalidateQueries({ queryKey: ['attendance'] }),
+      ]);
+    } catch (err: any) {
+      setIsSubmittingRequest(false);
+      const mainMsg = err?.response?.data?.message || err?.message || 'Failed to submit correction request.';
+      const detailErrs = err?.response?.data?.errors;
+      const displayMsg = Array.isArray(detailErrs) && detailErrs.length > 0 ? `${mainMsg}: ${detailErrs.join(', ')}` : mainMsg;
+      setInlineError(displayMsg);
+    }
   };
 
   // Fetch data using React Query history hook
@@ -259,9 +319,18 @@ export default function AttendanceScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Invalidate every active query on the screen to trigger fresh network refetches
-    await queryClient.invalidateQueries();
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries(),
+        profileApi.fetchProfile(),
+      ]);
+    } catch (err) {
+      console.warn('[AttendanceScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
+    }
   };
 
   const flatListRef = useRef<FlatList>(null);
@@ -596,7 +665,7 @@ export default function AttendanceScreen() {
     if (recordToDisplay.punchOut && recordToDisplay.punchOut !== '--:--') {
       items.push({
         title: 'Punch Out',
-        time: formatTime12h(recordToDisplay.punchOut),
+        time: formatTime12h(recordToDisplay.punchOut, recordToDisplay.punchIn, recordToDisplay.totalHours),
         desc: 'Automatic punch-out recorded via Geofencing',
         color: colors.success,
         icon: 'exit-outline',
@@ -898,7 +967,7 @@ export default function AttendanceScreen() {
                       <Ionicons name="create-outline" size={14} color={colors.textMuted} />
                     </View>
                     <Text style={[styles.gridVal, { color: colors.text, fontFamily: typography.fonts.bold }]}>
-                      {formatTime12h(recordToDisplay?.punchOut)}
+                      {formatTime12h(recordToDisplay?.punchOut, recordToDisplay?.punchIn, recordToDisplay?.totalHours)}
                     </Text>
                   </Pressable>
                 </View>
@@ -1408,35 +1477,47 @@ export default function AttendanceScreen() {
             {filteredRequests.length === 0 ? (
               <View style={{ paddingVertical: 40, alignItems: 'center' }}>
                 <Ionicons name="git-pull-request-outline" size={48} color="#94A3B8" style={{ marginBottom: 12 }} />
-                <Text style={{ color: '#64748B', fontFamily: typography.fonts.medium }}>No requests submitted for this date yet.</Text>
+                <Text style={{ color: '#64748B', fontFamily: typography.fonts.medium, textAlign: 'center' }}>
+                  No attendance correction requests found.
+                </Text>
               </View>
             ) : (
               <FlatList
                 data={filteredRequests}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item.id || String(Math.random())}
                 contentContainerStyle={{ gap: 12, paddingVertical: 8 }}
                 renderItem={({ item }) => {
                   const isApproved = item.status === 'Approved';
                   const isPending = item.status === 'Pending';
+                  const isRejected = item.status === 'Rejected';
+                  const isCancelled = item.status === 'Cancelled';
+
+                  const statusBg = isApproved ? '#ECFDF5' : isPending ? '#FFFBEB' : isRejected ? '#FFF5F5' : '#F1F5F9';
+                  const statusBorder = isApproved ? '#D1FAE5' : isPending ? '#FEF3C7' : isRejected ? '#FEE2E2' : '#E2E8F0';
+                  const statusColor = isApproved ? '#10B981' : isPending ? '#D97706' : isRejected ? '#EF4444' : '#64748B';
+
+                  const punchInStr = formatAttendanceTime((item as any).requestedPunchIn || item.proposedTime);
+                  const punchOutStr = formatAttendanceTime((item as any).requestedPunchOut);
+
                   return (
                     <View style={styles.requestHistoryCard}>
                       <View style={styles.requestHistoryHeader}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Ionicons
-                            name={item.type === 'In' ? 'enter-outline' : 'exit-outline'}
+                            name="git-pull-request-outline"
                             size={16}
                             color="#3F51B5"
                           />
                           <Text style={[styles.requestHistoryType, { fontFamily: typography.fonts.bold }]}>
-                            Punch {item.type}
+                            {(item as any).correctionType || `Punch Correction`}
                           </Text>
                         </View>
                         <View
                           style={[
                             styles.statusBadge,
                             {
-                              backgroundColor: isApproved ? '#ECFDF5' : isPending ? '#FFFBEB' : '#FFF5F5',
-                              borderColor: isApproved ? '#D1FAE5' : isPending ? '#FEF3C7' : '#FEE2E2',
+                              backgroundColor: statusBg,
+                              borderColor: statusBorder,
                             },
                           ]}
                         >
@@ -1444,7 +1525,7 @@ export default function AttendanceScreen() {
                             style={[
                               styles.statusBadgeText,
                               {
-                                color: isApproved ? '#10B981' : isPending ? '#D97706' : '#EF4444',
+                                color: statusColor,
                                 fontFamily: typography.fonts.bold,
                               },
                             ]}
@@ -1456,14 +1537,42 @@ export default function AttendanceScreen() {
                       
                       <View style={{ marginTop: 8, gap: 4 }}>
                         <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium }]}>
-                          Date: <Text style={{ fontFamily: typography.fonts.semibold, color: '#0F172A' }}>{dayjs(item.date).format('MMM DD, YYYY')}</Text>
+                          Attendance Date: <Text style={{ fontFamily: typography.fonts.semibold, color: '#0F172A' }}>{dayjs(item.date).format('MMM DD, YYYY')}</Text>
                         </Text>
-                        <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium }]}>
-                          Proposed Time: <Text style={{ fontFamily: typography.fonts.semibold, color: '#3F51B5' }}>{item.proposedTime}</Text>
-                        </Text>
+
+                        {punchInStr !== '--:--' && (
+                          <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium }]}>
+                            Requested Punch In: <Text style={{ fontFamily: typography.fonts.semibold, color: '#3F51B5' }}>{punchInStr}</Text>
+                          </Text>
+                        )}
+
+                        {punchOutStr !== '--:--' && (
+                          <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium }]}>
+                            Requested Punch Out: <Text style={{ fontFamily: typography.fonts.semibold, color: '#3F51B5' }}>{punchOutStr}</Text>
+                          </Text>
+                        )}
+
                         <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium }]} numberOfLines={2}>
-                          Reason: <Text style={{ color: '#64748B', fontStyle: 'italic' }}>"{item.reason}"</Text>
+                          Reason: <Text style={{ color: '#64748B', fontStyle: 'italic' }}>"{(item as any).reason || 'N/A'}"</Text>
                         </Text>
+
+                        {(item as any).createdAt && (
+                          <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.regular, fontSize: 11, color: '#94A3B8' }]}>
+                            Submitted: {dayjs((item as any).createdAt).format('MMM DD, YYYY hh:mm A')}
+                          </Text>
+                        )}
+
+                        {((item as any).approvedByName || (item as any).rejectedByName) && (
+                          <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium, fontSize: 11, color: '#475569' }]}>
+                            {isApproved ? 'Approved by: ' : 'Reviewed by: '}<Text style={{ fontFamily: typography.fonts.semibold }}>{(item as any).approvedByName || (item as any).rejectedByName}</Text>
+                          </Text>
+                        )}
+
+                        {((item as any).rejectionReason || (item as any).comments) && isRejected && (
+                          <Text style={[styles.requestHistoryDetail, { fontFamily: typography.fonts.medium, fontSize: 11, color: '#EF4444' }]}>
+                            Rejection Reason: "{(item as any).rejectionReason || (item as any).comments}"
+                          </Text>
+                        )}
                       </View>
 
                       {isPending && (

@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import secureStore from '../services/secureStore';
+import AvatarCacheManager from '../services/AvatarCacheManager';
 import { unregisterDeviceFromPushNotifications } from '../services/pushNotification';
 import { disconnectSocketOnLogout } from '../services/socketManager';
 
@@ -81,6 +82,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     disconnectSocketOnLogout();
 
     try {
+      AvatarCacheManager.clear();
       await unregisterDeviceFromPushNotifications();
     } catch (err) {
       console.warn('[authStore] Error during push notification unregistration:', err);
@@ -110,17 +112,22 @@ export const useAuthStore = create<AuthState>((set) => ({
       if (!state.user) return state;
       const newUser = { ...state.user, ...updatedFields };
       secureStore.setJson('user_profile', newUser);
+      if (state.user.id) {
+        AvatarCacheManager.invalidate(state.user.id);
+      }
       return { user: newUser };
     });
   },
 
   loadSession: async () => {
     try {
-      const token = await secureStore.getItem('auth_token');
-      const user = await secureStore.getJson<UserProfile>('user_profile');
-      const rememberMeVal = await secureStore.getItem('remember_me');
-      const rememberedEmail = await secureStore.getItem('remembered_email');
-      const rememberedCompanyCode = await secureStore.getItem('remembered_company_code');
+      const [token, user, rememberMeVal, rememberedEmail, rememberedCompanyCode] = await Promise.all([
+        secureStore.getItem('auth_token'),
+        secureStore.getJson<UserProfile>('user_profile'),
+        secureStore.getItem('remember_me'),
+        secureStore.getItem('remembered_email'),
+        secureStore.getItem('remembered_company_code'),
+      ]);
 
       const rememberMe = rememberMeVal === 'true';
 

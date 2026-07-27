@@ -1,5 +1,5 @@
 import CallingPolicy from './calling.policy.model.js';
-import { runWithTenant } from '../../database/tenantConnection.js';
+import { runWithTenant } from '../../utils/tenantContext.js';
 
 export const callingPolicyController = {
   /**

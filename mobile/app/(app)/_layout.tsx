@@ -7,6 +7,8 @@ import { useQuickActionsStore } from '../../src/shared/store/quickActionsStore';
 import { useAttendance } from '../../src/features/attendance/hooks/useAttendance';
 import useTheme from '../../src/shared/hooks/useTheme';
 
+import dayjs from 'dayjs';
+
 export default function AppLayout() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -25,8 +27,10 @@ export default function AppLayout() {
       return;
     }
 
+    const formattedNow = dayjs().format('hh:mm A');
     if (!hasPunchedIn) {
       await clockIn({
+        punchIn: formattedNow,
         location: {
           latitude: 28.6139,
           longitude: 77.2090,
@@ -36,6 +40,7 @@ export default function AppLayout() {
       await clockOut({
         id: todayRecord.id,
         payload: {
+          punchOut: formattedNow,
           notes: 'Shift completed.',
         },
       });
@@ -51,6 +56,28 @@ export default function AppLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" />
+        {/* ── Call screens — slide up from bottom like a native call sheet ─── */}
+        <Stack.Screen
+          name="incoming-call"
+          options={{
+            animation: 'slide_from_bottom',
+            gestureEnabled: false, // prevent accidental swipe-dismiss
+          }}
+        />
+        <Stack.Screen
+          name="call/index"
+          options={{
+            animation: 'slide_from_bottom',
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="call/video"
+          options={{
+            animation: 'slide_from_bottom',
+            gestureEnabled: false,
+          }}
+        />
       </Stack>
       <SidebarDrawer />
       

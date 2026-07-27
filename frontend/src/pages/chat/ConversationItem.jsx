@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useRenderCount } from '../../core/devtools/perf';
 import StatusDot from './StatusDot';
 import {
   Pin, Bell, BellOff, Archive, EyeOff, MailOpen, Mail,
@@ -99,6 +100,7 @@ const ConversationItem = ({
   // Toast + undo
   addToast
 }) => {
+  useRenderCount('ConversationItem');
   const other = getOtherParticipant(conv);
   const isDirect = conv.type === 'direct';
 

@@ -1,3 +1,4 @@
+
 /**
  * @file src/context/ChatContext.jsx
  * @description Global React context for real-time chat.
@@ -14,6 +15,21 @@ import React, {
 } from 'react';
 import { getSocket } from '../lib/socketManager';
 import { ImageKitUploadService } from '../services/imagekitUploadService';
+import { useQueryClient } from '@tanstack/react-query';
+import { chatApiFetch } from '../core/network/httpClient';
+import { useConversationsQuery } from '../features/chat/hooks/useConversationsQuery';
+import { patchConversations, denormalize } from '../features/chat/cache/conversationsCache';
+import ConversationRepository from '../features/chat/data/ConversationRepository';
+import MessageRepository from '../features/chat/data/MessageRepository';
+import MediaRepository from '../features/chat/data/MediaRepository';
+import { setupSocketDispatcher, teardownSocketDispatcher } from '../features/chat/socket/socketDispatcher';
+import { setupSocketMessageDispatcher, teardownSocketMessageDispatcher } from '../features/chat/socket/socketMessageDispatcher';
+import { setupSocketMediaDispatcher, teardownSocketMediaDispatcher } from '../features/chat/socket/socketMediaDispatcher';
+import { isHardenedChatEnabled, isMessageEngineEnabled, isMediaPipelineEnabled, isOfflineQueueEnabled, isDraftEngineEnabled } from '../core/config/featureFlags';
+import { optimisticEngine } from '../features/chat/engine/optimisticEngine';
+import { draftEngine } from '../features/chat/engine/draftEngine';
+import { UploadManager } from '../features/chat/engine/UploadManager';
+import { DownloadManager } from '../features/chat/engine/DownloadManager';
 import { useApp } from './AppContext';
 import { useDesktopNotifications } from '../hooks/useDesktopNotifications';
 import NotificationPermissionBanner from '../components/chat/NotificationPermissionBanner';
@@ -48,7 +64,6 @@ export const ChatProvider = ({ children }) => {
       return new Set();
     }
   });
-
   const mutedConversationsRef = useRef(mutedConversations);
   useEffect(() => {
     mutedConversationsRef.current = mutedConversations;
@@ -75,6 +90,9 @@ export const ChatProvider = ({ children }) => {
       localStorage.setItem(`chat_muted_conversations_${currentUser.id}`, JSON.stringify(Array.from(next)));
       return next;
     });
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('mute_conversation', { conversationId });
+    }
   }, [currentUser?.id]);
 
   const unmuteConversation = useCallback((conversationId) => {
@@ -85,6 +103,9 @@ export const ChatProvider = ({ children }) => {
       localStorage.setItem(`chat_muted_conversations_${currentUser.id}`, JSON.stringify(Array.from(next)));
       return next;
     });
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('unmute_conversation', { conversationId });
+    }
   }, [currentUser?.id]);
 
 
@@ -93,7 +114,23 @@ export const ChatProvider = ({ children }) => {
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [isConnected, setIsConnected] = useState(false);
-  const [conversations, setConversations] = useState([]);
+  // ── Conversations: React Query is the single source of truth ────────────────
+  // `conversations` is derived from the RQ cache; `setConversations` is a shim
+  // that patches that cache. Every existing socket handler / optimistic action
+  // keeps its exact `setConversations(value | prev => ...)` call shape but now
+  // writes through to React Query (features/chat/cache/conversationsCache.js),
+  // so there is exactly one owner of the list and no duplicate state.
+  const queryClient = useQueryClient();
+  const conversationsQuery = useConversationsQuery({ token });
+  // Cache stores the normalized {entities, ids} shape (§6); expose a plain array.
+  const conversations = React.useMemo(
+    () => denormalize(conversationsQuery.data),
+    [conversationsQuery.data]
+  );
+  const setConversations = useCallback(
+    (updater) => patchConversations(queryClient, updater),
+    [queryClient]
+  );
   const [activeConvId, setActiveConvId] = useState(null);
   const [archivedConversations, setArchivedConversations] = useState([]);
   const [isLoadingArchived, setIsLoadingArchived] = useState(false);
@@ -266,18 +303,13 @@ export const ChatProvider = ({ children }) => {
   }, [requestPermission, push]);
 
   // ── API Helper ────────────────────────────────────────────────────────────
-  const apiFetch = useCallback(async (path, options = {}) => {
-    if (!token) return { status: 'error', message: 'Not authenticated' };
-    const res = await fetch(`${getApiUrl()}/api/v1${path}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        ...(options.headers || {})
-      }
-    });
-    return res.json();
-  }, [token]);
+  // Delegates to the extracted feature HTTP client (features/chat/api/httpClient)
+  // so query/mutation functions and this context share one base-URL + auth path.
+  // Public behavior is unchanged: returns the parsed `{ status, data }` envelope.
+  const apiFetch = useCallback(
+    (path, options = {}) => chatApiFetch(path, { token, ...options }),
+    [token]
+  );
 
   useEffect(() => { apiFetchRef.current = apiFetch; }, [apiFetch]);
 
@@ -294,25 +326,30 @@ export const ChatProvider = ({ children }) => {
   }, [apiFetch]);
 
   // ── FETCH CONVERSATIONS ───────────────────────────────────────────────────
-  const fetchConversations = useCallback(async () => {
-    setIsLoadingConvs(true);
-    try {
-      const data = await apiFetch('/chat/conversations');
-      if (data.status === 'success') {
-        setConversations(data.data || []);
-        // Populate unread counts from server response
-        const counts = {};
-        (data.data || []).forEach(conv => {
-          counts[conv.id] = conv.unreadCount || 0;
-        });
-        setUnreadCounts(counts);
-      }
-    } catch (err) {
-      console.error('[Chat] fetchConversations error:', err);
-    } finally {
-      setIsLoadingConvs(false);
+  // The conversation list is fetched + cached by React Query (declared above in
+  // the state section). Seed the unread-count map from server truth ONLY after a
+  // real network fetch completes (mount / reconnect / explicit refetch) — never
+  // on socket setQueryData patches, which do not enter the fetching state. This
+  // preserves the original behavior where fetchConversations reset unread counts
+  // from each conversation's server `unreadCount`.
+  const wasFetchingConvsRef = useRef(false);
+  useEffect(() => {
+    const isFetching = conversationsQuery.isFetching;
+    if (wasFetchingConvsRef.current && !isFetching && conversationsQuery.status === 'success') {
+      const counts = {};
+      denormalize(conversationsQuery.data).forEach(conv => { counts[conv.id] = conv.unreadCount || 0; });
+      setUnreadCounts(counts);
     }
-  }, [apiFetch]);
+    wasFetchingConvsRef.current = isFetching;
+  }, [conversationsQuery.isFetching, conversationsQuery.status, conversationsQuery.data]);
+
+  // Preserved public signature: callers still `await fetchConversations()`.
+  // Now a thin wrapper over RQ's deduped refetch (unread seeding handled above).
+  const refetchConversations = conversationsQuery.refetch;
+  const fetchConversations = useCallback(async () => {
+    const { data } = await refetchConversations();
+    return data;
+  }, [refetchConversations]);
   useEffect(() => { fetchConversationsRef.current = fetchConversations; }, [fetchConversations]);
 
   const fetchArchivedConversations = useCallback(async () => {
@@ -385,9 +422,7 @@ export const ChatProvider = ({ children }) => {
 
   const archiveConversation = useCallback(async (convId) => {
     try {
-      const res = await apiFetch(`/chat/conversations/${convId}/archive`, {
-        method: 'POST'
-      });
+      const res = await ConversationRepository.archive(convId, token);
       if (res.status === 'success') {
         setConversations(prev => {
           const convToArchive = prev.find(c => c.id === convId);
@@ -407,13 +442,11 @@ export const ChatProvider = ({ children }) => {
       console.error('[Chat] archiveConversation error:', err);
     }
     return false;
-  }, [apiFetch]);
+  }, [token]);
 
   const unarchiveConversation = useCallback(async (convId) => {
     try {
-      const res = await apiFetch(`/chat/conversations/${convId}/unarchive`, {
-        method: 'POST'
-      });
+      const res = await ConversationRepository.unarchive(convId, token);
       if (res.status === 'success') {
         setArchivedConversations(prev => {
           const convToRestore = prev.find(c => c.id === convId);
@@ -429,13 +462,11 @@ export const ChatProvider = ({ children }) => {
       console.error('[Chat] unarchiveConversation error:', err);
     }
     return false;
-  }, [apiFetch]);
+  }, [token]);
 
   const hideConversation = useCallback(async (convId) => {
     try {
-      const res = await apiFetch(`/chat/conversations/${convId}/hide`, {
-        method: 'POST'
-      });
+      const res = await ConversationRepository.hide(convId, token);
       if (res.status === 'success') {
         setConversations(prev => {
           const convToHide = prev.find(c => c.id === convId);
@@ -453,13 +484,11 @@ export const ChatProvider = ({ children }) => {
       console.error('[Chat] hideConversation error:', err);
     }
     return false;
-  }, [apiFetch]);
+  }, [token]);
 
   const unhideConversation = useCallback(async (convId) => {
     try {
-      const res = await apiFetch(`/chat/conversations/${convId}/unhide`, {
-        method: 'POST'
-      });
+      const res = await ConversationRepository.unhide(convId, token);
       if (res.status === 'success') {
         setHiddenConversations(prev => {
           const convToRestore = prev.find(c => c.id === convId);
@@ -476,13 +505,11 @@ export const ChatProvider = ({ children }) => {
       console.error('[Chat] unhideConversation error:', err);
     }
     return false;
-  }, [apiFetch, fetchConversations]);
+  }, [token, fetchConversations]);
 
   const markConversationAsRead = useCallback(async (convId) => {
     try {
-      const res = await apiFetch(`/chat/conversations/${convId}/read`, {
-        method: 'PATCH'
-      });
+      const res = await ConversationRepository.markRead(convId, token);
       if (res.status === 'success') {
         setUnreadCounts(prev => ({ ...prev, [convId]: 0 }));
         socketRef.current?.emit('mark_read', { conversationId: convId });
@@ -492,13 +519,11 @@ export const ChatProvider = ({ children }) => {
       console.error('[Chat] markConversationAsRead error:', err);
     }
     return false;
-  }, [apiFetch]);
+  }, [token]);
 
   const markConversationAsUnread = useCallback(async (convId) => {
     try {
-      const res = await apiFetch(`/chat/conversations/${convId}/unread`, {
-        method: 'PATCH'
-      });
+      const res = await ConversationRepository.markUnread(convId, token);
       if (res.status === 'success') {
         setUnreadCounts(prev => ({ ...prev, [convId]: (prev[convId] || 0) + 1 }));
         return true;
@@ -507,7 +532,7 @@ export const ChatProvider = ({ children }) => {
       console.error('[Chat] markConversationAsUnread error:', err);
     }
     return false;
-  }, [apiFetch]);
+  }, [token]);
 
   const deleteConversationForMe = useCallback(async (convId) => {
     try {
@@ -887,10 +912,7 @@ export const ChatProvider = ({ children }) => {
 
   // ── UPDATE GROUP ──────────────────────────────────────────────────────────
   const updateGroup = useCallback(async (conversationId, groupData) => {
-    const data = await apiFetch(`/chat/conversations/${conversationId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(groupData)
-    });
+    const data = await ConversationRepository.updateMetadata(conversationId, groupData, token);
     if (data.status === 'success') {
       setConversations(prev => prev.map(c => {
         if (c.id === conversationId) {
@@ -901,7 +923,7 @@ export const ChatProvider = ({ children }) => {
       return data.data;
     }
     throw new Error(data.message || 'Failed to update group details');
-  }, [apiFetch]);
+  }, [token]);
 
   // ── ADD MEMBERS TO GROUP ──────────────────────────────────────────────────
   const addMembersToGroup = useCallback(async (conversationId, memberIds) => {
@@ -1336,13 +1358,44 @@ export const ChatProvider = ({ children }) => {
   }, []);
 
   const uploadProcess = useCallback(async (item) => {
-    const { id, file } = item;
+    const { id, file, convId } = item;
     const controller = new AbortController();
 
     updateUploadItem(id, { controller, status: 'uploading', error: null, progress: 0 });
 
     try {
-      // Convert file to base64
+      if (isMediaPipelineEnabled()) {
+        const result = await UploadManager.enqueueUpload(
+          file,
+          convId,
+          token,
+          {
+            uploadId: id,
+            abortSignal: controller.signal,
+            onProgress: (p) => updateUploadItem(id, { progress: p.progress }),
+          },
+          queryClient
+        );
+
+        const stillInQueue = uploadQueueRef.current.some(i => i.id === id);
+        if (stillInQueue) {
+          updateUploadItem(id, {
+            status: 'success',
+            progress: 100,
+            result: {
+              url: result.url,
+              thumbnailUrl: result.thumbnailUrl || result.url,
+              fileName: file.name,
+              fileSize: file.size,
+              mimeType: file.type,
+              fileType: file.type,
+            }
+          });
+        }
+        return;
+      }
+
+      // Convert file to base64 for legacy fallback
       const base64Data = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -1405,7 +1458,7 @@ export const ChatProvider = ({ children }) => {
         addToastRef.current('error', `Upload failed: ${err.message || 'Server connection error'}`);
       }
     }
-  }, [token, updateUploadItem]);
+  }, [token, updateUploadItem, queryClient]);
 
   const startFileUpload = useCallback((file, convId) => {
     if (!file) return;
@@ -1487,8 +1540,70 @@ export const ChatProvider = ({ children }) => {
     const socket = getSocket();
     socketRef.current = socket;
 
-    // If already connected (e.g. AppContext connected before ChatContext mounted),
-    // set state immediately.
+    // Attach Phase B, C & D Socket Dispatchers if feature flags enabled
+    let cleanupDispatcher = () => { };
+    let cleanupMessageDispatcher = () => { };
+    let cleanupMediaDispatcher = () => { };
+
+    if (isHardenedChatEnabled()) {
+      cleanupDispatcher = setupSocketDispatcher(socket, queryClient, {
+        onPresenceChange: (presence) => {
+          if (presence?.userId) {
+            setOnlineUsers(prev => {
+              const next = new Map(prev);
+              if (presence.status === 'offline') next.delete(presence.userId);
+              else next.set(presence.userId, presence);
+              return next;
+            });
+          }
+        },
+        onTypingStart: ({ conversationId, userId, name, isRecording }) => {
+          if (conversationId && userId) {
+            setTypingUsers(prev => {
+              const list = prev[conversationId] || [];
+              if (list.some(u => u.userId === userId)) return prev;
+              return { ...prev, [conversationId]: [...list, { userId, name, isRecording }] };
+            });
+          }
+        },
+        onTypingStop: ({ conversationId, userId }) => {
+          if (conversationId && userId) {
+            setTypingUsers(prev => ({
+              ...prev,
+              [conversationId]: (prev[conversationId] || []).filter(u => u.userId !== userId),
+            }));
+          }
+        },
+      });
+    }
+
+    if (isMessageEngineEnabled()) {
+      cleanupMessageDispatcher = setupSocketMessageDispatcher(socket, queryClient, {
+        onTypingStart: ({ conversationId, userId, name, isRecording }) => {
+          if (conversationId && userId) {
+            setTypingUsers(prev => {
+              const list = prev[conversationId] || [];
+              if (list.some(u => u.userId === userId)) return prev;
+              return { ...prev, [conversationId]: [...list, { userId, name, isRecording }] };
+            });
+          }
+        },
+        onTypingStop: ({ conversationId, userId }) => {
+          if (conversationId && userId) {
+            setTypingUsers(prev => ({
+              ...prev,
+              [conversationId]: (prev[conversationId] || []).filter(u => u.userId !== userId),
+            }));
+          }
+        },
+      });
+    }
+
+    if (isMediaPipelineEnabled()) {
+      cleanupMediaDispatcher = setupSocketMediaDispatcher(socket, queryClient);
+    }
+
+    // If already connected, set state immediately.
     if (socket.connected) {
       setIsConnected(true);
       fetchConversationsRef.current?.();
@@ -2765,6 +2880,12 @@ export const ChatProvider = ({ children }) => {
     // The socket connection lifecycle is managed exclusively by AppContext
     // (connectSocket on login, disconnectSocket on logout).
     return () => {
+      cleanupDispatcher();
+      cleanupMessageDispatcher();
+      cleanupMediaDispatcher();
+      teardownSocketDispatcher(socket);
+      teardownSocketMessageDispatcher(socket);
+      teardownSocketMediaDispatcher(socket);
       socket.removeAllListeners();
       socketRef.current = null;
     };
@@ -2852,7 +2973,7 @@ export const ChatProvider = ({ children }) => {
     pinnedPagination,
 
     // Loading states
-    isLoadingConvs,
+    isLoadingConvs: isLoadingConvs || conversationsQuery.isLoading,
     isLoadingMsgs,
     isLoadingPinned,
     hasMoreMessages,
@@ -2922,13 +3043,16 @@ export const ChatProvider = ({ children }) => {
     fetchThreadActivity,
     markThreadAsRead,
 
-    // File Uploads
+    // File Uploads & Media Pipeline
     uploadQueue,
     startFileUpload,
     cancelFileUpload,
     retryFileUpload,
     removeUploadItem,
     clearFileUploads,
+    MediaRepository,
+    UploadManager,
+    DownloadManager,
 
     // Helpers
     apiFetch,

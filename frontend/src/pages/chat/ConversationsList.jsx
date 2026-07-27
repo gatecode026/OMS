@@ -4,6 +4,8 @@
  */
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { Virtuoso } from 'react-virtuoso';
+import { useRenderCount } from '../../core/devtools/perf';
 import { useChat } from '../../context/ChatContext';
 import { useCall } from '../../context/CallContext';
 import { useApp } from '../../context/AppContext';
@@ -113,6 +115,7 @@ const avatarStyle = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, onShowHidden }) => {
+  useRenderCount('ConversationsList');
   const { initiateCall, callState } = useCall();
   const { addToast, showConfirm } = useApp();
   const {
@@ -956,13 +959,19 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
                 </button>
               </div>
             ) : (
-              sorted.map(conv => {
+              // Virtualized: only the visible rows mount, so the list stays
+              // smooth with thousands of conversations (audit CRIT-2 pattern).
+              <Virtuoso
+                data={sorted}
+                style={{ height: '100%' }}
+                className="conv-virtuoso"
+                computeItemKey={(_index, conv) => conv.id}
+                itemContent={(index, conv) => {
                 const other = getOtherParticipant(conv, currentUser?.id);
                 const isOnline = conv.type === 'direct' ? isUserOnline(other?.employeeId) : false;
                 const otherStatus = other ? (presenceMap?.get(other.employeeId)?.status || 'offline') : 'offline';
                 return (
                   <ConversationItem
-                    key={conv.id}
                     conversation={conv}
                     isActive={activeConvId === conv.id}
                     onClick={() => onSelectConversation(conv.id)}
@@ -1046,7 +1055,8 @@ const ConversationsList = ({ currentUser, onSelectConversation, onShowArchived, 
                     addToast={addToast}
                   />
                 );
-              })
+                }}
+              />
             )
           )
         ) : activeTab === 'calls' ? (

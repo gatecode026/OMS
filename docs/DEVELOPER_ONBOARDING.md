@@ -14,7 +14,7 @@
  [x] Step 1: Clone Repository & Install Node 20.x
  [x] Step 2: Run `npm install` in root & `mobile/` directory
  [x] Step 3: Copy `mobile/.env.example` to `mobile/.env.local`
- [x] Step 4: Verify API reachability (`https://oms-xdcz.onrender.com/health`)
+ [x] Step 4: Verify API reachability (`https://oms-5rmc.onrender.com/health`)
  [x] Step 5: Start Metro Bundler via `npm run start` inside `mobile/`
  [x] Step 6: Verify TypeScript types via `npx tsc --noEmit`
 ```

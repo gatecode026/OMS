@@ -80,7 +80,7 @@ cp mobile/.env.example mobile/.env.local
 Ensure `.env.local` points to the Render backend URL or local dev server:
 ```env
 EXPO_PUBLIC_APP_ENV=development
-EXPO_PUBLIC_API_URL=https://oms-xdcz.onrender.com
+EXPO_PUBLIC_API_URL=https://oms-5rmc.onrender.com
 EXPO_PUBLIC_ENABLE_LOGGER=true
 ```
 

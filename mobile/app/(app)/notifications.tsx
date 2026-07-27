@@ -27,7 +27,9 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
+import { useQueryClient } from '@tanstack/react-query';
 import useTheme from '../../src/shared/hooks/useTheme';
+import profileApi from '../../src/features/profile/api/profileApi';
 import { toast } from '../../src/shared/components/Toast';
 import {
   useNotifications,
@@ -68,6 +70,7 @@ const FILTER_CATEGORIES = [
 
 export default function NotificationsCenterScreen() {
   const { colors, spacing, radius, shadows, typography, isDark } = useTheme();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -87,8 +90,19 @@ export default function NotificationsCenterScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+        profileApi.fetchProfile(),
+        refetch(),
+      ]);
+    } catch (err) {
+      console.warn('[NotificationsScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
+    }
   };
 
   const handleTogglePref = (key: string, currentValue: boolean) => {

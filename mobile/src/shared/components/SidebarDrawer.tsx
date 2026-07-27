@@ -125,6 +125,8 @@ export const SidebarDrawer: React.FC = () => {
   // Sidebar Menu Items
   const menuItems: MenuItem[] = [
     { name: 'Dashboard', icon: 'grid', path: '/(app)/(tabs)', moduleKey: 'dashboard' },
+    { name: 'My Profile', icon: 'person', path: '/(app)/(tabs)/profile', moduleKey: 'profile_settings' },
+    { name: 'Attendance Pass', icon: 'qr-code', path: '/(app)/attendance-qr', moduleKey: 'attendance_management' },
     { name: 'Employees', icon: 'people', path: '/(app)/employees', moduleKey: 'employee_management' },
     { name: 'Attendance', icon: 'calendar', path: '/(app)/(tabs)/attendance', moduleKey: 'attendance_management' },
     { name: 'Leave Management', icon: 'today', path: '/(app)/(tabs)/leave', moduleKey: 'leave_management' },
@@ -165,7 +167,7 @@ export const SidebarDrawer: React.FC = () => {
   const handleProfilePress = () => {
     closeDrawer();
     setTimeout(() => {
-      router.push('/(app)/attendance-qr' as any);
+      router.push('/(app)/(tabs)/profile' as any);
     }, 180);
   };
 
@@ -295,7 +297,12 @@ export const SidebarDrawer: React.FC = () => {
             pressed && { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)' },
           ]}
         >
-          <Avatar source={displayAvatar} name={displayName} size={48} />
+          <Avatar
+            source={displayAvatar}
+            name={displayName}
+            size={48}
+            userId={user ? String(user.id || (user as any).employeeId || (user as any)._id || '') || undefined : undefined}
+          />
           <View style={styles.profileTextWrapper}>
             <Text style={[styles.profileName, { color: colors.text, fontFamily: typography.fonts.bold }]} numberOfLines={1}>
               {displayName}

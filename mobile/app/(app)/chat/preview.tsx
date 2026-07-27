@@ -32,14 +32,32 @@ import { toast } from '../../../src/shared/components/Toast';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /**
- * Isolated video player — useVideoPlayer only fires when this component mounts.
+ * Isolated video player — useVideoPlayer only plays when current slide is active.
  * Must NOT be inlined in the parent to preserve hook call order.
  */
-const VideoPlayerItem: React.FC<{ url: string; style: any }> = ({ url, style }) => {
+const VideoPlayerItem: React.FC<{ url: string; style: any; isActive: boolean }> = ({ url, style, isActive }) => {
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
-    p.play();
   });
+
+  useEffect(() => {
+    if (isActive) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  }, [isActive, player]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        player.pause();
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, [player]);
+
   return <VideoView player={player} nativeControls style={style} />;
 };
 
@@ -251,7 +269,7 @@ export default function MediaPreviewScreen() {
           setActiveIndex(index);
         }}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const isImg = item.type === 'image';
           const isVid = item.type === 'video';
           const progress = downloadProgresses[item.id];
@@ -292,7 +310,7 @@ export default function MediaPreviewScreen() {
                   />
                 </View>
               ) : isVid && item.url ? (
-                <VideoPlayerItem url={item.url} style={styles.videoPreview} />
+                <VideoPlayerItem url={item.url} style={styles.videoPreview} isActive={index === activeIndex} />
               ) : (
                 <View style={styles.docWrapper}>
                   <Ionicons name="document-attach" size={80} color="#3B82F6" />

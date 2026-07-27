@@ -193,7 +193,7 @@ export default function AttendanceQRScreen() {
   const displayName = profile?.name || authUser?.name || 'Employee User';
   const displayDesignation = profile?.designation || (authUser as any)?.designation || 'Software Engineer';
   const displayDepartment = profile?.department || (authUser as any)?.department || 'Engineering & IT';
-  const displayCompany = profile?.companyName || (authUser as any)?.companyName || companyId || 'Gatecode Technologies';
+  const displayCompany = profile?.companyName || (authUser as any)?.companyName || (companyId !== 'GATECODE' ? companyId : null) || 'Corporate Enterprise';
   const displayEmpId = profile?.employeeCode || profile?.id || authUser?.id || 'GATECO-EMP-008';
   const displayAvatar = profile?.avatarUrl || profile?.avatar || profile?.profilePhoto || (profile as any)?.photoUrl || (profile as any)?.image || (profile as any)?.profileImage || authUser?.avatarUrl || (authUser as any)?.avatar;
   const displayBranch = profile?.branch || profile?.officeLocation || 'Headquarters';
@@ -235,7 +235,7 @@ export default function AttendanceQRScreen() {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* ─── Sticky Header ─── */}
-      <View style={[styles.header, { paddingTop: insets.top + 12, backgroundColor: isDark ? '#1E1B4B' : '#4338CA' }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 12, backgroundColor: colors.primary }]}>
         <Pressable onPress={() => router.back()} style={styles.headerBtn}>
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </Pressable>
@@ -255,7 +255,7 @@ export default function AttendanceQRScreen() {
         <View style={[styles.idCard, { backgroundColor: isDark ? '#1E293B' : '#FFFFFF', borderColor: isDark ? '#334155' : '#E2E8F0' }]}>
           
           {/* Card Top Banner with Smartcard Chip */}
-          <View style={[styles.cardTopBanner, { backgroundColor: isDark ? '#1E1B4B' : '#4338CA' }]}>
+          <View style={[styles.cardTopBanner, { backgroundColor: colors.primary }]}>
             <View style={styles.bannerLeftRow}>
               <Ionicons name="shield-checkmark" size={20} color="#60A5FA" style={{ marginRight: 8 }} />
               <View>
@@ -280,7 +280,7 @@ export default function AttendanceQRScreen() {
                   <Skeleton width={76} height={76} borderRadius={38} style={{ marginBottom: 8 }} />
                 ) : (
                   <View style={styles.avatarWrapper}>
-                    <View style={[styles.avatarRing, { borderColor: isDark ? '#6366F1' : '#4F46E5' }]}>
+                    <View style={[styles.avatarRing, { borderColor: colors.primary }]}>
                       <Avatar
                         name={displayName}
                         size={76}

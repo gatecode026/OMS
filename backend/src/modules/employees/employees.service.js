@@ -6,6 +6,33 @@
 import repository from './employees.repository.js';
 import logger from '../../config/logger.js';
 import { emitEntitySync } from '../../services/sync.service.js';
+import { uploadToImageKit } from '../../utils/imagekit.js';
+
+/** True for an inline base64 image data URI. */
+const isBase64Image = (v) =>
+  typeof v === 'string' && v.startsWith('data:image') && v.includes(';base64,');
+
+/**
+ * Upload any inline base64 avatar/photo to ImageKit and replace it with the CDN
+ * URL, so employee records (and the chat payloads that embed them) never carry
+ * multi-MB data URIs. Forward-only + safe: on any failure the original value is
+ * kept (uploadToImageKit itself returns the base64 back if keys are missing).
+ * Mutates and returns `data`.
+ */
+const resolveAvatarFields = async (data) => {
+  if (!data) return data;
+  for (const field of ['avatar', 'photoUrl']) {
+    if (isBase64Image(data[field])) {
+      try {
+        const url = await uploadToImageKit(data[field], `employee_${field}_${Date.now()}.jpg`);
+        if (url && !url.startsWith('data:')) data[field] = url;
+      } catch (err) {
+        logger.warn(`[Employees] avatar upload failed, keeping inline base64: ${err.message}`);
+      }
+    }
+  }
+  return data;
+};
 
 export const findAll = async (query) => {
   logger.info('Executing EmployeesService::findAll query');
@@ -25,6 +52,9 @@ export const createRecord = async (data, currentUser) => {
 
   // Always strip the frontend-supplied id – the backend generates a company-scoped one
   delete data.id;
+
+  // Convert any inline base64 avatar to an ImageKit URL before persisting.
+  await resolveAvatarFields(data);
 
   // Check username uniqueness
   if (data.username) {
@@ -54,6 +84,9 @@ export const updateRecord = async (id, data, currentUser) => {
   if (data.country !== undefined) {
     data.country = 'India';
   }
+
+  // Convert any inline base64 avatar to an ImageKit URL before persisting.
+  await resolveAvatarFields(data);
 
   // Check username uniqueness
   if (data.username) {
@@ -85,6 +118,8 @@ export const updateAvatarRecord = async (id, data, currentUser) => {
   const safePayload = {};
   if (data.avatar) safePayload.avatar = data.avatar;
   if (data.photoUrl) safePayload.photoUrl = data.photoUrl;
+  // Convert any inline base64 avatar to an ImageKit URL before persisting.
+  await resolveAvatarFields(safePayload);
   const record = await repository.updateAvatarDirect(id, safePayload);
   if (record && currentUser?.companyId) {
     emitEntitySync(currentUser.companyId, {

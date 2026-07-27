@@ -12,10 +12,13 @@ export interface ThemeColors {
   info: string;
   background: string;
   surface: string;
+  surfaceHighlight: string;
   card: string;
   border: string;
   text: string;
+  textPrimary: string;
   textMuted: string;
+  textSecondary: string;
   textLight: string;
   neutral: string;
   neutralLight: string;
@@ -31,10 +34,13 @@ export const lightColors: ThemeColors = {
   info: '#3B82F6', // Blue 500
   background: '#F8FAFC', // Slate 50
   surface: '#FFFFFF',
+  surfaceHighlight: '#F1F5F9',
   card: '#FFFFFF',
   border: '#E2E8F0', // Slate 200
   text: '#0F172A', // Slate 900
+  textPrimary: '#0F172A',
   textMuted: '#64748B', // Slate 500
+  textSecondary: '#64748B',
   textLight: '#94A3B8', // Slate 400
   neutral: '#475569', // Slate 600
   neutralLight: '#F1F5F9', // Slate 100
@@ -50,10 +56,13 @@ export const darkColors: ThemeColors = {
   info: '#60A5FA', // Blue 400
   background: '#090D16', // Dark background
   surface: '#111827', // Gray 900
+  surfaceHighlight: '#1E293B',
   card: '#1F2937', // Gray 800
   border: '#374151', // Gray 700
   text: '#F9FAFB', // Gray 50
+  textPrimary: '#F9FAFB',
   textMuted: '#9CA3AF', // Gray 400
+  textSecondary: '#9CA3AF',
   textLight: '#6B7280', // Gray 500
   neutral: '#9CA3AF',
   neutralLight: '#1E293B',

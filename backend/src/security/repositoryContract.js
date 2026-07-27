@@ -71,6 +71,8 @@ export const secureAggregationPipeline = async (pipeline, context, queryBuilder)
  */
 export const validateBranchScope = (context, resource, branchField = 'branch', moduleName = 'unknown', operation = 'read') => {
   if (context.isSuperAdmin || context.isCompanyAdmin) return true;
+  // Directory & Calling bypass: Allow reading employee profiles across branches within the company
+  if ((moduleName === 'Employee' || moduleName === 'Employees') && operation === 'read') return true;
   
   const userBranch = context.branch;
   const resourceBranch = resource[branchField];
@@ -90,6 +92,8 @@ export const validateBranchScope = (context, resource, branchField = 'branch', m
 export const validateDepartmentScope = (context, resource, deptField = 'department', moduleName = 'unknown', operation = 'read') => {
   const isBranchWideRole = ['hr_manager', 'finance_manager', 'branch_manager', 'branch_admin'].includes(context.role) || context.role?.toLowerCase().includes('hr');
   if (context.isSuperAdmin || context.isCompanyAdmin || isBranchWideRole) return true;
+  // Directory & Calling bypass: Allow reading employee profiles across departments within the company
+  if ((moduleName === 'Employee' || moduleName === 'Employees') && operation === 'read') return true;
   
   const userDept = context.department;
   const resourceDept = resource[deptField];
@@ -183,9 +187,12 @@ export const validateRepositoryAccess = async (operation, resource, options = {}
   // 1. Verify Action Level Permission Matrix
   let isAllowed = await checkActionPermission(moduleName, context.role, operation);
   
-  // Self-service bypass: Employees and Team Leaders can always read or update their own profile record.
-  // Field-level constraints will still prevent them from editing restricted fields like salary, role, etc.
-  if (!isAllowed && (moduleName === 'Employee' || moduleName === 'Employees') && (operation === 'read' || operation === 'update') && resource && (resource.id === context.userId || resource.userId === context.userId)) {
+  // Directory, Calling & Self-service bypass: Employees can read employee profiles within their company, and update their own record.
+  if (!isAllowed && (moduleName === 'Employee' || moduleName === 'Employees') && operation === 'read') {
+    if (!resource || !resource.companyId || !context.companyId || resource.companyId === context.companyId) {
+      isAllowed = true;
+    }
+  } else if (!isAllowed && (moduleName === 'Employee' || moduleName === 'Employees') && operation === 'update' && resource && (resource.id === context.userId || resource.userId === context.userId)) {
     isAllowed = true;
   }
 

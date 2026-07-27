@@ -20,6 +20,7 @@ import {
   FlatList,
   Animated,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,17 +33,19 @@ import useTheme from '../../../src/shared/hooks/useTheme';
 import { useAuthStore } from '../../../src/shared/store/authStore';
 import { Avatar, Badge, Button, TextField } from '../../../src/shared/components';
 import { useConversations } from '../../../src/features/chat';
-import { useQuery } from '@tanstack/react-query';
+import { useAttendance } from '../../../src/features/attendance/hooks/useAttendance';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../../../src/shared/services/apiClient';
+import profileApi from '../../../src/features/profile/api/profileApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-export type CalendarFilter = 'all' | 'meetings' | 'tasks' | 'attendance' | 'leave' | 'holiday' | 'birthday';
+export type CalendarFilter = 'all' | 'meetings' | 'holiday' | 'reminder';
 
 export interface CalendarEvent {
   id: string;
   title: string;
-  type: 'meeting' | 'task' | 'attendance' | 'leave' | 'holiday' | 'birthday';
+  type: 'meeting' | 'holiday' | 'reminder';
   time: string; // e.g. "10:00 AM"
   endTime?: string;
   date: string; // YYYY-MM-DD
@@ -58,16 +61,14 @@ export interface CalendarEvent {
 
 const EVENT_COLOR_MAP: Record<string, string> = {
   meeting: '#3B82F6',   // Blue
-  task: '#F97316',      // Orange
-  attendance: '#10B981',// Green
-  leave: '#8B5CF6',     // Purple
-  holiday: '#EC4899',   // Pink
-  birthday: '#EAB308',  // Yellow
+  holiday: '#EC4899',   // Pink / Purple
+  reminder: '#F97316',  // Orange
 };
 
 export default function CalendarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { colors, spacing, typography, radius, shadows, isDark } = useTheme();
   const user = useAuthStore((state) => state.user);
   const { data: conversations = [] } = useConversations();
@@ -86,119 +87,110 @@ export default function CalendarScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [isCreateMeetingModalOpen, setIsCreateMeetingModalOpen] = useState(false);
-  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
-  const [isRequestLeaveModalOpen, setIsRequestLeaveModalOpen] = useState(false);
   const [isAddReminderModalOpen, setIsAddReminderModalOpen] = useState(false);
-  const [isBookRoomModalOpen, setIsBookRoomModalOpen] = useState(false);
 
-  // Form states for modals
+  // Form states for Create Meeting
   const [newMeetingTitle, setNewMeetingTitle] = useState('');
-  const [newMeetingRoom, setNewMeetingRoom] = useState('');
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newReminderTitle, setNewReminderTitle] = useState('');
+  const [newMeetingDate, setNewMeetingDate] = useState('');
+  const [newMeetingStartTime, setNewMeetingStartTime] = useState('10:00');
+  const [newMeetingEndTime, setNewMeetingEndTime] = useState('11:00');
+  const [newMeetingLocation, setNewMeetingLocation] = useState('');
+  const [newMeetingDescription, setNewMeetingDescription] = useState('');
+  const [isSavingMeeting, setIsSavingMeeting] = useState(false);
 
-  // Fetch calendar events via React Query (with mock fallback matching PRD image)
-  const { data: serverEvents = [], isLoading, isError, refetch } = useQuery<CalendarEvent[]>({
-    queryKey: ['calendar-events', currentMonth.format('YYYY-MM')],
+  // Form states for Add Reminder
+  const [newReminderTitle, setNewReminderTitle] = useState('');
+  const [newReminderDate, setNewReminderDate] = useState('');
+  const [newReminderTime, setNewReminderTime] = useState('10:00');
+  const [newReminderDescription, setNewReminderDescription] = useState('');
+  const [isSavingReminder, setIsSavingReminder] = useState(false);
+
+  // Fetch real attendance status
+  const { todayRecord } = useAttendance();
+
+  // Fetch global holidays from backend
+  const { data: userHolidays = [], refetch: refetchHolidays } = useQuery({
+    queryKey: ['calendar-holidays'],
     queryFn: async () => {
       try {
-        const response = await apiClient.get(`/api/v1/calls/calendar?month=${currentMonth.format('YYYY-MM')}`);
-        return response.data?.data || [];
+        const response = await apiClient.get('/api/v1/holidays');
+        return response.data?.data || response.data || [];
       } catch (err) {
         return [];
       }
     },
   });
 
-  // Mock events dataset matching the exact visual spec in PRD image
-  const defaultEvents: CalendarEvent[] = useMemo(() => {
-    const todayStr = dayjs().format('YYYY-MM-DD');
-    return [
-      {
-        id: '1',
-        title: 'Q4 Strategy Sync',
-        type: 'meeting',
-        time: '10:00 AM',
-        date: todayStr,
-        badgeText: 'INTERNAL',
-        location: 'Meeting Room A',
-        participants: [
-          { name: 'Rahul Sharma', avatarUrl: 'https://i.pravatar.cc/100?img=33' },
-          { name: 'Priya Patel', avatarUrl: 'https://i.pravatar.cc/100?img=47' },
-          { name: 'Amit Verma', avatarUrl: 'https://i.pravatar.cc/100?img=12' },
-        ],
-        totalParticipantsCount: 9,
-        actionText: 'Join',
-        actionType: 'join',
-      },
-      {
-        id: '2',
-        title: 'Product Review: V2.0',
-        type: 'task',
-        time: '01:30 PM',
-        date: todayStr,
-        badgeText: 'PROJECT',
-        location: 'Video Conference',
-        participants: [
-          { name: 'Ananya Roy', avatarUrl: 'https://i.pravatar.cc/100?img=25' },
-          { name: 'Vikram Singh', avatarUrl: 'https://i.pravatar.cc/100?img=68' },
-          { name: 'Siddharth Rao', avatarUrl: 'https://i.pravatar.cc/100?img=15' },
-        ],
-        totalParticipantsCount: 6,
-        actionText: 'View Task',
-        actionType: 'view_task',
-      },
-      {
-        id: '3',
-        title: 'Client Catch-up',
-        type: 'meeting',
-        time: '04:00 PM',
-        date: todayStr,
-        badgeText: 'CLIENT',
-        location: 'Blue Bottle Coffee',
-        participants: [
-          { name: 'David Miller', avatarUrl: 'https://i.pravatar.cc/100?img=53' },
-          { name: 'Sarah Jenkins', avatarUrl: 'https://i.pravatar.cc/100?img=44' },
-        ],
-        totalParticipantsCount: 4,
-        actionText: 'Call',
-        actionType: 'call',
-      },
-      {
-        id: '4',
-        title: 'Design System Sprint Review',
-        type: 'meeting',
-        time: '11:00 AM',
-        date: dayjs().add(1, 'day').format('YYYY-MM-DD'),
-        badgeText: 'INTERNAL',
-        location: 'Design Studio 2',
-        participants: [
-          { name: 'Neha Gupta', avatarUrl: 'https://i.pravatar.cc/100?img=20' },
-          { name: 'Rohan Mehta', avatarUrl: 'https://i.pravatar.cc/100?img=59' },
-        ],
-        totalParticipantsCount: 5,
-        actionText: 'Join',
-        actionType: 'join',
-      },
-      {
-        id: '5',
-        title: 'Submit Expense Report',
-        type: 'task',
-        time: '03:00 PM',
-        date: dayjs().add(1, 'day').format('YYYY-MM-DD'),
-        badgeText: 'FINANCE',
-        location: 'OMS Portal',
-        participants: [],
-        totalParticipantsCount: 1,
-        actionText: 'View Task',
-        actionType: 'view_task',
-      },
-    ];
-  }, []);
+  // Fetch calendar events via React Query
+  const { data: serverEvents = [], isLoading, isError, refetch: refetchEvents } = useQuery<CalendarEvent[]>({
+    queryKey: ['calendar-events', currentMonth.format('YYYY-MM')],
+    queryFn: async () => {
+      try {
+        const fromDate = currentMonth.startOf('month').format('YYYY-MM-DD');
+        const toDate = currentMonth.endOf('month').format('YYYY-MM-DD');
+        const response = await apiClient.get(`/api/v1/events?from=${fromDate}&to=${toDate}`);
+        return response.data?.data || response.data || [];
+      } catch (err) {
+        return [];
+      }
+    },
+  });
 
+  // Combine real events into allEvents (ONLY meetings, holidays, and reminders)
   const allEvents = useMemo(() => {
-    return serverEvents.length > 0 ? serverEvents : defaultEvents;
-  }, [serverEvents, defaultEvents]);
+    const events: CalendarEvent[] = [];
+
+    // 1. Add server events of type meeting, holiday, or reminder
+    if (Array.isArray(serverEvents)) {
+      serverEvents.forEach((ev: any) => {
+        const typeClean = (ev.type || '').toLowerCase();
+        if (['meeting', 'holiday', 'reminder'].includes(typeClean)) {
+          events.push({
+            id: ev.id || ev._id || `evt-${Math.random()}`,
+            title: ev.title || 'Event',
+            type: typeClean as 'meeting' | 'holiday' | 'reminder',
+            time: ev.time || (ev.startTime ? dayjs(ev.startTime).format('hh:mm A') : 'All Day'),
+            endTime: ev.endTime,
+            date: ev.date ? dayjs(ev.date).format('YYYY-MM-DD') : (ev.startTime ? dayjs(ev.startTime).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')),
+            badgeText: (ev.badgeText || typeClean).toUpperCase(),
+            location: ev.location || ev.description,
+            participants: ev.participants || ev.attendees || [],
+            totalParticipantsCount: ev.totalParticipantsCount || (ev.attendees ? ev.attendees.length : 0),
+            actionText: ev.actionText || (typeClean === 'meeting' ? 'Join' : 'Details'),
+            actionType: ev.actionType || (typeClean === 'meeting' ? 'join' : 'details'),
+          });
+        }
+      });
+    }
+
+    // 2. Add global company holidays
+    if (Array.isArray(userHolidays)) {
+      userHolidays.forEach((h: any) => {
+        const holidayDate = h.date;
+        if (holidayDate) {
+          const dateStr = dayjs(holidayDate).format('YYYY-MM-DD');
+          // Avoid duplicates if already present in serverEvents
+          if (!events.some((e) => e.date === dateStr && e.title === h.name)) {
+            events.push({
+              id: `holiday-${h.id || h._id}`,
+              title: h.name || 'Global Holiday',
+              type: 'holiday',
+              time: 'All Day',
+              date: dateStr,
+              badgeText: (h.type || 'GLOBAL HOLIDAY').toUpperCase(),
+              location: h.description || 'Company Holiday',
+              participants: [],
+              totalParticipantsCount: 0,
+              actionText: 'Holiday Details',
+              actionType: 'details',
+            });
+          }
+        }
+      });
+    }
+
+    return events;
+  }, [serverEvents, userHolidays]);
 
   // Map events by date for quick lookup in calendar cells
   const eventsByDate = useMemo(() => {
@@ -210,9 +202,46 @@ export default function CalendarScreen() {
     return map;
   }, [allEvents]);
 
-  // Filtered schedule events for selected date
+  // Metric overview statistics calculated dynamically from meetings, holidays & reminders
+  const todayStr = dayjs().format('YYYY-MM-DD');
+
+  const meetingsTodayCount = useMemo(() => {
+    return (eventsByDate[todayStr] || []).filter((e) => e.type === 'meeting').length;
+  }, [eventsByDate, todayStr]);
+
+  const remindersTodayCount = useMemo(() => {
+    return (eventsByDate[todayStr] || []).filter((e) => e.type === 'reminder').length;
+  }, [eventsByDate, todayStr]);
+
+  const holidaysCount = useMemo(() => {
+    return allEvents.filter((e) => e.type === 'holiday').length;
+  }, [allEvents]);
+
+  const totalEventsCount = useMemo(() => {
+    return allEvents.length;
+  }, [allEvents]);
+
+  // Filtered schedule events for selected date (with automatic Sunday Week Off)
   const filteredEventsForDate = useMemo(() => {
-    const eventsForDay = eventsByDate[selectedDate] || [];
+    const eventsForDay = [...(eventsByDate[selectedDate] || [])];
+    const isSunday = dayjs(selectedDate).day() === 0;
+
+    if (isSunday && !eventsForDay.some((e) => e.title.toLowerCase().includes('week off'))) {
+      eventsForDay.unshift({
+        id: `week-off-${selectedDate}`,
+        title: 'Sunday - Weekly Off',
+        type: 'holiday',
+        time: 'All Day',
+        date: selectedDate,
+        badgeText: 'WEEK OFF',
+        location: 'Company Weekly Off',
+        participants: [],
+        totalParticipantsCount: 0,
+        actionText: 'Weekly Off',
+        actionType: 'details',
+      });
+    }
+
     if (activeFilter === 'all') return eventsForDay;
     return eventsForDay.filter((e) => e.type === activeFilter);
   }, [eventsByDate, selectedDate, activeFilter]);
@@ -262,6 +291,16 @@ export default function CalendarScreen() {
     return days;
   }, [selectedDate, currentMonth]);
 
+  // Group days into rows of 7 for clean flex layout (prevents premature wrapping)
+  const calendarRows = useMemo(() => {
+    const daysList = viewMode === 'month' ? calendarDays : weekDays;
+    const rows: Array<Array<{ date: dayjs.Dayjs; isCurrentMonth: boolean; dateStr: string }>> = [];
+    for (let i = 0; i < daysList.length; i += 7) {
+      rows.push(daysList.slice(i, i + 7));
+    }
+    return rows;
+  }, [viewMode, calendarDays, weekDays]);
+
   const handlePrevMonth = () => {
     setCurrentMonth((prev) => prev.subtract(1, 'month'));
   };
@@ -278,11 +317,105 @@ export default function CalendarScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        refetchEvents(),
+        refetchHolidays(),
+        profileApi.fetchProfile(),
+      ]);
+    } catch (err) {
+      console.warn('[CalendarScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
+    }
   };
 
-  // Search filtered results across meetings, tasks, leave, holidays
+  const handleSaveMeeting = async () => {
+    if (!newMeetingTitle.trim()) {
+      Alert.alert('Validation Error', 'Please enter a meeting title.');
+      return;
+    }
+
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    const meetingDate = newMeetingDate.trim() || selectedDate || todayStr;
+    if (meetingDate < todayStr) {
+      Alert.alert('Validation Error', 'Cannot schedule meetings before today.');
+      return;
+    }
+
+    try {
+      setIsSavingMeeting(true);
+      await apiClient.post('/api/v1/events', {
+        title: newMeetingTitle.trim(),
+        type: 'meeting',
+        date: meetingDate,
+        startTime: newMeetingStartTime.trim() || '10:00',
+        endTime: newMeetingEndTime.trim() || '11:00',
+        location: newMeetingLocation.trim() || 'Meeting Room',
+        description: newMeetingDescription.trim(),
+      });
+
+      Alert.alert('Success', 'Meeting created successfully!');
+      setIsCreateMeetingModalOpen(false);
+      setNewMeetingTitle('');
+      setNewMeetingDate('');
+      setNewMeetingStartTime('10:00');
+      setNewMeetingEndTime('11:00');
+      setNewMeetingLocation('');
+      setNewMeetingDescription('');
+      refetchEvents();
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.error || err?.message || 'Failed to create meeting.';
+      Alert.alert('Error', errorMsg);
+    } finally {
+      setIsSavingMeeting(false);
+    }
+  };
+
+  const handleSaveReminder = async () => {
+    if (!newReminderTitle.trim()) {
+      Alert.alert('Validation Error', 'Please enter a reminder title.');
+      return;
+    }
+
+    const todayStr = dayjs().format('YYYY-MM-DD');
+    const reminderDate = newReminderDate.trim() || selectedDate || todayStr;
+    if (reminderDate < todayStr) {
+      Alert.alert('Validation Error', 'Cannot set reminders before today.');
+      return;
+    }
+
+    try {
+      setIsSavingReminder(true);
+      await apiClient.post('/api/v1/events', {
+        title: newReminderTitle.trim(),
+        type: 'reminder',
+        date: reminderDate,
+        startTime: newReminderTime.trim() || '10:00',
+        location: 'Reminder',
+        description: newReminderDescription.trim(),
+      });
+
+      Alert.alert('Success', 'Reminder added successfully!');
+      setIsAddReminderModalOpen(false);
+      setNewReminderTitle('');
+      setNewReminderDate('');
+      setNewReminderTime('10:00');
+      setNewReminderDescription('');
+      refetchEvents();
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.error || err?.message || 'Failed to add reminder.';
+      Alert.alert('Error', errorMsg);
+    } finally {
+      setIsSavingReminder(false);
+    }
+  };
+
+  // Search filtered results across meetings, leave, holidays
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const q = searchQuery.toLowerCase();
@@ -299,31 +432,22 @@ export default function CalendarScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent />
 
       {/* ─── 1. OMS HEADER ─── */}
-      <View style={[styles.headerRow, { paddingTop: insets.top + 12, backgroundColor: colors.surface }]}>
-        <Pressable
-          style={styles.headerLeft}
-          onPress={() => router.push('/(app)/attendance-qr' as any)}
-          accessibilityLabel="Profile settings"
-        >
-          <View style={styles.avatarWrapper}>
-            <Avatar
-              name={user?.name || 'Rahul Sharma'}
-              size={42}
-              source={user?.avatarUrl || (user as any)?.avatar || undefined}
-            />
-            <View style={styles.onlineDot} />
-          </View>
-          <View style={styles.headerTextContainer}>
-            <Text style={[styles.greetingTitle, { color: colors.text, fontFamily: typography.fonts.bold }]}>
-              Good Morning, {user?.name?.split(' ')[0] || 'Rahul'} 👋
+      <View style={[styles.headerRow, { paddingTop: insets.top + 12, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+        <View style={styles.headerTitleGroup}>
+          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityLabel="Go back">
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </Pressable>
+          <View style={{ marginLeft: 10 }}>
+            <Text style={[styles.headerTitleText, { color: colors.text, fontFamily: typography.fonts.bold }]}>
+              Calendar
             </Text>
-            <Text style={[styles.greetingSubtitle, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
-              Today is {dayjs().format('dddd, D MMM YYYY')}
+            <Text style={[styles.headerSubtitleText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
+              {dayjs().format('dddd, D MMM YYYY')}
             </Text>
           </View>
-        </Pressable>
+        </View>
 
-        <View style={styles.headerRight}>
+        <View style={styles.headerRightGroup}>
           <Pressable
             style={[styles.headerIconButton, { backgroundColor: colors.background }]}
             onPress={() => setIsSearchVisible(true)}
@@ -342,14 +466,19 @@ export default function CalendarScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.headerIconButton, { backgroundColor: colors.background }]}
-            onPress={() => setIsFabOpen(true)}
-            accessibilityLabel="Options"
+            onPress={() => router.push('/(app)/attendance-qr' as any)}
+            accessibilityLabel="Profile settings"
+            style={{ marginLeft: 6 }}
           >
-            <Ionicons name="ellipsis-vertical-outline" size={20} color={colors.text} />
+            <Avatar
+              name={user?.name || 'User'}
+              size={36}
+              source={user?.avatarUrl || (user as any)?.avatar || undefined}
+            />
           </Pressable>
         </View>
       </View>
+
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
@@ -396,7 +525,16 @@ export default function CalendarScreen() {
           {/* Weekday Labels Header */}
           <View style={styles.weekdayRow}>
             {['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].map((day) => (
-              <Text key={day} style={[styles.weekdayText, { color: colors.textMuted, fontFamily: typography.fonts.semibold }]}>
+              <Text
+                key={day}
+                style={[
+                  styles.weekdayText,
+                  {
+                    color: day === 'SU' ? '#EF4444' : colors.textMuted,
+                    fontFamily: typography.fonts.semibold,
+                  },
+                ]}
+              >
                 {day}
               </Text>
             ))}
@@ -404,46 +542,58 @@ export default function CalendarScreen() {
 
           {/* Date Grid Cells */}
           <View style={styles.gridContainer}>
-            {(viewMode === 'month' ? calendarDays : weekDays).map((item, index) => {
-              const isSelected = item.dateStr === selectedDate;
-              const dayEvents = eventsByDate[item.dateStr] || [];
-              const isToday = item.dateStr === dayjs().format('YYYY-MM-DD');
+            {calendarRows.map((row, rowIndex) => (
+              <View key={`row-${rowIndex}`} style={styles.gridRow}>
+                {row.map((item, colIndex) => {
+                  const isSelected = item.dateStr === selectedDate;
+                  const dayEvents = eventsByDate[item.dateStr] || [];
+                  const isToday = item.dateStr === dayjs().format('YYYY-MM-DD');
+                  const isSunday = item.date.day() === 0;
 
-              return (
-                <Pressable
-                  key={`${item.dateStr}-${index}`}
-                  style={[
-                    styles.dayCell,
-                    isSelected && [styles.selectedDayCell, { backgroundColor: colors.primary }],
-                  ]}
-                  onPress={() => setSelectedDate(item.dateStr)}
-                >
-                  <Text
-                    style={[
-                      styles.dayNumberText,
-                      {
-                        color: isSelected
-                          ? '#FFFFFF'
-                          : item.isCurrentMonth
-                          ? colors.text
-                          : colors.textMuted + '66',
-                        fontFamily: isSelected || isToday ? typography.fonts.bold : typography.fonts.medium,
-                      },
-                    ]}
-                  >
-                    {item.date.date()}
-                  </Text>
+                  return (
+                    <Pressable
+                      key={`${item.dateStr}-${colIndex}`}
+                      style={[
+                        styles.dayCell,
+                        isSunday && !isSelected && { backgroundColor: isDark ? 'rgba(239,68,68,0.1)' : '#FEF2F2' },
+                        isSelected && [styles.selectedDayCell, { backgroundColor: colors.primary }],
+                      ]}
+                      onPress={() => setSelectedDate(item.dateStr)}
+                    >
+                      <Text
+                        style={[
+                          styles.dayNumberText,
+                          {
+                            color: isSelected
+                              ? '#FFFFFF'
+                              : isSunday
+                              ? '#EF4444'
+                              : item.isCurrentMonth
+                              ? colors.text
+                              : colors.textMuted + '66',
+                            fontFamily: isSelected || isToday || isSunday ? typography.fonts.bold : typography.fonts.medium,
+                          },
+                        ]}
+                      >
+                        {item.date.date()}
+                      </Text>
 
-                  {/* Multi Event Dots */}
-                  <View style={styles.dotsRow}>
-                    {dayEvents.slice(0, 3).map((evt, idx) => {
-                      const dotColor = isSelected ? '#FFFFFF' : EVENT_COLOR_MAP[evt.type] || colors.primary;
-                      return <View key={idx} style={[styles.eventDot, { backgroundColor: dotColor }]} />;
-                    })}
-                  </View>
-                </Pressable>
-              );
-            })}
+                      {/* Multi Event Dots */}
+                      <View style={styles.dotsRow}>
+                        {dayEvents.length > 0 ? (
+                          dayEvents.slice(0, 3).map((evt, idx) => {
+                            const dotColor = isSelected ? '#FFFFFF' : EVENT_COLOR_MAP[evt.type] || colors.primary;
+                            return <View key={idx} style={[styles.eventDot, { backgroundColor: dotColor }]} />;
+                          })
+                        ) : isSunday ? (
+                          <View style={[styles.eventDot, { backgroundColor: isSelected ? '#FFFFFF' : '#EF4444' }]} />
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
         </View>
 
@@ -495,66 +645,6 @@ export default function CalendarScreen() {
           <Pressable
             style={[
               styles.filterChip,
-              activeFilter === 'tasks'
-                ? { backgroundColor: colors.primary }
-                : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-            ]}
-            onPress={() => setActiveFilter('tasks')}
-          >
-            <View style={[styles.chipDot, { backgroundColor: '#F97316' }]} />
-            <Text
-              style={[
-                styles.filterChipText,
-                { color: activeFilter === 'tasks' ? '#FFFFFF' : colors.text, fontFamily: typography.fonts.semibold },
-              ]}
-            >
-              Tasks
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.filterChip,
-              activeFilter === 'attendance'
-                ? { backgroundColor: colors.primary }
-                : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-            ]}
-            onPress={() => setActiveFilter('attendance')}
-          >
-            <View style={[styles.chipDot, { backgroundColor: '#10B981' }]} />
-            <Text
-              style={[
-                styles.filterChipText,
-                { color: activeFilter === 'attendance' ? '#FFFFFF' : colors.text, fontFamily: typography.fonts.semibold },
-              ]}
-            >
-              Attendance
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.filterChip,
-              activeFilter === 'leave'
-                ? { backgroundColor: colors.primary }
-                : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-            ]}
-            onPress={() => setActiveFilter('leave')}
-          >
-            <View style={[styles.chipDot, { backgroundColor: '#8B5CF6' }]} />
-            <Text
-              style={[
-                styles.filterChipText,
-                { color: activeFilter === 'leave' ? '#FFFFFF' : colors.text, fontFamily: typography.fonts.semibold },
-              ]}
-            >
-              Leave
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.filterChip,
               activeFilter === 'holiday'
                 ? { backgroundColor: colors.primary }
                 : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
@@ -571,6 +661,26 @@ export default function CalendarScreen() {
               Holidays
             </Text>
           </Pressable>
+
+          <Pressable
+            style={[
+              styles.filterChip,
+              activeFilter === 'reminder'
+                ? { backgroundColor: colors.primary }
+                : { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+            ]}
+            onPress={() => setActiveFilter('reminder')}
+          >
+            <View style={[styles.chipDot, { backgroundColor: '#F97316' }]} />
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: activeFilter === 'reminder' ? '#FFFFFF' : colors.text, fontFamily: typography.fonts.semibold },
+              ]}
+            >
+              Reminders
+            </Text>
+          </Pressable>
         </ScrollView>
 
         {/* ─── 5. METRIC OVERVIEW CARDS ─── */}
@@ -584,58 +694,50 @@ export default function CalendarScreen() {
             <View style={[styles.metricIconBox, { backgroundColor: '#EFF6FF' }]}>
               <Ionicons name="calendar-outline" size={20} color="#3B82F6" />
             </View>
-            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold }]}>03</Text>
+            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold }]}>
+              {String(meetingsTodayCount).padStart(2, '0')}
+            </Text>
             <Text style={[styles.metricLabelText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
               Meetings Today
             </Text>
           </View>
 
-          {/* Card 2: Tasks Today */}
+          {/* Card 2: Reminders Today */}
           <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={[styles.metricIconBox, { backgroundColor: '#FFF7ED' }]}>
-              <Ionicons name="clipboard-outline" size={20} color="#F97316" />
+              <Ionicons name="alarm-outline" size={20} color="#F97316" />
             </View>
-            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold }]}>05</Text>
+            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold }]}>
+              {String(remindersTodayCount).padStart(2, '0')}
+            </Text>
             <Text style={[styles.metricLabelText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
-              Tasks Today
+              Reminders Today
             </Text>
           </View>
 
-          {/* Card 3: Checked In */}
-          <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.metricIconBox, { backgroundColor: '#ECFDF5' }]}>
-              <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
-            </View>
-            <Text style={[styles.metricSmallText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
-              Checked In
-            </Text>
-            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold, fontSize: 16 }]}>
-              09:15 <Text style={{ fontSize: 11, color: colors.textMuted }}>AM</Text>
-            </Text>
-            <View style={styles.onTimeBadge}>
-              <Text style={styles.onTimeText}>On Time</Text>
-            </View>
-          </View>
-
-          {/* Card 4: Pending Leave */}
-          <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.metricIconBox, { backgroundColor: '#F3E8FF' }]}>
-              <Ionicons name="airplane-outline" size={20} color="#8B5CF6" />
-            </View>
-            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold }]}>01</Text>
-            <Text style={[styles.metricLabelText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
-              Pending Leave
-            </Text>
-          </View>
-
-          {/* Card 5: Upcoming Holidays */}
+          {/* Card 3: Global Holidays */}
           <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={[styles.metricIconBox, { backgroundColor: '#FDF2F8' }]}>
               <Ionicons name="gift-outline" size={20} color="#EC4899" />
             </View>
-            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold }]}>02</Text>
+            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold }]}>
+              {String(holidaysCount).padStart(2, '0')}
+            </Text>
             <Text style={[styles.metricLabelText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
-              Upcoming Holidays
+              Global Holidays
+            </Text>
+          </View>
+
+          {/* Card 4: Total Schedule */}
+          <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.metricIconBox, { backgroundColor: '#F3E8FF' }]}>
+              <Ionicons name="layers-outline" size={20} color="#8B5CF6" />
+            </View>
+            <Text style={[styles.metricNumberText, { color: colors.text, fontFamily: typography.fonts.bold }]}>
+              {String(totalEventsCount).padStart(2, '0')}
+            </Text>
+            <Text style={[styles.metricLabelText, { color: colors.textMuted, fontFamily: typography.fonts.medium }]}>
+              Total Events
             </Text>
           </View>
         </ScrollView>
@@ -858,51 +960,12 @@ export default function CalendarScreen() {
               style={styles.fabMenuItem}
               onPress={() => {
                 setIsFabOpen(false);
-                setIsCreateTaskModalOpen(true);
-              }}
-            >
-              <Ionicons name="clipboard-outline" size={18} color="#F97316" />
-              <Text style={[styles.fabMenuText, { color: colors.text, fontFamily: typography.fonts.semibold }]}>
-                Create Task
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.fabMenuItem}
-              onPress={() => {
-                setIsFabOpen(false);
-                setIsRequestLeaveModalOpen(true);
-              }}
-            >
-              <Ionicons name="airplane-outline" size={18} color="#8B5CF6" />
-              <Text style={[styles.fabMenuText, { color: colors.text, fontFamily: typography.fonts.semibold }]}>
-                Request Leave
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.fabMenuItem}
-              onPress={() => {
-                setIsFabOpen(false);
                 setIsAddReminderModalOpen(true);
               }}
             >
-              <Ionicons name="notifications-outline" size={18} color="#EC4899" />
+              <Ionicons name="notifications-outline" size={18} color="#F97316" />
               <Text style={[styles.fabMenuText, { color: colors.text, fontFamily: typography.fonts.semibold }]}>
                 Add Reminder
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.fabMenuItem}
-              onPress={() => {
-                setIsFabOpen(false);
-                setIsBookRoomModalOpen(true);
-              }}
-            >
-              <Ionicons name="business-outline" size={18} color="#10B981" />
-              <Text style={[styles.fabMenuText, { color: colors.text, fontFamily: typography.fonts.semibold }]}>
-                Book Room
               </Text>
             </Pressable>
           </View>
@@ -967,17 +1030,59 @@ export default function CalendarScreen() {
             <Text style={[styles.modalTitle, { color: colors.text, fontFamily: typography.fonts.bold, marginBottom: 12 }]}>
               Create New Meeting
             </Text>
-            <TextField label="Meeting Title" placeholder="e.g. Q4 Sprint Planning" value={newMeetingTitle} onChangeText={setNewMeetingTitle} />
-            <TextField label="Meeting Room / Link" placeholder="e.g. Meeting Room A" value={newMeetingRoom} onChangeText={setNewMeetingRoom} style={{ marginTop: 10 }} />
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              <TextField
+                label="Meeting Title *"
+                placeholder="e.g. Q4 Sprint Planning"
+                value={newMeetingTitle}
+                onChangeText={setNewMeetingTitle}
+              />
+              <TextField
+                label="Date (YYYY-MM-DD)"
+                placeholder={selectedDate}
+                value={newMeetingDate}
+                onChangeText={setNewMeetingDate}
+                style={{ marginTop: 10 }}
+              />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="Start Time (HH:mm)"
+                    placeholder="10:00"
+                    value={newMeetingStartTime}
+                    onChangeText={setNewMeetingStartTime}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="End Time (HH:mm)"
+                    placeholder="11:00"
+                    value={newMeetingEndTime}
+                    onChangeText={setNewMeetingEndTime}
+                  />
+                </View>
+              </View>
+              <TextField
+                label="Location / Room / Link"
+                placeholder="e.g. Conference Room A or Google Meet"
+                value={newMeetingLocation}
+                onChangeText={setNewMeetingLocation}
+                style={{ marginTop: 10 }}
+              />
+              <TextField
+                label="Description"
+                placeholder="Optional notes or agenda"
+                value={newMeetingDescription}
+                onChangeText={setNewMeetingDescription}
+                style={{ marginTop: 10 }}
+              />
+            </ScrollView>
             <View style={styles.modalFooterRow}>
               <Button title="Cancel" variant="outlined" onPress={() => setIsCreateMeetingModalOpen(false)} style={{ flex: 1, marginRight: 6 }} />
               <Button
-                title="Save Meeting"
-                onPress={() => {
-                  setIsCreateMeetingModalOpen(false);
-                  setNewMeetingTitle('');
-                  setNewMeetingRoom('');
-                }}
+                title={isSavingMeeting ? 'Saving...' : 'Save Meeting'}
+                loading={isSavingMeeting}
+                onPress={handleSaveMeeting}
                 style={{ flex: 1, marginLeft: 6 }}
               />
             </View>
@@ -985,45 +1090,52 @@ export default function CalendarScreen() {
         </View>
       </Modal>
 
-      {/* ─── 10. CREATE TASK MODAL ─── */}
-      <Modal visible={isCreateTaskModalOpen} animationType="slide" transparent onRequestClose={() => setIsCreateTaskModalOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.formModalContent, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.text, fontFamily: typography.fonts.bold, marginBottom: 12 }]}>
-              Create New Task
-            </Text>
-            <TextField label="Task Title" placeholder="e.g. Prepare deck for client" value={newTaskTitle} onChangeText={setNewTaskTitle} />
-            <View style={styles.modalFooterRow}>
-              <Button title="Cancel" variant="outlined" onPress={() => setIsCreateTaskModalOpen(false)} style={{ flex: 1, marginRight: 6 }} />
-              <Button
-                title="Save Task"
-                onPress={() => {
-                  setIsCreateTaskModalOpen(false);
-                  setNewTaskTitle('');
-                }}
-                style={{ flex: 1, marginLeft: 6 }}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── 11. ADD REMINDER MODAL ─── */}
+      {/* ─── 10. ADD REMINDER MODAL ─── */}
       <Modal visible={isAddReminderModalOpen} animationType="slide" transparent onRequestClose={() => setIsAddReminderModalOpen(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.formModalContent, { backgroundColor: colors.surface }]}>
             <Text style={[styles.modalTitle, { color: colors.text, fontFamily: typography.fonts.bold, marginBottom: 12 }]}>
               Add Reminder
             </Text>
-            <TextField label="Reminder Note" placeholder="e.g. Follow up on proposal" value={newReminderTitle} onChangeText={setNewReminderTitle} />
+            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+              <TextField
+                label="Reminder Title *"
+                placeholder="e.g. Follow up on client proposal"
+                value={newReminderTitle}
+                onChangeText={setNewReminderTitle}
+              />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="Date (YYYY-MM-DD)"
+                    placeholder={selectedDate}
+                    value={newReminderDate}
+                    onChangeText={setNewReminderDate}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <TextField
+                    label="Time (HH:mm)"
+                    placeholder="10:00"
+                    value={newReminderTime}
+                    onChangeText={setNewReminderTime}
+                  />
+                </View>
+              </View>
+              <TextField
+                label="Note / Details"
+                placeholder="Optional reminder details"
+                value={newReminderDescription}
+                onChangeText={setNewReminderDescription}
+                style={{ marginTop: 10 }}
+              />
+            </ScrollView>
             <View style={styles.modalFooterRow}>
               <Button title="Cancel" variant="outlined" onPress={() => setIsAddReminderModalOpen(false)} style={{ flex: 1, marginRight: 6 }} />
               <Button
-                title="Set Reminder"
-                onPress={() => {
-                  setIsAddReminderModalOpen(false);
-                  setNewReminderTitle('');
-                }}
+                title={isSavingReminder ? 'Setting...' : 'Set Reminder'}
+                loading={isSavingReminder}
+                onPress={handleSaveReminder}
                 style={{ flex: 1, marginLeft: 6 }}
               />
             </View>
@@ -1047,33 +1159,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
   },
-  headerLeft: {
+  headerTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  avatarWrapper: {
-    position: 'relative',
+  backButton: {
+    padding: 4,
   },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 1,
-    right: 1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#10B981',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+  headerTitleText: {
+    fontSize: 18,
   },
-  headerTextContainer: {
-    marginLeft: 10,
+  headerSubtitleText: {
+    fontSize: 11,
+    marginTop: 1,
   },
-  greetingTitle: {
-    fontSize: 16,
-  },
-  greetingSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerRight: {
     flexDirection: 'row',
@@ -1160,22 +1262,24 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0,0,0,0.04)',
   },
   weekdayText: {
+    flex: 1,
     fontSize: 12,
-    width: (SCREEN_WIDTH - 64) / 7,
     textAlign: 'center',
   },
   gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     marginTop: 8,
   },
+  gridRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 2,
+  },
   dayCell: {
-    width: (SCREEN_WIDTH - 64) / 7,
+    flex: 1,
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 14,
-    marginVertical: 2,
   },
   selectedDayCell: {
     borderRadius: 14,

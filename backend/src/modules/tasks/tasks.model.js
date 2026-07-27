@@ -58,6 +58,8 @@ const taskSchema = new mongoose.Schema({
 taskSchema.plugin(tenantPlugin);
 taskSchema.index({ companyId: 1, id: 1 }, { unique: true, sparse: true });
 taskSchema.index({ companyId: 1, taskCode: 1 }, { unique: true, sparse: true });
+taskSchema.index({ companyId: 1, assigneeId: 1, status: 1, createdAt: -1 });
+taskSchema.index({ companyId: 1, status: 1, createdAt: -1 });
 
 taskSchema.pre('save', async function(next) {
   if (this.isNew) {

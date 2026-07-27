@@ -22,10 +22,13 @@ const MONTHS = [
 
 const parseTimeToHours = (timeStr) => {
   if (!timeStr || timeStr === '--:--') return 0;
-  const parts = timeStr.split(':');
-  if (parts.length < 2) return 0;
-  const h = parseInt(parts[0], 10) || 0;
-  const m = parseInt(parts[1], 10) || 0;
+  const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return 0;
+  let h = parseInt(match[1], 10) || 0;
+  const m = parseInt(match[2], 10) || 0;
+  const ampm = (match[3] || '').toUpperCase();
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
   return h + m / 60;
 };
 

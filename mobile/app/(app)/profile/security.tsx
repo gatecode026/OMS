@@ -217,22 +217,6 @@ export default function SecurityScreen() {
           </View>
         </InfoCard>
 
-        {/* Change Password Card */}
-        <InfoCard title="Password & Authentication" icon="lock-closed-outline" iconColor="#6366F1">
-          <Text style={{ fontSize: 13, fontFamily: typography.fonts.medium, color: colors.textMuted, marginBottom: 12 }}>
-            We recommend changing your password regularly to keep your enterprise account secure.
-          </Text>
-          <Pressable
-            onPress={() => setPasswordModalVisible(true)}
-            style={[styles.primaryActionBtn, { backgroundColor: colors.primary, borderRadius: radius.md }]}
-          >
-            <Ionicons name="key-outline" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={{ color: '#FFFFFF', fontFamily: typography.fonts.bold, fontSize: 14 }}>
-              Change Password
-            </Text>
-          </Pressable>
-        </InfoCard>
-
         {/* Active Login Sessions */}
         <InfoCard title="Active Login Sessions" icon="phone-portrait-outline" iconColor="#10B981">
           {sessionsLoading ? (
@@ -243,18 +227,24 @@ export default function SecurityScreen() {
             <View style={{ gap: spacing.md }}>
               {sortedSessions.map((session, idx) => {
                 const isCurrent = session.id === currentSessionId;
+                const deviceName = session.os && session.browser ? `${session.os} • ${session.browser}` : (session.os || session.browser || session.deviceType || 'Active Device');
+                let formattedDate = session.lastActivity || session.loginTime || 'Active';
+                if (formattedDate && !isNaN(new Date(formattedDate).getTime())) {
+                  formattedDate = new Date(formattedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                }
+
                 return (
                   <View key={session.id || idx} style={[styles.sessionItem, { borderBottomColor: colors.border, borderBottomWidth: idx < sortedSessions.length - 1 ? 1 : 0, paddingBottom: idx < sortedSessions.length - 1 ? spacing.md : 0 }]}>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Ionicons
-                          name={session.deviceType === 'Mobile' ? 'phone-portrait-outline' : 'desktop-outline'}
+                          name={session.deviceType === 'Mobile' || session.os === 'Android' || session.os === 'iOS' ? 'phone-portrait-outline' : 'desktop-outline'}
                           size={18}
                           color={isCurrent ? colors.success : colors.text}
                           style={{ marginRight: 6 }}
                         />
                         <Text style={{ fontSize: 14, fontFamily: typography.fonts.bold, color: colors.text }}>
-                          {session.os || 'Unknown OS'} • {session.browser || 'Browser'}
+                          {deviceName}
                         </Text>
                         {isCurrent && (
                           <View style={[styles.currentTag, { backgroundColor: `${colors.success}15`, borderRadius: radius.sm }]}>
@@ -263,10 +253,10 @@ export default function SecurityScreen() {
                         )}
                       </View>
                       <Text style={{ fontSize: 12, fontFamily: typography.fonts.medium, color: colors.textMuted, marginTop: 4 }}>
-                        IP Address: {session.ipAddress || '—'} • {session.location || 'Unknown Location'}
+                        IP Address: {session.ipAddress || '—'}
                       </Text>
                       <Text style={{ fontSize: 11, fontFamily: typography.fonts.regular, color: colors.textLight, marginTop: 2 }}>
-                        Last Active: {new Date(session.lastActivity).toLocaleString('en-IN')}
+                        Last Active: {formattedDate}
                       </Text>
                     </View>
 
@@ -299,78 +289,6 @@ export default function SecurityScreen() {
           )}
         </InfoCard>
       </ScrollView>
-
-      {/* CHANGE PASSWORD MODAL */}
-      <Modal
-        visible={passwordModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setPasswordModalVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card, borderRadius: radius.lg, borderColor: colors.border, borderWidth: 1, padding: spacing.lg }]}>
-            <View style={styles.modalHeader}>
-              <Text style={{ fontSize: 18, fontFamily: typography.fonts.bold, color: colors.text }}>
-                Change Password
-              </Text>
-              <Pressable onPress={() => setPasswordModalVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textLight} />
-              </Pressable>
-            </View>
-
-            <ScrollView contentContainerStyle={{ gap: 12, paddingVertical: spacing.md }} showsVerticalScrollIndicator={false}>
-              <Text style={[styles.formLabel, { color: colors.textMuted, fontFamily: typography.fonts.bold }]}>Current Password</Text>
-              <TextInput
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                secureTextEntry
-                placeholder="Enter current password"
-                placeholderTextColor={colors.textLight}
-                style={[styles.input, { color: colors.text, borderColor: colors.border, borderRadius: radius.md, backgroundColor: isDark ? colors.background : '#F8FAFC' }]}
-              />
-
-              <Text style={[styles.formLabel, { color: colors.textMuted, fontFamily: typography.fonts.bold }]}>New Password</Text>
-              <TextInput
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
-                placeholder="Enter new password"
-                placeholderTextColor={colors.textLight}
-                style={[styles.input, { color: colors.text, borderColor: colors.border, borderRadius: radius.md, backgroundColor: isDark ? colors.background : '#F8FAFC' }]}
-              />
-
-              <Text style={[styles.formLabel, { color: colors.textMuted, fontFamily: typography.fonts.bold }]}>Confirm New Password</Text>
-              <TextInput
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                placeholder="Confirm new password"
-                placeholderTextColor={colors.textLight}
-                style={[styles.input, { color: colors.text, borderColor: colors.border, borderRadius: radius.md, backgroundColor: isDark ? colors.background : '#F8FAFC' }]}
-              />
-            </ScrollView>
-
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: spacing.md }}>
-              <Pressable
-                onPress={() => setPasswordModalVisible(false)}
-                style={{ paddingVertical: 8, paddingHorizontal: 16 }}
-              >
-                <Text style={{ color: colors.textMuted, fontFamily: typography.fonts.bold }}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleChangePassword}
-                disabled={passwordChanging}
-                style={{ backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center' }}
-              >
-                {passwordChanging && <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />}
-                <Text style={{ color: '#FFFFFF', fontFamily: typography.fonts.bold }}>
-                  Save
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

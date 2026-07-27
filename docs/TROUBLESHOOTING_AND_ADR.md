@@ -37,7 +37,7 @@
 ## 2. Developer Knowledge Base & FAQs
 
 ### Q1: How do I test real-time presence between Web and Mobile locally?
-Ensure both web and mobile point to `https://oms-xdcz.onrender.com` or the same local backend IP (`http://<YOUR_IP>:5000`). Verify that the tenant ID matches on both clients.
+Ensure both web and mobile point to `https://oms-5rmc.onrender.com` or the same local backend IP (`http://<YOUR_IP>:5000`). Verify that the tenant ID matches on both clients.
 
 ### Q2: How does the attendance QR Code work offline?
 The `AttendanceQRScreen` generates a deterministic 25x25 vector SVG QR code locally from the database employee ID payload, allowing office kiosks to scan it even when cellular data is intermittent.

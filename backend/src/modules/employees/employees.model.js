@@ -360,8 +360,9 @@ employeeSchema.plugin(tenantPlugin);
 employeeSchema.index({ companyId: 1, id: 1 }, { unique: true });
 employeeSchema.index({ companyId: 1, email: 1 }, { unique: true });
 employeeSchema.index({ companyId: 1, phone: 1 }, { sparse: true });
-
 employeeSchema.index({ companyId: 1, employeeCode: 1 }, { unique: true, sparse: true });
+employeeSchema.index({ companyId: 1, department: 1, designation: 1 });
+employeeSchema.index({ name: 'text', department: 'text', designation: 'text' }, { weights: { name: 10, department: 5, designation: 3 } });
 
 const Employee = mongoose.model('Employee', employeeSchema);
 

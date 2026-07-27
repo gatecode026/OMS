@@ -1579,6 +1579,33 @@ export const registerChatSocketHandlers = (io) => {
       }
     });
 
+    socket.on("remove_reaction", async ({ messageId, emoji, conversationId }) => {
+      try {
+        if (!messageId || !conversationId) {
+          socket.emit("error", {
+            event: "remove_reaction",
+            message: "messageId and conversationId are required",
+          });
+          return;
+        }
+
+        await runTrackedWrite(() =>
+          chatService.removeReaction(messageId, userId, companyId),
+        );
+
+        const reactionPayload = {
+          messageId,
+          conversationId,
+          employeeId: userId,
+          emoji,
+        };
+        io.to(`conv:${conversationId}`).emit("reaction_removed", reactionPayload);
+      } catch (err) {
+        logger.error("[Chat] remove_reaction error:", err);
+        socket.emit("error", { event: "remove_reaction", message: err.message });
+      }
+    });
+
     // ── EVENT: LEAVE GROUP ───────────────────────────────────────────────────
     socket.on("leave_group", async ({ conversationId }) => {
       try {
@@ -1735,6 +1762,48 @@ export const registerChatSocketHandlers = (io) => {
         logger.error("[Chat] unpin_conversation error:", err);
         socket.emit("error", {
           event: "unpin_conversation",
+          message: err.message,
+        });
+      }
+    });
+
+    // ── EVENT: MUTE CONVERSATION ─────────────────────────────────────────────
+    socket.on("mute_conversation", async ({ conversationId, durationMinutes }) => {
+      try {
+        if (!conversationId) return;
+        const mutedUntil = durationMinutes ? new Date(Date.now() + durationMinutes * 60000) : null;
+        await runTrackedWrite(() =>
+          chatService.muteConversation(conversationId, userId, companyId, mutedUntil),
+        );
+        socket.emit("conversation_muted", {
+          conversationId,
+          mutedBy: userId,
+          mutedUntil,
+        });
+      } catch (err) {
+        logger.error("[Chat] mute_conversation error:", err);
+        socket.emit("error", {
+          event: "mute_conversation",
+          message: err.message,
+        });
+      }
+    });
+
+    // ── EVENT: UNMUTE CONVERSATION ───────────────────────────────────────────
+    socket.on("unmute_conversation", async ({ conversationId }) => {
+      try {
+        if (!conversationId) return;
+        await runTrackedWrite(() =>
+          chatService.unmuteConversation(conversationId, userId, companyId),
+        );
+        socket.emit("conversation_unmuted", {
+          conversationId,
+          mutedBy: userId,
+        });
+      } catch (err) {
+        logger.error("[Chat] unmute_conversation error:", err);
+        socket.emit("error", {
+          event: "unmute_conversation",
           message: err.message,
         });
       }
@@ -1996,9 +2065,15 @@ export const registerChatSocketHandlers = (io) => {
       },
     );
 
-    socket.on("call:accept", async ({ callId }) => {
+    socket.on("call:accept", async ({ callId }, ackCallback) => {
+      const tStart = Date.now();
       try {
         if (socket.ringingTimeout) clearTimeout(socket.ringingTimeout);
+
+        // Immediate Socket ACK to callee
+        if (typeof ackCallback === "function") {
+          ackCallback({ status: "ok", timestamp: tStart });
+        }
 
         await runTrackedWrite(() =>
           runWithTenant(companyId, async () => {
@@ -2032,6 +2107,10 @@ export const registerChatSocketHandlers = (io) => {
             io.to(`user:${callRecord.calleeId}`).emit(
               "call:accepted",
               acceptPayload,
+            );
+
+            logger.info(
+              `[CALL-BACKEND] call:accept processed in ${Date.now() - tStart}ms — callId:${callId}`,
             );
           }),
         );

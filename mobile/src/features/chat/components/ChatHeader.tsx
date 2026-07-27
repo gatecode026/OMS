@@ -28,6 +28,7 @@ interface ChatHeaderProps {
   onScrollToMessage: (msgId: string) => void;
   onVoiceCallInit: () => void;
   onVideoCallInit: () => void;
+  onOpenSharedMedia?: () => void;
   insets: EdgeInsets;
 }
 
@@ -58,6 +59,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   onScrollToMessage,
   onVoiceCallInit,
   onVideoCallInit,
+  onOpenSharedMedia,
   insets,
 }) => {
   const router = useRouter();
@@ -117,7 +119,22 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           )}
         >
           <View style={styles.avatarWrapper}>
-            <Avatar name={chatMeta.title} size={36} source={chatMeta.avatar || undefined} />
+            <Avatar
+              name={chatMeta.title}
+              size={36}
+              source={chatMeta.avatar || undefined}
+              userId={
+                chatMeta.otherUser
+                  ? String(
+                      chatMeta.otherUser.employeeId ||
+                        chatMeta.otherUser.id ||
+                        chatMeta.otherUser._id ||
+                        chatMeta.otherUser.userId ||
+                        ''
+                    ) || undefined
+                  : undefined
+              }
+            />
             {conversation?.type === 'direct' && (
               <View style={[styles.statusDot, { backgroundColor: getStatusColor(currentStatus), borderColor: colors.card }]} />
             )}
@@ -151,6 +168,11 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
                 <Ionicons name="videocam-outline" size={22} color={colors.text} />
               </Pressable>
             </>
+          )}
+          {onOpenSharedMedia && (
+            <Pressable style={styles.headerBtn} onPress={onOpenSharedMedia} accessibilityLabel="Shared Media & Files" accessibilityRole="button" accessible>
+              <Ionicons name="folder-open-outline" size={20} color={colors.text} />
+            </Pressable>
           )}
           <Pressable style={styles.headerBtn} onPress={() => router.push(
             conversation?.type === 'direct'

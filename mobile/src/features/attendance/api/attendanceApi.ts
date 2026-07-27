@@ -78,6 +78,51 @@ export const attendanceApi = {
       totalWorkingDays: 22
     };
   },
+  /**
+   * Submit an attendance correction request
+   */
+  async submitCorrection(payload: {
+    date: string;
+    correctionType: string;
+    requestedPunchIn?: string;
+    requestedPunchOut?: string;
+    requestedStatus: string;
+    reason: string;
+  }) {
+    const response = await apiClient.post('/api/v1/attendance-corrections', payload);
+    return response.data?.data;
+  },
+
+  /**
+   * Update an existing attendance correction request
+   */
+  async updateCorrection(id: string, payload: Partial<{
+    correctionType: string;
+    requestedPunchIn: string;
+    requestedPunchOut: string;
+    requestedStatus: string;
+    reason: string;
+    status: string;
+  }>) {
+    const response = await apiClient.put(`/api/v1/attendance-corrections/${id}`, payload);
+    return response.data?.data;
+  },
+
+  /**
+   * Cancel an attendance correction request
+   */
+  async cancelCorrection(id: string) {
+    const response = await apiClient.put(`/api/v1/attendance-corrections/${id}`, { status: 'Cancelled' });
+    return response.data?.data;
+  },
+
+  /**
+   * Fetch attendance correction requests
+   */
+  async fetchCorrections() {
+    const response = await apiClient.get('/api/v1/attendance-corrections');
+    return response.data?.data || [];
+  },
 };
 
 export default attendanceApi;

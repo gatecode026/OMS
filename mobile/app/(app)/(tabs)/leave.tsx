@@ -27,6 +27,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import useTheme from '../../../src/shared/hooks/useTheme';
 import useBranding from '../../../src/shared/hooks/useBranding';
 import useAuthStore from '../../../src/shared/store/authStore';
+import profileApi from '../../../src/features/profile/api/profileApi';
 import {
   useLeaveRequests,
   useLeavePolicies,
@@ -77,12 +78,20 @@ export default function LeaveManagementScreen() {
   // Pull-to-Refresh Handler
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['leaves'] }),
-      queryClient.invalidateQueries({ queryKey: ['profile'] }),
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-    ]);
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['leaves'] }),
+        queryClient.invalidateQueries({ queryKey: ['profile'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+        profileApi.fetchProfile(),
+      ]);
+    } catch (err) {
+      console.warn('[LeaveScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
+    }
   };
 
   // ─── Leave Balance & Summary Stats Calculations ────────────────────────────

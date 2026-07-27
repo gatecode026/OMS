@@ -46,11 +46,9 @@ export const useTyping = (conversationId: string) => {
 
   useEffect(() => {
     return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
+      forceStopTyping();
     };
-  }, []);
+  }, [conversationId]);
 
   return {
     updateTypingStatus,

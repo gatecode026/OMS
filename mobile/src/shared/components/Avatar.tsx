@@ -1,24 +1,33 @@
 /**
  * @file Avatar.tsx
- * @description Theme-aware avatar component leveraging expo-image with automatic fallback to text initials.
+ * @description Theme-aware avatar component with UserProfileManager integration.
+ *              When `userId` is provided, resolves the avatar from the centralized
+ *              UserProfileStore (single source of truth) — never from stale payload.
+ *              Falls back to the raw `source` prop for backwards compatibility,
+ *              and shows text initials only when no avatar exists in the database.
  */
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, StyleProp } from 'react-native';
 import { Image } from 'expo-image';
 import useTheme from '../hooks/useTheme';
-import ENV from '../../config/env';
+import { useUserProfile } from '../hooks/useUserProfile';
+import AvatarCacheManager from '../services/AvatarCacheManager';
 
 export interface AvatarProps {
-  source?: string;
+  /** Optional: when provided, avatar is resolved from UserProfileStore (preferred) */
+  userId?: string | null;
+  /** Raw URL fallback — used when userId has no store entry yet */
+  source?: string | null;
+  /** Display name — used to generate initials if no avatar is available */
   name: string;
   size?: number;
   rounded?: boolean;
   style?: StyleProp<any>;
 }
 
-export const Avatar: React.FC<AvatarProps> = ({
-  source,
+const AvatarInner: React.FC<AvatarProps & { resolvedUri: string | undefined }> = ({
+  resolvedUri,
   name,
   size = 40,
   rounded = true,
@@ -27,8 +36,12 @@ export const Avatar: React.FC<AvatarProps> = ({
   const { colors, radius, typography } = useTheme();
   const [hasError, setHasError] = useState(false);
 
-  // Generate initials (e.g. "John Doe" -> "JD")
-  const getInitials = (text: string) => {
+  // Reset error state whenever resolvedUri changes (e.g. from empty to valid URL)
+  React.useEffect(() => {
+    setHasError(false);
+  }, [resolvedUri]);
+
+  const getInitials = (text: string): string => {
     if (!text) return '';
     const parts = text.trim().split(/\s+/);
     if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
@@ -38,25 +51,10 @@ export const Avatar: React.FC<AvatarProps> = ({
   const initials = getInitials(name);
   const borderRadius = rounded ? radius.circular : radius.md;
 
-  // Helper function resolving relative image paths to full HTTP URLs
-  const resolveUri = (url?: string): string | undefined => {
-    if (!url || typeof url !== 'string') return undefined;
-    const clean = url.trim();
-    if (!clean) return undefined;
-    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image/')) {
-      return clean;
-    }
-    const baseUrl = ENV.API_URL.replace(/\/+$/, '').replace(/\/api\/v1\/?$/, '');
-    const cleanPath = clean.startsWith('/') ? clean : `/${clean}`;
-    return `${baseUrl}${cleanPath}`;
-  };
-
-  const imageUri = resolveUri(source);
-
-  if (imageUri && !hasError) {
+  if (resolvedUri && !hasError) {
     return (
       <Image
-        source={{ uri: imageUri }}
+        source={{ uri: resolvedUri }}
         onError={() => setHasError(true)}
         style={[
           {
@@ -68,11 +66,12 @@ export const Avatar: React.FC<AvatarProps> = ({
           style as any,
         ]}
         transition={200}
+        cachePolicy="memory-disk"
       />
     );
   }
 
-  // Fallback to initial text
+  // Initials fallback — shown ONLY when no avatar exists in the database
   return (
     <View
       style={[
@@ -99,10 +98,33 @@ export const Avatar: React.FC<AvatarProps> = ({
   );
 };
 
+/**
+ * Smart Avatar — resolves from UserProfileStore when userId is provided.
+ * Falls back to raw `source` prop for backwards-compatible usage.
+ * Raw source paths are always normalized through AvatarCacheManager (relative → full URI).
+ */
+export const Avatar: React.FC<AvatarProps> = (props) => {
+  const { userId, source, name, ...rest } = props;
+
+  // Always resolve from centralized store when userId is provided
+  const profile = useUserProfile(userId, name, source);
+  const storeUri = userId ? profile.avatarUri : undefined;
+
+  // Normalize the raw source prop as fallback (handles relative backend paths)
+  const rawFallbackUri = source
+    ? AvatarCacheManager.resolve(userId ?? '__raw__', source)
+    : undefined;
+
+  const finalUri = storeUri ?? rawFallbackUri;
+
+  return <AvatarInner resolvedUri={finalUri} name={profile.name || name} {...rest} />;
+};
+
 const styles = StyleSheet.create({
   fallback: {
     justifyContent: 'center',
     alignItems: 'center',
   },
 });
+
 export default Avatar;

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import ImageKitUploadService from '../../../shared/services/imagekitUploadService';
+import UploadManager from '../services/UploadManager';
 import { getSocket } from '../../../shared/services/socketManager';
 import { toast } from '../../../shared/components/Toast';
 import { ChatMessage } from '../types';
@@ -86,33 +87,23 @@ export const useUploadQueue = ({ conversationId, authUser, setLocalMessages }: U
         validateFile(fileName, mimeType, fileSize);
       }
 
-      // Step 2: Compression State
-      setUploadStates((prev) => ({ ...prev, [tempId]: 'compressing' }));
-      
-      // Simulate stripping metadata & quality check
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Step 3: Create Abort Controller & Upload
-      const controller = new AbortController();
-      abortControllersRef.current[tempId] = controller;
-
-      setUploadStates((prev) => ({ ...prev, [tempId]: 'uploading' }));
-      setUploadsProgress((prev) => ({ ...prev, [tempId]: 1 }));
-
-      const authParams = await ImageKitUploadService.fetchAuthParams();
-
-      const uploadRes = await ImageKitUploadService.upload(
+      // Step 2: Delegate to UploadManager singleton
+      const result = await UploadManager.enqueueUpload(
+        tempId,
+        conversationId,
         localUri,
         fileName,
         mimeType,
-        authParams,
-        (progress) => {
-          setUploadsProgress((prev) => ({ ...prev, [tempId]: progress.percentage }));
-        },
-        controller.signal
+        type,
+        fileSize
       );
 
-      // Step 4: Uploaded successfully
+      if (!result) {
+        setUploadStates((prev) => ({ ...prev, [tempId]: 'failed' }));
+        return;
+      }
+
+      // Step 3: Uploaded successfully
       setUploadStates((prev) => ({ ...prev, [tempId]: 'uploaded' }));
       setUploadsProgress((prev) => {
         const copy = { ...prev };
@@ -120,11 +111,10 @@ export const useUploadQueue = ({ conversationId, authUser, setLocalMessages }: U
         return copy;
       });
 
-      // Step 5: Socket Sending State
+      // Step 4: Socket Message Dispatch
       setUploadStates((prev) => ({ ...prev, [tempId]: 'sending' }));
       const socket = getSocket();
       
-      // 10-second failure timer
       const timer = setTimeout(() => {
         const markFailed = (prev: ChatMessage[]) => {
           if (!prev) return [];
@@ -142,12 +132,11 @@ export const useUploadQueue = ({ conversationId, authUser, setLocalMessages }: U
         type,
         tempId,
         media: {
-          url: uploadRes.url,
-          fileName: uploadRes.name,
-          fileSize: uploadRes.size,
+          url: result.url,
+          fileName,
+          fileSize,
           fileType: mimeType,
-          imageKitFileId: uploadRes.fileId,
-          imageKitFilePath: uploadRes.filePath,
+          imageKitFileId: result.fileId,
         },
       }, (ack: any) => {
         if (ack && ack.success) {
@@ -162,18 +151,6 @@ export const useUploadQueue = ({ conversationId, authUser, setLocalMessages }: U
           setLocalMessages(markSent);
           queryClient.setQueryData(['chat', 'messages', conversationId], markSent);
           setUploadStates((prev) => ({ ...prev, [tempId]: 'delivered' }));
-        } else {
-          if (sendingTimeoutsRef.current[tempId]) {
-            clearTimeout(sendingTimeoutsRef.current[tempId]);
-            delete sendingTimeoutsRef.current[tempId];
-          }
-          const markFailed = (prev: ChatMessage[]) => {
-            if (!prev) return [];
-            return prev.map(m => (m.id === tempId || m.tempId === tempId) ? { ...m, status: 'failed' as const, failureReason: 'timeout' as const } : m);
-          };
-          setLocalMessages(markFailed);
-          queryClient.setQueryData(['chat', 'messages', conversationId], markFailed);
-          setUploadStates((prev) => ({ ...prev, [tempId]: 'failed' }));
         }
       });
 

@@ -10,7 +10,7 @@ import { Card, Button, Divider } from '../../../shared/components';
 import useAttendance from '../hooks/useAttendance';
 import dayjs from 'dayjs';
 
-export const AttendanceCard: React.FC = () => {
+export const AttendanceCard: React.FC = React.memo(() => {
   const { colors, spacing, typography } = useTheme();
   const {
     todayRecord,
@@ -26,10 +26,12 @@ export const AttendanceCard: React.FC = () => {
   const handlePress = async () => {
     setMessage('');
     try {
+      const formattedNow = dayjs().format('hh:mm A');
       if (!todayRecord) {
         // Clock In
         const mockLocation = { latitude: 37.7749, longitude: -122.4194 };
         await clockIn({
+          punchIn: formattedNow,
           notes: 'Clocked in via OMS Mobile',
           location: mockLocation,
         });
@@ -38,7 +40,10 @@ export const AttendanceCard: React.FC = () => {
         // Clock Out
         await clockOut({
           id: todayRecord.id,
-          payload: { notes: 'Clocked out via OMS Mobile' },
+          payload: {
+            punchOut: formattedNow,
+            notes: 'Clocked out via OMS Mobile',
+          },
         });
         setMessage('Checked out successfully!');
       }
@@ -132,7 +137,7 @@ export const AttendanceCard: React.FC = () => {
       )}
     </Card>
   );
-};
+});
 
 const styles = StyleSheet.create({
   card: {

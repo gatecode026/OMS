@@ -12,6 +12,8 @@ import queryClient from '../api/queryClient';
 import NetworkProvider from './NetworkProvider';
 import ThemeProvider from '../theme/ThemeProvider';
 import CallProvider from './CallProvider';
+import { CallStoreSyncer } from '../components/CallStoreSyncer';
+import { UserProfileSyncer } from '../components/UserProfileSyncer';
 
 interface RootProviderProps {
   children: React.ReactNode;
@@ -24,7 +26,11 @@ export const RootProvider: React.FC<RootProviderProps> = ({ children }) => {
         <QueryClientProvider client={queryClient}>
           <NetworkProvider>
             <ThemeProvider>
-              <CallProvider>{children}</CallProvider>
+              <CallProvider>
+                <CallStoreSyncer />
+                <UserProfileSyncer />
+                {children}
+              </CallProvider>
             </ThemeProvider>
           </NetworkProvider>
         </QueryClientProvider>

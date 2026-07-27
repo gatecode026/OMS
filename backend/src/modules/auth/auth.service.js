@@ -245,21 +245,24 @@ export const login = async (email, password, options = {}) => {
     if (!sessionCompanyId) {
       logger.warn(`AuthService::login session skipped — no companyId resolved for ${user.name}`);
     } else {
-      // Simple UA parsing
-      let browser = 'Unknown';
-      let os = 'Unknown';
-      if (ua.includes('Chrome')) browser = 'Chrome';
+      // Smart UA parsing
+      let browser = 'Web Browser';
+      let os = 'Unknown OS';
+      if (ua.includes('Expo') || ua.includes('okhttp') || ua.includes('Darwin') || ua.includes('CFNetwork') || ua.includes('ReactNative')) {
+        browser = 'OMS Mobile App';
+      } else if (ua.includes('Chrome')) browser = 'Chrome';
       else if (ua.includes('Firefox')) browser = 'Firefox';
       else if (ua.includes('Safari')) browser = 'Safari';
       else if (ua.includes('Edge')) browser = 'Edge';
-      if (ua.includes('Windows')) os = 'Windows';
+
+      if (ua.includes('Android')) os = 'Android';
+      else if (ua.includes('iPhone') || ua.includes('iPad') || ua.includes('iOS') || ua.includes('Darwin')) os = 'iOS';
+      else if (ua.includes('Windows')) os = 'Windows';
       else if (ua.includes('Mac')) os = 'macOS';
       else if (ua.includes('Linux')) os = 'Linux';
-      else if (ua.includes('Android')) os = 'Android';
-      else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
-      const deviceType = ua.includes('Mobile') ? 'Mobile' : 'Desktop';
-      const now = new Date();
-      const loginTimeStr = now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+      const deviceType = (os === 'Android' || os === 'iOS' || ua.includes('Mobile')) ? 'Mobile' : 'Desktop';
+      const nowIso = new Date().toISOString();
 
       await UserSession.create({
         id: sessionId,
@@ -267,8 +270,8 @@ export const login = async (email, password, options = {}) => {
         employeeName: user.name || user.email,
         employeeId: isCompanyAdmin ? (user.companyId || user.id) : user.id,
         role: isCompanyAdmin ? 'Company Admin' : (user.roleId || 'Employee'),
-        loginTime: loginTimeStr,
-        lastActivity: loginTimeStr,
+        loginTime: nowIso,
+        lastActivity: nowIso,
         duration: '0m',
         deviceType,
         browser,

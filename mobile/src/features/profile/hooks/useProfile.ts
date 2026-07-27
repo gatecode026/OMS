@@ -13,6 +13,7 @@ import {
 } from '../types';
 
 import { useAuthStore } from '../../../shared/store/authStore';
+import UserProfileManager from '../../../shared/services/UserProfileManager';
 
 const STALE_PROFILE = 5 * 60 * 1000;   // 5 min
 const STALE_STATIC  = 10 * 60 * 1000;  // 10 min
@@ -35,12 +36,33 @@ export const useProfile = () => {
 
 export const useUpdateProfilePhoto = () => {
   const queryClient = useQueryClient();
+  const updateUser = useAuthStore((s) => s.updateUser);
   return useMutation({
     mutationFn: async ({ employeeId, base64Image }: { employeeId: string; base64Image: string | null }) => {
       return profileApi.updateProfilePhoto(employeeId, base64Image);
     },
-    onSuccess: () => {
-      // Invalidate queries to refresh automatically
+    onSuccess: (data, variables) => {
+      const newAvatarUrl = data?.profilePhoto || data?.avatarUrl || variables.base64Image || undefined;
+      updateUser({
+        avatar:    newAvatarUrl,
+        avatarUrl: newAvatarUrl,
+        photoUrl:  newAvatarUrl,
+      });
+      // Invalidate centralized UserProfileManager + AvatarCacheManager
+      const userId = useAuthStore.getState().user?.id;
+      if (userId) {
+        UserProfileManager.invalidate(userId);
+        // Re-seed with new URL immediately so all screens update without re-fetch
+        if (newAvatarUrl) {
+          UserProfileManager.cacheProfile({
+            userId,
+            name:         useAuthStore.getState().user?.name || '',
+            avatarUrl:    newAvatarUrl,
+            profilePhoto: newAvatarUrl,
+          });
+        }
+      }
+      // Invalidate React Query cache
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
   });

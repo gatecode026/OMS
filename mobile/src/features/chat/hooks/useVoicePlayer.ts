@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { toast } from '../../../shared/components/Toast';
 
+let activeGlobalVoicePlayer: any = null;
+
 export const useVoicePlayer = (url: string, duration: number) => {
   const player = useAudioPlayer(url);
   const status = useAudioPlayerStatus(player);
@@ -16,10 +18,21 @@ export const useVoicePlayer = (url: string, duration: number) => {
       if (s.didJustFinish) {
         player.pause();
         player.seekTo(0);
+        if (activeGlobalVoicePlayer === player) {
+          activeGlobalVoicePlayer = null;
+        }
       }
     });
     return () => {
       subscription.remove();
+      try {
+        player.pause();
+        if (activeGlobalVoicePlayer === player) {
+          activeGlobalVoicePlayer = null;
+        }
+      } catch (e) {
+        // ignore
+      }
     };
   }, [player]);
 
@@ -27,7 +40,18 @@ export const useVoicePlayer = (url: string, duration: number) => {
     try {
       if (isPlaying) {
         player.pause();
+        if (activeGlobalVoicePlayer === player) {
+          activeGlobalVoicePlayer = null;
+        }
       } else {
+        if (activeGlobalVoicePlayer && activeGlobalVoicePlayer !== player) {
+          try {
+            activeGlobalVoicePlayer.pause();
+          } catch (e) {
+            // ignore
+          }
+        }
+        activeGlobalVoicePlayer = player;
         player.play();
       }
     } catch (err) {

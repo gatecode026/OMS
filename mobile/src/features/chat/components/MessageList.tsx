@@ -108,6 +108,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       <AnyFlashList
         ref={flatListRef}
         data={localMessages}
+        extraData={localMessages}
         keyExtractor={(item: ChatMessage) => item.id}
         estimatedItemSize={80}
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}

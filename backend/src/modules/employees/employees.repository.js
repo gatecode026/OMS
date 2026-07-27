@@ -388,8 +388,8 @@ export const updateAvatarDirect = async (id, payload) => {
   }
 
   const safeUpdate = {};
-  if (payload.avatar) safeUpdate.avatar = payload.avatar;
-  if (payload.photoUrl) safeUpdate.photoUrl = payload.photoUrl;
+  if (payload.avatar !== undefined) safeUpdate.avatar = payload.avatar;
+  if (payload.photoUrl !== undefined) safeUpdate.photoUrl = payload.photoUrl;
 
   const updated = await Employee.findOneAndUpdate(
     { companyId: tenantId, id },

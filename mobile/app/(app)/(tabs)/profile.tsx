@@ -23,12 +23,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 
 import useTheme from '../../../src/shared/hooks/useTheme';
 import useAuthStore from '../../../src/shared/store/authStore';
+import profileApi from '../../../src/features/profile/api/profileApi';
 import { Avatar } from '../../../src/shared/components/Avatar';
 import { Badge, ErrorState, toast } from '../../../src/shared/components';
 import { useNotificationsUnreadCount } from '../../../src/features/notifications';
@@ -50,6 +52,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const { colors, spacing, radius, shadows, typography, isDark } = useTheme();
+  const queryClient = useQueryClient();
   const { logout } = useAuthStore();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -122,36 +125,77 @@ export default function ProfileScreen() {
   const { mutateAsync: updateProfilePhoto } = useUpdateProfilePhoto();
   const completeness = useProfileCompleteness(profile);
 
-  // Active sessions hooks
+  // Active sessions hooks & optimistic local state
   const { data: sessions, isLoading: sessionsLoading } = useActiveSessions();
   const terminateSessionMut = useTerminateSession();
   const terminateOtherSessionsMut = useTerminateOtherSessions();
 
-  const currentSessionId = sessions?.find((s: any) => s.isCurrent)?.id || null;
+  const [localSessions, setLocalSessions] = useState<any[]>([]);
+  const [terminatingOthers, setTerminatingOthers] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (sessions) {
+      setLocalSessions(sessions);
+    }
+  }, [sessions]);
+
+  const currentSessionId = localSessions?.find((s: any) => s.isCurrent)?.id || sessions?.find((s: any) => s.isCurrent)?.id || null;
 
   const handleTerminateSession = async (id: string) => {
+    // Instant optimistic UI update
+    setLocalSessions((prev) => prev.filter((s) => s.id !== id));
+    setSessionNotice('Session terminated');
+
     try {
       await terminateSessionMut.mutateAsync(id);
-      toast.success('Session terminated successfully');
     } catch (err) {
-      toast.error('Failed to terminate session');
+      console.error('Failed to terminate session:', err);
     }
+
+    setTimeout(() => {
+      setSessionNotice(null);
+    }, 2000);
   };
 
   const handleTerminateOthers = async () => {
+    setTerminatingOthers(true);
+    const keepId = currentSessionId || '';
+
+    // Instant optimistic UI update
+    setLocalSessions((prev) => prev.filter((s) => s.id === currentSessionId || s.isCurrent));
+    setSessionNotice('Logged out from all other devices!');
+
     try {
-      const keepId = currentSessionId || '';
       await terminateOtherSessionsMut.mutateAsync(keepId);
-      toast.success('All other sessions terminated');
     } catch (err) {
-      toast.error('Failed to terminate other sessions');
+      console.error('Failed to terminate other sessions:', err);
+    } finally {
+      setTerminatingOthers(false);
     }
+
+    // Auto vanish modal after 1.2s
+    setTimeout(() => {
+      setSessionNotice(null);
+      setActiveSessionsVisible(false);
+    }, 1200);
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['profile'] }),
+        profileApi.fetchProfile(),
+        refetch(),
+      ]);
+    } catch (err) {
+      console.warn('[ProfileScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
+    }
   };
 
   const handleLogout = async () => {
@@ -295,13 +339,6 @@ export default function ProfileScreen() {
 
   const accountSecurityItems = [
     {
-      title: 'Change Password',
-      subtitle: 'Update your account password',
-      icon: 'lock-closed-outline' as const,
-      iconColor: '#6366F1',
-      path: '/(app)/profile/security?action=password',
-    },
-    {
       title: 'Security & Login',
       subtitle: 'Manage 2FA, devices and login sessions',
       icon: 'shield-outline' as const,
@@ -315,7 +352,7 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.container, { backgroundColor: isDark ? colors.background : '#F8FAFC' }]}>
       <StatusBar
-        barStyle="light-content"
+        barStyle={isDark ? 'light-content' : 'dark-content'}
         backgroundColor="transparent"
         translucent
       />
@@ -1110,7 +1147,7 @@ export default function ProfileScreen() {
             ]}
             onPress={(e) => e.stopPropagation()}
           >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
               <Text style={{ fontSize: 18, fontFamily: typography.fonts.bold, color: colors.text }}>
                 Active Devices & Logins
               </Text>
@@ -1119,73 +1156,114 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
 
+            {/* Inline Animated Action Banner */}
+            {sessionNotice && (
+              <Animated.View
+                entering={FadeIn.duration(200)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                  borderColor: '#10B981',
+                  borderWidth: 1,
+                  borderRadius: radius.md,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  marginBottom: spacing.md,
+                }}
+              >
+                <Ionicons name="checkmark-circle" size={18} color="#10B981" style={{ marginRight: 8 }} />
+                <Text style={{ fontSize: 13, fontFamily: typography.fonts.semibold, color: isDark ? '#34D399' : '#065F46', flex: 1 }}>
+                  {sessionNotice}
+                </Text>
+              </Animated.View>
+            )}
+
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 16 }}>
               {sessionsLoading ? (
                 <ActivityIndicator size="large" color={colors.primary} />
-              ) : sessions && sessions.length > 0 ? (
-                sessions.map((sess: any) => (
-                  <View
-                    key={sess.id}
-                    style={{
-                      padding: 12,
-                      borderRadius: radius.md,
-                      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                      borderColor: colors.border,
-                      borderWidth: 1,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Ionicons
-                      name={sess.deviceType?.toLowerCase().includes('phone') ? 'phone-portrait-outline' : 'desktop-outline'}
-                      size={24}
-                      color={colors.textMuted}
-                      style={{ marginRight: 12 }}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 14, fontFamily: typography.fonts.bold, color: colors.text }}>
-                        {sess.deviceName || 'Unknown Device'}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.textMuted }}>
-                        IP: {sess.ipAddress || '—'}
-                      </Text>
-                    </View>
-                    {sess.id !== currentSessionId && (
-                      <Pressable
-                        onPress={() => handleTerminateSession(sess.id)}
-                        style={{ padding: 6 }}
-                      >
-                        <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                      </Pressable>
-                    )}
-                  </View>
-                ))
+              ) : localSessions && localSessions.length > 0 ? (
+                localSessions.map((sess: any) => {
+                  const deviceName = sess.os && sess.browser ? `${sess.os} • ${sess.browser}` : (sess.os || sess.browser || sess.deviceType || 'Active Device');
+                  let formattedDate = sess.lastActivity || sess.loginTime || 'Active';
+                  if (formattedDate && !isNaN(new Date(formattedDate).getTime())) {
+                    formattedDate = new Date(formattedDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                  }
+
+                  return (
+                    <Animated.View
+                      key={sess.id}
+                      entering={FadeIn.duration(200)}
+                      style={{
+                        padding: 12,
+                        borderRadius: radius.md,
+                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Ionicons
+                        name={sess.deviceType === 'Mobile' || sess.os === 'Android' || sess.os === 'iOS' ? 'phone-portrait-outline' : 'desktop-outline'}
+                        size={24}
+                        color={colors.textMuted}
+                        style={{ marginRight: 12 }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontFamily: typography.fonts.bold, color: colors.text }}>
+                          {deviceName}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                          IP: {sess.ipAddress || '—'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>
+                          {formattedDate}
+                        </Text>
+                      </View>
+                      {sess.id !== currentSessionId && (
+                        <Pressable
+                          onPress={() => handleTerminateSession(sess.id)}
+                          style={{ padding: 6 }}
+                        >
+                          <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                        </Pressable>
+                      )}
+                    </Animated.View>
+                  );
+                })
               ) : (
                 <Text style={{ color: colors.textMuted, textAlign: 'center', marginVertical: 20 }}>
                   No active login sessions found.
                 </Text>
               )}
 
-              {sessions && sessions.length > 1 && (
+              {localSessions && localSessions.length > 1 && (
                 <Pressable
                   onPress={handleTerminateOthers}
+                  disabled={terminatingOthers}
                   style={[
                     styles.logoutButton,
                     {
                       borderColor: colors.danger,
-                      backgroundColor: 'transparent',
+                      backgroundColor: terminatingOthers ? `${colors.danger}15` : 'transparent',
                       borderWidth: 1,
                       marginTop: spacing.md,
                       borderRadius: 12,
                       paddingVertical: 10,
                       alignItems: 'center',
                       justifyContent: 'center',
+                      flexDirection: 'row',
                     },
                   ]}
                 >
-                  <Ionicons name="power-outline" size={16} color={colors.danger} style={{ marginRight: 8 }} />
+                  {terminatingOthers ? (
+                    <ActivityIndicator size="small" color={colors.danger} style={{ marginRight: 8 }} />
+                  ) : (
+                    <Ionicons name="power-outline" size={16} color={colors.danger} style={{ marginRight: 8 }} />
+                  )}
                   <Text style={{ color: colors.danger, fontFamily: typography.fonts.bold }}>
-                    Log Out From All Other Devices
+                    {terminatingOthers ? 'Logging out...' : 'Log Out From All Other Devices'}
                   </Text>
                 </Pressable>
               )}

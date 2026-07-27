@@ -183,6 +183,8 @@ messageSchema.index({
 // Pinned messages indexes for high-performance sorting and querying
 messageSchema.index({ conversationId: 1, isPinned: 1, isDeleted: 1, pinnedAt: -1 });
 messageSchema.index({ conversationId: 1, isPinned: 1, isDeleted: 1, createdAt: -1 });
+messageSchema.index({ companyId: 1, type: 1, createdAt: -1 });
+messageSchema.index({ content: 'text' }, { weights: { content: 10 } });
 
 messageSchema.plugin(tenantPlugin);
 const Message = mongoose.model('Message', messageSchema);

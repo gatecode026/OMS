@@ -44,6 +44,53 @@ const notifyAdminsAndManagers = async (companyId, title, message, data = {}) => 
   }
 };
 
+const getOrgTimezone = () => process.env.ORG_TIMEZONE || 'Asia/Kolkata';
+
+const getTodayFormattedDate = () => {
+  const tz = getOrgTimezone();
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+};
+
+const getCurrentFormattedTime = () => {
+  const tz = getOrgTimezone();
+  try {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    });
+    const parts = formatter.formatToParts(new Date());
+    let hour = parts.find(p => p.type === 'hour').value;
+    const minute = parts.find(p => p.type === 'minute').value;
+    if (hour === '24') hour = '00';
+    return `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  } catch (error) {
+    const d = new Date();
+    const hour = String(d.getHours()).padStart(2, '0');
+    const minute = String(d.getMinutes()).padStart(2, '0');
+    return `${hour}:${minute}`;
+  }
+};
+
 export const findAll = async (query) => {
   logger.info('Executing AttendanceService::findAll query');
   return repository.find(query);
@@ -57,12 +104,8 @@ export const findById = async (id) => {
 export const createRecord = async (data, currentUser) => {
   logger.info('Executing AttendanceService::createRecord by user: ' + currentUser?.id);
   
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const todayStr = `${year}-${month}-${day}`;
-  const currentTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const todayStr = getTodayFormattedDate();
+  const currentTimeStr = getCurrentFormattedTime();
 
   const empId = currentUser?.id || data?.employeeId;
 
@@ -75,16 +118,16 @@ export const createRecord = async (data, currentUser) => {
   }
 
   const enrichedData = {
+    ...data,
     employeeId: empId,
     employeeName: currentUser?.name || data?.employeeName || 'Employee',
     department: currentUser?.department || data?.department || 'Operations',
     branch: currentUser?.branch || data?.branch || 'Headquarters',
     date: todayStr,
-    punchIn: currentTimeStr,
-    punchOut: '--:--',
-    status: 'Present',
-    source: 'Mobile App',
-    ...data
+    punchIn: data?.punchIn || currentTimeStr,
+    punchOut: (data?.punchOut && data?.punchOut !== '--:--' && data?.punchOut !== 'Pending') ? data.punchOut : '--:--',
+    status: data?.status || 'Present',
+    source: data?.source || 'Mobile App',
   };
 
   const record = await repository.save(enrichedData);
@@ -116,20 +159,21 @@ export const updateRecord = async (id, data, currentUser) => {
   }
   id = existing.id || existing._id;
 
-  const d = new Date();
-  const currentTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const currentTimeStr = (data?.punchOut && data?.punchOut !== '--:--' && data?.punchOut !== 'Pending') 
+    ? data.punchOut 
+    : getCurrentFormattedTime();
 
-  const punchInTime = new Date(existing.createdAt);
+  const punchInTime = new Date(existing.createdAt || existing.date + 'T' + existing.punchIn);
   const now = new Date();
-  const diffMs = now.getTime() - punchInTime.getTime();
+  const diffMs = Math.max(0, now.getTime() - punchInTime.getTime());
   const diffHours = diffMs / (1000 * 60 * 60);
   const totalHours = parseFloat(diffHours.toFixed(2));
 
   const enrichedData = {
+    ...data,
     punchOut: currentTimeStr,
     totalHours: totalHours > 0 ? totalHours : 0.01,
     status: existing.status === 'Late' ? 'Late' : 'Present',
-    ...data
   };
 
   const record = await repository.update(id, enrichedData);
@@ -164,7 +208,7 @@ export const deleteRecord = async (id, currentUser) => {
 
 export const findToday = async (employeeId) => {
   logger.info('Executing AttendanceService::findToday query for employee: ' + employeeId);
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayFormattedDate();
   const records = await repository.find({ employeeId, date: todayStr });
   return records[0] || null;
 };
@@ -206,13 +250,8 @@ export const qrPunch = async (employeeId, companyId) => {
       throw err;
     }
 
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const todayStr = `${year}-${month}-${day}`;
-
-    const currentTimeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const todayStr = getTodayFormattedDate();
+    const currentTimeStr = getCurrentFormattedTime();
 
     // Find today's record
     const records = await repository.find({ employeeId, date: todayStr });
@@ -255,7 +294,7 @@ export const qrPunch = async (employeeId, companyId) => {
     }
 
     // 3. PUNCH OUT (but check 1 hour constraint)
-    const punchInTime = new Date(todayRecord.createdAt);
+    const punchInTime = new Date(todayRecord.createdAt || todayRecord.date + 'T' + todayRecord.punchIn);
     const now = new Date();
     const diffMs = now - punchInTime;
     const diffHours = diffMs / (1000 * 60 * 60);

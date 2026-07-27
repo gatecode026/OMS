@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import WebhookSubscription from './webhook.model.js';
-import { runWithTenant } from '../../database/tenantConnection.js';
+import { runWithTenant } from '../../utils/tenantContext.js';
 
 export const webhookService = {
   /**

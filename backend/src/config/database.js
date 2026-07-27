@@ -45,7 +45,11 @@ export const database = {
 
       const mongooseOpts = {
         autoIndex: true,
-        serverSelectionTimeoutMS: 15000 // Allow enough time for Atlas DNS resolution on local network
+        maxPoolSize: 50,
+        minPoolSize: 10,
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+        family: 4,
       };
 
       await mongoose.connect(env.dbUri, mongooseOpts);

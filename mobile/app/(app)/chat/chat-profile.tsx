@@ -340,18 +340,26 @@ export default function ChatProfileScreen() {
       toast.error('Cannot initiate call: User not found.');
       return;
     }
-    initiateCall(targetEmployeeId, 'audio', conversationId || '');
-    router.push('/(app)/call' as any);
-  }, [targetEmployeeId, targetParticipant, displayName, displayAvatar, initiateCall, router]);
+    initiateCall(targetEmployeeId, 'audio', conversationId || '', {
+      name: displayName,
+      avatar: displayAvatar,
+      role: displayDesignation,
+      department: displayDepartment,
+    });
+  }, [targetEmployeeId, targetParticipant, displayName, displayAvatar, displayDesignation, displayDepartment, conversationId, initiateCall]);
 
   const handleVideoCall = useCallback(() => {
     if (!targetEmployeeId || !targetParticipant) {
       toast.error('Cannot initiate video call: User not found.');
       return;
     }
-    initiateCall(targetEmployeeId, 'video', conversationId || '');
-    router.push('/(app)/call' as any);
-  }, [targetEmployeeId, targetParticipant, displayName, displayAvatar, initiateCall, router]);
+    initiateCall(targetEmployeeId, 'video', conversationId || '', {
+      name: displayName,
+      avatar: displayAvatar,
+      role: displayDesignation,
+      department: displayDepartment,
+    });
+  }, [targetEmployeeId, targetParticipant, displayName, displayAvatar, displayDesignation, displayDepartment, conversationId, initiateCall]);
 
   const handleMessage = useCallback(() => {
     router.back();

@@ -1,5 +1,5 @@
 import { AgentExecutionLog, EnterpriseAgent } from './agent.model.js';
-import { runWithTenant } from '../../database/tenantConnection.js';
+import { runWithTenant } from '../../utils/tenantContext.js';
 
 export const agentService = {
   /**

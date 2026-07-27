@@ -34,6 +34,8 @@ const areEqual = (prev: ConversationCardProps, next: ConversationCardProps) => {
     prev.conv.lastActivityAt === next.conv.lastActivityAt &&
     prev.conv.unreadCount === next.conv.unreadCount &&
     JSON.stringify(prev.conv.lastMessage) === JSON.stringify(next.conv.lastMessage) &&
+    JSON.stringify(prev.conv.participants) === JSON.stringify(next.conv.participants) &&
+    prev.conv.avatar === next.conv.avatar &&
     prev.isOnline === next.isOnline &&
     prev.userStatus === next.userStatus &&
     prev.statusEmoji === next.statusEmoji &&
@@ -65,9 +67,20 @@ export const ConversationCard: React.FC<ConversationCardProps> = React.memo(({
 }) => {
   // Own the theme subscription so this re-renders on mode switch
   const { colors, spacing, radius, typography, isDark } = useTheme();
-  const otherUser = conv.type === 'direct' ? conv.participants.find((p) => p.employeeId !== currentUserId) : null;
+  const otherUser = conv.type === 'direct'
+    ? conv.participants.find((p) => {
+        const pId = String(p.employeeId || (p as any).id || (p as any)._id || (p as any).userId || '');
+        const myId = String(currentUserId || '');
+        return pId && pId !== myId;
+      })
+    : null;
   const title = conv.type === 'direct' ? otherUser?.name || 'Chat Partner' : conv.name || 'Group Chat';
-  const avatar = conv.type === 'direct' ? otherUser?.avatar || null : conv.avatar || null;
+  const avatar = conv.type === 'direct'
+    ? (otherUser?.avatar || (otherUser as any)?.avatarUrl || (otherUser as any)?.profilePhoto || (otherUser as any)?.photoUrl || null)
+    : conv.avatar || null;
+  const otherUserId = conv.type === 'direct' && otherUser
+    ? String(otherUser.employeeId || (otherUser as any).id || (otherUser as any)._id || (otherUser as any).userId || '')
+    : undefined;
   
   const lastMsg = conv.lastMessage;
   const isMe = lastMsg?.senderId === currentUserId;
@@ -145,7 +158,12 @@ export const ConversationCard: React.FC<ConversationCardProps> = React.memo(({
         ]}
       >
         <View style={styles.avatarWrapper}>
-          <Avatar name={title} size={52} source={avatar || undefined} />
+          <Avatar
+            name={title}
+            size={52}
+            source={avatar || undefined}
+            userId={otherUserId}
+          />
           {conv.type === 'direct' && (
             <View
               style={[

@@ -9,6 +9,7 @@ import Message from "../message.repository.js";
 import Conversation from "../conversation.repository.js";
 import { runWithTenant } from "../../../utils/tenantContext.js";
 import { getIO } from "../../../config/socket.js";
+import { CacheKeys, cacheDel, cacheDelPattern } from "../../../services/cache.service.js";
 
 /**
  * Marks a message as delivered to a user
@@ -106,11 +107,16 @@ export const markConversationRead = async (conversationId, userId, userName, las
     // 1. Store in Redis Cache
     if (redis.isAvailable) {
       const readKey = `read:${conversationId}:${userId}`;
-      await redis.set(readKey, lastReadMessageId, { EX: 2592000 }); // 30-day TTL
+      await redis.set(readKey, lastReadMessageId || 'READ', { EX: 2592000 }); // 30-day TTL
 
       // 2. Clear unread counts in Redis
       const unreadKey = `unread:${userId}:${conversationId}`;
-      await redis.del(unreadKey);
+      await redis.set(unreadKey, 0);
+    }
+
+    if (companyId) {
+      await cacheDel(CacheKeys.sidebar(companyId, userId)).catch(() => {});
+      await cacheDelPattern(CacheKeys.sidebar(companyId, '*')).catch(() => {});
     }
 
     // 3. Asynchronously update MongoDB
@@ -135,17 +141,16 @@ export const markConversationRead = async (conversationId, userId, userName, las
         }
       );
 
-      // Update participant's lastReadAt in Conversation
-      await Conversation.findOneAndUpdate(
-        {
-          id: conversationId,
-          'participants.employeeId': userId
-        },
-        {
-          $set: {
-            'participants.$.lastReadAt': now
-          }
-        }
+      // Update participant's lastReadAt and lastReadMessageId in Conversation
+      const updateFields = { 'participants.$[elem].lastReadAt': now };
+      if (lastReadMessageId) {
+        updateFields['participants.$[elem].lastReadMessageId'] = lastReadMessageId;
+      }
+
+      await Conversation.updateOne(
+        { id: conversationId },
+        { $set: updateFields },
+        { arrayFilters: [{ $or: [{ 'elem.employeeId': userId }, { 'elem.userId': userId }, { 'elem.id': userId }] }] }
       );
 
       // Broadcast update to the conversation room and personal room (for multi-device sync)
@@ -154,7 +159,7 @@ export const markConversationRead = async (conversationId, userId, userName, las
         const readUpdatePayload = {
           conversationId,
           userId,
-          lastReadMessageId,
+          lastReadMessageId: lastReadMessageId || null,
           readAt: now
         };
 
@@ -230,6 +235,7 @@ export const getUnreadCount = async (userId, conversationId, unreadAfterDate, co
         conversationId,
         senderId: { $ne: userId },
         isDeleted: false,
+        'readBy.employeeId': { $ne: userId },
         createdAt: { $gt: unreadAfterDate }
       });
 

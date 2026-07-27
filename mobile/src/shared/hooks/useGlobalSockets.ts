@@ -87,12 +87,20 @@ export const useGlobalSockets = () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
     };
 
+    const handleAttendanceUpdated = (data: any) => {
+      console.log('[GlobalSocket] attendance updated/created received:', data);
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    };
+
     // Attach listeners
     socket.on('notification:new', handleNewNotification);
     socket.on('notification:read', handleNotificationRead);
     socket.on('profile:updated', handleProfileUpdated);
     socket.on('company:updated', handleCompanyUpdated);
     socket.on('permission:updated', handlePermissionUpdated);
+    socket.on('entity:sync', handleAttendanceUpdated);
+    socket.on('attendance:updated', handleAttendanceUpdated);
+    socket.on('attendance:created', handleAttendanceUpdated);
 
     // Also support fallback event names if backend fires them
     socket.on('notification_received', handleNewNotification);
@@ -107,6 +115,9 @@ export const useGlobalSockets = () => {
       socket.off('profile:updated', handleProfileUpdated);
       socket.off('company:updated', handleCompanyUpdated);
       socket.off('permission:updated', handlePermissionUpdated);
+      socket.off('entity:sync', handleAttendanceUpdated);
+      socket.off('attendance:updated', handleAttendanceUpdated);
+      socket.off('attendance:created', handleAttendanceUpdated);
       
       socket.off('notification_received', handleNewNotification);
       socket.off('profile_updated', handleProfileUpdated);

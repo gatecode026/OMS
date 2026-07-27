@@ -14,14 +14,16 @@ import ENV from '../../../config/env';
 import usePresenceStore from '../../../shared/store/presenceStore';
 import secureStore from '../../../shared/services/secureStore';
 import useAuthStore from '../../../shared/store/authStore';
-import apiClient from '../../../shared/services/apiClient';
+import apiClient, { refreshAuthToken } from '../../../shared/services/apiClient';
 import { ChatMessage, ChatConversation } from '../types';
 import { useThemeStore } from '../../../shared/store/themeStore';
+
+import OfflineQueueManager from '../services/OfflineQueueManager';
 
 export const useChatSocket = (socket: Socket | null) => {
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
-  const currentUserId = currentUser?.id || null;
+  const currentUserId = currentUser ? String(currentUser.id || (currentUser as any).employeeId || (currentUser as any)._id || '') : null;
 
   // Use refs to avoid stale closures in socket event handlers
   const currentUserIdRef = useRef(currentUserId);
@@ -137,7 +139,7 @@ export const useChatSocket = (socket: Socket | null) => {
     const startHeartbeat = () => {
       if (heartbeatInterval) clearInterval(heartbeatInterval);
       heartbeatInterval = setInterval(() => {
-        if (socket.connected) {
+        if (socket.connected && AppState.currentState === 'active') {
           const startTime = Date.now();
           socket.emit('heartbeat', { clientTime: startTime }, (ack: any) => {
             const rtt = Date.now() - startTime;
@@ -169,6 +171,11 @@ URL: ${ENV.API_URL}`);
       usePresenceStore.getState().setConnectionInfo({ connectionState: 'connected' });
       socket.emit('get_online_users');
       startHeartbeat();
+
+      // Flush offline action queue immediately on reconnect
+      OfflineQueueManager.flushQueue().catch((err) => {
+        console.warn('[ChatSocket] Error flushing offline queue:', err);
+      });
       
       // Auto-resend failed messages from cache
       if (activeConvIdRef.current) {
@@ -339,6 +346,9 @@ URL: ${ENV.API_URL}`);
 
     // New Incoming Message
     const handleNewMessage = async (msg: any) => {
+      if (msg.senderId === currentUserIdRef.current) {
+        return; // Ignore own message broadcasts as they are already handled by the send callback
+      }
       console.log('[ChatSocket] New message received:', msg.id);
 
       const isCurrentActive = activeConvIdRef.current === msg.conversationId;
@@ -524,7 +534,9 @@ URL: ${ENV.API_URL}`);
     const handleReadUpdate = async ({ conversationId, userId, lastReadMessageId, readAt }: any) => {
       console.log('[ChatSocket] Conversation read update:', conversationId);
 
-      const isMe = userId === currentUserIdRef.current;
+      const myId = String(currentUserIdRef.current || '');
+      const readUserId = String(userId || '');
+      const isMe = !!(myId && readUserId && myId === readUserId);
 
       // 1. Update message ticks
       queryClient.setQueryData(['chat', 'messages', conversationId], (oldMsgs: any) => {
@@ -713,6 +725,21 @@ URL: ${ENV.API_URL}`);
           if (m.id === messageId) {
             const nextReactions = (m.reactions || []).filter((r) => r.employeeId !== employeeId);
             nextReactions.push({ employeeId, name, reaction: emoji });
+            return { ...m, reactions: nextReactions };
+          }
+          return m;
+        });
+      });
+      await updateSyncTimestamp();
+    };
+
+    // Emoji reaction removed
+    const handleReactionRemoved = async ({ messageId, conversationId, employeeId }: any) => {
+      queryClient.setQueryData(['chat', 'messages', conversationId], (oldData: any) => {
+        if (!Array.isArray(oldData)) return [];
+        return oldData.map((m: ChatMessage) => {
+          if (m.id === messageId) {
+            const nextReactions = (m.reactions || []).filter((r) => r.employeeId !== employeeId);
             return { ...m, reactions: nextReactions };
           }
           return m;
@@ -988,6 +1015,7 @@ Last Seen: ${lastSeen || 'just now'}`);
     socket.on('message_deleted', handleMessageDeleted);
     socket.on('reaction_added', handleReactionUpdated);
     socket.on('reaction:updated', handleReactionUpdated);
+    socket.on('reaction_removed', handleReactionRemoved);
     
     // Token/Auth expiration signaling
     socket.on('token_expiring', handleTokenExpiring);

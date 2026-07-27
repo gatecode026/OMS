@@ -1,5 +1,5 @@
 import { FederationInvitation, FederationTrust } from './federation.model.js';
-import { runWithTenant } from '../../database/tenantConnection.js';
+import { runWithTenant } from '../../utils/tenantContext.js';
 
 export const federationService = {
   /**

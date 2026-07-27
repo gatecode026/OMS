@@ -463,13 +463,17 @@ export const deleteMessagesBulk = asyncHandler(async (req, res) => {
 
 // GET /api/v1/chat/calls/history
 export const getCallHistory = asyncHandler(async (req, res) => {
-  const { id: employeeId } = req.user;
-  const calls = await Call.find({
+  const { id: employeeId, companyId } = req.user;
+  const filter = {
     $or: [
       { callerId: employeeId },
       { calleeId: employeeId }
     ]
-  }).sort({ createdAt: -1 }).limit(50).lean();
+  };
+  if (companyId) {
+    filter.companyId = companyId;
+  }
+  const calls = await Call.find(filter).sort({ createdAt: -1 }).limit(50).lean();
 
   return successResponse(res, calls, 'Call history fetched');
 });
@@ -542,15 +546,17 @@ export const rejectCall = asyncHandler(async (req, res) => {
 export const getImageKitAuth = asyncHandler(async (req, res) => {
   const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
   const publicKey = process.env.IMAGEKIT_PUBLIC_KEY;
-  if (!privateKey || !publicKey) {
-    return res.status(500).json({
-      status: 'error',
-      message: 'ImageKit credentials (public/private keys) are not fully configured on the server'
-    });
+  if (!privateKey || !publicKey || privateKey.includes('***')) {
+    return successResponse(res, {
+      fallback: true,
+      token: '',
+      expire: 0,
+      signature: '',
+      publicKey: ''
+    }, 'ImageKit credentials not configured. Server fallback enabled.');
   }
 
   const token = req.query.token || crypto.randomBytes(16).toString('hex');
-  // Expire in 30 minutes (1800 seconds) to absorb clock skew and stay safely under ImageKit's 1-hour limit
   const expire = req.query.expire || Math.floor(Date.now() / 1000) + 1800;
 
   const signature = crypto
@@ -560,6 +566,7 @@ export const getImageKitAuth = asyncHandler(async (req, res) => {
 
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   return successResponse(res, {
+    fallback: false,
     token,
     expire,
     signature,
@@ -567,9 +574,37 @@ export const getImageKitAuth = asyncHandler(async (req, res) => {
   }, 'ImageKit authentication parameters generated successfully');
 });
 
+// POST /api/v1/chat/upload, /api/v1/chat/attachments, /api/v1/chat/media, /api/v1/chat/files
+export const uploadAttachmentRoute = asyncHandler(async (req, res) => {
+  const { fileData, fileName, mimeType } = req.body;
+  if (!fileData) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'No file data provided for attachment upload'
+    });
+  }
+
+  const result = await uploadToImageKitDetailed(fileData, fileName || `file_${Date.now()}`);
+  if (!result || !result.url) {
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to process and store attachment'
+    });
+  }
+
+  return successResponse(res, {
+    fileId: result.fileId || null,
+    name: fileName || 'attachment',
+    size: result.size || 0,
+    filePath: result.filePath || result.url,
+    url: result.url,
+    fileType: mimeType || 'application/octet-stream'
+  }, 'Attachment uploaded successfully');
+});
+
 // POST /api/v1/chat/imagekit/upload
 export const uploadToImageKitRoute = asyncHandler(async (req, res) => {
-  const { fileData, fileName } = req.body;
+  const { fileData, fileName, mimeType } = req.body;
   if (!fileData) {
     return res.status(400).json({
       status: 'error',
@@ -577,16 +612,18 @@ export const uploadToImageKitRoute = asyncHandler(async (req, res) => {
     });
   }
 
-  // Upload to ImageKit using basic auth helper
   const result = await uploadToImageKitDetailed(fileData, fileName);
-  if (!result || !result.url || result.url.startsWith('data:')) {
+  if (!result || !result.url) {
     return res.status(500).json({
       status: 'error',
       message: 'Failed to upload file to ImageKit'
     });
   }
 
-  return successResponse(res, result, 'File uploaded to ImageKit successfully');
+  return successResponse(res, {
+    ...result,
+    fileType: mimeType || 'application/octet-stream'
+  }, 'File uploaded to ImageKit successfully');
 });
 
 // DELETE /api/v1/chat/messages/:id/permanent

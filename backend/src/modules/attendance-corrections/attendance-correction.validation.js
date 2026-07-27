@@ -17,16 +17,16 @@ export const createSchema = (data) => {
   if (!requestedStatus) errors.push('Requested Status is required');
   if (!reason) errors.push('Reason for correction is required');
 
-  // Verify format of punch times if provided
-  const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+  // Verify format of punch times if provided (supports HH:MM, HH:MM:SS, and 12h hh:mm AM/PM)
+  const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?(\s*(AM|PM))?$/i;
   if (data.requestedPunchIn && data.requestedPunchIn !== '--:--') {
     if (!timeRegex.test(data.requestedPunchIn)) {
-      errors.push('Requested Punch In must be in HH:MM format');
+      errors.push('Requested Punch In must be in valid time format (e.g. HH:MM or HH:MM AM/PM)');
     }
   }
   if (data.requestedPunchOut && data.requestedPunchOut !== '--:--') {
     if (!timeRegex.test(data.requestedPunchOut)) {
-      errors.push('Requested Punch Out must be in HH:MM format');
+      errors.push('Requested Punch Out must be in valid time format (e.g. HH:MM or HH:MM AM/PM)');
     }
   }
 

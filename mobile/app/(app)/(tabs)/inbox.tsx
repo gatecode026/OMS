@@ -49,6 +49,7 @@ import {
   useSearchEmployees,
   useThreadActivity,
   useMarkThreadRead,
+  useMarkChatRead,
 } from '../../../src/features/chat';
 import { Avatar } from '../../../src/shared/components/Avatar';
 import { EmptyState, toast, Skeleton } from '../../../src/shared/components';
@@ -58,6 +59,7 @@ import { ChatConversation } from '../../../src/features/chat/types';
 import { useCall } from '../../../src/shared/providers/CallProvider';
 import ConversationCard from '../../../src/features/chat/components/ConversationCard';
 import ENV from '../../../src/config/env';
+import profileApi from '../../../src/features/profile/api/profileApi';
 
 type FilterType = 'All' | 'Unread' | 'Groups' | 'Pinned' | 'Archived' | 'Hidden' | 'Muted' | 'Mentions' | 'Calls' | 'Files';
 
@@ -77,6 +79,7 @@ export default function InboxScreen() {
   const [activeTab, setActiveTab] = useState<'chats' | 'calls'>('chats');
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const [createGroupVisible, setCreateGroupVisible] = useState(false);
   const [menuDropdownVisible, setMenuDropdownVisible] = useState(false);
 
@@ -131,6 +134,7 @@ export default function InboxScreen() {
   const { mutate: unarchiveChat } = useUnarchiveConversation();
   const { mutate: hideChat } = useHideConversation();
   const { mutate: unhideChat } = useUnhideConversation();
+  const { mutate: markRead } = useMarkChatRead();
   const { mutate: deleteChat } = useDeleteConversationForMe();
 
   // Socket states
@@ -145,13 +149,29 @@ export default function InboxScreen() {
     }
   }, []);
 
-  // Refresh active list
+  // Hard pull-to-refresh handler
   const handleRefresh = async () => {
-    if (activeTab === 'chats') {
-      await refetchConversations();
-      await refetchArchived();
-    } else if (activeTab === 'calls') {
-      await refetchCalls();
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['conversations'] }),
+        queryClient.invalidateQueries({ queryKey: ['archived-conversations'] }),
+        queryClient.invalidateQueries({ queryKey: ['calls'] }),
+        queryClient.invalidateQueries({ queryKey: ['searchEmployees'] }),
+        queryClient.invalidateQueries({ queryKey: ['profile'] }),
+        profileApi.fetchProfile(),
+      ]);
+
+      const socket = getSocket();
+      if (socket && socket.connected) {
+        socket.emit('get_online_users');
+      }
+    } catch (err) {
+      console.warn('[InboxScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
     }
   };
 
@@ -553,12 +573,7 @@ export default function InboxScreen() {
   // Active Now list: online employees from directory
   const activeNowList = useMemo(() => {
     return [...employees]
-      .filter((emp) => emp.id !== authUser?.id)
-      .sort((a, b) => {
-        const aOnline = onlineUserIds.has(a.id) ? 1 : 0;
-        const bOnline = onlineUserIds.has(b.id) ? 1 : 0;
-        return bOnline - aOnline;
-      });
+      .filter((emp) => emp.id !== authUser?.id && onlineUserIds.has(emp.id));
   }, [employees, onlineUserIds, authUser]);
 
   // Resolve direct chat item metadata
@@ -635,7 +650,12 @@ export default function InboxScreen() {
             <Ionicons name="people-outline" size={22} color={colors.text} />
           </Pressable>
           <Pressable style={{ marginLeft: 12, marginRight: 4 }} onPress={() => router.push('/(app)/attendance-qr' as any)} accessibilityLabel="View Attendance ID Pass">
-            <Avatar name={authUser?.name || 'Me'} size={32} source={authUser?.avatarUrl || undefined} />
+            <Avatar
+              name={authUser?.name || 'Me'}
+              size={32}
+              source={authUser?.avatarUrl || authUser?.avatar || (authUser as any)?.photoUrl || undefined}
+              userId={authUser?.id}
+            />
           </Pressable>
           <Pressable style={[styles.headerBtn, { marginLeft: 4 }]} onPress={() => setMenuDropdownVisible(!menuDropdownVisible)} accessibilityLabel="More Options">
             <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
@@ -796,11 +816,16 @@ export default function InboxScreen() {
               ) : (
                 globalSearchResults.contacts.map((emp: any) => (
                   <Pressable
-                    key={emp.id}
-                    onPress={() => handleSelectEmployee(emp.id)}
+                    key={emp.id || emp.employeeId || emp._id}
+                    onPress={() => handleSelectEmployee(emp.id || emp.employeeId || emp._id)}
                     style={[styles.chatCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
                   >
-                    <Avatar name={emp.name} size={42} source={emp.avatarUrl || undefined} />
+                    <Avatar
+                      name={emp.name}
+                      size={42}
+                      source={emp.avatarUrl || emp.avatar || emp.photoUrl || emp.profilePhoto || undefined}
+                      userId={emp.id || emp.employeeId || emp._id}
+                    />
                     <View style={styles.cardBody}>
                       <Text style={[styles.cardTitleText, { color: colors.text, fontFamily: typography.fonts.bold }]}>
                         {emp.name}
@@ -821,8 +846,9 @@ export default function InboxScreen() {
                 <Text style={[styles.noResultsText, { color: colors.textLight, fontFamily: typography.fonts.medium }]}>No matching conversations</Text>
               ) : (
                 globalSearchResults.conversations.map((conv: any) => {
-                  const title = conv.name || (conv.type === 'direct' ? conv.participants.find((p: any) => p.employeeId !== authUser?.id)?.name : 'Group Chat') || 'Chat';
-                  const avatar = conv.avatar || (conv.type === 'direct' ? conv.participants.find((p: any) => p.employeeId !== authUser?.id)?.avatar : null) || null;
+                  const title = conv.name || (conv.type === 'direct' ? conv.participants.find((p: any) => (p.employeeId || p.id || p._id) !== authUser?.id)?.name : 'Group Chat') || 'Chat';
+                  const avatar = conv.avatar || (conv.type === 'direct' ? (conv.participants.find((p: any) => (p.employeeId || p.id || p._id) !== authUser?.id)?.avatar || conv.participants.find((p: any) => (p.employeeId || p.id || p._id) !== authUser?.id)?.avatarUrl) : null) || null;
+                  const otherPartId = conv.type === 'direct' ? (conv.participants.find((p: any) => (p.employeeId || p.id || p._id) !== authUser?.id)?.employeeId || conv.participants.find((p: any) => (p.employeeId || p.id || p._id) !== authUser?.id)?.id || conv.participants.find((p: any) => (p.employeeId || p.id || p._id) !== authUser?.id)?._id) : undefined;
                   return (
                     <Pressable
                       key={conv.id}
@@ -832,7 +858,7 @@ export default function InboxScreen() {
                       }}
                       style={[styles.chatCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
                     >
-                      <Avatar name={title} size={42} source={avatar || undefined} />
+                      <Avatar name={title} size={42} source={avatar || undefined} userId={otherPartId} />
                       <View style={styles.cardBody}>
                         <Text style={[styles.cardTitleText, { color: colors.text, fontFamily: typography.fonts.bold }]}>
                           {title}
@@ -862,7 +888,7 @@ export default function InboxScreen() {
                     }}
                     style={[styles.chatCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
                   >
-                    <Avatar name={msg.senderName} size={36} source={msg.senderAvatar || undefined} />
+                    <Avatar name={msg.senderName} size={36} source={msg.senderAvatar || undefined} userId={msg.senderId} />
                     <View style={styles.cardBody}>
                       <View style={styles.cardHeader}>
                         <Text style={[styles.cardTitleText, { color: colors.text, fontFamily: typography.fonts.bold }]}>
@@ -956,12 +982,17 @@ export default function InboxScreen() {
 
                       return (
                         <Pressable
-                          key={emp.id}
-                          onPress={() => handleSelectEmployee(emp.id)}
+                          key={emp.id || emp.employeeId || emp._id}
+                          onPress={() => handleSelectEmployee(emp.id || emp.employeeId || emp._id)}
                           style={styles.activeUserItem}
                         >
                           <View style={styles.activeAvatarWrapper}>
-                            <Avatar name={emp.name} size={48} source={emp.avatarUrl || undefined} />
+                            <Avatar
+                              name={emp.name}
+                              size={48}
+                              source={emp.avatarUrl || emp.avatar || emp.photoUrl || emp.profilePhoto || undefined}
+                              userId={emp.id || emp.employeeId || emp._id}
+                            />
                             <View style={[styles.activePresenceDot, { backgroundColor: statusColor, borderColor: colors.card }]} />
                           </View>
                           <Text style={[styles.activeUserName, { color: colors.text, fontFamily: typography.fonts.medium }]} numberOfLines={1}>
@@ -979,14 +1010,16 @@ export default function InboxScreen() {
 
               <AnyFlashList
                 data={displayChats}
+                extraData={displayChats}
                 keyExtractor={(item: ChatConversation) => item.id}
                 estimatedItemSize={72}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
                 refreshControl={
                   <RefreshControl
-                    refreshing={isConversationsLoading || isArchivedLoading}
+                    refreshing={refreshing}
                     onRefresh={handleRefresh}
+                    colors={[colors.primary]}
                     tintColor={colors.primary}
                   />
                 }
@@ -1010,7 +1043,10 @@ export default function InboxScreen() {
                       typingState={typingState}
                       isPinned={isPinned}
                       isMuted={isMuted}
-                      onPress={(c) => router.push(`/chat/${c.id}`)}
+                      onPress={(c) => {
+                        markRead(c.id);
+                        router.push(`/chat/${c.id}`);
+                      }}
                       onLongPress={(c) => setLongPressedChat(c)}
                       onTogglePin={handleTogglePin}
                       onToggleMute={(c) => handleToggleMute(c.id)}
@@ -1040,8 +1076,9 @@ export default function InboxScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
           refreshControl={
             <RefreshControl
-              refreshing={isCallsLoading}
+              refreshing={refreshing}
               onRefresh={handleRefresh}
+              colors={[colors.primary]}
               tintColor={colors.primary}
             />
           }
@@ -1085,10 +1122,13 @@ export default function InboxScreen() {
                 key={item.id}
                 style={[styles.chatCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
                 onPress={() => {
-                  initiateCall(otherPersonId, callTypeParam, item.conversationId || '');
+                  initiateCall(otherPersonId, callTypeParam, item.conversationId || '', {
+                    name: otherPersonName,
+                    avatar: otherPersonAvatar || undefined,
+                  });
                 }}
               >
-                <Avatar name={otherPersonName} size={48} source={otherPersonAvatar || undefined} />
+                <Avatar name={otherPersonName} size={48} source={otherPersonAvatar || undefined} userId={otherPersonId} />
                 
                 <View style={styles.cardBody}>
                   <View style={styles.cardHeader}>
@@ -1111,7 +1151,10 @@ export default function InboxScreen() {
 
                     <Pressable
                       style={{ padding: 6 }}
-                      onPress={() => initiateCall(otherPersonId, callTypeParam, item.conversationId || '')}
+                      onPress={() => initiateCall(otherPersonId, callTypeParam, item.conversationId || '', {
+                        name: otherPersonName,
+                        avatar: otherPersonAvatar || undefined,
+                      })}
                     >
                       <Ionicons name={isVideo ? 'videocam-outline' : 'call-outline'} size={20} color={colors.primary} />
                     </Pressable>

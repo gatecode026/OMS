@@ -180,13 +180,46 @@ export const deleteFromImageKit = async (url) => {
  * @param {String} fileName - The desired name of the file
  * @returns {Promise<Object>} - `{ url, fileId, filePath }` if successful, otherwise `{ url: base64Str, fileId: null, filePath: null }`
  */
+export const saveFileLocally = (base64Str, fileName) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const uploadDir = path.join(process.cwd(), 'uploads', 'chat');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    const cleanName = `${Date.now()}_${(fileName || 'file.bin').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const filePath = path.join(uploadDir, cleanName);
+    const base64Data = base64Str.includes(';base64,') ? base64Str.split(';base64,')[1] : base64Str;
+    const buffer = Buffer.from(base64Data, 'base64');
+    fs.writeFileSync(filePath, buffer);
+
+    const relativeUrl = `/uploads/chat/${cleanName}`;
+    return {
+      url: relativeUrl,
+      fileId: `local_${cleanName}`,
+      filePath: relativeUrl,
+      size: buffer.length
+    };
+  } catch (err) {
+    logger.error('[ImageKit] Local file save fallback failed:', err);
+    return { url: base64Str, fileId: null, filePath: null, size: 0 };
+  }
+};
+
+/**
+ * Uploads a base64 encoded file string directly to ImageKit, returning detailed metadata.
+ * @param {String} base64Str - The raw base64 string
+ * @param {String} fileName - The desired name of the file
+ * @returns {Promise<Object>} - `{ url, fileId, filePath }` if successful
+ */
 export const uploadToImageKitDetailed = async (base64Str, fileName) => {
   const publicKey = process.env.IMAGEKIT_PUBLIC_KEY || 'public_CpBAKCTW3cCxoXfv';
   const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
   
   if (!privateKey || privateKey.includes('***')) {
-    logger.warn('[ImageKit] IMAGEKIT_PRIVATE_KEY is not defined. Skipping detailed upload.');
-    return { url: base64Str, fileId: null, filePath: null };
+    logger.warn('[ImageKit] IMAGEKIT_PRIVATE_KEY is not defined. Using local file storage fallback.');
+    return saveFileLocally(base64Str, fileName);
   }
 
   try {
@@ -219,11 +252,12 @@ export const uploadToImageKitDetailed = async (base64Str, fileName) => {
     return {
       url: result.url,
       fileId: result.fileId,
-      filePath: result.filePath
+      filePath: result.filePath,
+      size: result.size
     };
   } catch (err) {
     logger.error('[ImageKit] Failed to upload detailed file to ImageKit:', err);
-    return { url: base64Str, fileId: null, filePath: null };
+    return saveFileLocally(base64Str, fileName);
   }
 };
 

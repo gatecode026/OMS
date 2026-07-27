@@ -383,10 +383,22 @@ const EmployeeDetail = () => {
               <button className="id-card-close" onClick={() => setShowIdCard(false)}>✕</button>
               <div className="id-card-render-wrapper" ref={idCardRef}>
                 <div className="id-card-front">
+                  <div className="id-card-front-header-bg"></div>
+                  <div className="id-card-front-pink-bg"></div>
+                  <div className="id-card-watermark"></div>
+                  <div className="id-card-badge">OFFICIAL ID</div>
+                  <div className="id-card-chip">
+                    <svg viewBox="0 0 40 30" width="30" height="22">
+                      <rect width="40" height="30" rx="4" fill="#D97706" opacity="0.9" />
+                      <rect x="2" y="2" width="36" height="26" rx="3" fill="#F59E0B" />
+                      <path d="M2 10 H38 M2 20 H38 M14 2 V28 M26 2 V28" stroke="#B45309" strokeWidth="1.2" />
+                      <rect x="14" y="10" width="12" height="10" rx="2" fill="#FEF3C7" opacity="0.85" />
+                    </svg>
+                  </div>
                   <div className="id-card-logo-area">
-                    <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="var(--color-primary)" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="var(--color-primary)" /></svg>
-                    <div className="id-card-company-title">{emp.companyName || generalSettings?.companyName || 'OMS Enterprise'}</div>
-                    <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : 'Gatecode OMS'}</div>
+                    <svg viewBox="0 0 100 100" width="22" height="22" className="id-card-logo-svg"><polygon points="50,15 85,50 50,85 15,50" fill="none" stroke="#FFFFFF" strokeWidth="8" /><polygon points="50,28 72,50 50,72 28,50" fill="#FFFFFF" /></svg>
+                    <div className="id-card-company-title">{emp.companyName || generalSettings?.companyName || 'Corporate Enterprise'}</div>
+                    <div className="id-card-company-subtitle">{emp.branch ? (emp.branch.toLowerCase().includes('branch') ? emp.branch : `${emp.branch} Branch`) : (emp.officeLocation || 'Main Headquarters')}</div>
                   </div>
                   <div className="id-card-photo-wrap"><Avatar name={emp.name} size="xl" className="id-card-photo-img" src={emp.avatar || emp.photoUrl} /></div>
                   <div className="id-card-name-area"><h2 className="id-card-emp-name">{renderName(emp.name)}</h2><p className="id-card-emp-role">{emp.designation || emp.role}</p></div>
@@ -397,8 +409,10 @@ const EmployeeDetail = () => {
                   </div>
                 </div>
                 <div className="id-card-back">
+                  <div className="id-card-back-bottom-bg"></div>
+                  <div className="id-card-back-pink-bg"></div>
                   <div className="id-card-back-bullets">
-                    <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {emp.companyName || generalSettings?.companyName || 'OMS Enterprise'} and must be returned on demand.</p></div>
+                    <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>This card is the official property of {emp.companyName || generalSettings?.companyName || 'Corporate Enterprise'} and must be returned on demand.</p></div>
                     <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p>If found, please return to the HR Department or dynamic branch address below immediately.</p></div>
                     <div className="id-card-bullet-row"><span className="id-bullet-dot"></span><p style={{ fontWeight: 600 }}>Branch Address: {emp.branchAddress || getBranchAddress(emp.branch, branches)}</p></div>
                   </div>

@@ -33,6 +33,7 @@ export interface AttendanceRecord {
 }
 
 export interface ClockInPayload {
+  punchIn?: string;
   notes?: string;
   location?: {
     latitude: number;
@@ -41,5 +42,6 @@ export interface ClockInPayload {
 }
 
 export interface ClockOutPayload {
+  punchOut?: string;
   notes?: string;
 }

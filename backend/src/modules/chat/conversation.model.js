@@ -104,6 +104,11 @@ conversationSchema.index({
   'participants.employeeId': 1,
   type: 1
 });
+conversationSchema.index({
+  companyId: 1,
+  'participants.employeeId': 1,
+  lastActivityAt: -1
+});
 
 conversationSchema.plugin(tenantPlugin);
 const Conversation = mongoose.model('Conversation', conversationSchema);

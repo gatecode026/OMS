@@ -5,6 +5,7 @@
  */
 
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -43,6 +44,11 @@ app.set('trust proxy', 1);
 
 // ─── SECURITY MIDDLEWARES ────────────────────────────────────────────────────
 app.use(correlationMiddleware);
+// Gzip responses. Critical for chat payloads that embed base64 avatars: the
+// repeated/duplicated data-URI strings dedupe under gzip, cutting the
+// conversation-list payload dramatically. (Root-cause fix — moving avatars to
+// URLs — is tracked separately.)
+app.use(compression());
 app.use(helmet());
 app.use(cors(corsOptions));
 

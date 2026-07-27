@@ -58,7 +58,7 @@ Copy `.env.example` to `.env.local` or `.env.development`:
 
 ```env
 EXPO_PUBLIC_APP_ENV=development
-EXPO_PUBLIC_API_URL=https://oms-xdcz.onrender.com
+EXPO_PUBLIC_API_URL=https://oms-5rmc.onrender.com
 EXPO_PUBLIC_TIMEOUT=15000
 EXPO_PUBLIC_APP_NAME=OMS (Dev)
 EXPO_PUBLIC_ENABLE_LOGGER=true

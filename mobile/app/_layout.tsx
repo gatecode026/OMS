@@ -28,6 +28,8 @@ import * as KeepAwake from 'expo-keep-awake';
 import * as Notifications from 'expo-notifications';
 import { registerDeviceForPushNotifications } from '../src/shared/services/pushNotification';
 
+import AppBootManager from '../src/shared/services/AppBootManager';
+
 // Safely monkey-patch expo-keep-awake to prevent uncaught promise rejections on platforms where it's not supported
 if (KeepAwake) {
   try {
@@ -47,9 +49,6 @@ if (KeepAwake) {
     console.warn('Failed to patch expo-keep-awake:', e);
   }
 }
-
-// Minimum ms the splash screen must be visible (gives the full animation time to play)
-const SPLASH_MIN_MS = 2500;
 
 // Keep the native splash visible while JS bundle loads
 ExpoSplashScreen.preventAutoHideAsync().catch(() => {
@@ -90,14 +89,12 @@ if (Platform.OS !== 'web') {
 // ─── Navigation Gate (runs inside RootProvider — has full theme/branding context) ──
 
 function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
-  const { isAuthenticated, loadingSession, loadSession } = useAuthStore();
+  const { isAuthenticated, loadingSession } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
 
   // Initialize global socket listeners for real-time syncing
   useGlobalSockets();
-
-  const [minTimePassed, setMinTimePassed] = useState(false);
 
   // Configure notification permissions and response listener (tap to deep link)
   useEffect(() => {
@@ -197,6 +194,27 @@ function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
           return;
         }
 
+        // ── PROD-BUG-002 FIX: Route incoming call push notification to /incoming-call ──
+        // When the app is backgrounded or locked, the push notification wakes the device.
+        // Tapping it must navigate to the incoming-call screen so the user can accept/decline.
+        const notificationType = response.notification.request.content.data?.type;
+        if (notificationType === 'incoming_call') {
+          setTimeout(() => {
+            router.push('/(app)/incoming-call' as any);
+          }, 200);
+          return;
+        }
+
+        // ── Route cancelled call notification — dismiss any pending incoming call UI ──
+        if (notificationType === 'call_cancelled') {
+          // The socket event call:missed will handle cleanup
+          // but if app was backgrounded, navigate back to inbox
+          setTimeout(() => {
+            router.replace('/(tabs)/inbox' as any);
+          }, 150);
+          return;
+        }
+
         if (conversationId) {
           setTimeout(() => {
             router.push(`/chat/${conversationId}` as any);
@@ -213,19 +231,20 @@ function NavigationGate({ fontsReady }: { fontsReady: boolean }) {
     };
   }, [router]);
 
-  // Start the guaranteed minimum splash timer on mount
+  // Restore session from secure storage (critical stage 1 boot)
   useEffect(() => {
-    const timer = setTimeout(() => setMinTimePassed(true), SPLASH_MIN_MS);
-    return () => clearTimeout(timer);
+    AppBootManager.runCriticalBoot();
   }, []);
 
-  // Restore session from secure storage
-  useEffect(() => {
-    loadSession();
-  }, [loadSession]);
+  // All must be true before we navigate away from the splash
+  const splashDone = fontsReady && !loadingSession;
 
-  // All three must be true before we navigate away from the splash
-  const splashDone = fontsReady && !loadingSession && minTimePassed;
+  // Trigger UI Paint ready stage in AppBootManager
+  useEffect(() => {
+    if (splashDone) {
+      AppBootManager.onUiReady();
+    }
+  }, [splashDone]);
 
   // Dev logging for session state
   if (__DEV__ && !loadingSession) {

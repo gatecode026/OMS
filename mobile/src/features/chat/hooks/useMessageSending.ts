@@ -76,6 +76,24 @@ export const useMessageSending = ({ conversationId, authUser, setLocalMessages }
         : null,
     };
 
+    if (!socket?.connected) {
+      const offlineMsg: ChatMessage = {
+        ...optimisticMsg,
+        status: 'pending' as const,
+        failureReason: 'disconnected' as const,
+      };
+      setLocalMessages((prev) => [...prev, offlineMsg]);
+      queryClient.setQueryData(['chat', 'messages', conversationId], (oldData: any) => {
+        const list = Array.isArray(oldData) ? oldData : [];
+        return [...list, offlineMsg];
+      });
+      import('../services/OfflineQueueManager').then(({ OfflineQueueManager }) => {
+        OfflineQueueManager.enqueueAction('message', conversationId, payload).catch(() => {});
+      });
+      onSuccess();
+      return;
+    }
+
     setLocalMessages((prev) => [...prev, optimisticMsg]);
     queryClient.setQueryData(['chat', 'messages', conversationId], (oldData: any) => {
       const list = Array.isArray(oldData) ? oldData : [];

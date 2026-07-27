@@ -7,6 +7,7 @@
 
 import apiClient from '../../../shared/services/apiClient';
 import { useAuthStore } from '../../../shared/store/authStore';
+import UserProfileManager from '../../../shared/services/UserProfileManager';
 import {
   EmployeeProfile,
   BankDetails,
@@ -81,6 +82,35 @@ export const profileApi = {
     if (profile) {
       profile.currentAddress = parseAddressString(profile.currentAddress);
       profile.permanentAddress = parseAddressString(profile.permanentAddress);
+
+      // Automatically sync latest profile info and avatar to authStore & UserProfileManager
+      const targetId = profile.id || profile._id || useAuthStore.getState().user?.id;
+      if (targetId) {
+        const latestAvatar = profile.profilePhoto || profile.avatarUrl || profile.avatar || profile.photoUrl || null;
+        const currentAuthUser = useAuthStore.getState().user;
+
+        if (currentAuthUser && (currentAuthUser.id === targetId || (currentAuthUser as any)._id === targetId)) {
+          useAuthStore.getState().updateUser({
+            avatar: latestAvatar || currentAuthUser.avatar,
+            avatarUrl: latestAvatar || currentAuthUser.avatarUrl,
+            profilePhoto: latestAvatar || currentAuthUser.profilePhoto,
+            photoUrl: latestAvatar || currentAuthUser.photoUrl,
+            name: profile.name || currentAuthUser.name,
+            designation: profile.designation || currentAuthUser.designation,
+            department: profile.department || currentAuthUser.department,
+          });
+        }
+
+        UserProfileManager.cacheProfile({
+          userId: targetId,
+          name: profile.name || currentAuthUser?.name || '',
+          avatarUrl: latestAvatar,
+          profilePhoto: latestAvatar,
+          designation: profile.designation,
+          department: profile.department,
+          employeeCode: profile.employeeCode,
+        });
+      }
     }
     return profile;
   },
@@ -180,12 +210,12 @@ export const profileApi = {
   },
 
   /**
-   * Update profile picture by sending base64 data to employee update endpoint.
+   * Update profile picture by sending base64 data to dedicated employee avatar endpoint.
    */
   async updateProfilePhoto(employeeId: string, base64Image: string | null): Promise<EmployeeProfile> {
-    const response = await apiClient.put(`/api/v1/employees/${employeeId}`, {
-      avatar: base64Image,
-      photoUrl: base64Image,
+    const response = await apiClient.patch(`/api/v1/employees/${employeeId}/avatar`, {
+      avatar: base64Image || '',
+      photoUrl: base64Image || '',
     });
     return response.data?.data || response.data;
   },

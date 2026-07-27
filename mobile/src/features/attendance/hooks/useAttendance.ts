@@ -19,6 +19,7 @@ export const useAttendance = () => {
     queryKey: ['attendance', 'today'],
     queryFn: () => attendanceApi.fetchTodayStatus(),
     enabled: isConnected, // Only fetch from server if online
+    refetchOnWindowFocus: true,
   });
 
   // 2. Clock In Mutation
@@ -91,12 +92,14 @@ export const useAttendanceHistory = (month: string) => {
     queryKey: ['attendance', 'history', month],
     queryFn: () => attendanceApi.fetchMonthRecords(from, to),
     enabled: isConnected && !!month,
+    refetchOnWindowFocus: true,
   });
 
   const summaryQuery = useQuery({
     queryKey: ['attendance', 'summary', month],
     queryFn: () => attendanceApi.fetchSummary(month),
     enabled: isConnected && !!month,
+    refetchOnWindowFocus: true,
   });
 
   const holidaysQuery = useQuery({

@@ -91,9 +91,13 @@ router.get('/employees',                     controller.searchEmployees);
 router.get('/calls/history',                 controller.getCallHistory);
 router.post('/calls/:callId/reject',          controller.rejectCall);
 
-// ─── IMAGEKIT CLIENT AUTH ────────────────────────────────────────────────────
+// ─── ATTACHMENT & MEDIA UPLOADS ──────────────────────────────────────────────
 router.get('/imagekit/auth',                 controller.getImageKitAuth);
 router.post('/imagekit/upload',               controller.uploadToImageKitRoute);
+router.post('/upload',                        controller.uploadAttachmentRoute);
+router.post('/attachments',                   controller.uploadAttachmentRoute);
+router.post('/media',                         controller.uploadAttachmentRoute);
+router.post('/files',                         controller.uploadAttachmentRoute);
 
 // ─── ADMIN CLEANUP ENDPOINTS ─────────────────────────────────────────────────
 router.get('/admin/cleanup/stats',           restrictTo('admin', 'super_admin'), controller.getCleanupStats);

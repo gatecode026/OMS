@@ -24,8 +24,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 
+import { useQueryClient } from '@tanstack/react-query';
 import useTheme from '../../src/shared/hooks/useTheme';
 import { useMyPayroll } from '../../src/features/payroll/hooks/usePayrollData';
+import profileApi from '../../src/features/profile/api/profileApi';
 import { formatINR } from '../../src/shared/utils/format';
 import { downloadPayslipFile, sharePayslipAsPdf } from '../../src/features/payroll/utils/payslipDownloader';
 import { PayrollRecord } from '../../src/features/profile/types';
@@ -35,6 +37,7 @@ import { useProfile } from '../../src/features/profile/hooks/useProfile';
 export default function PayrollScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { colors, spacing, typography, radius, shadows, isDark } = useTheme();
 
   const { data, isLoading, refetch, isFetching } = useMyPayroll();
@@ -42,8 +45,19 @@ export default function PayrollScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['payroll'] }),
+        profileApi.fetchProfile(),
+        refetch(),
+      ]);
+    } catch (err) {
+      console.warn('[PayrollScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
+    }
   };
 
   // High-fidelity fallback records matching the reference screenshots

@@ -48,7 +48,7 @@ eas update --branch production --message "Hotfix: Attendance QR sync and chat pr
 ## 3. Render Backend Deployment
 
 The backend Node.js API & Socket.IO server is deployed on **Render**:
-- **Production Service URL:** `https://oms-xdcz.onrender.com`
+- **Production Service URL:** `https://oms-5rmc.onrender.com`
 - **Build Command:** `npm install`
 - **Start Command:** `node src/server.js`
 - **Health Endpoint:** `GET /health` (Returns HTTP 200)

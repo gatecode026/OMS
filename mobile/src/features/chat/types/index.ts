@@ -66,6 +66,7 @@ export interface ChatMessage {
   type: 'text' | 'image' | 'video' | 'file' | 'audio' | 'system' | 'emoji' | 'call' | 'poll' | 'task' | 'leave' | 'attendance' | 'payslip' | 'project' | 'meeting' | 'contact' | 'location';
   contentType: 'plain' | 'markdown';
   createdAt: string;
+  updatedAt?: string | null;
   isDeleted: boolean;
   isEdited: boolean;
   replyTo?: {
@@ -80,6 +81,7 @@ export interface ChatMessage {
     fileName: string | null;
     fileSize: number | null;
     mimeType: string | null;
+    fileType?: string | null;
     duration?: number | null;
     imageKitFileId?: string | null;
     imageKitFilePath?: string | null;
@@ -97,6 +99,9 @@ export interface ChatMessage {
   failureReason?: 'network_error' | 'upload_failed' | 'timeout' | 'unauthorized' | 'disconnected';
   reactions?: ChatMessageReaction[];
   isPinned?: boolean;
+  isStarred?: boolean;
+  isRead?: boolean;
+  isDelivered?: boolean;
   starredBy?: string[];
   threadId?: string | null;
   threadReplyCount?: number;

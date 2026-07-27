@@ -35,6 +35,7 @@ import { useNotificationsUnreadCount } from '../../../src/features/notifications
 import useAuthStore from '../../../src/shared/store/authStore';
 import useDrawerStore from '../../../src/shared/store/drawerStore';
 import { connectSocket } from '../../../src/shared/services/socketManager';
+import profileApi from '../../../src/features/profile/api/profileApi';
 import {
   Card,
   Avatar,
@@ -49,20 +50,46 @@ import dayjs from 'dayjs';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// 12-hour format converter helper
-const formatTime12h = (time24?: string) => {
-  if (!time24 || time24 === '--:--') return 'Pending';
-  if (time24.toLowerCase().includes('am') || time24.toLowerCase().includes('pm')) {
-    return time24;
+const parseToMinutes = (timeStr?: string): number | null => {
+  if (!timeStr || timeStr === '--:--' || timeStr === 'Pending') return null;
+  const clean = timeStr.trim();
+  const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const ampm = (match[3] || '').toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
   }
-  const parts = time24.split(':');
-  if (parts.length < 2) return time24;
-  const h = parseInt(parts[0], 10);
-  const m = parseInt(parts[1], 10);
-  if (isNaN(h) || isNaN(m)) return time24;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const displayH = h % 12 === 0 ? 12 : h % 12;
-  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+  return null;
+};
+
+// 12-hour format converter helper (with robust UTC offset & AM/PM auto-resolution)
+const formatTime12h = (time24?: string, punchInStr?: string, totalHours?: number) => {
+  if (!time24 || time24 === '--:--' || time24 === 'Pending') return 'Pending';
+  const clean = time24.trim();
+
+  let outMins = parseToMinutes(clean);
+  if (outMins === null) return clean;
+
+  const inMins = parseToMinutes(punchInStr);
+
+  // UTC to IST offset correction (+5h30m = +330 mins):
+  // Check if punchOut in UTC is before punchIn or yields working duration far less than totalHours
+  if (inMins !== null) {
+    const diff = outMins - inMins;
+    const expectedDiffMins = totalHours && totalHours > 0.5 ? totalHours * 60 : 120;
+    if (diff < 0 || (diff < expectedDiffMins - 90)) {
+      outMins = (outMins + 330) % 1440;
+    }
+  }
+
+  const h24 = Math.floor(outMins / 60);
+  const mins = outMins % 60;
+  const ampm = h24 >= 12 ? 'PM' : 'AM';
+  const displayH = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${String(displayH).padStart(2, '0')}:${String(mins).padStart(2, '0')} ${ampm}`;
 };
 
 // Robust format parser helper supporting 12h, 24h and ISO strings
@@ -372,8 +399,18 @@ export default function DashboardScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries();
-    setRefreshing(false);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries(),
+        profileApi.fetchProfile(),
+      ]);
+    } catch (err) {
+      console.warn('[HomeScreen] Hard refresh error:', err);
+    } finally {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 400);
+    }
   };
 
   const handleQuickClockToggle = async () => {
@@ -386,8 +423,10 @@ export default function DashboardScreen() {
         return;
       }
 
+      const formattedNow = dayjs().format('hh:mm A');
       if (!hasPunchedIn) {
         await clockIn({
+          punchIn: formattedNow,
           location: {
             latitude: 28.6139,
             longitude: 77.2090,
@@ -398,11 +437,12 @@ export default function DashboardScreen() {
         await clockOut({
           id: attendanceId,
           payload: {
+            punchOut: formattedNow,
             notes: 'Shift completed.',
           },
         });
         setJustPunchedOutStatus(todayRecord?.status || 'Present');
-        setJustPunchedOutTime(dayjs().format('HH:mm'));
+        setJustPunchedOutTime(formattedNow);
       }
       await Promise.all([refetchTodayAttendance(), refetchHistory()]);
     } catch (error: any) {
@@ -461,7 +501,7 @@ export default function DashboardScreen() {
     { label: 'Leave', icon: 'calendar-outline', color: '#F59E0B', route: 'leave' },
     { label: 'Payslip', icon: 'document-text-outline', color: '#8B5CF6', route: 'payroll' },
     { label: 'Tasks', icon: 'checkbox-outline', color: '#10B981', route: 'work' },
-    { label: 'Calendar', icon: 'today-outline', color: '#EC4899', route: 'work' },
+    { label: 'Calendar', icon: 'today-outline', color: '#EC4899', route: 'calendar' },
     { label: 'Reports', icon: 'bar-chart-outline', color: '#14B8A6', route: 'reports' },
     { label: 'Documents', icon: 'folder-open-outline', color: '#3B82F6', route: 'documents' },
     { label: 'Projects', icon: 'briefcase-outline', color: '#6366F1', route: 'projects' },
@@ -538,6 +578,7 @@ export default function DashboardScreen() {
               name={user?.name || 'User'}
               size={38}
               source={user?.avatarUrl || (user as any)?.avatar || (user as any)?.profilePhoto || (user as any)?.photoUrl || (user as any)?.image || undefined}
+              userId={user?.id}
             />
           </Pressable>
         </View>
@@ -631,8 +672,8 @@ export default function DashboardScreen() {
                   <Text style={styles.cardLabel}>PUNCH OUT</Text>
                   <Text style={styles.cardTimeValue}>
                     {todayRecord?.punchOut && todayRecord.punchOut !== '--:--'
-                      ? formatTime12h(todayRecord.punchOut)
-                      : 'Pending'}
+                      ? formatTime12h(todayRecord.punchOut, todayRecord.punchIn, todayRecord.totalHours)
+                      : (justPunchedOutTime ? formatTime12h(justPunchedOutTime, todayRecord?.punchIn) : 'Pending')}
                   </Text>
                 </View>
               </View>
@@ -685,7 +726,7 @@ export default function DashboardScreen() {
                           Shift Completed
                         </Text>
                         <Text style={[styles.shiftCompletedSubText, { fontFamily: typography.fonts.medium }]}>
-                          Out at {formatTime12h(todayRecord?.punchOut !== '--:--' ? todayRecord?.punchOut : (justPunchedOutTime || undefined))}
+                          Out at {formatTime12h(todayRecord?.punchOut !== '--:--' ? todayRecord?.punchOut : (justPunchedOutTime || undefined), todayRecord?.punchIn, todayRecord?.totalHours)}
                         </Text>
                       </View>
                     </View>
@@ -750,7 +791,7 @@ export default function DashboardScreen() {
               <Text style={[styles.sectionTitle, { color: colors.text, fontFamily: typography.fonts.bold }]}>
                 Upcoming Events
               </Text>
-              <Pressable>
+              <Pressable onPress={() => router.push('/calendar' as any)}>
                 <Text style={[styles.seeAllLink, { color: colors.primary, fontFamily: typography.fonts.semibold }]}>
                   See All
                 </Text>

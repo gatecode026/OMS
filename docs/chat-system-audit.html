@@ -1,0 +1,603 @@
+<title>OMS Chat System — Cross-Platform Architecture Audit</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --panel-2:#eef0f4; --ink:#1a1d23; --ink-2:#4a4f5a;
+    --ink-3:#767c88; --line:#dfe2e8; --line-2:#e9ebf0;
+    --accent:#4a63d8; --accent-soft:#e7ebfb;
+    --crit:#d3383d; --crit-bg:#fbe9e9; --high:#c9741a; --high-bg:#fbf0e2;
+    --med:#9a8410; --med-bg:#f7f2d9; --low:#2f8f68; --low-bg:#e3f3ec;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e1116; --panel:#151a21; --panel-2:#1b212a; --ink:#e7eaf0; --ink-2:#aeb5c2;
+      --ink-3:#7b8494; --line:#262d38; --line-2:#20262f;
+      --accent:#7f93f0; --accent-soft:#1d2540;
+      --crit:#f0666b; --crit-bg:#2c1618; --high:#e2953f; --high-bg:#2a1e12;
+      --med:#d6c04a; --med-bg:#262110; --low:#54c495; --low-bg:#112319;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f6f8; --panel:#ffffff; --panel-2:#eef0f4; --ink:#1a1d23; --ink-2:#4a4f5a;
+    --ink-3:#767c88; --line:#dfe2e8; --line-2:#e9ebf0; --accent:#4a63d8; --accent-soft:#e7ebfb;
+    --crit:#d3383d; --crit-bg:#fbe9e9; --high:#c9741a; --high-bg:#fbf0e2;
+    --med:#9a8410; --med-bg:#f7f2d9; --low:#2f8f68; --low-bg:#e3f3ec;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1116; --panel:#151a21; --panel-2:#1b212a; --ink:#e7eaf0; --ink-2:#aeb5c2;
+    --ink-3:#7b8494; --line:#262d38; --line-2:#20262f; --accent:#7f93f0; --accent-soft:#1d2540;
+    --crit:#f0666b; --crit-bg:#2c1618; --high:#e2953f; --high-bg:#2a1e12;
+    --med:#d6c04a; --med-bg:#262110; --low:#54c495; --low-bg:#112319;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
+    font-size:15.5px;-webkit-font-smoothing:antialiased;margin:0}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px 120px}
+  .mono{font-family:var(--mono)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--panel-2);padding:.1em .4em;
+    border-radius:4px;border:1px solid var(--line-2);color:var(--ink)}
+  a{color:var(--accent)}
+
+  /* Masthead */
+  header.mast{border-bottom:1px solid var(--line);margin-bottom:8px;padding:64px 0 34px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--accent);font-weight:600}
+  h1{font-size:clamp(30px,5vw,46px);line-height:1.08;letter-spacing:-.02em;margin:14px 0 10px;
+    text-wrap:balance;font-weight:750}
+  .sub{color:var(--ink-2);font-size:17px;max-width:70ch}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:22px;font-family:var(--mono);
+    font-size:12.5px;color:var(--ink-3)}
+  .meta-row b{color:var(--ink-2);font-weight:600}
+
+  /* Section scaffolding */
+  section{padding:38px 0;border-bottom:1px solid var(--line-2);scroll-margin-top:20px}
+  h2{font-size:24px;letter-spacing:-.01em;margin:0 0 6px;font-weight:720;display:flex;
+    align-items:baseline;gap:12px}
+  h2 .num{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600;
+    border:1px solid var(--line);border-radius:5px;padding:2px 7px;background:var(--panel)}
+  h3{font-size:16.5px;margin:26px 0 8px;font-weight:680;letter-spacing:-.005em}
+  .lede{color:var(--ink-2);max-width:74ch;margin:2px 0 4px}
+  p{max-width:76ch}
+
+  /* Scorecard */
+  .score-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:22px 0 6px}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px;
+    position:relative;overflow:hidden}
+  .tile .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .tile .v{font-size:30px;font-weight:740;letter-spacing:-.02em;margin-top:6px;font-variant-numeric:tabular-nums}
+  .tile .u{font-size:13px;color:var(--ink-2);margin-top:2px}
+  .tile .stripe{position:absolute;left:0;top:0;bottom:0;width:4px}
+  .big-score{grid-column:span 2}
+  @media(max-width:640px){.big-score{grid-column:span 1}}
+
+  /* Pills */
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;
+    font-weight:600;padding:2px 8px;border-radius:20px;letter-spacing:.02em;white-space:nowrap;
+    border:1px solid transparent;line-height:1.5}
+  .p-crit{color:var(--crit);background:var(--crit-bg);border-color:color-mix(in srgb,var(--crit) 30%,transparent)}
+  .p-high{color:var(--high);background:var(--high-bg);border-color:color-mix(in srgb,var(--high) 30%,transparent)}
+  .p-med{color:var(--med);background:var(--med-bg);border-color:color-mix(in srgb,var(--med) 30%,transparent)}
+  .p-low{color:var(--low);background:var(--low-bg);border-color:color-mix(in srgb,var(--low) 30%,transparent)}
+  .p-neutral{color:var(--ink-2);background:var(--panel-2);border-color:var(--line)}
+
+  /* Tables */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;margin:18px 0;background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:640px}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line-2);vertical-align:top}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--ink-3);font-weight:600;background:var(--panel-2);position:sticky;top:0}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:var(--panel-2)}
+  td.mono,th.mono{font-family:var(--mono);font-size:12.5px}
+  .yes{color:var(--low);font-weight:600}
+  .no{color:var(--crit);font-weight:600}
+  .part{color:var(--high);font-weight:600}
+
+  /* Callout cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 17px}
+  .card h4{margin:0 0 6px;font-size:14.5px;font-weight:680;display:flex;align-items:center;gap:8px}
+  .card p{font-size:13.5px;color:var(--ink-2);margin:0}
+
+  /* Finding blocks */
+  .finding{background:var(--panel);border:1px solid var(--line);border-left-width:4px;border-radius:10px;
+    padding:15px 17px;margin:13px 0}
+  .finding.crit{border-left-color:var(--crit)}
+  .finding.high{border-left-color:var(--high)}
+  .finding.med{border-left-color:var(--med)}
+  .finding.low{border-left-color:var(--low)}
+  .finding .ftop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px}
+  .finding .fid{font-family:var(--mono);font-size:12px;color:var(--ink-3);font-weight:600}
+  .finding .ftitle{font-weight:680;font-size:15px}
+  .finding p{margin:6px 0 0;font-size:13.8px;color:var(--ink-2)}
+  .finding .ev{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-top:8px;
+    background:var(--panel-2);border:1px solid var(--line-2);border-radius:6px;padding:7px 10px;
+    overflow-x:auto;white-space:nowrap}
+
+  ul.tight{margin:8px 0;padding-left:22px}ul.tight li{margin:5px 0;color:var(--ink-2);max-width:74ch}
+  ul.tight li b,ul.tight li strong{color:var(--ink)}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  @media(max-width:720px){.two-col{grid-template-columns:1fr}}
+
+  /* Mermaid */
+  pre.mermaid{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;
+    overflow-x:auto;text-align:center;margin:18px 0}
+
+  /* Nav */
+  nav.toc{position:sticky;top:0;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);z-index:10;margin-bottom:8px}
+  nav.toc .inner{max-width:1120px;margin:0 auto;padding:9px 24px;display:flex;gap:6px 14px;
+    flex-wrap:wrap;font-family:var(--mono);font-size:11.5px}
+  nav.toc a{color:var(--ink-3);text-decoration:none;white-space:nowrap}
+  nav.toc a:hover{color:var(--accent)}
+  .verdict{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+    border-radius:12px;padding:18px 20px;margin:16px 0}
+  .verdict b{color:var(--ink)}
+  .kbd{font-family:var(--mono);font-size:12px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:4px;padding:1px 5px}
+  .foot{color:var(--ink-3);font-size:12.5px;font-family:var(--mono);padding-top:26px}
+</style>
+
+<nav class="toc"><div class="inner">
+  <a href="#summary">00 · Summary</a>
+  <a href="#arch">01 · Architecture</a>
+  <a href="#tree">02 · Structure</a>
+  <a href="#state">03 · State</a>
+  <a href="#sockets">04 · Socket Matrix</a>
+  <a href="#flows">05 · Sync Flows</a>
+  <a href="#features">06 · Feature Parity</a>
+  <a href="#api">07 · API</a>
+  <a href="#media">08 · Media</a>
+  <a href="#security">09 · Security</a>
+  <a href="#perf">10 · Performance</a>
+  <a href="#issues">11 · Issues</a>
+  <a href="#debt">12 · Tech Debt</a>
+  <a href="#roadmap">13 · Roadmap</a>
+  <a href="#answers">14 · Verdict</a>
+</div></nav>
+
+<div class="wrap">
+
+<header class="mast">
+  <div class="eyebrow">Engineering Audit · Priority P0</div>
+  <h1>OMS Chat System — Cross-Platform Architecture &amp; Synchronization Report</h1>
+  <p class="sub">A read-only audit of the React web, React Native mobile, and Node.js/MongoDB/Redis/Socket.IO backend chat stacks — mapping structure, data flow, feature parity, and every synchronization fault that stops Web and Mobile from behaving as one enterprise messaging platform.</p>
+  <div class="meta-row">
+    <span><b>Scope</b> frontend/ · mobile/ · backend/src/modules/chat</span>
+    <span><b>Chat LOC audited</b> ≈37,000</span>
+    <span><b>Method</b> static repository analysis</span>
+    <span><b>Code changed</b> none</span>
+  </div>
+</header>
+
+<!-- ============ SUMMARY ============ -->
+<section id="summary">
+  <h2><span class="num">00</span> Executive Summary</h2>
+  <p class="lede">Web and Mobile are <b>not</b> architecturally identical — they are two independently-built clients that talk to a shared backend and socket contract, but diverge in state ownership, offline strategy, virtualization, and call signaling. The backend is the source of truth and is the most mature layer. The most urgent risks are a <b>duplicate/dead mobile call-signaling path</b>, <b>no message virtualization on Web</b>, and <b>no shared event/feature contract</b>, which lets the two clients drift silently.</p>
+
+  <div class="score-grid">
+    <div class="tile big-score"><div class="stripe" style="background:var(--high)"></div>
+      <div class="k">Production Readiness</div><div class="v">6.4<span style="font-size:16px;color:var(--ink-3)"> / 10</span></div>
+      <div class="u">Feature-rich, backend-solid; blocked by client drift &amp; perf gaps</div></div>
+    <div class="tile"><div class="stripe" style="background:var(--low)"></div>
+      <div class="k">Backend maturity</div><div class="v">8.0</div><div class="u">Multi-tenant, Redis-backed, well-indexed</div></div>
+    <div class="tile"><div class="stripe" style="background:var(--high)"></div>
+      <div class="k">Web client</div><div class="v">5.5</div><div class="u">Monolithic context, no virtualization</div></div>
+    <div class="tile"><div class="stripe" style="background:var(--med)"></div>
+      <div class="k">Mobile client</div><div class="v">6.5</div><div class="u">Modern stack, heavy dead scaffolding</div></div>
+  </div>
+
+  <div class="score-grid" style="margin-top:12px">
+    <div class="tile"><div class="k">Socket events (backend)</div><div class="v">~70</div><div class="u">emit + on handlers</div></div>
+    <div class="tile"><div class="k">Event mismatches</div><div class="v" style="color:var(--crit)">6+</div><div class="u">client ⇄ server drift</div></div>
+    <div class="tile"><div class="k">Dead mobile services</div><div class="v" style="color:var(--high)">5</div><div class="u">of 29 "Manager" services</div></div>
+    <div class="tile"><div class="k">Feature parity</div><div class="v">~80%</div><div class="u">Web trails Mobile</div></div>
+  </div>
+
+  <h3>Top findings at a glance</h3>
+  <div class="cards">
+    <div class="card"><h4><span class="pill p-crit">CRIT</span> Two call systems on Mobile</h4><p>Live WebRTC uses correct <code>call:signal:*</code> events; a parallel <code>CallSignalingManager</code> listens for <code>call:offer/answer/ice-candidate/busy</code> — events the backend <b>never emits</b>. Dead, misleading, and a maintenance trap.</p></div>
+    <div class="card"><h4><span class="pill p-crit">CRIT</span> Web renders every message</h4><p>No <code>react-window</code>/virtualization anywhere in <code>frontend/</code>. Long conversations mount thousands of DOM nodes; Mobile uses <code>FlashList</code>.</p></div>
+    <div class="card"><h4><span class="pill p-high">HIGH</span> No shared contract</h4><p>Socket event names + payloads are hand-maintained in three places. Backend emits both <code>message:new</code> and <code>new_message</code>; clients pick different ones.</p></div>
+    <div class="card"><h4><span class="pill p-high">HIGH</span> Divergent offline models</h4><p>Web: <code>localStorage</code> failed-message cache. Mobile: <code>OfflineQueueManager</code> (secureStore) + a bespoke <code>fileCacheService</code> React-Query persister. Neither shares logic.</p></div>
+    <div class="card"><h4><span class="pill p-med">MED</span> State ownership asymmetry</h4><p>Web = single 2,973-line React Context (35 <code>useState</code>). Mobile = React Query + 4 Zustand stores. No server-state layer on Web.</p></div>
+    <div class="card"><h4><span class="pill p-med">MED</span> Web feature lag</h4><p>Drafts, scheduled messages, and broadcast surfaces exist on Mobile/backend but are absent or thin on Web.</p></div>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section id="arch">
+  <h2><span class="num">01</span> Architecture Overview</h2>
+  <p class="lede">One backend, one socket gateway, two clients built to different philosophies. The backend owns truth (MongoDB) and ephemeral state (Redis); clients subscribe over Socket.IO and reconcile via REST.</p>
+
+  <pre class="mermaid">
+flowchart TB
+  subgraph Clients
+    W["Web · React SPA<br/>ChatContext (Context API)<br/>no server-state cache"]
+    M["Mobile · React Native/Expo<br/>React Query + Zustand<br/>+ Service layer"]
+  end
+  subgraph Gateway["Socket.IO Gateway (chat.socket.js · 2544 LOC)"]
+    S["JWT handshake auth<br/>reauthenticate · heartbeat<br/>rooms: user:{id}, conv:{id}, thread:{id}"]
+  end
+  subgraph Backend["Node.js / Express (chat.service.js · 2061 LOC)"]
+    C["Controllers → Services → Repositories"]
+    R[("Redis<br/>presence · typing · online sets")]
+    DB[("MongoDB<br/>conversations · messages<br/>threads · polls · calls")]
+    IK["ImageKit<br/>media CDN + signed auth"]
+  end
+  W <-->|REST| C
+  M <-->|REST| C
+  W <-->|socket| S
+  M <-->|socket| S
+  S --> C
+  C --> DB
+  C --> R
+  S --> R
+  C --> IK
+  </pre>
+
+  <div class="two-col">
+    <div>
+      <h3>Web (React SPA)</h3>
+      <ul class="tight">
+        <li><b>State:</b> one <code>ChatContext.jsx</code> (2,973 LOC, 35 <code>useState</code>, <code>useReducer</code>-free) owns conversations, messages, typing, presence, calls.</li>
+        <li><b>Server state:</b> <span class="no">none</span> — no React Query/SWR. Every fetch is manual and lives in memory; lost on refresh.</li>
+        <li><b>Rendering:</b> plain <code>.map()</code> lists, <span class="no">no virtualization</span>.</li>
+        <li><b>Offline:</b> failed messages cached to <code>localStorage</code> (<code>chat_failed_msg_*</code>) with retry; no send queue.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Mobile (RN / Expo 57)</h3>
+      <ul class="tight">
+        <li><b>Server state:</b> TanStack Query, keys <code>['chat','conversations']</code>, <code>['chat','messages',convId]</code>; custom disk persister via <code>fileCacheService</code>.</li>
+        <li><b>Client state:</b> 4 Zustand stores (call, message-action, realtime, shared-media).</li>
+        <li><b>Rendering:</b> <code>FlashList</code> (virtualized).</li>
+        <li><b>Offline:</b> <code>OfflineQueueManager</code> (secureStore) flushes on reconnect; <code>SyncManager</code>/<code>ConflictResolver</code> present.</li>
+        <li><b>Service layer:</b> 29 "Manager" services — powerful but <b>5 are dead</b> (§12).</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Backend</h3>
+  <ul class="tight">
+    <li><b>Layering:</b> <code>chat.controller.js</code> (1,312) → <code>chat.service.js</code> (2,061) → repositories (<code>message.repository.js</code>, <code>conversation.repository.js</code>) with a <code>repositoryContract.js</code> security guard and per-tenant plugin.</li>
+    <li><b>Sub-domains modularized:</b> threads, polls, search, pinned, presence, typing, read-receipts each have their own service/controller/routes.</li>
+    <li><b>Multi-tenant:</b> every model carries <code>companyId</code> + <code>tenantPlugin</code>; indexes are company-scoped.</li>
+    <li><b>Redis:</b> presence (<code>presence:user:*</code>, 120s TTL + in-memory fallback), typing (<code>typing:conversation:*</code>), company online sets (<code>presence:company:*</code>).</li>
+  </ul>
+</section>
+
+<!-- ============ STRUCTURE ============ -->
+<section id="tree">
+  <h2><span class="num">02</span> Folder Structure &amp; Module Map</h2>
+  <div class="two-col">
+    <div>
+      <h3>backend/src/modules/chat</h3>
+      <ul class="tight mono" style="font-size:12.5px">
+        <li>chat.{socket,service,controller,routes,validation}.js</li>
+        <li>{conversation,message}.{model,repository}.js</li>
+        <li>call.model.js · cleanupLog.model.js</li>
+        <li>models/ → Poll · Thread · UserChatSettings</li>
+        <li>controllers/ → pinned · poll · search · thread · user</li>
+        <li>services/ → presence · typing · readReceipt · search · thread · poll · pinned · notification.socket</li>
+        <li>routes/ → pinned · poll · search · thread</li>
+      </ul>
+    </div>
+    <div>
+      <h3>frontend/src (chat)</h3>
+      <ul class="tight mono" style="font-size:12.5px">
+        <li>context/ChatContext.jsx <span class="pill p-high">2973</span></li>
+        <li>pages/chat/ → ChatWindow · ConversationsList · MessageBubble · MessageInput · CallScreen · GroupInfoPanel · CreateGroupModal …</li>
+        <li>components/ChatHeader.jsx</li>
+      </ul>
+      <h3>mobile/src/features/chat</h3>
+      <ul class="tight mono" style="font-size:12.5px">
+        <li>hooks/ → useChat · useChatSocket <span class="pill p-high">1147</span> · useWebRTC · useMessageSending · useUploadQueue · useTyping …</li>
+        <li>services/ → 29 *Manager.ts</li>
+        <li>stores/ → useCallStore · useMessageActionStore · useRealtimeStore · useSharedMediaStore</li>
+        <li>components/ · screens/ChatRoomScreen <span class="pill p-high">1011</span></li>
+      </ul>
+    </div>
+  </div>
+  <p><span class="pill p-neutral">observation</span> &nbsp;The backend is cleanly modularized by sub-domain; the <b>Web client is a monolith</b> (one context file larger than any backend file); the <b>Mobile client is over-modularized</b> (a service per concern, several unused). Neither client mirrors the backend's module boundaries, so there is no 1:1 mental model across the stack.</p>
+</section>
+
+<!-- ============ STATE ============ -->
+<section id="state">
+  <h2><span class="num">03</span> State Management Audit</h2>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Concern</th><th>Web</th><th>Mobile</th><th>Backend / Redis</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">Server cache</td><td class="no">none (in-memory Context)</td><td class="yes">React Query + disk persist</td><td>MongoDB truth</td><td><span class="pill p-high">HIGH</span> Web refetches everything, no dedupe</td></tr>
+      <tr><td class="mono">Messages list</td><td>Context state + manual <code>loadMoreMessages</code></td><td class="part"><code>useQuery</code> (not <code>useInfiniteQuery</code>)</td><td>cursor by <code>createdAt/_id</code></td><td><span class="pill p-med">MED</span> Mobile lacks true infinite pagination</td></tr>
+      <tr><td class="mono">Optimistic send</td><td><code>tempId</code> + localStorage failed cache</td><td><code>setQueryData</code> optimistic + queue</td><td><code>tempId</code>→<code>id</code> reconcile</td><td><span class="pill p-med">MED</span> two different reconcile algorithms</td></tr>
+      <tr><td class="mono">Presence / typing</td><td>Context maps</td><td>Zustand <code>useRealtimeStore</code></td><td>Redis (120s TTL)</td><td><span class="pill p-low">LOW</span></td></tr>
+      <tr><td class="mono">Calls</td><td>Context + CallScreen</td><td>Zustand <code>useCallStore</code></td><td>call.model + signaling relay</td><td><span class="pill p-crit">CRIT</span> duplicate mobile signaling path</td></tr>
+      <tr><td class="mono">Persistence</td><td><code>localStorage</code> (failed msgs only)</td><td><code>fileCacheService</code> + secureStore queue</td><td>—</td><td><span class="pill p-high">HIGH</span> no shared hydration model</td></tr>
+    </tbody>
+  </table></div>
+  <p><span class="pill p-neutral">duplicate ownership</span> &nbsp;Presence and unread counts are derived independently in each client from the same socket stream, so a bug in one client's reducer diverges silently from the other. There is no single normalized entity store either side of the wire.</p>
+</section>
+
+<!-- ============ SOCKET MATRIX ============ -->
+<section id="sockets">
+  <h2><span class="num">04</span> Socket Event Matrix &amp; Mismatches</h2>
+  <p class="lede">The socket contract is the spine of real-time sync. The backend emits ~70 event names; the two clients each subscribe to an overlapping-but-not-identical subset. Columns show whether each side handles the event.</p>
+
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Event</th><th>Backend</th><th>Web</th><th>Mobile</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">new_message</td><td class="yes">emit</td><td class="yes">on</td><td class="yes">on</td><td>Primary message fan-out (both clients)</td></tr>
+      <tr><td class="mono">message:new</td><td class="yes">emit</td><td class="no">—</td><td class="no">—</td><td><span class="pill p-med">redundant</span> backend emits a 2nd name nobody consumes</td></tr>
+      <tr><td class="mono">message_delivered / message:delivery_update</td><td class="yes">emit</td><td class="yes">on</td><td class="yes">on</td><td>Double-tick; both variants handled</td></tr>
+      <tr><td class="mono">messages_read / conversation:read_update</td><td class="yes">emit</td><td class="yes">on</td><td class="yes">on (+legacy)</td><td>Mobile keeps a legacy handler too</td></tr>
+      <tr><td class="mono">user:typing / user:stopped_typing</td><td class="yes">emit</td><td class="yes">on</td><td class="yes">on</td><td class="yes">Consistent (clients emit <code>typing:start/stop</code>)</td></tr>
+      <tr><td class="mono">reaction_added / reaction_removed</td><td class="yes">emit</td><td class="yes">on (added)</td><td class="yes">on (both)</td><td><span class="pill p-high">gap</span> Web listens <code>reaction_added</code> only; Mobile also handles <code>reaction:updated</code> &amp; <code>reaction_removed</code></td></tr>
+      <tr><td class="mono">call:signal:offer/answer/ice</td><td class="yes">emit+on</td><td class="yes">on</td><td class="yes">on (useWebRTC)</td><td class="yes">Correct live path</td></tr>
+      <tr><td class="mono">call:offer / call:answer / call:ice-candidate / call:busy</td><td class="no">never emitted</td><td class="no">—</td><td class="no">CallSignalingManager listens</td><td><span class="pill p-crit">DEAD</span> Mobile subscribes to phantom events</td></tr>
+      <tr><td class="mono">call:incoming/ringing/ended/missed/rejected</td><td class="yes">emit</td><td class="yes">on</td><td class="part">partial</td><td>Mobile mixes correct + phantom names</td></tr>
+      <tr><td class="mono">poll:created/voted/closed/reopened/deleted</td><td class="yes">emit</td><td class="part">deleted+updated only</td><td class="yes">all</td><td><span class="pill p-high">gap</span> Web misses granular poll events</td></tr>
+      <tr><td class="mono">thread:reply:new / thread:mention / thread:updated / thread:read</td><td class="yes">emit</td><td class="yes">on</td><td class="part">updated only</td><td><span class="pill p-med">gap</span> Mobile thread realtime is thinner</td></tr>
+      <tr><td class="mono">conversation:archived/hidden/cleared/deleted_for_me…</td><td class="yes">emit</td><td class="part">cleared+read_update</td><td class="yes">full sync set</td><td><span class="pill p-high">gap</span> Web multi-device conv sync incomplete</td></tr>
+      <tr><td class="mono">notification:new/sync/unread_count</td><td class="yes">emit</td><td class="yes">on (new/sync)</td><td class="yes">on (new)</td><td>Unread-count reset event handled unevenly</td></tr>
+      <tr><td class="mono">user_online/offline · user:online/offline</td><td class="yes">emit (both)</td><td class="yes">on (both)</td><td class="yes">on (both)</td><td><span class="pill p-med">smell</span> two naming conventions for one fact</td></tr>
+      <tr><td class="mono">group_updated · member_added/removed/left</td><td class="yes">emit</td><td class="yes">on</td><td class="yes">on</td><td>Consistent</td></tr>
+      <tr><td class="mono">delete_message (client→server)</td><td class="yes">on</td><td class="no">uses REST</td><td class="yes">emit</td><td><span class="pill p-med">divergent</span> Web deletes via REST, Mobile via socket</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cards">
+    <div class="card"><h4>Root cause</h4><p>No generated/shared event enum. Each side string-literals event names, so typos and renames survive silently until a feature "just doesn't update" on one platform.</p></div>
+    <div class="card"><h4>Dual naming</h4><p>Backend emits both colon-style (<code>message:new</code>, <code>user:online</code>) and snake-style (<code>new_message</code>, <code>user_online</code>) — an unfinished migration. Redundant emits waste bandwidth and confuse consumers.</p></div>
+    <div class="card"><h4>Acknowledgements</h4><p><code>send_message</code>, <code>heartbeat</code> use ack callbacks (good). Most broadcasts are fire-and-forget with a <code>missed_events</code> replay on reconnect as the safety net.</p></div>
+  </div>
+</section>
+
+<!-- ============ FLOWS ============ -->
+<section id="flows">
+  <h2><span class="num">05</span> Synchronization Flow Analysis</h2>
+  <p class="lede">Message send is the canonical path and is healthy end-to-end. The breaks appear in <b>secondary events</b> (polls, threads, conversation-management, calls) where one client subscribes and the other does not.</p>
+
+  <pre class="mermaid">
+sequenceDiagram
+  participant U as Sender UI
+  participant SK as Socket
+  participant SVC as chat.service
+  participant DB as MongoDB
+  participant R as Redis
+  participant O as Other clients
+  U->>SK: send_message {tempId, convId, content}
+  SK->>SVC: persist + build message
+  SVC->>DB: insert message + update conversation.lastMessage
+  SVC->>R: bump unread / presence
+  SVC-->>U: ack {id} (tempId→id reconcile)
+  SVC-->>O: emit new_message
+  Note over O: Web → Context.setState<br/>Mobile → queryClient.setQueryData
+  O->>SK: message:delivered
+  SK-->>U: message:delivery_update (double-tick)
+  </pre>
+
+  <h3>Sync status by path</h3>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Path</th><th>Status</th><th>Where it breaks</th></tr></thead>
+    <tbody>
+      <tr><td>Send / receive text</td><td><span class="pill p-low">SYNCED</span></td><td>—</td></tr>
+      <tr><td>Delivery + read receipts</td><td><span class="pill p-low">SYNCED</span></td><td>Mobile carries a legacy handler; harmless</td></tr>
+      <tr><td>Typing / presence</td><td><span class="pill p-low">SYNCED</span></td><td>—</td></tr>
+      <tr><td>Reactions</td><td><span class="pill p-med">PARTIAL</span></td><td>Web ignores <code>reaction_removed</code>/<code>reaction:updated</code> → stale reaction on Web after remote un-react</td></tr>
+      <tr><td>Polls</td><td><span class="pill p-high">BROKEN(web)</span></td><td>Web only reacts to <code>poll:updated/deleted</code>; created/voted/closed don't live-update</td></tr>
+      <tr><td>Threads</td><td><span class="pill p-med">PARTIAL</span></td><td>Mobile only handles <code>thread:updated</code>; new replies/mentions not pushed</td></tr>
+      <tr><td>Conversation mgmt (archive/hide/clear)</td><td><span class="pill p-high">PARTIAL(web)</span></td><td>Web multi-device sync set is incomplete → action on phone not reflected on web tab</td></tr>
+      <tr><td>Calls</td><td><span class="pill p-crit">FRAGILE</span></td><td>Mobile's second signaling manager binds phantom events; risk of double handlers / missed hangups</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section id="features">
+  <h2><span class="num">06</span> Feature Parity Matrix</h2>
+  <p class="lede">Derived from presence of implementing code per platform. <span class="yes">●</span> full · <span class="part">◐</span> partial/thin · <span class="no">○</span> absent.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Feature</th><th>Backend</th><th>Web</th><th>Mobile</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Direct &amp; Group chat</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Core parity</td></tr>
+      <tr><td>Reply / Forward</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Mobile has richer forward UI</td></tr>
+      <tr><td>Edit / Delete / soft-delete</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td><code>deletedFor[]</code> per-user + permanent</td></tr>
+      <tr><td>Delete for everyone</td><td class="part">◐</td><td class="part">◐</td><td class="part">◐</td><td>Implemented via <code>deleteMsgPermanent</code>/<code>conversationDeleted</code>, not a first-class flag</td></tr>
+      <tr><td>Pin / Star messages</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Dedicated indexes + service</td></tr>
+      <tr><td>Reactions</td><td class="yes">●</td><td class="part">◐</td><td class="yes">●</td><td>Web misses remove-reaction realtime</td></tr>
+      <tr><td>Threads</td><td class="yes">●</td><td class="yes">●</td><td class="part">◐</td><td>Mobile thread realtime thin</td></tr>
+      <tr><td>Polls</td><td class="yes">●</td><td class="part">◐</td><td class="yes">●</td><td>Web live-update incomplete</td></tr>
+      <tr><td>Scheduled messages</td><td class="part">◐</td><td class="no">○</td><td class="part">◐</td><td>Only Mobile surfaces it</td></tr>
+      <tr><td>Drafts</td><td class="no">○</td><td class="no">○</td><td class="yes">●</td><td>Mobile-only, local</td></tr>
+      <tr><td>Broadcast / Channels</td><td class="no">○</td><td class="no">○</td><td class="part">◐</td><td>Mobile stub only; no backend model</td></tr>
+      <tr><td>Voice notes</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Recorder+player both sides</td></tr>
+      <tr><td>Images / Video / Files / PDF</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>ImageKit pipeline</td></tr>
+      <tr><td>Location / Contacts</td><td class="part">◐</td><td class="part">◐</td><td class="yes">●</td><td>Mobile richer (native pickers)</td></tr>
+      <tr><td>Archive / Mute / Pin chat / Block</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Web multi-device sync partial</td></tr>
+      <tr><td>Voice &amp; Video calls (WebRTC)</td><td class="yes">●</td><td class="yes">●</td><td class="part">◐</td><td>Mobile dual-path defect</td></tr>
+      <tr><td>Read/Delivery/Unread</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Parity</td></tr>
+      <tr><td>Offline queue / retry</td><td>n/a</td><td class="part">◐</td><td class="yes">●</td><td>Web = failed-cache only; no true outbox</td></tr>
+      <tr><td>Search (global + in-conv)</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Mongo text index</td></tr>
+      <tr><td>Push / In-app notifications</td><td class="yes">●</td><td class="yes">●</td><td class="yes">●</td><td>Web = web-push subscribe</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ API ============ -->
+<section id="api">
+  <h2><span class="num">07</span> REST API Surface</h2>
+  <p class="lede">All routes sit under <code>/chat</code>, guarded by <code>authenticate</code>; admin cleanup under <code>restrictTo('admin','super_admin')</code>. Both clients hit the same endpoints, but Web leans REST-heavy (deletes, reactions) where Mobile prefers socket.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Group</th><th>Endpoints</th><th>Consumed by</th></tr></thead>
+    <tbody>
+      <tr><td>Conversations</td><td class="mono">GET /conversations · /archived · /hidden · POST /direct · /group · GET /:id/messages · PATCH /:id/read · /unread</td><td>Web + Mobile</td></tr>
+      <tr><td>Conv management</td><td class="mono">hide · unhide · archive · unarchive · DELETE /:id/me · clear · export · members</td><td>Web + Mobile</td></tr>
+      <tr><td>Messages</td><td class="mono">star · bulk-delete · GET/DELETE /:id · /permanent · PATCH /edit · POST /react · /forward</td><td>Web (react via REST), Mobile (socket)</td></tr>
+      <tr><td>Users</td><td class="mono">block · unblock · report · GET /blocked · /:id/last-seen</td><td>Both</td></tr>
+      <tr><td>Presence/Status</td><td class="mono">PATCH /status · GET /presence/:userId · /ping</td><td>Both</td></tr>
+      <tr><td>Calls</td><td class="mono">GET /calls/history · POST /calls/:id/reject</td><td>Both</td></tr>
+      <tr><td>Media</td><td class="mono">GET /imagekit/auth · POST /imagekit/upload · /upload · /attachments · /media · /files</td><td>Both — <span class="pill p-med">4 aliases</span> for one handler</td></tr>
+      <tr><td>Sub-routers</td><td class="mono">/threads · /polls · /search · /conversations (pinned)</td><td>Both</td></tr>
+    </tbody>
+  </table></div>
+  <p><span class="pill p-neutral">smell</span> &nbsp;<code>/upload</code>, <code>/attachments</code>, <code>/media</code>, <code>/files</code> all map to <code>uploadAttachmentRoute</code> — client-driven aliasing that hides which client calls what. Consolidate to one.</p>
+</section>
+
+<!-- ============ MEDIA ============ -->
+<section id="media">
+  <h2><span class="num">08</span> Media Pipeline</h2>
+  <div class="two-col">
+    <div>
+      <h3>Backend / storage</h3>
+      <ul class="tight">
+        <li>ImageKit CDN; signed auth via <code>/imagekit/auth</code>; server-side upload via <code>utils/imagekit.js</code>.</li>
+        <li>Message <code>media{}</code> stores url, fileName, size, mime, width/height, duration, <code>imageKitFileId/FilePath</code> for later deletion.</li>
+        <li>Types: text · image · file · audio · system · emoji · call · poll.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Clients</h3>
+      <ul class="tight">
+        <li><b>Mobile:</b> <code>UploadManager</code> + <code>useUploadQueue</code> (retry, progress), <code>DownloadManager</code>, <code>AttachmentCacheManager</code> (<span class="no">dead</span>), <code>fileCacheService</code>.</li>
+        <li><b>Web:</b> upload inside <code>MessageInput.jsx</code>; direct ImageKit + <code>message_upload_error</code> socket fallback.</li>
+        <li><b>Gap:</b> no thumbnail/transcode step server-side; clients render full media. Compression is client-only and asymmetric.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="finding med"><div class="ftop"><span class="fid">MED-M1</span><span class="pill p-med">MEDIA</span><span class="ftitle">No shared upload contract → asymmetric retry/compression</span></div>
+    <p>Mobile has a durable upload queue with retry; Web uploads inline with a single error event. Large-file behavior, compression quality, and retry semantics differ per platform.</p></div>
+</section>
+
+<!-- ============ SECURITY ============ -->
+<section id="security">
+  <h2><span class="num">09</span> Security Review</h2>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Control</th><th>State</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>JWT auth (REST)</td><td><span class="pill p-low">OK</span></td><td><code>authenticate</code> on every chat route</td></tr>
+      <tr><td>Socket auth</td><td><span class="pill p-low">OK</span></td><td>Handshake token + <code>reauthenticate</code> with revoked-token &amp; identity-mismatch checks</td></tr>
+      <tr><td>Token expiry UX</td><td><span class="pill p-low">OK</span></td><td><code>token_expiring</code> → client re-auths without dropping socket</td></tr>
+      <tr><td>Tenant isolation</td><td><span class="pill p-low">OK</span></td><td><code>tenantPlugin</code> + <code>companyId</code> on all models/indexes; <code>repositoryContract.js</code> guard</td></tr>
+      <tr><td>Media access</td><td><span class="pill p-med">REVIEW</span></td><td>ImageKit signed auth for upload; verify delivery URLs aren't long-lived public links across tenants</td></tr>
+      <tr><td>Message/group permissions</td><td><span class="pill p-med">REVIEW</span></td><td><code>onlyAdminsCanMessage</code>, admin add/remove flags exist — confirm enforced in service, not just UI</td></tr>
+      <tr><td>Input validation</td><td><span class="pill p-med">REVIEW</span></td><td><code>chat.validation.js</code> is thin (25 LOC) vs. correction module; socket payloads largely unvalidated</td></tr>
+      <tr><td>E2E encryption</td><td><span class="pill p-neutral">N/A</span></td><td><code>EncryptionManager</code> exists on mobile but transport is TLS-only; not true E2EE</td></tr>
+    </tbody>
+  </table></div>
+  <div class="finding high"><div class="ftop"><span class="fid">HIGH-S1</span><span class="pill p-high">SECURITY</span><span class="ftitle">Socket event payloads lack schema validation</span></div>
+    <p>REST has middleware validation, but socket handlers (<code>send_message</code>, reactions, pins) trust client payloads. A shared validation layer (e.g. zod contract reused REST+socket) should gate every inbound event.</p>
+    <div class="ev">backend/src/modules/chat/chat.validation.js — 25 LOC · chat.socket.js — 2544 LOC of handlers</div></div>
+</section>
+
+<!-- ============ PERF ============ -->
+<section id="perf">
+  <h2><span class="num">10</span> Performance Analysis</h2>
+  <div class="cards">
+    <div class="card"><h4><span class="pill p-crit">CRIT</span> Web message list</h4><p>No virtualization — a 5k-message thread mounts 5k bubbles. Scroll jank + memory growth. Mobile's <code>FlashList</code> proves the fix is known internally.</p></div>
+    <div class="card"><h4><span class="pill p-high">HIGH</span> Web context re-renders</h4><p>One 2,973-LOC provider with 35 <code>useState</code> → any message updates re-render every consumer. No selector/memo isolation like Zustand gives Mobile.</p></div>
+    <div class="card"><h4><span class="pill p-med">MED</span> Mobile message query</h4><p><code>useQuery</code> not <code>useInfiniteQuery</code> for messages → whole list refetched instead of paged windows.</p></div>
+    <div class="card"><h4><span class="pill p-low">GOOD</span> DB indexing</h4><p>Message/conversation indexes are company-scoped and cover the hot paths (list, pinned, search text index).</p></div>
+    <div class="card"><h4><span class="pill p-low">GOOD</span> Redis presence</h4><p>120s TTL keys + in-memory fallback avoid a hard Redis dependency for online status.</p></div>
+    <div class="card"><h4><span class="pill p-med">MED</span> Redundant socket traffic</h4><p>Dual event names (<code>message:new</code>+<code>new_message</code>, <code>user:online</code>+<code>user_online</code>) double some broadcasts.</p></div>
+  </div>
+</section>
+
+<!-- ============ ISSUES ============ -->
+<section id="issues">
+  <h2><span class="num">11</span> Prioritized Issue Register</h2>
+
+  <div class="finding crit"><div class="ftop"><span class="fid">CRIT-1</span><span class="pill p-crit">CRITICAL</span><span class="ftitle">Mobile has two call-signaling systems; one binds events the backend never emits</span></div>
+    <p><b>Root cause:</b> a legacy <code>CallSignalingManager</code> was kept alongside the live <code>useWebRTC</code> hook. It subscribes to <code>call:offer</code>, <code>call:answer</code>, <code>call:ice-candidate</code>, <code>call:busy</code> — none exist server-side (backend emits <code>call:signal:*</code>). <b>Impact:</b> dead handlers, risk of double-registration and missed hangup/hangup-race if ever re-enabled. <b>Repro:</b> place a call from web → mobile; the manager's listeners never fire while useWebRTC's do.</p>
+    <div class="ev">mobile/.../services/CallSignalingManager.ts:76-83  ·  useWebRTC.ts:249,340,396,472 (correct)  ·  backend chat.socket.js:2255 emits call:signal:offer</div></div>
+
+  <div class="finding crit"><div class="ftop"><span class="fid">CRIT-2</span><span class="pill p-crit">CRITICAL</span><span class="ftitle">Web renders all messages — no virtualization</span></div>
+    <p><b>Evidence:</b> zero matches for <code>react-window</code>/<code>react-virtual</code>/<code>virtuoso</code> across <code>frontend/src</code>. <b>Impact:</b> long conversations degrade to unusable; memory climbs with history depth. <b>Business impact:</b> power users (support, ops) with large threads hit the worst experience.</p>
+    <div class="ev">frontend/src/pages/chat/ChatWindow.jsx — plain list render · MessageBubble.jsx 1222 LOC per-item</div></div>
+
+  <div class="finding high"><div class="ftop"><span class="fid">HIGH-1</span><span class="pill p-high">HIGH</span><span class="ftitle">No shared socket-event / payload contract across three codebases</span></div>
+    <p>Event names are string literals maintained by hand in backend, web, and mobile. Renames and typos surface only as "feature silently doesn't sync." Poll, thread, reaction-remove, and conversation-sync gaps all trace here.</p></div>
+
+  <div class="finding high"><div class="ftop"><span class="fid">HIGH-2</span><span class="pill p-high">HIGH</span><span class="ftitle">Web server-state lives in one Context with no cache layer</span></div>
+    <p><b>Impact:</b> full refetch on mount, no request dedupe/stale management, whole-tree re-renders, state lost on refresh. Mobile already proves the React Query pattern in-house.</p></div>
+
+  <div class="finding high"><div class="ftop"><span class="fid">HIGH-3</span><span class="pill p-high">HIGH</span><span class="ftitle">Incomplete conversation-management &amp; poll realtime on Web</span></div>
+    <p>Web omits several <code>conversation:*</code> sync events and granular <code>poll:*</code> events that Mobile handles → multi-device actions (archive on phone, vote on phone) don't reflect on an open web tab until refresh.</p></div>
+
+  <div class="finding med"><div class="ftop"><span class="fid">MED-1</span><span class="pill p-med">MEDIUM</span><span class="ftitle">Reaction-remove not handled on Web</span></div>
+    <p>Web binds <code>reaction_added</code> but not <code>reaction_removed</code>/<code>reaction:updated</code> → a reaction removed elsewhere lingers on the web view.</p></div>
+
+  <div class="finding med"><div class="ftop"><span class="fid">MED-2</span><span class="pill p-med">MEDIUM</span><span class="ftitle">Two offline models, no shared reconciliation</span></div>
+    <p>Web localStorage failed-cache vs. Mobile secureStore queue + disk-persisted React Query. Conflict resolution (<code>ConflictResolver</code>) exists only on Mobile.</p></div>
+
+  <div class="finding med"><div class="ftop"><span class="fid">MED-3</span><span class="pill p-med">MEDIUM</span><span class="ftitle">Dual event-naming convention on backend</span></div>
+    <p>Unfinished snake_case→colon migration leaves duplicate emits (<code>new_message</code>/<code>message:new</code>, <code>user_online</code>/<code>user:online</code>).</p></div>
+
+  <div class="finding low"><div class="ftop"><span class="fid">LOW-1</span><span class="pill p-low">LOW</span><span class="ftitle">Four REST aliases for one upload handler</span></div>
+    <p><code>/upload · /attachments · /media · /files</code> → same function; obscures client usage and widens surface.</p></div>
+</section>
+
+<!-- ============ DEBT ============ -->
+<section id="debt">
+  <h2><span class="num">12</span> Duplicate Logic &amp; Technical Debt</h2>
+  <h3>Dead / unwired mobile services</h3>
+  <p class="lede">Of 29 <code>*Manager</code> services, these have <b>no import outside their own file/tests</b>:</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Service</th><th>Ext. usages</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">AttachmentCacheManager</td><td>0</td><td class="no">dead</td></tr>
+      <tr><td class="mono">CallManager</td><td>0</td><td class="no">dead (superseded by useWebRTC)</td></tr>
+      <tr><td class="mono">OfflineEngine</td><td>0</td><td class="no">dead (superseded by OfflineQueueManager)</td></tr>
+      <tr><td class="mono">QAValidationManager</td><td>0</td><td class="no">dead / scaffolding</td></tr>
+      <tr><td class="mono">RealtimeManager</td><td>0</td><td class="no">dead (useChatSocket owns realtime)</td></tr>
+      <tr><td class="mono">CallSignalingManager</td><td>1</td><td class="part">wired but phantom events (CRIT-1)</td></tr>
+    </tbody>
+  </table></div>
+  <ul class="tight">
+    <li><b>Duplicate call stacks:</b> <code>useWebRTC</code> + <code>WebRTCManager</code> + <code>CallManager</code> + <code>CallSignalingManager</code> — four abstractions for one feature.</li>
+    <li><b>Duplicate offline stacks:</b> <code>OfflineEngine</code> vs <code>OfflineQueueManager</code>; <code>RealtimeManager</code>/<code>RealtimeQueue</code> vs <code>useChatSocket</code>.</li>
+    <li><b>Web monolith:</b> <code>ChatContext.jsx</code> mixes socket wiring, fetching, optimistic sends, presence, calls — untestable as a unit.</li>
+    <li><b>Legacy handlers retained:</b> <code>messages_read</code> "legacy" path on mobile alongside <code>conversation:read_update</code>.</li>
+  </ul>
+</section>
+
+<!-- ============ ROADMAP ============ -->
+<section id="roadmap">
+  <h2><span class="num">13</span> Cross-Platform Synchronization Roadmap</h2>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Phase</th><th>Action</th><th>Outcome</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill p-crit">P0</span></td><td>Delete mobile phantom call path (<code>CallSignalingManager</code>, <code>CallManager</code>, <code>OfflineEngine</code>, <code>RealtimeManager</code>, <code>QAValidationManager</code>, <code>AttachmentCacheManager</code>). Standardize on <code>useWebRTC</code>.</td><td>Removes CRIT-1; shrinks surface</td></tr>
+      <tr><td><span class="pill p-crit">P0</span></td><td>Add virtualization to Web message list (react-window/virtuoso) + memoize <code>MessageBubble</code>.</td><td>Removes CRIT-2</td></tr>
+      <tr><td><span class="pill p-high">P1</span></td><td>Extract a <b>shared socket-event contract</b> package (const enum + payload types/zod) imported by all three stacks; retire dual names.</td><td>Kills the drift class (HIGH-1)</td></tr>
+      <tr><td><span class="pill p-high">P1</span></td><td>Introduce React Query on Web for conversations/messages; move socket handlers to <code>setQueryData</code> patches mirroring Mobile.</td><td>HIGH-2; unifies cache model</td></tr>
+      <tr><td><span class="pill p-high">P1</span></td><td>Fill Web's missing listeners: <code>reaction_removed</code>, granular <code>poll:*</code>, full <code>conversation:*</code> sync set.</td><td>HIGH-3, MED-1; true multi-device</td></tr>
+      <tr><td><span class="pill p-med">P2</span></td><td>Unify offline: shared outbox contract; port <code>ConflictResolver</code> semantics to Web.</td><td>MED-2</td></tr>
+      <tr><td><span class="pill p-med">P2</span></td><td>Add socket-payload validation server-side; consolidate upload aliases; server-side thumbnails.</td><td>HIGH-S1, LOW-1, media symmetry</td></tr>
+      <tr><td><span class="pill p-low">P3</span></td><td>Decompose <code>ChatContext.jsx</code> into hooks/slices; make messages query infinite on Mobile.</td><td>Maintainability, perf</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============ ANSWERS ============ -->
+<section id="answers">
+  <h2><span class="num">14</span> Final Verdict — the 10 Questions</h2>
+  <div class="verdict">
+  <ol class="tight" style="padding-left:20px">
+    <li><b>Are Web &amp; Mobile architecturally identical?</b> No. Same backend contract, but Web = React Context (no server cache, no virtualization); Mobile = React Query + Zustand + service layer + FlashList.</li>
+    <li><b>Web-only features?</b> None of note — Web is a subset. (Web-specific: web-push subscription flow.)</li>
+    <li><b>Mobile-only features?</b> Drafts, scheduled-message surface, broadcast stub, richer location/contacts, durable offline queue + conflict resolution.</li>
+    <li><b>Partially implemented?</b> Delete-for-everyone (both), Web reactions/polls/conversation-sync realtime, Mobile threads realtime &amp; infinite pagination, broadcast/channels (stub only).</li>
+    <li><b>Broken sync paths?</b> Web poll events, Web reaction-remove, Web conversation-management multi-device, Mobile thread realtime, Mobile phantom call events.</li>
+    <li><b>Inconsistent caches?</b> Web has no server-state cache; Mobile disk-persists React Query. Presence/unread derived independently per client → drift.</li>
+    <li><b>Missing/mismatched socket events?</b> Backend dual-names (<code>message:new</code>/<code>new_message</code>); Web misses <code>reaction_removed</code> + granular <code>poll:*</code> + several <code>conversation:*</code>; Mobile binds non-existent <code>call:offer/answer/ice-candidate/busy</code>.</li>
+    <li><b>APIs behaving differently?</b> Reactions &amp; deletes: Web via REST, Mobile via socket → different failure/latency profiles; 4 upload aliases.</li>
+    <li><b>What blocks perfect real-time sync?</b> Absence of a single shared event/payload contract, plus asymmetric client state models — every gap above is downstream of these two.</li>
+    <li><b>What architectural change unifies them?</b> (a) One versioned socket-event + payload contract consumed by all three; (b) React Query as the shared server-state layer on both clients with socket→cache patches; (c) shared offline-outbox + conflict semantics; (d) delete duplicate/dead mobile services and Web virtualization gap. That converges the two clients onto one enterprise platform behavior.</li>
+  </ol>
+  </div>
+  <p class="foot">OMS Chat Architecture Audit · static analysis, no code modified · findings cite file:line from the repository at audit time. Line counts and grep-derived usage counts are point-in-time. Items marked REVIEW require a follow-up read of the named service to confirm enforcement.</p>
+</section>
+
+</div>

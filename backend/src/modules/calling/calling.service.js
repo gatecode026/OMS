@@ -1,5 +1,5 @@
 import CallSession from './calling.model.js';
-import { runWithTenant } from '../../database/tenantConnection.js';
+import { runWithTenant } from '../../utils/tenantContext.js';
 
 export const callingService = {
   /**

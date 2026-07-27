@@ -26,6 +26,11 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
+    "androidStatusBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#00000000",
+      "translucent": true
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },

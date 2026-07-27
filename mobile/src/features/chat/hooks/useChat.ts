@@ -3,9 +3,12 @@
  * @description React Query hooks for active/archived conversations, calls, threads, and message interactions.
  */
 
+import { AppState } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import chatApi from '../api/chatApi';
+import { ChatConversation } from '../types';
 import useOfflineStore from '../../../shared/store/offlineStore';
+import UserProfileManager from '../../../shared/services/UserProfileManager';
 
 export const useConversations = () => {
   const isConnected = useOfflineStore((s) => s.isConnected);
@@ -15,10 +18,40 @@ export const useConversations = () => {
       if (__DEV__) console.log('[useConversations] Fetching conversations...');
       const result = await chatApi.fetchConversations();
       if (__DEV__) console.log('[useConversations] Result:', result?.length, 'conversations');
+
+      // ── Seed all participant profiles into UserProfileStore ──────────────────
+      // This ensures every avatar in the conversation list and chat rooms
+      // resolves from the centralized store (single source of truth)
+      if (Array.isArray(result)) {
+        const batchEntries: any[] = [];
+        for (const conv of result) {
+          if (Array.isArray(conv.participants)) {
+            for (const p of conv.participants) {
+              const pId = String(p.employeeId || (p as any).id || (p as any)._id || (p as any).userId || '');
+              const pAvatar = p.avatar || (p as any).avatarUrl || (p as any).profilePhoto || (p as any).photoUrl || null;
+              if (pId && pAvatar) {
+                batchEntries.push({
+                  userId:      pId,
+                  employeeId:  (p as any).employeeId,
+                  id:          (p as any).id,
+                  _id:         (p as any)._id,
+                  name:        p.name || '',
+                  avatarUrl:   pAvatar,
+                  profilePhoto: pAvatar,
+                });
+              }
+            }
+          }
+        }
+        if (batchEntries.length > 0) {
+          UserProfileManager.cacheProfilesBatch(batchEntries);
+        }
+      }
+
       return result;
     },
     enabled: isConnected,
-    refetchInterval: 12 * 1000, // Poll every 12s to sync message previews
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -29,7 +62,7 @@ export const useChatMessages = (conversationId: string) => {
     queryFn: () => chatApi.fetchMessages(conversationId),
     // Guard against literal string 'undefined' from bad navigation params
     enabled: isConnected && !!conversationId && conversationId !== 'undefined',
-    staleTime: 5000,
+    staleTime: 30000,
   });
 };
 
@@ -58,8 +91,28 @@ export const useMarkChatRead = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (conversationId: string) => chatApi.markAsRead(conversationId),
+    onMutate: async (conversationId: string) => {
+      await queryClient.cancelQueries({ queryKey: ['chat', 'conversations'] });
+      queryClient.setQueryData<ChatConversation[]>(['chat', 'conversations'], (old) => {
+        if (!old) return old;
+        return old.map((conv) => {
+          if (conv.id === conversationId || (conv as any)._id === conversationId) {
+            return { ...conv, unreadCount: 0 };
+          }
+          return conv;
+        });
+      });
+    },
     onSuccess: (_, conversationId) => {
-      queryClient.invalidateQueries({ queryKey: ['chat', 'conversations'] });
+      queryClient.setQueryData<ChatConversation[]>(['chat', 'conversations'], (old) => {
+        if (!old) return old;
+        return old.map((conv) => {
+          if (conv.id === conversationId || (conv as any)._id === conversationId) {
+            return { ...conv, unreadCount: 0 };
+          }
+          return conv;
+        });
+      });
       queryClient.invalidateQueries({ queryKey: ['chat', 'messages', conversationId] });
     },
   });
@@ -69,7 +122,33 @@ export const useSearchEmployees = (query: string) => {
   const isConnected = useOfflineStore((s) => s.isConnected);
   return useQuery({
     queryKey: ['chat', 'employees', query],
-    queryFn: () => chatApi.searchEmployees(query),
+    queryFn: async () => {
+      const employees = await chatApi.searchEmployees(query);
+      if (Array.isArray(employees)) {
+        const batchEntries: any[] = [];
+        for (const emp of employees) {
+          const empId = String(emp.id || emp.employeeId || emp._id || '');
+          const empAvatar = emp.avatarUrl || emp.avatar || emp.photoUrl || emp.profilePhoto || null;
+          if (empId) {
+            batchEntries.push({
+              userId:      empId,
+              employeeId:  emp.employeeId,
+              id:          emp.id,
+              _id:         emp._id,
+              name:        emp.name || '',
+              avatarUrl:   empAvatar,
+              profilePhoto: empAvatar,
+              designation: emp.designation,
+              department:  emp.department,
+            });
+          }
+        }
+        if (batchEntries.length > 0) {
+          UserProfileManager.cacheProfilesBatch(batchEntries);
+        }
+      }
+      return employees;
+    },
     enabled: isConnected,
     staleTime: 60 * 1000, // Cache search results for 1 minute
   });
@@ -81,7 +160,6 @@ export const useCallHistory = () => {
     queryKey: ['chat', 'calls'],
     queryFn: () => chatApi.fetchCallHistory(),
     enabled: isConnected,
-    refetchInterval: 15 * 1000,
   });
 };
 
@@ -218,7 +296,26 @@ export const useGlobalSearch = (query: string, category: string = 'all') => {
   const isConnected = useOfflineStore((s) => s.isConnected);
   return useQuery({
     queryKey: ['chat', 'global-search', query, category],
-    queryFn: () => chatApi.globalSearch(query, category),
+    queryFn: async () => {
+      const results = await chatApi.globalSearch(query, category);
+      if (results && Array.isArray(results.contacts)) {
+        for (const emp of results.contacts) {
+          const empId = String(emp.id || emp.employeeId || emp._id || '');
+          const empAvatar = emp.avatarUrl || emp.avatar || emp.photoUrl || emp.profilePhoto || null;
+          if (empId) {
+            UserProfileManager.cacheProfile({
+              userId: empId,
+              name: emp.name || '',
+              avatarUrl: empAvatar,
+              profilePhoto: empAvatar,
+              designation: emp.designation,
+              department: emp.department,
+            });
+          }
+        }
+      }
+      return results;
+    },
     enabled: isConnected && !!query.trim(),
     staleTime: 10 * 1000,
   });
@@ -242,7 +339,6 @@ export const useThreadActivity = () => {
     queryKey: ['chat', 'threads', 'activity'],
     queryFn: () => chatApi.fetchThreadActivity(),
     enabled: isConnected,
-    refetchInterval: 15 * 1000,
   });
 };
 
@@ -447,7 +543,6 @@ export const useUserPresence = (userId: string) => {
     queryKey: ['chat', 'presence', userId],
     queryFn: () => chatApi.fetchUserPresence(userId),
     enabled: isConnected && !!userId,
-    refetchInterval: 30000, // Sync status every 30s
   });
 };
 
