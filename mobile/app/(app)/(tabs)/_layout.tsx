@@ -25,10 +25,10 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#A78BFA', // Soft bright purple
-        tabBarInactiveTintColor: '#94A3B8', // Slate grey
+        tabBarInactiveTintColor: isDark ? '#94A3B8' : '#64748B',
         tabBarStyle: {
-          backgroundColor: isDark ? '#0F1221' : '#1E1B4B',
-          borderColor: 'rgba(255,255,255,0.08)',
+          backgroundColor: isDark ? '#0F1221' : '#FFFFFF',
+          borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
           borderTopWidth: 1,
           height: Platform.OS === 'ios' ? 72 : 64,
           paddingBottom: Platform.OS === 'ios' ? 12 : 8,
@@ -84,7 +84,7 @@ export default function TabsLayout() {
           tabBarLabel: () => null,
           tabBarIcon: () => (
             <View style={styles.floatingActionWrapper}>
-              <View style={styles.floatingActionCircle}>
+              <View style={[styles.floatingActionCircle, { borderColor: isDark ? '#0F1221' : '#FFFFFF' }]}>
                 <Ionicons name="flash" size={24} color="#FFFFFF" />
               </View>
             </View>
@@ -162,6 +162,5 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     borderWidth: 3,
-    borderColor: '#0F1221',
   },
 });
