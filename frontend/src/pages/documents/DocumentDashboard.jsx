@@ -9,21 +9,19 @@ const COLORS = ['#ec4899', '#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'
 const DocumentDashboard = ({ onNavigateToSection }) => {
   const { getDocumentAnalytics } = useApp();
   const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const loadStats = async () => {
       try {
         const data = await getDocumentAnalytics();
-        setStats(data);
+        if (data) setStats(data);
       } catch (err) {
         console.error(err);
-      } finally {
-        setLoading(false);
       }
     };
     loadStats();
-  }, [getDocumentAnalytics]);
+  }, []);
 
   if (loading) {
     return (

@@ -29,7 +29,7 @@ The OMS ecosystem consists of a **React Native Cross-Platform Application** (iOS
 |                                                                                   |
 |  +-----------------------------------------------------------------------------+  |
 |  |                    Render-Hosted Node.js / Express Server                    |  |
-|  |                                                                             |  |
+|  |                                                                              |  |
 |  |  [Auth Middleware] -> [Tenant Scoping Middleware] -> [Rate Limiters]        |  |
 |  |  [Socket.IO Server] -> [Event Handlers] -> [Room Broadcast Manager]          |  |
 |  +---------------------------------------+-------------------------------------+  |

@@ -14,8 +14,6 @@ import ActiveProjectsWidget from '../components/employeeDashboard/ActiveProjects
 import DailyWorkReportWidget from '../components/employeeDashboard/DailyWorkReportWidget';
 import LeaveBalanceWidget from '../components/employeeDashboard/LeaveBalanceWidget';
 import PerformanceSummaryWidget from '../components/employeeDashboard/PerformanceSummaryWidget';
-import NotificationsCenter from '../components/employeeDashboard/NotificationsCenter';
-import RecentActivities from '../components/employeeDashboard/RecentActivities';
 import ProductivityAnalytics from '../components/employeeDashboard/ProductivityAnalytics';
 import UpcomingSchedule from '../components/employeeDashboard/UpcomingSchedule';
 import CompanyUpdates from '../components/employeeDashboard/CompanyUpdates';
@@ -498,16 +496,6 @@ const EmployeeDashboard = () => {
           {/* Work Report Status Widget (Moved here to balance column heights) */}
           <DailyWorkReportWidget
             myReports={myReports}
-          />
-
-          {/* Notifications Center */}
-          <NotificationsCenter
-            notifications={notifications}
-          />
-
-          {/* Recent Activities Widget */}
-          <RecentActivities
-            myActivities={myActivities}
           />
         </div>
       </div>

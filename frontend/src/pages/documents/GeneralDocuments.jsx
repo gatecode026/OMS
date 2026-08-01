@@ -17,11 +17,10 @@ const GeneralDocuments = ({
   const { getDocumentFolders, documentsList } = useApp();
   
   const [folders, setFolders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [currentFolder, setCurrentFolder] = useState(null); // folder object
 
   const loadFolders = async () => {
-    setLoading(true);
     try {
       const data = await getDocumentFolders();
       if (data && data.generalFolders) {
@@ -29,14 +28,12 @@ const GeneralDocuments = ({
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
     loadFolders();
-  }, [getDocumentFolders, documentsList]);
+  }, [documentsList]);
 
   if (loading) {
     return (

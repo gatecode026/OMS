@@ -45,7 +45,8 @@ export const getToday = asyncHandler(async (req, res) => {
 export const getSummary = asyncHandler(async (req, res) => {
   const employeeId = req.query.employeeId || req.user.id;
   const month = req.query.month;
-  const data = await service.findSummary(employeeId, month);
+  const weekendPolicy = req.query.weekendPolicy;
+  const data = await service.findSummary(employeeId, month, weekendPolicy);
   return successResponse(res, data, 'Summary fetched successfully');
 });
 

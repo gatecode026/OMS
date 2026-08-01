@@ -3,16 +3,15 @@ import Modal from '../../common/Modal';
 import { useApp } from '../../../context/AppContext';
 import { BsCalendar2Date, BsInfoCircle } from 'react-icons/bs';
 import { IoSendSharp } from 'react-icons/io5';
+import YearFixedDateInput from '../../common/YearFixedDateInput';
 
 const sanitizeYearInput = (dateStr) => {
   if (!dateStr) return '';
+  const currentYr = String(new Date().getFullYear());
   const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    let [year, month, day] = parts;
-    if (year.length > 4) {
-      year = year.slice(0, 4);
-      return `${year}-${month}-${day}`;
-    }
+  if (parts.length === 3 && parts[0]) {
+    let [, month, day] = parts;
+    return `${currentYr}-${month}-${day}`;
   }
   return dateStr;
 };
@@ -184,13 +183,14 @@ const ApplyLeaveModal = ({
         width: '32px',
         height: '32px',
         borderRadius: '8px',
-        background: 'rgba(16,185,129,0.12)',
+        background: 'rgba(255, 255, 255, 0.15)',
+        border: '1px solid rgba(255, 255, 255, 0.25)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0
       }}>
-        <BsCalendar2Date size={16} style={{ color: 'var(--color-success, #10b981)' }} />
+        <BsCalendar2Date size={16} style={{ color: '#ffffff' }} />
       </div>
       <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Apply for Leave</span>
     </div>
@@ -241,46 +241,29 @@ const ApplyLeaveModal = ({
           {/* From Date */}
           <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column' }}>
             <label style={labelStyle}>From Date</label>
-            <input
-              type="date"
+            <YearFixedDateInput
               value={startDate}
-              onChange={(e) => {
-                const val = sanitizeYearInput(e.target.value);
+              onChange={(val) => {
                 setStartDate(val);
                 if (endDate && endDate < val) {
                   setEndDate('');
                 }
               }}
               required
-              min={new Date().toISOString().split('T')[0]}
-              max="2099-12-31"
               style={inputStyle}
-              onFocus={(e) => e.target.style.borderColor = 'var(--color-primary, #d946ef)'}
-              onBlur={(e) => e.target.style.borderColor = '#282F3E'}
             />
           </div>
 
           {/* To Date */}
           <div style={{ flex: '1 1 150px', display: 'flex', flexDirection: 'column' }}>
             <label style={labelStyle}>To Date</label>
-            <input
-              type="date"
+            <YearFixedDateInput
               value={endDate}
-              onChange={(e) => {
-                const val = sanitizeYearInput(e.target.value);
-                setEndDate(val);
-              }}
+              onChange={(val) => setEndDate(val)}
               required
               disabled={!startDate}
               min={startDate}
-              max="2099-12-31"
-              style={{
-                ...inputStyle,
-                opacity: startDate ? 1 : 0.6,
-                cursor: startDate ? 'text' : 'not-allowed'
-              }}
-              onFocus={(e) => e.target.style.borderColor = 'var(--color-primary, #d946ef)'}
-              onBlur={(e) => e.target.style.borderColor = '#282F3E'}
+              style={inputStyle}
             />
           </div>
 

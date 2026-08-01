@@ -19,7 +19,7 @@ const ProjectDocuments = ({
   const { getDocumentFolders, documentsList, projectsList } = useApp();
   
   const [folders, setFolders] = useState({ active: [], archived: [] });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'archived'
 
   // Navigation states
@@ -27,7 +27,6 @@ const ProjectDocuments = ({
   const [currentCategory, setCurrentCategory] = useState(null); // string category
 
   const loadFolders = async () => {
-    setLoading(true);
     try {
       const data = await getDocumentFolders();
       if (data && data.projectFolders) {
@@ -35,14 +34,12 @@ const ProjectDocuments = ({
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
     loadFolders();
-  }, [getDocumentFolders, documentsList, projectsList]);
+  }, [documentsList, projectsList]);
 
   // Navigate Back handler
   const handleBack = () => {

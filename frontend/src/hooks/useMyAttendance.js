@@ -1,11 +1,45 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 
-export const useMyAttendance = (filters = {}) => {
-  const { currentUser, token } = useApp();
-  const userId = currentUser?.id || '';
+/**
+ * Returns the number of working days in a given 'YYYY-MM' month string,
+ * taking the weekendPolicy into account.
+ *   'Sunday Only'          → only Sundays are non-working
+ *   'Friday & Saturday'    → Fridays + Saturdays are non-working
+ *   anything else          → Saturdays + Sundays are non-working (default)
+ */
+const calcWorkingDays = (monthStr, weekendPolicy) => {
+  const [year, monthNum] = monthStr.split('-').map(Number);
+  const daysInMonth = new Date(year, monthNum, 0).getDate();
+  let weekendDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayOfWeek = new Date(year, monthNum - 1, d).getDay(); // 0=Sun, 6=Sat, 5=Fri
+    if (weekendPolicy === 'Sunday Only') {
+      if (dayOfWeek === 0) weekendDays++;
+    } else if (weekendPolicy === 'Friday & Saturday') {
+      if (dayOfWeek === 5 || dayOfWeek === 6) weekendDays++;
+    } else {
+      // Default: 'Saturday & Sunday'
+      if (dayOfWeek === 0 || dayOfWeek === 6) weekendDays++;
+    }
+  }
+  return daysInMonth - weekendDays;
+};
 
-  const getSwrCache = () => {
+export const useMyAttendance = (filters = {}) => {
+  const { currentUser, token, payrollRules } = useApp();
+  const userId = currentUser?.id || '';
+  const weekendPolicy = payrollRules?.weekendPolicy || 'Saturday & Sunday';
+
+  const currentMonthStr = new Date().toISOString().substring(0, 7);
+
+  // Always compute the correct working days using the live weekendPolicy from global context
+  const correctWorkingDays = useMemo(
+    () => calcWorkingDays(currentMonthStr, weekendPolicy),
+    [currentMonthStr, weekendPolicy]
+  );
+
+  const getSwrCache = useCallback(() => {
     if (!userId) return null;
     try {
       const saved = localStorage.getItem(`swr_my_attendance_${userId}`);
@@ -13,19 +47,25 @@ export const useMyAttendance = (filters = {}) => {
     } catch (e) {
       return null;
     }
-  };
+  }, [userId]);
 
   const initialCache = getSwrCache();
 
   const [loading, setLoading] = useState(!initialCache);
   const [error, setError] = useState(null);
   const [todayRecord, setTodayRecord] = useState(initialCache?.todayRecord || null);
-  const [summary, setSummary] = useState(initialCache?.summary || {
-    presentDays: 0,
-    absentDays: 0,
-    lateDays: 0,
-    avgHours: 0,
-    totalWorkingDays: 22
+  const [summary, setSummary] = useState(() => {
+    // Even if we have a cached summary, always correct the working days
+    if (initialCache?.summary) {
+      return { ...initialCache.summary, totalWorkingDays: calcWorkingDays(currentMonthStr, weekendPolicy) };
+    }
+    return {
+      presentDays: 0,
+      absentDays: 0,
+      lateDays: 0,
+      avgHours: 0,
+      totalWorkingDays: calcWorkingDays(currentMonthStr, weekendPolicy)
+    };
   });
   const [records, setRecords] = useState(initialCache?.records || []);
 
@@ -37,7 +77,6 @@ export const useMyAttendance = (filters = {}) => {
       return;
     }
 
-    // If no initial cache, set loading to true
     const cache = getSwrCache();
     if (!cache) {
       setLoading(true);
@@ -49,48 +88,43 @@ export const useMyAttendance = (filters = {}) => {
       'Content-Type': 'application/json'
     };
 
+    const fromVal = from || '';
+    const toVal = to || '';
+    const monthVal = month || new Date().toISOString().substring(0, 7);
+
+    const workingDaysForMonth = calcWorkingDays(monthVal, weekendPolicy);
+
     try {
-      // 1. Fetch range-filtered records
+      const [recordsRes, todayRes, summaryRes] = await Promise.allSettled([
+        fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance?employeeId=${currentUser.id}&from=${fromVal}&to=${toVal}`, { headers }),
+        fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/today?employeeId=${currentUser.id}`, { headers }),
+        fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/summary?employeeId=${currentUser.id}&month=${monthVal}&weekendPolicy=${encodeURIComponent(weekendPolicy)}`, { headers })
+      ]);
+
       let recordsData = [];
-      try {
-        const fromVal = from || '';
-        const toVal = to || '';
-        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance?employeeId=${currentUser.id}&from=${fromVal}&to=${toVal}`, { headers });
-        const json = await res.json();
-        if (json.status === 'success') {
-          recordsData = json.data || [];
-        }
-      } catch (err) {
-        console.error('Failed fetching attendance list:', err);
+      if (recordsRes.status === 'fulfilled' && recordsRes.value.ok) {
+        const json = await recordsRes.value.json();
+        if (json.status === 'success') recordsData = json.data || [];
       }
 
-      // 2. Fetch today's record (with fallback)
       let todayData = null;
-      try {
-        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/today?employeeId=${currentUser.id}`, { headers });
-        if (res.status === 404) throw new Error('Endpoint not found');
-        const json = await res.json();
-        if (json.status === 'success') {
-          todayData = json.data;
-        }
-      } catch (err) {
-        // Fallback: search locally in recordsData or today's Date
+      if (todayRes.status === 'fulfilled' && todayRes.value.ok) {
+        const json = await todayRes.value.json();
+        if (json.status === 'success') todayData = json.data;
+      }
+      if (!todayData) {
         const todayStr = new Date().toISOString().split('T')[0];
         todayData = recordsData.find(r => r.date === todayStr) || null;
       }
 
-      // 3. Fetch summary stats (with fallback)
       let summaryData = null;
-      try {
-        const monthVal = month || new Date().toISOString().substring(0, 7); // YYYY-MM
-        const res = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/attendance/summary?employeeId=${currentUser.id}&month=${monthVal}`, { headers });
-        if (res.status === 404) throw new Error('Endpoint not found');
-        const json = await res.json();
-        if (json.status === 'success') {
-          summaryData = json.data;
-        }
-      } catch (err) {
-        // Fallback: calculate from recordsData
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.ok) {
+        const json = await summaryRes.value.json();
+        if (json.status === 'success') summaryData = json.data;
+      }
+
+      if (!summaryData) {
+        // Client-side fallback: compute working days using the weekendPolicy
         const present = recordsData.filter(r => r.status === 'Present' || r.status === 'Work From Home' || r.status === 'WFH' || r.status === 'Late').length;
         const absent = recordsData.filter(r => r.status === 'Absent').length;
         const late = recordsData.filter(r => r.status === 'Late').length;
@@ -104,17 +138,18 @@ export const useMyAttendance = (filters = {}) => {
           absentDays: absent,
           lateDays: late,
           avgHours: avg,
-          totalWorkingDays: 22
+          totalWorkingDays: workingDaysForMonth
         };
+      } else {
+        // Always override totalWorkingDays with the client-computed value
+        // so the weekendPolicy setting is always respected
+        summaryData = { ...summaryData, totalWorkingDays: workingDaysForMonth };
       }
 
       setRecords(recordsData);
       setTodayRecord(todayData);
-      if (summaryData) {
-        setSummary(summaryData);
-      }
+      setSummary(summaryData);
 
-      // Save to SWR Cache for instant 0ms subsequent loads
       if (userId) {
         localStorage.setItem(`swr_my_attendance_${userId}`, JSON.stringify({
           records: recordsData,
@@ -123,15 +158,21 @@ export const useMyAttendance = (filters = {}) => {
         }));
       }
     } catch (err) {
-      setError(err.message || 'An error occurred fetching attendance data.');
+      console.error('Error fetching attendance data:', err);
+      setError(err);
     } finally {
       setLoading(false);
     }
-  }, [currentUser, token, from, to, month, userId]);
+  }, [currentUser, token, from, to, month, userId, weekendPolicy, getSwrCache]);
 
   useEffect(() => {
     fetchMyAttendanceData();
   }, [fetchMyAttendanceData]);
+
+  // Whenever weekendPolicy changes, re-correct the working days in the current summary
+  useEffect(() => {
+    setSummary(prev => ({ ...prev, totalWorkingDays: correctWorkingDays }));
+  }, [correctWorkingDays]);
 
   return {
     loading,

@@ -99,6 +99,14 @@ const Announcements = () => {
     return hasCompanyRead ? 'company' : 'self';
   });
 
+  const isManagementRole = useMemo(() => {
+    if (currentUserRole === 'employee') return false;
+    return (
+      ['super_admin', 'company_admin', 'branch_admin', 'dept_admin', 'manager'].includes(currentUserRole) ||
+      (typeof hasPermission === 'function' && (hasPermission('announcements', 'update') || hasPermission('announcements', 'delete')))
+    );
+  }, [currentUserRole, hasPermission]);
+
   const showPerspectiveDropdown = useMemo(() => {
     if (currentUserRole === 'employee') return false;
     const hasCompanyRead = hasPermission('announcements', 'read', 'company');
@@ -255,6 +263,10 @@ const Announcements = () => {
   };
 
   const handleDelete = (id) => {
+    if (!isManagementRole) {
+      addPageToast('error', 'Only management roles are permitted to delete announcements.');
+      return;
+    }
     showConfirm(
       'Delete Announcement',
       'Are you sure you want to permanently delete this announcement? This action cannot be undone.',
@@ -267,6 +279,10 @@ const Announcements = () => {
   };
 
   const handleEditClick = (ann) => {
+    if (!isManagementRole) {
+      addPageToast('error', 'Only management roles are permitted to edit announcements.');
+      return;
+    }
     setEditingAnnId(ann.id || ann._id);
     setCreateForm({
       title: ann.title || '',
@@ -558,10 +574,7 @@ const Announcements = () => {
                         <span className="badge badge-secondary font-xsmall">{ann.category}</span>
                       </div>
                       <div className="flex-center gap-1">
-                        {(currentUserRole === 'super_admin' || 
-                          currentUserRole === 'company_admin' || 
-                          ann.publishedBy === currentUser?.name || 
-                          (typeof hasPermission === 'function' && hasPermission('announcements', 'update'))) && (
+                        {isManagementRole && (
                           <div className="flex-center gap-1 mr-2" style={{ borderRight: '1px solid var(--border-color)', paddingRight: 8 }}>
                             <button
                               className="action-circle-btn"
@@ -1209,10 +1222,7 @@ const Announcements = () => {
                 <h3 className="modal-title-bold">{selectedAnnDetail.title}</h3>
               </div>
               <div className="flex-center gap-2">
-                {(currentUserRole === 'super_admin' || 
-                  currentUserRole === 'company_admin' || 
-                  selectedAnnDetail.publishedBy === currentUser?.name || 
-                  (typeof hasPermission === 'function' && hasPermission('announcements', 'update'))) && (
+                {isManagementRole && (
                   <div className="flex-center gap-2 mr-2" style={{ borderRight: '1px solid var(--border-color)', paddingRight: 10 }}>
                     <button
                       className="action-circle-btn"

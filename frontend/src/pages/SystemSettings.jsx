@@ -229,6 +229,8 @@ const SystemSettings = () => {
     setNotificationSettings,
     securitySettings,
     setSecuritySettings,
+    payrollRules,
+    setPayrollRules,
     saveSystemSettings,
     token,
     activityLogs,
@@ -380,22 +382,42 @@ const SystemSettings = () => {
     };
   });
 
-  // 7. Payroll Components
-  const [payrollRules, setPayrollRules] = useState(() => {
-    const savedData = localStorage.getItem('saas_payroll_rules');
-    return savedData ? JSON.parse(savedData) : {
-      cycle: 'Monthly Payroll',
-      basicSalaryPct: 50,
-      hraPct: 20,
-      conveyanceFlat: 1600,
-      medicalFlat: 1250,
-      pfPct: 12,
-      esiPct: 0.75,
-      tdsFlat: 0,
-      overtimeMultiplier: 1.5,
-      holidayMultiplier: 2.0
+  // 7. Payroll Components & Auto-Save
+  const updatePayrollRulesAndSave = async (updater) => {
+    let updated;
+    if (typeof updater === 'function') {
+      updated = updater(payrollRules);
+    } else {
+      updated = updater;
+    }
+
+    setPayrollRules(updated);
+
+    const mergedGeneral = { ...generalSettings, ...localGeneral, companyName: companyProfile.companyName };
+    const payload = {
+      companyProfile,
+      branches,
+      departments,
+      empSettings,
+      attendanceRules,
+      leaveRules,
+      payrollRules: updated,
+      projectRules,
+      docRules,
+      smtpConfig,
+      smsConfig,
+      generalSettings: mergedGeneral,
+      notificationSettings: localNotif,
+      securitySettings: localSecurity
     };
-  });
+
+    const savedToDb = await saveSystemSettings(payload);
+    if (savedToDb) {
+      addToast('success', '✅ Payroll settings saved to database successfully!');
+    } else {
+      addToast('warning', '⚠️ Failed to save settings to database.');
+    }
+  };
 
   // 8. Project / Tasks
   const [projectRules, setProjectRules] = useState(() => {
@@ -1636,7 +1658,7 @@ const SystemSettings = () => {
                   <select
                     className="settings-input"
                     value={payrollRules.cycle}
-                    onChange={e => setPayrollRules(p => ({ ...p, cycle: e.target.value }))}
+                    onChange={e => updatePayrollRulesAndSave(p => ({ ...p, cycle: e.target.value }))}
                   >
                     <option value="Monthly Payroll">Monthly Payroll Cycle</option>
                     <option value="Weekly Payroll">Weekly Payroll Cycle</option>
@@ -1656,37 +1678,37 @@ const SystemSettings = () => {
                   label="Basic Salary Percentage (%)"
                   type="number"
                   value={payrollRules.basicSalaryPct}
-                  onChange={v => setPayrollRules(p => ({ ...p, basicSalaryPct: parseInt(v) || 0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, basicSalaryPct: parseInt(v) || 0 }))}
                 />
                 <SettingsInput
                   label="HRA Percentage (%)"
                   type="number"
                   value={payrollRules.hraPct}
-                  onChange={v => setPayrollRules(p => ({ ...p, hraPct: parseInt(v) || 0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, hraPct: parseInt(v) || 0 }))}
                 />
                 <SettingsInput
                   label="Conveyance Allowance Flat Amount (INR)"
                   type="number"
                   value={payrollRules.conveyanceFlat}
-                  onChange={v => setPayrollRules(p => ({ ...p, conveyanceFlat: parseInt(v) || 0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, conveyanceFlat: parseInt(v) || 0 }))}
                 />
                 <SettingsInput
                   label="Medical Allowance Flat Amount (INR)"
                   type="number"
                   value={payrollRules.medicalFlat}
-                  onChange={v => setPayrollRules(p => ({ ...p, medicalFlat: parseInt(v) || 0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, medicalFlat: parseInt(v) || 0 }))}
                 />
                 <SettingsInput
                   label="Provident Fund (PF) Employee contribution (%)"
                   type="number"
                   value={payrollRules.pfPct}
-                  onChange={v => setPayrollRules(p => ({ ...p, pfPct: parseFloat(v) || 0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, pfPct: parseFloat(v) || 0 }))}
                 />
                 <SettingsInput
                   label="ESI Contribution (%)"
                   type="number"
                   value={payrollRules.esiPct}
-                  onChange={v => setPayrollRules(p => ({ ...p, esiPct: parseFloat(v) || 0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, esiPct: parseFloat(v) || 0 }))}
                 />
                 <SettingsInput
                   label="Professional Tax flat deduction"
@@ -1698,7 +1720,7 @@ const SystemSettings = () => {
                   label="Standard TDS flat deduction threshold"
                   type="number"
                   value={payrollRules.tdsFlat}
-                  onChange={v => setPayrollRules(p => ({ ...p, tdsFlat: parseInt(v) || 0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, tdsFlat: parseInt(v) || 0 }))}
                 />
               </div>
             </div>
@@ -1710,13 +1732,13 @@ const SystemSettings = () => {
                   label="Regular Overtime Multiplier"
                   type="number"
                   value={payrollRules.overtimeMultiplier}
-                  onChange={v => setPayrollRules(p => ({ ...p, overtimeMultiplier: parseFloat(v) || 1.0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, overtimeMultiplier: parseFloat(v) || 1.0 }))}
                 />
                 <SettingsInput
                   label="Holiday Overtime Multiplier"
                   type="number"
                   value={payrollRules.holidayMultiplier}
-                  onChange={v => setPayrollRules(p => ({ ...p, holidayMultiplier: parseFloat(v) || 1.0 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, holidayMultiplier: parseFloat(v) || 1.0 }))}
                 />
               </div>
             </div>
@@ -1728,14 +1750,14 @@ const SystemSettings = () => {
                   label="Payroll Working Days"
                   type="number"
                   value={payrollRules.payrollWorkingDays || 30}
-                  onChange={v => setPayrollRules(p => ({ ...p, payrollWorkingDays: parseInt(v) || 30 }))}
+                  onChange={v => updatePayrollRulesAndSave(p => ({ ...p, payrollWorkingDays: parseInt(v) || 30 }))}
                 />
                 <div className="settings-field">
                   <label className="settings-field-label">Salary Calculation Method</label>
                   <select
                     className="settings-input"
                     value={payrollRules.salaryCalculationMethod || 'Fixed 30 Days'}
-                    onChange={e => setPayrollRules(p => ({ ...p, salaryCalculationMethod: e.target.value }))}
+                    onChange={e => updatePayrollRulesAndSave(p => ({ ...p, salaryCalculationMethod: e.target.value }))}
                   >
                     <option value="Fixed 30 Days">Fixed 30 Days</option>
                     <option value="Calendar Days">Calendar Days</option>
@@ -1747,7 +1769,7 @@ const SystemSettings = () => {
                   <select
                     className="settings-input"
                     value={payrollRules.dailySalaryFormula || 'Monthly Salary / Payroll Working Days'}
-                    onChange={e => setPayrollRules(p => ({ ...p, dailySalaryFormula: e.target.value }))}
+                    onChange={e => updatePayrollRulesAndSave(p => ({ ...p, dailySalaryFormula: e.target.value }))}
                   >
                     <option value="Monthly Salary / Payroll Working Days">Monthly Salary / Payroll Working Days</option>
                     <option value="Monthly Salary / Calendar Days">Monthly Salary / Calendar Days</option>
@@ -1758,7 +1780,7 @@ const SystemSettings = () => {
                   <select
                     className="settings-input"
                     value={payrollRules.weekendPolicy || 'Saturday & Sunday'}
-                    onChange={e => setPayrollRules(p => ({ ...p, weekendPolicy: e.target.value }))}
+                    onChange={e => updatePayrollRulesAndSave(p => ({ ...p, weekendPolicy: e.target.value }))}
                   >
                     <option value="Saturday & Sunday">Saturday & Sunday</option>
                     <option value="Sunday Only">Sunday Only</option>
@@ -1770,7 +1792,7 @@ const SystemSettings = () => {
                   <select
                     className="settings-input"
                     value={payrollRules.holidayPolicy || 'Paid'}
-                    onChange={e => setPayrollRules(p => ({ ...p, holidayPolicy: e.target.value }))}
+                    onChange={e => updatePayrollRulesAndSave(p => ({ ...p, holidayPolicy: e.target.value }))}
                   >
                     <option value="Paid">Paid (No salary deduction)</option>
                     <option value="Unpaid">Unpaid (Excludes holidays from pay)</option>
@@ -1781,7 +1803,7 @@ const SystemSettings = () => {
                   <select
                     className="settings-input"
                     value={payrollRules.halfDayPolicy || 'Deduct Half Day'}
-                    onChange={e => setPayrollRules(p => ({ ...p, halfDayPolicy: e.target.value }))}
+                    onChange={e => updatePayrollRulesAndSave(p => ({ ...p, halfDayPolicy: e.target.value }))}
                   >
                     <option value="Deduct Half Day">Deduct Half Day Salary (50%)</option>
                     <option value="No Deduction">No Salary Deduction</option>
@@ -1792,7 +1814,7 @@ const SystemSettings = () => {
                   <select
                     className="settings-input"
                     value={payrollRules.lopFormula || 'Daily Salary * Unpaid Days'}
-                    onChange={e => setPayrollRules(p => ({ ...p, lopFormula: e.target.value }))}
+                    onChange={e => updatePayrollRulesAndSave(p => ({ ...p, lopFormula: e.target.value }))}
                   >
                     <option value="Daily Salary * Unpaid Days">Daily Salary * Unpaid Days</option>
                   </select>
@@ -1802,7 +1824,7 @@ const SystemSettings = () => {
                   <select
                     className="settings-input"
                     value={payrollRules.graceRules || 'Late Penalty Flat'}
-                    onChange={e => setPayrollRules(p => ({ ...p, graceRules: e.target.value }))}
+                    onChange={e => updatePayrollRulesAndSave(p => ({ ...p, graceRules: e.target.value }))}
                   >
                     <option value="Late Penalty Flat">Late Penalty Flat Rate</option>
                     <option value="No Penalty">No Penalty</option>
