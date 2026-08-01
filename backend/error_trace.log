@@ -2355,3 +2355,203 @@ Stack: Error: Invalid email or password
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
     at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/auth/auth.controller.js:30:16
 Body: {"email":"animeshh@gmail.com","password":"password"}
+
+[2026-07-28T05:48:42.861Z] DELETE /api/v1/documents/GATECO-DOC-1000
+Error: Access denied: Role employee is not authorized to perform delete on Documents.
+Stack: Error: Access denied: Role employee is not authorized to perform delete on Documents.
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:194:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.remove (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.repository.js:162:5)
+    at async Object.deleteRecord (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:215:18)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:34:16
+Body: {}
+
+[2026-07-28T05:48:46.689Z] DELETE /api/v1/documents/GATECO-DOC-1000
+Error: Access denied: Role employee is not authorized to perform delete on Documents.
+Stack: Error: Access denied: Role employee is not authorized to perform delete on Documents.
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:194:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.remove (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.repository.js:162:5)
+    at async Object.deleteRecord (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:215:18)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:34:16
+Body: {}
+
+[2026-07-28T05:49:24.276Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:28.235Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:28.375Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:28.523Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:28.695Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:28.841Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:29.039Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:29.273Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:32.492Z] DELETE /api/v1/documents/GATECO-DOC-1001
+Error: Access denied: Role employee is not authorized to perform delete on Documents.
+Stack: Error: Access denied: Role employee is not authorized to perform delete on Documents.
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:194:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.remove (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.repository.js:162:5)
+    at async Object.deleteRecord (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:215:18)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:34:16
+Body: {}
+
+[2026-07-28T05:49:43.185Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:47.126Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:53.941Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:54.053Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:54.224Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:54.384Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:54.559Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:54.727Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:54.923Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:49:55.120Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDEyIiwiZW1haWwiOiJhbmltZXNoQGdtYWlsLmNvbSIsInJvbGUiOiJlbXBsb3llZSIsInJvbGVJZCI6ImVtcGxveWVlIiwiY29tcGFueUlkIjoiQ09NUC0wMDEiLCJpYXQiOjE3ODUxNTI0OTgsImV4cCI6MTc4NTc1NzI5OH0.4nS_Lqfx13hiUVsR08-wt3O-1XonKc6DbMxIXpSTYX0&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:50:00.974Z] DELETE /api/v1/documents/GATECO-DOC-1001
+Error: Access denied: Role employee is not authorized to perform delete on Documents.
+Stack: Error: Access denied: Role employee is not authorized to perform delete on Documents.
+    at validateRepositoryAccess (file:///C:/Users/Shubh/Desktop/OMS/backend/src/security/repositoryContract.js:194:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.remove (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.repository.js:162:5)
+    at async Object.deleteRecord (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:215:18)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:34:16
+Body: {}
+
+[2026-07-28T05:50:26.076Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDAxIiwiZW1haWwiOiJoYXJzaEBnbWFpbC5jb20iLCJyb2xlIjoibWFuYWdlciIsInJvbGVJZCI6Im1hbmFnZXIiLCJjb21wYW55SWQiOiJDT01QLTAwMSIsImlhdCI6MTc4NTIxNzgwOCwiZXhwIjoxNzg1ODIyNjA4fQ.ohkjHLwUTQ2Zk0wdzOa4QqrhHs5UTe7WsoWzxAiy6qo
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}
+
+[2026-07-28T05:50:29.108Z] GET /api/v1/documents/GATECO-DOC-1001/file?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IkdBVEVDTy1FTVAtMDAxIiwiZW1haWwiOiJoYXJzaEBnbWFpbC5jb20iLCJyb2xlIjoibWFuYWdlciIsInJvbGVJZCI6Im1hbmFnZXIiLCJjb21wYW55SWQiOiJDT01QLTAwMSIsImlhdCI6MTc4NTIxNzgwOCwiZXhwIjoxNzg1ODIyNjA4fQ.ohkjHLwUTQ2Zk0wdzOa4QqrhHs5UTe7WsoWzxAiy6qo&download=true
+Error: You do not have permission to view this document.
+Stack: Error: You do not have permission to view this document.
+    at Object.findById (file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.service.js:116:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///C:/Users/Shubh/Desktop/OMS/backend/src/modules/documents/documents.controller.js:114:20
+Body: {}

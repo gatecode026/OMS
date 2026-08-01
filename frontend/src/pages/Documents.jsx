@@ -25,7 +25,7 @@ const typeColorMap = {
 };
 
 const Documents = () => {
-  const isLoading = usePageLoading(400);
+  const isLoading = usePageLoading(0);
   const { 
     addToast, 
     showConfirm, 

@@ -16,6 +16,7 @@ import ApplyLeavePanel from '../components/leave/ApplyLeavePanel';
 import LeaveFilterTabs from '../components/leave/LeaveFilterTabs';
 import UpcomingHolidays from '../components/leave/UpcomingHolidays';
 import LeaveUsageChart from '../components/leave/LeaveUsageChart';
+import YearFixedDateInput from '../components/common/YearFixedDateInput';
 import {
   Check, X, Eye, FileText, CalendarDays, Search, Filter, Plus, Settings,
   AlertCircle, Calendar, TrendingUp, Users, BarChart3, ArrowRight,
@@ -27,15 +28,15 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RechartsPieChart, Pie, Cell, BarChart as RechartsBarChart, Bar, Legend
 } from 'recharts';
-import { 
-  MdOutlineDateRange, MdHourglassEmpty, MdCheckCircle, MdCancel, MdAdd, MdRefresh, 
-  MdBeachAccess, MdLocalHospital, MdDateRange, MdChildCare, MdPeople, MdAssignment 
+import {
+  MdOutlineDateRange, MdHourglassEmpty, MdCheckCircle, MdCancel, MdAdd, MdRefresh,
+  MdBeachAccess, MdLocalHospital, MdDateRange, MdChildCare, MdPeople, MdAssignment
 } from 'react-icons/md';
-import { 
-  FiBriefcase, FiCalendar, FiClock, FiCheckSquare, FiAlertCircle, FiSettings, FiPlus, FiArrowRight 
+import {
+  FiBriefcase, FiCalendar, FiClock, FiCheckSquare, FiAlertCircle, FiSettings, FiPlus, FiArrowRight
 } from 'react-icons/fi';
-import { 
-  BsCalendarCheck, BsCalendarEvent, BsFileText, BsUmbrella 
+import {
+  BsCalendarCheck, BsCalendarEvent, BsFileText, BsUmbrella
 } from 'react-icons/bs';
 
 const LeaveManagement = () => {
@@ -113,10 +114,10 @@ const LeaveManagement = () => {
 
   const canManageLeaves = useMemo(() => {
     if (typeof hasPermission !== 'function') return true;
-    return hasPermission('leave_management', 'create') || 
-           hasPermission('leave_management', 'update') || 
-           hasPermission('leave_management', 'approve') ||
-           hasPermission('leave_management', 'delete');
+    return hasPermission('leave_management', 'create') ||
+      hasPermission('leave_management', 'update') ||
+      hasPermission('leave_management', 'approve') ||
+      hasPermission('leave_management', 'delete');
   }, [hasPermission]);
 
   const canApplyLeaveRole = useMemo(() => {
@@ -257,7 +258,7 @@ const LeaveManagement = () => {
     if (e) e.preventDefault();
     const empId = currentUser?.id || applyForm.employeeId;
     const emp = employees.find(e => e.id === empId);
-    
+
     if (!empId) {
       addToast('warning', 'Employee ID is required.');
       return;
@@ -421,7 +422,7 @@ const LeaveManagement = () => {
     (departments || []).forEach(d => {
       data[d.name] = { department: d.name, totalLeaves: 0, leaveRequests: 0, approved: 0, pending: 0 };
     });
-    
+
     leavesList.forEach(l => {
       const dept = l.department || '';
       if (!data[dept]) {
@@ -446,7 +447,7 @@ const LeaveManagement = () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentMonthIdx = new Date().getMonth();
     const data = months.slice(0, currentMonthIdx + 1).map(m => ({ name: m, requests: 0, approved: 0 }));
-    
+
     leavesList.forEach(l => {
       if (!l.fromDate) return;
       const date = new Date(l.fromDate);
@@ -494,7 +495,7 @@ const LeaveManagement = () => {
     (departments || []).forEach(d => {
       data[d.name] = { name: d.name, Approved: 0, Rejected: 0 };
     });
-    
+
     leavesList.forEach(l => {
       const dept = l.department || '';
       if (!data[dept]) {
@@ -506,7 +507,7 @@ const LeaveManagement = () => {
         data[dept].Rejected += 1;
       }
     });
-    
+
     return Object.values(data).map(d => {
       const total = d.Approved + d.Rejected;
       const appRate = total > 0 ? Math.round((d.Approved / total) * 100) : 100;
@@ -556,7 +557,7 @@ const LeaveManagement = () => {
     return Array.from({ length: daysInMonth }, (_, i) => {
       const dayNum = i + 1;
       const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-      
+
       // Filter approved leaves overlapping this day
       const dailyLeaves = (leavesList || []).filter(l => {
         return l.status === 'Approved' && l.fromDate <= dateStr && l.toDate >= dateStr;
@@ -631,11 +632,11 @@ const LeaveManagement = () => {
   // Get filtered policies for the admin table
   const getFilteredPolicies = () => {
     return leavePolicyConfigs.filter(policy => {
-      const matchesSearch = 
+      const matchesSearch =
         policy.leaveCode.toLowerCase().includes(policySearchQuery.toLowerCase()) ||
         policy.leaveName.toLowerCase().includes(policySearchQuery.toLowerCase());
       const matchesGender = filterPolicyGender === 'All' || policy.genderRestriction === filterPolicyGender;
-      const matchesStatus = filterPolicyStatus === 'All' || 
+      const matchesStatus = filterPolicyStatus === 'All' ||
         (filterPolicyStatus === 'Active' && policy.isActive) ||
         (filterPolicyStatus === 'Inactive' && !policy.isActive);
       return matchesSearch && matchesGender && matchesStatus;
@@ -679,10 +680,10 @@ const LeaveManagement = () => {
       addToast('warning', 'Please fill all required fields.');
       return;
     }
-    
+
     // Generate next POL-xxx ID
-    const nextNum = leavePolicyConfigs.length > 0 
-      ? Math.max(...leavePolicyConfigs.map(p => parseInt(p.id.split('-')[1]) || 0)) + 1 
+    const nextNum = leavePolicyConfigs.length > 0
+      ? Math.max(...leavePolicyConfigs.map(p => parseInt(p.id.split('-')[1]) || 0)) + 1
       : 1;
     const newId = `POL-${String(nextNum).padStart(3, '0')}`;
     const newPolicy = { id: newId, ...newPolicyForm };
@@ -708,7 +709,7 @@ const LeaveManagement = () => {
         setShowDeletePolicyConfirm(null);
       }
     };
-    
+
     showConfirm(
       'Delete Leave Policy',
       `Are you sure you want to delete "${policy.leaveName}" policy? This action cannot be undone.`,
@@ -726,12 +727,13 @@ const LeaveManagement = () => {
     }
   };
 
+
   // Reset all policies to default
   const handleResetAllPolicies = () => {
     const action = async () => {
       await resetLeavePolicies();
     };
-    
+
     showConfirm(
       'Reset All Policies',
       'This will reset all leave policies to their default values. Are you sure?',
@@ -876,7 +878,7 @@ const LeaveManagement = () => {
     };
 
     addLeaveRequest(newRequest);
-    
+
     // Close modal and reset state
     setShowAssignLeaveModal(false);
     setSelectedAssignEmployee(null);
@@ -925,7 +927,7 @@ const LeaveManagement = () => {
     const success = await addHoliday(newHol);
     if (success) {
       addToast('success', `Holiday "${newHolidayForm.name}" added successfully!`);
-      
+
       setAlertsFeed(prev => [
         {
           id: `AL-${Math.random().toString(36).substring(2, 9)}`,
@@ -936,7 +938,7 @@ const LeaveManagement = () => {
         },
         ...prev
       ]);
-      
+
       setNewHolidayForm({
         date: '',
         name: '',
@@ -951,7 +953,7 @@ const LeaveManagement = () => {
     const action = async () => {
       await deleteHoliday(holiday.id);
     };
-    
+
     showConfirm(
       'Delete Scheduled Holiday',
       `Are you sure you want to delete the holiday "${holiday.name}"? This action cannot be undone.`,
@@ -970,9 +972,9 @@ const LeaveManagement = () => {
     // Only count actual employee-requested leaves (exclude auto-allocation records
     // created when the policy was set up — those have reason starting with 'Automatic policy allocation:')
     const approvedDaysTaken = leaveRequests
-      .filter(req => 
-        req.employeeId === employee.id && 
-        req.status === 'Approved' && 
+      .filter(req =>
+        req.employeeId === employee.id &&
+        req.status === 'Approved' &&
         (req.type === code || req.type === policy.leaveName) &&
         !(req.reason && req.reason.startsWith('Automatic policy allocation:'))
       )
@@ -984,7 +986,7 @@ const LeaveManagement = () => {
   // Balance edit trigger
   const handleEditBalanceClick = (employee) => {
     setBalanceEditEmployee(employee);
-    
+
     const inputs = {};
     activePolicies.forEach(policy => {
       const code = policy.leaveCode;
@@ -1123,7 +1125,7 @@ const LeaveManagement = () => {
   if (isEmployeeView) {
     // Build balance cards from policy configs
     const myLeaves = leavesList; // already scoped to current user
-    
+
     const myHolidays = holidaysList || [];
 
     // Use policies from the database only — no hardcoded fallbacks
@@ -1164,10 +1166,10 @@ const LeaveManagement = () => {
     });
 
     const tabCounts = {
-      Pending:  myLeaves.filter(l => l.status === 'Pending').length,
+      Pending: myLeaves.filter(l => l.status === 'Pending').length,
       Approved: myLeaves.filter(l => l.status === 'Approved').length,
       Rejected: myLeaves.filter(l => l.status === 'Rejected').length,
-      All:      myLeaves.length,
+      All: myLeaves.length,
     };
 
     const [empStatusTab, setEmpStatusTab] = empStatusTabState;
@@ -1178,10 +1180,10 @@ const LeaveManagement = () => {
       : myLeaves.filter(l => l.status === empStatusTab).sort((a, b) => new Date(b.appliedDate) - new Date(a.appliedDate));
 
     const handleEmpApply = async (formData) => {
-      const typeLabel = formData.type === 'CL' ? 'Casual Leave' : 
-                        formData.type === 'SL' ? 'Sick Leave' : 
-                        formData.type === 'PL' ? 'Earned Leave' : 
-                        formData.type;
+      const typeLabel = formData.type === 'CL' ? 'Casual Leave' :
+        formData.type === 'SL' ? 'Sick Leave' :
+          formData.type === 'PL' ? 'Earned Leave' :
+            formData.type;
 
       if (editingLeave) {
         const updatedRequest = {
@@ -1253,11 +1255,11 @@ const LeaveManagement = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', paddingBottom: '3rem' }}>
 
         {/* ── Page Header ── */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          flexWrap: 'wrap', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
           gap: '16px',
           background: 'var(--bg-card)',
           padding: '20px 24px',
@@ -1367,41 +1369,41 @@ const LeaveManagement = () => {
         {/* ── Quick Stats Row ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
           {[
-            { 
-              label: 'Available Balance', 
-              value: totalAvailable, 
-              color: 'var(--color-success, #10b981)', 
-              bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, rgba(16, 185, 129, 0.02) 100%)', 
+            {
+              label: 'Available Balance',
+              value: totalAvailable,
+              color: 'var(--color-success, #10b981)',
+              bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, rgba(16, 185, 129, 0.02) 100%)',
               border: 'rgba(16, 185, 129, 0.2)',
               icon: BsCalendarCheck,
               iconColor: '#10b981',
               desc: 'Days remaining for use'
             },
-            { 
-              label: 'Leaves Used', 
-              value: totalUsed, 
-              color: 'var(--color-warning, #f59e0b)', 
-              bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.07) 0%, rgba(245, 158, 11, 0.02) 100%)', 
+            {
+              label: 'Leaves Used',
+              value: totalUsed,
+              color: 'var(--color-warning, #f59e0b)',
+              bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.07) 0%, rgba(245, 158, 11, 0.02) 100%)',
               border: 'rgba(245, 158, 11, 0.2)',
               icon: FiClock,
               iconColor: '#f59e0b',
               desc: 'Approved days taken'
             },
-            { 
-              label: 'Pending Approval', 
-              value: tabCounts.Pending, 
-              color: 'var(--color-info, #3b82f6)', 
-              bg: 'linear-gradient(135deg, rgba(59, 130, 246, 0.07) 0%, rgba(59, 130, 246, 0.02) 100%)', 
+            {
+              label: 'Pending Approval',
+              value: tabCounts.Pending,
+              color: 'var(--color-info, #3b82f6)',
+              bg: 'linear-gradient(135deg, rgba(59, 130, 246, 0.07) 0%, rgba(59, 130, 246, 0.02) 100%)',
               border: 'rgba(59, 130, 246, 0.2)',
               icon: MdHourglassEmpty,
               iconColor: '#3b82f6',
               desc: 'Awaiting manager response'
             },
-            { 
-              label: 'Approved Filings', 
-              value: tabCounts.Approved, 
-              color: 'var(--color-success, #10b981)', 
-              bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, rgba(16, 185, 129, 0.02) 100%)', 
+            {
+              label: 'Approved Filings',
+              value: tabCounts.Approved,
+              color: 'var(--color-success, #10b981)',
+              bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.07) 0%, rgba(16, 185, 129, 0.02) 100%)',
               border: 'rgba(16, 185, 129, 0.2)',
               icon: MdCheckCircle,
               iconColor: '#10b981',
@@ -1410,13 +1412,13 @@ const LeaveManagement = () => {
           ].map((s, i) => {
             const CardIcon = s.icon;
             return (
-              <div 
-                key={i} 
-                style={{ 
-                  background: 'var(--bg-card)', 
+              <div
+                key={i}
+                style={{
+                  background: 'var(--bg-card)',
                   backgroundImage: s.bg,
-                  border: `1px solid var(--border-color)`, 
-                  borderRadius: 'var(--radius-lg)', 
+                  border: `1px solid var(--border-color)`,
+                  borderRadius: 'var(--radius-lg)',
                   padding: '20px',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -1466,12 +1468,12 @@ const LeaveManagement = () => {
           border: '1px solid var(--border-color)',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
         }}>
-          <div style={{ 
-            fontSize: '0.8rem', 
-            fontWeight: 800, 
-            color: 'var(--text-primary)', 
-            textTransform: 'uppercase', 
-            letterSpacing: '0.08em', 
+          <div style={{
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            color: 'var(--text-primary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
             marginBottom: '18px',
             display: 'flex',
             alignItems: 'center',
@@ -1492,10 +1494,10 @@ const LeaveManagement = () => {
         </div>
 
         {/* ── Request Cards Section ── */}
-        <div style={{ 
-          background: 'var(--bg-card)', 
-          border: '1px solid var(--border-color)', 
-          borderRadius: 'var(--radius-xl)', 
+        <div style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-xl)',
           overflow: 'hidden',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)'
         }}>
@@ -1537,7 +1539,7 @@ const LeaveManagement = () => {
 
   return (
     <div className="leaves-page flex-column grid-gap">
-      
+
       {/* 1. Header Strip */}
       <div className="page-header-row justify-between">
         <div>
@@ -1627,18 +1629,18 @@ const LeaveManagement = () => {
             </button>
           ))}
         </div>
-        
+
       </div>
 
       {/* ==================== TAB 1: REQUESTS & APPROVALS ==================== */}
       {activeTab === 'requests' && (
         <div className="leaves-tab-layout full-width">
-          
+
           <div className="leaves-main-panel flex-column grid-gap">
-            
+
             {/* Top KPI Cards Row */}
             <div className="leaves-kpi-grid">
-              <div 
+              <div
                 className="kpi-card-custom gradient-blue"
                 onClick={() => { setStatusTab('All'); setActiveTab('requests'); scrollToTable(); }}
               >
@@ -1651,7 +1653,7 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div 
+              <div
                 className="kpi-card-custom gradient-orange"
                 onClick={() => { setStatusTab('Pending'); setActiveTab('requests'); scrollToTable(); }}
               >
@@ -1664,7 +1666,7 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div 
+              <div
                 className="kpi-card-custom gradient-green"
                 onClick={() => { setStatusTab('Approved'); setActiveTab('requests'); scrollToTable(); }}
               >
@@ -1677,7 +1679,7 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div 
+              <div
                 className="kpi-card-custom gradient-red"
                 onClick={() => { setStatusTab('Rejected'); setActiveTab('requests'); scrollToTable(); }}
               >
@@ -1690,7 +1692,7 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div 
+              <div
                 className="kpi-card-custom gradient-purple"
                 onClick={() => { setStatusTab('OnLeaveToday'); setActiveTab('requests'); scrollToTable(); }}
               >
@@ -1703,7 +1705,7 @@ const LeaveManagement = () => {
                 </div>
               </div>
 
-              <div 
+              <div
                 className="kpi-card-custom gradient-pink"
                 onClick={() => { setActiveTab('analytics'); }}
               >
@@ -1724,7 +1726,7 @@ const LeaveManagement = () => {
                   <Filter size={18} className="text-primary" />
                   <h4>Search & Multi-Filters</h4>
                 </div>
-                <button 
+                <button
                   className="reset-filters-btn"
                   onClick={() => {
                     setSearchQuery('');
@@ -1843,7 +1845,7 @@ const LeaveManagement = () => {
       {/* ==================== TAB 2: ANALYTICS & CALENDARS ==================== */}
       {activeTab === 'analytics' && (
         <div className="leaves-tab-layout-vertical animate-fade-in flex-column grid-gap">
-          
+
           {/* Charts Row */}
           <div className="analytics-charts-grid">
             <div className="card chart-box">
@@ -1856,12 +1858,12 @@ const LeaveManagement = () => {
                   <AreaChart data={trendsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="reqGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--accent-pink-solid)" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="var(--accent-pink-solid)" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="var(--accent-pink-solid)" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="var(--accent-pink-solid)" stopOpacity={0} />
                       </linearGradient>
                       <linearGradient id="appGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--accent-green-solid)" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="var(--accent-green-solid)" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="var(--accent-green-solid)" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="var(--accent-green-solid)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
@@ -1915,7 +1917,7 @@ const LeaveManagement = () => {
           </div>
 
           <div className="analytics-data-grid">
-            
+
             {/* Department Wise analytics */}
             <div className="card dept-analytics-table-box">
               <div className="table-header-row justify-between mb-4">
@@ -1962,8 +1964,8 @@ const LeaveManagement = () => {
                   <p className="text-muted text-xs">Visual resource availability mapping and planned team departures</p>
                 </div>
                 <div className="flex-center gap-2">
-                  <select 
-                    value={calendarMonth} 
+                  <select
+                    value={calendarMonth}
                     onChange={(e) => setCalendarMonth(e.target.value)}
                     className="calendar-month-select"
                   >
@@ -2027,7 +2029,7 @@ const LeaveManagement = () => {
       {/* ==================== TAB 3: BALANCES & POLICIES ==================== */}
       {activeTab === 'balances' && (
         <div className="leaves-tab-layout with-sidebar animate-fade-in">
-          
+
           {/* Left panel: Balance Table */}
           <div className="leaves-main-panel flex-column grid-gap">
             <div className="card balance-table-card">
@@ -2067,12 +2069,12 @@ const LeaveManagement = () => {
                           const total = policy.defaultDays;
                           const used = total - remaining;
                           const pct = total > 0 ? Math.round((remaining / total) * 100) : 0;
-                          const badgeClass = 
+                          const badgeClass =
                             remaining === 0 ? 'danger-badge' :
-                            remaining < total * 0.5 ? 'warning-badge' :
-                            policy.leaveCode === 'CL' ? 'cl-badge' :
-                            policy.leaveCode === 'SL' ? 'sl-badge' :
-                            policy.leaveCode === 'PL' ? 'pl-badge' : 'neutral-badge';
+                              remaining < total * 0.5 ? 'warning-badge' :
+                                policy.leaveCode === 'CL' ? 'cl-badge' :
+                                  policy.leaveCode === 'SL' ? 'sl-badge' :
+                                    policy.leaveCode === 'PL' ? 'pl-badge' : 'neutral-badge';
                           return (
                             <td key={policy.id}>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -2080,18 +2082,18 @@ const LeaveManagement = () => {
                                   <span className={`balance-badge ${badgeClass}`}>{remaining} days</span>
                                   <span style={{ fontSize: '10px', opacity: 0.55 }}>/ {total}</span>
                                 </div>
-                                <div style={{ 
-                                  height: '3px', 
-                                  background: 'var(--border-color)', 
+                                <div style={{
+                                  height: '3px',
+                                  background: 'var(--border-color)',
                                   borderRadius: '2px',
                                   overflow: 'hidden'
                                 }}>
-                                  <div style={{ 
-                                    height: '100%', 
+                                  <div style={{
+                                    height: '100%',
                                     width: `${pct}%`,
-                                    background: remaining === 0 ? 'var(--accent-pink-solid)' : 
-                                               remaining < total * 0.5 ? 'var(--accent-orange, #f59e0b)' : 
-                                               'var(--accent-green-solid)',
+                                    background: remaining === 0 ? 'var(--accent-pink-solid)' :
+                                      remaining < total * 0.5 ? 'var(--accent-orange, #f59e0b)' :
+                                        'var(--accent-green-solid)',
                                     borderRadius: '2px',
                                     transition: 'width 0.3s ease'
                                   }} />
@@ -2156,8 +2158,8 @@ const LeaveManagement = () => {
             <div className="policy-form flex-column gap-4">
               <div className="policy-form-field">
                 <label>Accrual Rules Cycle</label>
-                <select 
-                  value={policies.accrualRate} 
+                <select
+                  value={policies.accrualRate}
                   onChange={(e) => setPolicies({ ...policies, accrualRate: e.target.value })}
                 >
                   <option value="Monthly">Monthly Accruals</option>
@@ -2184,10 +2186,10 @@ const LeaveManagement = () => {
                         </span>
                         <Badge variant="success">Active</Badge>
                       </div>
-                      
+
                       <div className="policy-form-field mb-2">
                         <label style={{ fontSize: '11px', opacity: 0.85 }}>Monthly Quota (Days)</label>
-                        <input 
+                        <input
                           type="number"
                           min="0"
                           value={rates.defaultDays}
@@ -2203,7 +2205,7 @@ const LeaveManagement = () => {
 
                       <div className="policy-form-field">
                         <label style={{ fontSize: '11px', opacity: 0.85 }}>Carry Forward Limit (Max Days)</label>
-                        <input 
+                        <input
                           type="number"
                           min="0"
                           value={rates.maxCarryForward}
@@ -2272,8 +2274,8 @@ const LeaveManagement = () => {
               </div>
 
               <div className="mt-4 pt-4 border-top">
-                <Button 
-                  variant="primary" 
+                <Button
+                  variant="primary"
                   onClick={handleSavePolicyConfigs}
                   className="w-full"
                 >
@@ -2283,8 +2285,8 @@ const LeaveManagement = () => {
               </div>
 
               <div className="mt-2">
-                <Button 
-                  variant="secondary" 
+                <Button
+                  variant="secondary"
                   onClick={() => setActiveTab('policies')}
                   className="w-full flex-center gap-2"
                   icon={Database}
@@ -2302,7 +2304,7 @@ const LeaveManagement = () => {
       {/* ==================== TAB 4: HOLIDAYS & REPORTS ==================== */}
       {activeTab === 'holidays' && (
         <div className="leaves-tab-layout with-sidebar animate-fade-in">
-          
+
           {/* Left panel: Holidays Calendar */}
           <div className="leaves-main-panel flex-column grid-gap">
             <div className="card holidays-calendar-card">
@@ -2339,8 +2341,8 @@ const LeaveManagement = () => {
                         <td>
                           <Badge variant={
                             hol.type === 'National' ? 'purple' :
-                            hol.type === 'Regional' ? 'warning' :
-                            hol.type === 'Company' ? 'success' : 'neutral'
+                              hol.type === 'Regional' ? 'warning' :
+                                hol.type === 'Company' ? 'success' : 'neutral'
                           }>
                             {hol.type} Holiday
                           </Badge>
@@ -2352,7 +2354,7 @@ const LeaveManagement = () => {
                               <button
                                 className="action-btn-mini danger-btn"
                                 onClick={() => handleDeleteHolidayClick(hol)}
-                                  title="Delete Holiday"
+                                title="Delete Holiday"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -2377,8 +2379,8 @@ const LeaveManagement = () => {
             <form onSubmit={handleGenerateReport} className="reports-export-form flex-column gap-4">
               <div className="policy-form-field">
                 <label>Target Report Category</label>
-                <select 
-                  value={reportType} 
+                <select
+                  value={reportType}
                   onChange={(e) => setReportType(e.target.value)}
                 >
                   <optgroup label="Leave Statuses">
@@ -2415,9 +2417,9 @@ const LeaveManagement = () => {
               </div>
 
               <div className="policy-form-field mt-2">
-                <Button 
+                <Button
                   type="submit"
-                  variant="primary" 
+                  variant="primary"
                   disabled={isExporting}
                   className="w-full flex-center gap-2 justify-center"
                 >
@@ -2447,7 +2449,7 @@ const LeaveManagement = () => {
       {/* ==================== TAB 5: ADMIN POLICY TABLE ==================== */}
       {activeTab === 'policies' && (
         <div className="leaves-tab-layout-vertical animate-fade-in flex-column grid-gap">
-          
+
           {/* Policy Management Header */}
           <div className="card filters-card-wrapper">
             <div className="filters-header-row">
@@ -2867,9 +2869,9 @@ const LeaveManagement = () => {
               {activePolicies.map(policy => (
                 <div key={policy.id} className="policy-form-field">
                   <label>{policy.leaveName} ({policy.leaveCode})</label>
-                  <input 
-                    type="number" 
-                    value={balanceInput[policy.leaveCode] || 0} 
+                  <input
+                    type="number"
+                    value={balanceInput[policy.leaveCode] || 0}
                     onChange={(e) => setBalanceInput({ ...balanceInput, [policy.leaveCode]: parseInt(e.target.value) || 0 })}
                   />
                 </div>
@@ -2915,178 +2917,178 @@ const LeaveManagement = () => {
         {selectedLeave && (() => {
           const selectedEmp = employees.find(e => e.id === selectedLeave.employeeId);
           return (
-          <div className="leave-modal-detail-body animate-fade-in">
-            
-            {/* 1. Profile information */}
-            <div className="leave-detail-profile">
-              <Avatar name={selectedLeave.employeeName} size="md" />
-              <div className="profile-details-column flex-column items-start">
-                <h4 className="detail-profile-name">{selectedLeave.employeeName}</h4>
-                <div className="flex-row items-center gap-2 mt-1 flex-wrap">
-                  <span className="profile-tag-detail">ID: {selectedLeave.employeeId || 'EMP-2026-006'}</span>
-                  <span className="profile-tag-divider">•</span>
-                  <span className="profile-tag-detail">Dept: {selectedLeave.department || ''}</span>
-                  <span className="profile-tag-divider">•</span>
-                  <span className="profile-tag-detail">Role: {selectedEmp?.designation || 'Staff'}</span>
+            <div className="leave-modal-detail-body animate-fade-in">
+
+              {/* 1. Profile information */}
+              <div className="leave-detail-profile">
+                <Avatar name={selectedLeave.employeeName} size="md" />
+                <div className="profile-details-column flex-column items-start">
+                  <h4 className="detail-profile-name">{selectedLeave.employeeName}</h4>
+                  <div className="flex-row items-center gap-2 mt-1 flex-wrap">
+                    <span className="profile-tag-detail">ID: {selectedLeave.employeeId || 'EMP-2026-006'}</span>
+                    <span className="profile-tag-divider">•</span>
+                    <span className="profile-tag-detail">Dept: {selectedLeave.department || ''}</span>
+                    <span className="profile-tag-divider">•</span>
+                    <span className="profile-tag-detail">Role: {selectedEmp?.designation || 'Staff'}</span>
+                  </div>
+                </div>
+                <Badge variant={selectedLeave.status === 'Approved' ? 'success' : selectedLeave.status === 'Pending' ? 'warning' : 'danger'}>
+                  {selectedLeave.status}
+                </Badge>
+              </div>
+
+              {/* Manager and Lead info */}
+              <div className="manager-assignments-strip card flex-row justify-between flex-wrap gap-3">
+                <div className="assignment-box">
+                  <span className="block-label">Team Leader</span>
+                  <strong>{selectedEmp?.teamLeader || 'Not Assigned'}</strong>
+                </div>
+                <div className="assignment-box">
+                  <span className="block-label">Project Manager</span>
+                  <strong>{selectedEmp?.projectManager || 'Not Assigned'}</strong>
+                </div>
+                <div className="assignment-box">
+                  <span className="block-label">Filing Date</span>
+                  <span>{selectedLeave.appliedDate}</span>
                 </div>
               </div>
-              <Badge variant={selectedLeave.status === 'Approved' ? 'success' : selectedLeave.status === 'Pending' ? 'warning' : 'danger'}>
-                {selectedLeave.status}
-              </Badge>
-            </div>
 
-            {/* Manager and Lead info */}
-            <div className="manager-assignments-strip card flex-row justify-between flex-wrap gap-3">
-              <div className="assignment-box">
-                <span className="block-label">Team Leader</span>
-                <strong>{selectedEmp?.teamLeader || 'Not Assigned'}</strong>
+              {/* 2. Dates summary */}
+              <div className="leave-dates-summary">
+                <div className="date-block">
+                  <span className="block-label">From Date</span>
+                  <strong>{selectedLeave.fromDate}</strong>
+                </div>
+                <div className="date-block">
+                  <span className="block-label">To Date</span>
+                  <strong>{selectedLeave.toDate}</strong>
+                </div>
+                <div className="date-block block-highlight">
+                  <span className="block-label">Total Days</span>
+                  <strong>{selectedLeave.days} Days</strong>
+                </div>
               </div>
-              <div className="assignment-box">
-                <span className="block-label">Project Manager</span>
-                <strong>{selectedEmp?.projectManager || 'Not Assigned'}</strong>
-              </div>
-              <div className="assignment-box">
-                <span className="block-label">Filing Date</span>
-                <span>{selectedLeave.appliedDate}</span>
-              </div>
-            </div>
 
-            {/* 2. Dates summary */}
-            <div className="leave-dates-summary">
-              <div className="date-block">
-                <span className="block-label">From Date</span>
-                <strong>{selectedLeave.fromDate}</strong>
-              </div>
-              <div className="date-block">
-                <span className="block-label">To Date</span>
-                <strong>{selectedLeave.toDate}</strong>
-              </div>
-              <div className="date-block block-highlight">
-                <span className="block-label">Total Days</span>
-                <strong>{selectedLeave.days} Days</strong>
-              </div>
-            </div>
+              {/* Leave type and document attachments */}
+              <div className="leave-reason-section card">
+                <div className="flex-row justify-between items-center mb-2">
+                  <span className="section-label">Filing Category</span>
+                  <Badge variant="purple">{selectedLeave.type}</Badge>
+                </div>
 
-            {/* Leave type and document attachments */}
-            <div className="leave-reason-section card">
-              <div className="flex-row justify-between items-center mb-2">
-                <span className="section-label">Filing Category</span>
-                <Badge variant="purple">{selectedLeave.type}</Badge>
-              </div>
-              
-              <span className="section-label mt-2">Reason for Absence</span>
-              <p className="reason-full-text mt-1">{selectedLeave.reason}</p>
+                <span className="section-label mt-2">Reason for Absence</span>
+                <p className="reason-full-text mt-1">{selectedLeave.reason}</p>
 
-              {/* Supporting document preview block */}
-              <div className="attached-document-details-sec mt-3 border-top pt-3">
-                <span className="section-label">Attached Document ({selectedLeave.documentType || 'Medical Certificate'})</span>
-                {selectedLeave.fileName ? (
-                  <div className="document-download-card flex-row justify-between items-center mt-2">
-                    <div className="flex-center gap-2">
-                      <FileText size={16} className="text-primary" />
-                      <div className="flex-column items-start justify-center">
-                        <span className="text-sm font-semibold">{selectedLeave.fileName}</span>
-                        <span className="text-xs text-muted">Format: {selectedLeave.fileFormat || 'PDF'}</span>
+                {/* Supporting document preview block */}
+                <div className="attached-document-details-sec mt-3 border-top pt-3">
+                  <span className="section-label">Attached Document ({selectedLeave.documentType || 'Medical Certificate'})</span>
+                  {selectedLeave.fileName ? (
+                    <div className="document-download-card flex-row justify-between items-center mt-2">
+                      <div className="flex-center gap-2">
+                        <FileText size={16} className="text-primary" />
+                        <div className="flex-column items-start justify-center">
+                          <span className="text-sm font-semibold">{selectedLeave.fileName}</span>
+                          <span className="text-xs text-muted">Format: {selectedLeave.fileFormat || 'PDF'}</span>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        className="download-doc-btn flex-center gap-1"
+                        onClick={() => addToast('success', 'Document download simulation initiated.')}
+                      >
+                        <Download size={14} />
+                        <span>Download</span>
+                      </button>
                     </div>
-                    <button 
-                      type="button" 
-                      className="download-doc-btn flex-center gap-1"
-                      onClick={() => addToast('success', 'Document download simulation initiated.')}
-                    >
-                      <Download size={14} />
-                      <span>Download</span>
-                    </button>
-                  </div>
-                ) : selectedLeave.type === 'Sick Leave' ? (
-                  <div className="document-download-card flex-row justify-between items-center mt-2">
-                    <div className="flex-center gap-2">
-                      <FileText size={16} className="text-primary" />
-                      <div className="flex-column items-start justify-center">
-                        <span className="text-sm font-semibold">dental_surgery_certificate.pdf</span>
-                        <span className="text-xs text-muted">Format: PDF</span>
+                  ) : selectedLeave.type === 'Sick Leave' ? (
+                    <div className="document-download-card flex-row justify-between items-center mt-2">
+                      <div className="flex-center gap-2">
+                        <FileText size={16} className="text-primary" />
+                        <div className="flex-column items-start justify-center">
+                          <span className="text-sm font-semibold">dental_surgery_certificate.pdf</span>
+                          <span className="text-xs text-muted">Format: PDF</span>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        className="download-doc-btn flex-center gap-1"
+                        onClick={() => addToast('success', 'Medical document download initiated.')}
+                      >
+                        <Download size={14} />
+                        <span>Download</span>
+                      </button>
                     </div>
-                    <button 
-                      type="button" 
-                      className="download-doc-btn flex-center gap-1"
-                      onClick={() => addToast('success', 'Medical document download initiated.')}
-                    >
-                      <Download size={14} />
-                      <span>Download</span>
-                    </button>
-                  </div>
+                  ) : (
+                    <p className="text-xs text-muted italic mt-1">No supporting files attached to this leave filing.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Approver notes form */}
+              <div className="leave-notes-section">
+                <span className="section-label">Approver Notes & Comments</span>
+                {selectedLeave.status === 'Pending' ? (
+                  <textarea
+                    placeholder="Enter comments, adjustment rules notes or fitment recommendations here..."
+                    value={approverNotesInput}
+                    onChange={(e) => setApproverNotesInput(e.target.value)}
+                    rows={3}
+                  />
                 ) : (
-                  <p className="text-xs text-muted italic mt-1">No supporting files attached to this leave filing.</p>
+                  <p className="approver-notes-display">
+                    {selectedLeave.approverNotes || <em>No comments recorded by the approver.</em>}
+                  </p>
                 )}
               </div>
-            </div>
 
-            {/* 3. Approver notes form */}
-            <div className="leave-notes-section">
-              <span className="section-label">Approver Notes & Comments</span>
-              {selectedLeave.status === 'Pending' ? (
-                <textarea
-                  placeholder="Enter comments, adjustment rules notes or fitment recommendations here..."
-                  value={approverNotesInput}
-                  onChange={(e) => setApproverNotesInput(e.target.value)}
-                  rows={3}
-                />
-              ) : (
-                <p className="approver-notes-display">
-                  {selectedLeave.approverNotes || <em>No comments recorded by the approver.</em>}
-                </p>
-              )}
-            </div>
+              {/* 4. Approval Workflow Timeline */}
+              <div className="leave-history-timeline-section card">
+                <span className="section-label">Approval Workflow Routing</span>
 
-            {/* 4. Approval Workflow Timeline */}
-            <div className="leave-history-timeline-section card">
-              <span className="section-label">Approval Workflow Routing</span>
-              
-              <div className="workflow-hierarchy-tracker mt-3">
-                <div className="hierarchy-step completed">
-                  <div className="step-badge flex-center">
-                    <Check size={12} />
+                <div className="workflow-hierarchy-tracker mt-3">
+                  <div className="hierarchy-step completed">
+                    <div className="step-badge flex-center">
+                      <Check size={12} />
+                    </div>
+                    <div className="step-info">
+                      <span className="step-role">Employee (Filed)</span>
+                      <span className="step-status-sub">{selectedLeave.employeeName} — {selectedLeave.appliedDate}</span>
+                    </div>
                   </div>
-                  <div className="step-info">
-                    <span className="step-role">Employee (Filed)</span>
-                    <span className="step-status-sub">{selectedLeave.employeeName} — {selectedLeave.appliedDate}</span>
-                  </div>
-                </div>
 
-                <div className={`hierarchy-step ${selectedLeave.status !== 'Pending' ? 'completed' : 'active'}`}>
-                  <div className="step-badge flex-center">
-                    {selectedLeave.status !== 'Pending' ? <Check size={12} /> : <Clock size={12} />}
+                  <div className={`hierarchy-step ${selectedLeave.status !== 'Pending' ? 'completed' : 'active'}`}>
+                    <div className="step-badge flex-center">
+                      {selectedLeave.status !== 'Pending' ? <Check size={12} /> : <Clock size={12} />}
+                    </div>
+                    <div className="step-info">
+                      <span className="step-role">Team Leader Approval</span>
+                      <span className="step-status-sub">{selectedEmp?.teamLeader || 'Team Leader'} — {selectedLeave.status !== 'Pending' ? 'Reviewed' : 'Awaiting Review'}</span>
+                    </div>
                   </div>
-                  <div className="step-info">
-                    <span className="step-role">Team Leader Approval</span>
-                    <span className="step-status-sub">{selectedEmp?.teamLeader || 'Team Leader'} — {selectedLeave.status !== 'Pending' ? 'Reviewed' : 'Awaiting Review'}</span>
-                  </div>
-                </div>
 
-                <div className={`hierarchy-step ${selectedLeave.status === 'Approved' ? 'completed' : selectedLeave.status === 'Rejected' ? 'rejected' : ''}`}>
-                  <div className="step-badge flex-center">
-                    {selectedLeave.status === 'Approved' ? <Check size={12} /> : selectedLeave.status === 'Rejected' ? <X size={12} /> : <Clock size={12} />}
+                  <div className={`hierarchy-step ${selectedLeave.status === 'Approved' ? 'completed' : selectedLeave.status === 'Rejected' ? 'rejected' : ''}`}>
+                    <div className="step-badge flex-center">
+                      {selectedLeave.status === 'Approved' ? <Check size={12} /> : selectedLeave.status === 'Rejected' ? <X size={12} /> : <Clock size={12} />}
+                    </div>
+                    <div className="step-info">
+                      <span className="step-role">Project Manager Approval</span>
+                      <span className="step-status-sub">{selectedEmp?.projectManager || 'Project Manager'} — {selectedLeave.status === 'Approved' ? 'Approved' : selectedLeave.status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
+                    </div>
                   </div>
-                  <div className="step-info">
-                    <span className="step-role">Project Manager Approval</span>
-                    <span className="step-status-sub">{selectedEmp?.projectManager || 'Project Manager'} — {selectedLeave.status === 'Approved' ? 'Approved' : selectedLeave.status === 'Rejected' ? 'Rejected' : 'Pending'}</span>
-                  </div>
-                </div>
 
-                <div className={`hierarchy-step ${selectedLeave.status === 'Approved' ? 'completed' : ''}`}>
-                  <div className="step-badge flex-center">
-                    {selectedLeave.status === 'Approved' ? <Check size={12} /> : <Info size={12} />}
-                  </div>
-                  <div className="step-info">
-                    <span className="step-role">Super Admin Audit</span>
-                    <span className="step-status-sub">Auto-logged on final decision approval</span>
+                  <div className={`hierarchy-step ${selectedLeave.status === 'Approved' ? 'completed' : ''}`}>
+                    <div className="step-badge flex-center">
+                      {selectedLeave.status === 'Approved' ? <Check size={12} /> : <Info size={12} />}
+                    </div>
+                    <div className="step-info">
+                      <span className="step-role">Super Admin Audit</span>
+                      <span className="step-status-sub">Auto-logged on final decision approval</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-          </div>
+            </div>
           );
         })()}
       </Modal>
@@ -3257,17 +3259,9 @@ const LeaveManagement = () => {
           <div className="apply-fields-grid-2">
             <div className="policy-form-field">
               <label>Start Date *</label>
-              <input
-                type="date"
+              <YearFixedDateInput
                 value={assignForm.startDate}
-                min={new Date().toISOString().split('T')[0]}
-                max="2099-12-31"
-                onChange={(e) => {
-                  let val = e.target.value;
-                  const parts = val.split('-');
-                  if (parts[0] && parts[0].length > 4) val = `${parts[0].slice(0, 4)}-${parts[1] || ''}-${parts[2] || ''}`;
-                  setAssignForm({ ...assignForm, startDate: val });
-                }}
+                onChange={(val) => setAssignForm({ ...assignForm, startDate: val })}
                 required
               />
             </div>
@@ -3293,8 +3287,8 @@ const LeaveManagement = () => {
           editingLeave
             ? 'Edit Leave Request'
             : ['manager', 'dept_admin', 'branch_admin', 'super_admin'].includes(currentUserRole)
-            ? 'Register Leave'
-            : 'Apply for Leave'
+              ? 'Register Leave'
+              : 'Apply for Leave'
         }
         size="md"
         footer={
@@ -3304,8 +3298,8 @@ const LeaveManagement = () => {
               {editingLeave
                 ? 'Update Request'
                 : ['manager', 'dept_admin', 'branch_admin', 'super_admin'].includes(currentUserRole)
-                ? 'Register Leave'
-                : 'Submit Request'}
+                  ? 'Register Leave'
+                  : 'Submit Request'}
             </Button>
           </div>
         }
@@ -3327,17 +3321,9 @@ const LeaveManagement = () => {
           <div className="apply-fields-grid-2">
             <div className="policy-form-field">
               <label>Start Date *</label>
-              <input
-                type="date"
+              <YearFixedDateInput
                 value={applyForm.startDate}
-                min={new Date().toISOString().split('T')[0]}
-                max="2099-12-31"
-                onChange={(e) => {
-                  let val = e.target.value;
-                  const parts = val.split('-');
-                  if (parts[0] && parts[0].length > 4) val = `${parts[0].slice(0, 4)}-${parts[1] || ''}-${parts[2] || ''}`;
-                  setApplyForm({ ...applyForm, startDate: val });
-                }}
+                onChange={(val) => setApplyForm({ ...applyForm, startDate: val })}
                 required
               />
             </div>

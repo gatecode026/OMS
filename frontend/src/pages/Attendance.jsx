@@ -190,7 +190,7 @@ const calculateWorkingHours60 = (punchIn, punchOut) => {
 };
 
 const Attendance = () => {
-  const isLoading = usePageLoading(600);
+  const isLoading = usePageLoading(0);
   const navigate = useNavigate();
   const {
     attendance,

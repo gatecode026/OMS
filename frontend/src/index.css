@@ -902,3 +902,9 @@ select option {
   from { transform: translateY(0); opacity: 1; }
   to { transform: translateY(-100%); opacity: 0; }
 }
+
+/* Ensure native date picker calendar icon is white */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}

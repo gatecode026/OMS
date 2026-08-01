@@ -150,7 +150,7 @@ const getLocalDateString = () => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const WebPortalAttendance = () => {
-  const isLoading = usePageLoading(600);
+  const isLoading = usePageLoading(0);
   const {
     attendance,
     employees,

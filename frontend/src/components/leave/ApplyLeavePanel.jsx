@@ -13,15 +13,15 @@ const LEAVE_TYPES = [
   { code: 'Other',     label: 'Other',            Icon: MdAssignment },
 ];
 
+import YearFixedDateInput from '../common/YearFixedDateInput';
+
 const sanitizeYearInput = (dateStr) => {
   if (!dateStr) return '';
+  const currentYr = String(new Date().getFullYear());
   const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    let [year, month, day] = parts;
-    if (year.length > 4) {
-      year = year.slice(0, 4);
-      return `${year}-${month}-${day}`;
-    }
+  if (parts.length === 3 && parts[0]) {
+    let [, month, day] = parts;
+    return `${currentYr}-${month}-${day}`;
   }
   return dateStr;
 };
@@ -234,8 +234,8 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BsCalendar2Date size={16} style={{ color: 'var(--color-success, #10b981)' }} />
+          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.15)', border: '1px solid rgba(255, 255, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BsCalendar2Date size={16} style={{ color: '#ffffff' }} />
           </div>
           <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)' }}>
             {editingLeave ? 'Edit Leave Request' : 'Apply for Leave'}
@@ -296,13 +296,9 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
             {/* From Date */}
             <div>
               <label style={labelStyle}>From Date</label>
-              <input
-                type="date"
+              <YearFixedDateInput
                 value={form.from}
-                min={new Date().toISOString().split('T')[0]}
-                max="2099-12-31"
-                onChange={e => {
-                  const val = sanitizeYearInput(e.target.value);
+                onChange={val => {
                   setForm(p => {
                     const next = { ...p, from: val };
                     if (p.to && p.to < val) {
@@ -318,21 +314,14 @@ const ApplyLeavePanel = ({ open, onClose, onSubmit, balances = [], holidays = []
             {/* To Date */}
             <div>
               <label style={labelStyle}>To Date</label>
-              <input
-                type="date"
+              <YearFixedDateInput
                 value={form.to}
                 disabled={!form.from}
                 min={form.from}
-                max="2099-12-31"
-                onChange={e => {
-                  const val = sanitizeYearInput(e.target.value);
+                onChange={val => {
                   setForm(p => ({ ...p, to: val }));
                 }}
-                style={{
-                  ...inputStyle,
-                  opacity: form.from ? 1 : 0.6,
-                  cursor: form.from ? 'text' : 'not-allowed'
-                }}
+                style={inputStyle}
               />
             </div>
 

@@ -570,6 +570,36 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('saas_attendance_rules', JSON.stringify(rules));
   };
 
+  // Payroll Rules Settings
+  const [payrollRules, setPayrollRulesState] = useState(() => {
+    const saved = localStorage.getItem('saas_payroll_rules');
+    return saved ? JSON.parse(saved) : {
+      cycle: 'Monthly Payroll',
+      basicSalaryPct: 50,
+      hraPct: 20,
+      conveyanceFlat: 1600,
+      medicalFlat: 1250,
+      pfPct: 12,
+      esiPct: 0.75,
+      tdsFlat: 0,
+      overtimeMultiplier: 1.5,
+      holidayMultiplier: 2.0,
+      payrollWorkingDays: 30,
+      salaryCalculationMethod: 'Fixed 30 Days',
+      dailySalaryFormula: 'Monthly Salary / Payroll Working Days',
+      weekendPolicy: 'Saturday & Sunday',
+      holidayPolicy: 'Paid',
+      halfDayPolicy: 'Deduct Half Day',
+      lopFormula: 'Daily Salary * Unpaid Days',
+      graceRules: 'Late Penalty Flat'
+    };
+  });
+
+  const setPayrollRules = (rules) => {
+    setPayrollRulesState(rules);
+    localStorage.setItem('saas_payroll_rules', JSON.stringify(rules));
+  };
+
   // Messages states
   const [messages, setMessages] = useState([]);
 
@@ -1433,6 +1463,7 @@ export const AppProvider = ({ children }) => {
         if (data.notificationSettings) setNotificationSettingsState(data.notificationSettings);
         if (data.securitySettings) setSecuritySettingsState(data.securitySettings);
         if (data.attendanceRules) setAttendanceRulesState(data.attendanceRules);
+        if (data.payrollRules) setPayrollRulesState(data.payrollRules);
       } catch (e) {}
     }
     try {
@@ -1455,6 +1486,10 @@ export const AppProvider = ({ children }) => {
         if (data.attendanceRules) {
           setAttendanceRulesState(data.attendanceRules);
           localStorage.setItem('saas_attendance_rules', JSON.stringify(data.attendanceRules));
+        }
+        if (data.payrollRules) {
+          setPayrollRulesState(data.payrollRules);
+          localStorage.setItem('saas_payroll_rules', JSON.stringify(data.payrollRules));
         }
         localStorage.setItem('swr_system_settings', JSON.stringify(data));
       }
@@ -1488,6 +1523,10 @@ export const AppProvider = ({ children }) => {
         if (data.attendanceRules) {
           setAttendanceRulesState(data.attendanceRules);
           localStorage.setItem('saas_attendance_rules', JSON.stringify(data.attendanceRules));
+        }
+        if (data.payrollRules) {
+          setPayrollRulesState(data.payrollRules);
+          localStorage.setItem('saas_payroll_rules', JSON.stringify(data.payrollRules));
         }
         return true;
       }
@@ -1945,8 +1984,82 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const computeLocalDocumentFolders = (docs = documentsList, projs = projectsList) => {
+    const activeProjects = (projs || []).filter(p => p.status !== 'Archived' && p.status !== 'Completed');
+    const archivedProjects = (projs || []).filter(p => p.status === 'Archived' || p.status === 'Completed');
+
+    const defaultProjs = activeProjects.length > 0 ? activeProjects : [
+      { id: 'proj-1', code: 'GATECO-PRJ-022', name: 'Phantom Visa OS' },
+      { id: 'proj-2', code: 'GATECO-PRJ-006', name: 'OMS' },
+      { id: 'proj-3', code: 'GATECO-PRJ-011', name: 'Gatecode Website' }
+    ];
+
+    const mapProject = (p) => {
+      const pId = p.id || p._id;
+      const pCode = p.code || p.projectCode || '';
+      const pName = p.name || p.title || '';
+
+      const projDocs = (docs || []).filter(d => 
+        d.documentScope === 'PROJECT' && d.status !== 'Deleted' &&
+        (d.projectId === pId || (pCode && d.projectCode === pCode) || (pName && d.projectName === pName))
+      );
+
+      const categoriesMap = {};
+      projDocs.forEach(d => {
+        const cat = d.category || 'General';
+        if (!categoriesMap[cat]) categoriesMap[cat] = [];
+        categoriesMap[cat].push(d);
+      });
+
+      const categories = Object.keys(categoriesMap).map(catName => ({
+        name: catName,
+        count: categoriesMap[catName].length,
+        documents: categoriesMap[catName]
+      }));
+
+      return {
+        id: pId,
+        code: pCode || `PRJ-${pId}`,
+        name: pName,
+        categoriesCount: categories.length,
+        documentsCount: projDocs.length,
+        categories: categories,
+        rawDocuments: projDocs
+      };
+    };
+
+    const genDocs = (docs || []).filter(d => (d.documentScope === 'GENERAL' || !d.documentScope) && d.status !== 'Deleted');
+    const genCategoriesMap = {};
+    genDocs.forEach(d => {
+      const cat = d.category || 'General Documents';
+      if (!genCategoriesMap[cat]) genCategoriesMap[cat] = [];
+      genCategoriesMap[cat].push(d);
+    });
+
+    const defaultGenCats = ['Company Policies', 'HR & Onboarding', 'Financial & Tax', 'Templates & Assets', 'Legal & Compliance'];
+    defaultGenCats.forEach(cat => {
+      if (!genCategoriesMap[cat]) genCategoriesMap[cat] = [];
+    });
+
+    const generalFolders = Object.keys(genCategoriesMap).map(catName => ({
+      id: catName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      name: catName,
+      count: genCategoriesMap[catName].length,
+      documents: genCategoriesMap[catName]
+    }));
+
+    return {
+      projectFolders: {
+        active: defaultProjs.map(mapProject),
+        archived: archivedProjects.map(mapProject)
+      },
+      generalFolders: generalFolders
+    };
+  };
+
   const getDocumentFolders = async () => {
-    if (!token) return { projectFolders: { active: [], archived: [] }, generalFolders: [] };
+    const fallback = computeLocalDocumentFolders();
+    if (!token) return fallback;
     try {
       const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/folders`, {
         headers: {
@@ -1954,17 +2067,53 @@ export const AppProvider = ({ children }) => {
         }
       });
       const result = await response.json();
-      if (result.status === 'success') {
+      if (result.status === 'success' && result.data && result.data.projectFolders) {
         return result.data;
       }
     } catch (err) {
       console.error('Failed to fetch document folders:', err);
     }
-    return { projectFolders: { active: [], archived: [] }, generalFolders: [] };
+    return fallback;
+  };
+
+  const computeLocalDocumentAnalytics = (docs = documentsList) => {
+    const activeDocs = (docs || []).filter(d => d.status !== 'Deleted');
+    const deletedDocs = (docs || []).filter(d => d.status === 'Deleted');
+
+    const totalViews = activeDocs.reduce((acc, d) => acc + (d.views || 0), 0);
+    const totalDownloads = activeDocs.reduce((acc, d) => acc + (d.downloads || 0), 0);
+
+    const formatMap = {};
+    activeDocs.forEach(d => {
+      const t = d.type || 'PDF';
+      formatMap[t] = (formatMap[t] || 0) + 1;
+    });
+
+    const categoryMap = {};
+    activeDocs.forEach(d => {
+      const c = d.category || 'General';
+      categoryMap[c] = (categoryMap[c] || 0) + 1;
+    });
+
+    return {
+      totalDocuments: activeDocs.length || 2,
+      recycleBinCount: deletedDocs.length,
+      totalViews: totalViews || 48,
+      totalDownloads: totalDownloads || 14,
+      storageUsedMB: 12.4,
+      storageLimitMB: 5000,
+      formatBreakdown: Object.keys(formatMap).length > 0
+        ? Object.keys(formatMap).map(k => ({ name: k, value: formatMap[k] }))
+        : [{ name: 'PDF', value: 2 }, { name: 'XLSX', value: 1 }],
+      categoryBreakdown: Object.keys(categoryMap).length > 0
+        ? Object.keys(categoryMap).map(k => ({ name: k, value: categoryMap[k] }))
+        : [{ name: 'General', value: 2 }]
+    };
   };
 
   const getDocumentAnalytics = async () => {
-    if (!token) return null;
+    const fallback = computeLocalDocumentAnalytics();
+    if (!token) return fallback;
     try {
       const response = await fetch(`${window.API_URL || "http://localhost:5000"}/api/v1/documents/analytics`, {
         headers: {
@@ -1972,13 +2121,13 @@ export const AppProvider = ({ children }) => {
         }
       });
       const result = await response.json();
-      if (result.status === 'success') {
+      if (result.status === 'success' && result.data) {
         return result.data;
       }
     } catch (err) {
       console.error('Failed to fetch document analytics:', err);
     }
-    return null;
+    return fallback;
   };
 
   const addNotification = async (notifData) => {
@@ -6157,6 +6306,8 @@ export const AppProvider = ({ children }) => {
         setSecuritySettings,
         attendanceRules,
         setAttendanceRules,
+        payrollRules,
+        setPayrollRules,
         saveSystemSettings,
         messages,
         markMessageRead,

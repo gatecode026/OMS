@@ -169,7 +169,7 @@ export const findToday = async (employeeId) => {
   return records[0] || null;
 };
 
-export const findSummary = async (employeeId, month) => {
+export const findSummary = async (employeeId, month, weekendPolicy) => {
   logger.info(`Executing AttendanceService::findSummary query for employee: ${employeeId}, month: ${month}`);
   // month is formatted as 'YYYY-MM'
   const from = `${month}-01`;
@@ -184,13 +184,28 @@ export const findSummary = async (employeeId, month) => {
   const avgHours = hoursRecords.length > 0 
     ? parseFloat((hoursRecords.reduce((sum, r) => sum + r.totalHours, 0) / hoursRecords.length).toFixed(1))
     : 0;
+
+  // Calculate totalWorkingDays based on weekendPolicy
+  const [year, monthNum] = month.split('-').map(Number);
+  const daysInMonth = new Date(year, monthNum, 0).getDate();
+  let weekendDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayOfWeek = new Date(year, monthNum - 1, d).getDay(); // 0=Sun, 6=Sat
+    if (weekendPolicy === 'Sunday Only') {
+      if (dayOfWeek === 0) weekendDays++;
+    } else {
+      // Default: 'Saturday & Sunday' or any other value
+      if (dayOfWeek === 0 || dayOfWeek === 6) weekendDays++;
+    }
+  }
+  const totalWorkingDays = daysInMonth - weekendDays;
     
   return {
     presentDays,
     absentDays,
     lateDays,
     avgHours,
-    totalWorkingDays: 22
+    totalWorkingDays
   };
 };
 
